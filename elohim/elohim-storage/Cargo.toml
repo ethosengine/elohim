@@ -13,6 +13,9 @@ elohim-epr = { path = "../epr" }
 # SDK boundary types — View types migrate here incrementally from views.rs
 elohim-sdk = { path = "../../crates/elohim-sdk" }
 
+# Wire-shape view types (ts-rs-anchored) — atomic migration from views.rs (VIEWS.T2)
+elohim-views = { path = "../elohim-views" }
+
 # Server-side rendering via V8 / deno_core (opt-in; most peer hardware can't sustain V8)
 elohim-render = { path = "../elohim-render", optional = true }
 

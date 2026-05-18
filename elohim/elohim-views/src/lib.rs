@@ -27,4 +27,11 @@ pub mod infrastructure;
 pub mod epr;
 pub mod inputs;
 
+// Re-export all domain types at the crate root for convenience
 pub use shared::*;
+pub use lamad::*;
+pub use shefa::*;
+pub use qahal::*;
+pub use imagodei::*;
+pub use infrastructure::*;
+pub use epr::*;

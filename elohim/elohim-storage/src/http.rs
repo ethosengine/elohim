@@ -1722,7 +1722,7 @@ impl HttpServer {
             });
         }
 
-        let view = crate::views::PutBlobResponseView::from_manifest(manifest, blake3_hash_str);
+        let view = crate::views::put_blob_response_view_from_manifest(manifest, blake3_hash_str);
         let body =
             serde_json::to_string(&view).map_err(|e| StorageError::Internal(e.to_string()))?;
 
@@ -3796,7 +3796,7 @@ impl HttpServer {
                                 }
                                 Err(e) => {
                                     warn!(id = %content_id, error = %e, "Failed to persist P2P content");
-                                    let view = ContentView::from_epr_head(&head);
+                                    let view = crate::views::content_view_from_epr_head(&head);
                                     return Ok(response::ok(&view));
                                 }
                             }
@@ -5549,7 +5549,7 @@ impl HttpServer {
                                         .flatten()
                                         .map(|h| h.display_name)
                                         .unwrap_or_else(|| s.human_id.clone());
-                                        NodeStewardshipView::from_with_name(s, name)
+                                        crate::views::node_stewardship_view_from_with_name(s, name)
                                     })
                                     .collect();
                             }
@@ -5605,7 +5605,7 @@ impl HttpServer {
                                 .flatten()
                                 .map(|h| h.display_name)
                                 .unwrap_or_else(|| stewardship.human_id.clone());
-                        let view = NodeStewardshipView::from_with_name(stewardship, name);
+                        let view = crate::views::node_stewardship_view_from_with_name(stewardship, name);
                         Ok(response::created(&view))
                     }
                     Err(e) => Ok(response::error_response(e)),
@@ -6040,7 +6040,7 @@ impl HttpServer {
         let result = crate::db::elohim_reputation::compute(&mut conn, &q)?;
 
         let view =
-            ElohimReputationProfileView::from_result(elohim_id, window_start, window_end, result);
+            crate::views::elohim_reputation_profile_view_from_result(elohim_id, window_start, window_end, result);
 
         Ok(response::ok(&view))
     }

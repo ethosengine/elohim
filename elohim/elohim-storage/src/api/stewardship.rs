@@ -918,7 +918,7 @@ async fn handle_upsert_policy(req: Request<Incoming>, pool: &DbPool) -> Response
     };
 
     // In v0, author_id defaults to "self" (no auth context yet)
-    let db_input = input_view.to_db_input("self", "self");
+    let db_input = crate::views::upsert_policy_to_db_input(input_view, "self", "self");
 
     match StewardshipService::upsert_device_policy(&mut conn, &db_input) {
         Ok(policy) => response::ok(&DevicePolicyView::from(policy)),

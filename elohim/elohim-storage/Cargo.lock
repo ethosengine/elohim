@@ -2351,17 +2351,14 @@ name = "elohim-sdk"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "chrono",
  "doorway-client",
  "elohim-storage-client",
  "reqwest 0.11.27",
  "serde",
- "serde_bytes",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "ts-rs",
 ]
 
 [[package]]
@@ -2394,6 +2391,7 @@ dependencies = [
  "elohim-epr",
  "elohim-render",
  "elohim-sdk",
+ "elohim-views",
  "fs4",
  "futures",
  "futures-util",
@@ -2464,6 +2462,18 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "urlencoding",
+]
+
+[[package]]
+name = "elohim-views"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "ts-rs",
 ]
 
 [[package]]

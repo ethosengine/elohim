@@ -395,7 +395,7 @@ pub async fn handle(
             // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let vote = governance::cast_vote(&mut conn, &new_vote)?;
             let hide = proposal.voting_anonymous == 1;
-            Ok(response::created(&VoteView::from_vote(vote, hide)))
+            Ok(response::created(&crate::views::vote_view_from_vote(vote, hide)))
         }
 
         // POST /api/v1/governance/proposals/{id}/options — Create proposal options
@@ -560,7 +560,7 @@ pub async fn handle(
             let hide = proposal.voting_anonymous == 1;
             let views: Vec<RankedVoteView> = results
                 .into_iter()
-                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .map(|v| crate::views::ranked_vote_view_from_ranked_vote(v, hide))
                 .collect();
             Ok(response::created(&views))
         }
@@ -579,7 +579,7 @@ pub async fn handle(
             let votes = governance::query_ranked_votes(&mut conn, id)?;
             let views: Vec<RankedVoteView> = votes
                 .into_iter()
-                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .map(|v| crate::views::ranked_vote_view_from_ranked_vote(v, hide))
                 .collect();
             Ok(response::ok(&views))
         }
@@ -629,7 +629,7 @@ pub async fn handle(
             let votes = governance::query_votes(&mut conn, id)?;
             let views: Vec<VoteView> = votes
                 .into_iter()
-                .map(|v| VoteView::from_vote(v, hide))
+                .map(|v| crate::views::vote_view_from_vote(v, hide))
                 .collect();
             Ok(response::ok(&views))
         }
@@ -649,7 +649,7 @@ pub async fn handle(
             let votes = governance::get_proxy_votes(&mut conn, id)?;
             let views: Vec<RankedVoteView> = votes
                 .into_iter()
-                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .map(|v| crate::views::ranked_vote_view_from_ranked_vote(v, hide))
                 .collect();
             Ok(response::ok(&views))
         }
@@ -1168,7 +1168,7 @@ pub async fn handle(
             let hide = proposal.voting_anonymous == 1;
             let views: Vec<RankedVoteView> = results
                 .into_iter()
-                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .map(|v| crate::views::ranked_vote_view_from_ranked_vote(v, hide))
                 .collect();
             Ok(response::created(&views))
         }
@@ -1299,7 +1299,7 @@ pub async fn handle(
             let hide = proposal.voting_anonymous == 1;
             let views: Vec<RankedVoteView> = results
                 .into_iter()
-                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .map(|v| crate::views::ranked_vote_view_from_ranked_vote(v, hide))
                 .collect();
             Ok(response::created(&views))
         }

@@ -22,68 +22,9 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+// ts_rs is used transitively via elohim-views; keep for any remaining #[derive(TS)] in this file
+#[allow(unused_imports)]
 use ts_rs::TS;
-
-/// Wrapper for `serde_json::Value` that controls ts-rs export location.
-///
-/// This replaces the `serde-json-impl` feature of ts-rs, which exports
-/// `JsonValue.ts` to `bindings/serde_json/` — a different directory than
-/// our View types. When other generated files import `JsonValue`, ts-rs
-/// calculates a cross-directory relative path that breaks at build time.
-///
-/// By owning the type locally, we set `export_to` to the same directory
-/// as all View types, so all imports resolve as `"./JsonValue"`.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(transparent)]
-#[ts(
-    export,
-    export_to = "../../sdk/storage-client-ts/src/generated/",
-    rename = "JsonValue"
-)]
-pub struct JsonVal(
-    #[ts(
-        type = "number | string | boolean | Array<JsonValue> | { [key in string]?: JsonValue } | null"
-    )]
-    pub Value,
-);
-
-/// Parse a JSON string to JsonVal, returning None on parse failure.
-/// This encapsulates the storage format (TEXT) from the API contract.
-fn parse_json_opt(json_str: &Option<String>) -> Option<JsonVal> {
-    json_str
-        .as_ref()
-        .and_then(|s| serde_json::from_str(s).ok())
-        .map(JsonVal)
-}
-
-/// Parse a required JSON string to JsonVal, returning empty object on failure.
-fn parse_json(json_str: &str) -> JsonVal {
-    JsonVal(serde_json::from_str(json_str).unwrap_or(Value::Object(serde_json::Map::new())))
-}
-
-/// Default schema version for InputView types.
-/// Clients that omit schemaVersion are implicitly version 1.
-fn default_schema_version() -> u32 {
-    1
-}
-
-/// Supported schema versions. Reject anything not in this set.
-/// Extend this array when introducing a new schema version.
-pub const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1];
-
-/// Validate that all schema versions in a batch are supported.
-pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
-    if let Some(&bad) = versions
-        .iter()
-        .find(|v| !SUPPORTED_SCHEMA_VERSIONS.contains(v))
-    {
-        return Err(format!(
-            "Unsupported schema version: {}. Supported: {:?}",
-            bad, SUPPORTED_SCHEMA_VERSIONS
-        ));
-    }
-    Ok(())
-}
 
 use crate::db::contributors::ImpactSummary;
 use crate::db::models::{
@@ -102,16 +43,6 @@ use crate::db::steward_operations::RevenueSummary;
 // App View
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AppView {
-    pub id: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub created_at: String,
-    pub enabled: bool,
-}
 
 impl From<App> for AppView {
     fn from(a: App) -> Self {
@@ -129,29 +60,6 @@ impl From<App> for AppView {
 // Content Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContentView {
-    pub id: String,
-    pub h_app_id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub content_type: String,
-    pub content_format: String,
-    pub blob_hash: Option<String>,
-    pub blob_cid: Option<String>,
-    pub content_size_bytes: Option<i32>,
-    /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<JsonVal>,
-    pub reach: String,
-    pub validation_status: String,
-    pub created_by: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub content_body: Option<String>,
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<Content> for ContentView {
     fn from(c: Content) -> Self {
@@ -184,12 +92,11 @@ impl From<ContentWithTags> for ContentView {
     }
 }
 
-impl ContentView {
     /// Construct a minimal ContentView from an EPR Head resolved via P2P.
     /// Provides enough data for the frontend to render content metadata
     /// while the full content body is fetched asynchronously.
-    pub fn from_epr_head(head: &crate::epr_codec::EprHead) -> Self {
-        Self {
+pub fn content_view_from_epr_head(head: &crate::epr_codec::EprHead) -> ContentView {
+        ContentView {
             id: head.id.clone(),
             h_app_id: "lamad".to_string(),
             title: head.lamad.title.clone(),
@@ -227,16 +134,8 @@ impl ContentView {
             dht_anchor_hash: None,
         }
     }
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContentWithTagsView {
-    #[serde(flatten)]
-    pub content: ContentView,
-    pub tags: Vec<String>,
-}
+
 
 impl From<ContentWithTags> for ContentWithTagsView {
     fn from(c: ContentWithTags) -> Self {
@@ -251,29 +150,6 @@ impl From<ContentWithTags> for ContentWithTagsView {
 // Relationship Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RelationshipView {
-    pub id: String,
-    pub h_app_id: String,
-    pub source_id: String,
-    pub target_id: String,
-    pub relationship_type: String,
-    pub confidence: f32,
-    pub inference_source: String,
-    pub is_bidirectional: bool,
-    pub inverse_relationship_id: Option<String>,
-    /// Parsed provenance chain (was provenance_chain_json string in storage)
-    pub provenance_chain: Option<JsonVal>,
-    pub governance_layer: Option<String>,
-    pub reach: String,
-    /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<JsonVal>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<Relationship> for RelationshipView {
     fn from(r: Relationship) -> Self {
@@ -298,15 +174,6 @@ impl From<Relationship> for RelationshipView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RelationshipWithContentView {
-    #[serde(flatten)]
-    pub relationship: RelationshipView,
-    pub source: Option<ContentView>,
-    pub target: Option<ContentView>,
-}
 
 impl From<RelationshipWithContent> for RelationshipWithContentView {
     fn from(r: RelationshipWithContent) -> Self {
@@ -322,35 +189,6 @@ impl From<RelationshipWithContent> for RelationshipWithContentView {
 // Human Relationship Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct HumanRelationshipView {
-    pub id: String,
-    pub h_app_id: String,
-    pub party_a_id: String,
-    pub party_b_id: String,
-    pub relationship_type: String,
-    pub intimacy_level: String,
-    pub is_bidirectional: bool,
-    pub consent_given_by_a: bool,
-    pub consent_given_by_b: bool,
-    pub custody_enabled_by_a: bool,
-    pub custody_enabled_by_b: bool,
-    pub auto_custody_enabled: bool,
-    pub emergency_access_enabled: bool,
-    pub initiated_by: String,
-    pub verified_at: Option<String>,
-    pub governance_layer: Option<String>,
-    pub reach: String,
-    /// Parsed context object (was context_json string in storage)
-    pub context: Option<JsonVal>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub expires_at: Option<String>,
-    /// DHT provenance: ActionHash of the HumanRelationship entry in imagodei DNA. None for pre-coherence rows.
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<HumanRelationship> for HumanRelationshipView {
     fn from(h: HumanRelationship) -> Self {
@@ -385,46 +223,6 @@ impl From<HumanRelationship> for HumanRelationshipView {
 // Contributor Presence Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContributorPresenceView {
-    pub id: String,
-    pub h_app_id: String,
-    pub display_name: String,
-    pub presence_state: String,
-    /// Parsed external identifiers (was external_identifiers_json string in storage)
-    pub external_identifiers: Option<JsonVal>,
-    /// Parsed establishing content IDs (was establishing_content_ids_json string in storage)
-    pub establishing_content_ids: JsonVal,
-    pub affinity_total: f32,
-    pub unique_engagers: i32,
-    pub citation_count: i32,
-    pub recognition_score: f32,
-    /// Parsed recognition by content (was recognition_by_content_json string in storage)
-    pub recognition_by_content: Option<JsonVal>,
-    pub last_recognition_at: Option<String>,
-    pub steward_id: Option<String>,
-    pub stewardship_started_at: Option<String>,
-    pub stewardship_commitment_id: Option<String>,
-    pub stewardship_quality_score: Option<f32>,
-    pub claim_initiated_at: Option<String>,
-    pub claim_verified_at: Option<String>,
-    pub claim_verification_method: Option<String>,
-    /// Parsed claim evidence (was claim_evidence_json string in storage)
-    pub claim_evidence: Option<JsonVal>,
-    pub claimed_agent_id: Option<String>,
-    pub claim_recognition_transferred_value: Option<f32>,
-    pub claim_facilitated_by: Option<String>,
-    pub image: Option<String>,
-    pub note: Option<String>,
-    /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<JsonVal>,
-    pub created_at: String,
-    pub updated_at: String,
-    /// DHT provenance: ActionHash of the ContributorPresence entry in imagodei DNA. None for pre-coherence rows.
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<ContributorPresence> for ContributorPresenceView {
     fn from(c: ContributorPresence) -> Self {
@@ -466,41 +264,6 @@ impl From<ContributorPresence> for ContributorPresenceView {
 // Economic Event Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EconomicEventView {
-    pub id: String,
-    pub h_app_id: String,
-    pub action: String,
-    pub provider: String,
-    pub receiver: String,
-    pub resource_conforms_to: Option<String>,
-    pub resource_inventoried_as: Option<String>,
-    /// Parsed resource classification (was resource_classified_as_json string in storage)
-    pub resource_classified_as: Option<JsonVal>,
-    pub resource_quantity_value: Option<f32>,
-    pub resource_quantity_unit: Option<String>,
-    pub effort_quantity_value: Option<f32>,
-    pub effort_quantity_unit: Option<String>,
-    pub has_point_in_time: String,
-    pub has_duration: Option<String>,
-    pub input_of: Option<String>,
-    pub output_of: Option<String>,
-    pub lamad_event_type: Option<String>,
-    pub content_id: Option<String>,
-    pub contributor_presence_id: Option<String>,
-    pub path_id: Option<String>,
-    pub triggered_by: Option<String>,
-    pub state: String,
-    pub note: Option<String>,
-    /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<JsonVal>,
-    pub dht_anchor_hash: Option<String>,
-    pub created_at: String,
-    /// Place ID where this event occurred (spatial grounding)
-    pub at_location: Option<String>,
-}
 
 impl From<EconomicEvent> for EconomicEventView {
     fn from(e: EconomicEvent) -> Self {
@@ -540,41 +303,7 @@ impl From<EconomicEvent> for EconomicEventView {
 // REA Commitment Views
 // ============================================================================
 
-/// Measure — quantity + unit pair (ValueFlows)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct MeasureView {
-    pub has_numerical_value: f32,
-    pub has_unit: String,
-}
 
-/// REA Commitment — API output
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ReaCommitmentView {
-    pub id: String,
-    pub action: String,
-    pub provider: String,
-    pub receiver: String,
-    pub resource_conforms_to: Option<String>,
-    pub resource_classified_as: Option<Vec<String>>,
-    pub resource_quantity: Option<MeasureView>,
-    pub effort_quantity: Option<MeasureView>,
-    pub has_beginning: Option<String>,
-    pub has_end: Option<String>,
-    pub due: Option<String>,
-    pub clause_of: Option<String>,
-    pub in_scope_of: Option<Vec<String>>,
-    pub medium_of_exchange_id: Option<String>,
-    pub state: String,
-    pub finished: bool,
-    pub note: Option<String>,
-    pub metadata: Option<JsonVal>,
-    pub dht_anchor_hash: Option<String>,
-    pub created_at: String,
-}
 
 impl From<ReaCommitment> for ReaCommitmentView {
     fn from(c: ReaCommitment) -> Self {
@@ -625,31 +354,6 @@ impl From<ReaCommitment> for ReaCommitmentView {
 // Content Mastery Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContentMasteryView {
-    pub id: String,
-    pub h_app_id: String,
-    pub human_id: String,
-    pub content_id: String,
-    pub mastery_level: String,
-    pub mastery_level_index: i32,
-    pub freshness_score: f32,
-    pub needs_refresh: bool,
-    pub engagement_count: i32,
-    pub last_engagement_type: Option<String>,
-    pub last_engagement_at: Option<String>,
-    pub level_achieved_at: Option<String>,
-    pub content_version_at_mastery: Option<String>,
-    /// Parsed assessment evidence (was assessment_evidence_json string in storage)
-    pub assessment_evidence: Option<JsonVal>,
-    /// Parsed privileges (was privileges_json string in storage)
-    pub privileges: Option<JsonVal>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<ContentMastery> for ContentMasteryView {
     fn from(m: ContentMastery) -> Self {
@@ -680,39 +384,6 @@ impl From<ContentMastery> for ContentMasteryView {
 // Stewardship Allocation Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StewardshipAllocationView {
-    pub id: String,
-    pub h_app_id: String,
-    pub content_id: String,
-    pub steward_presence_id: String,
-    pub allocation_ratio: f32,
-    pub allocation_method: String,
-    pub contribution_type: String,
-    /// Parsed contribution evidence (was contribution_evidence_json string in storage)
-    pub contribution_evidence: Option<JsonVal>,
-    pub governance_state: String,
-    pub dispute_id: Option<String>,
-    pub dispute_reason: Option<String>,
-    pub disputed_at: Option<String>,
-    pub disputed_by: Option<String>,
-    pub negotiation_session_id: Option<String>,
-    pub elohim_ratified_at: Option<String>,
-    pub elohim_ratifier_id: Option<String>,
-    pub effective_from: String,
-    pub effective_until: Option<String>,
-    pub superseded_by: Option<String>,
-    pub recognition_accumulated: f32,
-    pub last_recognition_at: Option<String>,
-    pub note: Option<String>,
-    /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<JsonVal>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<StewardshipAllocation> for StewardshipAllocationView {
     fn from(a: StewardshipAllocation) -> Self {
@@ -747,14 +418,6 @@ impl From<StewardshipAllocation> for StewardshipAllocationView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StewardshipAllocationWithPresenceView {
-    #[serde(flatten)]
-    pub allocation: StewardshipAllocationView,
-    pub steward: Option<ContributorPresenceView>,
-}
 
 impl From<StewardshipAllocationWithPresence> for StewardshipAllocationWithPresenceView {
     fn from(a: StewardshipAllocationWithPresence) -> Self {
@@ -765,16 +428,6 @@ impl From<StewardshipAllocationWithPresence> for StewardshipAllocationWithPresen
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContentStewardshipView {
-    pub content_id: String,
-    pub allocations: Vec<StewardshipAllocationWithPresenceView>,
-    pub total_allocation: f32,
-    pub has_disputes: bool,
-    pub primary_steward: Option<StewardshipAllocationView>,
-}
 
 impl From<ContentStewardship> for ContentStewardshipView {
     fn from(s: ContentStewardship) -> Self {
@@ -792,18 +445,6 @@ impl From<ContentStewardship> for ContentStewardshipView {
 // Comment Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CommentView {
-    pub id: String,
-    pub content_id: String,
-    pub human_id: String,
-    pub body: String,
-    pub reach: String,
-    pub governance_state: String,
-    pub created_at: String,
-}
 
 impl From<crate::db::models::Comment> for CommentView {
     fn from(c: crate::db::models::Comment) -> Self {
@@ -819,13 +460,6 @@ impl From<crate::db::models::Comment> for CommentView {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateCommentInputView {
-    pub content_id: String,
-    pub body: String,
-}
 
 // ============================================================================
 // Device Policy Views (Stewardship v5)
@@ -833,39 +467,6 @@ pub struct CreateCommentInputView {
 
 use crate::db::models::DevicePolicy;
 
-/// Device policy view — camelCase API boundary
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct DevicePolicyView {
-    pub id: String,
-    pub subject_id: String,
-    pub device_id: Option<String>,
-    pub author_id: String,
-    pub author_tier: String,
-    pub inherits_from: Option<String>,
-    pub blocked_categories: JsonVal,
-    pub blocked_hashes: JsonVal,
-    pub age_rating_max: Option<String>,
-    pub reach_level_max: Option<i32>,
-    pub session_max_minutes: Option<i32>,
-    pub daily_max_minutes: Option<i32>,
-    pub time_windows: JsonVal,
-    pub cooldown_minutes: Option<i32>,
-    pub disabled_features: JsonVal,
-    pub disabled_routes: JsonVal,
-    pub require_approval: JsonVal,
-    pub log_sessions: bool,
-    pub log_categories: bool,
-    pub log_policy_events: bool,
-    pub retention_days: i32,
-    pub subject_can_view: bool,
-    pub effective_from: String,
-    pub effective_until: Option<String>,
-    pub version: i32,
-    pub created_at: String,
-    pub updated_at: String,
-}
 
 impl From<DevicePolicy> for DevicePolicyView {
     fn from(p: DevicePolicy) -> Self {
@@ -901,56 +502,12 @@ impl From<DevicePolicy> for DevicePolicyView {
     }
 }
 
-/// Policy chain link — one layer in the policy inheritance chain
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PolicyChainLinkView {
-    pub policy_id: String,
-    pub author_tier: String,
-    pub layer_order: i32,
-}
 
-/// Time access decision — result of time-based policy check
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase", tag = "status")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub enum TimeAccessView {
-    #[serde(rename = "allowed")]
-    Allowed {
-        remaining_session: Option<u32>,
-        remaining_daily: Option<u32>,
-    },
-    #[serde(rename = "outside_window")]
-    OutsideWindow,
-    #[serde(rename = "session_limit")]
-    SessionLimit,
-    #[serde(rename = "daily_limit")]
-    DailyLimit,
-}
 
 // ============================================================================
 // Local Session Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct LocalSessionView {
-    pub id: String,
-    pub human_id: String,
-    pub agent_pub_key: String,
-    pub doorway_url: String,
-    pub doorway_id: Option<String>,
-    pub identifier: String,
-    pub display_name: Option<String>,
-    pub profile_image_hash: Option<String>,
-    pub is_active: bool,
-    pub created_at: String,
-    pub updated_at: String,
-    pub last_synced_at: Option<String>,
-    pub bootstrap_url: Option<String>,
-}
 
 impl From<LocalSession> for LocalSessionView {
     fn from(s: LocalSession) -> Self {
@@ -980,10 +537,6 @@ impl From<LocalSession> for LocalSessionView {
 // objects. They convert to internal DB Input types which use snake_case with
 // String fields. This encapsulates JSON serialization at the API boundary.
 
-/// Serialize a JsonVal to JSON string for DB storage, or None if null/absent.
-fn serialize_json_opt(value: &Option<JsonVal>) -> Option<String> {
-    value.as_ref().map(|v| v.0.to_string())
-}
 
 // ============================================================================
 // Content Input Views
@@ -991,39 +544,6 @@ fn serialize_json_opt(value: &Option<JsonVal>) -> Option<String> {
 
 use crate::db::content_diesel::CreateContentInput;
 
-/// Input for creating content - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateContentInputView {
-    pub id: String,
-    pub title: String,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default)]
-    pub content_type: Option<String>,
-    #[serde(default)]
-    pub content_format: Option<String>,
-    #[serde(default)]
-    pub content_body: Option<String>,
-    #[serde(default)]
-    pub blob_hash: Option<String>,
-    #[serde(default)]
-    pub blob_cid: Option<String>,
-    #[serde(default)]
-    pub content_size_bytes: Option<i64>,
-    /// Parsed metadata object (serialized to JSON string for DB)
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-    #[serde(default)]
-    pub reach: Option<String>,
-    #[serde(default)]
-    pub created_by: Option<String>,
-    #[serde(default)]
-    pub tags: Vec<String>,
-}
 
 impl From<CreateContentInputView> for CreateContentInput {
     fn from(v: CreateContentInputView) -> Self {
@@ -1045,32 +565,6 @@ impl From<CreateContentInputView> for CreateContentInput {
     }
 }
 
-/// Input for partially updating a content item — PATCH /db/content/{id}
-///
-/// All fields are optional — only provided fields are applied.
-/// `metadata` is shallow-merged into the existing metadata object (key-by-key overwrite).
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpdateContentInputView {
-    #[serde(default)]
-    pub title: Option<String>,
-    /// Pass `null` explicitly to clear the description field.
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default)]
-    pub content_body: Option<String>,
-    #[serde(default)]
-    pub content_format: Option<String>,
-    /// Shallow-merged into existing metadata: only keys present in this object are updated.
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-    /// If provided, replaces all existing tags.
-    #[serde(default)]
-    pub tags: Option<Vec<String>>,
-    #[serde(default)]
-    pub reach: Option<String>,
-}
 
 // ============================================================================
 // Relationship Input Views
@@ -1078,26 +572,6 @@ pub struct UpdateContentInputView {
 
 use crate::db::relationships_diesel::CreateRelationshipInput;
 
-/// Input for creating a relationship - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateRelationshipInputView {
-    #[serde(default)]
-    pub id: Option<String>,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    pub source_id: String,
-    pub target_id: String,
-    pub relationship_type: String,
-    #[serde(default)]
-    pub confidence: Option<f64>,
-    #[serde(default)]
-    pub inference_source: Option<String>,
-    /// Parsed metadata object (serialized to JSON string for DB)
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<CreateRelationshipInputView> for CreateRelationshipInput {
     fn from(v: CreateRelationshipInputView) -> Self {
@@ -1123,37 +597,6 @@ impl From<CreateRelationshipInputView> for CreateRelationshipInput {
 
 use crate::db::human_relationships::CreateHumanRelationshipInput;
 
-/// Input for creating a human relationship - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateHumanRelationshipInputView {
-    #[serde(default)]
-    pub id: Option<String>,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    pub party_a_id: String,
-    pub party_b_id: String,
-    pub relationship_type: String,
-    #[serde(default)]
-    pub intimacy_level: Option<String>,
-    #[serde(default)]
-    pub is_bidirectional: bool,
-    #[serde(default)]
-    pub consent_given_by_a: bool,
-    #[serde(default)]
-    pub consent_given_by_b: bool,
-    pub initiated_by: String,
-    #[serde(default)]
-    pub governance_layer: Option<String>,
-    #[serde(default)]
-    pub reach: Option<String>,
-    /// Parsed context object (serialized to JSON string for DB)
-    #[serde(default)]
-    pub context: Option<JsonVal>,
-    #[serde(default)]
-    pub expires_at: Option<String>,
-}
 
 impl From<CreateHumanRelationshipInputView> for CreateHumanRelationshipInput {
     fn from(v: CreateHumanRelationshipInputView) -> Self {
@@ -1183,28 +626,6 @@ impl From<CreateHumanRelationshipInputView> for CreateHumanRelationshipInput {
 
 use crate::db::contributor_presences::{CreateContributorPresenceInput, InitiateClaimInput};
 
-/// Input for creating a contributor presence - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateContributorPresenceInputView {
-    #[serde(default)]
-    pub id: Option<String>,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    pub display_name: String,
-    /// Parsed external identifiers (serialized to JSON string for DB)
-    #[serde(default)]
-    pub external_identifiers: Option<JsonVal>,
-    pub establishing_content_ids: Vec<String>,
-    #[serde(default)]
-    pub image: Option<String>,
-    #[serde(default)]
-    pub note: Option<String>,
-    /// Parsed metadata object (serialized to JSON string for DB)
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<CreateContributorPresenceInputView> for CreateContributorPresenceInput {
     fn from(v: CreateContributorPresenceInputView) -> Self {
@@ -1220,21 +641,6 @@ impl From<CreateContributorPresenceInputView> for CreateContributorPresenceInput
     }
 }
 
-/// Input for initiating a claim - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct InitiateClaimInputView {
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    pub claiming_agent_id: String,
-    pub verification_method: String,
-    /// Parsed evidence object (serialized to JSON string for DB)
-    #[serde(default)]
-    pub evidence: Option<JsonVal>,
-    #[serde(default)]
-    pub facilitated_by: Option<String>,
-}
 
 impl From<InitiateClaimInputView> for InitiateClaimInput {
     fn from(v: InitiateClaimInputView) -> Self {
@@ -1253,59 +659,6 @@ impl From<InitiateClaimInputView> for InitiateClaimInput {
 
 use crate::db::economic_events::CreateEconomicEventInput;
 
-/// Input for creating an economic event - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateEconomicEventInputView {
-    #[serde(default)]
-    pub id: Option<String>,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    pub action: String,
-    pub provider: String,
-    pub receiver: String,
-    #[serde(default)]
-    pub resource_conforms_to: Option<String>,
-    #[serde(default)]
-    pub resource_inventoried_as: Option<String>,
-    #[serde(default)]
-    pub resource_classified_as: Vec<String>,
-    #[serde(default)]
-    pub resource_quantity_value: Option<f32>,
-    #[serde(default)]
-    pub resource_quantity_unit: Option<String>,
-    #[serde(default)]
-    pub effort_quantity_value: Option<f32>,
-    #[serde(default)]
-    pub effort_quantity_unit: Option<String>,
-    #[serde(default)]
-    pub has_point_in_time: Option<String>,
-    #[serde(default)]
-    pub has_duration: Option<String>,
-    #[serde(default)]
-    pub input_of: Option<String>,
-    #[serde(default)]
-    pub output_of: Option<String>,
-    #[serde(default)]
-    pub lamad_event_type: Option<String>,
-    #[serde(default)]
-    pub content_id: Option<String>,
-    #[serde(default)]
-    pub contributor_presence_id: Option<String>,
-    #[serde(default)]
-    pub path_id: Option<String>,
-    #[serde(default)]
-    pub triggered_by: Option<String>,
-    #[serde(default)]
-    pub note: Option<String>,
-    /// Parsed metadata object (serialized to JSON string for DB)
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-    /// Place ID where this event occurred (spatial grounding)
-    #[serde(default)]
-    pub at_location: Option<String>,
-}
 
 impl From<CreateEconomicEventInputView> for CreateEconomicEventInput {
     fn from(v: CreateEconomicEventInputView) -> Self {
@@ -1343,30 +696,6 @@ impl From<CreateEconomicEventInputView> for CreateEconomicEventInput {
 
 use crate::db::stewardship_allocations::{CreateAllocationInput, UpdateAllocationInput};
 
-/// Input for creating a stewardship allocation - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateAllocationInputView {
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    pub content_id: String,
-    pub steward_presence_id: String,
-    #[serde(default)]
-    pub allocation_ratio: Option<f32>,
-    #[serde(default)]
-    pub allocation_method: Option<String>,
-    #[serde(default)]
-    pub contribution_type: Option<String>,
-    /// Parsed contribution evidence (serialized to JSON string for DB)
-    #[serde(default)]
-    pub contribution_evidence: Option<JsonVal>,
-    #[serde(default)]
-    pub note: Option<String>,
-    /// Parsed metadata object (serialized to JSON string for DB)
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<CreateAllocationInputView> for CreateAllocationInput {
     fn from(v: CreateAllocationInputView) -> Self {
@@ -1385,35 +714,6 @@ impl From<CreateAllocationInputView> for CreateAllocationInput {
     }
 }
 
-/// Input for updating a stewardship allocation - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpdateAllocationInputView {
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    #[serde(default)]
-    pub allocation_ratio: Option<f32>,
-    #[serde(default)]
-    pub allocation_method: Option<String>,
-    #[serde(default)]
-    pub contribution_type: Option<String>,
-    /// Parsed contribution evidence (serialized to JSON string for DB)
-    #[serde(default)]
-    pub contribution_evidence: Option<JsonVal>,
-    #[serde(default)]
-    pub governance_state: Option<String>,
-    #[serde(default)]
-    pub dispute_id: Option<String>,
-    #[serde(default)]
-    pub dispute_reason: Option<String>,
-    #[serde(default)]
-    pub elohim_ratified_at: Option<String>,
-    #[serde(default)]
-    pub elohim_ratifier_id: Option<String>,
-    #[serde(default)]
-    pub note: Option<String>,
-}
 
 impl From<UpdateAllocationInputView> for UpdateAllocationInput {
     fn from(v: UpdateAllocationInputView) -> Self {
@@ -1436,88 +736,20 @@ impl From<UpdateAllocationInputView> for UpdateAllocationInput {
 // Device Policy Input Views
 // ============================================================================
 
-/// Input for upserting a device policy — camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpsertPolicyInputView {
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    pub subject_id: Option<String>,
-    pub device_id: Option<String>,
-    pub content_rules: ContentRulesInput,
-    pub time_rules: TimeRulesInput,
-    pub feature_rules: FeatureRulesInput,
-    #[serde(default)]
-    pub monitoring_rules: Option<MonitoringRulesInput>,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContentRulesInput {
-    #[serde(default)]
-    pub blocked_categories: Vec<String>,
-    #[serde(default)]
-    pub blocked_hashes: Vec<String>,
-    pub age_rating_max: Option<String>,
-    pub reach_level_max: Option<i32>,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct TimeRulesInput {
-    pub session_max_minutes: Option<i32>,
-    pub daily_max_minutes: Option<i32>,
-    #[serde(default)]
-    pub time_windows: Vec<JsonVal>,
-    pub cooldown_minutes: Option<i32>,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct FeatureRulesInput {
-    #[serde(default)]
-    pub disabled_features: Vec<String>,
-    #[serde(default)]
-    pub disabled_routes: Vec<String>,
-    #[serde(default)]
-    pub require_approval: Vec<String>,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct MonitoringRulesInput {
-    #[serde(default)]
-    pub log_sessions: bool,
-    #[serde(default)]
-    pub log_categories: bool,
-    #[serde(default = "default_true")]
-    pub log_policy_events: bool,
-    #[serde(default = "default_30i32")]
-    pub retention_days: i32,
-    #[serde(default = "default_true")]
-    pub subject_can_view: bool,
-}
 
-fn default_true() -> bool {
-    true
-}
-fn default_30i32() -> i32 {
-    30
-}
 
-impl UpsertPolicyInputView {
-    /// Convert to DB input with author context
-    pub fn to_db_input(
-        self,
-        author_id: &str,
-        author_tier: &str,
-    ) -> crate::db::device_policies::CreateDevicePolicyInput {
-        let monitoring = self.monitoring_rules.unwrap_or(MonitoringRulesInput {
+/// Convert UpsertPolicyInputView to DB input with author context.
+pub fn upsert_policy_to_db_input(
+    input_view: UpsertPolicyInputView,
+    author_id: &str,
+    author_tier: &str,
+) -> crate::db::device_policies::CreateDevicePolicyInput {
+    let this = input_view;
+        let monitoring = this.monitoring_rules.unwrap_or(MonitoringRulesInput {
             log_sessions: false,
             log_categories: false,
             log_policy_events: true,
@@ -1525,21 +757,21 @@ impl UpsertPolicyInputView {
             subject_can_view: true,
         });
         crate::db::device_policies::CreateDevicePolicyInput {
-            subject_id: self.subject_id.unwrap_or_default(),
-            device_id: self.device_id,
+            subject_id: this.subject_id.unwrap_or_default(),
+            device_id: this.device_id,
             author_id: author_id.to_string(),
             author_tier: author_tier.to_string(),
             inherits_from: None,
-            blocked_categories_json: serde_json::to_string(&self.content_rules.blocked_categories)
+            blocked_categories_json: serde_json::to_string(&this.content_rules.blocked_categories)
                 .unwrap_or_else(|_| "[]".into()),
-            blocked_hashes_json: serde_json::to_string(&self.content_rules.blocked_hashes)
+            blocked_hashes_json: serde_json::to_string(&this.content_rules.blocked_hashes)
                 .unwrap_or_else(|_| "[]".into()),
-            age_rating_max: self.content_rules.age_rating_max,
-            reach_level_max: self.content_rules.reach_level_max,
-            session_max_minutes: self.time_rules.session_max_minutes,
-            daily_max_minutes: self.time_rules.daily_max_minutes,
+            age_rating_max: this.content_rules.age_rating_max,
+            reach_level_max: this.content_rules.reach_level_max,
+            session_max_minutes: this.time_rules.session_max_minutes,
+            daily_max_minutes: this.time_rules.daily_max_minutes,
             time_windows_json: serde_json::to_string(
-                &self
+                &this
                     .time_rules
                     .time_windows
                     .iter()
@@ -1547,12 +779,12 @@ impl UpsertPolicyInputView {
                     .collect::<Vec<_>>(),
             )
             .unwrap_or_else(|_| "[]".into()),
-            cooldown_minutes: self.time_rules.cooldown_minutes,
-            disabled_features_json: serde_json::to_string(&self.feature_rules.disabled_features)
+            cooldown_minutes: this.time_rules.cooldown_minutes,
+            disabled_features_json: serde_json::to_string(&this.feature_rules.disabled_features)
                 .unwrap_or_else(|_| "[]".into()),
-            disabled_routes_json: serde_json::to_string(&self.feature_rules.disabled_routes)
+            disabled_routes_json: serde_json::to_string(&this.feature_rules.disabled_routes)
                 .unwrap_or_else(|_| "[]".into()),
-            require_approval_json: serde_json::to_string(&self.feature_rules.require_approval)
+            require_approval_json: serde_json::to_string(&this.feature_rules.require_approval)
                 .unwrap_or_else(|_| "[]".into()),
             log_sessions: monitoring.log_sessions,
             log_categories: monitoring.log_categories,
@@ -1560,8 +792,8 @@ impl UpsertPolicyInputView {
             retention_days: monitoring.retention_days,
             subject_can_view: monitoring.subject_can_view,
         }
-    }
 }
+
 
 // ============================================================================
 // Content Mastery Input View
@@ -1569,22 +801,6 @@ impl UpsertPolicyInputView {
 
 use crate::db::content_mastery::CreateMasteryInput;
 
-/// Input for creating/updating content mastery - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateMasteryInputView {
-    #[serde(default)]
-    pub id: Option<String>,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    pub human_id: String,
-    pub content_id: String,
-    #[serde(default)]
-    pub mastery_level: Option<String>,
-    #[serde(default)]
-    pub content_version_at_mastery: Option<String>,
-}
 
 impl From<CreateMasteryInputView> for CreateMasteryInput {
     fn from(v: CreateMasteryInputView) -> Self {
@@ -1602,25 +818,6 @@ impl From<CreateMasteryInputView> for CreateMasteryInput {
 // Token Views (Shefa economy — elohim-token sprint 1)
 // ============================================================================
 
-/// API view for a token mint event.
-/// Mirrors `TokenMintEvent` with camelCase fields for TypeScript clients.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct TokenMintEventView {
-    pub id: String,
-    pub h_app_id: String,
-    pub amount: f32,
-    pub provenance_event_id: String,
-    pub mint_tier: String,
-    pub source_epr_id: String,
-    pub agent_id: String,
-    pub constitutional_context: Option<String>,
-    pub elohim_attestation: Option<String>,
-    pub reasoning_trace: Option<String>,
-    pub dht_anchor_hash: Option<String>,
-    pub created_at: String,
-}
 
 impl From<TokenMintEvent> for TokenMintEventView {
     fn from(m: TokenMintEvent) -> Self {
@@ -1641,22 +838,6 @@ impl From<TokenMintEvent> for TokenMintEventView {
     }
 }
 
-/// API view for a token balance ledger entry.
-/// One row per agent per governance layer.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct TokenBalanceView {
-    pub agent_id: String,
-    pub h_app_id: String,
-    pub governance_layer: String,
-    pub balance: f32,
-    pub total_minted: f32,
-    pub total_transferred_in: f32,
-    pub total_transferred_out: f32,
-    pub last_activity_at: String,
-    pub created_at: String,
-}
 
 impl From<TokenBalance> for TokenBalanceView {
     fn from(b: TokenBalance) -> Self {
@@ -1674,21 +855,6 @@ impl From<TokenBalance> for TokenBalanceView {
     }
 }
 
-/// API view for a token transfer event.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct TokenTransferView {
-    pub id: String,
-    pub h_app_id: String,
-    pub from_agent: String,
-    pub to_agent: String,
-    pub amount: f32,
-    pub governance_layer: String,
-    pub note: Option<String>,
-    pub dht_anchor_hash: Option<String>,
-    pub created_at: String,
-}
 
 impl From<TokenTransfer> for TokenTransferView {
     fn from(t: TokenTransfer) -> Self {
@@ -1706,28 +872,7 @@ impl From<TokenTransfer> for TokenTransferView {
     }
 }
 
-/// Input view for creating a token transfer — camelCase API boundary type.
-/// Accepted by HTTP handlers; converted to internal DB types by the service layer.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateTokenTransferInputView {
-    /// Optional client-supplied ID. If absent, the service generates a UUID.
-    #[serde(default)]
-    pub id: Option<String>,
-    pub from_agent: String,
-    pub to_agent: String,
-    pub amount: f32,
-    /// Governance layer for this transfer (e.g. `"individual"`, `"household"`).
-    #[serde(default = "default_governance_layer")]
-    pub governance_layer: String,
-    #[serde(default)]
-    pub note: Option<String>,
-}
 
-fn default_governance_layer() -> String {
-    "individual".to_string()
-}
 
 // ============================================================================
 // Responsibility Demand Config Views (Shefa — elohim-token sprint 2)
@@ -1735,28 +880,6 @@ fn default_governance_layer() -> String {
 
 use crate::db::models::ResponsibilityDemandConfig;
 
-/// API view for a responsibility demand curve config.
-///
-/// Encodes the per-layer parameters that couple token accumulation with
-/// obligation. `enforcementActive` is coerced from SQLite INTEGER (0/1) to bool.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ResponsibilityDemandConfigView {
-    pub id: String,
-    pub governance_layer: String,
-    pub dignity_floor: f32,
-    pub median_estimate: f32,
-    pub soft_ceiling_multiplier: f32,
-    pub hard_ceiling_multiplier: f32,
-    pub social_contract_health: f32,
-    /// Coerced from INTEGER (0/1) to bool at the API boundary.
-    pub enforcement_active: bool,
-    pub ratified_by: Option<String>,
-    pub ratified_at: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
 
 impl From<ResponsibilityDemandConfig> for ResponsibilityDemandConfigView {
     fn from(c: ResponsibilityDemandConfig) -> Self {
@@ -1777,25 +900,6 @@ impl From<ResponsibilityDemandConfig> for ResponsibilityDemandConfigView {
     }
 }
 
-/// Input view for creating a responsibility demand config — camelCase API boundary type.
-///
-/// All curve parameters are optional; the service layer applies protocol defaults
-/// when absent (dignity_floor=100, median_estimate=1000, multipliers=10/20,
-/// social_contract_health=0.5, enforcement_active=true).
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateResponsibilityDemandConfigInputView {
-    /// Governance layer this config applies to (e.g. `"individual"`, `"household"`).
-    pub governance_layer: String,
-    pub dignity_floor: Option<f32>,
-    pub median_estimate: Option<f32>,
-    pub soft_ceiling_multiplier: Option<f32>,
-    pub hard_ceiling_multiplier: Option<f32>,
-    pub social_contract_health: Option<f32>,
-    /// Whether the curve is actively enforced. Defaults to `true`.
-    pub enforcement_active: Option<bool>,
-}
 
 // ============================================================================
 // Token Decay Event Views (Shefa — elohim-token sprint 3)
@@ -1803,25 +907,6 @@ pub struct CreateResponsibilityDemandConfigInputView {
 
 use crate::db::models::TokenDecayEvent;
 
-/// API view for a token decay event.
-///
-/// Each decay event records one periodic balance reduction applied to an agent,
-/// including the before/after balances, the decay amount, the obligation level
-/// that triggered the decay, and the dignity floor that was enforced.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct TokenDecayEventView {
-    pub id: String,
-    pub agent_id: String,
-    pub governance_layer: String,
-    pub balance_before: f32,
-    pub balance_after: f32,
-    pub decay_amount: f32,
-    pub obligation_level: String,
-    pub dignity_floor: f32,
-    pub created_at: String,
-}
 
 impl From<TokenDecayEvent> for TokenDecayEventView {
     fn from(d: TokenDecayEvent) -> Self {
@@ -1839,32 +924,6 @@ impl From<TokenDecayEvent> for TokenDecayEventView {
     }
 }
 
-/// Input view for the discernment mint pathway.
-///
-/// Discernment mints are elohim-attested awards for demonstrated judgment —
-/// qualitative recognition that cannot be reduced to an REA provenance event.
-/// The elohim attestation and reasoning trace are mandatory: they form the
-/// audit record that allows constitutional review of elohim mint decisions.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct DiscernmentMintInputView {
-    /// Agent receiving the discernment mint.
-    pub agent_id: String,
-    /// Governance layer for the mint (e.g. `"individual"`, `"household"`).
-    /// Defaults to `"individual"` when absent.
-    #[serde(default)]
-    pub governance_layer: Option<String>,
-    /// Token amount to mint.
-    pub amount: f32,
-    /// Identifier of the elohim agent making this attestation.
-    pub elohim_attestation: String,
-    /// Free-form reasoning trace from the elohim agent explaining the award.
-    pub reasoning_trace: String,
-    /// Optional EPR content reference that grounded the discernment decision.
-    #[serde(default)]
-    pub source_epr_id: Option<String>,
-}
 
 // ============================================================================
 // Collective Views (Qahal - Governance Contexts)
@@ -1872,23 +931,6 @@ pub struct DiscernmentMintInputView {
 
 use crate::db::models::{Collective, CollectiveParticipation};
 
-/// Collective response view
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CollectiveView {
-    pub id: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub governance_layer: String,
-    pub constitutional_parent_id: Option<String>,
-    pub reach: String,
-    pub metadata: Option<JsonVal>,
-    pub created_by: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub dissolved_at: Option<String>,
-}
 
 impl From<Collective> for CollectiveView {
     fn from(c: Collective) -> Self {
@@ -1908,25 +950,6 @@ impl From<Collective> for CollectiveView {
     }
 }
 
-/// Create collective input view
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateCollectiveInputView {
-    pub id: String,
-    pub name: String,
-    #[serde(default)]
-    pub description: Option<String>,
-    pub governance_layer: String,
-    #[serde(default)]
-    pub constitutional_parent_id: Option<String>,
-    #[serde(default)]
-    pub reach: Option<String>,
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-    #[serde(default)]
-    pub created_by: Option<String>,
-}
 
 impl From<CreateCollectiveInputView> for crate::db::collectives::CreateCollectiveInput {
     fn from(v: CreateCollectiveInputView) -> Self {
@@ -1943,23 +966,6 @@ impl From<CreateCollectiveInputView> for crate::db::collectives::CreateCollectiv
     }
 }
 
-/// Collective participation response view
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CollectiveParticipationView {
-    pub id: String,
-    pub collective_id: String,
-    pub human_id: String,
-    pub intimacy_level: String,
-    pub role_context: Option<String>,
-    pub governance_weight: f32,
-    pub consent_state: String,
-    pub metadata: Option<JsonVal>,
-    pub joined_at: String,
-    pub updated_at: String,
-    pub departed_at: Option<String>,
-}
 
 impl From<CollectiveParticipation> for CollectiveParticipationView {
     fn from(p: CollectiveParticipation) -> Self {
@@ -1983,149 +989,15 @@ impl From<CollectiveParticipation> for CollectiveParticipationView {
 // Account Package Views (Import/Export)
 // ============================================================================
 
-/// Content assignment within an account package
-#[derive(Debug, Clone, Deserialize, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContentAssignmentView {
-    pub content_id: String,
-    pub reach: String,
-    #[serde(default)]
-    pub reason: Option<String>,
-    #[serde(default)]
-    pub steward_ratio: Option<f32>,
-}
 
-/// Relationship seed within an account package
-#[derive(Debug, Clone, Deserialize, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RelationshipSeedView {
-    pub target_id: String,
-    pub relationship_type: String,
-    pub intimacy_level: String,
-    #[serde(default)]
-    pub is_bidirectional: bool,
-    #[serde(default)]
-    pub reach: Option<String>,
-}
 
-/// Stewardship seed within an account package
-#[derive(Debug, Clone, Deserialize, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StewardshipSeedView {
-    pub content_category: String,
-    pub allocation_ratio: f32,
-    #[serde(default)]
-    pub contribution_type: Option<String>,
-}
 
-/// Collective seed within an account package
-#[derive(Debug, Clone, Deserialize, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CollectiveSeedView {
-    pub collective_id: String,
-    #[serde(default)]
-    pub role_context: Option<String>,
-    #[serde(default)]
-    pub intimacy_level: Option<String>,
-}
 
-/// Organization context within account identity (display-only, from humans.json)
-#[derive(Debug, Clone, Deserialize, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct OrganizationContextView {
-    pub id: String,
-    pub name: String,
-    #[serde(default)]
-    pub role: Option<String>,
-}
 
-/// Identity section of an account package
-#[derive(Debug, Clone, Deserialize, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AccountIdentityView {
-    pub human_id: String,
-    pub display_name: String,
-    #[serde(default)]
-    pub category: Option<String>,
-    #[serde(default)]
-    pub profile_reach: Option<String>,
-    #[serde(default)]
-    pub bio: Option<String>,
-    #[serde(default)]
-    pub location: Option<String>,
-    #[serde(default)]
-    pub affinities: Vec<String>,
-    #[serde(default)]
-    pub organizations: Vec<OrganizationContextView>,
-}
 
-/// Package manifest metadata
-#[derive(Debug, Clone, Deserialize, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PackageManifestView {
-    pub version: String,
-    pub generated_at: String,
-    #[serde(default)]
-    pub source_story: Option<String>,
-    #[serde(default)]
-    pub content_hash: Option<String>,
-}
 
-/// Account package input — accepts a full account package for import
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AccountPackageInputView {
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    pub identity: AccountIdentityView,
-    #[serde(default)]
-    pub content: Vec<ContentAssignmentView>,
-    #[serde(default)]
-    pub relationships: Vec<RelationshipSeedView>,
-    #[serde(default)]
-    pub stewardship: Vec<StewardshipSeedView>,
-    #[serde(default)]
-    pub collectives: Vec<CollectiveSeedView>,
-    #[serde(default)]
-    pub conductor_group: Option<u32>,
-    #[serde(default)]
-    pub manifest: Option<PackageManifestView>,
-}
 
-/// Result of an account package import
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AccountImportResultView {
-    pub human_id: String,
-    pub content_updated: usize,
-    pub relationships_created: usize,
-    pub relationships_skipped: usize,
-    pub stewardship_created: usize,
-    pub collectives_joined: usize,
-    pub errors: Vec<String>,
-}
 
-/// Exported account package (full response)
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AccountPackageView {
-    pub identity: AccountIdentityView,
-    pub content: Vec<ContentAssignmentView>,
-    pub relationships: Vec<RelationshipSeedView>,
-    pub stewardship: Vec<StewardshipSeedView>,
-    pub collectives: Vec<CollectiveSeedView>,
-    pub manifest: PackageManifestView,
-}
 
 // ============================================================================
 // EPR Head Views
@@ -2296,26 +1168,6 @@ impl From<EprHead> for EprHeadView {
 // Human Identity Views (imagodei pillar)
 // ============================================================================
 
-/// Output view for a human identity record — camelCase for TypeScript clients.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct HumanView {
-    pub id: String,
-    pub agent_pub_key: Option<String>,
-    pub display_name: String,
-    pub bio: Option<String>,
-    /// Parsed affinities array (stored as JSON text in DB)
-    pub affinities: Vec<String>,
-    pub profile_reach: String,
-    pub location: Option<String>,
-    pub profile_photo_url: Option<String>,
-    pub h_app_id: String,
-    pub created_at: String,
-    pub updated_at: String,
-    /// DHT provenance: ActionHash of the Human entry in imagodei DNA. None for pre-coherence rows.
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<Human> for HumanView {
     fn from(h: Human) -> Self {
@@ -2337,184 +1189,21 @@ impl From<Human> for HumanView {
     }
 }
 
-/// Input for registering a new human — camelCase API boundary type.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateHumanInputView {
-    /// Caller-supplied stable ID (e.g. UUID derived from agent key)
-    pub id: String,
-    #[serde(default)]
-    pub agent_pub_key: Option<String>,
-    pub display_name: String,
-    #[serde(default)]
-    pub bio: Option<String>,
-    #[serde(default)]
-    pub affinities: Vec<String>,
-    #[serde(default = "default_profile_reach")]
-    pub profile_reach: String,
-    #[serde(default)]
-    pub location: Option<String>,
-    #[serde(default)]
-    pub profile_photo_url: Option<String>,
-}
 
-fn default_profile_reach() -> String {
-    "community".to_string()
-}
 
-/// Input for updating a human's mutable profile fields — camelCase API boundary type.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpdateHumanInputView {
-    #[serde(default)]
-    pub display_name: Option<String>,
-    #[serde(default)]
-    pub bio: Option<String>,
-    #[serde(default)]
-    pub affinities: Option<Vec<String>>,
-    #[serde(default)]
-    pub profile_reach: Option<String>,
-    #[serde(default)]
-    pub location: Option<String>,
-    #[serde(default)]
-    pub profile_photo_url: Option<String>,
-}
 
 // ============================================================================
 // Custodian Metrics Views
 // ============================================================================
 
-/// Health metrics for a custodian node
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianHealthView {
-    pub uptime_percent: f64,
-    pub availability: bool,
-    pub response_time_p50_ms: f64,
-    pub response_time_p95_ms: f64,
-    pub response_time_p99_ms: f64,
-    pub error_rate: f64,
-    pub sla_compliance: bool,
-}
 
-/// Storage metrics for a custodian node
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianStorageMetricsView {
-    pub total_capacity_bytes: i64,
-    pub used_bytes: i64,
-    pub free_bytes: i64,
-    pub utilization_percent: f64,
-    /// Parsed by-domain map (was JSON string in storage)
-    pub by_domain: Option<JsonVal>,
-    pub full_replica_bytes: i64,
-    pub threshold_bytes: i64,
-    pub erasure_coded_bytes: i64,
-}
 
-/// Bandwidth metrics for a custodian node
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianBandwidthView {
-    pub declared_mbps: f64,
-    pub current_usage_mbps: f64,
-    pub peak_usage_mbps: f64,
-    pub average_usage_mbps: f64,
-    pub utilization_percent: f64,
-    pub inbound_mbps: f64,
-    pub outbound_mbps: f64,
-    /// Parsed by-domain map (was JSON string in storage)
-    pub by_domain: Option<JsonVal>,
-}
 
-/// Computation metrics for a custodian node
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianComputationView {
-    pub cpu_cores: u32,
-    pub cpu_usage_percent: f64,
-    pub memory_gb: f64,
-    pub memory_usage_percent: f64,
-    pub zome_ops_per_second: f64,
-    pub reconstruction_workload_percent: f64,
-}
 
-/// Reputation metrics for a custodian node
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianReputationView {
-    pub reliability_rating: f64,
-    pub speed_rating: f64,
-    pub reputation_score: f64,
-    pub specialization_bonus: f64,
-    pub commitment_fulfillment: f64,
-}
 
-/// Economic metrics for a custodian node
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianEconomicView {
-    pub steward_tier: u32,
-    pub price_per_gb: f64,
-    pub monthly_earnings: f64,
-    pub lifetime_earnings: f64,
-    pub active_commitments: u32,
-    pub total_committed_bytes: i64,
-}
 
-/// Complete metrics snapshot for a single custodian node.
-///
-/// Assembled from the custodian_metrics table (reported by the node) and
-/// used by the shefa dashboard and operator tooling.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianMetricsView {
-    pub custodian_id: String,
-    pub tier: u32,
-    pub health: CustodianHealthView,
-    pub storage: CustodianStorageMetricsView,
-    pub bandwidth: CustodianBandwidthView,
-    pub computation: CustodianComputationView,
-    pub reputation: CustodianReputationView,
-    pub economic: CustodianEconomicView,
-    /// Unix timestamp (milliseconds) when metrics were collected
-    pub collected_at: i64,
-    /// Unix timestamp (milliseconds) of last update
-    pub last_updated_at: i64,
-}
 
-/// Alert for custodian operators.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianAlertView {
-    pub custodian_id: String,
-    /// "warning" | "critical"
-    pub severity: String,
-    pub category: String,
-    pub message: String,
-    pub suggestion: Option<String>,
-}
 
-/// Recommendation for custodian operators.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianRecommendationView {
-    pub custodian_id: String,
-    pub category: String,
-    pub opportunity: String,
-    pub potential_revenue: Option<f64>,
-}
 
 impl From<CustodianMetrics> for CustodianMetricsView {
     fn from(m: CustodianMetrics) -> Self {
@@ -2592,48 +1281,28 @@ impl From<CustodianMetrics> for CustodianMetricsView {
     }
 }
 
-/// Input view for a node reporting its own metrics snapshot.
-///
-/// The sub-metric groups are accepted as raw JSON values and stored verbatim
-/// (serialised back to String for the `UpsertCustodianMetrics` insertable).
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ReportCustodianMetricsInputView {
-    pub custodian_id: String,
-    pub tier: u32,
-    pub health: CustodianHealthView,
-    pub storage: CustodianStorageMetricsView,
-    pub bandwidth: CustodianBandwidthView,
-    pub computation: CustodianComputationView,
-    pub reputation: CustodianReputationView,
-    pub economic: CustodianEconomicView,
-    /// Unix timestamp (ms) when metrics were collected — defaults to now if absent
-    pub collected_at: Option<i64>,
-}
 
-impl ReportCustodianMetricsInputView {
-    /// Convert to the insertable DB type, stamping `h_app_id` and `last_updated_at`.
-    pub fn into_upsert(
-        self,
-        h_app_id: impl Into<String>,
-        now_ms: i64,
-    ) -> crate::db::models::UpsertCustodianMetrics {
+/// Convert ReportCustodianMetricsInputView to the insertable DB type.
+pub fn report_custodian_metrics_into_upsert(
+    view: ReportCustodianMetricsInputView,
+    h_app_id: impl Into<String>,
+    now_ms: i64,
+) -> crate::db::models::UpsertCustodianMetrics {
         crate::db::models::UpsertCustodianMetrics {
-            custodian_id: self.custodian_id,
+            custodian_id: view.custodian_id,
             h_app_id: h_app_id.into(),
-            tier: self.tier as i32,
-            health_json: serde_json::to_string(&self.health).unwrap_or_default(),
-            storage_json: serde_json::to_string(&self.storage).unwrap_or_default(),
-            bandwidth_json: serde_json::to_string(&self.bandwidth).unwrap_or_default(),
-            computation_json: serde_json::to_string(&self.computation).unwrap_or_default(),
-            reputation_json: serde_json::to_string(&self.reputation).unwrap_or_default(),
-            economic_json: serde_json::to_string(&self.economic).unwrap_or_default(),
-            collected_at: self.collected_at.unwrap_or(now_ms),
+            tier: view.tier as i32,
+            health_json: serde_json::to_string(&view.health).unwrap_or_default(),
+            storage_json: serde_json::to_string(&view.storage).unwrap_or_default(),
+            bandwidth_json: serde_json::to_string(&view.bandwidth).unwrap_or_default(),
+            computation_json: serde_json::to_string(&view.computation).unwrap_or_default(),
+            reputation_json: serde_json::to_string(&view.reputation).unwrap_or_default(),
+            economic_json: serde_json::to_string(&view.economic).unwrap_or_default(),
+            collected_at: view.collected_at.unwrap_or(now_ms),
             last_updated_at: now_ms,
         }
     }
-}
+
 
 // ============================================================================
 // Data Protection Views
@@ -2642,94 +1311,9 @@ impl ReportCustodianMetricsInputView {
 // and DHT queries. No dedicated DB tables required.
 // ============================================================================
 
-/// A node protecting the operator's data.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianNodeView {
-    pub id: String,
-    pub name: String,
-    /// "family" | "friend" | "community" | "professional" | "institution"
-    pub custodian_type: String,
-    pub location_region: Option<String>,
-    pub location_country: Option<String>,
-    // dataStored
-    pub data_stored_total_gb: f64,
-    pub data_stored_shard_count: u32,
-    pub data_stored_redundancy_level: u32,
-    // health
-    pub health_up_percent: f64,
-    pub health_last_heartbeat: String,
-    pub health_response_time_ms: f64,
-    // commitment
-    pub commitment_id: String,
-    /// "active" | "pending" | "breached" | "expired"
-    pub commitment_status: String,
-    pub commitment_start_date: String,
-    pub commitment_expiry_date: String,
-    /// "auto-renew" | "manual" | "expired"
-    pub commitment_renewal_status: String,
-    pub trust_level: f64,
-    pub relationship: String,
-}
 
-/// Geographic distribution of custodians in a region.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RegionalPresenceView {
-    pub region: String,
-    pub custodian_count: u32,
-    pub data_shards: u32,
-    pub redundancy: u32,
-    pub risk_factors: Vec<String>,
-}
 
-/// Trust relationship in the trust graph.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct TrustRelationshipView {
-    pub from: String,
-    pub to: String,
-    /// "family-member" | "friend" | "community-peer" | "professional" | "institution"
-    pub relationship_type: String,
-    pub trust_score: f64,
-    pub depth: u32,
-    /// "weak" | "moderate" | "strong"
-    pub strength: String,
-}
 
-/// Complete family-community protection status.
-///
-/// Assembled from CustodianCommitment entries and DHT health data.
-/// No dedicated DB table — assembled by the data protection service.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct FamilyCommunityProtectionStatusView {
-    // Redundancy model
-    /// "full_replica" | "threshold_split" | "erasure_coded"
-    pub redundancy_strategy: String,
-    pub redundancy_factor: f64,
-    pub recovery_threshold: u32,
-    // Custodian network
-    pub custodians: Vec<CustodianNodeView>,
-    pub total_custodians: u32,
-    // Geographic distribution
-    pub geographic_regions: Vec<RegionalPresenceView>,
-    /// "centralized" | "distributed" | "geo-redundant"
-    pub geographic_risk_profile: String,
-    // Trust graph
-    pub trust_graph: Vec<TrustRelationshipView>,
-    // Overall protection status
-    /// "vulnerable" | "protected" | "highly-protected"
-    pub protection_level: String,
-    pub estimated_recovery_time: String,
-    pub last_verification: String,
-    /// "verified" | "pending" | "failed"
-    pub verification_status: String,
-}
 
 // ============================================================================
 // Shefa Dashboard Views
@@ -2738,580 +1322,38 @@ pub struct FamilyCommunityProtectionStatusView {
 // compute handler. No dedicated DB tables.
 // ============================================================================
 
-/// Time-series data point for metric history charts.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct MetricHistoryView {
-    pub timestamp: String,
-    pub value: f64,
-}
 
-/// Node availability tracking.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpTimeMetricsView {
-    pub up_percent: f64,
-    pub downtime_hours_24: f64,
-    pub downtime_hours_7d: f64,
-    pub downtime_hours_30d: f64,
-    pub last_failure: Option<String>,
-    pub consecutive_uptime: String,
-    /// "excellent" | "good" | "fair" | "poor"
-    pub reliability: String,
-}
 
-/// Real-time node performance and capacity.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ComputeMetricsView {
-    // CPU
-    pub cpu_total_cores: u32,
-    pub cpu_available: u32,
-    pub cpu_usage_percent: f64,
-    pub cpu_usage_history: Vec<MetricHistoryView>,
-    pub cpu_temperature: Option<f64>,
-    // Memory
-    pub memory_total_gb: f64,
-    pub memory_used_gb: f64,
-    pub memory_available_gb: f64,
-    pub memory_usage_percent: f64,
-    pub memory_usage_history: Vec<MetricHistoryView>,
-    // Storage
-    pub storage_total_gb: f64,
-    pub storage_used_gb: f64,
-    pub storage_available_gb: f64,
-    pub storage_usage_percent: f64,
-    pub storage_usage_history: Vec<MetricHistoryView>,
-    pub storage_breakdown_holochain_gb: f64,
-    pub storage_breakdown_cache_gb: f64,
-    pub storage_breakdown_custodian_data_gb: f64,
-    pub storage_breakdown_user_applications_gb: f64,
-    // Network
-    pub network_upstream_mbps: f64,
-    pub network_downstream_mbps: f64,
-    pub network_used_upstream_mbps: f64,
-    pub network_used_downstream_mbps: f64,
-    pub network_latency_p50: f64,
-    pub network_latency_p95: f64,
-    pub network_latency_p99: f64,
-    pub network_connections_total: u32,
-    pub network_connections_holochain: u32,
-    pub network_connections_cache: u32,
-    pub network_connections_custodian: u32,
-    // Load
-    pub load_average_one_minute: f64,
-    pub load_average_five_minutes: f64,
-    pub load_average_fifteen_minutes: f64,
-    // Power (optional)
-    pub power_consumption_watts: Option<f64>,
-    pub power_thermal_output: Option<f64>,
-}
 
-/// Resource allocation percentages for a single governance level.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GovernanceLevelAllocationView {
-    pub cpu_percent: f64,
-    pub memory_percent: f64,
-    pub storage_percent: f64,
-    pub bandwidth_percent: f64,
-}
 
-/// A specific allocation block for a purpose (e.g., "10% CPU for Lamad family learning").
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AllocationBlockView {
-    pub id: String,
-    pub label: String,
-    /// "individual" | "household" | "community" | "network"
-    pub governance_level: String,
-    pub priority: u32,
-    pub cpu_cores: f64,
-    pub cpu_percent: f64,
-    pub memory_gb: f64,
-    pub memory_percent: f64,
-    pub storage_gb: f64,
-    pub storage_percent: f64,
-    pub bandwidth_mbps: f64,
-    pub bandwidth_percent: f64,
-    pub utilized_cpu_percent: f64,
-    pub utilized_memory_percent: f64,
-    pub utilized_storage_percent: f64,
-    pub utilized_bandwidth_percent: f64,
-    pub commitment_id: Option<String>,
-    pub related_agents: Vec<String>,
-}
 
-/// How much compute is allocated to family-community.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AllocationSnapshotView {
-    pub by_governance_individual: GovernanceLevelAllocationView,
-    pub by_governance_household: GovernanceLevelAllocationView,
-    pub by_governance_community: GovernanceLevelAllocationView,
-    pub by_governance_network: GovernanceLevelAllocationView,
-    pub total_allocated_cpu_percent: f64,
-    pub total_allocated_memory_percent: f64,
-    pub total_allocated_storage_percent: f64,
-    pub total_allocated_bandwidth_percent: f64,
-    pub allocation_blocks: Vec<AllocationBlockView>,
-}
 
-/// Infrastructure-token balance and earnings.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct InfrastructureTokenBalanceView {
-    pub balance_tokens: f64,
-    pub balance_estimated_value: f64,
-    pub balance_currency: String,
-    pub earning_rate_tokens_per_hour: f64,
-    pub earning_rate_cpu_allocation: f64,
-    pub earning_rate_storage_allocation: f64,
-    pub earning_rate_bandwidth_allocation: f64,
-    pub earning_rate_estimated_monthly: f64,
-    pub decay_demurrage_rate: f64,
-    pub decay_last_calculated: String,
-    pub decay_projected_next_month_tokens: f64,
-    pub decay_projected_next_month_value_usd: f64,
-    pub token_history_last_24h: f64,
-    pub token_history_last_7d: f64,
-    pub token_history_last_30d: f64,
-    pub token_history_all_time: f64,
-    pub transactions: Vec<TokenTransactionView>,
-    pub exchange_rates: Vec<ExchangeRateView>,
-}
 
-/// A token earning or spending event.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct TokenTransactionView {
-    pub id: String,
-    pub timestamp: String,
-    /// "earned" | "transferred" | "exchanged" | "decayed" | "claimed"
-    pub transaction_type: String,
-    pub amount: f64,
-    pub related_agent: Option<String>,
-    pub description: String,
-    pub economic_event_id: Option<String>,
-}
 
-/// Cross-swimlane token exchange rate.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ExchangeRateView {
-    pub from: String,
-    pub to: String,
-    pub rate: f64,
-    /// "market" | "consensus" | "algorithm"
-    pub source: String,
-    pub last_updated: String,
-}
 
-/// A single compute-related hREA economic event.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RecentEconomicEventView {
-    pub id: String,
-    pub timestamp: String,
-    pub event_type: String,
-    pub provider: Option<String>,
-    pub receiver: Option<String>,
-    pub quantity_has_unit: String,
-    pub quantity_has_numerical_value: f64,
-    pub tokens_minted: Option<f64>,
-    pub note: String,
-}
 
-/// Dignity floor enforcement status.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct DignityFloorView {
-    pub compute_min_cores: f64,
-    pub compute_min_memory_gb: f64,
-    pub compute_min_storage_gb: f64,
-    pub compute_min_bandwidth_mbps: f64,
-    /// "met" | "warning" | "breached"
-    pub status: String,
-    pub percent_of_floor: f64,
-    /// "voluntary" | "progressive" | "hard"
-    pub enforcement: String,
-}
 
-/// Ceiling limit enforcement status.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CeilingLimitView {
-    pub compute_max_cores: f64,
-    pub compute_max_memory_gb: f64,
-    pub compute_max_storage_gb: f64,
-    pub compute_max_bandwidth_mbps: f64,
-    pub token_accumulation_ceiling: f64,
-    pub current_accumulation: f64,
-    pub percent_of_ceiling: f64,
-    /// "safe" | "warning" | "breached"
-    pub status: String,
-    /// "voluntary" | "progressive" | "hard"
-    pub enforcement: String,
-}
 
-/// A constitutional limit violation alert.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ConstitutionalAlertView {
-    pub id: String,
-    /// "info" | "warning" | "critical"
-    pub severity: String,
-    /// "floor-breach" | "ceiling-breach" | "redistribution-required"
-    pub alert_type: String,
-    pub message: String,
-    pub affected_resource: String,
-    pub current_value: f64,
-    pub threshold: f64,
-    pub recommended_action: String,
-    pub timestamp: String,
-}
 
-/// Dignity floor and ceiling enforcement status.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ConstitutionalLimitsStatusView {
-    pub dignity_floor: DignityFloorView,
-    pub ceiling_limit: CeilingLimitView,
-    pub safe_zone_cpu: f64,
-    pub safe_zone_memory: f64,
-    pub safe_zone_storage: f64,
-    pub safe_zone_bandwidth: f64,
-    pub safe_zone_tokens: f64,
-    pub alerts: Vec<ConstitutionalAlertView>,
-}
 
-/// A node in the user's cluster.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct OwnedNodeView {
-    pub node_id: String,
-    pub display_name: String,
-    /// "holoport" | "holoport-plus" | "holoport-nano" | "self-hosted" | "cloud"
-    pub node_type: String,
-    /// "online" | "offline" | "degraded" | "maintenance" | "provisioning" | "unknown"
-    pub status: String,
-    pub last_heartbeat: String,
-    pub consecutive_uptime: String,
-    pub location_label: Option<String>,
-    pub location_region: Option<String>,
-    pub location_country: Option<String>,
-    pub roles: Vec<NodeRoleView>,
-    pub resources_cpu_percent: f64,
-    pub resources_memory_percent: f64,
-    pub resources_storage_used_gb: f64,
-    pub resources_storage_total_gb: f64,
-    pub resources_bandwidth_mbps: f64,
-    pub custodian_activity_items_custodied: u32,
-    pub custodian_activity_items_being_custodied: u32,
-    pub custodian_activity_total_custodied_gb: f64,
-    pub is_primary: bool,
-}
 
-/// A role a node is playing in the cluster.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct NodeRoleView {
-    /// "storage" | "compute" | "gateway" | "custodian" | "archive"
-    pub role: String,
-    pub description: String,
-    pub utilization_percent: f64,
-}
 
-/// Node topology overview for an operator.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct NodeTopologyStateView {
-    pub nodes: Vec<OwnedNodeView>,
-    pub total_nodes: u32,
-    pub online_nodes: u32,
-    pub offline_nodes: u32,
-    pub degraded_nodes: u32,
-    pub primary_node_id: Option<String>,
-    pub primary_node_status: Option<String>,
-    pub primary_node_is_online: Option<bool>,
-    /// "healthy" | "degraded" | "critical" | "offline"
-    pub cluster_health: String,
-    pub alerts: Vec<OfflineNodeAlertView>,
-    pub last_updated: String,
-}
 
-/// Alert when a node goes offline.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct OfflineNodeAlertView {
-    pub id: String,
-    /// "info" | "warning" | "critical"
-    pub severity: String,
-    pub node_id: String,
-    pub node_name: String,
-    pub is_primary_node: bool,
-    /// "went-offline" | "degraded" | "heartbeat-missed" | "recovery-needed"
-    pub event_type: String,
-    pub message: String,
-    pub detected_at: String,
-    pub last_seen_online: String,
-    pub offline_duration: String,
-    pub impact_affected_content: u32,
-    pub impact_affected_custodians: u32,
-    pub impact_compute_gap_percent: f64,
-    pub impact_storage_gap_percent: f64,
-    pub recommended_actions: Vec<String>,
-    pub help_flow_url: Option<String>,
-    pub dismissed_at: Option<String>,
-}
 
-/// A single custodian relationship (helping or being helped).
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CustodianRelationshipView {
-    pub agent_id: String,
-    pub display_name: String,
-    /// "family" | "friend" | "community" | "professional"
-    pub relationship_type: String,
-    pub trust_score: f64,
-    /// "i-help-them" | "they-help-me"
-    pub direction: String,
-    pub content_summary_total_items: u32,
-    pub content_summary_total_gb: f64,
-    /// Parsed content types breakdown (was JSON string in storage)
-    pub content_summary_content_types: Vec<JsonVal>,
-    /// "active" | "pending" | "at-risk" | "expired"
-    pub status: String,
-    pub last_activity: String,
-    pub reliability: f64,
-}
 
-/// Bidirectional custodian view (who I help vs who helps me).
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct BidirectionalCustodianView {
-    pub helping: Vec<CustodianRelationshipView>,
-    pub helping_count: u32,
-    pub helping_total_gb: f64,
-    pub being_helped_by: Vec<CustodianRelationshipView>,
-    pub being_helped_by_count: u32,
-    pub being_helped_by_total_gb: f64,
-    pub mutual_aid_balance_ratio: f64,
-    /// "giving-more" | "balanced" | "receiving-more"
-    pub mutual_aid_balance_status: String,
-    pub mutual_aid_balance_message: String,
-    /// "strong" | "moderate" | "weak"
-    pub community_strength: String,
-}
 
-/// Storage breakdown by content type.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContentTypeStorageView {
-    /// "video" | "audio" | "image" | "document" | "application" | "learning" | "other"
-    pub content_type: String,
-    pub display_label: String,
-    pub icon: Option<String>,
-    pub item_count: u32,
-    pub size_gb: f64,
-    pub percent_of_total: f64,
-    pub fully_replicated: u32,
-    pub under_replicated: u32,
-    pub average_replicas: f64,
-}
 
-/// Storage breakdown by reach level (0–7).
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ReachLevelStorageView {
-    pub reach_level: u32,
-    pub reach_label: String,
-    pub item_count: u32,
-    pub size_gb: f64,
-    pub target_replicas: u32,
-    pub current_replicas: f64,
-    /// "met" | "under" | "over"
-    pub replication_status: String,
-}
 
-/// Storage breakdown for a single node.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct NodeStorageBreakdownView {
-    pub node_id: String,
-    pub node_name: String,
-    pub node_status: String,
-    pub total_gb: f64,
-    pub used_gb: f64,
-    pub available_gb: f64,
-    pub my_content_gb: f64,
-    pub custodied_content_gb: f64,
-    pub cache_content_gb: f64,
-    /// Parsed content-type list (was JSON string in storage)
-    pub content_types: Vec<JsonVal>,
-}
 
-/// What types of content are stored where.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StorageContentDistributionView {
-    pub by_content_type: Vec<ContentTypeStorageView>,
-    pub by_reach_level: Vec<ReachLevelStorageView>,
-    pub by_node: Vec<NodeStorageBreakdownView>,
-    pub total_items: u32,
-    pub total_size_gb: f64,
-    pub total_replica_count: u32,
-}
 
-/// A specific compute deficiency.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ComputeGapView {
-    /// "cpu" | "memory" | "storage" | "bandwidth" | "redundancy"
-    pub resource: String,
-    pub current_value: f64,
-    pub target_value: f64,
-    pub gap_percent: f64,
-    /// "minor" | "moderate" | "critical"
-    pub severity: String,
-    pub description: String,
-    pub impact: String,
-}
 
-/// Suggested node to address compute gaps.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct NodeRecommendationView {
-    /// "holoport" | "holoport-plus" | "holoport-nano" | "self-hosted" | "cloud"
-    pub node_type: String,
-    pub display_name: String,
-    pub description: String,
-    pub addresses_gaps: Vec<String>,
-    pub improvement_percent: f64,
-    pub estimated_cost_value: Option<f64>,
-    pub estimated_cost_currency: Option<String>,
-    pub estimated_cost_period: Option<String>,
-    pub order_url: Option<String>,
-    /// "recommended" | "optional" | "future"
-    pub priority: String,
-}
 
-/// Compute needs assessment — gaps and recommendations for the help-flow.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ComputeNeedsAssessmentView {
-    pub current_capacity_cpu_cores: u32,
-    pub current_capacity_memory_gb: f64,
-    pub current_capacity_storage_gb: f64,
-    pub current_capacity_bandwidth_mbps: f64,
-    pub gaps: Vec<ComputeGapView>,
-    pub has_gaps: bool,
-    /// "none" | "minor" | "moderate" | "critical"
-    pub overall_gap_severity: String,
-    pub recommendations: Vec<NodeRecommendationView>,
-    pub help_flow_url: String,
-    pub help_flow_cta: String,
-}
 
-/// Complete state for the operator's Shefa compute dashboard.
-///
-/// Assembled server-side from compute metrics, allocations, protection
-/// status, token economics, and constitutional limits. Angular is a thin
-/// display client — no aggregation happens in TypeScript.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct SheafaDashboardStateView {
-    // Identity
-    pub operator_id: String,
-    pub operator_name: String,
-    pub stewarded_resource_id: String,
-    pub node_id: String,
-    pub node_location_region: Option<String>,
-    pub node_location_country: Option<String>,
-    pub node_location_latitude: Option<f64>,
-    pub node_location_longitude: Option<f64>,
-    // Status
-    /// "online" | "offline" | "degraded" | "maintenance"
-    pub status: String,
-    pub last_heartbeat: String,
-    pub uptime: UpTimeMetricsView,
-    // Compute
-    pub compute_metrics: ComputeMetricsView,
-    pub allocations: AllocationSnapshotView,
-    // Protection
-    pub family_community_protection: FamilyCommunityProtectionStatusView,
-    // Economics
-    pub infrastructure_tokens: InfrastructureTokenBalanceView,
-    pub economic_events: Vec<RecentEconomicEventView>,
-    // Constitutional
-    pub constitutional_limits: ConstitutionalLimitsStatusView,
-    // Timestamps
-    pub last_updated: String,
-    pub update_frequency_ms: u32,
-}
 
 // ============================================================================
 // Governance Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GovernanceStateView {
-    pub id: String,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub reach: String,
-    pub labels: JsonVal,
-    pub voting_state: String,
-    pub signal_count: i32,
-    pub created_at: String,
-    pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
-    // --- Wire-type fields from qahal-types::GovernanceState ---
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status_basis: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub active_challenges: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub active_proposals: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub precedent_ids: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_updated: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<GovernanceState> for GovernanceStateView {
     fn from(g: GovernanceState) -> Self {
@@ -3337,57 +1379,6 @@ impl From<GovernanceState> for GovernanceStateView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ChallengeView {
-    pub id: String,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub challenger_id: String,
-    pub standing_basis: String,
-    pub grounds_primary: String,
-    pub grounds_secondary: Option<String>,
-    pub evidence: JsonVal,
-    pub requested_outcome: Option<String>,
-    pub state: String,
-    pub response_outcome: Option<String>,
-    pub response_reasoning: Option<String>,
-    pub response_actions: Option<String>,
-    pub response_by: Option<String>,
-    pub sets_precedent: bool,
-    pub filed_at: String,
-    pub acknowledged_at: Option<String>,
-    pub response_deadline: String,
-    pub responded_at: Option<String>,
-    pub resolved_at: Option<String>,
-    pub created_at: String,
-    pub sla_status: String,
-    pub dht_anchor_hash: Option<String>,
-    // --- Wire-type fields from qahal-types::Challenge ---
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub challenger_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub challenger_standing: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grounds: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub priority: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sla_deadline: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub assigned_elohim: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resolution: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<Challenge> for ChallengeView {
     fn from(c: Challenge) -> Self {
@@ -3430,25 +1421,6 @@ impl From<Challenge> for ChallengeView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AppealView {
-    pub id: String,
-    pub challenge_id: String,
-    pub appellant_id: String,
-    pub grounds: String,
-    pub additional_evidence: Option<String>,
-    pub state: String,
-    pub escalation_level: Option<String>,
-    pub decision: Option<String>,
-    pub decision_reasoning: Option<String>,
-    pub decided_by: Option<String>,
-    pub filed_at: String,
-    pub decided_at: Option<String>,
-    pub created_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<Appeal> for AppealView {
     fn from(a: Appeal) -> Self {
@@ -3471,87 +1443,9 @@ impl From<Appeal> for AppealView {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct FileChallengeInputView {
-    pub entity_type: String,
-    pub entity_id: String,
-    pub challenger_id: String,
-    pub standing_basis: String,
-    pub grounds_primary: String,
-    pub grounds_secondary: Option<String>,
-    pub evidence: String,
-    pub requested_outcome: Option<String>,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RespondToChallengeInputView {
-    pub outcome: String,
-    pub reasoning: String,
-    pub actions: Option<String>,
-    pub sets_precedent: bool,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct FileAppealInputView {
-    pub grounds: String,
-    pub additional_evidence: Option<String>,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ProposalView {
-    pub id: String,
-    pub content_id: String,
-    pub proposer_presence_id: String,
-    pub proposal_type: String,
-    pub title: String,
-    pub body: String,
-    pub status: String,
-    pub votes_for: i32,
-    pub votes_against: i32,
-    pub voting_anonymous: bool,
-    pub created_at: String,
-    pub updated_at: String,
-    pub voting_mechanism: String,
-    pub score_min: Option<i32>,
-    pub score_max: Option<i32>,
-    pub dots_per_voter: Option<i32>,
-    pub quorum_percentage: Option<f64>,
-    pub passage_threshold: Option<f64>,
-    pub dht_anchor_hash: Option<String>,
-    // --- Wire-type fields from qahal-types::Proposal ---
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub proposer_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub proposer_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rationale: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub phase: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub amendments: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub voting_config: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_votes: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub outcome: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub related_entity_type: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub related_entity_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<Proposal> for ProposalView {
     fn from(p: Proposal) -> Self {
@@ -3591,41 +1485,6 @@ impl From<Proposal> for ProposalView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PrecedentView {
-    pub id: String,
-    pub content_id: String,
-    pub principle: String,
-    pub interpretation: String,
-    pub established_by: String,
-    pub created_at: String,
-    pub dht_anchor_hash: Option<String>,
-    // --- Wire-type fields from qahal-types::Precedent ---
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub summary: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub full_reasoning: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub binding: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub scope: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub citations: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub established_at: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub superseded_by: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<Precedent> for PrecedentView {
     fn from(p: Precedent) -> Self {
@@ -3652,37 +1511,6 @@ impl From<Precedent> for PrecedentView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct DiscussionView {
-    pub id: String,
-    pub content_id: String,
-    pub author_presence_id: String,
-    pub body: String,
-    pub parent_id: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    // --- Wire-type fields from qahal-types::Discussion ---
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entity_type: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entity_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub category: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub messages: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub message_count: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_activity_at: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<Discussion> for DiscussionView {
     fn from(d: Discussion) -> Self {
@@ -3707,115 +1535,14 @@ impl From<Discussion> for DiscussionView {
     }
 }
 
-/// Vote on a governance proposal — API response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct VoteView {
-    pub id: String,
-    pub proposal_id: String,
-    pub human_id: Option<String>,
-    pub position: String,
-    pub reason: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
-    // --- Wire-type fields from qahal-types::ProposalVote ---
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub voter_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub voter_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub previous_position: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
-impl VoteView {
-    pub fn from_vote(v: Vote, hide_identity: bool) -> Self {
-        Self {
-            id: v.id,
-            proposal_id: v.proposal_id,
-            human_id: if hide_identity {
-                None
-            } else {
-                Some(v.human_id)
-            },
-            position: v.position,
-            reason: v.reason,
-            created_at: v.created_at,
-            updated_at: v.updated_at,
-            dht_anchor_hash: v.dht_anchor_hash,
-            voter_id: None,
-            voter_name: None,
-            reasoning: None,
-            version: None,
-            previous_position: None,
-            metadata: None,
-        }
-    }
-}
 
-fn default_voting_mechanism() -> String {
-    "consent".to_string()
-}
 
-/// Create a proposal — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateProposalInputView {
-    pub id: String,
-    pub content_id: String,
-    pub proposer_presence_id: String,
-    pub proposal_type: String,
-    pub title: String,
-    pub body: String,
-    #[serde(default)]
-    pub voting_anonymous: bool,
-    #[serde(default = "default_voting_mechanism")]
-    pub voting_mechanism: String,
-    pub score_min: Option<i32>,
-    pub score_max: Option<i32>,
-    pub dots_per_voter: Option<i32>,
-    pub quorum_percentage: Option<f64>,
-    pub passage_threshold: Option<f64>,
-}
-
-/// Cast or update a vote — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CastVoteInputView {
-    pub human_id: String,
-    pub position: String,
-    #[serde(default)]
-    pub reason: Option<String>,
-}
 
 // ============================================================================
 // Proposal Option Views (multi-mechanism voting)
 // ============================================================================
 
-/// Proposal option — API response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ProposalOptionView {
-    pub id: String,
-    pub proposal_id: String,
-    pub label: String,
-    pub description: String,
-    pub position: i32,
-    pub source: Option<String>,
-    pub source_justification: Option<String>,
-    pub created_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<ProposalOption> for ProposalOptionView {
     fn from(o: ProposalOption) -> Self {
@@ -3833,112 +1560,18 @@ impl From<ProposalOption> for ProposalOptionView {
     }
 }
 
-/// Create proposal options — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateProposalOptionInputView {
-    pub id: String,
-    pub label: String,
-    pub description: String,
-    pub position: i32,
-    pub source: Option<String>,
-    pub source_justification: Option<String>,
-}
 
 // ============================================================================
 // Ranked Vote Views (multi-mechanism voting)
 // ============================================================================
 
-/// Ranked/scored/dot vote — API response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RankedVoteView {
-    pub id: String,
-    pub proposal_id: String,
-    pub human_id: Option<String>,
-    pub option_id: String,
-    pub rank: Option<i32>,
-    pub score: Option<i32>,
-    pub dots: Option<i32>,
-    pub approved: Option<bool>,
-    pub reasoning: Option<String>,
-    pub proxy_elohim_id: Option<String>,
-    pub created_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
-impl RankedVoteView {
-    pub fn from_ranked_vote(v: RankedVote, hide_identity: bool) -> Self {
-        Self {
-            id: v.id,
-            proposal_id: v.proposal_id,
-            human_id: if hide_identity {
-                None
-            } else {
-                Some(v.human_id)
-            },
-            option_id: v.option_id,
-            rank: v.rank,
-            score: v.score,
-            dots: v.dots,
-            approved: v.approved.map(|a| a == 1),
-            reasoning: v.reasoning,
-            proxy_elohim_id: v.proxy_elohim_id,
-            created_at: v.created_at,
-            dht_anchor_hash: v.dht_anchor_hash,
-        }
-    }
-}
 
-/// Single entry in a ranked/scored/dot ballot
-#[derive(Debug, Clone, Deserialize, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct BallotEntry {
-    pub option_id: String,
-    pub rank: Option<i32>,
-    pub score: Option<i32>,
-    pub dots: Option<i32>,
-    pub approved: Option<bool>,
-}
-
-/// Cast a ranked/scored/dot/approval vote — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CastRankedVoteInputView {
-    pub human_id: String,
-    pub ballots: Vec<BallotEntry>,
-    #[serde(default)]
-    pub reasoning: Option<String>,
-    #[serde(default)]
-    pub proxy_elohim_id: Option<String>,
-    #[serde(default)]
-    pub proxy_justification: Option<String>,
-}
 
 // ============================================================================
 // Governance Signal Views
 // ============================================================================
 
-/// Governance signal — API response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GovernanceSignalView {
-    pub id: String,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub human_id: String,
-    pub signal_type: String,
-    pub signal_value: String,
-    pub mechanism_level: i32,
-    pub proxy_elohim_id: Option<String>,
-    pub created_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<GovernanceSignal> for GovernanceSignalView {
     fn from(s: GovernanceSignal) -> Self {
@@ -3957,59 +1590,12 @@ impl From<GovernanceSignal> for GovernanceSignalView {
     }
 }
 
-/// Aggregated governance signal statistics for an entity
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct SignalAggregateView {
-    pub entity_type: String,
-    pub entity_id: String,
-    pub total_signals: i64,
-    pub by_type: HashMap<String, i64>,
-    pub by_value: HashMap<String, i64>,
-    pub unique_participants: i64,
-    pub consensus_strength: f64,
-}
 
-/// Record a governance signal — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RecordSignalInputView {
-    pub entity_type: String,
-    pub entity_id: String,
-    pub human_id: String,
-    pub signal_type: String,
-    pub signal_value: String,
-    pub mechanism_level: i32,
-    #[serde(default)]
-    pub proxy_elohim_id: Option<String>,
-}
 
 // ============================================================================
 // Governance Disposition Views
 // ============================================================================
 
-/// Governance disposition — persistent governance profile (B: Agent-Scoped)
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GovernanceDispositionView {
-    pub id: String,
-    pub human_id: String,
-    pub risk_tolerance: f64,
-    pub change_openness: f64,
-    pub consensus_preference: f64,
-    pub priority_values: JsonVal,
-    pub voting_pattern_summary: JsonVal,
-    pub total_votes_cast: i32,
-    pub total_challenges_filed: i32,
-    pub total_signals_recorded: i32,
-    pub dht_anchor_hash: Option<String>,
-    pub last_computed_at: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
 
 impl From<GovernanceDisposition> for GovernanceDispositionView {
     fn from(d: GovernanceDisposition) -> Self {
@@ -4032,118 +1618,23 @@ impl From<GovernanceDisposition> for GovernanceDispositionView {
     }
 }
 
-/// Update disposition manual overrides — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpdateDispositionInputView {
-    #[serde(default)]
-    pub risk_tolerance: Option<f64>,
-    #[serde(default)]
-    pub change_openness: Option<f64>,
-    #[serde(default)]
-    pub consensus_preference: Option<f64>,
-    #[serde(default)]
-    pub priority_values: Option<JsonVal>,
-}
 
-/// Start a discussion — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateDiscussionInputView {
-    pub id: String,
-    pub content_id: String,
-    pub author_presence_id: String,
-    pub body: String,
-    #[serde(default)]
-    pub parent_id: Option<String>,
-}
 
-/// Post a message (reply) in a discussion — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PostMessageInputView {
-    pub id: String,
-    pub author_presence_id: String,
-    pub body: String,
-}
 
 // ============================================================================
 // Governance Reaction Views (from qahal-types::GovernanceReaction)
 // ============================================================================
 
-/// Governance reaction — API response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GovernanceReactionView {
-    pub id: String,
-    pub content_id: String,
-    pub content_type: String,
-    pub reactor_id: String,
-    pub reaction: String,
-    pub intensity: u8,
-    pub mediated: bool,
-    pub mediation_accepted: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<JsonVal>,
-    pub created_at: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
 // ============================================================================
 // Graduated Feedback Views (from qahal-types::GraduatedFeedback)
 // ============================================================================
 
-/// Graduated feedback — API response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GraduatedFeedbackView {
-    pub id: String,
-    pub content_id: String,
-    pub content_type: String,
-    pub responder_id: String,
-    pub feedback_context: String,
-    pub position: i8,
-    pub intensity: u8,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_count: Option<u32>,
-    pub created_at: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
 // ============================================================================
 // Attestation Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContentAttestationView {
-    pub id: String,
-    pub content_id: String,
-    pub attestor_presence_id: String,
-    pub scope: String,
-    pub attestation_type: String,
-    pub evidence: Option<JsonVal>,
-    pub grantor: Option<JsonVal>,
-    pub is_revoked: bool,
-    pub revocation: Option<JsonVal>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<ContentAttestation> for ContentAttestationView {
     fn from(c: ContentAttestation) -> Self {
@@ -4164,43 +1655,12 @@ impl From<ContentAttestation> for ContentAttestationView {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateAttestationInputView {
-    pub content_id: String,
-    pub attestor_presence_id: String,
-    pub scope: String,
-    pub attestation_type: String,
-    pub evidence: Option<JsonVal>,
-    pub grantor: Option<JsonVal>,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RevokeAttestationInputView {
-    pub revocation: Option<JsonVal>,
-}
 
 // ============================================================================
 // Steward Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StewardCredentialView {
-    pub id: String,
-    pub presence_id: String,
-    pub content_id: String,
-    pub affinity_coefficient: f32,
-    pub credential_type: String,
-    pub status: String,
-    pub dht_anchor_hash: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
 
 impl From<StewardCredential> for StewardCredentialView {
     fn from(s: StewardCredential) -> Self {
@@ -4218,20 +1678,6 @@ impl From<StewardCredential> for StewardCredentialView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PremiumGateView {
-    pub id: String,
-    pub steward_credential_id: String,
-    pub steward_presence_id: String,
-    pub gated_resource_type: String,
-    pub gated_resource_ids: JsonVal,
-    pub gate_title: String,
-    pub gate_description: Option<String>,
-    pub dht_anchor_hash: Option<String>,
-    pub created_at: String,
-}
 
 impl From<PremiumGate> for PremiumGateView {
     fn from(g: PremiumGate) -> Self {
@@ -4249,19 +1695,6 @@ impl From<PremiumGate> for PremiumGateView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AccessGrantView {
-    pub id: String,
-    pub gate_id: String,
-    pub grantee_presence_id: String,
-    pub contributor_presence_id: Option<String>,
-    pub granted_at: String,
-    pub expires_at: Option<String>,
-    pub status: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
 impl From<AccessGrant> for AccessGrantView {
     fn from(a: AccessGrant) -> Self {
@@ -4278,14 +1711,6 @@ impl From<AccessGrant> for AccessGrantView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StewardRevenueSummaryView {
-    pub total_credentials: i64,
-    pub total_gates: i64,
-    pub total_grants: i64,
-}
 
 impl From<RevenueSummary> for StewardRevenueSummaryView {
     fn from(r: RevenueSummary) -> Self {
@@ -4297,53 +1722,13 @@ impl From<RevenueSummary> for StewardRevenueSummaryView {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateCredentialInputView {
-    pub presence_id: String,
-    pub content_id: String,
-    pub affinity_coefficient: f32,
-    pub credential_type: String,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateGateInputView {
-    pub steward_credential_id: String,
-    pub steward_presence_id: String,
-    pub gated_resource_type: String,
-    pub gated_resource_ids: JsonVal,
-    pub gate_title: String,
-    pub gate_description: Option<String>,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateGrantInputView {
-    pub gate_id: String,
-    pub grantee_presence_id: String,
-    pub contributor_presence_id: Option<String>,
-    pub expires_at: Option<String>,
-}
 
 // ============================================================================
 // Contributor Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContributorDashboardView {
-    pub presence_id: String,
-    pub total_contributions: i32,
-    pub total_recognitions: i32,
-    pub impact_score: f32,
-    pub last_contribution_at: Option<String>,
-    pub updated_at: String,
-}
 
 impl From<ContributorDashboard> for ContributorDashboardView {
     fn from(d: ContributorDashboard) -> Self {
@@ -4358,14 +1743,6 @@ impl From<ContributorDashboard> for ContributorDashboardView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContributorImpactView {
-    pub presence_id: String,
-    pub total_events: i64,
-    pub unique_content_ids: Vec<String>,
-}
 
 impl From<ImpactSummary> for ContributorImpactView {
     fn from(i: ImpactSummary) -> Self {
@@ -4377,13 +1754,6 @@ impl From<ImpactSummary> for ContributorImpactView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ContributorRecognitionView {
-    pub presence_id: String,
-    pub events: Vec<EconomicEventView>,
-}
 
 // ============================================================================
 // REA Commitment Input Views
@@ -4391,41 +1761,6 @@ pub struct ContributorRecognitionView {
 
 use crate::db::rea_commitments::{CreateReaCommitmentInput, UpdateReaCommitmentState};
 
-/// REA Commitment — API input
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateReaCommitmentInputView {
-    #[serde(default)]
-    pub id: Option<String>,
-    pub action: String,
-    pub provider: String,
-    pub receiver: String,
-    #[serde(default)]
-    pub resource_conforms_to: Option<String>,
-    #[serde(default)]
-    pub resource_classified_as: Option<Vec<String>>,
-    #[serde(default)]
-    pub resource_quantity: Option<MeasureView>,
-    #[serde(default)]
-    pub effort_quantity: Option<MeasureView>,
-    #[serde(default)]
-    pub has_beginning: Option<String>,
-    #[serde(default)]
-    pub has_end: Option<String>,
-    #[serde(default)]
-    pub due: Option<String>,
-    #[serde(default)]
-    pub clause_of: Option<String>,
-    #[serde(default)]
-    pub in_scope_of: Option<Vec<String>>,
-    #[serde(default)]
-    pub medium_of_exchange_id: Option<String>,
-    #[serde(default)]
-    pub note: Option<String>,
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<CreateReaCommitmentInputView> for CreateReaCommitmentInput {
     fn from(v: CreateReaCommitmentInputView) -> Self {
@@ -4456,15 +1791,6 @@ impl From<CreateReaCommitmentInputView> for CreateReaCommitmentInput {
     }
 }
 
-/// State update input
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpdateReaCommitmentStateView {
-    pub state: String,
-    #[serde(default)]
-    pub finished: Option<bool>,
-}
 
 impl From<UpdateReaCommitmentStateView> for UpdateReaCommitmentState {
     fn from(v: UpdateReaCommitmentStateView) -> Self {
@@ -4479,18 +1805,6 @@ impl From<UpdateReaCommitmentStateView> for UpdateReaCommitmentState {
 // Agreement Views
 // ============================================================================
 
-/// REA Agreement — API output
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AgreementView {
-    pub id: String,
-    pub name: Option<String>,
-    pub note: Option<String>,
-    pub dht_anchor_hash: Option<String>,
-    pub metadata: Option<JsonVal>,
-    pub created_at: String,
-}
 
 impl From<AgreementRow> for AgreementView {
     fn from(a: AgreementRow) -> Self {
@@ -4505,17 +1819,6 @@ impl From<AgreementRow> for AgreementView {
     }
 }
 
-/// Create agreement — API input
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateAgreementInputView {
-    #[serde(default)]
-    pub id: Option<String>,
-    pub name: Option<String>,
-    pub note: Option<String>,
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<CreateAgreementInputView> for crate::db::agreements::CreateAgreementInput {
     fn from(v: CreateAgreementInputView) -> Self {
@@ -4532,27 +1835,6 @@ impl From<CreateAgreementInputView> for crate::db::agreements::CreateAgreementIn
 // Stewarded Node Views
 // ============================================================================
 
-/// API output for a stewarded node, with stewards joined in.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StewardedNodeView {
-    pub id: String,
-    pub display_name: String,
-    pub claim_status: String,
-    pub cpu_cores: i32,
-    pub memory_gb: i32,
-    pub storage_tb: f64,
-    pub bandwidth_mbps: i32,
-    pub steward_tier: String,
-    pub custodian_opt_in: bool,
-    pub region: Option<String>,
-    pub context_epr_id: Option<String>,
-    pub dht_anchor_hash: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub stewards: Vec<NodeStewardshipView>,
-}
 
 impl From<StewardedNode> for StewardedNodeView {
     fn from(n: StewardedNode) -> Self {
@@ -4576,65 +1858,10 @@ impl From<StewardedNode> for StewardedNodeView {
     }
 }
 
-/// API output for a single node–human stewardship record.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct NodeStewardshipView {
-    pub human_id: String,
-    pub display_name: String,
-    pub affinity_score: f64,
-    pub relationship: String,
-    pub context_epr_id: Option<String>,
-    pub granted_at: String,
-}
 
-impl NodeStewardshipView {
-    /// Build from DB model + joined display name from humans table.
-    pub fn from_with_name(s: NodeStewardship, display_name: String) -> Self {
-        Self {
-            human_id: s.human_id,
-            display_name,
-            affinity_score: s.affinity_score,
-            relationship: s.relationship,
-            context_epr_id: s.context_epr_id,
-            granted_at: s.granted_at,
-        }
-    }
-}
 
-fn default_claim_status() -> String {
-    "unclaimed".to_string()
-}
 
-fn default_steward_tier() -> String {
-    "caretaker".to_string()
-}
 
-fn default_relationship() -> String {
-    "primary".to_string()
-}
-
-/// API input for registering a new stewarded node.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateStewardedNodeInputView {
-    pub id: String,
-    pub display_name: String,
-    #[serde(default = "default_claim_status")]
-    pub claim_status: String,
-    pub cpu_cores: i32,
-    pub memory_gb: i32,
-    pub storage_tb: f64,
-    pub bandwidth_mbps: i32,
-    #[serde(default = "default_steward_tier")]
-    pub steward_tier: String,
-    #[serde(default = "default_true")]
-    pub custodian_opt_in: bool,
-    pub region: Option<String>,
-    pub context_epr_id: Option<String>,
-}
 
 impl From<CreateStewardedNodeInputView> for crate::db::stewarded_nodes::CreateStewardedNodeInput {
     fn from(v: CreateStewardedNodeInputView) -> Self {
@@ -4656,18 +1883,6 @@ impl From<CreateStewardedNodeInputView> for crate::db::stewarded_nodes::CreateSt
     }
 }
 
-/// API input for adding a stewardship relationship to a node.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateNodeStewardshipInputView {
-    pub node_id: String,
-    pub human_id: String,
-    pub affinity_score: f64,
-    #[serde(default = "default_relationship")]
-    pub relationship: String,
-    pub context_epr_id: Option<String>,
-}
 
 impl From<CreateNodeStewardshipInputView>
     for crate::db::stewarded_nodes::CreateNodeStewardshipInput
@@ -4687,17 +1902,6 @@ impl From<CreateNodeStewardshipInputView>
 // Recognition Pipeline Views
 // ============================================================================
 
-/// API input for triggering recognition distribution
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RecognitionTriggerInputView {
-    pub content_id: String,
-    pub event_type: String,
-    pub raw_amount: f64,
-    #[serde(default)]
-    pub triggered_by: Option<String>,
-}
 
 impl From<RecognitionTriggerInputView>
     for crate::services::recognition_pipeline_service::RecognitionTrigger
@@ -4712,21 +1916,6 @@ impl From<RecognitionTriggerInputView>
     }
 }
 
-/// Per-steward trace in the distribution result
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StageTraceView {
-    pub steward_presence_id: String,
-    pub allocation_ratio: f32,
-    pub stored_affinity: f64,
-    pub derived_affinity: f64,
-    pub effective_ratio: f64,
-    pub pre_limit_share: f64,
-    pub final_share: f64,
-    pub limit_reasons: Vec<JsonVal>,
-    pub economic_event_id: String,
-}
 
 impl From<crate::services::recognition_pipeline_service::StageTrace> for StageTraceView {
     fn from(t: crate::services::recognition_pipeline_service::StageTrace) -> Self {
@@ -4748,19 +1937,6 @@ impl From<crate::services::recognition_pipeline_service::StageTrace> for StageTr
     }
 }
 
-/// Full pipeline result
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RecognitionDistributionResultView {
-    pub content_id: String,
-    pub trigger_event_type: String,
-    pub raw_amount: f64,
-    pub weighted_amount: f64,
-    pub distributions: Vec<StageTraceView>,
-    pub economic_event_ids: Vec<String>,
-    pub limits_applied: Vec<JsonVal>,
-}
 
 impl From<crate::services::recognition_pipeline_service::RecognitionDistributionResult>
     for RecognitionDistributionResultView
@@ -4792,19 +1968,6 @@ impl From<crate::services::recognition_pipeline_service::RecognitionDistribution
 // Steward Affinity Views
 // ============================================================================
 
-/// Steward affinity output view
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StewardAffinityView {
-    pub id: String,
-    pub steward_id: String,
-    pub content_id: String,
-    pub affinity_score: f32,
-    pub source: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
 
 impl From<crate::db::models::StewardAffinity> for StewardAffinityView {
     fn from(a: crate::db::models::StewardAffinity) -> Self {
@@ -4820,18 +1983,6 @@ impl From<crate::db::models::StewardAffinity> for StewardAffinityView {
     }
 }
 
-/// Input for creating steward affinity via API
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateStewardAffinityInputView {
-    pub steward_id: String,
-    pub content_id: String,
-    #[serde(default)]
-    pub affinity_score: f32,
-    #[serde(default)]
-    pub source: Option<String>,
-}
 
 impl From<CreateStewardAffinityInputView> for crate::db::steward_affinity::CreateAffinityInput {
     fn from(v: CreateStewardAffinityInputView) -> Self {
@@ -4844,124 +1995,20 @@ impl From<CreateStewardAffinityInputView> for crate::db::steward_affinity::Creat
     }
 }
 
-/// Bulk create input
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct BulkCreateStewardAffinityInputView {
-    pub affinities: Vec<CreateStewardAffinityInputView>,
-}
 
-/// Input for recording a curation activity
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CurationEventInputView {
-    pub steward_id: String,
-    pub content_id: String,
-    pub activity_type: String,
-}
 
 // ============================================================================
 // ElohimGate Views
 // ============================================================================
 
-/// Trust context summary for client observability.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct TrustContextView {
-    pub composite_trust: f64,
-    pub mastery_depth: f64,
-    pub steward_standing: f64,
-    pub relationship_density: f64,
-    pub governance_health: f64,
-    pub behavioral_trust: f64,
-    pub intent_divergence: f64,
-    pub declared_intent: Option<String>,
-}
 
-/// Gate evaluation result for client.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GateEvaluationView {
-    pub tier: String,
-    pub trust_context: TrustContextView,
-    /// Present when gate pauses the mutation
-    pub pause_prompt: Option<String>,
-    /// Token to confirm a paused mutation
-    pub confirm_token: Option<String>,
-    /// Present when gate settles (constitutional boundary)
-    pub settlement_boundary: Option<String>,
-    pub appeal_path: Option<String>,
-}
 
-/// Imagodei observation output view.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ImagodeiObservationView {
-    pub id: String,
-    pub human_id: String,
-    pub observed_at: String,
-    pub observation_type: String,
-    pub content: String,
-    pub structured_signals: Option<JsonVal>,
-    pub trust_delta: f64,
-    pub visibility_layer: String,
-    pub relevance_decay: f64,
-    pub created_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
 
-/// Session intent input view.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct SetSessionIntentInputView {
-    pub intent: String,
-}
 
 // ============================================================================
 // Sensemaking Statement Views
 // ============================================================================
 
-/// Statement — API response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StatementView {
-    pub id: String,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub human_id: String,
-    pub text: String,
-    pub agree_count: i32,
-    pub disagree_count: i32,
-    pub pass_count: i32,
-    pub group_id: Option<String>,
-    pub is_bridging: bool,
-    pub created_at: String,
-    pub dht_anchor_hash: Option<String>,
-    // --- Wire-type fields from qahal-types::OpinionStatement ---
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub context_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub author_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub vote_count: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub consensus_score: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cluster: Option<JsonVal>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<Statement> for StatementView {
     fn from(s: Statement) -> Self {
@@ -4990,23 +2037,6 @@ impl From<Statement> for StatementView {
     }
 }
 
-/// Statement vote — API response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StatementVoteView {
-    pub id: String,
-    pub statement_id: String,
-    pub human_id: String,
-    pub vote: String,
-    pub created_at: String,
-    pub dht_anchor_hash: Option<String>,
-    // --- Wire-type fields from qahal-types::StatementVote ---
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub voter_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<StatementVote> for StatementVoteView {
     fn from(v: StatementVote) -> Self {
@@ -5023,96 +2053,16 @@ impl From<StatementVote> for StatementVoteView {
     }
 }
 
-/// Create a statement — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateStatementInputView {
-    pub entity_type: String,
-    pub entity_id: String,
-    pub human_id: String,
-    pub text: String,
-}
 
-/// Vote on a statement — API request
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct VoteOnStatementInputView {
-    pub human_id: String,
-    pub vote: String,
-}
 
-/// Sensemaking clustering result — API response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct SensemakingResultView {
-    pub entity_type: String,
-    pub entity_id: String,
-    pub clusters: Vec<OpinionClusterView>,
-    pub bridging_statements: Vec<StatementView>,
-    pub divisive_statements: Vec<StatementView>,
-    pub statement_metrics: Vec<StatementMetricsView>,
-    pub participant_positions: Vec<ParticipantPositionView>,
-    pub total_participants: usize,
-    pub total_statements: usize,
-}
 
-/// Opinion cluster within a sensemaking result
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct OpinionClusterView {
-    pub id: String,
-    pub member_count: usize,
-    pub characteristic_statements: Vec<StatementView>,
-    pub internal_agreement: f64,
-}
 
-/// 2D position of a participant in the PCA-projected opinion landscape
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ParticipantPositionView {
-    pub human_id: String,
-    pub x: f64,
-    pub y: f64,
-    pub cluster_id: String,
-}
 
-/// Per-statement metrics for sensemaking visualization
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StatementMetricsView {
-    pub statement_id: String,
-    /// Overall agreement across all participants (-1.0 = all disagree, 1.0 = all agree)
-    pub overall_agreement: f64,
-    /// Variance of agreement ratios across clusters (0 = uniform, high = divisive)
-    pub cross_cluster_variance: f64,
-    /// Classification: "bridging", "divisive", "characteristic", or "neutral"
-    pub classification: String,
-}
 
 // ============================================================================
 // Schedule Views (Kairos temporal dimension)
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ScheduleView {
-    pub id: String,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub scheduled_at: Option<String>,
-    pub expires_at: Option<String>,
-    pub rrule: Option<String>,
-    pub next_occurrence_at: Option<String>,
-    pub occurrence_count: i32,
-    pub created_at: String,
-}
 
 impl From<Schedule> for ScheduleView {
     fn from(s: Schedule) -> Self {
@@ -5130,56 +2080,12 @@ impl From<Schedule> for ScheduleView {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateScheduleInputView {
-    pub entity_type: String,
-    pub entity_id: String,
-    pub scheduled_at: Option<String>,
-    pub expires_at: Option<String>,
-    pub rrule: Option<String>,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpdateScheduleInputView {
-    pub scheduled_at: Option<String>,
-    pub expires_at: Option<String>,
-    pub rrule: Option<String>,
-}
 
 // ============================================================================
 // Spatial Context Views
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct SpatialContextView {
-    pub id: String,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
-    pub altitude: Option<f64>,
-    pub accuracy: Option<f64>,
-    pub h3_res5: Option<String>,
-    pub h3_res7: Option<String>,
-    pub h3_res9: Option<String>,
-    pub place_id: Option<String>,
-    pub osm_type: Option<String>,
-    pub osm_id: Option<i32>,
-    pub label: Option<String>,
-    pub context_type: String,
-    pub geometry_json: Option<JsonVal>,
-    pub metadata: Option<JsonVal>,
-    pub observed_at: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub is_current: bool,
-}
 
 impl From<crate::db::models::SpatialContext> for SpatialContextView {
     fn from(s: crate::db::models::SpatialContext) -> Self {
@@ -5209,70 +2115,12 @@ impl From<crate::db::models::SpatialContext> for SpatialContextView {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateSpatialContextInputView {
-    pub entity_type: String,
-    pub entity_id: String,
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
-    pub altitude: Option<f64>,
-    pub accuracy: Option<f64>,
-    pub place_id: Option<String>,
-    pub osm_type: Option<String>,
-    pub osm_id: Option<i32>,
-    pub label: Option<String>,
-    pub context_type: Option<String>,
-    pub geometry_json: Option<JsonVal>,
-    pub metadata: Option<JsonVal>,
-    pub observed_at: Option<String>,
-}
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpdateSpatialContextInputView {
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
-    pub altitude: Option<f64>,
-    pub accuracy: Option<f64>,
-    pub place_id: Option<String>,
-    pub label: Option<String>,
-    pub context_type: Option<String>,
-    pub geometry_json: Option<JsonVal>,
-    pub metadata: Option<JsonVal>,
-    pub observed_at: Option<String>,
-}
 
 // ============================================================================
 // Place Views (governed spatial entity — DHT projection)
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PlaceView {
-    pub id: String,
-    pub dht_anchor_hash: String,
-    pub name: String,
-    pub place_type: String,
-    pub constitutional_layer: String,
-    pub h3_index: String,
-    pub h3_resolution: i32,
-    pub geometry_json: Option<JsonVal>,
-    pub centroid_lat: f64,
-    pub centroid_lng: f64,
-    pub parent_place_id: Option<String>,
-    pub osm_reference: Option<JsonVal>,
-    pub carrying_capacity: Option<JsonVal>,
-    pub governing_collective_id: Option<String>,
-    pub status: String,
-    pub created_by: String,
-    pub created_at: String,
-    pub updated_at: String,
-    pub metadata: Option<JsonVal>,
-}
 
 impl From<crate::db::models::Place> for PlaceView {
     fn from(p: crate::db::models::Place) -> Self {
@@ -5300,25 +2148,6 @@ impl From<crate::db::models::Place> for PlaceView {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreatePlaceInputView {
-    pub name: String,
-    pub place_type: String,
-    pub constitutional_layer: String,
-    pub h3_index: String,
-    pub h3_resolution: i32,
-    pub geometry_json: JsonVal,
-    pub centroid_lat: f64,
-    pub centroid_lng: f64,
-    pub parent_place_id: Option<String>,
-    pub osm_reference: Option<JsonVal>,
-    pub carrying_capacity: Option<JsonVal>,
-    pub governing_collective_id: Option<String>,
-    pub status: Option<String>,
-    pub metadata: Option<JsonVal>,
-}
 
 // ============================================================================
 // Hazard Views (Sprint 7 — Risk + Resilience Mapping)
@@ -5326,32 +2155,6 @@ pub struct CreatePlaceInputView {
 
 use crate::db::models::{Hazard, RiskAlert};
 
-/// View for a geospatial hazard event
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct HazardView {
-    pub id: String,
-    pub h_app_id: String,
-    pub place_id: String,
-    pub hazard_type: String,
-    pub severity: String,
-    pub title: String,
-    pub description: String,
-    pub reported_at: String,
-    pub projected_onset: Option<String>,
-    pub projected_end: Option<String>,
-    pub actual_onset: Option<String>,
-    pub resolved_at: Option<String>,
-    pub affected_h3_cells: JsonVal,
-    pub radius_km: Option<f64>,
-    pub source: String,
-    pub source_reference: Option<String>,
-    pub metadata: Option<JsonVal>,
-    pub status: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
 
 impl From<Hazard> for HazardView {
     fn from(h: Hazard) -> Self {
@@ -5380,67 +2183,12 @@ impl From<Hazard> for HazardView {
     }
 }
 
-/// Input for creating a hazard
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateHazardInputView {
-    pub place_id: String,
-    pub hazard_type: String,
-    pub severity: String,
-    pub title: String,
-    #[serde(default)]
-    pub description: String,
-    #[serde(default)]
-    pub projected_onset: Option<String>,
-    #[serde(default)]
-    pub projected_end: Option<String>,
-    #[serde(default)]
-    pub affected_h3_cells: Option<Vec<String>>,
-    #[serde(default)]
-    pub radius_km: Option<f64>,
-    #[serde(default = "default_hazard_source")]
-    pub source: String,
-    #[serde(default)]
-    pub source_reference: Option<String>,
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-}
 
-fn default_hazard_source() -> String {
-    "manual-report".to_string()
-}
 
 // ============================================================================
 // RiskAlert Views (Sprint 7 — Risk + Resilience Mapping)
 // ============================================================================
 
-/// View for a generated risk alert
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RiskAlertView {
-    pub id: String,
-    pub h_app_id: String,
-    pub place_id: String,
-    pub alert_type: String,
-    pub severity: String,
-    pub title: String,
-    pub description: String,
-    pub trigger_hazard_id: Option<String>,
-    pub trigger_data: Option<JsonVal>,
-    pub triggered_at: String,
-    pub lead_time_hours: Option<f64>,
-    pub expires_at: Option<String>,
-    pub status: String,
-    pub acknowledged_by: Option<String>,
-    pub acknowledged_at: Option<String>,
-    pub resolved_at: Option<String>,
-    pub escalated_to: Option<String>,
-    pub metadata: Option<JsonVal>,
-    pub created_at: String,
-    pub updated_at: String,
-}
 
 impl From<RiskAlert> for RiskAlertView {
     fn from(r: RiskAlert) -> Self {
@@ -5469,18 +2217,6 @@ impl From<RiskAlert> for RiskAlertView {
     }
 }
 
-/// Input for updating a risk alert (PATCH semantics)
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct UpdateRiskAlertInputView {
-    #[serde(default)]
-    pub status: Option<String>,
-    #[serde(default)]
-    pub acknowledged_by: Option<String>,
-    #[serde(default)]
-    pub escalated_to: Option<String>,
-}
 
 // ============================================================================
 // Schema Version Tests
@@ -5490,134 +2226,15 @@ pub struct UpdateRiskAlertInputView {
 // Spatial Dashboard Views (Sprint 8 — Planet-Scale Governance Dashboard)
 // ============================================================================
 
-/// Carrying capacity summary for the dashboard tile
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CapacitySummaryView {
-    pub resource_count: u32,
-    pub worst_utilization: f64,
-    pub worst_category: String,
-    pub trigger_governance: bool,
-}
 
-/// Hazard summary for the dashboard tile
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct HazardEntrySummaryView {
-    pub active_count: u32,
-    pub worst_severity: String,
-    pub nearest_onset_hours: Option<f64>,
-    pub types: Vec<String>,
-}
 
-/// Vulnerability summary for the dashboard tile
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct VulnerabilitySummaryView {
-    pub overall_score: f64,
-    pub risk_tier: String,
-    pub preparation_status: String,
-}
 
-/// Weather summary for the dashboard tile
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct WeatherEntrySummaryView {
-    pub risk_level: String,
-    pub temperature_c: f64,
-    pub precipitation_mm: f64,
-    pub wind_speed_kmh: f64,
-}
 
-/// Alert summary for the dashboard tile
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AlertEntrySummaryView {
-    pub active_count: u32,
-    pub worst_severity: String,
-    pub unacknowledged_count: u32,
-    pub types: Vec<String>,
-}
 
-/// Route summary for the dashboard tile
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RouteEntrySummaryView {
-    pub active_route_count: u32,
-    pub total_distance_km: f64,
-}
 
-/// Single place entry in the planet-scale dashboard
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PlaceDashboardEntry {
-    // Core (always present)
-    pub id: String,
-    pub name: String,
-    pub place_type: String,
-    pub constitutional_layer: String,
-    pub h3_index: String,
-    pub centroid_lat: f64,
-    pub centroid_lng: f64,
-    pub geometry_json: Option<JsonVal>,
-    pub status: String,
-    pub parent_place_id: Option<String>,
-    // Optional enrichments
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub capacity: Option<CapacitySummaryView>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hazards: Option<HazardEntrySummaryView>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vulnerability: Option<VulnerabilitySummaryView>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub weather: Option<WeatherEntrySummaryView>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub alerts: Option<AlertEntrySummaryView>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub routes: Option<RouteEntrySummaryView>,
-}
 
-/// Risk tier distribution counts across all places
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RiskTierDistribution {
-    pub low: u32,
-    pub moderate: u32,
-    pub elevated: u32,
-    pub critical: u32,
-    pub unknown: u32,
-}
 
-/// Summary statistics for the full dashboard
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct DashboardSummaryView {
-    pub total_places: u32,
-    pub places_by_risk_tier: RiskTierDistribution,
-    pub total_active_hazards: u32,
-    pub total_active_alerts: u32,
-    pub total_unacknowledged_alerts: u32,
-    pub worst_overall_risk: String,
-}
 
-/// Full spatial dashboard response
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct SpatialDashboardView {
-    pub places: Vec<PlaceDashboardEntry>,
-    pub summary: DashboardSummaryView,
-    pub queried_at: String,
-}
 
 // ============================================================================
 
@@ -5793,9 +2410,6 @@ pub struct BeginObservationInputView {
     pub metadata: Option<JsonVal>,
 }
 
-fn default_obs_ttl() -> i32 {
-    300
-}
 
 /// Response returned after beginning an observation session.
 #[derive(Debug, Clone, Serialize)]
@@ -5824,9 +2438,6 @@ pub struct ObservationEntryInputView {
     pub context: Option<JsonVal>,
 }
 
-fn default_obs_severity() -> String {
-    "info".to_string()
-}
 
 /// A single observation entry as returned in a report.
 #[derive(Debug, Clone, Serialize)]
@@ -5918,92 +2529,13 @@ pub struct ObservationReportView {
 // Resilience Views
 // =========================================================================
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ResilienceView {
-    pub content_id: String,
-    pub encoding: EncodingInfoView,
-    pub distribution: DistributionView,
-    pub stewardship: ResilienceStewardshipView,
-    pub commitments: CommitmentHealthView,
-    pub health: HealthScoreView,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EncodingInfoView {
-    pub strategy: String,
-    pub data_shards: i32,
-    pub parity_shards: i32,
-    pub total_size_bytes: i64,
-    pub shard_size_bytes: i64,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct DistributionView {
-    pub total_shards: i32,
-    pub shards_with_locations: i32,
-    pub distinct_peers: i32,
-    pub shards: Vec<ShardInfoView>,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ShardInfoView {
-    pub hash: String,
-    pub shard_type: String,
-    pub peer_ids: Vec<String>,
-    pub status: String,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ResilienceStewardshipView {
-    pub steward_count: i32,
-    pub allocations: Vec<StewardshipAllocationView>,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CommitmentHealthView {
-    pub active_peers: i32,
-    pub total_committed_bytes: i64,
-    pub total_used_bytes: i64,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct HealthScoreView {
-    pub score: f32,
-    pub can_survive_failures: i32,
-    pub status: String,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct VerificationResultView {
-    pub content_id: String,
-    pub verified: bool,
-    pub encoding: String,
-    pub shards_available: i32,
-    pub shards_needed: i32,
-    pub shards_located: i32,
-    pub shards_missing: i32,
-    pub reconstruction_time_ms: u64,
-    pub original_hash: String,
-    pub reconstructed_hash: String,
-    pub hash_match: bool,
-    pub error: Option<String>,
-}
 
 // ============================================================================
 // Gate Decision Attestation View
@@ -6019,40 +2551,6 @@ pub struct VerificationResultView {
 
 use crate::db::gate_decision_attestations::GateDecisionAttestationRow;
 
-/// Wire view for a notarized gate decision attestation.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GateDecisionAttestationView {
-    /// CID of this attestation (self-addressing, globally unique).
-    pub decision_id: String,
-    /// Deployment phase: "dev-context" | "elohim-active".
-    pub phase: String,
-    /// AgentPubKey (base64) of the deciding elohim agent.
-    pub elohim_id: String,
-    /// CID of the substance declaration active at decision time.
-    pub elohim_substance_cid: String,
-    /// Name of the gate that evaluated the request.
-    pub gate_name: String,
-    /// CID of the GateProcessDeclaration DAG that was executed.
-    pub gate_process_cid: String,
-    /// Serialised RequestRef (opaque JSON string).
-    pub request_ref_json: String,
-    /// Decision outcome: "allow" | "decline" | "escalate" | "verdict".
-    pub decision: String,
-    /// Full ConstitutionalReasoning (opaque JSON string).
-    pub reasoning_json: String,
-    /// CID of the privacy-respecting GateContext snapshot.
-    pub context_summary_cid: String,
-    /// ISO 8601 timestamp of when the decision was made.
-    pub decided_at: String,
-    /// CID of the universal-band DAG declaration active at decision time.
-    pub universal_band_cid: String,
-    /// ActionHash (base64) of the upstream DHT entry — provenance anchor.
-    pub dht_anchor_hash: String,
-    /// ISO 8601 timestamp of when this projection row was inserted.
-    pub created_at: String,
-}
 
 impl From<GateDecisionAttestationRow> for GateDecisionAttestationView {
     fn from(row: GateDecisionAttestationRow) -> Self {
@@ -6086,32 +2584,6 @@ impl From<GateDecisionAttestationRow> for GateDecisionAttestationView {
 
 use crate::db::gate_decision_challenges::GateDecisionChallengeRow;
 
-/// Wire view for a notarized gate decision challenge.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GateDecisionChallengeView {
-    /// CID of this challenge (self-addressing, globally unique).
-    pub challenge_id: String,
-    /// CID of the GateDecisionAttestation being challenged.
-    pub challenged_decision_cid: String,
-    /// AgentPubKey (base64) of the challenger.
-    pub challenger_id: String,
-    /// Grounds: "factual-error" | "safety" | "policy" | "constitutional" | "indemnification-request".
-    pub grounds: String,
-    /// Challenger's articulation of the grievance.
-    pub summary: String,
-    /// Comma-separated CIDs of evidence refs (empty string if none).
-    pub evidence_refs: String,
-    /// ISO 8601 timestamp of when the challenge was filed.
-    pub filed_at: String,
-    /// Reach level: "self" | "intimate" | "community" | "commons".
-    pub reach: String,
-    /// ActionHash (base64) of the upstream DHT entry — provenance anchor.
-    pub dht_anchor_hash: String,
-    /// ISO 8601 timestamp of when this projection row was inserted.
-    pub created_at: String,
-}
 
 impl From<GateDecisionChallengeRow> for GateDecisionChallengeView {
     fn from(row: GateDecisionChallengeRow) -> Self {
@@ -6144,30 +2616,6 @@ impl From<GateDecisionChallengeRow> for GateDecisionChallengeView {
 
 use crate::db::challenge_outcomes::ChallengeOutcomeRow;
 
-/// Wire view for a notarized challenge outcome.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ChallengeOutcomeView {
-    /// CID of this outcome (self-addressing, globally unique).
-    pub outcome_id: String,
-    /// CID of the GateDecisionChallenge closed by this outcome.
-    pub challenge_cid: String,
-    /// Verdict: "upheld" | "dismissed" | "superseded".
-    pub verdict: String,
-    /// Comma-separated AgentPubKeys (base64) of reviewers who reached consensus.
-    pub reviewer_consensus: String,
-    /// Full ConstitutionalReasoning (opaque JSON string).
-    pub reasoning_json: String,
-    /// ISO 8601 timestamp of when the verdict was decided.
-    pub decided_at: String,
-    /// Indemnification actions as JSON array (empty array "[]" if no action required).
-    pub indemnification_actions_json: String,
-    /// ActionHash (base64) of the upstream DHT entry — provenance anchor.
-    pub dht_anchor_hash: String,
-    /// ISO 8601 timestamp of when this projection row was inserted.
-    pub created_at: String,
-}
 
 impl From<ChallengeOutcomeRow> for ChallengeOutcomeView {
     fn from(row: ChallengeOutcomeRow) -> Self {
@@ -6203,84 +2651,6 @@ impl From<ChallengeOutcomeRow> for ChallengeOutcomeView {
 
 use crate::db::elohim_reputation::ReputationResult;
 
-/// Multi-dimensional reputation profile for an elohim agent over a time window.
-///
-/// Reputation emerges from the accumulated public record — no elohim can assert
-/// its own reputation; no protocol steward can assign it.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ElohimReputationProfileView {
-    /// AgentPubKey (base64) of the queried elohim agent.
-    pub elohim_id: String,
-    /// ISO 8601 timestamp — start of the query window (inclusive).
-    pub window_start: String,
-    /// ISO 8601 timestamp — end of the query window (inclusive).
-    pub window_end: String,
-    /// CID of the most-recently-used ElohimSubstance in the window.
-    /// None if no decisions exist in the window.
-    pub current_substance_cid: Option<String>,
-    /// Count of GateDecisionAttestations where phase=elohim-active in the window.
-    /// Dev-context decisions are excluded; they carry no reputation weight.
-    pub total_decisions: i64,
-    /// Count of distinct decisions that attracted at least one GateDecisionChallenge.
-    pub challenged_count: i64,
-    /// Count of ChallengeOutcomes with verdict=upheld.
-    pub upheld_count: i64,
-    /// Count of ChallengeOutcomes with verdict=dismissed.
-    pub dismissed_count: i64,
-    /// Count of ChallengeOutcomes with verdict=superseded.
-    pub superseded_count: i64,
-    /// Count of challenges with no ChallengeOutcome yet (still open).
-    pub pending_count: i64,
-    /// Histogram of ChallengeGrounds values to count.
-    /// Keys: "factual-error" | "safety" | "policy" | "constitutional" | "indemnification-request".
-    /// Missing keys indicate zero challenges on those grounds.
-    pub challenges_by_grounds: JsonVal,
-    /// Histogram of ChallengeVerdict values to count.
-    /// Keys: "upheld" | "dismissed" | "superseded".
-    /// Missing keys indicate zero outcomes of that verdict.
-    pub outcomes_by_verdict: JsonVal,
-}
-
-impl ElohimReputationProfileView {
-    /// Construct from a computed aggregation result plus the query context.
-    pub fn from_result(
-        elohim_id: String,
-        window_start: String,
-        window_end: String,
-        r: ReputationResult,
-    ) -> Self {
-        use serde_json::Map;
-
-        let grounds_map: Map<String, serde_json::Value> = r
-            .challenges_by_grounds
-            .into_iter()
-            .map(|(k, v)| (k, serde_json::Value::Number(v.into())))
-            .collect();
-
-        let verdicts_map: Map<String, serde_json::Value> = r
-            .outcomes_by_verdict
-            .into_iter()
-            .map(|(k, v)| (k, serde_json::Value::Number(v.into())))
-            .collect();
-
-        Self {
-            elohim_id,
-            window_start,
-            window_end,
-            current_substance_cid: r.current_substance_cid,
-            total_decisions: r.total_decisions,
-            challenged_count: r.challenged_count,
-            upheld_count: r.upheld_count,
-            dismissed_count: r.dismissed_count,
-            superseded_count: r.superseded_count,
-            pending_count: r.pending_count,
-            challenges_by_grounds: JsonVal(serde_json::Value::Object(grounds_map)),
-            outcomes_by_verdict: JsonVal(serde_json::Value::Object(verdicts_map)),
-        }
-    }
-}
 
 // ============================================================================
 // Peer Status View
@@ -6301,130 +2671,15 @@ impl ElohimReputationProfileView {
 
 use crate::db::peer_statuses::PeerStatusRow;
 
-/// Renderer kind a bundle targets. Mirrors `enums/renderer-kind.schema.json`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "kebab-case")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub enum RendererKind {
-    AngularSsr,
-    ReactRsc,
-    VueSsr,
-    SvelteSsr,
-    LitSsr,
-    StaticHtml,
-}
 
-/// One bundle a doorway carries (mirrors `bundles[]` items in the profile schema).
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct BundleEntry {
-    pub name: String,
-    pub version: String,
-    pub renderer: RendererKind,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub digest: Option<String>,
-}
 
-/// Tier-1 render capability profile. View-layer Category C operational state,
-/// layered into PeerStatusView post-construction. NOT a DHT entry.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RenderCapabilityProfile {
-    pub bundles: Vec<BundleEntry>,
-    pub renderers: Vec<RendererKind>,
-    pub auth_modes: Vec<String>,
-    pub max_concurrent_renders: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub memory_budget_mib: Option<u32>,
-}
 
-/// Tier-2 extension capability claim (one entry in the extensions map).
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CapabilityExtensionEntry {
-    pub schema_ref: String,
-    pub profile: JsonVal,
-}
 
 /// Tier-2 extensions map. Keys are kebab-case capability names registered in
 /// the capability registry. Validation checks shape only; consumers interpret content.
 pub type CapabilityExtensions = std::collections::BTreeMap<String, CapabilityExtensionEntry>;
 
-/// Advertised model-level capabilities of an elohim-agent running at this peer.
-///
-/// Wire format: `elohim/sdk/schemas/v1/views/elohim-capability-profile.schema.json`
-///
-/// Operator-configured at startup. Phase 10+ may auto-detect from
-/// elohim-agent-service. All string arrays default to empty.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ElohimCapabilityProfile {
-    /// Fully-qualified model name. E.g. `claude-opus-4-7`, `llama-3.1-70b-q4`.
-    pub model_name: String,
-    /// Model family/vendor. E.g. `claude`, `llama`, `gpt`, `mistral`.
-    pub model_family: String,
-    /// Maximum input context in tokens for this model instance.
-    #[ts(type = "number")]
-    pub context_window_tokens: u64,
-    /// CID of the constitution document. Null when no specific constitution is applied.
-    pub constitution_cid: Option<String>,
-    /// Quantization descriptor. E.g. `q4_K_M`, `bf16`, `f32`. Null for hosted/closed models.
-    pub quantization_spec: Option<String>,
-    /// Free-form host descriptor. E.g. `tauri-desktop-mac-arm64`, `elohim-node-linux-x86_64`.
-    pub deployment_context: Option<String>,
-    /// Domains this elohim is primed for. Free-form in Phase 9.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub specialties: Vec<String>,
-    /// Named gate/service capabilities this elohim can dispatch.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub skills: Vec<String>,
-    /// Observed strengths accrued from attestation history.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub strengths: Vec<String>,
-    /// ISO 8601 timestamp when this elohim instance became active at this peer.
-    pub active_since: String,
-    /// Reach of this elohim instance. Distinct from the node's overall reach. Null until attestations accrue.
-    pub reach_level: Option<String>,
-}
 
-/// Wire view for a peer's notarized status, as projected from the infrastructure DNA DHT.
-///
-/// Wire format: `elohim/sdk/schemas/v1/views/peer-status-view.schema.json`
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PeerStatusView {
-    /// Agent pubkey of the peer (base64url encoded).
-    pub peer_id: String,
-    /// Peer availability status: "online" | "degraded" | "leaving" | "offline".
-    pub status: String,
-    /// True when this peer is available as a general-pool request target.
-    pub general_pool_member: bool,
-    /// True when this peer is accepting new stewardship reserve allocations.
-    pub accepting_stewardship_reserves: bool,
-    /// Operator-declared node archetype. E.g. home-nuc, blade, desktop, cloud-vps.
-    pub archetype_class: Option<String>,
-    /// Holochain action timestamp in microseconds since Unix epoch (u64 as string).
-    pub timestamp: String,
-    /// ActionHash of the upstream PeerStatus DHT entry — provenance anchor.
-    pub dht_anchor_hash: String,
-    /// Unix microseconds when this projection row was last written (u64 as string).
-    pub updated_at: String,
-    /// Model-level capabilities if an elohim-agent runs at this peer. None for pure storage/relay nodes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub elohim_capability: Option<ElohimCapabilityProfile>,
-    /// Render capability profile if a doorway co-located with this peer can SSR.
-    /// Layered post-construction via build_peer_status_view; NOT in DHT entry.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub render_capability: Option<RenderCapabilityProfile>,
-    /// Tier-2 extension capabilities. Layered post-construction.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub extensions: Option<CapabilityExtensions>,
-}
 
 impl From<PeerStatusRow> for PeerStatusView {
     fn from(row: PeerStatusRow) -> Self {
@@ -6561,120 +2816,12 @@ pub fn load_render_capability_from_url_blocking() -> Option<RenderCapabilityProf
     rt.block_on(load_render_capability_from_url())
 }
 
-/// Committed hardware resources declared by a node in its NodeRegistration DHT entry.
-///
-/// Wire format: embedded in `NodeShapeView`.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CommittedResources {
-    pub cpu_cores: i32,
-    pub memory_gb: i32,
-    pub storage_tb: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub bandwidth_mbps: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_custody_gb: Option<f64>,
-    pub can_steward: bool,
-    pub can_infer: bool,
-    pub can_doorway: bool,
-}
 
-/// Wire view for a node's declared shape, as projected from the infrastructure DNA DHT.
-///
-/// Wire format: `elohim/sdk/schemas/v1/views/node-shape-view.schema.json`
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct NodeShapeView {
-    pub node_id: String,
-    pub hostname: String,
-    pub device_archetype_id: String,
-    pub household_id: String,
-    pub role: String,
-    pub capability_level: i32,
-    pub committed: CommittedResources,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub steward_tier: Option<String>,
-    pub custodian_opt_in: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
-    pub signature: String,
-    pub signed_at: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dht_anchor_hash: Option<String>,
-}
 
-/// A single device entry combining node shape with live peer status (if online).
-///
-/// Wire format: embedded in `HouseholdDevicesView`.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct DeviceEntryView {
-    pub shape: NodeShapeView,
-    /// Live peer status; present when online, null when offline/unknown.
-    pub peer: Option<PeerStatusView>,
-}
 
-/// Wire view listing all devices registered under a household.
-///
-/// Wire format: `elohim/sdk/schemas/v1/views/household-devices-view.schema.json`
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct HouseholdDevicesView {
-    pub household_id: String,
-    pub devices: Vec<DeviceEntryView>,
-}
 
-/// Aggregate network posture: counts over PeerStatus projection and
-/// household reciprocation. Operational Category C — computed per-request,
-/// no persistence. Source of truth: PeerStatus DHT entries (infrastructure
-/// DNA) and stewarded_nodes / stewardship_allocations projections.
-///
-/// Wire format: `elohim/sdk/schemas/v1/views/network-posture-view.schema.json`
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct NetworkPostureView {
-    pub total_peers: i32,
-    pub active_peers: i32,
-    pub stale_peers: i32,
-    pub always_on_peers: i32,
-    pub households_reciprocating: i32,
-    pub compute_available: bool,
-    pub storage_pressure: f32,
-    pub computed_at: String,
-}
 
-/// Per-content household-first resilience claim. Source of truth:
-/// computed projection over stewardship_allocations (Category A2 link
-/// metadata on Agreement DHT entries), peer_statuses (PeerStatus DHT
-/// entries), and stewarded_nodes (NodeRegistration projection). Category C
-/// operational view — no persistence, no new entry types.
-///
-/// Wire format: `elohim/sdk/schemas/v1/views/household-resilience-view.schema.json`
-#[derive(Debug, Clone, Serialize, Default, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct HouseholdResilienceView {
-    pub content_id: String,
-    pub households_stewarding: i32,
-    pub households_reciprocated: i32,
-    pub protection_status: String,
-    pub details: HouseholdResilienceDetails,
-}
 
-#[derive(Debug, Clone, Serialize, Default, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct HouseholdResilienceDetails {
-    #[serde(default)]
-    pub steward_households: Vec<String>,
-    pub online_peer_count: i32,
-    pub health_score: f32,
-}
 
 // ============================================================================
 // Placement Gap + Resilience Snapshot Views
@@ -6682,26 +2829,6 @@ pub struct HouseholdResilienceDetails {
 
 use crate::db::models::PlacementGapRow;
 
-/// Structured shefa signal: a content item's achieved placement falls short of
-/// its requested stewarding-collective diversity. Source of truth: computed
-/// projection from shard_locations + rea_commitments + humans → collectives.
-/// Operational Category C — no DHT entry.
-///
-/// Wire format: `elohim/sdk/schemas/v1/views/placement-gap-view.schema.json`
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PlacementGapView {
-    pub id: String,
-    pub content_id: String,
-    pub shard_hash: String,
-    pub requested_steward_count: i32,
-    pub achieved_steward_count: i32,
-    pub contract_coverage: f32,
-    pub gap_kind: String,
-    pub first_seen_at: String,
-    pub last_seen_at: String,
-}
 
 impl From<PlacementGapRow> for PlacementGapView {
     fn from(r: PlacementGapRow) -> Self {
@@ -6719,132 +2846,16 @@ impl From<PlacementGapRow> for PlacementGapView {
     }
 }
 
-/// Regional distribution of steward peers across geographic tiers.
-///
-/// Wire format: embedded in `resilience-snapshot-view.schema.json`
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RegionalDistributionView {
-    pub local: i32,
-    pub regional: i32,
-    pub global: i32,
-    pub unknown: i32,
-}
 
-/// Per-content collective-general resilience snapshot. Collective-general:
-/// stewards can be any collective kind (household, church, patron-circle,
-/// DAO, …) — any group that holds DHT-notarized REA commitments.
-/// Source of truth: computed projection. Operational Category C.
-///
-/// Wire format: `elohim/sdk/schemas/v1/views/resilience-snapshot-view.schema.json`
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ResilienceSnapshotView {
-    pub content_id: String,
-    pub stewarding_collectives: i32,
-    pub commitment_backed_collectives: i32,
-    pub diversity_score: f32,
-    pub regional_distribution: RegionalDistributionView,
-    pub placement_gaps: Vec<PlacementGapView>,
-    pub protection_status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reciprocating_collectives: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<ResilienceSnapshotDetailsView>,
-}
 
-/// A collective (of any kind) currently stewarding a content item.
-///
-/// Wire format: embedded in `resilience-snapshot-view.schema.json` details
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StewardingCollectiveEntry {
-    pub id: String,
-    pub kind: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-}
 
-/// Optional detail layer for `ResilienceSnapshotView`. Source of truth:
-/// computed projection. Operational Category C.
-///
-/// Wire format: embedded in `resilience-snapshot-view.schema.json` details
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ResilienceSnapshotDetailsView {
-    pub stewarding_collectives: Vec<StewardingCollectiveEntry>,
-    pub online_peer_count: i32,
-    pub health_score: f32,
-}
 
 // =============================================================================
 // Recovery Protocol Phase 2 Views
 // =============================================================================
 
-/// Source of truth: DHT (imagodei RecoveryRequest entry).
-/// RecoveryRequestView — projection of the modernized RecoveryRequest DHT entry.
-/// Replaces the M1 RecoveryQuorumRequestView. See recovery phase 2 revised spec §5.3.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RecoveryRequestView {
-    pub dht_anchor_hash: String,
-    pub human_agent_pubkey: String,
-    pub new_agent_pubkey: String,
-    pub hosting_doorway_pubkey: String,
-    /// Discriminator for proposed_authority — "intimateQuorum" | "communityConsensus" | "governanceAct" | "networkWitness" | "cryptographicQuorum".
-    pub proposed_authority_kind: String,
-    /// JSON-encoded variant-specific fields (grant_hash, purpose, stewardship_hash, etc.).
-    /// Empty string `""` for variants with no extra fields.
-    pub proposed_authority_json: String,
-    pub request_nonce: Vec<u8>,
-    /// Coordinator-populated resolution of human_agent_pubkey to legacy String human_id.
-    /// None at request-commit time is accepted (back-compat); required for IntimateQuorum
-    /// KeyRotation and freeze-floor checks per M2 validator semantics.
-    pub human_id: Option<String>,
-    /// Threshold for IntimateQuorum — distinct witness-author count must be >= this value.
-    /// Coordinator computes ceil(emergency_contact_count / 2) + 1, floored at 2.
-    pub required_witness_count: u32,
-    pub created_at: String,
-}
 
-/// Source of truth: DHT (imagodei KeyRotation entry).
-/// KeyRotationView — projection of the modernized KeyRotation DHT entry with RecoveryAuthority enum.
-/// Replaces the M1 KeyRotationView (which had seed_commitment_hash + quorum_signature fields).
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct KeyRotationView {
-    pub dht_anchor_hash: String,
-    pub human_agent_pubkey: String,
-    pub new_agent_pubkey: String,
-    pub superseded_agent_pubkey: String,
-    pub recovery_request_hash: String,
-    /// Discriminator for authority — "intimateQuorum" | "communityConsensus" | "governanceAct" | "networkWitness" | "cryptographicQuorum".
-    pub authority_kind: String,
-    /// JSON-encoded variant-specific fields (witness_hashes, challenge_hash, etc.).
-    pub authority_json: String,
-    pub rotated_at: String,
-}
 
-/// Source of truth: DHT (imagodei HumanityWitness entry linked via
-/// RecoveryRequestToHumanityWitness from a RecoveryRequest). Projection
-/// populated from `RecoveryV2Signal::IntimateWitnessSubmitted`.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RecoveryWitnessView {
-    pub dht_anchor_hash: String,
-    pub recovery_request_hash: String,
-    pub witness_agent_id: String,
-    pub human_id: String,
-    pub note: Option<String>,
-    pub submitted_at: String,
-}
 
 impl From<crate::db::models::RecoveryWitnessRow> for RecoveryWitnessView {
     fn from(r: crate::db::models::RecoveryWitnessRow) -> Self {
@@ -6865,34 +2876,6 @@ impl From<crate::db::models::RecoveryWitnessRow> for RecoveryWitnessView {
 // These tables are read-optimized projections rebuildable via signal replay.
 // =============================================================================
 
-/// Projection of an elohim-DNA Content key-revocation entry
-/// (content_type = 'governance-action:key-revocation').
-/// Source of truth: DHT. Rebuildable via signal replay on the
-/// ElohimContentSignal dispatcher.
-///
-/// Field naming follows the Content-routed producer contract:
-/// `subject_human_id` / `initiated_by_cid` (replacing the legacy
-/// `human_id` / `initiated_by`). EPR W2D adds `derived_compromise_at`.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct KeyRevocationView {
-    /// Holochain ActionHash of the source Content entry (hex-encoded).
-    pub dht_anchor_hash: String,
-    pub id: String,
-    pub subject_human_id: String,
-    pub revoked_key: String,
-    pub reason: String,
-    pub trigger_type: String,
-    pub initiated_by_cid: String,
-    pub required_votes: u32,
-    pub current_votes: u32,
-    pub threshold_reached: bool,
-    pub effective_at: Option<String>,
-    pub derived_compromise_at: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
 
 impl From<crate::db::models::KeyRevocationRow> for KeyRevocationView {
     fn from(r: crate::db::models::KeyRevocationRow) -> Self {
@@ -6917,22 +2900,6 @@ impl From<crate::db::models::KeyRevocationRow> for KeyRevocationView {
     }
 }
 
-/// Projection of an imagodei RevocationVote DHT entry.
-/// Source of truth: DHT. Rebuildable via signal replay on
-/// RecoveryV2Signal::RevocationVoteSubmitted.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RevocationVoteView {
-    pub dht_anchor_hash: String,
-    pub id: String,
-    pub revocation_dht_anchor_hash: String,
-    pub revocation_id: String,
-    pub steward_id: String,
-    pub approved: bool,
-    pub attestation: String,
-    pub voted_at: String,
-}
 
 impl From<crate::db::models::RevocationVoteRow> for RevocationVoteView {
     fn from(r: crate::db::models::RevocationVoteRow) -> Self {
@@ -6954,289 +2921,30 @@ impl From<crate::db::models::RevocationVoteRow> for RevocationVoteView {
 // Source of truth: EPR atom (self-notarized via content-address + Ed25519).
 // ============================================================================
 
-/// Coupling legs for an EPR envelope. All legs are optional at the wire level;
-/// kind-specific requirements are enforced by the validator (EprService::ingest).
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EprCouplingView {
-    pub knowledge: Option<String>,
-    pub value: Option<String>,
-    pub governance: Option<String>,
-}
 
-/// Detached Ed25519 proof on the EPR canonical bytes.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EprSignatureView {
-    /// CIDv1 base32 of the signer's Agent EPR.
-    pub signer: String,
-    pub algorithm: String,
-    /// Hex-encoded 64 bytes (128 hex chars).
-    pub signature: String,
-}
 
-/// Wire-string projection of an EPR Envelope for HTTP consumers.
-/// CIDs are CIDv1 base32 strings. `issuedAt` is an RFC3339 date-time string.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EprEnvelopeView {
-    pub cid: String,
-    pub kind: String,
-    pub schema_ref: String,
-    pub schema_key: String,
-    pub reach: String,
-    pub coupling: EprCouplingView,
-    pub claims: Vec<String>,
-    pub supersedes: Option<String>,
-    pub superseded_by: Option<String>,
-    /// RFC3339 date-time string — passed through from storage as-is.
-    pub issued_at: String,
-    pub proof: EprSignatureView,
-}
 
-/// Full HTTP view for GET /api/v1/epr/:cid. Payload is hex-encoded.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EprView {
-    pub envelope: EprEnvelopeView,
-    /// Hex-encoded payload bytes.
-    pub payload: String,
-    /// Optional hex-encoded canonical bytes (included when ?includeCanonical=true).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub canonical_bytes: Option<String>,
-}
 
-/// Error detail for a failed verify stage.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EprVerifyErrorView {
-    pub stage: String,
-    pub message: String,
-}
 
-/// Verify response for GET /api/v1/epr/:cid/verify.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EprVerifyView {
-    pub cid: String,
-    pub verified: bool,
-    pub stages_run: Vec<String>,
-    pub stages_skipped: Vec<String>,
-    pub error: Option<EprVerifyErrorView>,
-}
 
-/// Paged list response for GET /api/v1/epr. Items are envelope-only (no payload).
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EprListView {
-    pub items: Vec<EprEnvelopeView>,
-    /// Opaque cursor for next page; null when exhausted.
-    pub next_cursor: Option<String>,
-}
 
-/// Input body for POST /api/v1/epr.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EprPublishInput {
-    pub envelope: EprEnvelopeView,
-    /// Hex-encoded payload bytes.
-    pub payload: String,
-}
 
-/// Wire view for the providers endpoint.
-///
-/// Source of truth: peer providers advertising that they hold the atom at the
-/// given cid. Phase 2a returns ["local"] when held locally, [] otherwise.
-/// Phase 2c extends with Kad DHT provider records.
-/// Category C — operational (DHT query, reconstructed per request).
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct EprProvidersView {
-    /// CIDv1 base32 of the queried atom.
-    pub cid: String,
-    /// Peer identifiers — "local" for this node, or libp2p PeerId for remote peers.
-    pub providers: Vec<String>,
-}
 
 // =============================================================================
 // Recovery Protocol Phase 2 — M5 Views
 // Auth Portal Convergence + Revocation UX + Stub Defender
 // =============================================================================
 
-/// Projection of an imagodei PortalHost DHT entry.
-/// Source of truth: DHT (imagodei PortalHost entry).
-/// This table is a read-optimized projection rebuildable via signal replay.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PortalHostView {
-    pub human_id: String,
-    pub host_url: String,
-    pub label: Option<String>,
-    pub added_at: String,
-    /// Last time this host was successfully reached.
-    /// Operational enrichment — NOT stored in the notarized DHT entry.
-    /// Populated by the elohim-storage reconciliation controller from
-    /// periodic health probes; may be None if never probed or unreachable.
-    pub last_reachable_at: Option<String>,
-    pub reach: String,
-    pub dht_anchor_hash: String,
-}
 
-/// Projection of an EPR 2B AgentPeerBinding DHT entry.
-/// Source of truth: DHT (imagodei AgentPeerBinding entry).
-/// Links an agent CID to a libp2p PeerId with an Ed25519 signature proof.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AgentPeerBindingView {
-    /// CIDv1 base32 of the agent's EPR atom.
-    pub agent_cid: String,
-    /// libp2p PeerId of the bound peer (base58btc multihash).
-    pub peer_id: String,
-    /// RFC3339 date-time when the binding becomes valid.
-    pub valid_from: String,
-    /// RFC3339 date-time when the binding expires; None for non-expiring bindings.
-    pub valid_until: Option<String>,
-    /// Hex-encoded Ed25519 signature over canonical binding bytes.
-    pub signature: String,
-    pub dht_anchor_hash: String,
-}
 
-/// Aggregate view for the authenticated account portal.
-/// Composes identity, recovery state, and hosting configuration into a single
-/// response so the Angular account pillar can render the full account surface
-/// without multiple sequential calls.
-///
-/// Source of truth: composite — individual sub-views each carry their own
-/// `dhtAnchorHash` for provenance. See sub-view docs for per-entity truth layer.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AccountView {
-    pub human: HumanView,
-    pub active_key_rotation: Option<KeyRotationView>,
-    pub recent_revocations: Vec<KeyRevocationView>,
-    pub pending_recovery_requests: Vec<RecoveryRequestView>,
-    pub emergency_contacts: Vec<HumanRelationshipView>,
-    pub portal_hosts: Vec<PortalHostView>,
-    /// True when this account holds a stewardship allocation on the local conductor.
-    pub is_steward: bool,
-    /// True when elohim-storage is connected to a local Holochain conductor
-    /// (as opposed to operating through a hosted doorway-only path).
-    pub has_local_conductor: bool,
-}
 
-/// Input for registering a new portal host URL for the authenticated human.
-/// reach defaults to "trusted" when omitted.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AddPortalHostInputView {
-    pub host_url: String,
-    pub label: Option<String>,
-    /// Reach classification — "public" | "trusted" | "private".
-    /// Defaults to "trusted" when omitted.
-    pub reach: Option<String>,
-}
 
-/// Input for an elohim defender submitting a specialist revocation.
-/// Used when the defender detects anomalous behaviour and escalates a
-/// revocation without waiting for a community quorum vote.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct SubmitSpecialistRevocationInputView {
-    /// ActionHash (base64) of the human's source-chain entry being acted upon.
-    pub human_action_hash: String,
-    /// The agent pubkey being revoked (base64 or hex — must match DHT record).
-    pub revoked_pub_key: String,
-    /// Structured anomaly attestation produced by the elohim defender.
-    /// Schema is defined by the specialist revocation protocol; validated
-    /// by the imagodei coordinator zome before committing to DHT.
-    pub anomaly_attestation: JsonVal,
-}
 
-/// Input for self-revocation (M4 fast-path: a human voluntarily revokes
-/// one of their own keys).
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateSelfRevocationInputView {
-    /// Base64-encoded AgentPubKey (e.g. "uhCAk...") of the key being revoked.
-    /// Must belong to the same human as the caller.
-    pub revoked_key: String,
-    /// Reason — one of REVOCATION_REASONS recognised by the imagodei zome.
-    pub reason: String,
-}
 
-/// Output of `create_self_revocation` — projected from the zome's
-/// `KeyRevocationOutput` for HTTP camelCase responses.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateSelfRevocationOutputView {
-    pub revocation_id: String,
-    /// Base64-encoded ActionHash of the committed KeyRevocation entry.
-    pub action_hash: String,
-}
 
-/// Input for an emergency-contact vote on a pending KeyRevocation.
-/// The `revocation_id` arrives via the URL path `/recovery/:id/vote`,
-/// so the body holds only the steward's vote payload.
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct SubmitRevocationVoteInputView {
-    /// `true` to approve the revocation, `false` to reject. The M4 zome
-    /// only counts approvals towards the threshold; rejections are recorded
-    /// for transparency.
-    pub approved: bool,
-    /// Free-text steward attestation — must be non-empty.
-    pub attestation: String,
-}
 
-/// Output of `submit_revocation_vote` — projected from the zome's
-/// `RevocationVoteOutput` for HTTP camelCase responses.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct SubmitRevocationVoteOutputView {
-    pub vote_id: String,
-    pub current_votes: u32,
-    pub required_votes: u32,
-    pub threshold_now_reached: bool,
-}
 
-/// Output of `add_portal_host` — projected from the zome's `ActionHash`
-/// return for a uniform HTTP shape.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AddPortalHostOutputView {
-    /// Base64-encoded ActionHash of the committed PortalHost entry.
-    pub action_hash: String,
-}
 
-/// Output of `remove_portal_host`. Empty body on success — included for
-/// uniform contract shape (clients may still expect a JSON body).
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RemovePortalHostOutputView {
-    /// Always `true` — the zome returns `()` on success; clients can use
-    /// this as a presence check.
-    pub deleted: bool,
-}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Light-Up-Topology Phase 1 — operational distribution + cluster + reciprocity
@@ -7247,467 +2955,37 @@ pub struct RemovePortalHostOutputView {
 // + peer_identity_bindings + libp2p swarm state. None of them introduce a new
 // DHT entry type; none of them are persisted on the elohim-storage side.
 
-/// Replica health bucket for a CID's distribution summary.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "snake_case")]
-pub enum ReplicaHealth {
-    Healthy,
-    AtRisk,
-    Critical,
-}
 
-/// Reach class for a CID — mirrors the protocol Reach enum's content-distribution
-/// classes. Drives target replica count and badge tier.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "snake_case")]
-pub enum ReachClass {
-    Private,
-    Intimate,
-    Household,
-    Neighborhood,
-    Collective,
-    Community,
-    District,
-    Public,
-}
 
-/// Where the bytes for the current fetch were sourced from.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "snake_case")]
-pub enum FetchSource {
-    ProjectedViaDoorway,
-    PeerDirect,
-    LocalPantry,
-}
 
-/// Viewer's role for a CID.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "snake_case")]
-pub enum MyRole {
-    SoleReplica,
-    Replica,
-    ReplicaAndProjector,
-    NotHosting,
-}
 
-/// Tagged peer-diversity hint for a CID's replica set. Tag/content layout
-/// matches the schema's `{ kind, value }` envelope so downstream consumers can
-/// branch on `kind` without untagged-enum heuristics. The `None` unit variant
-/// serializes as `{"kind":"none","value":null}`.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
-pub enum DiversityHint {
-    /// Replicas span these region-metro tiers.
-    RegionMetro(Vec<String>),
-    /// Replicas span these household device archetypes.
-    HouseholdArchetypes(Vec<String>),
-    /// Replicas live within a single collective; carries member count.
-    CollectiveMemberCount(u32),
-    /// No diversity hint available.
-    None,
-}
 
-/// Inline per-CID distribution payload hydrated onto EPR/content responses.
-/// Operational (Category C) projection; not persisted.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct DistributionSummary {
-    pub replica_count: u32,
-    pub replica_target: u32,
-    pub replica_health: ReplicaHealth,
-    pub projector_count: u32,
-    pub reach_class: ReachClass,
-    pub diversity_hint: DiversityHint,
-    pub this_fetch_source: FetchSource,
-    pub last_verified_seconds: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub my_role: Option<MyRole>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reciprocity_hint: Option<i64>,
-}
 
-/// Hardware/deployment archetype carried on an AgentPeerBinding (Category A
-/// from imagodei DHT). Mirrors the protocol enum at
-/// `elohim/sdk/schemas/v1/enums/device-archetype.schema.json`.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "snake_case")]
-pub enum DeviceArchetype {
-    Node,
-    Desktop,
-    Mobile,
-    Steward,
-}
 
-/// Per-replica row in a CID's distribution-details view.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct ReplicaPeer {
-    pub peer_id: String,
-    pub device_archetype: DeviceArchetype,
-    pub last_seen_seconds: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hop_hint: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub household_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub region_tier: Option<String>,
-}
 
-/// Per-doorway projector row in a CID's distribution-details view.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectorIdentity {
-    pub doorway_hostname: String,
-    pub last_ack_seconds: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub region_tier: Option<String>,
-}
 
-/// Lazy-fetched per-CID developer-grade distribution view. Strict superset of
-/// `DistributionSummary`. Operational (Category C) projection; not persisted.
-///
-/// `reciprocityEdges` is intentionally omitted at T05 — it references
-/// `PeerHouseholdEdge` which lands in T07. T07 (or a follow-up) extends both
-/// the schema and this struct with the optional field.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct DistributionDetails {
-    pub summary: DistributionSummary,
-    pub replica_peers: Vec<ReplicaPeer>,
-    pub projector_identities: Vec<ProjectorIdentity>,
-    /// Open-shape placement-gap records during bring-up; will graduate to a
-    /// typed schema once stable.
-    pub placement_gaps: Vec<JsonVal>,
-    /// Open-shape rea projection-event records relevant to this CID.
-    pub recent_projection_events: Vec<JsonVal>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub commitment_references: Option<Vec<String>>,
-}
 
-/// Freshness state bucket for cluster + topology + slice views.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "snake_case")]
-pub enum FreshnessState {
-    Live,
-    Stale,
-    Offline,
-    CachedOfflineUntilReconnect,
-    Unverifiable,
-    AllOffline,
-}
 
-/// Liveness/staleness indicator. `staleSinceMs` is populated when state ≠ live.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct Freshness {
-    pub state: FreshnessState,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stale_since_ms: Option<u64>,
-}
 
-/// Per-device summary in `MyClusterView`.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct DeviceSummary {
-    pub peer_id: String,
-    pub archetype: DeviceArchetype,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub display_name: Option<String>,
-    pub online: bool,
-    pub freshness: Freshness,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub storage_used_bytes: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub storage_total_bytes: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub memory_used_bytes: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub memory_total_bytes: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hosting_count: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub projecting_count: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub beacon_age_ms: Option<u64>,
-}
 
-/// Aggregated totals across the agent's devices.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct DeviceTotals {
-    pub storage_used_bytes: u64,
-    pub storage_total_bytes: u64,
-    pub external_committed_bytes: u64,
-    pub reciprocity_net_bytes: i64,
-}
 
-/// Federated cluster view of an agent's devices.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct MyClusterView {
-    pub agent_cid: String,
-    pub devices: Vec<DeviceSummary>,
-    pub totals: DeviceTotals,
-    pub freshness: Freshness,
-}
 
-/// Per-household reciprocation edge in a peer topology view.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct PeerHouseholdEdge {
-    pub household_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub display_name: Option<String>,
-    pub online: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_sync_sec: Option<u64>,
-    pub my_cids_hosted_by_them: u32,
-    pub their_cids_hosted_by_me: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub net_diff: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_critical_for_me: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub i_am_critical_for_them: Option<bool>,
-}
 
-/// Sole-replica risk row in a peer topology view.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct ResilienceCliff {
-    pub household_id: String,
-    pub sole_replica_cid_count: u32,
-}
 
-/// Per-agent peer topology — reciprocation edges + resilience cliffs.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct PeerTopologyView {
-    pub agent_cid: String,
-    pub edges: Vec<PeerHouseholdEdge>,
-    pub reciprocation_count: u32,
-    pub resilience_cliffs: Vec<ResilienceCliff>,
-    pub freshness: Freshness,
-}
 
-/// Per-counterparty row in a reciprocity view's inflow/outflow ledger.
-///
-/// `honored_percent` is `f64` so PartialEq is impl'd but Eq is not — matches
-/// JSON Schema's `number` with `minimum: 0`.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct ReciprocityRow {
-    pub counterparty_household_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub display_name: Option<String>,
-    pub committed_bytes: u64,
-    pub delivered_bytes: u64,
-    pub honored_percent: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub online: Option<bool>,
-}
 
-/// Per-agent reciprocity ledger.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct ReciprocityView {
-    pub agent_cid: String,
-    pub inflow: Vec<ReciprocityRow>,
-    pub outflow: Vec<ReciprocityRow>,
-    pub net_hosted_bytes: i64,
-    pub capacity_available_bytes: u64,
-}
 
-/// Per-storage-steward row in a doorway dashboard.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct DashboardSteward {
-    pub peer_id: String,
-    pub archetype: DeviceArchetype,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub display_name: Option<String>,
-    pub online: bool,
-    pub hosting_count: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hop_hint: Option<u32>,
-}
 
-/// Direction of byte flow across a doorway federation edge.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "snake_case")]
-pub enum FederationDirection {
-    Bidirectional,
-    OutboundOnly,
-    InboundOnly,
-}
 
-/// Per-doorway federation row in a doorway dashboard.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct DashboardFederationPeer {
-    pub doorway_hostname: String,
-    pub online: bool,
-    pub direction: FederationDirection,
-    pub shared_cid_count: u32,
-}
 
-/// Projection cache + lag aggregate for a doorway.
-///
-/// `cache_hit_rate_24h` is `f64` so PartialEq only.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectionCoverage {
-    pub projected_cid_count: u32,
-    pub known_cid_count: u32,
-    pub cache_hit_rate_24h: f64,
-    pub projection_lag_ms_avg: u64,
-}
 
-/// DNS/TLS/reachability surface for a doorway hostname.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct PublicSurfaceState {
-    pub dns_resolves: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dns_target: Option<String>,
-    pub tls_valid: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tls_expires_in_days: Option<i32>,
-    pub public_reachable: bool,
-}
 
-/// Doorway operator dashboard view — composed at request time from cluster +
-/// reciprocity views over view-federation/1.0.0.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct DoorwayDashboardView {
-    pub doorway_hostname: String,
-    pub storage_stewards: Vec<DashboardSteward>,
-    pub federation_peers: Vec<DashboardFederationPeer>,
-    pub projection_coverage: ProjectionCoverage,
-    pub public_surface: PublicSurfaceState,
-}
 
-/// Which kind of view a federation slice represents.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "snake_case")]
-pub enum ViewKind {
-    Cluster,
-    PeerTopology,
-}
 
-/// Per-device slice returned over the view-federation/1.0.0 libp2p protocol;
-/// signed by the responding peer's agent key. The meta-shape that federates
-/// cluster + topology views across household peers.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct ViewSlice {
-    pub peer_id: String,
-    pub view_kind: ViewKind,
-    pub freshness: Freshness,
-    pub payload: JsonVal,
-    pub signature: String,
-}
 
-/// Request envelope for `/elohim/view-federation/1.0.0` — peer A asks peer B
-/// for a signed `ViewSlice` of `view_kind` on behalf of `agent_cid`.
-///
-/// F-T16: wire envelope only. The codec lands in F-T17 and the responder
-/// handler in F-T20.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct ViewFederationRequest {
-    pub view_kind: ViewKind,
-    pub agent_cid: String,
-    pub request_id: String,
-}
 
-/// Response envelope for `/elohim/view-federation/1.0.0` — peer B returns the
-/// signed slice. Echoes `view_kind` + `agent_cid` + `request_id` so the caller
-/// can dedup replies in the F-T21 aggregator.
-///
-/// PartialEq is intentionally NOT derived: `ViewSlice.payload` is `JsonVal`
-/// (`serde_json::Value`), which does not implement `PartialEq` cleanly.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
-pub struct ViewFederationResponse {
-    pub view_kind: ViewKind,
-    pub agent_cid: String,
-    pub request_id: String,
-    pub slice: ViewSlice,
-}
 
-impl ViewFederationRequest {
-    /// Canonical bytes for signing/dedup keys. MessagePack named-fields encoding
-    /// — same shape as the wire codec uses, so request bytes used by the codec
-    /// and request bytes used as a dedup-key are byte-identical.
-    pub fn canonical_bytes(&self) -> Vec<u8> {
-        rmp_serde::to_vec_named(self).expect("canonical request msgpack should not fail")
-    }
-}
 
-impl ViewSlice {
-    /// Bytes-to-sign for the slice's `signature` field:
-    /// `view_kind || peer_id || freshness_state || payload` in MessagePack
-    /// named-fields canonical form.
-    ///
-    /// Receivers verify this against the responding peer's agent ed25519
-    /// public key from the `AgentPeerBinding`.
-    ///
-    /// `Freshness::stale_since_ms` is intentionally excluded from the signing
-    /// canonical: it is operational metric data (when did this peer last hear
-    /// from a beacon?) that varies per-observer and per-clock, not a protocol
-    /// fact about the slice itself. Including it would break signature
-    /// verification across receivers whose clocks drift apart, even when the
-    /// underlying slice is identical.
-    pub fn canonical_bytes_for_signing(&self) -> Vec<u8> {
-        #[derive(serde::Serialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Canonical<'a> {
-            view_kind: &'a ViewKind,
-            peer_id: &'a str,
-            freshness_state: &'a FreshnessState,
-            payload: &'a JsonVal,
-        }
-        rmp_serde::to_vec_named(&Canonical {
-            view_kind: &self.view_kind,
-            peer_id: &self.peer_id,
-            freshness_state: &self.freshness.state,
-            payload: &self.payload,
-        })
-        .expect("canonical slice msgpack should not fail")
-    }
-}
 
 #[cfg(test)]
 mod federation_canonical_tests {
@@ -7796,123 +3074,15 @@ mod federation_canonical_tests {
 // Source-of-truth pairing: peer_transport_manifest SQLite table,
 // populated by p2p_iroh::peer_map record_* fns.
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct Libp2pTransportProfileView {
-    pub peer_id: String,
-    pub addrs: Vec<String>,
-    pub supports: Vec<String>,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct IrohTransportProfileView {
-    pub node_id: String,
-    pub relays: Vec<String>,
-    pub supports: Vec<String>,
-}
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PeerTransportManifestView {
-    pub agent_cid: String,
-    pub libp2p: Option<Libp2pTransportProfileView>,
-    pub iroh: Option<IrohTransportProfileView>,
-    pub discovery: Vec<String>,
-    pub capability_level: u8,
-    pub last_observed: i64,
-}
 
-/// Response view for `PUT /blob/{hash}`.
-///
-/// Wire-compatible superset of the legacy `ShardManifest` JSON (all pre-existing
-/// fields retained). Adds `blake3_hash` as an optional field populated by the
-/// iroh dual-write path. Clients on the libp2p-only path receive `blake3_hash: null`.
-///
-/// Source of truth: `BlobStore` filesystem (SHA256-keyed, Category C operational)
-/// and `IrohBlobStore` filesystem (BLAKE3-keyed, Category C operational). This
-/// view is a projection of both for the single PUT response.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PutBlobResponseView {
-    pub blob_hash: String,
-    pub total_size: u64,
-    pub mime_type: String,
-    pub encoding: String,
-    pub data_shards: u8,
-    pub total_shards: u8,
-    pub shard_size: u64,
-    pub shard_hashes: Vec<String>,
-    pub reach: String,
-    pub author_id: Option<String>,
-    pub created_at: String,
-    pub verified_at: Option<String>,
-    /// BLAKE3 hash the same bytes were written to in `IrohBlobStore`.
-    /// `None` (serialises as `null`) when the iroh side is not configured or
-    /// the dual-write failed — the SHA256 write still succeeded in that case.
-    pub blake3_hash: Option<String>,
-}
-
-impl PutBlobResponseView {
-    /// Build from an existing `ShardManifest` plus the optional BLAKE3 hash
-    /// produced by the iroh-side dual-write.
-    pub fn from_manifest(m: crate::sharding::ShardManifest, blake3_hash: Option<String>) -> Self {
-        Self {
-            blob_hash: m.blob_hash,
-            total_size: m.total_size,
-            mime_type: m.mime_type,
-            encoding: m.encoding,
-            data_shards: m.data_shards,
-            total_shards: m.total_shards,
-            shard_size: m.shard_size,
-            shard_hashes: m.shard_hashes,
-            reach: m.reach,
-            author_id: m.author_id,
-            created_at: m.created_at,
-            verified_at: m.verified_at,
-            blake3_hash,
-        }
-    }
-}
 
 // ============================================================================
 
 // Observation Views
 // ============================================================================
 
-/// HTTP view of a single row from the `observations` table.
-///
-/// Source of truth for any observation is the per-observer iroh-blob log;
-/// this projection is rebuildable by log replay. Classification: Category C
-/// (operational, reconstructable from log_cid + log_offset).
-///
-/// `payloadJson` is forwarded as a raw JSON string — clients parse according
-/// to `observationKind`. This preserves forward-compatibility: new payload
-/// shapes do not require a Rust redeploy.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ObservationView {
-    pub observer_cid: String,
-    pub log_cid: String,
-    pub log_offset: i64,
-    pub observed_at: i64,
-    pub seq: i64,
-    pub observation_kind: String,
-    pub subject_cid: Option<String>,
-    pub subject_kind: Option<String>,
-    pub payload_json: String,
-    pub observer_household_cid: Option<String>,
-    pub observer_collective_cid: Option<String>,
-    pub observer_region: Option<String>,
-    pub observer_archetype: Option<String>,
-    pub observer_compute_class: Option<String>,
-    pub signature_b64: String,
-}
 
 impl From<crate::db::models::ObservationRow> for ObservationView {
     fn from(r: crate::db::models::ObservationRow) -> Self {
@@ -7936,29 +3106,6 @@ impl From<crate::db::models::ObservationRow> for ObservationView {
     }
 }
 
-/// HTTP view of a row from the `observation_diversity_summary` SQLite view.
-///
-/// Diversity rollup over `observations` — one row per (subject_cid,
-/// observation_kind) with distinct-counts across diversity dimensions. Used
-/// by the graduation evaluator (Stage 5) to gate attestation graduation.
-/// Classification: Category C (aggregation; reconstructable by re-querying
-/// the observations table).
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ObservationDiversitySummaryView {
-    pub subject_cid: String,
-    pub observation_kind: String,
-    pub distinct_agents: i64,
-    pub distinct_households: i64,
-    pub distinct_collectives: i64,
-    pub distinct_regions: i64,
-    pub distinct_archetypes: i64,
-    pub distinct_compute_classes: i64,
-    pub total_count: i64,
-    pub first_observed_at: i64,
-    pub last_observed_at: i64,
-}
 
 impl From<crate::db::models::ObservationDiversitySummaryRow> for ObservationDiversitySummaryView {
     fn from(r: crate::db::models::ObservationDiversitySummaryRow) -> Self {
@@ -7990,57 +3137,6 @@ impl From<crate::db::models::ObservationDiversitySummaryRow> for ObservationDive
 
 use crate::db::models::AttestationRow;
 
-/// Wire view for a notarized attestation Content entry.
-///
-/// Source of truth: Holochain DHT (elohim DNA, Content entry,
-/// `content_type LIKE 'attestation:%'`, Category A per p2p-design-gate).
-/// This record is a read-optimised projection populated by the
-/// `AttestationProjector` post-commit signal. DHT is authoritative.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct AttestationView {
-    /// CID of this attestation (content-derived identity).
-    pub id: String,
-    /// ActionHash (hex) of the DHT entry — provenance anchor.
-    pub dht_anchor_hash: String,
-    /// Discriminator matching `attestation:<subtype>`.
-    pub attestation_kind: String,
-    /// CID of the entity being attested.
-    pub subject_cid: String,
-    /// Kind of the subject: "agent" | "content" | "device" | "hub" | "computation" | "governance-action".
-    pub subject_kind: String,
-    /// CID of the issuing agent.
-    pub issuer_cid: String,
-    /// CID of the parent governance-action, if this attestation is a vote.
-    pub parent_governance_action_cid: Option<String>,
-    /// Vote value: "approve" | "reject" | "abstain" (null for non-votes).
-    pub vote_value: Option<String>,
-    /// Optional vote weight as a decimal string (null when unweighted).
-    pub vote_weight: Option<String>,
-    /// Proof class: "witness" | "self-attest" | "audit-signature" | "computational".
-    pub proof_class: String,
-    /// Serialised proof evidence JSON (opaque string — parse only when needed).
-    pub proof_evidence_json: String,
-    /// Serialised full evidence JSON (opaque string).
-    pub evidence_json: String,
-    /// ISO 8601 expiry timestamp, if any.
-    pub expires_at: Option<String>,
-    /// CID of the attestation this one supersedes, if any.
-    pub supersedes_cid: Option<String>,
-    /// Reason this attestation was revoked, if revoked.
-    pub revocation_reason: Option<String>,
-    /// ISO 8601 revocation timestamp, if revoked.
-    pub revoked_at: Option<String>,
-    /// ISO 8601 creation timestamp.
-    pub created_at: String,
-    /// Manifest reference (e.g. "mishpat", "lamad").
-    pub manifest_ref: String,
-    /// Human-readable title from the Content entry.
-    pub title: String,
-    /// Optional description from the Content entry.
-    pub description: Option<String>,
-}
 
 impl From<AttestationRow> for AttestationView {
     fn from(row: AttestationRow) -> Self {
@@ -8080,43 +3176,6 @@ impl From<AttestationRow> for AttestationView {
 
 use crate::db::models::GovernanceActionRow;
 
-/// Wire view for a notarized governance-action Content entry.
-///
-/// Source of truth: Holochain DHT (elohim DNA, Content entry,
-/// `content_type LIKE 'governance-action:%'`, Category A per p2p-design-gate).
-/// Parent entry; vote attestations reference its CID as
-/// `parent_governance_action_cid`. DHT is authoritative.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GovernanceActionView {
-    /// CID of this governance action (content-derived identity).
-    pub id: String,
-    /// ActionHash (hex) of the DHT entry — provenance anchor.
-    pub dht_anchor_hash: String,
-    /// Discriminator matching `governance-action:<subtype>`.
-    pub governance_kind: String,
-    /// CID of the entity being acted upon.
-    pub subject_cid: String,
-    /// CID of the proposing agent.
-    pub proposer_cid: String,
-    /// Serialised threshold JSON (e.g. `{"m":3}` or `{"percentage":0.51}`).
-    pub threshold_json: String,
-    /// Serialised eligibility predicate JSON, if constrained.
-    pub eligibility_predicate_json: Option<String>,
-    /// Ballot format: "approve-reject" | "ranked-choice" | "weighted".
-    pub ballot_format: String,
-    /// ISO 8601 close time for the voting window.
-    pub closes_at: String,
-    /// Serialised additional parameters JSON, if any.
-    pub parameters_json: Option<String>,
-    /// Human-readable title.
-    pub title: String,
-    /// Optional description.
-    pub description: Option<String>,
-    /// ISO 8601 creation timestamp.
-    pub created_at: String,
-}
 
 impl From<GovernanceActionRow> for GovernanceActionView {
     fn from(row: GovernanceActionRow) -> Self {
@@ -8149,43 +3208,18 @@ impl From<GovernanceActionRow> for GovernanceActionView {
 
 use crate::db::models::GovernanceActionTallyRow;
 
-/// Wire view for a locally-derived governance-action vote tally.
-///
-/// Source of truth: local (operational, Category C per p2p-design-gate).
-/// This record is recomputable from `governance_actions JOIN attestations`
-/// at any time via `tally_projector::recompute`. It is NOT notarized on the
-/// DHT — only the constituent vote attestations are.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct GovernanceActionTallyView {
-    /// CID of the parent governance-action.
-    pub parent_cid: String,
-    /// Governance kind discriminator (copied from parent).
-    pub governance_kind: String,
-    /// CID of the subject being acted upon (copied from parent).
-    pub subject_cid: String,
-    /// Required count for M-of-N quorum (threshold.m).
-    pub threshold_m: i32,
-    /// Optional N for M-of-N quorum (threshold.n).
-    pub threshold_n: Option<i32>,
-    /// Optional percentage for percentage-threshold ballots.
-    pub threshold_percentage: Option<f64>,
-    /// ISO 8601 close time (copied from parent).
-    pub closes_at: String,
-    /// Current count of approve votes.
-    pub current_approve_count: i32,
-    /// Current count of reject votes.
-    pub current_reject_count: i32,
-    /// Current count of abstain votes.
-    pub current_abstain_count: i32,
-    /// Computed status: "pending" | "reached-quorum" | "rejected" | "expired" | "tied".
-    pub computed_status: String,
-    /// ISO 8601 timestamp of the most recent child vote, if any.
-    pub last_child_at: Option<String>,
-    /// ISO 8601 timestamp when this tally row was last recomputed.
-    pub rebuilt_at: String,
-}
+// Re-export wire types from elohim-views so in-tree consumers' `crate::views::TypeName`
+// continues to resolve. New code should import directly from `elohim_views::*`.
+pub use elohim_views::shared::*;
+pub use elohim_views::lamad::*;
+pub use elohim_views::shefa::*;
+pub use elohim_views::qahal::*;
+pub use elohim_views::imagodei::*;
+pub use elohim_views::infrastructure::*;
+pub use elohim_views::epr::*;
+pub use elohim_views::inputs::*;
+
+
 
 impl From<GovernanceActionTallyRow> for GovernanceActionTallyView {
     fn from(row: GovernanceActionTallyRow) -> Self {
@@ -8204,5 +3238,117 @@ impl From<GovernanceActionTallyRow> for GovernanceActionTallyView {
             last_child_at: row.last_child_at,
             rebuilt_at: row.rebuilt_at,
         }
+    }
+}
+
+// ============================================================================
+// Free functions replacing inherent impls that use storage-internal types.
+// These replace the `impl TypeName { pub fn ... }` pattern, which is
+// forbidden by Rust's orphan rule when `TypeName` is defined in another crate.
+// ============================================================================
+
+/// Construct a VoteView from a DB Vote model.
+pub fn vote_view_from_vote(v: crate::db::models::Vote, hide_identity: bool) -> VoteView {
+    VoteView {
+        id: v.id,
+        proposal_id: v.proposal_id,
+        human_id: if hide_identity { None } else { Some(v.human_id) },
+        position: v.position,
+        reason: v.reason,
+        created_at: v.created_at,
+        updated_at: v.updated_at,
+        dht_anchor_hash: v.dht_anchor_hash,
+        voter_id: None,
+        voter_name: None,
+        reasoning: None,
+        version: None,
+        previous_position: None,
+        metadata: None,
+    }
+}
+
+/// Construct a RankedVoteView from a DB RankedVote model.
+pub fn ranked_vote_view_from_ranked_vote(v: crate::db::models::RankedVote, hide_identity: bool) -> RankedVoteView {
+    RankedVoteView {
+        id: v.id,
+        proposal_id: v.proposal_id,
+        human_id: if hide_identity { None } else { Some(v.human_id) },
+        option_id: v.option_id,
+        rank: v.rank,
+        score: v.score,
+        dots: v.dots,
+        approved: v.approved.map(|a| a == 1),
+        reasoning: v.reasoning,
+        proxy_elohim_id: v.proxy_elohim_id,
+        created_at: v.created_at,
+        dht_anchor_hash: v.dht_anchor_hash,
+    }
+}
+
+/// Build a NodeStewardshipView from DB model + joined display name.
+pub fn node_stewardship_view_from_with_name(s: crate::db::models::NodeStewardship, display_name: String) -> NodeStewardshipView {
+    NodeStewardshipView {
+        human_id: s.human_id,
+        display_name,
+        affinity_score: s.affinity_score,
+        relationship: s.relationship,
+        context_epr_id: s.context_epr_id,
+        granted_at: s.granted_at,
+    }
+}
+
+/// Build an ElohimReputationProfileView from a computed aggregation result.
+pub fn elohim_reputation_profile_view_from_result(
+    elohim_id: String,
+    window_start: String,
+    window_end: String,
+    r: crate::db::elohim_reputation::ReputationResult,
+) -> ElohimReputationProfileView {
+    use serde_json::Map;
+    let grounds_map: Map<String, serde_json::Value> = r
+        .challenges_by_grounds
+        .into_iter()
+        .map(|(k, v)| (k, serde_json::Value::Number(v.into())))
+        .collect();
+    let verdicts_map: Map<String, serde_json::Value> = r
+        .outcomes_by_verdict
+        .into_iter()
+        .map(|(k, v)| (k, serde_json::Value::Number(v.into())))
+        .collect();
+    ElohimReputationProfileView {
+        elohim_id,
+        window_start,
+        window_end,
+        current_substance_cid: r.current_substance_cid,
+        total_decisions: r.total_decisions,
+        challenged_count: r.challenged_count,
+        upheld_count: r.upheld_count,
+        dismissed_count: r.dismissed_count,
+        superseded_count: r.superseded_count,
+        pending_count: r.pending_count,
+        challenges_by_grounds: JsonVal(serde_json::Value::Object(grounds_map)),
+        outcomes_by_verdict: JsonVal(serde_json::Value::Object(verdicts_map)),
+    }
+}
+
+/// Build a PutBlobResponseView from an existing ShardManifest plus optional BLAKE3 hash.
+pub fn put_blob_response_view_from_manifest(
+    m: crate::sharding::ShardManifest,
+    blake3_hash: Option<String>,
+) -> PutBlobResponseView {
+    PutBlobResponseView {
+        blob_hash: m.blob_hash,
+        total_size: m.total_size,
+        mime_type: m.mime_type,
+        encoding: m.encoding,
+        data_shards: m.data_shards,
+        total_shards: m.total_shards,
+        shard_size: m.shard_size,
+        shard_hashes: m.shard_hashes,
+        reach: m.reach,
+        author_id: m.author_id,
+        created_at: m.created_at,
+        verified_at: m.verified_at,
+        blake3_hash,
     }
 }

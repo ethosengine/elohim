@@ -200,7 +200,7 @@ fn default_query() -> ReputationQuery {
 /// the HTTP handler does.
 fn to_view(conn: &mut SqliteConnection) -> ElohimReputationProfileView {
     let result = compute(conn, &default_query()).expect("compute must succeed");
-    ElohimReputationProfileView::from_result(
+    elohim_storage::views::elohim_reputation_profile_view_from_result(
         ELOHIM.to_string(),
         WIN_START.to_string(),
         WIN_END.to_string(),
