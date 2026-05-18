@@ -37,9 +37,6 @@
 //! let content = client.get::<Content>("manifesto").await?;
 //! ```
 
-// Wire-shape view types (SDK boundary types for HTTP consumers)
-pub mod views;
-
 // Core traits for content types
 pub mod traits;
 

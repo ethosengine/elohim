@@ -1,0 +1,18 @@
+[package]
+name = "elohim-views"
+version = "0.1.0"
+edition = "2021"
+description = "Wire-shape Rust types for the Elohim Protocol storage API — ts-rs-anchored View + InputView types used at the HTTP boundary"
+license = "CAL-1.0"
+repository = "https://github.com/ethosengine/elohim"
+readme = "README.md"
+keywords = ["elohim", "views", "ts-rs", "wire-types"]
+categories = ["data-structures"]
+publish = ["elohim"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_bytes = "0.11"
+chrono = { version = "0.4", features = ["serde"] }
+ts-rs = { version = "10.1", features = ["chrono-impl", "serde-compat"] }
