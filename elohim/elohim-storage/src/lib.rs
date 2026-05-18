@@ -136,6 +136,9 @@ pub mod recovery;
 // View types for HTTP API responses (camelCase serialization for TypeScript)
 pub mod views;
 
+// Wire→View conversion helpers (DB-type-touching converters split per domain).
+pub mod views_convert;
+
 // Three-pillar trust verification via conductor (DHT credential checks)
 pub mod trust_verification;
 
