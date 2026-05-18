@@ -25,7 +25,7 @@ The `graph_views/{lamad,shefa}/` sibling-module exemplar (2026-05-16 graph-nativ
 ## Goals
 
 - **Plan 1 (Manifests)**: Split `lamad/manifest.json` into per-concern files referenced via `$ref` from a thin shell. Generated TypeScript output stays byte-identical (verified per task). Pattern documented for the other 7 domains as follow-on.
-- **Plan 2 (SDK Boundary)**: Move ts-rs-anchored View types from `elohim-storage` to `crates/elohim-sdk`. `elohim-storage` depends on `elohim-sdk`. Consumers depend on `elohim-sdk` only. Add `cargo-deny` rule that prevents `elohim-storage` from being a direct dep of any non-server consumer.
+- **Plan 2 (SDK Boundary)** [REVISED 2026-05-18 post-PILOT]: Create lightweight `crates/elohim-views` crate holding ALL ts-rs-anchored View types in one atomic migration. `elohim-storage` depends on `elohim-views`; `elohim-sdk` re-exports `elohim-views` as a consumer-friendly facade with client helpers; lightweight consumers (`elohim-storage-client`, future third-party SDKs) depend on `elohim-views` alone — no transitive elohim-storage. The original incremental per-domain plan was retired after a T4 PILOT discovered ts-rs's cross-crate import-path mechanic breaks partial moves; see `[[feedback_ts_rs_cross_crate_import_paths]]`.
 - **Plan 3 (Monoliths)**: Sibling-module decomposition of the four giants in dependency-respecting order. Each file reduced to <500 LOC of re-exports OR removed entirely. DNA hash stability verified per task on content_store. ts-rs output byte-identical per task on views.rs.
 
 ## Non-Goals (explicit)
