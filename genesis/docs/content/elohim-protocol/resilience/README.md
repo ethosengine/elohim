@@ -339,11 +339,87 @@ This work is downstream of the recovery-feature work in Part IV (recovery is the
 
 ---
 
-## **Part VI: How the Substrate Composes — and Where It Stops**
+## **Part VI: The Patron-Enabled CDN — How Distribution, Succession, and Trust Become Substrate Properties**
+
+### **Sheila's Test**
+
+Sheila Wray Gregoire is a Canadian author and podcaster who built a public ministry around faith, marriage, and the harms of certain widely-circulating evangelical sex-and-marriage advice. She published books, ran the podcast, and over a decade gathered roughly ninety thousand followers on her Facebook business page — a working relationship to her audience, the place readers came to discover new material, ask her questions, and pass her work to friends who needed it.
+
+Her page was hacked. The credential was stolen, sold, and ended up with an operator out of Macedonia who used the now-stolen account to broadcast pornography and clickbait into the feeds of her ninety thousand followers — under her name, in the voice the platform had taught those readers to expect. Followers reported. Patrons emailed. Volunteers filed forms. Months passed. Nobody at Meta ever picked up the phone. The architecture has no obligation in it that points back at her. The account is a credential; the credential is single-factor; the recovery path is a customer-support queue that does not exist in any operational sense for ordinary users; the audience she spent ten years gathering is held by a custodian whose revenue model has no line item for restoring her access. Meta will let the impersonation broadcast porn into the feed of every reader who once trusted her, and Meta will not pick up.
+
+This is the architecture's silent failure mode, made specific. It is not a marginal case. It is the load-bearing pattern of centrally custodial consumer technology: ownership is a credential, credentials are stealable, the custodian holds the audience and the recovery path, and the custodian's revenue does not depend on giving any of it back when something goes wrong. Memory `project_no_sovereignty_stewardship_over_ownership` names this directly: ownership is the trap; stewardship is the protocol's structural inversion. *The substrate's answer to Sheila is not "we will run a better customer-support queue." It is "we will not hold your audience as a credential in the first place."* The recovery architecture from earlier in this chapter — Gertrude logging in with help from her people — is the same architecture that restores Sheila to herself. The trillion-dollar problem is a single problem with many tests; Sheila's hijack is one of them.
+
+### **Stewardship Over Ownership — Anti-Capture as Substrate Primitive**
+
+The protocol's anti-capture design is named in the [steward-affinity lifecycle](../../../../plans/2026-03-14-steward-affinity-lifecycle-design.md) plan: on centralized platforms, *"ownership" is a single credential — steal the credential, steal the page*. Anti-capture in the substrate is **earned standing across a web of demonstrated relationships**, not a single secret a hijacker can take. Four structural defenses compose:
+
+- **Mastery gate** — A steward earns curation authority over content by demonstrating deep understanding of it, not by holding a password. Mastery is a substrate-attested credential, agent-signed, and *cannot be transferred by stealing a session token*.
+- **Affinity accrual** — Standing is earned through sustained curation work and recorded in `steward_affinity` (content_id × steward_id × score). It is not granted by a platform; it accumulates over time through `curation-event` deltas; it does not move when an account credential moves.
+- **Community resistance** — Other stewards have first-class governance standing (the qahal layer) to refuse hostile changes. Hijacking one credential does not coerce the rest of the curatorial web; the web's standing is independent of any single member's.
+- **No single point of capture** — Stewardship is a multi-party relationship-web, not a single-key ownership claim. There is no analog of "steal the credential, steal the page."
+
+The substrate primitive that operationalizes this is the **CustodianCommitment** entry type, live in the elohim DNA (`content_store_integrity/lib.rs:3289`). Four commitment types (`relationship` / `category` / `community` / `steward`); six selection bases (intimate relationship, trusted relationship, community member, category specialist, bandwidth capacity, geographic proximity); three shard strategies (full replica, Shamir threshold split, erasure coded); five emergency-trigger types (manual signal, trusted party, M-of-N consensus, dead-man's switch, beneficiary incapacity). The entry type's doc comment names Sheila's case as the canonical example of the **community-custody pattern**:
+
+> *Community (100 of 100k followers) → Sheila's commons-reach content (democratic resilience)*
+
+A hundred of her ninety thousand followers, each holding a small piece of the recovery quorum for her account, constitutes a democratic resilience that no Macedonian impersonator and no Meta queue can extinguish.
+
+### **Patrons Are the CDN**
+
+In the centralized model, the content-delivery network is a Cloudflare or an Akamai or a YouTube/Netflix backbone — owned by the custodian, paid for from the same revenue stream as the surveillance, optimized for the platform's engagement metrics, blind to the contributor whose work it moves. In the substrate, **the CDN is the patrons**. Every household, congregation, or affinity group holding a commons shard for a creator they support *is* the distribution edge for that creator's work in their part of the network. Aunt Carol's recycled laptop hosting two gigabytes of Sheila's back catalog is the CDN edge for Sheila's content in Aunt Carol's neighborhood; the bytes resolve from there, content-addressed, with attribution preserved in the same REA ledger that records Aunt Carol's hosting as a recognition-bearing contribution.
+
+The architectural design for this is established. The [doorway-hub-edge spec](../../../superpowers/specs/2026-05-08-doorway-hub-edge-design.md) names distribution as one of four aggregate-scale reach-earning surfaces (alongside compute, defense, and AI-coordination), with **FANG-subsumption** as the explicit scaling target: aggregate compute (Google AI), aggregate distribution (YouTube/Netflix CDN), aggregate defense (Cloudflare), and aggregate algorithmic discernment (Facebook's feed). Hub federation absorbs these scaling concerns by *earning*, not by enlarging any single hub past what the humans inside can govern. The existing feature suite already exercises the substrate side of this claim: [`peer-mesh.feature`](../../../../a2o/features/delivery/peer-mesh.feature) — *"peers serve peers. Doorway becomes one source among many, not the mandatory funnel. The client discovers, scores, and selects the best delivery peer — preferring LAN over WAN, warm extraction over compressed, and falling back gracefully when peers are unavailable"*; [`web2-absorption.feature`](../../../../a2o/features/delivery/web2-absorption.feature) — *"the projection cache absorbs browser traffic patterns before they reach storage. Storage is a P2P node, not a CDN"*; [`content-addressing.feature`](../../../../a2o/features/delivery/content-addressing.feature), [`protocol-omnibar.feature`](../../../../a2o/features/delivery/protocol-omnibar.feature) (provenance display — *"protocol's equivalent of a browser address bar with SSL padlock"*), [`spa-bundle-delivery.feature`](../../../../a2o/features/delivery/spa-bundle-delivery.feature), [`transport-perf.feature`](../../../../a2o/features/delivery/transport-perf.feature).
+
+What is not yet wired is the *story-side* expression — a `feature-patron-cdn-and-the-hijacked-page.feature` (the Sheila scenario as Gherkin), canonical stories for the patron-as-distributor role and the creator-as-stewardee role, and the storage-stewardship-summary surface from Part V exposing the commons-tier breakdown as visible patron contribution.
+
+### **Discovery, Distribution, Trust and Safety — All Earned, Not Imposed**
+
+Once distribution is a function of patron-held commons custody rather than a custodian-owned backbone, three downstream civic properties shift in shape together:
+
+**Discovery** in the centralized model is whatever the engagement algorithm decides will keep the user clicking; what surfaces is what monetizes. In the substrate, discovery is *graph-walked* — through the [first-class graph pattern](../../../../../.claude/memory/project_first_class_graph_pattern.md) of EPRs as nodes and couplings/memberships/delegations as edges — and *reach-gated* (the gate from `services/reach_earning.rs`). A searcher finds content their standing allows them to receive, surfaced through the structural graph of attribution and patronage, not through an opaque ranking function. Creators with sustained standing accumulate discoverability because the substrate rewards earned reach, not because they bought it back from the platform that's selling it.
+
+**Distribution** earns reach the same way every other substrate operation does — provenance, standing, receiver pre-authorization at each hop. A hijacker who steals a credential and tries to broadcast porn through Sheila's account does not get to amplify it, because *amplification is not a property of the account, it is a property of the cumulative reach-earning behavior of the agent over time*. An agent with no reach-earning history attempting fanout to ninety thousand receivers triggers the substrate's reach-gate, fails the receivers' pre-authorization, and dies at the first unconvinced hub. The "thousands of small targets" defense Cloudflare achieves through anycast is achieved here through federated reach-earning — each hub independently evaluates, the cost to attack is quadratic against the number of hubs to convince, and the substrate routes legitimate distribution while routing-around adversarial fanout.
+
+**Trust and Safety** in the centralized model is a policy layer applied unevenly, after the fact, by an unaccountable enforcement mechanism, in service of legal and reputational cost-management for the custodian. In the substrate, **T&S is a structural property of the reach-earning gate + the social-recovery quorum + the graduated-authority delegation**. The impersonation attempt fails at the substrate floor for the reasons named above; the recovery quorum unwinds the hijack the same way it unwinds Gertrude's lost device; witnesses across the community record `signal_kind: "impersonation-claim"` against the suspected hijack and elohim-operators escalate through graduated authority. Adversarial actors do not face a customer-support queue that no longer picks up; they face a substrate that enforces what was declared at authoring time and a recovery quorum constituted by the people who actually know the impersonated party. T&S is what the substrate *is*, not a service the custodian provides on top of it.
+
+### **Creator Succession**
+
+Creators die. They retire. They pass the work to a successor or to a community. In the centralized model, the platform's dormancy policies eventually dissolve the account; the audience the creator built dissolves into the algorithm's general feed; the work becomes inaccessible or repurposed by whoever currently rents the namespace; the relationship between creator and audience evaporates because the platform never modeled it as a first-class thing. In the substrate, **ContributorPresence is a long-lived entry with 32 fields including stewardship transitions and claim-verification methods**, and the same graduated-authority delegation that recovers Gertrude can transition a creator's identity to a designated successor — a family member, a community trust, a co-op, a religious order, an estate. Recognition continues to flow; attribution remains accurate; the work doesn't vanish into "we delete dormant accounts after 24 months."
+
+For collective-authored works — a co-op's curriculum, a congregation's directory, a watershed council's biodiversity records, an open-source project's documentation — succession composes even more naturally because authorship was always collective; the substrate just makes the collective custody explicit and the transitions visible. The protocol gives creators what no platform has ever given them: *durability across generations*. The work survives the creator; the audience survives the platform; the relationship between them survives both.
+
+### **The Virtuous Cycle on a Shared Ledger**
+
+The three flows compose on a single REA ledger and reinforce each other:
+
+- **Patrons** holding commons shards receive recognition flows for the hosting (`signal_kind: "stewardship"` over commons-reach resources). The 2 GB Aunt Carol carries for Sheila is visible to Aunt Carol on her stewardship surface, is recognized by the network, is part of how Aunt Carol's own standing accrues.
+- **Authors** receive recognition flows attached to their ContributorPresence — accumulating affinity from engagement, citation count from references, recognition score across the network — flowing to the steward today and reserved for transfer-on-claim when an absent contributor arrives.
+- **The commons** receives a substrate that does not extract. No ad-tech side channel funded by Aunt Carol's hosting. No algorithmic re-ranking optimized for someone else's revenue model. No surveillance affordance riding on the distribution layer.
+
+Each layer makes the others possible. Patrons want to support creators whose recognition the substrate durably honors. Creators want to publish where their work survives them and where their relationship to readers is structural, not platform-mediated. The commons benefits from a substrate where pro-social participation is visible, accountable, and rewarded structurally — without being financialized into a marketplace that re-creates the extraction it was meant to escape. The cycle is the same one mutual aid has always run on; the substrate makes it computable, queryable, breach-bounded, and dignity-preserving.
+
+### **What Is Built — and What the Sheila Scenario Closes**
+
+For Distribution, Discovery, Succession, and T&S as substrate properties, much of the foundation is LIVE: CustodianCommitment entry type and coordinator functions; steward_affinity table and pipeline integration (Stage 2 wired against affinity scores); the doorway-hub-edge architecture for federation; the peer-mesh + web2-absorption + content-addressing + protocol-omnibar + spa-bundle-delivery + transport-perf feature suite; the reach-earning gate at authoring; ContributorPresence with stewardship and claim fields; the FANG-subsumption design in `2026-05-08-doorway-hub-edge-design.md`; the graduated-authority recovery doctrine.
+
+What is named-but-unfinished, and what the **Sheila scenario** would exercise end-to-end:
+
+- `feature-account-takeover-recovery.feature` — the Sheila hijack as Gherkin: account stolen → impersonator attempts fanout → reach-gate breach + receiver pre-authorization failures + community impersonation-claim signals → graduated-authority quorum revokes the impersonation → original creator restored. This is the highest-leverage T&S scenario the substrate can prove, and it has no executable spec today.
+- `feature-creator-succession.feature` — designated successor receives ContributorPresence via graduated-authority delegation; recognition flows continue; audience relationship intact.
+- `feature-patron-cdn-discovery.feature` — content searcher resolves to nearest patron-edge through reach-walked discovery rather than to a corporate cache.
+- `signal_kind: "impersonation-claim"` validator whitelist addition + standing-policy debit weights.
+- Storage-stewardship summary route's commons-tier drill-down showing per-creator patron-CDN composition (which patrons hold what fraction of which creator's commons-reach content).
+- Canonical stories under `genesis/data/stories/`: a Sheila-shaped persona on `as-creator-under-impersonation-attack`; a patron-shaped persona on `as-commons-custodian-for-a-creator-they-support`; a successor on `as-inheritor-of-contributor-presence`.
+
+These complete the resilience epic's civic claims — not as new architecture, but as vocabulary added to a substrate that already speaks the language. The substrate's existing primitives carry the weight; the Sheila scenario is the executable spec that proves they carry the weight specifically for the trillion-dollar failure mode the architecture of consumer technology cannot solve.
+
+---
+
+## **Part VII: How the Substrate Composes — and Where It Stops**
 
 ### **Threading the Claim Through Real Code**
 
-The trillion-dollar claim — that mutual aid expressed as REA Commitments is the substrate primitive that dissolves the convenience/dignity trade — has to compose through the actual code, not float above it. This section threads the resilience flows through the layers of the substrate as they exist today, and as they are being built. The point is not exhaustive specification; the point is to ground the philosophical claim in a real stack with a real implementation gradient, and to name honestly what is built, what is designed-not-yet-wired, and what is still aspirational. The gap matrix at the end of Part VIII is the precise accounting; this section is the architectural walk.
+The trillion-dollar claim — that mutual aid expressed as REA Commitments is the substrate primitive that dissolves the convenience/dignity trade — has to compose through the actual code, not float above it. This section threads the resilience flows through the layers of the substrate as they exist today, and as they are being built. The point is not exhaustive specification; the point is to ground the philosophical claim in a real stack with a real implementation gradient, and to name honestly what is built, what is designed-not-yet-wired, and what is still aspirational. The gap matrix at the end of Part IX is the precise accounting; this section is the architectural walk.
 
 ### **The Layers**
 
@@ -393,7 +469,7 @@ The trust compute gradient is in similar shape. The 707-line brainstorm at `gene
 
 The one substrate gap that *most directly* affects the resilience epic's claims is the **node-lifecycle observable** edge. The bridge today is *unidirectional*: every elohim-node, at boot, registers its committed shape as a `NodeRegistration` DHT entry via `boot_registration::register_at_boot` (`elohim-storage/src/services/boot_registration.rs:147-170`), calling the `register_node_shape` coordinator zome at `node-registry/.../shape.rs:48-76`. That is LIVE — the act of deploying a node DOES create an agent-signed, content-addressed shape claim. What is NOT live is the inverse edge: there is no substrate-native node-health observer that emits breach signals when a committed node stops fulfilling its commitments. When a peer goes silent — through hardware death, sustained unavailability, exhausted capacity, or any other observable mode of falling-short — the protocol does not autonomously emit a `compute-breach` EconomicEvent. The May 4 hardware death on the alpha cluster was handled by a human operator editing the seed-deployment record (`suspended: true` flipped, narrative preserved in `$comment` blocks); the protocol-level Event ledger stayed silent.
 
-The closing of this edge is substrate-native and protocol-internal: peers gossip liveness, peers observe each other through libp2p connection state and through the EPR reach signal pathways already in place (see Part VI's data-ops layer and the LUT topology view modules); the missing layer is the *interpretation*, the rule that says "this committed counterparty has stopped fulfilling for N rounds — emit a `compute-breach` against the underlying Commitment." This rule belongs in the elohim-operator's discernment layer (see Part VII), bounded by the substrate-floor / elohim-ceiling pattern: substrate detects the observable fact (silence, slowness, exhaustion); the operator decides whether to escalate to breach versus to defer, witness, sponsor, or renegotiate.
+The closing of this edge is substrate-native and protocol-internal: peers gossip liveness, peers observe each other through libp2p connection state and through the EPR reach signal pathways already in place (see this section's data-ops layer above and the LUT topology view modules); the missing layer is the *interpretation*, the rule that says "this committed counterparty has stopped fulfilling for N rounds — emit a `compute-breach` against the underlying Commitment." This rule belongs in the elohim-operator's discernment layer (see Part VIII), bounded by the substrate-floor / elohim-ceiling pattern: substrate detects the observable fact (silence, slowness, exhaustion); the operator decides whether to escalate to breach versus to defer, witness, sponsor, or renegotiate.
 
 The recovery agreements described throughout this chapter are NOT blocked on this gap — they operate at the REA Commitment + FeedbackSignal layer, which is LIVE and queryable through `ReaCommitmentView`. The compute-commitment substrate-floor scenarios in `a2o/features/deployment/compute-commitment-bounds.feature` are the ones blocked; they are `@wip` today and unblock when the substrate-native node-health observable lands. *The temporary developer-substrate currently underneath the alpha cluster — k8s — is incidental to this design*: the protocol's eventual answer does not include cluster APIs (see the next section on the developer-substrate trajectory). The observable layer is gossip + libp2p connection state + EPR reach signals; the interpretation layer is the elohim-operator's discernment.
 
@@ -407,7 +483,7 @@ The substrate is closer to the trillion-dollar test than the manifesto-tier fram
 
 ---
 
-## **Part VII: The Complexity Collapse — Elohim Operators as Substrate AI**
+## **Part VIII: The Complexity Collapse — Elohim Operators as Substrate AI**
 
 ### **The Hyperscaler Wall, Diagnosed**
 
@@ -471,7 +547,7 @@ The argument distilled: **the hyperscaler wall is the wall of complexity-managem
 
 ---
 
-## **Part VIII: What Is Built, What Is Designed, What Remains**
+## **Part IX: What Is Built, What Is Designed, What Remains**
 
 ### **The Honesty Discipline**
 
@@ -571,6 +647,27 @@ A chapter that anchors a trillion-dollar civic claim has to be specific about wh
 | Storage-stewardship summary route (`GET /storage-stewardship/summary` returning 3-bucket breakdown) | **GAP** | doorway-manifest declaration needed |
 | Angular widget in shefa pillar (top-level bar with drill-down) | **GAP** | UI work; awaits LUT M1 |
 
+### **Distribution / Succession / T&S — Civic Substrate Tests**
+
+| Capability | Status | Where |
+|---|---|---|
+| CustodianCommitment entry type (4 commitment types, 6 selection bases, 3 shard strategies, 5 emergency-trigger types) | **LIVE** | `content_store_integrity/lib.rs:3289` |
+| CustodianCommitment coordinator functions (create, accept, etc.) + wire types | **LIVE** | `content_store/lib.rs:8391+`, shefa-types |
+| `steward_affinity` table + Stage 2 pipeline integration (affinity-weighted recognition) | **LIVE** | `recognition_pipeline_service.rs`, `2026-03-14-steward-affinity-lifecycle-design.md` |
+| Mastery gate + curation-event endpoint + affinity deltas | **DESIGNED** | Increment 2 of steward-affinity-lifecycle plan |
+| Stage 4 constitutional limits (floor/ceiling/excess redistribution) | **DESIGNED** | Increment 3 of steward-affinity-lifecycle plan |
+| Peer-mesh delivery (peers serve peers; doorway as one source among many; LAN-preferring) | **DESIGNED + scenarios** | `peer-mesh.feature` @wip |
+| Web2-absorption projection cache (browser traffic absorbed before reaching storage) | **DESIGNED + scenarios** | `web2-absorption.feature` |
+| Protocol omnibar (provenance pill, EPR-address display, drill-down) | **DESIGNED + scenarios** | `protocol-omnibar.feature`, `2026-04-03-content-delivery-toolbar-sprint2-plan.md` |
+| Content-addressing delivery + content-delivery transport-perf scenarios | **DESIGNED + scenarios** | `content-addressing.feature`, `transport-perf.feature`, `spa-bundle-delivery.feature`, `delivery-diagnostics.feature` |
+| FANG-subsumption (YouTube/Netflix-class distribution by federated reach-earning, not centralization) | **DESIGNED** | `2026-05-08-doorway-hub-edge-design.md` distribution-reach surface |
+| `signal_kind: "impersonation-claim"` validator whitelist | **GAP** | not in `SIGNAL_KINDS`; needed for T&S substrate floor |
+| `feature-account-takeover-recovery.feature` — the Sheila scenario end-to-end | **GAP** | no Gherkin; highest-leverage T&S test the substrate can prove |
+| `feature-creator-succession.feature` — ContributorPresence inheritance via graduated-authority | **GAP** | no Gherkin |
+| `feature-patron-cdn-discovery.feature` — content resolves to nearest patron-edge via reach-walked discovery | **GAP** | no Gherkin |
+| Storage-stewardship summary commons-tier drill-down showing per-creator patron-CDN composition | **GAP** | depends on storage-stewardship-summary route (already in Resilience-Specific table) |
+| Canonical stories: creator-under-impersonation-attack / commons-custodian-for-creator / inheritor-of-contributor-presence | **GAP** | no stories under `genesis/data/stories/` |
+
 ### **Hub + Operator Layer**
 
 | Capability | Status | Where |
@@ -587,20 +684,22 @@ A chapter that anchors a trillion-dollar civic claim has to be specific about wh
 The matrix above names every load-bearing edge. The work in rough order of leverage (for the resilience-epic surface specifically):
 
 1. `feature-social-recovery-with-help-from-family.feature` — the highest-leverage Gherkin; grandma-standard end-to-end recovery; no executable spec today.
-2. Recovery-class `signal_kind` extensions (`recovery-share-custody`, `recovery-breach`, `recovery-quorum-formed`, `recovery-fulfilled`) into the integrity-zome whitelist + schema + standing-policy-floor manifest.
-3. `recovery` + `share-custody` + `encrypted-custody` `resource_classified_as` classifications added (or the validator pattern updated to accept manifest-declared classifications).
-4. `role-as-recovery-counterparty` and `role-as-account-claimant` role records in `genesis/data/lamad/content/`.
-5. Reciprocal-backup feature pair: `feature-backup-stewardship-for-household-{dowell,gertrude}.feature`.
-6. Seed-data expression of the gertrude↔dowell Agreement (shape: open; story-first decides).
-7. Recovery-class signal handlers in `ReconcileController`.
-8. Storage-stewardship summary HTTP route + Angular widget.
-9. Recognition transfer on claim — the missing executor for the absent-contributor flow.
-10. (Substrate-wide, not just resilience-surface) Substrate-native node-health observable → REA EconomicEvent edge — closes the compute-commitment-bounds.feature gap and the broader substrate-floor / elohim-ceiling claim. The observer rides protocol-native signals (gossip + libp2p connection state + EPR reach), not container-orchestrator APIs; the developer-substrate the alpha cluster currently runs on (k8s) is incidental and retires when brit/rakia mature.
-11. (Substrate-wide) Reach enum reconciliation — Rust vs schema vs resilience-epic vocabularies.
-12. (Substrate-wide) Trust-compute gradient layered modulation per the 707-line brainstorm.
-13. (Substrate-wide) Bridge from elohim-hub trait to elohim-agent specialist dispatch — the elohim-operator-as-AI runtime.
+2. `feature-account-takeover-recovery.feature` — the Sheila scenario as Gherkin; impersonation rejection at the reach-gate + community-quorum revocation; highest-leverage T&S test the substrate can prove.
+3. Recovery-class `signal_kind` extensions (`recovery-share-custody`, `recovery-breach`, `recovery-quorum-formed`, `recovery-fulfilled`, `impersonation-claim`) into the integrity-zome whitelist + schema + standing-policy-floor manifest.
+4. `recovery` + `share-custody` + `encrypted-custody` `resource_classified_as` classifications added (or the validator pattern updated to accept manifest-declared classifications).
+5. `role-as-recovery-counterparty`, `role-as-account-claimant`, `role-as-creator-under-impersonation-attack`, `role-as-commons-custodian-for-creator`, `role-as-inheritor-of-contributor-presence` role records in `genesis/data/lamad/content/`.
+6. Reciprocal-backup feature pair: `feature-backup-stewardship-for-household-{dowell,gertrude}.feature`.
+7. `feature-creator-succession.feature` + `feature-patron-cdn-discovery.feature` — the civic-substrate companion scenarios to the recovery surface.
+8. Seed-data expression of the gertrude↔dowell Agreement (shape: open; story-first decides).
+9. Recovery-class signal handlers in `ReconcileController`.
+10. Storage-stewardship summary HTTP route + Angular widget, including commons-tier drill-down with per-creator patron-CDN composition.
+11. Recognition transfer on claim — the missing executor for the absent-contributor flow (also load-bearing for creator succession).
+12. (Substrate-wide, not just resilience-surface) Substrate-native node-health observable → REA EconomicEvent edge — closes the compute-commitment-bounds.feature gap and the broader substrate-floor / elohim-ceiling claim. The observer rides protocol-native signals (gossip + libp2p connection state + EPR reach), not container-orchestrator APIs; the developer-substrate the alpha cluster currently runs on (k8s) is incidental and retires when brit/rakia mature.
+13. (Substrate-wide) Reach enum reconciliation — Rust vs schema vs resilience-epic vocabularies.
+14. (Substrate-wide) Trust-compute gradient layered modulation per the 707-line brainstorm.
+15. (Substrate-wide) Bridge from elohim-hub trait to elohim-agent specialist dispatch — the elohim-operator-as-AI runtime.
 
-Numbers 1–9 are *resilience-epic-scoped*. Numbers 10–13 are the substrate-wide foundational work the trillion-dollar claim depends on, even when not directly resilience-surface. They are named here because the chapter is responsible for naming them.
+Numbers 1–11 are *resilience-epic-scoped* (recovery surface + patron-CDN civic surface). Numbers 12–15 are the substrate-wide foundational work the trillion-dollar claim depends on, even when not directly resilience-surface. They are named here because the chapter is responsible for naming them.
 
 ---
 
@@ -612,11 +711,11 @@ The protocol's commitment is that none of these trades is actually necessary. Th
 
 What makes this commitment more than rhetoric is that it is *testable*. Not in twenty years. Not at scale. Now, on the alpha cluster, against Gertrude and Matthew and Jessica and James, with one reciprocal-backup pair, three canonical stories, a finite list of feature files to write, and an REA primitive that already exists. The grandma standard is a Gherkin scenario waiting to be authored. The trillion-dollar problem is, structurally, four minutes of recovery flow, executed correctly, with help from her people, on a substrate that doesn't betray her.
 
-What this chapter has tried to demonstrate — walking through the substrate's actual layers in Part VI, the elohim-operator complexity-collapse in Part VII, and the honest gap matrix in Part VIII — is that the trillion-dollar civic claim is currently load-bearing at every layer where it has shipped, and named-with-scope at every layer where it has not. The work is finite. The substrate stack composes. The notary layer is in production; the data-ops layer is in permanent dual-stack with Phase 11 closed and Phase 12 in flight; the reconciliation controller carries imagodei recovery signals today and gets recovery-class signals next; the storage projection is live; the topology↔REA bridge is queried in four production code paths; the reach gate and standing evaluator run on every reach decision; the ContributorPresence entry runs in production with 32 fields and the transfer-on-claim machinery reserved. The elohim-operator runtime that will eventually carry the operational load for ordinary households is scaffold-stage today, with Matthew the human carrying that role on the alpha cluster while the protocol's eventual answer takes form. The transition is *the generational work* — the migration of the household-operator role from competent humans doing it by hand on alpha hardware to elohim-operator AI agents doing it dignifiably for ordinary humans on consumer hardware everywhere.
+What this chapter has tried to demonstrate — walking through the patron-enabled CDN in Part VI, the substrate's actual layers in Part VII, the elohim-operator complexity-collapse in Part VIII, and the honest gap matrix in Part IX — is that the trillion-dollar civic claim is currently load-bearing at every layer where it has shipped, and named-with-scope at every layer where it has not. The work is finite. The substrate stack composes. The notary layer is in production; the data-ops layer is in permanent dual-stack with Phase 11 closed and Phase 12 in flight; the reconciliation controller carries imagodei recovery signals today and gets recovery-class signals next; the storage projection is live; the topology↔REA bridge is queried in four production code paths; the reach gate and standing evaluator run on every reach decision; the ContributorPresence entry runs in production with 32 fields and the transfer-on-claim machinery reserved. The elohim-operator runtime that will eventually carry the operational load for ordinary households is scaffold-stage today, with Matthew the human carrying that role on the alpha cluster while the protocol's eventual answer takes form. The transition is *the generational work* — the migration of the household-operator role from competent humans doing it by hand on alpha hardware to elohim-operator AI agents doing it dignifiably for ordinary humans on consumer hardware everywhere.
 
-The other epics in this corpus — learning, governance, economy, identity — rest on this substrate. Lamad's learning recognition, Qahal's governance participation, Shefa's value flows, Imagodei's identity continuity all require a substrate that survives device loss, household failure, contributor absence, hardware decommission, and the slow erosion of trust that takes centralized custodians down one century at a time. This chapter is therefore not one chapter among the others; it is the chapter that says what the others are scaling and delivering against. Resilience is not a feature added to the other epics — it is the substrate on which the other epics are themselves possible. The trillion-dollar civic claim is what makes their claims composable across decades and across households.
+The other epics in this corpus — learning, governance, economy, identity — rest on this substrate. Lamad's learning recognition, Qahal's governance participation, Shefa's value flows, Imagodei's identity continuity all require a substrate that survives device loss, household failure, contributor absence, hardware decommission, account hijack, creator death, and the slow erosion of trust that takes centralized custodians down one century at a time. This chapter is therefore not one chapter among the others; it is the chapter that says what the others are scaling and delivering against. Resilience is not a feature added to the other epics — it is the substrate on which the other epics are themselves possible. The trillion-dollar civic claim is what makes their claims composable across decades and across households, what protects creators when their credentials are stolen, what carries patrons' contributions through the substrate as recognition rather than ad inventory, what passes a creator's work to a successor when the creator is gone.
 
-That is the work. That is the entire work. Mutual aid as substrate, recovery as the test, the elohim-operator as the complexity collapse, Gertrude as the witness.
+That is the work. That is the entire work. Mutual aid as substrate, recovery as the test, the patron-enabled CDN as the civic distribution layer, the elohim-operator as the complexity collapse, Gertrude and Sheila as the two witnesses — one for the recovery surface, one for the impersonation-resistance surface, both proving the same substrate from opposite vantages.
 
 ---
 
