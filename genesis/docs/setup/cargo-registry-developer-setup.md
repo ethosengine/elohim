@@ -1,15 +1,19 @@
 # Cargo Registry — Developer Setup
 
-The Elohim Protocol monorepo proxies crates.io through a Nexus repository at
-`nexus.ethosengine.com/repository/cargo/`. This means:
+The Elohim Protocol monorepo routes Cargo traffic through Nexus at
+`nexus.ethosengine.com`:
 
-- `cargo build` automatically goes through the proxy — no per-developer setup
-  needed for *reads*.
+- `cargo build` reads crates.io packages through the **group** endpoint
+  (`/repository/cargo/`), which transparently caches upstream. No per-developer
+  setup needed for *reads*.
 - `cargo publish --registry elohim` publishes internal crates to the
-  `cargo-internal` hosted repo behind the same group endpoint.
+  **hosted** endpoint (`/repository/cargo-internal/`). Nexus only accepts
+  publishes on hosted repos — group endpoints are read-only.
+- Consumers of internal crates declare `registry = "elohim"` in their
+  `Cargo.toml` and resolve directly against `cargo-internal`.
 
 The repo-level `.cargo/config.toml` (checked in at the repo root) configures
-the proxy redirect. You do NOT need to modify your global cargo config.
+both. You do NOT need to modify your global cargo config.
 
 ## When you need credentials
 
