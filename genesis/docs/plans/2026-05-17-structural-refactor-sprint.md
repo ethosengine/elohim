@@ -1,6 +1,20 @@
 # Structural Refactor Sprint — Compilation Boundaries + SDK Cleanup
 
-> ## 🚦 GATE — REVISIT BEFORE EXECUTING
+> ## 📦 SUPERSEDED 2026-05-18
+>
+> This skeleton plan has been replaced by three executable plans, orchestrated by `genesis/docs/specs/2026-05-18-refactor-orchestration.md`:
+>
+> - **Plan 1** — `genesis/docs/plans/2026-05-18-app-manifest-modularization.md` (new emphasis: manifest splits per concern)
+> - **Plan 2** — `genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md` (Phase D of this old plan, fleshed out)
+> - **Plan 3** — `genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md` (Phases A/B/C of this old plan + new p2p/mod.rs target)
+>
+> Phases E (elohim-provenance), F (elohim-schema-tools), G (elohim-test-fixtures), H (feature-gating), and I (multi-workspace unification) from this old plan are explicitly deferred until after Plans 1-3 land — see the orchestration spec's Non-Goals section.
+>
+> **Reading this file** remains useful for the architectural intent of the deferred phases, but the executable work has moved.
+>
+> ---
+>
+> ## 🚦 [Historical] GATE — REVISIT BEFORE EXECUTING
 >
 > **This plan is INTENTIONALLY SKELETON-FORM.** It captures the deferred refactor work in dependency order while the design context is fresh, but each phase needs operator review and detail fill-in before any task is executed.
 >
