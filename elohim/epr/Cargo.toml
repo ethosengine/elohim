@@ -1,9 +1,14 @@
 [package]
 name = "elohim-epr"
-version.workspace = true
-edition.workspace = true
-description = "Elohim EPR codec: canonical CBOR + CIDv1 + Ed25519 for the graph substrate"
-license = "CAL-1.0"
+version = "0.1.0"
+edition = "2021"
+description = "Elohim Protocol canonical EPR codec — CBOR + CIDv1 + Ed25519 for the graph substrate"
+license = "Apache-2.0"
+repository = "https://github.com/ethosengine/elohim"
+readme = "README.md"
+keywords = ["elohim", "epr", "cbor", "cid", "p2p"]
+categories = ["data-structures", "encoding", "cryptography"]
+publish = ["elohim"]
 
 [dependencies]
 ipld-core = "0.4"
