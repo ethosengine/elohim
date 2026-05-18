@@ -20,11 +20,11 @@ chrono.workspace = true
 uuid.workspace = true
 
 # TypeScript type exports
-ts-rs = { version = "10", optional = true }
+ts-rs = { workspace = true, optional = true }
 
 [features]
 default = []
 typescript = ["ts-rs"]
 
 [dev-dependencies]
-tokio-test = "0.4"
+tokio-test = { workspace = true }

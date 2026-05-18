@@ -73,6 +73,10 @@ dashmap = "6.1"
 deno_core = "0.339.0"
 deno_error = "0.5.7"
 
+# Dev / test utilities
+tokio-test = "0.4"
+wiremock = "0.6"
+
 # Internal crate dependencies
 constitution = { path = "constitution" }
 elohim-agent = { path = "elohim-agent/elohim-agent-service" }

@@ -39,5 +39,5 @@ typescript = ["ts-rs", "constitution/typescript"]
 llamacpp = ["llama-cpp-2"]
 
 [dev-dependencies]
-tokio-test = "0.4"
-wiremock = "0.6"
+tokio-test = { workspace = true }
+wiremock = { workspace = true }

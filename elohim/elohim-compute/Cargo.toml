@@ -7,8 +7,8 @@ authors = ["Elohim Protocol"]
 description = "Shared compute reporting types and traits for the Elohim fleet"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-dashmap = "6.1"
-chrono = { version = "0.4", features = ["serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+dashmap = { workspace = true }
+chrono = { workspace = true }
 parking_lot = "0.12"

@@ -63,13 +63,13 @@ typescript = ["ts-rs", "gate-types/typescript"]
 testing = []
 
 [dev-dependencies]
-tokio-test = "0.4"
+tokio-test = { workspace = true }
 axum.workspace = true
 http-body-util.workspace = true
 tower = { workspace = true, features = ["util"] }
 # HTTP mock server for ElohimStorageResolver / ManifestResolver tests.
 # Used under `#[cfg(feature = "testing")]` in phase3_stubs.rs.
-wiremock = "0.6"
+wiremock = { workspace = true }
 
 # Integration test: universal_band_integration requires the "testing" feature
 # so that __test_set_decision_override and gate_client::testing are available.
