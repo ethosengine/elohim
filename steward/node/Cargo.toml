@@ -34,6 +34,9 @@ libp2p = { version = "0.54", features = [
 # Storage (elohim-storage as library for unified P2P)
 rusqlite = { version = "0.37", features = ["bundled"] }
 elohim-storage = { path = "../../elohim/elohim-storage", default-features = false, features = ["p2p"] }
+
+# Wire-shape View types — boundary is now explicit; view imports must use elohim-views, not elohim-storage
+elohim-views = { path = "../../elohim/elohim-views" }
 elohim-bitswap = { path = "../../elohim/elohim-bitswap" }
 sled = "0.34"
 cid = "0.11"
