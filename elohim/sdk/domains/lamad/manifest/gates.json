@@ -1,0 +1,34 @@
+{
+  "discernment-gate-v1-mechanical": {
+    "processCid": "epr:gates:discernment-gate-v1-mechanical",
+    "description": "Seven-valence discernment of experience-moments; mints :story-point attestations.",
+    "handlesEvents": [
+      "AttestationWrite"
+    ],
+    "governanceReach": "community",
+    "peerReviewedBy": [],
+    "supersedes": null
+  },
+  "reach-gate-v1": {
+    "processCid": "epr:gates:reach-gate-v1",
+    "description": "Attestation-graph-aggregated reach level for content-node subjects.",
+    "handlesEvents": [
+      "CapabilityInvoke"
+    ],
+    "governanceReach": "community",
+    "peerReviewedBy": [],
+    "supersedes": null
+  },
+  "content-safety-gate-v1": {
+    "processCid": "epr:gates:content-safety-gate-v1",
+    "description": "Wide protocol gate evaluating content body / payload safety for ContentPublish, AttestationWrite, and PeerMessage events. Emits Allow or Decline{category:content-safety}. Runs before specialised domain gates.",
+    "handlesEvents": [
+      "ContentPublish",
+      "AttestationWrite",
+      "PeerMessage"
+    ],
+    "governanceReach": "protocol",
+    "peerReviewedBy": [],
+    "supersedes": null
+  }
+}
