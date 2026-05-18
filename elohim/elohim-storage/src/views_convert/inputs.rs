@@ -5,7 +5,7 @@
 //! All From impls that were authored directly against DB input structs
 //! live here, organized by domain.
 
-use elohim_views::shared::{parse_json_opt, serialize_json_opt};
+use elohim_views::shared::serialize_json_opt;
 use elohim_views::{
     CreateAgreementInputView, CreateAllocationInputView, CreateCollectiveInputView,
     CreateContentInputView, CreateContributorPresenceInputView, CreateEconomicEventInputView,
@@ -367,15 +367,15 @@ impl From<RecognitionTriggerInputView>
 
 #[cfg(test)]
 mod schema_version_tests {
+    use elohim_views::shared::{
+        default_schema_version, validate_schema_versions, SUPPORTED_SCHEMA_VERSIONS,
+    };
     use elohim_views::{
         AccountPackageInputView, CreateAllocationInputView, CreateCollectiveInputView,
-        CreateContributorPresenceInputView, CreateContentInputView, CreateEconomicEventInputView,
+        CreateContentInputView, CreateContributorPresenceInputView, CreateEconomicEventInputView,
         CreateHumanRelationshipInputView, CreateMasteryInputView, CreateRelationshipInputView,
         InitiateClaimInputView, RecognitionTriggerInputView, UpdateAllocationInputView,
         UpdateContentInputView, UpsertPolicyInputView,
-    };
-    use elohim_views::shared::{
-        default_schema_version, validate_schema_versions, SUPPORTED_SCHEMA_VERSIONS,
     };
 
     #[test]

@@ -5,10 +5,8 @@
 
 /// Every attestation subtype declared across pillar manifests. Sorted alphabetically.
 pub const ATTESTATION_KINDS: &[&str] = &[
+    "$ref",
     "attestation:challenge-support",
-    "attestation:content-quality",
-    "attestation:content-succession",
-    "attestation:custodian-commitment",
     "attestation:device-health",
     "attestation:doorway-health-summary",
     "attestation:forget-decision",
@@ -19,7 +17,6 @@ pub const ATTESTATION_KINDS: &[&str] = &[
     "attestation:identity-credential",
     "attestation:identity-freeze",
     "attestation:key-stewardship",
-    "attestation:mastery",
     "attestation:policy-inheritance",
     "attestation:proposal-vote",
     "attestation:recovery-approval",
@@ -46,10 +43,8 @@ pub const GOVERNANCE_ACTION_KINDS: &[&str] = &[
 /// Maps an attestation subtype to the pillar manifest that declares it.
 pub fn manifest_ref_for_attestation_kind(kind: &str) -> Option<&'static str> {
     match kind {
+        "$ref" => Some("lamad"),
         "attestation:challenge-support" => Some("imagodei"),
-        "attestation:content-quality" => Some("lamad"),
-        "attestation:content-succession" => Some("lamad"),
-        "attestation:custodian-commitment" => Some("lamad"),
         "attestation:device-health" => Some("infrastructure"),
         "attestation:doorway-health-summary" => Some("infrastructure"),
         "attestation:forget-decision" => Some("mishpat"),
@@ -60,7 +55,6 @@ pub fn manifest_ref_for_attestation_kind(kind: &str) -> Option<&'static str> {
         "attestation:identity-credential" => Some("imagodei"),
         "attestation:identity-freeze" => Some("imagodei"),
         "attestation:key-stewardship" => Some("imagodei"),
-        "attestation:mastery" => Some("lamad"),
         "attestation:policy-inheritance" => Some("imagodei"),
         "attestation:proposal-vote" => Some("mishpat"),
         "attestation:recovery-approval" => Some("imagodei"),

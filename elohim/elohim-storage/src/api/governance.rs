@@ -395,7 +395,9 @@ pub async fn handle(
             // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let vote = governance::cast_vote(&mut conn, &new_vote)?;
             let hide = proposal.voting_anonymous == 1;
-            Ok(response::created(&crate::views::vote_view_from_vote(vote, hide)))
+            Ok(response::created(&crate::views::vote_view_from_vote(
+                vote, hide,
+            )))
         }
 
         // POST /api/v1/governance/proposals/{id}/options — Create proposal options

@@ -5,8 +5,8 @@
 
 use elohim_views::shared::{parse_json, parse_json_opt};
 use elohim_views::{
-    AccessGrantView, AgreementView, ContributorDashboardView, ContributorImpactView,
-    ContributorPresenceView, ContentStewardshipView, EconomicEventView, MeasureView,
+    AccessGrantView, AgreementView, ContentStewardshipView, ContributorDashboardView,
+    ContributorImpactView, ContributorPresenceView, EconomicEventView, MeasureView,
     NodeStewardshipView, PremiumGateView, ReaCommitmentView, ResponsibilityDemandConfigView,
     StewardAffinityView, StewardCredentialView, StewardRevenueSummaryView, StewardedNodeView,
     StewardshipAllocationView, StewardshipAllocationWithPresenceView, TokenBalanceView,
@@ -15,10 +15,11 @@ use elohim_views::{
 
 use crate::db::contributors::ImpactSummary;
 use crate::db::models::{
-    AccessGrant, AgreementRow, ContributorDashboard, ContributorPresence, ContentStewardship,
+    AccessGrant, AgreementRow, ContentStewardship, ContributorDashboard, ContributorPresence,
     EconomicEvent, NodeStewardship, PremiumGate, ReaCommitment, ResponsibilityDemandConfig,
     StewardAffinity, StewardCredential, StewardedNode, StewardshipAllocation,
-    StewardshipAllocationWithPresence, TokenBalance, TokenDecayEvent, TokenMintEvent, TokenTransfer,
+    StewardshipAllocationWithPresence, TokenBalance, TokenDecayEvent, TokenMintEvent,
+    TokenTransfer,
 };
 use crate::db::steward_operations::RevenueSummary;
 

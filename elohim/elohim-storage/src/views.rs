@@ -266,6 +266,9 @@ mod federation_canonical_tests {
 pub use elohim_views::epr::*;
 pub use elohim_views::imagodei::*;
 pub use elohim_views::infrastructure::*;
+// InputView types: re-exported for callers, but unused inside this crate under
+// the WASM rustflags build. allow keeps clippy -D warnings happy.
+#[allow(unused_imports)]
 pub use elohim_views::inputs::*;
 pub use elohim_views::lamad::*;
 pub use elohim_views::qahal::*;

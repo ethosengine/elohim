@@ -80,7 +80,6 @@ use crate::views::{
     CreateScheduleInputView,
     CreateStewardedNodeInputView,
     EconomicEventView,
-    ElohimReputationProfileView,
     EprHeadInputView,
     EprHeadView,
     GateDecisionAttestationView,
@@ -88,7 +87,6 @@ use crate::views::{
     HumanView,
     InitiateClaimInputView,
     LocalSessionView,
-    NodeStewardshipView,
     ObservationDurationView,
     ObservationEntryInputView,
     ObservationEntryView,
@@ -5605,7 +5603,8 @@ impl HttpServer {
                                 .flatten()
                                 .map(|h| h.display_name)
                                 .unwrap_or_else(|| stewardship.human_id.clone());
-                        let view = crate::views::node_stewardship_view_from_with_name(stewardship, name);
+                        let view =
+                            crate::views::node_stewardship_view_from_with_name(stewardship, name);
                         Ok(response::created(&view))
                     }
                     Err(e) => Ok(response::error_response(e)),
@@ -6039,8 +6038,12 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
         let result = crate::db::elohim_reputation::compute(&mut conn, &q)?;
 
-        let view =
-            crate::views::elohim_reputation_profile_view_from_result(elohim_id, window_start, window_end, result);
+        let view = crate::views::elohim_reputation_profile_view_from_result(
+            elohim_id,
+            window_start,
+            window_end,
+            result,
+        );
 
         Ok(response::ok(&view))
     }

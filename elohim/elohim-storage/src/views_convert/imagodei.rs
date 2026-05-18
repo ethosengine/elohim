@@ -5,9 +5,9 @@
 
 use elohim_views::shared::parse_json;
 use elohim_views::{
-    DevicePolicyView, HumanView, JsonVal, KeyRevocationView, LocalSessionView, MonitoringRulesInput,
-    RecognitionDistributionResultView, RecoveryWitnessView, RevocationVoteView, StageTraceView,
-    UpsertPolicyInputView,
+    DevicePolicyView, HumanView, JsonVal, KeyRevocationView, LocalSessionView,
+    MonitoringRulesInput, RecognitionDistributionResultView, RecoveryWitnessView,
+    RevocationVoteView, StageTraceView, UpsertPolicyInputView,
 };
 
 use crate::db::models::{DevicePolicy, Human, KeyRevocationRow, LocalSession, RevocationVoteRow};
@@ -209,7 +209,6 @@ pub fn upsert_policy_to_db_input(
         subject_can_view: monitoring.subject_can_view,
     }
 }
-
 
 // ============================================================================
 // Recognition Pipeline Views

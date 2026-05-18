@@ -33,7 +33,9 @@ fn resolve_refs(value: serde_json::Value, base_dir: &std::path::Path) -> serde_j
     match value {
         Value::Object(map) => {
             if let Some(Value::String(ref_str)) = map.get("$ref") {
-                if map.len() == 1 && (ref_str.starts_with("./manifest/") || ref_str.starts_with("../")) {
+                if map.len() == 1
+                    && (ref_str.starts_with("./manifest/") || ref_str.starts_with("../"))
+                {
                     let ref_path = base_dir.join(ref_str);
                     let raw = std::fs::read_to_string(&ref_path)
                         .unwrap_or_else(|e| panic!("read {}: {e}", ref_path.display()));
@@ -48,7 +50,9 @@ fn resolve_refs(value: serde_json::Value, base_dir: &std::path::Path) -> serde_j
                     .collect(),
             )
         }
-        Value::Array(arr) => Value::Array(arr.into_iter().map(|v| resolve_refs(v, base_dir)).collect()),
+        Value::Array(arr) => {
+            Value::Array(arr.into_iter().map(|v| resolve_refs(v, base_dir)).collect())
+        }
         other => other,
     }
 }

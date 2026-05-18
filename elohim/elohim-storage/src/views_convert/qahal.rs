@@ -5,12 +5,11 @@
 
 use elohim_views::shared::{parse_json, parse_json_opt};
 use elohim_views::{
-    AppealView, AttestationView, ChallengeOutcomeView, ChallengeView,
-    CollectiveParticipationView, CollectiveView, ContentAttestationView, DiscussionView,
-    GateDecisionAttestationView, GateDecisionChallengeView, GovernanceActionTallyView,
-    GovernanceActionView, GovernanceDispositionView, GovernanceSignalView, GovernanceStateView,
-    PrecedentView, ProposalOptionView, ProposalView, RankedVoteView, StatementView,
-    StatementVoteView, VoteView,
+    AppealView, AttestationView, ChallengeOutcomeView, ChallengeView, CollectiveParticipationView,
+    CollectiveView, ContentAttestationView, DiscussionView, GateDecisionAttestationView,
+    GateDecisionChallengeView, GovernanceActionTallyView, GovernanceActionView,
+    GovernanceDispositionView, GovernanceSignalView, GovernanceStateView, PrecedentView,
+    ProposalOptionView, ProposalView, RankedVoteView, StatementView, StatementVoteView, VoteView,
 };
 
 use crate::db::challenge_outcomes::ChallengeOutcomeRow;
@@ -548,7 +547,11 @@ pub fn vote_view_from_vote(v: Vote, hide_identity: bool) -> VoteView {
     VoteView {
         id: v.id,
         proposal_id: v.proposal_id,
-        human_id: if hide_identity { None } else { Some(v.human_id) },
+        human_id: if hide_identity {
+            None
+        } else {
+            Some(v.human_id)
+        },
         position: v.position,
         reason: v.reason,
         created_at: v.created_at,
@@ -568,7 +571,11 @@ pub fn ranked_vote_view_from_ranked_vote(v: RankedVote, hide_identity: bool) -> 
     RankedVoteView {
         id: v.id,
         proposal_id: v.proposal_id,
-        human_id: if hide_identity { None } else { Some(v.human_id) },
+        human_id: if hide_identity {
+            None
+        } else {
+            Some(v.human_id)
+        },
         option_id: v.option_id,
         rank: v.rank,
         score: v.score,

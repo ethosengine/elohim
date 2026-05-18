@@ -9,7 +9,7 @@ use elohim_views::{
     CustodianBandwidthView, CustodianComputationView, CustodianEconomicView, CustodianHealthView,
     CustodianMetricsView, CustodianReputationView, CustodianStorageMetricsView,
     ElohimCapabilityProfile, ElohimReputationProfileView, HazardView, JsonVal,
-    ObservationDiversitySummaryView, ObservationView, PeerStatusView, PlacementGapView, PlaceView,
+    ObservationDiversitySummaryView, ObservationView, PeerStatusView, PlaceView, PlacementGapView,
     PutBlobResponseView, RenderCapabilityProfile, ReportCustodianMetricsInputView, RiskAlertView,
     ScheduleView, SpatialContextView,
 };
