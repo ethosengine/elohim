@@ -1,0 +1,54 @@
+{
+  "description": "A structured practice activity with specific skill-building objectives. More guided than an exercise, with defined success criteria.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "VALIDATES": [
+          "concept"
+        ],
+        "BELONGS_TO": [
+          "lesson",
+          "path"
+        ],
+        "REQUIRES": [
+          "concept"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "practice",
+        "recognition": "mastery-credit"
+      },
+      "onComplete": {
+        "action": "produce",
+        "resourceConformsTo": "mastery-attestation",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "practice-engagement",
+        "mastery-achieved"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "knowledge-retention",
+        "contradictedBy": "retention-failure",
+        "validityHorizon": "P30D",
+        "leg": "knowledge"
+      },
+      {
+        "asserts": "mastery-attestation-meaningful",
+        "contradictedBy": "downstream-prerequisite-failure",
+        "validityHorizon": "P90D",
+        "leg": "value"
+      }
+    ]
+  }
+}

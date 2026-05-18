@@ -1,0 +1,47 @@
+{
+  "description": "A collaborative dialogue space tied to content. Enables peer learning and community sensemaking around topics.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "RELATES_TO": [
+          "concept",
+          "lesson",
+          "article"
+        ],
+        "BELONGS_TO": [
+          "path",
+          "course-module"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      },
+      "onContribute": {
+        "action": "produce",
+        "resourceConformsTo": "contribution",
+        "recognition": "contribution-record"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "intimate",
+      "governanceModel": "community-vote",
+      "signalTypes": [
+        "learning-signal",
+        "contribution-created"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "community-value-confirmed",
+        "contradictedBy": "engagement-decline",
+        "validityHorizon": "P90D",
+        "leg": "value"
+      }
+    ]
+  }
+}

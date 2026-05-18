@@ -1,0 +1,60 @@
+{
+  "description": "A structured teaching unit that guides learners through a topic with explanations, examples, and practice opportunities.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "CONTAINS": [
+          "concept",
+          "exercise",
+          "assessment",
+          "reflection"
+        ],
+        "BELONGS_TO": [
+          "path",
+          "course-module"
+        ],
+        "FOLLOWS": [
+          "lesson"
+        ],
+        "REQUIRES": [
+          "concept"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      },
+      "onComplete": {
+        "action": "produce",
+        "resourceConformsTo": "mastery-attestation",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "learning-signal",
+        "mastery-achieved"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "knowledge-retention",
+        "contradictedBy": "retention-failure",
+        "validityHorizon": "P30D",
+        "leg": "knowledge"
+      },
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P180D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

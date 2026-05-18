@@ -1,0 +1,40 @@
+{
+  "description": "An external tool or utility referenced in the learning context. Provides metadata and links for tools learners need during their journey.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "RELATES_TO": [
+          "concept",
+          "lesson",
+          "exercise"
+        ],
+        "REFERENCES": [
+          "article"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P365D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

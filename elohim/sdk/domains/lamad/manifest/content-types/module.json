@@ -1,0 +1,50 @@
+{
+  "description": "A generic content module — a reusable, self-contained unit that can be composed into different paths and course structures.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "CONTAINS": [
+          "lesson",
+          "concept",
+          "exercise"
+        ],
+        "BELONGS_TO": [
+          "path",
+          "course-module"
+        ],
+        "RELATES_TO": [
+          "module"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "learning-outcome-achieved",
+        "contradictedBy": "path-completion-without-retention",
+        "validityHorizon": "P90D",
+        "leg": "knowledge"
+      },
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P180D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

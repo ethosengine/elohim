@@ -1,0 +1,40 @@
+{
+  "description": "An open-ended prompt for self-reflection and metacognition. Not graded — produces qualitative insight rather than scores.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "BELONGS_TO": [
+          "lesson",
+          "path"
+        ],
+        "RELATES_TO": [
+          "concept",
+          "discussion"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P180D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

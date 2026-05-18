@@ -1,0 +1,34 @@
+{
+  "description": "Protocol-root universal-band DAG — the wisdom-as-system-auth layer that wraps every relational-impact invocation. Structurally identical to gate-process-declaration but protocol-reach governed. Referenced by a well-known constitutional pointer.",
+  "metadataSchema": {
+    "$ref": "./schemas/universal-band-declaration-metadata.schema.json"
+  },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "REFERENCES": [
+          "gate-rules-declaration",
+          "aggregation-spec",
+          "escalation-target-spec"
+        ]
+      }
+    },
+    "value": {},
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "commons",
+      "governanceModel": "protocol-ratification",
+      "signalTypes": [
+        "attestation-granted"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "peer-review-verified",
+        "contradictedBy": "manifest-challenged",
+        "validityHorizon": "P365D",
+        "leg": "governance"
+      }
+    ]
+  }
+}

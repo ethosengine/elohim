@@ -1,0 +1,40 @@
+{
+  "description": "A durable narrative junction representing (subject, role, feature) — the persona's experience with a feature in a given role. Accumulates value via :story-point attestations over time.",
+  "metadataSchema": {
+    "$ref": "./schemas/experience-story-metadata.schema.json"
+  },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "HAS_SUBJECT": [
+          "human",
+          "collective"
+        ],
+        "IN_ROLE": [
+          "role"
+        ],
+        "EXERCISES": [
+          "feature"
+        ]
+      }
+    },
+    "value": {
+      "onAttest": {
+        "action": "produce",
+        "resourceConformsTo": "experience-evidence"
+      }
+    },
+    "governance": {
+      "defaultReach": "self",
+      "governanceModel": "steward-consent"
+    },
+    "claims": [
+      {
+        "asserts": "community-value-confirmed",
+        "contradictedBy": "content-misleading",
+        "validityHorizon": "P90D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

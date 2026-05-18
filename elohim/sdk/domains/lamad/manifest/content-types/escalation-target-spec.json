@@ -1,0 +1,27 @@
+{
+  "description": "Parameter artifact for the `escalate-to-review` step type. Declares where escalated decisions route (app-steward / qahal / existential-boundary) and at what severity tier.",
+  "metadataSchema": {
+    "$ref": "./schemas/escalation-target-spec-metadata.schema.json"
+  },
+  "coupling": {
+    "knowledge": {},
+    "value": {},
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "attestation-granted",
+        "attestation-revoked"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "peer-review-verified",
+        "contradictedBy": "manifest-challenged",
+        "validityHorizon": "P365D",
+        "leg": "governance"
+      }
+    ]
+  }
+}

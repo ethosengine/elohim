@@ -1,0 +1,48 @@
+{
+  "description": "An interactive HTML5 simulation or game that teaches through experiential learning. Served via iframe from doorway.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "VALIDATES": [
+          "concept"
+        ],
+        "BELONGS_TO": [
+          "lesson",
+          "path"
+        ],
+        "RELATES_TO": [
+          "exercise"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      },
+      "onComplete": {
+        "action": "produce",
+        "resourceConformsTo": "mastery-attestation",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "practice-engagement",
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "knowledge-retention",
+        "contradictedBy": "retention-failure",
+        "validityHorizon": "P30D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

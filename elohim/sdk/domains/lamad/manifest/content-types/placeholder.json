@@ -1,0 +1,19 @@
+{
+  "description": "A placeholder for missing or errored content. Shown when content cannot be loaded — ensures the graph remains navigable.",
+  "coupling": {
+    "value": {},
+    "governance": {
+      "defaultReach": "private",
+      "minimumReach": "private",
+      "governanceModel": "steward-consent"
+    },
+    "claims": [
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P1D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "description": "A curated learning journey — an ordered sequence of steps through content. Paths are EPR composites that reference other content types.",
+  "metadataSchema": {
+    "$ref": "./schemas/path-metadata.schema.json"
+  },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "CONTAINS": [
+          "concept",
+          "lesson",
+          "assessment",
+          "exercise",
+          "reflection",
+          "article",
+          "simulation"
+        ],
+        "FOLLOWS": [
+          "path"
+        ],
+        "REQUIRES": [
+          "path",
+          "concept"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      },
+      "onComplete": {
+        "action": "produce",
+        "resourceConformsTo": "path-completion",
+        "recognition": "mastery-credit"
+      },
+      "onContribute": {
+        "action": "produce",
+        "resourceConformsTo": "contribution",
+        "recognition": "stewardship-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "path-completed",
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "learning-outcome-achieved",
+        "contradictedBy": "path-completion-without-retention",
+        "validityHorizon": "P90D",
+        "leg": "knowledge"
+      },
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P180D",
+        "leg": "knowledge"
+      },
+      {
+        "asserts": "stewardship-distributed",
+        "contradictedBy": "stewardship-concentrated",
+        "validityHorizon": "P180D",
+        "leg": "governance"
+      }
+    ]
+  }
+}

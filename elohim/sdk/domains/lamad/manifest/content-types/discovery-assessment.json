@@ -1,0 +1,45 @@
+{
+  "description": "Self-discovery quiz (Enneagram, learning style, values inventory). Ungraded — produces psychometric insights rather than scores.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "RELATES_TO": [
+          "concept",
+          "instrument"
+        ],
+        "BELONGS_TO": [
+          "path"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "evaluation",
+        "recognition": "mastery-credit"
+      },
+      "onComplete": {
+        "action": "produce",
+        "resourceConformsTo": "self-knowledge",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "assessment-completed",
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P365D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "description": "Parameter artifact for the `mechanical-ruleset` step type. An ordered rule list referenced by CID from a gate-process-declaration. Example: the 7-valence discernment ruleset for experience-moment.",
+  "metadataSchema": {
+    "$ref": "./schemas/gate-rules-declaration-metadata.schema.json"
+  },
+  "coupling": {
+    "knowledge": {},
+    "value": {},
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "attestation-granted",
+        "attestation-revoked"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "peer-review-verified",
+        "contradictedBy": "manifest-challenged",
+        "validityHorizon": "P365D",
+        "leg": "governance"
+      }
+    ]
+  }
+}

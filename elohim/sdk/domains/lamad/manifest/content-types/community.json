@@ -1,0 +1,40 @@
+{
+  "description": "A community group or collective in the learning network. App-layer rendering hint for community identity and membership.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "CONTAINS": [
+          "path",
+          "article",
+          "discussion"
+        ],
+        "RELATES_TO": [
+          "community"
+        ]
+      }
+    },
+    "value": {
+      "onContribute": {
+        "action": "produce",
+        "resourceConformsTo": "contribution",
+        "recognition": "stewardship-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "community",
+      "minimumReach": "intimate",
+      "governanceModel": "community-vote",
+      "signalTypes": [
+        "contribution-created"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "community-value-confirmed",
+        "contradictedBy": "engagement-decline",
+        "validityHorizon": "P90D",
+        "leg": "value"
+      }
+    ]
+  }
+}

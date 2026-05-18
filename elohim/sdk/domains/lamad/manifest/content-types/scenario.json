@@ -1,0 +1,43 @@
+{
+  "description": "A BDD scenario specifying observable behavior — Given/When/Then. Scenarios are executable specifications that validate learning outcomes.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "BELONGS_TO": [
+          "epic",
+          "feature"
+        ],
+        "VALIDATES": [
+          "concept",
+          "lesson"
+        ],
+        "IMPLEMENTS": [
+          "epic"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P365D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

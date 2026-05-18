@@ -1,0 +1,41 @@
+{
+  "description": "A BDD feature file grouping related scenarios. Maps to Gherkin Feature blocks and organizes executable specifications.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "BELONGS_TO": [
+          "epic"
+        ],
+        "CONTAINS": [
+          "scenario"
+        ],
+        "IMPLEMENTS": [
+          "epic"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P365D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

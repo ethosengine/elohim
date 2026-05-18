@@ -1,0 +1,52 @@
+{
+  "description": "A lightweight graded question set — simpler than a full assessment, typically embedded within lessons or used for quick knowledge checks.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "VALIDATES": [
+          "concept",
+          "lesson"
+        ],
+        "BELONGS_TO": [
+          "lesson",
+          "course-module"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "evaluation",
+        "recognition": "mastery-credit"
+      },
+      "onComplete": {
+        "action": "produce",
+        "resourceConformsTo": "mastery-attestation",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "assessment-completed",
+        "mastery-achieved"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "knowledge-retention",
+        "contradictedBy": "retention-failure",
+        "validityHorizon": "P30D",
+        "leg": "knowledge"
+      },
+      {
+        "asserts": "mastery-attestation-meaningful",
+        "contradictedBy": "downstream-prerequisite-failure",
+        "validityHorizon": "P90D",
+        "leg": "value"
+      }
+    ]
+  }
+}

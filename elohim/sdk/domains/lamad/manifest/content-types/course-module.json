@@ -1,0 +1,60 @@
+{
+  "description": "A thematic grouping of lessons, exercises, and assessments within a path. Provides intermediate structure between path and individual content.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "CONTAINS": [
+          "lesson",
+          "assessment",
+          "exercise",
+          "quiz"
+        ],
+        "BELONGS_TO": [
+          "path"
+        ],
+        "FOLLOWS": [
+          "course-module"
+        ],
+        "REQUIRES": [
+          "course-module",
+          "concept"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      },
+      "onComplete": {
+        "action": "produce",
+        "resourceConformsTo": "mastery-attestation",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "learning-signal",
+        "mastery-achieved"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "learning-outcome-achieved",
+        "contradictedBy": "path-completion-without-retention",
+        "validityHorizon": "P90D",
+        "leg": "knowledge"
+      },
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P180D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

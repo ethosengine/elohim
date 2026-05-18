@@ -1,0 +1,38 @@
+{
+  "description": "A psychometric instrument definition — subscales, scoring rules, and display configuration for discovery assessments.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "DESCRIBES": [
+          "discovery-assessment"
+        ],
+        "RELATES_TO": [
+          "concept"
+        ]
+      }
+    },
+    "value": {
+      "onContribute": {
+        "action": "produce",
+        "resourceConformsTo": "contribution",
+        "recognition": "stewardship-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "contribution-created"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P365D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

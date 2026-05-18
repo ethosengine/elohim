@@ -1,0 +1,35 @@
+{
+  "description": "An app-manifest-declared gate-process DAG. Carries the step graph an elohim executes when a RelationalImpactEvent fires for a given content type. CID-addressed and inspectable (spec P3). See elohim/elohim-agent/spec/2026-04-18-gate-interface.md §2.",
+  "metadataSchema": {
+    "$ref": "./schemas/gate-process-declaration-metadata.schema.json"
+  },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "REFERENCES": [
+          "gate-rules-declaration",
+          "aggregation-spec",
+          "escalation-target-spec"
+        ]
+      }
+    },
+    "value": {},
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "attestation-granted",
+        "attestation-revoked"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "peer-review-verified",
+        "contradictedBy": "manifest-challenged",
+        "validityHorizon": "P365D",
+        "leg": "governance"
+      }
+    ]
+  }
+}

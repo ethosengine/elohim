@@ -1,0 +1,44 @@
+{
+  "description": "A high-level narrative arc that organizes features and scenarios into a coherent story. Epics frame the why behind learning content.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "CONTAINS": [
+          "feature",
+          "scenario",
+          "article"
+        ],
+        "DESCRIBES": [
+          "concept",
+          "path"
+        ],
+        "RELATES_TO": [
+          "epic"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P365D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

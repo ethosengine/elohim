@@ -1,0 +1,33 @@
+{
+  "description": "One persona's first-person recording of one scenario at one moment. Agent-scoped (private source-chain entry). Projected locally per persona; never gossipped.",
+  "metadataSchema": {
+    "$ref": "./schemas/experience-moment-metadata.schema.json"
+  },
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "ATTESTS_TO": [
+          "experience-story"
+        ]
+      }
+    },
+    "value": {},
+    "governance": {
+      "defaultReach": "self",
+      "governanceModel": "agent-scoped",
+      "gates": [
+        "content-safety-gate-v1",
+        "discernment-gate-v1-mechanical",
+        "reach-gate-v1"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "community-value-confirmed",
+        "contradictedBy": "content-misleading",
+        "validityHorizon": "P30D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

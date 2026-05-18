@@ -1,0 +1,56 @@
+{
+  "description": "Long-form written content — essays, explainers, deep dives. The primary narrative format for knowledge sharing.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "DESCRIBES": [
+          "concept",
+          "epic"
+        ],
+        "REFERENCES": [
+          "article",
+          "book-chapter"
+        ],
+        "RELATES_TO": [
+          "lesson",
+          "concept"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "learning-content",
+        "recognition": "mastery-credit"
+      },
+      "onContribute": {
+        "action": "produce",
+        "resourceConformsTo": "contribution",
+        "recognition": "stewardship-standing"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "learning-signal",
+        "contribution-created"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "content-relevant",
+        "contradictedBy": "content-outdated",
+        "validityHorizon": "P180D",
+        "leg": "knowledge"
+      },
+      {
+        "asserts": "stewardship-distributed",
+        "contradictedBy": "stewardship-concentrated",
+        "validityHorizon": "P180D",
+        "leg": "governance"
+      }
+    ]
+  }
+}

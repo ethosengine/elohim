@@ -1,0 +1,43 @@
+{
+  "description": "A practice activity that reinforces understanding. Unlike assessments, exercises are ungraded and focus on skill building.",
+  "coupling": {
+    "knowledge": {
+      "relationships": {
+        "BELONGS_TO": [
+          "lesson",
+          "concept"
+        ],
+        "VALIDATES": [
+          "concept"
+        ],
+        "RELATES_TO": [
+          "exercise"
+        ]
+      }
+    },
+    "value": {
+      "onConsume": {
+        "action": "use",
+        "resourceConformsTo": "practice",
+        "recognition": "mastery-credit"
+      }
+    },
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "practice-engagement",
+        "learning-signal"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "knowledge-retention",
+        "contradictedBy": "retention-failure",
+        "validityHorizon": "P30D",
+        "leg": "knowledge"
+      }
+    ]
+  }
+}

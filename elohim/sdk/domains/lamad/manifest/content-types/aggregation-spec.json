@@ -1,0 +1,27 @@
+{
+  "description": "Parameter artifact for the `aggregate-attestations` step type. Declares how a step queries the DHT attestation graph and reduces results to a scalar (e.g., reach-level tiers for reach-gate).",
+  "metadataSchema": {
+    "$ref": "./schemas/aggregation-spec-metadata.schema.json"
+  },
+  "coupling": {
+    "knowledge": {},
+    "value": {},
+    "governance": {
+      "defaultReach": "commons",
+      "minimumReach": "community",
+      "governanceModel": "steward-consent",
+      "signalTypes": [
+        "attestation-granted",
+        "attestation-revoked"
+      ]
+    },
+    "claims": [
+      {
+        "asserts": "peer-review-verified",
+        "contradictedBy": "manifest-challenged",
+        "validityHorizon": "P365D",
+        "leg": "governance"
+      }
+    ]
+  }
+}
