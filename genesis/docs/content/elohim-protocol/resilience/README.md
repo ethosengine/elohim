@@ -221,6 +221,112 @@ We are not there yet. We have a reciprocal pair on the alpha cluster, three cano
 
 ---
 
+## **Part V: Seeing What You Hold — The Stewardship Surface**
+
+### **Mutual Aid Extends Past the Household**
+
+The reciprocal-backup pair between Gertrude and the Dowells is the *minimum viable* shape of mutual aid expressed as protocol primitive. It is the smallest case that exercises the whole surface. But the substrate's promise — and the reason the trillion-dollar problem is solvable at consumer scale rather than at family scale — is that **the same primitive composes outward, indefinitely, across every reach the protocol already understands.**
+
+Mutual aid agreements at household reach: backup share custody between gertrude and matthew, two parents agreeing to hold each other's child's learning record after a divorce, a household member quietly stewarding a sibling's medical directives.
+
+Mutual aid agreements at neighborhood reach: a block's worth of households agreeing to steward each other's elder-recovery shares so that no single household becomes a single point of failure for the block, a homeschool co-op agreeing to host each other's curriculum decisions, a community garden agreeing to steward each other's plot records.
+
+Mutual aid agreements at congregation / affinity / organization reach: a church holding directory and pastoral-care records distributed across its members' devices rather than rented from a SaaS platform, a credit union stewarding members' transaction histories on member-operated hardware, a small business stewarding customer records on the business owner's family hub plus a backup co-op of fellow small business owners.
+
+Mutual aid agreements at commons reach: a watershed council stewarding the watershed's biodiversity records, a public-records co-op holding the county's court judgements and tax records, a podcast-supporter network stewarding the back catalog of independent journalism, a Wikipedia-shaped collective stewarding educational content, a public-domain archive stewarding orphaned cultural works.
+
+Each of these is the same protocol shape: a Commitment, between two Agents, over a Resource classified by `signal_kind` and `resource_classified_as`, in a `state` that progresses through the lifecycle, with breach signals isolated from attribution. The compositional discipline is the same at every reach. The only thing that changes is who the counterparties are and what reach the Resource carries.
+
+### **The Top-Level Surface — A Bar That Tells the Truth**
+
+For a human staring at their screen — Gertrude with her recycled laptop, Matthew with his on-prem family-node, the small business owner with their home-NUC, the watershed council operator with their decommissioned office desktop — the substrate's claim has to *show up* somewhere they can see it. Not in a settings panel six clicks deep. Not as an opt-in advanced view. At the top level of the storage / compute surface, glanceable in a second:
+
+```
+  ──────────────────────────────────────────────────────────────────────────
+  Your hardware                                       80 GB
+  ──────────────────────────────────────────────────────────────────────────
+  ▓▓▓▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░░░░░░░░░░░░░
+  10 GB used (your own things)
+  20 GB stewarded (held for others) — click to see who
+  50 GB free
+  ──────────────────────────────────────────────────────────────────────────
+```
+
+(Bar, circle, sparkline, whatever form the design layer settles on — the substrate's claim is invariant under presentation choice.) The three quantities are the load-bearing claims. **Used** is the steward's own footprint. **Stewarded** is what they're holding for others. **Free** is what's available to commit. The ratio of stewarded-to-used is — directly, gracefully, glanceably — *the measure of the human's pro-social participation in the substrate*. Not as a leaderboard. Not as a credit score. As a fact about the hardware, made visible.
+
+### **Drilling Down — Three Classes of Stewardship, Three Postures**
+
+A click on the stewarded slice opens the three-class breakdown that names what kind of pro-social participation is happening:
+
+```
+  ──────────────────────────────────────────────────────────────────────────
+  20 GB stewarded — three kinds of holding
+  ──────────────────────────────────────────────────────────────────────────
+
+  Encrypted        ▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    6 GB
+                   Private shards for people you back up.
+                   You cannot read these. You hold them so they can
+                   come back to themselves if they lose their device.
+
+  Social           ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░   12 GB
+                   Data your communities trust you with.
+                   Church directory. Co-op curriculum. Watershed
+                   council minutes. The neighborhood's accounting.
+                   You may be able to read it; the community
+                   decides what is shared with whom.
+
+  Commons          ▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    2 GB
+                   Public goods you carry a piece of.
+                   Course material. County records. Biodiversity
+                   archives. Map tiles. Independent journalism.
+                   Anyone can read these; you help host them.
+  ──────────────────────────────────────────────────────────────────────────
+```
+
+These are three different *postures* of pro-social participation. The substrate has been quietly carrying them as separate dimensions of the Commitment ledger; the UX makes them legible to the human stewarding the hardware.
+
+**Encrypted custody** — opaque material the steward holds without read access. The recovery share-custody case from the Gertrude story sits here. So does any "I am holding the bytes but not the keys" arrangement: a Shamir share, a sealed envelope, an emergency cache for someone the steward loves. The ethical posture is *plausible deniability + load-bearing reliability*: the steward cannot even know what they hold; what they can promise is that it will be available when the counterparty needs it. In protocol terms: `resource_classified_as_json` carries `["encrypted-custody"]`; the steward's storage projects the bytes but the steward's elohim agent does not have the decryption material; the FeedbackSignal stream is the only thing the steward can observe (acceptance, exercise, breach).
+
+**Social custody** — community-tier data the steward holds on behalf of a bounded social group. The church directory. The homeschool co-op's curriculum decisions. The watershed council's minutes. The neighborhood's shared accounting. The small business's customer records, stewarded by the business owner and a small co-op of fellow business owners. The steward may or may not be a member of the group; the *group's* governance decides who can read what. In protocol terms: `reach` is in {`household`, `neighborhood`, `community`, `organization`}; `signal_kind` carries the kind of stewardship being provided; the doorway projects member-visible queries onto the stewarded shards. This is where the bulk of the trillion-dollar problem actually moves: church directories, neighborhood association records, co-op books, small-organization data — *exactly* the kind of records that hyperscalers currently host as SaaS platforms with monthly rent and a surveillance side-channel. The substrate lets these move home to member-operated hardware.
+
+**Commons custody** — public-reach content where the steward is hosting a piece of the digital public commons. Course material. Public records. Court judgements (anonymized appropriately). Tax records. Biodiversity archives. OpenStreetMap tiles. Independent journalism the steward chooses to support. Wikipedia-shaped collective knowledge. Out-of-copyright literature. Public health data. In protocol terms: `reach: "commons"`; the steward elects (or has elected on their behalf via household policy) which commons resources to carry; the substrate handles distribution, replication, and integrity. This is the digital-library-as-distributed-infrastructure layer — the kind of public-goods hosting that has historically required a Library of Congress, an Internet Archive, a university library, a national broadcaster, and that the substrate makes possible at distributed scale through individual humans carrying small shards.
+
+### **The Composition Discipline**
+
+The three classes are not arbitrary categories overlaid on the protocol — they are *queries against the existing Commitment ledger, partitioned by `reach` and by `resource_classified_as`*. Specifically:
+
+- **Encrypted bucket** = `SELECT SUM(quantity) FROM rea_commitments WHERE resource_classified_as @> 'encrypted-custody' AND provider = $self AND state IN ('accepted', 'in-progress')`
+- **Social bucket** = `SELECT SUM(quantity) FROM rea_commitments WHERE reach IN ('household','neighborhood','community','organization') AND resource_classified_as @> 'storage-stewardship' AND provider = $self AND state IN ('accepted', 'in-progress')`
+- **Commons bucket** = `SELECT SUM(quantity) FROM rea_commitments WHERE reach = 'commons' AND resource_classified_as @> 'storage-stewardship' AND provider = $self AND state IN ('accepted', 'in-progress')`
+
+These are not new database tables. They are not new entry types. They are *views over the existing REA Commitment store*, projected through the same `ReaCommitmentView` that already serves the compute-commitment scenarios. The UX layer (elohim-app, shefa pillar) renders these three numbers; the storage layer projects them from the live commitment ledger; the DHT notarizes the underlying agreements. Every layer is speaking the same protocol vocabulary.
+
+This is the load-bearing point: **the visibility-of-participation is not a separate feature**. It is what the substrate looks like when you look at it. The protocol does not have to remember to *make* stewardship visible; stewardship is in the ledger, and looking at the ledger *is* the act of seeing it.
+
+### **What the Visibility Buys**
+
+Three things the substrate-as-visible-commons claim does that opaque hyperscaler hosting cannot:
+
+**It makes pro-social participation legible without quantifying it into a market.** The bar shows "20 GB stewarded" — it does not show a leaderboard ranking. It does not award points. It does not create envy or competition. It does what mutual aid has always done: makes the contribution real enough to count without making it transactional enough to corrupt. The elohim agent stewarding the user's experience is explicitly the [*counsel for the relationship*](../../../../../.claude/memory/project_elohim_as_counsel.md) ([as in the Dowell-Gertrude story](../../../../data/stories/matthew-manager--as-recovery-counterparty--backup-stewardship-for-household-gertrude.md)), refusing the transactional collapse before it can land.
+
+**It makes the commons feel real to the human carrying a piece of it.** A grandma whose 2 GB of disk is hosting a piece of the county's archived court judgements or her favorite podcaster's back catalog is *participating in the public commons in a way she can see*. That is the missing ingredient in most digital-public-infrastructure proposals: they have no surface where the contributor sees what they hold. The substrate's promise to her is not "trust us, the public goods are out there somewhere"; it is "look, 2 GB of your disk *is* the public goods, here is what."
+
+**It makes the cost of extractive alternatives visible by contrast.** Once the user can see that 20 GB of their hardware is stewarded across three pro-social tiers, the next question is: where does the hyperscaler-equivalent of this work? When the church directory currently rented as SaaS could be hosted on the congregation's own family hubs in the *social* tier, the rental cost (in dollars and surveillance side-channel) becomes architectural rather than inevitable. The substrate's contribution to public discourse about consumer technology is, in part, this: *the stewardship surface makes the alternative legible*.
+
+### **The Roadmap For Visibility**
+
+The stewardship-surface UX is a deliverable, not a slogan. The pieces:
+
+1. **Storage projection** — the `ReaCommitmentView` already exposes provider, receiver, resource_classified_as, quantity, state. Storage adds aggregation queries that bucket by the three classes above and serves them via a manifest-declared HTTP route. No DHT changes; no new entry types.
+2. **Doorway route** — the doorway-manifest pattern declares a route like `GET /storage-stewardship/summary` that returns the three-bucket breakdown for a given agent. Doorway projects from storage.
+3. **Angular surface in the shefa pillar** — a top-level dashboard widget rendering the bar / circle. Drill-down into each class. Per-counterparty visibility for the social tier (which church, which co-op). Per-public-good visibility for the commons tier (which podcasts, which archive shards).
+4. **Feature files** — `feature-storage-stewardship-summary.feature` for the top-level bar; `feature-stewardship-class-drilldown.feature` for the three-class breakdown; `feature-storage-stewardship-changes.feature` for what happens when the user accepts or revokes a stewardship commitment.
+5. **Story coverage** — a stewardship-class story per posture, anchored by a real human in the seed data: Gertrude on encrypted custody (already authored), a Dowell-household-style figure on social custody (homeschool co-op records?), a commons-tier steward (a podcaster-supporter or biodiversity-archive contributor) on commons custody. Each story names what it feels like to participate at that tier.
+
+This work is downstream of the recovery-feature work in Part IV (recovery is the test that the substrate works at all), but it is the *same shape* of work, against the same primitives, surfaced through the same UX pillar (shefa). The visibility layer and the recovery layer are not separate efforts; they are two views onto the same Commitment ledger.
+
+---
+
 ## **Closing**
 
 The architecture of consumer technology asks Grandma to trade her humanity for convenience. The architecture of an extractive economy asks her to do this continuously, in fractions, without ever quite noticing. The architecture of a centrally custodial AI future will ask her to surrender judgment about her own life to a system whose revenue depends on getting that judgment subtly wrong.
