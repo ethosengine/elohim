@@ -1887,21 +1887,37 @@ spec:
             }
             steps {
                 container('builder') {
-                    script {
-                        // Standalone deliverable: actual-build-graph.json was
-                        // written by Execute Builds. This stage's only job is
-                        // to verify it, archive it, and print a summary that
-                        // mirrors Post Predicted Build Graph. Symmetric stages
-                        // give external watchers two clean artifacts to diff.
-                        def actual = readJSON(file: env.ACTUAL_BUILD_GRAPH_FILE)
-                        archiveArtifacts(artifacts: env.ACTUAL_BUILD_GRAPH_FILE, fingerprint: true)
+                    // Observational/reporting stage — runs AFTER every dispatched
+                    // build has completed. By this point the world is what it is;
+                    // a parse/archive hiccup here must not blank-out the downstream
+                    // truth. Mirror the 'P2P Validation (Advisory)' pattern: mark
+                    // UNSTABLE on any exception so the pipeline still rolls into
+                    // Reconcile Build Graph (the real signal-bearer) instead of
+                    // hard-failing the whole orchestrator. Compare 'Post Predicted
+                    // Build Graph' which is INTENTIONALLY hard-fail because it
+                    // runs BEFORE dispatch and a failure means the setup is broken.
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                        script {
+                            // Standalone deliverable: actual-build-graph.json was
+                            // written by Execute Builds. This stage's only job is
+                            // to verify it, archive it, and print a summary that
+                            // mirrors Post Predicted Build Graph. Symmetric stages
+                            // give external watchers two clean artifacts to diff.
+                            def actual = readJSON(file: env.ACTUAL_BUILD_GRAPH_FILE)
+                            archiveArtifacts(artifacts: env.ACTUAL_BUILD_GRAPH_FILE, fingerprint: true)
 
-                        def resultLine = (actual.executionOrder ?: []).collect { name ->
-                            def r = actual.results[name]
-                            "${name}=${r?.result ?: 'NOT_RUN'}"
-                        }.join(', ')
+                            // Defensive null-safety: actual.results may be null if
+                            // Execute Builds wrote the file before populating any
+                            // entries (e.g. all dispatches aborted-pre-start). The
+                            // prior version accessed `actual.results[name]` raw and
+                            // NPE'd in exactly that case — observed in build #970.
+                            def resultsMap = actual.results ?: [:]
+                            def resultLine = (actual.executionOrder ?: []).collect { name ->
+                                def r = resultsMap[name]
+                                "${name}=${r?.result ?: 'NOT_RUN'}"
+                            }.join(', ')
 
-                        echo """
+                            echo """
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📥 ACTUAL BUILD GRAPH posted
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1911,6 +1927,7 @@ spec:
   Artifact:         ${env.BUILD_URL}artifact/${env.ACTUAL_BUILD_GRAPH_FILE}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
+                        }
                     }
                 }
             }
@@ -1963,34 +1980,40 @@ spec:
             }
             steps {
                 container('builder') {
-                    script {
-                        echo '''
+                    // Observational deployment-version cross-check. checkDeployedVersion
+                    // is HTTP-bound; a deployment 502 or DNS hiccup during the call
+                    // must not hard-fail the orchestrator. Mark UNSTABLE on any
+                    // exception so subsequent post-flight stages still run.
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                        script {
+                            echo '''
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                          POST-DEPLOYMENT VERIFICATION                         │
 └──────────────────────────────────────────────────────────────────────────────┘'''
 
-                        // Wait for deployments to stabilize
-                        echo '⏳ Waiting 30s for deployments to stabilize...'
-                        sleep(30)
+                            // Wait for deployments to stabilize
+                            echo '⏳ Waiting 30s for deployments to stabilize...'
+                            sleep(30)
 
-                        def verificationResults = [:]
+                            def verificationResults = [:]
 
-                        VERSION_ENDPOINTS.each { name, url ->
-                            def result = checkDeployedVersion(url, env.GIT_COMMIT_SHORT)
-                            verificationResults[name] = result
-                        }
+                            VERSION_ENDPOINTS.each { name, url ->
+                                def result = checkDeployedVersion(url, env.GIT_COMMIT_SHORT)
+                                verificationResults[name] = result
+                            }
 
-                        printDeploymentVerification(env.GIT_COMMIT_SHORT, verificationResults)
+                            printDeploymentVerification(env.GIT_COMMIT_SHORT, verificationResults)
 
-                        env.VERIFICATION_RESULTS = writeJSON(returnText: true, json: verificationResults)
+                            env.VERIFICATION_RESULTS = writeJSON(returnText: true, json: verificationResults)
 
-                        def mismatches = verificationResults.findAll { k, v -> !v.match }
-                        if (mismatches.size() > 0) {
-                            echo "⚠️  WARNING: ${mismatches.size()} deployment(s) may not have the expected version"
-                            echo '   This could mean:'
-                            echo '   - Deployment is still rolling out'
-                            echo '   - Version endpoint not implemented'
-                            echo '   - Deployment failed silently'
+                            def mismatches = verificationResults.findAll { k, v -> !v.match }
+                            if (mismatches.size() > 0) {
+                                echo "⚠️  WARNING: ${mismatches.size()} deployment(s) may not have the expected version"
+                                echo '   This could mean:'
+                                echo '   - Deployment is still rolling out'
+                                echo '   - Version endpoint not implemented'
+                                echo '   - Deployment failed silently'
+                            }
                         }
                     }
                 }
@@ -2000,24 +2023,31 @@ spec:
         stage('Post-flight Health Check') {
             steps {
                 container('builder') {
-                    script {
-                        echo '''
+                    // Observational health probe. The inner unstable() call already
+                    // handles the policy decision (any unhealthy → UNSTABLE). The
+                    // catchError wraps the surrounding exception surface: checkHealth
+                    // HTTP errors, DNS hiccups, or writeJSON of an unserializable
+                    // map must not hard-fail the orchestrator.
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                        script {
+                            echo '''
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                          POST-FLIGHT HEALTH CHECK                             │
 └──────────────────────────────────────────────────────────────────────────────┘'''
 
-                        def healthResults = [:]
-                        getHealthEndpoints().each { name, url ->
-                            def result = checkHealth(name, url)
-                            healthResults[name] = result
-                            echo "${result.healthy ? '✅' : '❌'} ${name}: HTTP ${result.status}"
-                        }
+                            def healthResults = [:]
+                            getHealthEndpoints().each { name, url ->
+                                def result = checkHealth(name, url)
+                                healthResults[name] = result
+                                echo "${result.healthy ? '✅' : '❌'} ${name}: HTTP ${result.status}"
+                            }
 
-                        env.POSTFLIGHT_HEALTH = writeJSON(returnText: true, json: healthResults)
+                            env.POSTFLIGHT_HEALTH = writeJSON(returnText: true, json: healthResults)
 
-                        def unhealthy = healthResults.findAll { k, v -> !v.healthy }
-                        if (unhealthy.size() > 0) {
-                            unstable("${unhealthy.size()} service(s) unhealthy after deployment")
+                            def unhealthy = healthResults.findAll { k, v -> !v.healthy }
+                            if (unhealthy.size() > 0) {
+                                unstable("${unhealthy.size()} service(s) unhealthy after deployment")
+                            }
                         }
                     }
                 }
