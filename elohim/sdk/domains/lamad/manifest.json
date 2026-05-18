@@ -456,46 +456,7 @@
       }
     }
   },
-  "rendering": {
-    "markdown-renderer": {
-      "component": "MarkdownRendererComponent",
-      "formats": [
-        "markdown",
-        "html",
-        "plaintext"
-      ],
-      "platform": "angular"
-    },
-    "gherkin-renderer": {
-      "component": "GherkinRendererComponent",
-      "formats": [
-        "gherkin"
-      ],
-      "platform": "angular"
-    },
-    "sophia-renderer": {
-      "component": "SophiaRendererComponent",
-      "formats": [
-        "sophia-quiz-json"
-      ],
-      "platform": "angular"
-    },
-    "iframe-renderer": {
-      "component": "IframeRendererComponent",
-      "formats": [
-        "html5-app",
-        "video-embed"
-      ],
-      "platform": "angular"
-    },
-    "path-renderer": {
-      "component": "PathViewerComponent",
-      "formats": [
-        "epr-composite"
-      ],
-      "platform": "angular"
-    }
-  },
+  "rendering": { "$ref": "./manifest/rendering.json" },
   "gates": {
     "discernment-gate-v1-mechanical": {
       "processCid": "epr:gates:discernment-gate-v1-mechanical",
