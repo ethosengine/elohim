@@ -85,7 +85,7 @@ This matters enormously for resilience. It means that **the recovery agreement b
 
 The model for how this works is already in flight, in a slightly different domain. The protocol has been building toward **compute commitments as bounded REA primitives** — see [`project_compute_commitments_bounded`](../../../../../.claude/memory/project_compute_commitments_bounded.md), the [`compute-commitment-bounds.feature`](../../../../a2o/features/deployment/compute-commitment-bounds.feature) scenarios, and the [`compute-allocation.feature`](../../../../a2o/features/elohim/compute-allocation.feature) lifecycle scenarios.
 
-A compute commitment expresses: "this node, this household, this collective will provide *this many CPU-millicores and this much memory* to *this counterparty* under *these trigger conditions*, for *this duration*." It is a Commitment. It carries `resource_classified_as_json: ["compute"]`, a quantity (cpu_m, memory_Mi), a state, a counterparty, and a set of trigger kinds (request-driven, standing, subscription). Fulfillment is an Event. Breach is a FeedbackSignal of `signal_kind: "compute-breach"`. The doctrine — important — is that **breach never contaminates attribution**: if shem's power supply dies and the compute commitments backing adam/pete/frank go into breach, the *content they authored, the recognition they hold, the citations against their work* remain queryable and unimpaired. Compute-class flow and attribution-class flow are deliberately isolated, so that a hardware failure cannot silently re-rank a contributor's standing.
+A compute commitment expresses: "this node, this household, this collective will provide *this many CPU-millicores and this much memory* to *this counterparty* under *these trigger conditions*, for *this duration*." It is a Commitment. It carries `resource_classified_as_json: ["compute"]`, a quantity (cpu_m, memory_Mi), a state, a counterparty, and a set of trigger kinds (request-driven, standing, subscription). Fulfillment is an Event. Breach is a FeedbackSignal of `signal_kind: "compute-breach"`. The doctrine — important, and currently expressed as architectural invariant rather than schema-level enforcement — is that **breach never contaminates attribution**: if shem's power supply dies and the compute commitments backing adam/pete/frank go into breach, the *content they authored, the recognition they hold, the citations against their work* remain queryable and unimpaired. Compute-class flow and attribution-class flow are deliberately isolated, so that a hardware failure cannot silently re-rank a contributor's standing. The isolation is documented discipline today, enforced by the projection layer respecting the classification distinction in code review and in scenario coverage; making it *structurally* enforced through a typed taxonomy split (a `compute-class` vs `attribution-class` partition on the Resource classification) is a named follow-up surfaced in the gap matrix below.
 
 This is the design pattern. Recovery agreements are the *same shape*, extended through the substrate's extension primitive — the `signal_kind` field on FeedbackSignal — without inventing a new entry type.
 
@@ -295,7 +295,9 @@ In practice this class is built out of small high-trust mutual circles: Matthew,
 
 **The civic distinction — attribution travels with the bytes.** A prior generation of peer-to-peer infrastructure — BitTorrent, the various Pirate-Bay-shaped trackers, raw IPFS hosting — proved that bytes can move at the edge without central custodians. What it could not do, structurally, was preserve the chain of recognition: the original creator of the work being moved was invisible to the protocol the moment the first copy left their machine. The hosting collapsed into anonymous byte-movement; the contribution collapsed into nothing. The substrate could neither acknowledge the author nor reward the steward; both became unnamed counters in a distribution graph. That architectural amnesia is what made the prior generation of decentralized hosting *exclusively* good at moving content that nobody was supposed to be paid for, and bad at almost everything else.
 
-The Elohim substrate is the opposite architectural choice. Every commons shard carries attribution. The original contributor — whether or not they are present on the network — has a [ContributorPresence](../../../../../.claude/skills/rea-economics/SKILL.md) record in the substrate, a stable identifier the network maintains on their behalf. The stewards holding commons shards generate `EconomicEvent`s of `action: "deliver-service"` against the underlying content, which flow recognition to the steward (for the hosting) and to the ContributorPresence (for the authorship). Both flows are visible in the REA ledger. Neither is lost in transit. When a podcaster who has been quietly hosted across the network for years finally creates an Elohim account and claims their ContributorPresence, the accumulated recognition becomes theirs — *by right* — and is transferred to their newly-claimed agent. The substrate has been carrying their value-flow for them, ungrudgingly, for as long as they were absent.
+The Elohim substrate is the opposite architectural choice. Every commons shard carries attribution. The original contributor — whether or not they are present on the network — has a [ContributorPresence](../../../../../.claude/skills/rea-economics/SKILL.md) record in the substrate, a stable identifier the network maintains on their behalf. The ContributorPresence entry is a live DHT entry type with 32 fields — identity provenance, accumulating recognition (`affinity_total`, `unique_engagers`, `citation_count`, `recognition_score`), and the lifecycle states `unclaimed → stewarded → claimed`. The stewards holding commons shards generate `EconomicEvent`s of `action: "deliver-service"` against the underlying content, which flow recognition to the steward (for the hosting) and accumulate against the ContributorPresence (for the authorship). Both flows are visible in the REA ledger; neither is lost in transit; the accumulation runs continuously on the substrate that hosts the bytes.
+
+When a podcaster who has been quietly hosted across the network for years finally creates an Elohim account and claims their ContributorPresence, the accumulated recognition becomes theirs *by right*. The transfer-on-claim mechanism is named and the fields are reserved on the entry — `claim_recognition_transferred_value`, `claim_recognition_transferred_unit`, eight `claim_verification_methods` ranging from email and ORCID to community-vouching and cryptographic proof. The path is designed; the substrate-level executor that emits the lump-sum transfer `EconomicEvent` on claim is itself a named gap in the matrix below — the entry shape is in place, the closing edge awaits implementation. What is load-bearing today is the structural commitment: the network honors original contributors by default, accumulates their recognition while they are absent, and reserves the transfer-on-claim machinery in the entry type that already runs in production. The trillion-dollar civic claim — *contribution survives transmission, present or not* — is currently load-bearing at the schema and accumulation layers, and named-but-unfinished at the claim-and-transfer layer.
 
 This is the civic load-bearing claim: **the substrate always, always, always recognizes contribution, present or not.** A creator does not have to opt in to the network to be honored by it; the network honors them by default, holds their accrued recognition until they arrive, and transfers it to them on claim with full provenance intact. A steward does not have to know who they are hosting to be recognized for hosting them; the protocol books the recognition by class and provenance, and the steward is entitled — *by right of stewardship, not by transaction* — to participate in the value flow their hosting enables. Both directions are first-class. Both flow through the same REA Commitment + EconomicEvent ledger. Both are queryable on the deployed network. This is what makes Elohim a civic substrate rather than a piracy substrate, a commons substrate rather than a freeloading substrate, an infrastructure substrate rather than a distribution substrate. The bytes move. The recognition moves *with them*. Neither outruns the other.
 
@@ -337,6 +339,265 @@ This work is downstream of the recovery-feature work in Part IV (recovery is the
 
 ---
 
+## **Part VI: How the Substrate Composes — and Where It Stops**
+
+### **Threading the Claim Through Real Code**
+
+The trillion-dollar claim — that mutual aid expressed as REA Commitments is the substrate primitive that dissolves the convenience/dignity trade — has to compose through the actual code, not float above it. This section threads the resilience flows through the layers of the substrate as they exist today, and as they are being built. The point is not exhaustive specification; the point is to ground the philosophical claim in a real stack with a real implementation gradient, and to name honestly what is built, what is designed-not-yet-wired, and what is still aspirational. The gap matrix at the end of Part VIII is the precise accounting; this section is the architectural walk.
+
+### **The Layers**
+
+The substrate composes through three structurally distinct layers and one optional projection (memory `project_three_layer_truth_model`):
+
+```
+DHT (Holochain)             ┃  notarized, expensive, narrow.
+                            ┃  agent-signed entries; content-addressed; non-repudiable.
+                            ┃  the only layer that can say "this fact is now true forever."
+─────────────────────────────╂─────────────────────────────────────────────────────
+libp2p + iroh (dual-stack)  ┃  data ops, per-peer, cheap.
+                            ┃  the working surface — moves the bytes, runs the gossip,
+                            ┃  exercises the agreements, projects the topology.
+─────────────────────────────╂─────────────────────────────────────────────────────
+Hub composition             ┃  runtime composition + federation + elohim-operator.
+(elohim-hub)                ┃  treats the hardware as a cluster; absorbs hyperscaler-class
+                            ┃  concerns inside the household, federates horizontally.
+─────────────────────────────╂─────────────────────────────────────────────────────
+Doorway (optional)          ┃  web2 projection surface.
+                            ┃  AT-Protocol / ActivityPub / OAuth-RP / HTTP/SSR.
+                            ┃  the only layer the public internet sees.
+```
+
+Each resilience flow described earlier in this chapter — proposal, acceptance, steady-state custody, exercise, breach, restoration — threads through these layers in a specific way. Walking one full pass:
+
+**Notary (DHT) — what the agreement IS.** The Gertrude ↔ Dowell reciprocal-backup Commitment is a `Commitment` entry in the elohim DNA (`content_store_integrity/lib.rs:1336`), with `resource_classified_as_json` carrying `["recovery","share-custody"]`, a quantity (1 shamir-share), provider/receiver pointing to the household-collective IDs, and a state in the live state vocabulary (`proposed → accepted → in-progress → fulfilled / cancelled / breached`). This is LIVE; the entry types are deployed, the validators run on every peer, the validator-side discipline that HDI rules forbid `get_links` (memory `project_hdi_no_get_links_in_validators`) means cross-entry verification is the coordinator's job.
+
+**Notary → data-ops bridge.** The Commitment, once notarized, projects into the SQLite layer (`elohim-storage/src/db/rea_commitments.rs`) through the *reconciliation controller* pattern (Principle P1, memory `project_principle_p1_reconciliation_controller`). The controller is implemented at `elohim-storage/src/reconcile/controller.rs` — currently as a *skeleton* with real handlers for imagodei/M5 recovery signals (`on_key_rotation`, `on_key_revocation`, `on_agent_peer_binding`, `on_revocation_attestation`, `on_portal_host_created/removed`) and stubs for the rest. The pattern is k8s-controller-shape (observe → reconcile → no hesitation); the implementation surface today is targeted at the recovery-and-key-management signals that M5 needs. **The recovery-class signal handlers — `recovery-share-custody`, `recovery-breach`, `recovery-quorum-formed`, `recovery-fulfilled` — are not yet wired in the controller**; they are the next-leverage extension once the corresponding `signal_kind` whitelist edits land in the integrity zome.
+
+**Data ops (libp2p + iroh) — what the agreement DOES.** Phase 11 of the iroh integration landed (memory `project_iroh_phase11_all_backends_wired`) with all seven planes wired and 43 tests passing. The architecture is permanent dual-stack (per `genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`): iroh 0.92 + iroh-blobs 0.94 for hub-to-hub federation (BLAKE3 chunked streaming wins 4×–290× p50), libp2p 0.54 for consumer-grade-direct (intermittent, UDP-restricted, browser-WebRTC). Both transports preserve DHT-derived integrity equally; the choice is governed by per-peer transport-profile manifest, not by a security claim. Phase 12 — `peer_transport_manifest` as permanent schema — has substrate landed (migration `2026-05-10-120000`, `peer_map` API at `p2p_iroh/peer_map.rs:1-150`) and plan-tracking RED (0/59 boxes ticked); the four iroh adapter wiring tasks are partially landed per the in-tree README. This is the layer that moves the actual bytes of an exercised recovery agreement; the substrate is in place, the consumer-grade soak is named in gate #9 of the iroh master plan and is open work.
+
+**The topology↔REA bridge — live and queryable.** Per the *Light Up the Topology* design (`genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md`), the protocol uses three live REA action conventions to bridge stewardship to topology: `project-blob` (Commitment: doorway commits to project a blob), `serve-blob` (EconomicEvent: doorway fulfills projection), `custody-blob` (Commitment: peer steward commits to custody). These are LIVE — queried in `reciprocity_view.rs:114-147` for committed-bytes math, in `cluster_view.rs:47, 202, 217` for join-to-hosting-count, in `device_capacity.rs:92` for capacity-minus-committed arithmetic, and in `rea_projection.rs:180` for the signal handler on `AgreementCommitted | ReaCommitmentCommitted | ReaEconomicEventCommitted`. The 3-bucket stewardship surface from Part V (encrypted / social / commons) is a *view* over this live infrastructure, filtered by `reach` and `resource_classified_as` — no new tables, no new entry types.
+
+**Light Up the Graph — signals actually flow.** The companion *Light Up the Graph* sprint (`2026-05-01-light-up-the-graph-design.md`) LANDED on commit `4ea4e1558`. Pre-LUG, integration tests passed only via mock-outbound substitutions; the graph entities existed but their effects did not propagate at runtime. Post-LUG, six wiring sites are live: `api/epr.rs::put_epr` fan-out, bootstrap-manifest seeding, manifest-debit weight policy, the libp2p outbound sink + gossip publisher, the reach-earning gate (`services/reach_earning.rs:94-129`), and the Vouch primitive as `signal_kind` extension. **LUG is the proof-of-shape that the resilience epic's `signal_kind` extension claim is structurally sound** — Vouch was added without a new entry type, the validator whitelist was extended, the manifest carries the debit weight, and downstream projection respects it. The recovery-class `signal_kind` values follow exactly the same pattern.
+
+**Light Up the Topology — substrate is legible.** The companion LUT sprint is PARTIAL. Five view modules exist (`services/{distribution_view, cluster_view, peer_topology_view, reciprocity_view}.rs`), `peer_transport_manifest` migration is on disk, the dual-publish topic directory is populated, but the M1 substrate-completion plan (`2026-05-07-topology-substrate-completion-m1-plan.md`) is the unblocking sprint — 256 unchecked tasks at plan-write. Today's `peer_topology_view.rs` still carries M3 TODOs at lines 332, 394, 405, 491, 544 for per-peer authored-CID count, batch GROUP BY, `last_sync_sec` derivation, and the `resilience_cliffs` stub returning `vec![]`. LUT is the layer that makes the stewardship surface from Part V *renderable in the UI*; M1 completion is what gates the resilience-surface widget shipping.
+
+**Doorway (web2 projection) — the public face.** The doorway is the optional layer where the substrate becomes legible to web2 consumers (browsers, mobile apps, AT-Protocol / ActivityPub federation). Memory `project_doorway_views_through_not_owned` is load-bearing here: views are *served through* a doorway, not *owned by* one. The doorway-manifest pattern (memory `project_doorway_manifest_driven_routes`) declares routes; the storage layer implements them; the doorway proxies them. The recovery surface's `GET /storage-stewardship/summary` route lives on this layer and is doorway-manifest territory — not a doorway-authored endpoint.
+
+### **The Care vs Compute Boundary — Discipline, Not Yet Schema**
+
+A claim earlier in this chapter — that compute-class flow and attribution-class flow are deliberately isolated, so a hardware failure cannot silently re-rank a contributor's standing — is currently *documented discipline rather than structural enforcement*. The `RESOURCE_CLASSIFICATIONS` whitelist (`content_store_integrity/lib.rs:238-257`) mixes 16 values across both classes (`content`, `recognition`, `stewardship`, `compute`, `currency`, six shefa tokens). The compute-vs-care isolation is real — `project_compute_commitments_bounded` explicitly states it as architectural invariant — but the substrate enforces it through the projection layer's discipline (the views *don't* compose compute breach into attribution score) rather than through a typed schema partition. A future change that makes this isolation *structural* (a typed split on the Resource classification, validators that reject crossings, projector code that's actually unable to violate the rule) is the closing edge that would make the claim load-bearing at the schema level.
+
+The trust compute gradient is in similar shape. The 707-line brainstorm at `genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md` lays out a seven-layer gradient (DHT-notarization unchanged, libp2p gossipsub modulated, Kad provider records modulated, schemaRef walks modulated, projection caching modulated, validation amortization modulated, cold-fetch peer selection modulated) — with the trust-as-efficiency-signal frame (memory `project_trust_as_efficiency_signal`) and five constitutional floor classes (LIVE as the `FloorClass` enum at `reach_earning.rs:17-24`). The substrate primitives (FeedbackSignal, standing-policy manifest, reach-earning gate) are LIVE; the seven-layer gradient itself is mostly unwired. Standing composition memory (`project_standing_composes_multiple_evidence_streams`) says standing should compose from imagodei profile + lamad recognition + FeedbackSignal debits; today only the third stream is wired, and the schema seam (`unknownTreatment.evidenceSources`) is forward-compatible but unbridged.
+
+### **The Critical Gap — k8s Lifecycle to REA Event**
+
+The one substrate gap that *most directly* affects the resilience epic's claims is the k8s ↔ REA bridge. The bridge today is *unidirectional*: every deployed pod registers its committed shape as a `NodeRegistration` DHT entry via `boot_registration::register_at_boot` (`elohim-storage/src/services/boot_registration.rs:147-170`), calling the `register_node_shape` coordinator zome at `node-registry/.../shape.rs:48-76`. That is LIVE — the act of deploying a human DOES create an agent-signed, content-addressed shape claim. What is NOT live is the inverse edge: there is no kube-rs in elohim-storage, no Pod-watch loop, no OOMKill→breach signal emitter, no eviction-event→EconomicEvent path. The shem decommission on May 4 was handled by an operator editing `suspended: true` in `deployments.json`; the substrate did not autonomously emit `compute-breach` events. The narrative was preserved in `$comment` blocks and `anomalies` arrays; the protocol-level Event ledger stayed silent.
+
+The closing of this edge is the next-leverage substrate work, and it is named in the gap matrix below. The recovery agreements described throughout this chapter are NOT blocked on this gap — they operate at the REA Commitment + FeedbackSignal layer, which is LIVE and queryable through `ReaCommitmentView`. The compute-commitment substrate-floor scenarios in `a2o/features/deployment/compute-commitment-bounds.feature` are the ones blocked on this gap; they are `@wip` today and unblock when the inverse edge lands.
+
+### **What the Stack Actually Composes**
+
+What this layered walk demonstrates — without overclaiming — is that the resilience epic's primary surface is *structurally feasible* on the substrate as it exists today. The Commitment entry is LIVE. The FeedbackSignal extensibility primitive is LIVE. The storage projection is LIVE. The topology↔REA bridge through `custody-blob` / `project-blob` / `serve-blob` actions is LIVE and queried in multiple production code paths. The reciprocity view that powers the per-counterparty math is LIVE. The reach-earning gate that determines authorial-time authorization is LIVE. The signal-flow wiring is LIVE (LUG closed).
+
+What is NOT yet live, and what the resilience surface waits for, is *vocabulary* — the specific `signal_kind` extensions (`recovery-share-custody`, `recovery-breach`, `recovery-quorum-formed`, `recovery-fulfilled`), the `resource_classified_as` classifications (`recovery`, `share-custody`, `encrypted-custody`) added to the whitelist, the role records (`role-as-recovery-counterparty`, `role-as-account-claimant`), the seed-data expression of the gertrude↔dowell Agreement, the feature files that exercise the flows. These are *vocabulary additions on a substrate that already speaks the language* — finite work, well-shaped, no architectural surprises.
+
+The substrate is closer to the trillion-dollar test than the manifesto-tier framing alone would suggest. What it is *not* close to is a deployed-at-billions-of-households state, and that is the work the rest of this chapter exists to scope.
+
+---
+
+## **Part VII: The Complexity Collapse — Elohim Operators as Substrate AI**
+
+### **The Hyperscaler Wall, Diagnosed**
+
+The trillion-dollar problem of consumer technology is, at its root, a **complexity-management problem**. Hyperscalers did not win because their fundamental architecture was superior — peer-to-peer distribution of bytes has been operationally credible for two decades; mutual aid as a social pattern is millennia old. They won because they collapsed the *operational complexity* of running consumer-scale digital infrastructure into clean abstractions that ordinary developers, and through them ordinary humans, could build against. Pods. PersistentVolumeClaims. Deployments. Services. Ingresses. Secrets. ConfigMaps. These are not protocol-fundamental concepts. They are **complexity-collapse primitives** — clean abstractions that a small number of cloud-native operator binaries (`kubelet`, `kube-controller-manager`, `kube-scheduler`, `cloud-controller-manager`) maintain on behalf of every workload, so that the application developer does not have to think about node placement, storage attachment, network routing, restart loops, eviction policies, certificate rotation, secret injection, autoscaling, drain semantics, or any of the thousand other things that would otherwise make running consumer infrastructure impossible at human scale.
+
+The wall around the cloud garden is built of *this complexity-management capability*. It is not built primarily of malice. Most of the careless billionaires whose accumulated capital paid for the wall's construction did not set out to extract Grandma's interiority for ad-tech revenue. They set out to solve real operational problems at consumer scale, and they solved them, and the resulting infrastructure — necessarily centralized to be operationally tractable at the time — became the substrate everything else now rents from. The wall is built of *the work that nobody else could yet do at consumer scale*: turning the chaos of clusters into clean abstractions that survive Friday-night deploys, dropped racks, exhausted disks, partial-cluster failure modes, certificate expiration, and noisy-neighbor blast radius. The wall's *result* is a centralized custodian whose revenue model extracts attention. The wall's *cause* was the complexity-management capability the centralization made possible.
+
+This is the diagnosis that determines what the substrate has to do. **The substrate's competitive question is not "can we be more peer-to-peer than them" — it is "can we collapse equivalent complexity for ordinary humans, served by operators whose incentive geometry is aligned with the human rather than the platform."** The architecture that wins the trillion-dollar problem is the architecture that does *for P2P* what kube-controller-manager does *for k8s* — and serves the household, not the shareholder.
+
+### **The Elohim Operator — What It Is**
+
+Every hub in the substrate runs an **elohim-operator** — a context-bound specialist agent that fills the role a household's devops/IT person would fill if the household had one. The operator's definition lives in the iroh-libp2p complementarity spec (`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`) and is anchored by memory `project_elohim_subagent_specialists`:
+
+> "The operator treats the hub's hardware as a cluster (whether the cluster is one recycled laptop, three NUCs, five blades, or a Tier-3 family-node-extended with hot-swap modules) and continuously negotiates: internal cluster operations (hot/cold blade migration, leader election, replica placement, PVC movement, blob tiering across NVMe/bulk/encrypted-shard storage); stewardship-vs-capacity tradeoffs (how much compute / bandwidth / storage / AI inference budget each Track 3 spoke commitment, each Track 2 federation contract, and each internal household need consumes; when to defer, when to spend, when to renegotiate); and external federation participation (peer-hub gossip, sponsored compute contracts sending and receiving, AbusePattern signal emission, defense-reach earning, federation-manifest declaration of which peer hubs are reachable)."
+
+The mapping to k8s is exact in shape and inverse in posture:
+
+| k8s primitive | What the operator collapsed | elohim-operator equivalent | Whose interest |
+|---|---|---|---|
+| Pod | "How does this binary survive a node failure?" | elohim-node deployment + DHT-notarized NodeRegistration | The household's |
+| PersistentVolumeClaim | "Where does this state live and follow the workload?" | Stewardship Commitments on the REA ledger; tiered-quilt blob custody | The household's |
+| Service / Ingress | "How do consumers reach this?" | Doorway projection routes + iroh ALPN handlers | The household's |
+| ConfigMap / Secret | "How do config values flow without leaking?" | peer-policy.toml + identity-handshake handshake | The household's |
+| HorizontalPodAutoscaler | "How does capacity respond to demand?" | Compute-capacity negotiation + Track 2 federation | The household's |
+| Operator (e.g. cert-manager, etcd-operator) | "Domain logic for a specific workload class" | elohim-agent subagents (defender, advocate, steward, gate-discerner) | The household's |
+| kube-controller-manager | "Continuous reconciliation toward declared state" | ReconcileController (Principle P1) + elohim-operator discernment | The household's |
+
+The k8s side of this table is what the hyperscalers built to make consumer-scale infrastructure operationally tractable. The elohim side is what the substrate proposes to build to make consumer-scale infrastructure *dignifiably tractable* — same complexity collapse, opposite political geometry. The pods land in households; the volumes are stewardship contracts; the services are doorway projections; the autoscaling negotiates against federation peers rather than against a quarterly profit target.
+
+### **DwellingHub and CollectiveHub — Two Postures of the Same Trait**
+
+The elohim-hub crate (`elohim/elohim-hub/README.md`) names two archetypes that share a trait surface but differ in design attitude:
+
+**DwellingHub** is the primary archetype — the home-node cluster sized to one family / one dwelling. "Dwelling" grounds the concept at its natural physical limit: the place where humans live, walls and a roof, a known set of inhabitants who steward it together. The attitude is **co-presence**. Humans and their elohim-operators are co-present in the dwelling's fabric. The fabric is visible; family members can intervene; the elohim-operator is a *fabric-helper alongside the humans*, not a fabric-owner. The Matthew/Jessica/James/Gertrude reciprocal-backup story from Part V lives in this archetype — the operator does the operational lifting (replica placement, share custody, federation contract maintenance) so the humans don't have to, but the humans dial the level of operator agency and can intervene at any layer.
+
+**CollectiveHub** is the archetype for a collective — church, co-op, patron circle, DAO, mutual aid network. The attitude is **delegated stewardship**. The collective expects elohim-operators to carry more day-to-day fabric work autonomously, with humans designating stewardship roles rather than every member operating fabric directly. Not a hard taxonomic split from DwellingHub — both are bound by the substrate-floor / elohim-ceiling pattern below — but the *attitude* of who is most active in operation differs. This is the technical tier where the human-vs-elohim role separation is more visible, and where a small group of designated stewards (a homeschool co-op's facilitator, a congregation's deacon, a credit union's board) supervises the operator's fabric work on behalf of a larger membership.
+
+**Hubbiness is a dial, not a binary.** The same physical device can be just-a-personal-device at 6pm and a-hub-too at 2am when it's plugged in and shared with the household. The operator's role on the device scales with the dial. Humans dial up hubbiness as comfort and capacity allow; humans hand it off as Tier-3 hardware arrives and the household-fabric-manager role migrates to a more capable operator. The *steward+device layer* gives humans the consistency of their own space; the *hub layer* gives the elohim-operator a dwelling to be opinionated and helpful at social-coordination scope without stepping on human toes. The dial is owned by the human, declared via standing manifests, signed/witnessable/reversible at every increment.
+
+### **Substrate Floor and Elohim Ceiling — The Bounding Pattern**
+
+The elohim-operator's authority is *structurally bounded* by the substrate-floor / elohim-ceiling pattern (memory `project_substrate_floor_elohim_ceiling`). The substrate determines deterministic gates (Allowed / Blocked / Pending) at every reach-authorization decision; the operator's discernment can *escalate* (sponsor a normally-blocked action), *witness* (record additional context), or *defer* (request human input). The operator cannot unilaterally override the substrate's gates. The substrate cannot unilaterally make the discernment calls reserved to the operator. Both layers are structurally bounded — neither is a unilateral authority.
+
+This is the architectural answer to the alignment worry. An elohim-operator with unbounded authority over a household's substrate would be, eventually, a re-creation of the hyperscaler problem at household scale: a single concentrated capability operating on behalf of someone whose interests can drift from the household's. The substrate-floor / elohim-ceiling pattern structurally prevents this. The operator is a complexity-collapse layer; it is not a sovereignty-collapse layer. The household's authority over its own substrate remains constitutional, signed, witnessable, and reversible — by design, at every step, including against the operator's own judgment.
+
+### **What Is Built — and What Awaits**
+
+The elohim-hub crate exists; per its README it is scaffold-stage. The code currently lives in `elohim-node` until a second consumer (operator UI, fixtures crate) needs the trait independently. The hub trait is sketched in `2026-05-02-elohim-hub-boundaries-design.md`, and the responsibility surface is mapped in `2026-05-08-doorway-hub-edge-design.md`. The substrate-floor / elohim-ceiling pattern is documented; the operator-as-AI-agent layer is design + intent.
+
+The *alpha cluster's runtime today is k8s* — not elohim-hub. The `_edgenode-consolidated.template.yaml` produces a StatefulSet that runs the consolidated `elohim-node` binary; the operator is *Matthew the human*, editing `deployments.json` and `compute-capacity.json` by hand, watching the k8s dashboard, applying drift fallbacks when `kubectl apply` returns forbidden-field errors. This is the *bootstrap phase* of the operator-collapse story — a competent human carrying the operational load while the substrate that will eventually carry it for ordinary households is built.
+
+The transition path is the elohim-operator-as-AI runtime taking over progressively from the elohim-operator-as-Matthew. The substrate-floor / elohim-ceiling pattern that bounds the AI operator is already documented; the elohim-agent crate exists separately and carries the specialist-subagent shapes (`project_elohim_subagent_specialists`); the bridge from elohim-hub trait to elohim-agent specialist dispatch is the next-leverage piece of substrate work. This is the substrate's answer to the *generational* framing the operator named: a generation is how long it takes for the household-operator role to migrate from competent humans doing it by hand on alpha hardware to AI agents doing it dignifiably for ordinary humans on consumer hardware everywhere.
+
+### **The Core Move**
+
+The argument distilled: **the hyperscaler wall is the wall of complexity-management capability. AI is the lever that dissolves the advantage. Per-household elohim-operators do for substrate dignity what kube-controller-manager does for cluster operability — same complexity-collapse engineering, opposite political geometry.** The walled gardens of the careless billionaires were built of the work nobody else could yet do; the substrate's claim is that AI now lets us do that work, per household, in service of the household, with the operator's authority structurally bounded by the substrate floor and the household's expressed standing. The garden walls dissolve not by frontal attack but by being made *unnecessary* — by an operator layer that delivers equivalent convenience without auctioning the human.
+
+---
+
+## **Part VIII: What Is Built, What Is Designed, What Remains**
+
+### **The Honesty Discipline**
+
+A chapter that anchors a trillion-dollar civic claim has to be specific about what carries weight today and what is named-but-unfinished. The matrix below is that specificity. Three columns: **LIVE** (deployed, queryable on the alpha cluster, exercised by CI), **DESIGNED** (spec exists, partial implementation, named work to close), **GAP** (not started, named-and-scoped). The matrix is not exhaustive; it pulls the load-bearing rows from the substrate research.
+
+### **Notary Layer (Holochain DHT)**
+
+| Capability | Status | Where |
+|---|---|---|
+| Agreement, Commitment, EconomicEvent, EconomicResource entry types | **LIVE** | `content_store_integrity/lib.rs:1319-1368` |
+| FeedbackSignal entry + 6 bootstrap signal_kinds (squelch / correction / retraction / quarantine / vouch / forget-request) | **LIVE** | `feedback_signal.rs:42` |
+| ContributorPresence entry (32 fields, 3-state lifecycle, 8 verification methods) | **LIVE** | `content_store_integrity/lib.rs:1166-1219`, `PRESENCE_STATES`, `CLAIM_VERIFICATION_METHODS` |
+| 16-value resource_classified_as bootstrap whitelist (content / attention / recognition / compute / stewardship / 6 shefa tokens / etc.) | **LIVE** | `content_store_integrity/lib.rs:238-257` |
+| 23 REA_ACTIONS including custody-blob, project-blob, serve-blob, deliver-service | **LIVE** | `content_store_integrity/lib.rs:202-235` |
+| Recovery-class signal_kind extensions (recovery-share-custody, recovery-breach, recovery-quorum-formed, recovery-fulfilled) | **GAP** | requires whitelist edit + schema update + standing-policy debit-weight entries |
+| Recovery-class resource_classified_as classifications (recovery, share-custody, encrypted-custody) | **GAP** | requires whitelist edit OR manifest-driven validator pattern |
+| Typed compute-class vs attribution-class partition on Resource classification | **GAP** | currently documented discipline; not enforced at schema layer |
+
+### **Data Ops Layer (libp2p + iroh)**
+
+| Capability | Status | Where |
+|---|---|---|
+| Track 1 (kitsune2/tx5 over WebRTC) — DHT notary | **LIVE** | unchanged |
+| libp2p 0.54 in elohim-storage (request-response + gossipsub + Kademlia + Circuit Relay) | **LIVE** | `elohim-storage/Cargo.toml` |
+| iroh 0.92 + iroh-blobs 0.94 + iroh-gossip 0.92 for hub-to-hub federation | **LIVE** | Phase 11 closed; 43 tests |
+| All 7 iroh planes ALPN-registered + backends (blob, gossip, sync, epr, epr-atom, shard, view-fed, identity-handshake, trust) | **LIVE** | Phases 1-10 |
+| Dual-publish on inventory, identity-binding, recovery-invitation, recovery-revocation, feedback-signal, EPR-atom-announce | **LIVE (publish-side)** | `p2p_iroh/dual_publish/` |
+| Receive-side iroh gossip subscribers wired into daemon receive handlers | **GAP** | `src/p2p/mod.rs:4396-4607` still libp2p-only |
+| peer_transport_manifest schema + peer_map selection API | **LIVE (substrate)** | migration `2026-05-10-120000`, `p2p_iroh/peer_map.rs:1-150` |
+| Phase 12 (peer_transport_manifest fully wired) | **DESIGNED** | 0/59 plan boxes ticked; 4 adapter wiring tasks partially landed per in-tree README |
+| n0-mitigation Steps 2-5 (pkarr self-hostable resolver, full consumer-grade soak) | **GAP** | gate #9 of iroh master plan |
+| Consumer-grade-hub operator runtime (Track 3 spoke registration UX) | **GAP** | aspirational |
+
+### **Reconciliation Layer (Principle P1)**
+
+| Capability | Status | Where |
+|---|---|---|
+| ReconcileController k8s-style pattern (observe → reconcile → no hesitation) | **DESIGNED + skeleton** | `elohim-storage/src/reconcile/controller.rs` |
+| Handlers for imagodei/M5 recovery signals (key rotation, key revocation, agent-peer-binding, revocation attestation, portal-host) | **LIVE** | `controller.rs` real handlers |
+| Handlers for recovery-class signals (recovery-share-custody, recovery-breach, recovery-fulfilled) | **GAP** | not yet wired |
+| k8s pod-lifecycle (OOMKill / eviction / restart / suspended-flag flip) → REA EconomicEvent emission | **GAP** | no kube-rs, no Pod-watch loop, no auto-emitter — this is the load-bearing edge to close for compute-commitment-bounds.feature to pass |
+| `compute-commitment-bounds.feature` scenarios passing on alpha | **GAP** | all @wip; blocked on the substrate-floor design `2026-05-04-compute-commitment-substrate-floor-design.md` not yet landed |
+| ack-projection EconomicEvent + projection_events table | **LIVE** | `rea_projection.rs:178-202`, `tests/projection_ack_signal_e2e.rs` |
+
+### **Storage Projection Layer**
+
+| Capability | Status | Where |
+|---|---|---|
+| ReaCommitmentView + AgreementView (camelCase, parsed JSON, computed fields) | **LIVE** | `elohim-storage/src/views.rs:308, 1809` |
+| HTTP `/db/agreements`, `/db/rea-commitments` routes | **LIVE** | `elohim-storage/src/http.rs` |
+| `custody-blob` / `project-blob` / `serve-blob` action conventions queried in `reciprocity_view.rs`, `cluster_view.rs`, `device_capacity.rs`, `rea_projection.rs` | **LIVE** | as cited; the topology↔REA bridge IS live |
+| Compute-commitment DB table (for "matthew commits 1000 cpu_m to alpha-cluster") | **GAP** | only `stewardship_allocations` exists (content-stewardship, NOT compute) |
+
+### **Topology Layer (Light Up the Topology)**
+
+| Capability | Status | Where |
+|---|---|---|
+| Light Up the Graph (LUG) — signal-flow wiring at six sites; Vouch primitive end-to-end as signal_kind extension | **LIVE** | commit `4ea4e1558`; 21/27 tasks closed |
+| Light Up the Topology (LUT) — five view modules (`distribution_view`, `cluster_view`, `peer_topology_view`, `reciprocity_view`, `doorway_dashboard_view`) | **DESIGNED + partial** | service modules exist; M3 TODOs at `peer_topology_view.rs:332,394,405,491,544` (per-peer authored count, batch GROUP BY, last_sync_sec, resilience_cliffs stub) |
+| LUT M1 substrate-completion sprint (cross-household matthew↔terrance vertical slice) | **DESIGNED** | `2026-05-07-topology-substrate-completion-m1-plan.md`; unchecked at plan-write |
+| Resilience-cliff detection + presentation | **GAP** | `resilience_cliffs` returns `vec![]` |
+
+### **Reach + Trust + Standing Layer**
+
+| Capability | Status | Where |
+|---|---|---|
+| 8-value reach schema enum (private / self / intimate / trusted / familiar / community / public / commons) | **LIVE** | `elohim/sdk/schemas/v1/enums/reach.schema.json` |
+| Reach gating across validator, doorway, and receive-side preference guards | **LIVE** | `content_store_integrity/lib.rs:514`, `doorway/.../cache/reach_aware_serving.rs`, `steward/node/.../storage/reach.rs`, `elohim-storage/.../p2p/reach_authorization.rs` |
+| reach_earning service (5 floor classes + standing) with `ReachVerdict::{Allowed, Blocked, Pending}` | **LIVE** | `elohim-storage/src/services/reach_earning.rs` |
+| Standing as derived view, 5 ordinal levels (Floor / Low / Neutral / High / Trusted), evaluator-local, not global | **LIVE** | `services/standing.rs`, `Standing::evaluate`, `StandingScore` |
+| Standing-policy manifest (debit weights, thresholds, floor classes) | **LIVE** | `elohim/sdk/schemas/v1/manifest/standing-policy-floor.schema.json` |
+| Reach enum drift — Rust `Reach::{Personal, Intimate, Household, Neighborhood, Collective, Community, District, Public}` divergent from schema enum | **GAP** | reconciliation needed; resilience epic uses third vocabulary (`household / neighborhood / community / organization / commons`) |
+| Standing composes from imagodei profile + lamad recognition + FeedbackSignal debits | **DESIGNED** | schema seam exists (`unknownTreatment.evidenceSources`), bridges not implemented |
+| 7-layer trust-compute gradient modulation (gossipsub, Kad provider records, schemaRef walks, projection caching, validation amortization, cold-fetch peer selection) | **DESIGNED** | `2026-04-30-trust-compute-gradient-brainstorm.md`; primitives live, gradient mostly unwired |
+
+### **Attribution + ContributorPresence Layer**
+
+| Capability | Status | Where |
+|---|---|---|
+| ContributorPresence accumulation pipeline (affinity-weighted recognition flow during stewardship) | **LIVE** | `services/recognition_pipeline_service.rs` |
+| Storage projection CRUD (`CreateContributorPresenceInput`, `InitiateStewardshipInput`, `InitiateClaimInput`, `RecognitionUpdate`) | **LIVE** | `elohim-storage/src/db/contributor_presences.rs` |
+| 3-state lifecycle (unclaimed → stewarded → claimed) with state-transition Events (`presence-claim`, `recognition-transfer` LamadEventTypes) | **LIVE** | `content_store_integrity/lib.rs:284-285` |
+| Recognition transfer on claim (lump-sum EconomicEvent on agent claim) | **DESIGNED** | fields reserved on entry (`claim_recognition_transferred_value`, `claim_recognition_transferred_unit`); no `transfer_recognition()` coordinator function |
+
+### **Resilience-Specific Surface**
+
+| Capability | Status | Where |
+|---|---|---|
+| Three canonical recovery stories (Gertrude holds share / Dowells hold Gertrude's share / Gertrude logs in with help) | **LIVE** | `genesis/data/stories/gertrude-grandma--*--*.md`, `genesis/data/stories/matthew-manager--*--*.md`; status:draft |
+| Resilience epic chapter (this document) | **LIVE** | this file |
+| Gertrude + James deployments on alpha cluster | **LIVE** | deployments.json commits `7ebbeb8da`, `64f5e1b84` |
+| `human-resilience.feature` scenarios (Matthew alone → at-risk; +Susan → partial; +Pete → community depth) | **DESIGNED** | scenarios @wip; resilience profile computation against mutual-aid commitments |
+| `feature-social-recovery-with-help-from-family.feature` | **GAP** | highest-leverage; named in Part IV; no Gherkin on disk |
+| `feature-backup-stewardship-for-household-{dowell,gertrude}.feature` reciprocal pair | **GAP** | named in Part IV; no Gherkin on disk |
+| `role-as-recovery-counterparty`, `role-as-account-claimant` role records | **GAP** | named by storyteller; not in `genesis/data/lamad/content/` |
+| Seed-data expression of gertrude↔dowell Agreement on the REA ledger | **GAP** | shape open: seed corpus, schema decision |
+| Storage-stewardship summary route (`GET /storage-stewardship/summary` returning 3-bucket breakdown) | **GAP** | doorway-manifest declaration needed |
+| Angular widget in shefa pillar (top-level bar with drill-down) | **GAP** | UI work; awaits LUT M1 |
+
+### **Hub + Operator Layer**
+
+| Capability | Status | Where |
+|---|---|---|
+| elohim-hub crate (scaffold) | **LIVE (scaffold)** | `elohim/elohim-hub/README.md` |
+| DwellingHub / CollectiveHub trait sketch | **DESIGNED** | `2026-05-02-elohim-hub-boundaries-design.md`, `2026-05-08-doorway-hub-edge-design.md` |
+| Substrate-floor / elohim-ceiling pattern | **DESIGNED + partial** | doctrine in memory `project_substrate_floor_elohim_ceiling`; substrate floor is real (reach_earning), ceiling discernment integration with elohim-agent crate pending |
+| elohim-agent subagent specialists (defender, advocate, steward, gate-discerner) | **DESIGNED** | memory `project_elohim_subagent_specialists` |
+| Bridge from elohim-hub trait to elohim-agent specialist dispatch | **GAP** | the elohim-operator-as-AI-runtime layer; next-leverage substrate work |
+| Hubbiness dial in standing manifests | **DESIGNED** | concept clear; manifest schema additions pending |
+
+### **The Roadmap, Compressed**
+
+The matrix above names every load-bearing edge. The work in rough order of leverage (for the resilience-epic surface specifically):
+
+1. `feature-social-recovery-with-help-from-family.feature` — the highest-leverage Gherkin; grandma-standard end-to-end recovery; no executable spec today.
+2. Recovery-class `signal_kind` extensions (`recovery-share-custody`, `recovery-breach`, `recovery-quorum-formed`, `recovery-fulfilled`) into the integrity-zome whitelist + schema + standing-policy-floor manifest.
+3. `recovery` + `share-custody` + `encrypted-custody` `resource_classified_as` classifications added (or the validator pattern updated to accept manifest-declared classifications).
+4. `role-as-recovery-counterparty` and `role-as-account-claimant` role records in `genesis/data/lamad/content/`.
+5. Reciprocal-backup feature pair: `feature-backup-stewardship-for-household-{dowell,gertrude}.feature`.
+6. Seed-data expression of the gertrude↔dowell Agreement (shape: open; story-first decides).
+7. Recovery-class signal handlers in `ReconcileController`.
+8. Storage-stewardship summary HTTP route + Angular widget.
+9. Recognition transfer on claim — the missing executor for the absent-contributor flow.
+10. (Substrate-wide, not just resilience-surface) k8s lifecycle → REA EconomicEvent edge — closes the compute-commitment-bounds.feature gap and the broader substrate-floor / elohim-ceiling claim.
+11. (Substrate-wide) Reach enum reconciliation — Rust vs schema vs resilience-epic vocabularies.
+12. (Substrate-wide) Trust-compute gradient layered modulation per the 707-line brainstorm.
+13. (Substrate-wide) Bridge from elohim-hub trait to elohim-agent specialist dispatch — the elohim-operator-as-AI runtime.
+
+Numbers 1–9 are *resilience-epic-scoped*. Numbers 10–13 are the substrate-wide foundational work the trillion-dollar claim depends on, even when not directly resilience-surface. They are named here because the chapter is responsible for naming them.
+
+---
+
 ## **Closing**
 
 The architecture of consumer technology asks Grandma to trade her humanity for convenience. The architecture of an extractive economy asks her to do this continuously, in fractions, without ever quite noticing. The architecture of a centrally custodial AI future will ask her to surrender judgment about her own life to a system whose revenue depends on getting that judgment subtly wrong.
@@ -345,7 +606,11 @@ The protocol's commitment is that none of these trades is actually necessary. Th
 
 What makes this commitment more than rhetoric is that it is *testable*. Not in twenty years. Not at scale. Now, on the alpha cluster, against Gertrude and Matthew and Jessica and James, with one reciprocal-backup pair, three canonical stories, a finite list of feature files to write, and an REA primitive that already exists. The grandma standard is a Gherkin scenario waiting to be authored. The trillion-dollar problem is, structurally, four minutes of recovery flow, executed correctly, with help from her people, on a substrate that doesn't betray her.
 
-That is the work. That is the entire work. Mutual aid as substrate, recovery as the test, Gertrude as the witness.
+What this chapter has tried to demonstrate — walking through the substrate's actual layers in Part VI, the elohim-operator complexity-collapse in Part VII, and the honest gap matrix in Part VIII — is that the trillion-dollar civic claim is currently load-bearing at every layer where it has shipped, and named-with-scope at every layer where it has not. The work is finite. The substrate stack composes. The notary layer is in production; the data-ops layer is in permanent dual-stack with Phase 11 closed and Phase 12 in flight; the reconciliation controller carries imagodei recovery signals today and gets recovery-class signals next; the storage projection is live; the topology↔REA bridge is queried in four production code paths; the reach gate and standing evaluator run on every reach decision; the ContributorPresence entry runs in production with 32 fields and the transfer-on-claim machinery reserved. The elohim-operator runtime that will eventually carry the operational load for ordinary households is scaffold-stage today, with Matthew the human carrying that role on the alpha cluster while the protocol's eventual answer takes form. The transition is *the generational work* — the migration of the household-operator role from competent humans doing it by hand on alpha hardware to elohim-operator AI agents doing it dignifiably for ordinary humans on consumer hardware everywhere.
+
+The other epics in this corpus — learning, governance, economy, identity — rest on this substrate. Lamad's learning recognition, Qahal's governance participation, Shefa's value flows, Imagodei's identity continuity all require a substrate that survives device loss, household failure, contributor absence, hardware decommission, and the slow erosion of trust that takes centralized custodians down one century at a time. This chapter is therefore not one chapter among the others; it is the chapter that says what the others are scaling and delivering against. Resilience is not a feature added to the other epics — it is the substrate on which the other epics are themselves possible. The trillion-dollar civic claim is what makes their claims composable across decades and across households.
+
+That is the work. That is the entire work. Mutual aid as substrate, recovery as the test, the elohim-operator as the complexity collapse, Gertrude as the witness.
 
 ---
 
