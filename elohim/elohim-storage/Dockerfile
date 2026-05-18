@@ -28,12 +28,17 @@ COPY elohim/constitution ./constitution
 COPY elohim/elohim-cache-core ./elohim-cache-core
 COPY elohim/elohim-compute ./elohim-compute
 COPY elohim/epr ./epr
+# Plan 2 SDK boundary: elohim-views holds wire-shape Views; elohim-storage
+# depends on it directly. Without this COPY the build aborts at resolve time:
+# "failed to read /elohim-views/Cargo.toml: No such file".
+COPY elohim/elohim-views ./elohim-views
 
 # Fix the paths to local crates (now relative to /app)
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
     sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml && \
     sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
+    sed -i 's|path = "../elohim-views"|path = "elohim-views"|' Cargo.toml && \
     sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml
 
 # Strip the optional `elohim-render` path-dep + the `ssr` feature that
