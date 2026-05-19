@@ -33,6 +33,9 @@ describe('ShefaSidenavComponent', () => {
           { path: 'shefa/exchange', component: StubRouteComponent },
           { path: 'shefa/insurance', component: StubRouteComponent },
           { path: 'shefa/constitutional', component: StubRouteComponent },
+          { path: 'shefa/cluster', component: StubRouteComponent },
+          { path: 'shefa/peers', component: StubRouteComponent },
+          { path: 'shefa/reciprocity', component: StubRouteComponent },
           { path: 'shefa/dashboard', component: StubRouteComponent },
           { path: 'shefa/planning', component: StubRouteComponent },
           { path: 'shefa/settings', component: StubRouteComponent },
@@ -69,27 +72,33 @@ describe('ShefaSidenavComponent', () => {
   });
 
   describe('navigation groups', () => {
-    it('should render 4 nav groups', () => {
+    it('should render 5 nav groups', () => {
       const groups = fixture.nativeElement.querySelectorAll('.nav-group');
-      expect(groups.length).toBe(4);
+      expect(groups.length).toBe(5);
     });
 
     it('should render group titles', () => {
       const titles: HTMLElement[] = fixture.nativeElement.querySelectorAll('.nav-group-title');
       const titleTexts = Array.from(titles).map(t => t.textContent?.trim());
-      expect(titleTexts).toEqual(['Primary', 'Resources', 'Community', 'Management']);
+      expect(titleTexts).toEqual([
+        'Primary',
+        'Resources',
+        'Community',
+        'Topology',
+        'Management',
+      ]);
     });
 
-    it('should render 13 nav items total', () => {
+    it('should render 17 nav items total', () => {
       const items = fixture.nativeElement.querySelectorAll('.nav-item');
-      expect(items.length).toBe(14);
+      expect(items.length).toBe(17);
     });
   });
 
   describe('nav items', () => {
     it('should render Material icons for each nav item', () => {
       const icons = fixture.nativeElement.querySelectorAll('.nav-icon');
-      expect(icons.length).toBe(14);
+      expect(icons.length).toBe(17);
       expect(icons[0].textContent?.trim()).toBe('home');
     });
 
@@ -109,10 +118,41 @@ describe('ShefaSidenavComponent', () => {
       expect(items[1].getAttribute('href')).toBe('/shefa/accounts');
     });
 
+    it('should render Topology group links', () => {
+      const items: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.nav-item');
+      // Topology group starts after Primary (5) + Resources (3) + Community (3) = index 11
+      expect(items[11].getAttribute('href')).toBe('/shefa/cluster');
+      expect(items[12].getAttribute('href')).toBe('/shefa/peers');
+      expect(items[13].getAttribute('href')).toBe('/shefa/reciprocity');
+    });
+
     it('should have correct routerLink on Dashboard', () => {
       const items: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.nav-item');
-      // Dashboard is the 12th item (index 11) in Management group
-      expect(items[11].getAttribute('href')).toBe('/shefa/dashboard');
+      // Dashboard moves to index 14 with the Topology group inserted before Management
+      expect(items[14].getAttribute('href')).toBe('/shefa/dashboard');
+    });
+  });
+
+  describe('legibility (data-testid coverage)', () => {
+    it('should expose data-testid on every nav anchor', () => {
+      const items: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.nav-item');
+      const missingTestId = Array.from(items).filter(a => !a.getAttribute('data-testid'));
+      expect(missingTestId.length).toBe(0);
+    });
+
+    it('should derive Topology testids from route slug', () => {
+      const reciprocity = fixture.nativeElement.querySelector(
+        'a[data-testid="shefa-nav-reciprocity"]'
+      );
+      expect(reciprocity).toBeTruthy();
+      expect(reciprocity.getAttribute('href')).toBe('/shefa/reciprocity');
+    });
+
+    it('should expose data-testid on collapse button', () => {
+      const btn = fixture.nativeElement.querySelector(
+        '[data-testid="shefa-sidenav-collapse"]'
+      );
+      expect(btn).toBeTruthy();
     });
   });
 

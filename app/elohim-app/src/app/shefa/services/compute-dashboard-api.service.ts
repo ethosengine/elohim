@@ -58,25 +58,45 @@ export class ComputeDashboardApiService implements IComputeDashboard {
     return this.cachedState;
   }
 
+  // ─── Phantom-endpoint surface (backend not yet implemented) ────────────────
+  //
+  // The four methods below call routes that the elohim-storage compute API
+  // (`elohim-storage/src/api/compute.rs::handle()`) does not dispatch today —
+  // it only knows about `dashboard` and `dashboard/refresh`. Hitting any of
+  // these from the running app yields a 404.
+  //
+  // The consuming UI components (e.g. StorageDistributionComponent at
+  // `shefa/components/storage-distribution/`) are correspondingly NOT mounted
+  // in any route; this is intentional drift, not a regression. Phase 2 L4
+  // tracks landing the real backend aggregators; mounting the components is
+  // gated on those endpoints existing.
+  //
+  // If you wire one of these methods into a routed component before the
+  // backend lands, the component will silent-404. Read this comment first.
+
   getNodeTopology(operatorId: string): Observable<NodeTopologyState> {
+    // TODO(phase2-l4): backend `/api/v1/compute/topology` not implemented.
     return this.http.get<NodeTopologyState>('/api/v1/compute/topology', {
       params: { operatorId },
     });
   }
 
   getComputeNeedsAssessment(operatorId: string): Observable<ComputeNeedsAssessment> {
+    // TODO(phase2-l4): backend `/api/v1/compute/needs-assessment` not implemented.
     return this.http.get<ComputeNeedsAssessment>('/api/v1/compute/needs-assessment', {
       params: { operatorId },
     });
   }
 
   getStorageContentDistribution(operatorId: string): Observable<StorageContentDistribution> {
+    // TODO(phase2-l4): backend `/api/v1/compute/storage-distribution` not implemented.
     return this.http.get<StorageContentDistribution>('/api/v1/compute/storage-distribution', {
       params: { operatorId },
     });
   }
 
   getBidirectionalCustodianView(operatorId: string): Observable<BidirectionalCustodianView> {
+    // TODO(phase2-l4): backend `/api/v1/compute/custodian-view` not implemented.
     return this.http.get<BidirectionalCustodianView>('/api/v1/compute/custodian-view', {
       params: { operatorId },
     });

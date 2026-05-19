@@ -43,6 +43,14 @@ export const SHEFA_NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    title: 'Topology',
+    items: [
+      { label: 'My Cluster', icon: 'hub', route: '/shefa/cluster' },
+      { label: 'Peer Topology', icon: 'lan', route: '/shefa/peers' },
+      { label: 'Reciprocity', icon: 'sync_alt', route: '/shefa/reciprocity' },
+    ],
+  },
+  {
     title: 'Management',
     items: [
       { label: 'Network Dashboard', icon: 'monitoring', route: '/shefa/dashboard' },
@@ -73,6 +81,7 @@ export const SHEFA_NAV_GROUPS: NavGroup[] = [
                 [routerLink]="item.route"
                 routerLinkActive="active"
                 [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+                [attr.data-testid]="'shefa-nav-' + item.route.split('/').pop()"
                 (click)="navItemClicked.emit()"
               >
                 <span class="material-icons nav-icon">{{ item.icon }}</span>
@@ -86,6 +95,7 @@ export const SHEFA_NAV_GROUPS: NavGroup[] = [
       <button
         type="button"
         class="sidebar-collapse-btn"
+        data-testid="shefa-sidenav-collapse"
         (click)="collapseClicked.emit()"
         aria-label="Collapse sidebar"
       >
