@@ -27,6 +27,11 @@ const GENERATED_OUTPUT_DIRS = [
   resolve(REPO_ROOT, 'genesis/seeder/src/generated'),
   resolve(REPO_ROOT, 'app/elohim-app/src/app/generated'),
   resolve(REPO_ROOT, 'app/elohim-library/projects/elohim-service/src/generated'),
+  // Phase 2 L5 — doorway-app operator dashboard consumes the same wire types
+  // as elohim-app (DoorwayDashboardView, etc.). Without a generated/ dir here,
+  // tab components (e.g. topology-tab.component.ts) re-declare the type
+  // shapes inline and drift from the canonical schema. See task #11.
+  resolve(REPO_ROOT, 'doorway/doorway-app/src/app/generated'),
 ];
 
 const ENUM_OUTPUT_PATHS = GENERATED_OUTPUT_DIRS.map((d) => join(d, 'schema-enums.ts'));

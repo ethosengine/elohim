@@ -15,46 +15,15 @@ import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
-export type FederationDirection = 'bidirectional' | 'outbound_only' | 'inbound_only';
+// Generated types — single source of truth at
+// elohim/sdk/schemas/v1/views/{doorway-dashboard,dashboard-steward,dashboard-federation-peer,projection-coverage,public-surface-state}-view.schema.json.
+// Distributed here via codegen-ts.mjs GENERATED_OUTPUT_DIRS (Phase 2 L5).
+import type { DoorwayDashboardView } from '../../../generated/doorway-dashboard-view';
+import type { DashboardSteward } from '../../../generated/dashboard-steward';
+import type { DashboardFederationPeer } from '../../../generated/dashboard-federation-peer';
 
-export interface DashboardSteward {
-  peerId: string;
-  archetype: string;
-  displayName?: string;
-  online: boolean;
-  hostingCount: number;
-  hopHint?: number;
-}
-
-export interface DashboardFederationPeer {
-  doorwayHostname: string;
-  online: boolean;
-  direction: FederationDirection;
-  sharedCidCount: number;
-}
-
-export interface ProjectionCoverage {
-  projectedCidCount: number;
-  knownCidCount: number;
-  cacheHitRate24h: number;
-  projectionLagMsAvg: number;
-}
-
-export interface PublicSurfaceState {
-  dnsResolves: boolean;
-  dnsTarget?: string;
-  tlsValid: boolean;
-  tlsExpiresInDays?: number;
-  publicReachable: boolean;
-}
-
-export interface DoorwayDashboardView {
-  doorwayHostname: string;
-  storageStewards: DashboardSteward[];
-  federationPeers: DashboardFederationPeer[];
-  projectionCoverage: ProjectionCoverage;
-  publicSurface: PublicSurfaceState;
-}
+export type FederationDirection = DashboardFederationPeer['direction'];
+export type { DoorwayDashboardView, DashboardSteward, DashboardFederationPeer };
 
 @Component({
   selector: 'app-topology-tab',
