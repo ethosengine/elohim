@@ -3,6 +3,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+import { AgentService } from '@app/elohim/services/agent.service';
+
+import { environment } from '../../../../environments/environment';
+
 import { PeerTopologyComponent } from './peer-topology.component';
 
 const flushAsync = () => new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -12,9 +16,15 @@ describe('PeerTopologyComponent', () => {
   let http: HttpTestingController;
 
   beforeEach(async () => {
+    // Pin REST transport — service-level specs cover GraphQL separately.
+    environment.features = { useGraphqlTopology: false };
     await TestBed.configureTestingModule({
       imports: [PeerTopologyComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AgentService, useValue: { getCurrentAgentId: () => 'agent_M' } },
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(PeerTopologyComponent);
     http = TestBed.inject(HttpTestingController);
@@ -23,6 +33,7 @@ describe('PeerTopologyComponent', () => {
   afterEach(() => {
     fixture.destroy();
     http.verify();
+    TestBed.resetTestingModule();
   });
 
   it('renders one card per peer household edge', async () => {

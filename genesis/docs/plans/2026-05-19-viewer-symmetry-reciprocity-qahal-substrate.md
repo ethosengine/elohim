@@ -10,6 +10,16 @@
 
 **Tech Stack:** Rust `async-graphql` 7, Diesel projections, JSON-Schema codegen via `pnpm run schema:codegen:ts`, Angular 19 with signals, Cucumber a2o features.
 
+**Mid-execution audit (2026-05-19, after L6.0):** prior planning already landed most of the reciprocity wire surface. The following are **already in tree** and L6 reuses them rather than creating:
+- `elohim/sdk/schemas/v1/views/reciprocity-view.schema.json` and `reciprocity-row.schema.json`
+- `elohim/elohim-views/src/shefa.rs:1081` (`ReciprocityRow`) and `:1096` (`ReciprocityView` with `inflow`/`outflow`/`netHostedBytes`/`capacityAvailableBytes` shape)
+- `elohim/elohim-storage/src/services/reciprocity_view.rs` builder
+- `/api/v1/reciprocity` HTTP route (`elohim/elohim-storage/src/http.rs:9897-9901`)
+- `app/elohim-app/src/app/shefa/services/reciprocity.service.ts` (REST-only; method `getMyReciprocity()` carries the deprecated "my" prefix — renamed in L6.6)
+- TS generated types at `app/elohim-app/src/app/generated/reciprocity-{view,row}.ts`
+
+L6.1 (schema) and L6.2 (Rust struct) collapse to **verification-only**; the actual work shifts to L6.3 (GraphQL resolver wrapping existing builder), L6.6 (rename `getMyReciprocity` → `getReciprocity` + add GraphQL alternative), and L6.7 (page).
+
 **Sprint scope reminder (per `project_no_sovereignty_stewardship_over_ownership`):** field names avoid `my`/`own`. The `Viewer.X` namespace already encodes "from this viewer's perspective" — `my` prefixes are redundant ownership coding. Shipped fields `Viewer.hub` and `Viewer.peers` (`elohim/elohim-storage/src/graphql/resolvers.rs:713,728`) already follow this; the deferred surfaces (`reciprocity`, `collectives`) inherit the pattern.
 
 **P2P Design Gate declaration (L6):** zero new DHT entry types, zero new HTTP routes, zero new persistent storage. `ReciprocityView` is **Category C — operational projection** over the existing `rea_commitments` + `rea_economic_events` Diesel relations (which are themselves notarized projections of REA `Commitment` and `EconomicEvent` DHT entries — see the parent synthesis plan, `2026-05-19-topology-resilience-qahal-synthesis.md`, §"P2P Design Gate" table). Identity is CID-derived throughout; rebuild path is signal replay through `rea_projector::handle_content_signal`.

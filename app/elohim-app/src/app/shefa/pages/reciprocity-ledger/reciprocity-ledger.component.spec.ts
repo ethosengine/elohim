@@ -3,6 +3,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+import { AgentService } from '@app/elohim/services/agent.service';
+
+import { environment } from '../../../../environments/environment';
+
 import { ReciprocityLedgerComponent } from './reciprocity-ledger.component';
 
 const flushAsync = () => new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -12,9 +16,16 @@ describe('ReciprocityLedgerComponent', () => {
   let http: HttpTestingController;
 
   beforeEach(async () => {
+    // Pin REST transport for component rendering tests — service-level specs
+    // (reciprocity.service.spec.ts) cover GraphQL transport separately.
+    environment.features = { useGraphqlTopology: false };
     await TestBed.configureTestingModule({
       imports: [ReciprocityLedgerComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AgentService, useValue: { getCurrentAgentId: () => 'agent_M' } },
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(ReciprocityLedgerComponent);
     http = TestBed.inject(HttpTestingController);
@@ -23,6 +34,7 @@ describe('ReciprocityLedgerComponent', () => {
   afterEach(() => {
     fixture.destroy();
     http.verify();
+    TestBed.resetTestingModule();
   });
 
   it('renders inflow and outflow rows', async () => {

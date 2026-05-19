@@ -24,12 +24,16 @@ import type {
   MyClusterView,
 } from '@app/generated/my-cluster-view';
 import type { PeerHouseholdEdge, PeerTopologyView } from '@app/generated/peer-topology-view';
+import type { ReciprocityRow } from '@app/generated/reciprocity-row';
+import type { ReciprocityView } from '@app/generated/reciprocity-view';
 import type {
   DeviceSummaryGql,
   FreshnessGql,
   PeerHouseholdEdgeGql,
+  ReciprocityRowGql,
   ViewerHubResponse,
   ViewerPeersResponse,
+  ViewerReciprocityResponse,
 } from '@elohim/storage-client/graphql';
 
 // ---------------------------------------------------------------------------
@@ -140,5 +144,45 @@ export function adaptPeersResponse(gql: ViewerPeersResponse): PeerTopologyView {
       soleReplicaCidCount: c.soleReplicaCidCount,
     })),
     freshness: adaptFreshness(peers.freshness),
+  };
+}
+
+/**
+ * Map a single GraphQL `ReciprocityRowGql` to the REST-equivalent
+ * `ReciprocityRow`. String byte counters → number (precision trade-off
+ * accepted for the visual-parity sprint; same caveat as adaptHubResponse).
+ */
+function adaptReciprocityRow(gql: ReciprocityRowGql): ReciprocityRow {
+  const row: ReciprocityRow = {
+    counterpartyHouseholdId: gql.counterpartyHouseholdId,
+    committedBytes: Number(gql.committedBytes),
+    deliveredBytes: Number(gql.deliveredBytes),
+    honoredPercent: gql.honoredPercent,
+  };
+  // `displayName?: string` — JSON-schema-to-typescript renders Option<String>
+  // as an optional, so we omit the key when null rather than setting it to null.
+  if (gql.displayName !== null) {
+    row.displayName = gql.displayName;
+  }
+  if (gql.online !== null) {
+    row.online = gql.online;
+  }
+  return row;
+}
+
+/**
+ * Adapt the `data` payload of a `VIEWER_RECIPROCITY_QUERY` response into the
+ * REST-equivalent `ReciprocityView`.
+ *
+ * The caller is responsible for unwrapping the GraphQL envelope.
+ */
+export function adaptReciprocityResponse(gql: ViewerReciprocityResponse): ReciprocityView {
+  const r = gql.viewer.reciprocity;
+  return {
+    agentCid: r.agentCid,
+    inflow: r.inflow.map(adaptReciprocityRow),
+    outflow: r.outflow.map(adaptReciprocityRow),
+    netHostedBytes: Number(r.netHostedBytes),
+    capacityAvailableBytes: Number(r.capacityAvailableBytes),
   };
 }

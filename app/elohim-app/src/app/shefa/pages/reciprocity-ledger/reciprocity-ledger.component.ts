@@ -101,7 +101,7 @@ export class ReciprocityLedgerComponent implements OnInit, OnDestroy {
   private stopPolling?: () => void;
 
   ngOnInit(): void {
-    void this.recip.getMyReciprocity();
+    void this.recip.getReciprocity();
   }
 
   ngOnDestroy(): void {
