@@ -1,13 +1,5 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-  ChangeDetectorRef,
-  inject,
-  HostListener,
-  Inject,
-} from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, Inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 // @coverage: 82.9% (2026-03-03)
@@ -34,7 +26,6 @@ import { ContentMasteryService } from '../../services/content-mastery.service';
 import { PathContextService } from '../../services/path-context.service';
 import { PathService } from '../../services/path.service';
 import { getIconForContent, inferContentTypeFromId } from '../../utils/content-icons';
-import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { LessonViewComponent } from '../lesson-view/lesson-view.component';
 
 /**
@@ -95,7 +86,7 @@ const NAV_FAILED_MSG = 'Navigation failed:';
 @Component({
   selector: 'app-path-navigator',
   standalone: true,
-  imports: [CommonModule, RouterModule, LessonViewComponent, FocusedViewToggleComponent],
+  imports: [CommonModule, RouterModule, LessonViewComponent],
   templateUrl: './path-navigator.component.html',
   styleUrls: ['./path-navigator.component.css'],
 })
@@ -128,14 +119,6 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   isLoading = true;
   error: string | null = null;
   sidebarOpen = true; // Default open, click backdrop to dismiss on mobile
-
-  // Focused view (immersive mode) state
-  isFocusedView = false;
-  contentRefreshKey = 0; // Increment to trigger content reload
-  private readonly TRANSITION_DURATION = 300; // Match CSS transition duration
-
-  /** CSS class for focused view mode */
-  private readonly FOCUSED_VIEW_MODE_CLASS = 'focused-view-mode';
 
   /** Base route for path navigation */
   private readonly PATH_ROUTE = '/lamad/path';
@@ -180,8 +163,6 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
     // Exit path context when leaving the navigator
     this.pathContextService.exitPath();
-    // Clean up focused view mode if active
-    this.document.body.classList.remove(this.FOCUSED_VIEW_MODE_CLASS);
   }
 
   /**
@@ -963,44 +944,6 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     }
 
     this.contentViewStartTime = null;
-  }
-
-  // =========================================================================
-  // Focused View (Immersive Mode) Methods
-  // =========================================================================
-
-  /**
-   * Handle escape key to exit focused view mode.
-   */
-  @HostListener('document:keydown.escape')
-  onEscapeKey(): void {
-    if (this.isFocusedView) {
-      this.onFocusedViewToggle(false);
-    }
-  }
-
-  /**
-   * Toggle focused view mode.
-   * Waits for CSS transition to complete before reloading content
-   * so iframes can measure the new viewport dimensions correctly.
-   */
-  onFocusedViewToggle(active: boolean): void {
-    this.isFocusedView = active;
-
-    // Hide sidebar in focused view
-    if (active) {
-      this.sidebarOpen = false;
-      this.document.body.classList.add(this.FOCUSED_VIEW_MODE_CLASS);
-    } else {
-      this.document.body.classList.remove(this.FOCUSED_VIEW_MODE_CLASS);
-    }
-
-    // Wait for CSS transition to complete, then trigger content reload
-    // This ensures iframes get the correct viewport dimensions
-    setTimeout(() => {
-      this.contentRefreshKey = Date.now();
-      this.cdr.detectChanges();
-    }, this.TRANSITION_DURATION);
   }
 
   /**
