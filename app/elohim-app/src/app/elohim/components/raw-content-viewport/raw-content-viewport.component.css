@@ -1,0 +1,45 @@
+:host {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: var(--app-background, #0b0b10);
+  color: var(--app-foreground, #e9e9f0);
+  overflow: auto;
+}
+
+.raw-viewport {
+  position: relative;
+  min-height: 100vh;
+  width: 100vw;
+}
+
+.error {
+  padding: 2rem;
+  text-align: center;
+}
+
+.exit {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 2147482900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(20, 20, 30, 0.72);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+  opacity: 0.78;
+  transition: opacity 150ms ease;
+}
+
+.exit:hover {
+  opacity: 1;
+}

@@ -1,0 +1,32 @@
+<div class="raw-viewport">
+  <div *ngIf="error" class="error" data-testid="raw-viewport-error">
+    <p>{{ error }}</p>
+  </div>
+
+  <div data-testid="raw-viewport-renderer-host" class="renderer-host-wrapper">
+    <ng-container #rendererHost></ng-container>
+  </div>
+
+  <button
+    type="button"
+    class="exit"
+    (click)="exit()"
+    data-testid="raw-viewport-exit"
+    aria-label="Exit raw viewport"
+  >
+    ✕
+  </button>
+
+  <app-protocol-signal-badge
+    *ngIf="node"
+    [contentId]="node.id"
+    [attestationCount]="0"
+  ></app-protocol-signal-badge>
+
+  <!-- placeholder badge so the test can detect its presence pre-load -->
+  <app-protocol-signal-badge
+    *ngIf="!node"
+    contentId="pending"
+    [attestationCount]="0"
+  ></app-protocol-signal-badge>
+</div>
