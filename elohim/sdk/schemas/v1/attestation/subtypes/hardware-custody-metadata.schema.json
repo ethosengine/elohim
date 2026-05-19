@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/hardware-custody-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (imagodei Attestation entry, kind='hardware-custody'). Category A. Declares the legal/social custodian-of-record for a registered doorway's underlying hardware. The custodian is the human (or collective) of record — they own the box, pay the bills, decide the hardware's end-of-life, and authorize who serves as steward-of-record. Custody changes are real-world events (death, sale, gift, household reorganization); they must be witnessed by the succession quorum named at attestation time. Reach: commons (current custodian is publicly auditable by hosted users and federated peers). Quorum SETUP (who's in the quorum) is also commons — the secret material those quorum members hold lives at intimate reach in recovery_seed_commitments per Recovery Phase 2.",
+  "title": "HardwareCustodyAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:hardware-custody. Asserts that the signing agent (or a collective agent) is the custodian-of-record for the hardware behind the named doorway. For the duration of this attestation's validity, this agent holds the authority to issue (and revoke) steward-of-record attestations for the same doorway.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doorwayId",
+    "custodianAgent",
+    "successionQuorum",
+    "validFrom"
+  ],
+  "properties": {
+    "doorwayId": {
+      "type": "string",
+      "description": "DoorwayRegistration.id this custody covers. Until hardware-fingerprinting lands in compute reporting, this is the bound identity. Migration of custody to a different DoorwayRegistration is itself a transfer event (see custody-transfer-metadata.schema.json).",
+      "minLength": 1
+    },
+    "custodianAgent": {
+      "type": "string",
+      "description": "Agent public key claiming custody. May be a household_collective_key, an individual agent_key, or a recovery_committee key — anything the protocol recognizes as an agent identity.",
+      "minLength": 1
+    },
+    "successionQuorum": {
+      "type": "object",
+      "description": "M-of-N quorum authorized to attest a custody transfer when the custodian becomes unavailable (death, incapacitation, voluntary stepping-down). Reused from Recovery Phase 2 — these agents appear in recovery_witnesses table; the seed material they hold lives privately in recovery_seed_commitments at intimate reach.",
+      "additionalProperties": false,
+      "required": ["thresholdM", "witnessAgents"],
+      "properties": {
+        "thresholdM": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of witness signatures required to authorize a transfer (M-of-N)."
+        },
+        "witnessAgents": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string" },
+          "description": "Agent public keys of the witnesses. Must include at least thresholdM members. Membership is commons-reach; the seed shares they custody are not."
+        }
+      }
+    },
+    "validFrom": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO8601 timestamp this custody takes effect."
+    },
+    "predecessorAttestationHash": {
+      "type": ["string", "null"],
+      "description": "ActionHash of the prior HardwareCustodyAttestation this one supersedes. Null on the genesis attestation (issued at doorway first boot or hardware acquisition). Non-null custody attestations MUST be paired with a HardwareCustodyTransferAttestation that names this predecessor."
+    },
+    "evidenceCid": {
+      "type": ["string", "null"],
+      "description": "Optional CID of supporting real-world documentation (deed of sale, will, transfer-of-custody letter). Off-DHT; the CID is a discoverable pointer for human review."
+    },
+    "reachClass": {
+      "type": "string",
+      "enum": ["commons", "stewards-only"],
+      "default": "commons",
+      "description": "Visibility of this custody attestation. Defaults to commons so hosted users + federated peers can audit. stewards-only is a narrowed option for private federations; not recommended for general use."
+    }
+  }
+}

@@ -1,0 +1,39 @@
+-- Phase 2 L3 — REA action convention for doorway-operator authority.
+--
+-- Doorway-operator authority is NOT stored in a dedicated table. It lives in
+-- the existing rea_commitments table (Notarized via the existing Commitment
+-- entry type — elohim DNA, content_store_integrity zome) using a single new
+-- action discriminator:
+--
+--   operate-doorway (commitment) — agent commits to operate a doorway, with a
+--                                  capability set (resource_classified_as),
+--                                  doorway scope (in_scope_of), and succession
+--                                  role + reach class (metadata_json) per
+--                                  elohim/sdk/schemas/v1/objects/operator-classification.schema.json
+--
+-- Source of truth: Holochain DHT. The SQLite projection is a read-optimized
+-- cache; the dht_anchor_hash column on rea_commitments links each binding back
+-- to its Commitment ActionHash.
+--
+-- This mirrors the precedent established for blob-stewardship REA actions
+-- (custody-blob, serve-blob, project-blob) in 2026-05-02-100000_rea_blob_action_indexes:
+-- the protocol's "is X authorized?" lookups go through rea_commitments filtered
+-- by action + scope, not a parallel auth table.
+--
+-- Auth fast-path: JWT carries a capabilities snapshot. TTL refresh uses the
+-- composite index below to re-derive snapshot from active commitments.
+--
+-- Auth slow-path query shape:
+--   SELECT * FROM rea_commitments
+--   WHERE action = 'operate-doorway'
+--     AND in_scope_of = 'doorway:<id>'  -- exact scope match; in_scope_of is the
+--                                       --   first scope entry; multi-scope
+--                                       --   commitments project once per scope
+--                                       --   (see rea_projection.rs).
+--     AND state = 'active'
+--     AND provider = ?  -- the operator's agent_pubkey
+--
+-- The composite index covers (action, in_scope_of, state) for this hot path.
+
+CREATE INDEX idx_rea_commitments_action_scope_state
+    ON rea_commitments(action, in_scope_of, state);

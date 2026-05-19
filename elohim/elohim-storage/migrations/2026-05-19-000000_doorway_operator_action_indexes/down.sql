@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_rea_commitments_action_scope_state;

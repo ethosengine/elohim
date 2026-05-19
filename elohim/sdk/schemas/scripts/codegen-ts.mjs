@@ -92,6 +92,9 @@ const INTERFACE_FILES = [
   { src: 'views/reciprocity-view.ts', dest: 'reciprocity-view.ts' },
   { src: 'views/reciprocity-row.ts', dest: 'reciprocity-row.ts' },
   { src: 'views/doorway-dashboard-view.ts', dest: 'doorway-dashboard-view.ts' },
+  // Phase 2 L3 — operator authority as notarized Commitment (Category C view
+  // of a Category A entry; underlying Commitment is action='operate-doorway')
+  { src: 'views/doorway-operator-binding-view.ts', dest: 'doorway-operator-binding-view.ts' },
   { src: 'views/dashboard-steward.ts', dest: 'dashboard-steward.ts' },
   { src: 'views/dashboard-federation-peer.ts', dest: 'dashboard-federation-peer.ts' },
   { src: 'views/projection-coverage.ts', dest: 'projection-coverage.ts' },

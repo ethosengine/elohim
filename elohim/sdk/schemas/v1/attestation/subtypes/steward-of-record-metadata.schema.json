@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/steward-of-record-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (imagodei Attestation entry, kind='steward-of-record'). Category A. Declares the operational steward-of-record for a doorway — the accountable person/agent for day-to-day operation. Separate from custody: custody is legal/social, stewardship is operational. Often the same agent (grandpa was both), can split (household custodies, kid stewards). The steward-of-record is who signs operate-doorway Commitments under their authority; the chain is custody -> steward -> operator commitments. Reach: commons (current steward is publicly auditable). Succession quorum membership is commons; secret material is intimate.",
+  "title": "StewardOfRecordAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:steward-of-record. Asserts the signing agent is the operational steward-of-record for the named doorway, serving under the named custody attestation. Steward authority is what activates operate-doorway Commitments — operators serve under the steward, the steward serves under custody. Steward transfer is independent of custody transfer (steward can be replaced without changing custody).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doorwayId",
+    "stewardAgent",
+    "custodyAttestationHash",
+    "successionQuorum",
+    "validFrom"
+  ],
+  "properties": {
+    "doorwayId": {
+      "type": "string",
+      "description": "DoorwayRegistration.id this stewardship covers. Must match the doorwayId of the referenced custody attestation.",
+      "minLength": 1
+    },
+    "stewardAgent": {
+      "type": "string",
+      "description": "Agent public key serving as steward-of-record. May be the same agent as the custodian (collapsed roles) or distinct (delegated stewardship).",
+      "minLength": 1
+    },
+    "custodyAttestationHash": {
+      "type": "string",
+      "description": "ActionHash of the active HardwareCustodyAttestation this stewardship operates under. The auth chain requires this attestation to still be current (not superseded) for the stewardship to be valid.",
+      "minLength": 1
+    },
+    "successionQuorum": {
+      "type": "object",
+      "description": "M-of-N quorum authorized to attest a stewardship transfer. May or may not overlap with the custody quorum. Reuses Recovery Phase 2 primitives.",
+      "additionalProperties": false,
+      "required": ["thresholdM", "witnessAgents"],
+      "properties": {
+        "thresholdM": { "type": "integer", "minimum": 1 },
+        "witnessAgents": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "responsibilities": {
+      "type": "array",
+      "description": "Declared operational responsibilities this steward accepts. Free-form for now; future versions may constrain to an enum aligned with admin endpoint categories (federation, hosted-users, projection, etc.).",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "validFrom": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "predecessorAttestationHash": {
+      "type": ["string", "null"],
+      "description": "Prior StewardOfRecordAttestation this supersedes. Null on genesis."
+    },
+    "reachClass": {
+      "type": "string",
+      "enum": ["commons", "stewards-only"],
+      "default": "commons"
+    }
+  }
+}

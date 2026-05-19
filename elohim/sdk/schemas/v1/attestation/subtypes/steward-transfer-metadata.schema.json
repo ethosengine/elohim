@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/steward-transfer-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (imagodei Attestation entry, kind='steward-of-record-transfer'). Category A. Supersession event for a StewardOfRecordAttestation. Either: (a) authorized by the active custodian alone (typical case — custodian re-delegates stewardship), or (b) authorized by the steward's succession quorum (if custodian is unavailable AND stewardship is hereditary in the quorum's discretion). Reach: commons. Mirrors hardware-custody-transfer shape because the semantics are parallel; the distinction is one tier down in the authority chain.",
+  "title": "StewardOfRecordTransferAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:steward-of-record-transfer. Marks the named StewardOfRecordAttestation as superseded. Active operate-doorway Commitments under the previous steward are orphaned until re-blessed by the new steward.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doorwayId",
+    "predecessorAttestationHash",
+    "incomingSteward",
+    "transferReason",
+    "authorizationPath",
+    "effectiveAt"
+  ],
+  "properties": {
+    "doorwayId": { "type": "string", "minLength": 1 },
+    "predecessorAttestationHash": {
+      "type": "string",
+      "description": "ActionHash of the StewardOfRecordAttestation being superseded."
+    },
+    "outgoingSteward": {
+      "type": ["string", "null"],
+      "description": "Agent public key of the previous steward (may be null if the predecessor's steward agent is no longer available)."
+    },
+    "incomingSteward": {
+      "type": "string",
+      "description": "Agent public key of the new steward."
+    },
+    "transferReason": {
+      "type": "string",
+      "enum": [
+        "custodian-delegation",
+        "voluntary",
+        "incapacitation",
+        "recovery-event",
+        "custody-transferred"
+      ],
+      "description": "Why stewardship is changing. 'custody-transferred' indicates this transfer is a downstream effect of a HardwareCustodyTransferAttestation — the new custodian re-blesses (or replaces) the steward as their first act."
+    },
+    "authorizationPath": {
+      "type": "string",
+      "enum": ["custodian-signed", "succession-quorum"],
+      "description": "Which authority path authorized this transfer. 'custodian-signed' requires the active custodian's signature in witnessSignatures. 'succession-quorum' requires M-of-N from the steward's succession quorum."
+    },
+    "witnessSignatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["witnessAgent", "signature"],
+        "properties": {
+          "witnessAgent": { "type": "string", "minLength": 1 },
+          "signature": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "recoveryQuorumRequestHash": {
+      "type": ["string", "null"],
+      "description": "Optional link to a recovery_quorum_requests entry when the authorization path is 'succession-quorum'."
+    },
+    "effectiveAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

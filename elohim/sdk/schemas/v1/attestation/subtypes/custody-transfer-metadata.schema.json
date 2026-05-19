@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/custody-transfer-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (imagodei Attestation entry, kind='hardware-custody-transfer'). Category A. The supersession event for a HardwareCustodyAttestation. Authorized by M-of-N signatures from the succession quorum named in the predecessor. Real-world drivers: death, incapacitation, voluntary stepping-down, sale, household reorganization. Reach: commons — the entire network sees this event so hosted users and federated peers can re-evaluate trust. Pairs with a recovery_quorum_request (Recovery Phase 2 primitive, reused with request_kind='hardware-custody-transfer').",
+  "title": "HardwareCustodyTransferAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:hardware-custody-transfer. Marks the named HardwareCustodyAttestation as superseded. The auth resolver treats the predecessor as no longer current; all StewardOfRecord attestations and operate-doorway Commitments that reference the predecessor are correspondingly orphaned until re-blessed under the new custody.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doorwayId",
+    "predecessorAttestationHash",
+    "outgoingCustodian",
+    "incomingCustodian",
+    "transferReason",
+    "witnessSignatures",
+    "effectiveAt"
+  ],
+  "properties": {
+    "doorwayId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "predecessorAttestationHash": {
+      "type": "string",
+      "description": "ActionHash of the HardwareCustodyAttestation being superseded. Validators MUST confirm this is currently the latest valid custody attestation for the doorway."
+    },
+    "outgoingCustodian": {
+      "type": "string",
+      "description": "Agent public key of the previous custodian. For voluntary transfers, this agent's signature appears in witnessSignatures (alongside the quorum). For involuntary transfers (death, incapacitation), this is documented but the agent cannot sign — quorum acts on their behalf."
+    },
+    "incomingCustodian": {
+      "type": "string",
+      "description": "Agent public key of the new custodian. Their signature MUST appear in witnessSignatures."
+    },
+    "transferReason": {
+      "type": "string",
+      "enum": [
+        "voluntary",
+        "death",
+        "incapacitation",
+        "sale",
+        "gift",
+        "household-reorganization",
+        "recovery-event",
+        "decommission-prelude"
+      ],
+      "description": "Why custody is changing. Drives validator logic — 'death' requires outgoingCustodian's recovery quorum to act, 'voluntary' requires the outgoingCustodian's own signature."
+    },
+    "recoveryQuorumRequestHash": {
+      "type": ["string", "null"],
+      "description": "Optional link to the recovery_quorum_requests entry (Recovery Phase 2) that authorized this transition. Required for involuntary transfers (death, incapacitation); optional for voluntary."
+    },
+    "witnessSignatures": {
+      "type": "array",
+      "description": "Signatures from members of the succession quorum named in the predecessor attestation. Count MUST satisfy predecessor's thresholdM. Each entry carries the witness agent_key and their signature over the canonical bytes of this attestation.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["witnessAgent", "signature"],
+        "properties": {
+          "witnessAgent": { "type": "string", "minLength": 1 },
+          "signature": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "effectiveAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO8601 timestamp when this transfer takes effect. May be in the past (death/incapacitation discovered after the fact)."
+    },
+    "supportingEvidenceCid": {
+      "type": ["string", "null"],
+      "description": "Optional CID of supporting real-world documentation (death certificate, deed of sale, etc.)."
+    }
+  }
+}

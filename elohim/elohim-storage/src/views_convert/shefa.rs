@@ -6,11 +6,12 @@
 use elohim_views::shared::{parse_json, parse_json_opt};
 use elohim_views::{
     AccessGrantView, AgreementView, ContentStewardshipView, ContributorDashboardView,
-    ContributorImpactView, ContributorPresenceView, EconomicEventView, MeasureView,
-    NodeStewardshipView, PremiumGateView, ReaCommitmentView, ResponsibilityDemandConfigView,
-    StewardAffinityView, StewardCredentialView, StewardRevenueSummaryView, StewardedNodeView,
-    StewardshipAllocationView, StewardshipAllocationWithPresenceView, TokenBalanceView,
-    TokenDecayEventView, TokenMintEventView, TokenTransferView,
+    ContributorImpactView, ContributorPresenceView, DoorwayOperatorBindingView, EconomicEventView,
+    MeasureView, NodeStewardshipView, PremiumGateView, ReaCommitmentView,
+    ResponsibilityDemandConfigView, StewardAffinityView, StewardCredentialView,
+    StewardRevenueSummaryView, StewardedNodeView, StewardshipAllocationView,
+    StewardshipAllocationWithPresenceView, TokenBalanceView, TokenDecayEventView,
+    TokenMintEventView, TokenTransferView,
 };
 
 use crate::db::contributors::ImpactSummary;
@@ -148,6 +149,100 @@ impl From<ReaCommitment> for ReaCommitmentView {
             created_at: c.created_at,
         }
     }
+}
+
+// ============================================================================
+// Doorway Operator Binding View
+// ============================================================================
+
+/// Project an active operate-doorway commitment into the denormalized
+/// view shape. Callers MUST filter for `action == "operate-doorway"` and
+/// `state == "active"` before invoking this conversion; the function is
+/// total but interprets parsing failures as "binding does not project"
+/// (returns None) so the auth layer can skip malformed rows instead of
+/// crashing on a single bad commitment.
+///
+/// Parsing strategy:
+/// - capabilities: resource_classified_as as JSON array of strings; missing or
+///   unparseable → empty vec (binding is then unauthoritative — auth will deny)
+/// - doorway_id: first 'doorway:<id>' entry in in_scope_of JSON array; missing
+///   → None (this conversion returns None — the binding cannot be located)
+/// - successionRole / reachScope: parsed from metadata_json; defaults applied
+///   when fields absent ('deputy' / 'operator-private') so legacy commitments
+///   produced before schemaVersion 1 still project.
+pub fn project_doorway_operator_binding(
+    c: ReaCommitment,
+    agreement_id: String,
+) -> Option<DoorwayOperatorBindingView> {
+    let dht_anchor_hash = c.dht_anchor_hash.clone()?;
+
+    let capabilities: Vec<String> = c
+        .resource_classified_as
+        .as_deref()
+        .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+        .unwrap_or_default();
+
+    let scopes: Vec<String> = c
+        .in_scope_of
+        .as_deref()
+        .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+        .unwrap_or_default();
+
+    let doorway_id = scopes
+        .iter()
+        .find_map(|s| s.strip_prefix("doorway:").map(|id| id.to_string()))?;
+
+    // Note: parse the metadata directly to serde_json::Value here (bypassing
+    // the JsonVal wrapper) because we read individual fields rather than ship
+    // the whole thing through the API boundary.
+    let metadata: Option<serde_json::Value> = c
+        .metadata_json
+        .as_deref()
+        .and_then(|s| serde_json::from_str(s).ok());
+    let succession_role = metadata
+        .as_ref()
+        .and_then(|m| m.get("successionRole"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("deputy")
+        .to_string();
+    let reach_scope = metadata
+        .as_ref()
+        .and_then(|m| m.get("reachScope"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("operator-private")
+        .to_string();
+    // Custody + steward attestation references (schemaVersion=2 payload). Both
+    // None during the v1 transition window; the auth resolver treats None as
+    // "no chain enforcement yet" and accepts the binding. Once the doorway
+    // has bootstrapped its custody + steward attestations, producers emit v2
+    // and the auth resolver enforces chain currency.
+    let custody_attestation_hash = metadata
+        .as_ref()
+        .and_then(|m| m.get("custodyAttestationHash"))
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let steward_attestation_hash = metadata
+        .as_ref()
+        .and_then(|m| m.get("stewardAttestationHash"))
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+
+    Some(DoorwayOperatorBindingView {
+        commitment_id: c.id,
+        doorway_id,
+        operator_agent: c.provider,
+        capabilities,
+        succession_role,
+        reach_scope,
+        state: c.state,
+        agreement_id,
+        has_beginning: c.has_beginning,
+        has_end: c.has_end,
+        dht_anchor_hash,
+        custody_attestation_hash,
+        steward_attestation_hash,
+        created_at: c.created_at,
+    })
 }
 
 // ============================================================================

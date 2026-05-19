@@ -17,6 +17,57 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::auth::PermissionLevel;
 use crate::types::DoorwayError;
 
+/// Snapshot of doorway-operator authority captured at JWT issue time.
+///
+/// Source: derived from the rea_commitments projection (action='operate-doorway',
+/// state='active') for the issuing doorway. Wire shape:
+/// elohim/sdk/schemas/v1/views/doorway-operator-binding-view.schema.json
+///
+/// This snapshot is the **cached truth** the auth fast path checks. On
+/// snapshot_age exceeding the configured TTL, doorway re-queries the projection
+/// to re-issue the JWT with a fresh snapshot. The DHT-notarized Commitment is
+/// the canonical source; this struct is its in-flight projection.
+///
+/// Backward compatibility: absent for non-operator JWTs (hosted users, agent
+/// authentication for content access). Only populated for accounts that have
+/// an active operate-doorway commitment on the issuing doorway.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OperatorSnapshot {
+    /// DoorwayRegistration.id this operator authority applies to.
+    pub doorway_id: String,
+    /// Commitment.id of the underlying operate-doorway commitment.
+    pub commitment_id: String,
+    /// Capability strings carried by the binding (from
+    /// resource_classified_as). "*" entry grants all capabilities; otherwise
+    /// membership is checked exactly. Per operator-classification.schema.json.
+    pub capabilities: Vec<String>,
+    /// Role within the doorway's succession plan.
+    pub succession_role: String,
+    /// Reach class of the binding (visibility).
+    pub reach_scope: String,
+    /// ActionHash of the Commitment entry on the DHT (Cat A discipline).
+    pub dht_anchor_hash: String,
+    /// ActionHash of the active HardwareCustodyAttestation this operator
+    /// binding serves under. None during the schemaVersion=1 transition
+    /// window. Once populated, the auth chain resolver verifies it still
+    /// matches the doorway's current custody attestation; mismatch =
+    /// orphaned binding (CapabilityError::CustodyTransferred). See
+    /// elohim/sdk/schemas/v1/attestation/subtypes/hardware-custody-metadata.schema.json.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custody_attestation_hash: Option<String>,
+    /// ActionHash of the active StewardOfRecordAttestation this operator
+    /// binding serves under. Independently revocable from custody — a
+    /// stewardship transfer orphans operator commitments without affecting
+    /// custody. None during transition. See
+    /// elohim/sdk/schemas/v1/attestation/subtypes/steward-of-record-metadata.schema.json.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steward_attestation_hash: Option<String>,
+    /// Unix timestamp when this snapshot was taken from the projection.
+    /// Auth layer uses this for TTL-based refresh decisions.
+    pub snapshot_taken_at: u64,
+}
+
 /// Payload stored in JWT token
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
@@ -28,6 +79,11 @@ pub struct Claims {
     pub identifier: String,
     /// Permission level granted
     pub permission_level: PermissionLevel,
+    /// Operator authority snapshot, if this agent has an active
+    /// operate-doorway commitment on the issuing doorway. Absent for ordinary
+    /// hosted-user JWTs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doorway_operator: Option<OperatorSnapshot>,
     /// Session ID for signing key cache lookup (custodial mode)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
@@ -156,6 +212,11 @@ impl JwtValidator {
             agent_pub_key: input.agent_pub_key,
             identifier: input.identifier,
             permission_level: input.permission_level,
+            // Operator snapshot is populated at /auth/login via projection
+            // lookup (task #15). Plain generate_token leaves it empty; the
+            // login flow will replace the JWT with a snapshot-bearing one
+            // once the operator-binding lookup is wired in.
+            doorway_operator: None,
             session_id: input.session_id,
             doorway_id: input.doorway_id,
             doorway_url: input.doorway_url,
@@ -193,6 +254,10 @@ impl JwtValidator {
             agent_pub_key: input.agent_pub_key,
             identifier: input.identifier,
             permission_level: input.permission_level,
+            // Operator snapshot omitted on refresh tokens by design — refresh
+            // tokens are exchanged for new access tokens, at which point the
+            // login flow re-queries the projection for a fresh snapshot.
+            doorway_operator: None,
             session_id: input.session_id,
             doorway_id: input.doorway_id,
             doorway_url: input.doorway_url,

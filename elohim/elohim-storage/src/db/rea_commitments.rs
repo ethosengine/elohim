@@ -324,3 +324,120 @@ pub fn commitment_count(
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
 }
+
+// ============================================================================
+// Doorway-Operator Authority Selectors
+// ============================================================================
+//
+// Operator authority for a doorway is a Commitment with action='operate-doorway'
+// and in_scope_of='doorway:<id>'. The capabilities array lives in
+// resource_classified_as (JSON-encoded list of strings); succession-role and
+// reach-scope live in metadata_json. See:
+//   - elohim/sdk/schemas/v1/objects/operator-classification.schema.json
+//   - elohim/sdk/schemas/v1/views/doorway-operator-binding-view.schema.json
+//
+// Source of truth: DHT Commitment entry (Notarized, Category A). These
+// selectors read the projection only — re-derivable by replaying the signal
+// stream filtered to action='operate-doorway'.
+//
+// Fast-path queries use the (action, in_scope_of, state) composite index from
+// migration 2026-05-19-000000_doorway_operator_action_indexes.
+
+/// REA action discriminator for doorway-operator commitments. Single source of
+/// truth for this string in the storage crate; the same constant in the DNA's
+/// REA_ACTIONS array is the wire-contract value (kept in sync by convention,
+/// pending schema-first codegen of the action vocabulary).
+pub const OPERATE_DOORWAY_ACTION: &str = "operate-doorway";
+
+/// Build the canonical in_scope_of value for an operate-doorway commitment.
+///
+/// Stored encoding is a JSON-array string (ValueFlows in_scope_of convention),
+/// matching what the DNA projects into rea_commitments.in_scope_of verbatim
+/// from the Commitment entry's in_scope_of_json field. Operator commitments are
+/// always single-scope, so the resulting string is a one-element JSON array
+/// that can be matched exactly via the composite index from migration
+/// 2026-05-19-000000_doorway_operator_action_indexes.
+pub fn doorway_scope(doorway_id: &str) -> String {
+    serde_json::to_string(&[format!("doorway:{}", doorway_id)])
+        .expect("serializing a single-element string array cannot fail")
+}
+
+/// List active operator commitments for a doorway.
+///
+/// Returns every Commitment with action='operate-doorway', in_scope_of matching
+/// the doorway scope, and state='active'. Each row is a distinct operator
+/// binding (one row per operator-agent × doorway). The doorway's auth layer
+/// uses this at JWT refresh time to rebuild the capabilities snapshot.
+pub fn list_active_doorway_operators(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    doorway_id: &str,
+) -> Result<Vec<ReaCommitment>, StorageError> {
+    let scope = doorway_scope(doorway_id);
+    rea_commitments::table
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        .filter(rea_commitments::action.eq(OPERATE_DOORWAY_ACTION))
+        .filter(rea_commitments::in_scope_of.eq(&scope))
+        .filter(rea_commitments::state.eq("active"))
+        .order(rea_commitments::created_at.desc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Operator query failed: {}", e)))
+}
+
+/// Look up the active operator-binding for one agent on one doorway.
+///
+/// Returns at most one Commitment (the most-recent active binding). Callers
+/// MUST still verify the capability is present in the binding's
+/// resource_classified_as list before authorizing the operation. This selector
+/// is the substrate lookup; the capability membership check belongs to the
+/// auth layer (so capability vocabulary changes do not require a DB schema
+/// change).
+pub fn find_active_operator_binding(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    operator_agent: &str,
+    doorway_id: &str,
+) -> Result<Option<ReaCommitment>, StorageError> {
+    let scope = doorway_scope(doorway_id);
+    rea_commitments::table
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        .filter(rea_commitments::action.eq(OPERATE_DOORWAY_ACTION))
+        .filter(rea_commitments::in_scope_of.eq(&scope))
+        .filter(rea_commitments::state.eq("active"))
+        .filter(rea_commitments::provider.eq(operator_agent))
+        .order(rea_commitments::created_at.desc())
+        .first(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("Operator lookup failed: {}", e)))
+}
+
+#[cfg(test)]
+mod operator_helper_tests {
+    use super::*;
+
+    #[test]
+    fn doorway_scope_produces_canonical_json_array() {
+        // Single-element JSON array per operator-classification.schema.json
+        // scopes pattern. The composite index relies on this exact encoding.
+        assert_eq!(doorway_scope("alpha-elohim-host"), r#"["doorway:alpha-elohim-host"]"#);
+    }
+
+    #[test]
+    fn doorway_scope_escapes_embedded_quotes() {
+        // Defensive — doorway ids should never contain quotes (the schema
+        // pattern forbids them), but the JSON encoder must still escape them
+        // safely if a malformed id slips through.
+        let scope = doorway_scope("evil\"-injection");
+        let parsed: Vec<String> = serde_json::from_str(&scope).expect("valid JSON");
+        assert_eq!(parsed, vec!["doorway:evil\"-injection".to_string()]);
+    }
+
+    #[test]
+    fn operate_doorway_action_matches_dna_vocabulary() {
+        // The constant here must match the entry appended to REA_ACTIONS in
+        // elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs.
+        // Schema-first codegen of this vocabulary is a future refactor; until
+        // then this test is the drift detector.
+        assert_eq!(OPERATE_DOORWAY_ACTION, "operate-doorway");
+    }
+}

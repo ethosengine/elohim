@@ -199,7 +199,7 @@ pub const RECOGNITION_FLOW_TYPES: [&str; 4] = [
 
 /// REA Action vocabulary - what happened in an economic event
 /// Aligned with ValueFlows specification: https://www.valueflo.ws/concepts/actions/
-pub const REA_ACTIONS: [&str; 23] = [
+pub const REA_ACTIONS: [&str; 24] = [
     // Input actions (consume/use resources)
     "use",     // Use without consuming (view content, attend session)
     "consume", // Use up completely (one-time access tokens)
@@ -232,6 +232,12 @@ pub const REA_ACTIONS: [&str; 23] = [
     "custody-blob",    // Commit custody of a blob (storage stewardship)
     "serve-blob",      // Deliver a blob to a requester (projection service delivery)
     "ack-projection",  // Phase 4 — doorway projector acks successful projection of a blob
+    // Infrastructure-stewardship actions (doorway operation)
+    // Capability set + scope + succession role carried in Commitment fields per
+    // elohim/sdk/schemas/v1/objects/operator-classification.schema.json. The
+    // SQLite projection in rea_commitments (filtered by this action) is the
+    // queryable read path; no parallel auth table.
+    "operate-doorway", // Commit to operate a doorway with declared capabilities
 ];
 
 /// Resource classifications for Shefa economy

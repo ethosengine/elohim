@@ -84,6 +84,41 @@ pub struct ReaCommitmentView {
     pub created_at: String,
 }
 
+/// Denormalized read shape for active doorway-operator authority. Wire
+/// contract: elohim/sdk/schemas/v1/views/doorway-operator-binding-view.schema.json
+///
+/// Source of truth: derived from rea_commitments where action='operate-doorway'
+/// and state='active' (Operational, Category C — reconstructed from the
+/// notarized Commitment entry; no separate persistent table). Capability set
+/// is parsed from resource_classified_as; successionRole + reachScope from
+/// metadata_json (per operator-classification.schema.json).
+///
+/// Custody + steward chain: schemaVersion=2 carries custodyAttestationHash and
+/// stewardAttestationHash references — the two-layer attestation chain ABOVE
+/// the operator commitment. v1 commitments have these None during the
+/// transition window. Auth chain resolution (verify_custody_chain) walks
+/// commitment -> steward attestation -> custody attestation, returning
+/// orphaned if any link has been superseded.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct DoorwayOperatorBindingView {
+    pub commitment_id: String,
+    pub doorway_id: String,
+    pub operator_agent: String,
+    pub capabilities: Vec<String>,
+    pub succession_role: String,
+    pub reach_scope: String,
+    pub state: String,
+    pub agreement_id: String,
+    pub has_beginning: Option<String>,
+    pub has_end: Option<String>,
+    pub dht_anchor_hash: String,
+    pub custody_attestation_hash: Option<String>,
+    pub steward_attestation_hash: Option<String>,
+    pub created_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]

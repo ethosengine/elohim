@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:objects:operator-classification",
+  "title": "OperatorClassification",
+  "description": "Doorway-operator authority encoded as an REA Commitment. NOT a new entry type — uses the existing Commitment entry (elohim DNA, content_store_integrity zome) with action='operate-doorway'. This schema declares the controlled vocabulary for the three Commitment fields that carry the operator binding: resource_classified_as (capability set, queryable list), in_scope_of (doorway scope reference), and metadata_json (succession role and versioning). The doorway's projection layer reads active operate-doorway commitments by indexing (action, in_scope_of) on the rea_commitments table — no new physical projection table required. Source of truth: Holochain DHT (Notarized, Category A — existing Commitment entry type).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "action",
+    "capabilities",
+    "scopes",
+    "successionRole"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "enum": [1, 2],
+      "description": "Schema version. v1 omits custody/steward references (transition window — auth chain enforcement comes online with v2). v2 adds required custodyAttestationHash + stewardAttestationHash referencing the two-layer attestation chain above operator commitments. Producers SHOULD emit v2 once the doorway has the bootstrap attestations in place; readers MUST accept both during the transition."
+    },
+    "action": {
+      "type": "string",
+      "const": "operate-doorway",
+      "description": "REA action discriminator. Always 'operate-doorway' for operator commitments. Distinct from 'custody-blob', 'serve-blob', etc. — those are storage-stewardship actions on the same Commitment entry type."
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "Capability strings stored as the Commitment's resource_classified_as field (a list, queryable via existing idx_rea_commitments_action_resource index). Each string is a dot-separated capability path 'subsystem.operation' matching an admin endpoint declaration in doorway-service. Authority is checked at request time by membership in this list.",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "federation.peers.read",
+          "federation.peers.mutate",
+          "hosted_users.read",
+          "hosted_users.lifecycle",
+          "cache.read",
+          "cache.mutate",
+          "graduation.read",
+          "graduation.force",
+          "registry.read",
+          "registry.mutate",
+          "topology.read",
+          "pipeline.read",
+          "*"
+        ]
+      }
+    },
+    "scopes": {
+      "type": "array",
+      "description": "Scope references stored as the Commitment's in_scope_of field (a list). Each entry is a typed prefix 'kind:identifier'. The 'doorway:<id>' prefix names which doorway this operator authority applies to and MUST match an existing DoorwayRegistration.id.",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(doorway|household|collective):[a-z0-9][a-z0-9-]*$"
+      }
+    },
+    "successionRole": {
+      "type": "string",
+      "enum": ["primary", "deputy", "recovery-witness"],
+      "description": "Role within the doorway's succession plan. Primary is the bootstrap operator (matches DoorwayRegistration.operator_agent). Deputies have full or narrowed capability scope. Recovery-witnesses can only act under quorum recovery flow."
+    },
+    "reachScope": {
+      "type": "string",
+      "enum": ["operator-private", "stewards-only", "public"],
+      "default": "operator-private",
+      "description": "Reach class of the commitment itself — who can audit this operator's authority. 'operator-private' = visible only to fellow operators of the same doorway; 'stewards-only' = visible to all stewards of the broader network; 'public' = visible in any topology rollup."
+    },
+    "custodyAttestationHash": {
+      "type": ["string", "null"],
+      "description": "ActionHash of the active HardwareCustodyAttestation (kind='hardware-custody') the operator serves under. Required when schemaVersion=2; ignored when schemaVersion=1. The auth chain is custody -> steward -> operator-commitment; supersession of the referenced custody attestation orphans this commitment until re-blessed under new custody. See attestation/subtypes/hardware-custody-metadata.schema.json."
+    },
+    "stewardAttestationHash": {
+      "type": ["string", "null"],
+      "description": "ActionHash of the active StewardOfRecordAttestation (kind='steward-of-record') the operator serves under. Required when schemaVersion=2; ignored when schemaVersion=1. Stewardship supersession orphans this commitment independently of custody. See attestation/subtypes/steward-of-record-metadata.schema.json."
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": 1,
+      "action": "operate-doorway",
+      "capabilities": ["federation.peers.mutate", "hosted_users.lifecycle"],
+      "scopes": ["doorway:alpha-elohim-host"],
+      "successionRole": "deputy",
+      "reachScope": "operator-private"
+    },
+    {
+      "schemaVersion": 2,
+      "action": "operate-doorway",
+      "capabilities": ["*"],
+      "scopes": ["doorway:alpha-elohim-host"],
+      "successionRole": "primary",
+      "reachScope": "stewards-only",
+      "custodyAttestationHash": "uhCkk-example-custody-hash",
+      "stewardAttestationHash": "uhCkk-example-steward-hash"
+    }
+  ]
+}
