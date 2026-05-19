@@ -1380,11 +1380,42 @@ git commit -m "docs(spec): qahal Collective + Membership DHT design — substrat
 
 ## Out of scope (call-outs)
 
-- Renaming internal Rust view types (`MyClusterView` → `HubViewInternal`, `MyTopologyView` → `PeerTopologyInternal`, plus rename of internal fields like `myCidsHostedByThem` → `cidsHostedByPeer`). Blast radius: ~10 files, many test fixtures. Filed as a follow-on hygiene pass; no behavior change so it's cheap to do once stewardship-aligned naming is settled by use.
-- The Cypress feature `topology-graphql-parity.feature` referenced in the parent synthesis plan §A7 does not exist in tree; the Vitest unit-parity at `app/elohim-app/src/app/shefa/services/topology-parity.spec.ts` is the green-gate this plan relies on. If a Cypress E2E gate is later wanted, that's its own task.
 - Reciprocity historical rollup / time-series view — out of scope; the page renders current totals only.
 - Implementation of L7's `Collective`/`Membership` entry types — design-only this sprint.
-- Wave 3 hREA / VF-GraphQL interop brainstorm — deferred per the user's instruction; happens after this sprint closes.
+- Wave 3 hREA / VF-GraphQL interop brainstorm — deferred per the user's instruction; happens after this sprint closes (see §"Follow-on work" below).
+
+## Follow-on work (named explicitly, picked up after this sprint)
+
+### FU-1 — Internal Rust view-type rename pass (hygiene)
+
+The L6 plan deliberately left the wire/internal divergence in place (`Viewer.hub` resolver returns `HubView`, but internally that's built from `MyClusterView` via `impl From<MyClusterView> for HubView`). Now that the stewardship-aligned wire surface has shipped and we have a clear pattern, the internal rename should be the next pass.
+
+**Scope:**
+- `elohim/elohim-views/src/infrastructure.rs:1680` — `MyClusterView` → `HubView` (the canonical view struct)
+- `elohim/elohim-views/src/infrastructure.rs:1721` — `MyTopologyView` → `PeerTopologyView` (if still divergent)
+- Field names inside `PeerHouseholdEdge`: `myCidsHostedByThem` → `cidsHostedByPeer`; `theirCidsHostedByMe` → `peerCidsHostedHere`; `isCriticalForMe` → `criticalToViewer`; `iAmCriticalForThem` → `viewerCriticalToPeer`
+- Wire schema files (`my-cluster-view.schema.json` → `hub-view.schema.json`; same for peer-topology and field names inside `peer-household-edge.schema.json`)
+- TS regen via `cargo test export_bindings` + `pnpm run schema:codegen:ts`
+- Angular consumers (cluster.service, peer-topology.service, components, specs)
+
+**Blast radius:** ~10 source files + many test fixtures. No behavior change — pure rename. The `impl From<MyClusterView> for HubView` bridge can be deleted once internal == wire.
+
+**Why deferred from L6:** doing the rename DURING the symmetry pass would have ballooned the patch and obscured the substantive new work (Viewer.reciprocity resolver, flag flip, service rename). Doing it AFTER, in a focused commit, keeps the diff readable.
+
+**Gating:** after L6 lands on `main` and CI is green for ≥48h. Then FU-1 is a one-shot rename PR — no design needed.
+
+### FU-2 — Lift `@wip` on the m1 reciprocity scenario
+
+`genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature:26-31` — "Reciprocity page shows inflow from Terrance" — still `@wip` after this sprint. The step bindings exist (added in L6.8); the page renders with the right testids and bytes attributes; the GraphQL transport works. What's missing is **seeded test data** in the e2e environment: a `household-terrance` with REA commitments to and from Matthew, plus cross-pod delivery to produce non-zero `deliveredBytes`.
+
+**Scope:**
+- Add seed-data fixture in `genesis/data/lamad/` (or wherever the e2e seeder reads from) for household-terrance + matching REA commitments to/from Matthew.
+- Verify on the Jenkins genesis pipeline (per `feedback_shift_measure_jenkins` — Che has no docker/k8s/holochain; the truth is Jenkins).
+- Once the scenario passes on CI, delete the `@wip` tag at line 26.
+
+**Why deferred from L6:** seeded e2e fixtures are content-pipeline work (separate from substrate + UI work). The seeder lives in genesis/, has its own validation surface (hc-rna-fixtures), and the cross-pod fetch requires a multi-pod test cluster — out of scope for the L6 plan that focused on the symmetry pass.
+
+**Gating:** after FU-1 lands (so the test runs against the renamed internal types) AND a `household-terrance` fixture exists in the seed pipeline.
 
 ## Self-review
 
