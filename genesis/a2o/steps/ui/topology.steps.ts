@@ -340,6 +340,117 @@ Then(
 );
 
 // ---------------------------------------------------------------------------
+// M1 delivery scenario phrasings (m1-matthew-terrance-delivery.feature)
+// ---------------------------------------------------------------------------
+
+When(
+  /^([A-Z][a-zA-Z]+) opens the cluster topology page at "([^"]+)"$/,
+  async function (this: E2EWorld, humanName: string, path: string) {
+    const device = requirePwDevice(this, humanName);
+    await navigateToShefaPath(device, path);
+  }
+);
+
+When(
+  /^([A-Z][a-zA-Z]+) opens the peer topology page at "([^"]+)"$/,
+  async function (this: E2EWorld, humanName: string, path: string) {
+    const device = requirePwDevice(this, humanName);
+    await navigateToShefaPath(device, path);
+  }
+);
+
+When(
+  /^([A-Z][a-zA-Z]+) opens the reciprocity page at "([^"]+)"$/,
+  async function (this: E2EWorld, humanName: string, path: string) {
+    const device = requirePwDevice(this, humanName);
+    await navigateToShefaPath(device, path);
+  }
+);
+
+Then(
+  /^he sees at least one inflow row whose counterparty is ([\w-]+)$/,
+  async function (this: E2EWorld, expectedHousehold: string) {
+    for (const [, human] of this.humans) {
+      for (const device of human.devices) {
+        if (device instanceof PlaywrightDevice) {
+          const rows = device.page.locator(`[data-testid="${SHEFA_RECIPROCITY.INFLOW_ROW}"]`);
+          await rows.first().waitFor({ state: 'visible', timeout: 15_000 });
+          const counterparties = await rows
+            .locator(`[data-testid="${SHEFA_RECIPROCITY.COUNTERPARTY}"]`)
+            .allTextContents();
+          if (!counterparties.some(c => c.trim() === expectedHousehold)) {
+            assert.fail(
+              `expected inflow counterparty ${expectedHousehold}; got [${counterparties.join(', ')}]`
+            );
+          }
+          return;
+        }
+      }
+    }
+    assert.fail(NO_PW_DEVICE);
+  }
+);
+
+async function readBytesAttribute(
+  device: PlaywrightDevice,
+  selector: string
+): Promise<number[]> {
+  const cells = device.page.locator(selector);
+  const n = await cells.count();
+  const values: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const raw = await cells.nth(i).getAttribute('data-bytes');
+    values.push(Number(raw ?? '0'));
+  }
+  return values;
+}
+
+Then(
+  'the committed bytes column shows a non-zero value for that row',
+  async function (this: E2EWorld) {
+    for (const [, human] of this.humans) {
+      for (const device of human.devices) {
+        if (device instanceof PlaywrightDevice) {
+          const sel = `[data-testid="${SHEFA_RECIPROCITY.INFLOW_ROW}"] [data-testid="${SHEFA_RECIPROCITY.COMMITTED}"]`;
+          await device.page.locator(sel).first().waitFor({ state: 'visible', timeout: 15_000 });
+          const values = await readBytesAttribute(device, sel);
+          if (!values.some(v => v > 0)) {
+            assert.fail(`no inflow row had committed-bytes > 0; got [${values.join(', ')}]`);
+          }
+          return;
+        }
+      }
+    }
+    assert.fail(NO_PW_DEVICE);
+  }
+);
+
+Then(
+  'the delivered bytes column shows a non-zero value once the cross-pod fetch has completed',
+  async function (this: E2EWorld) {
+    for (const [, human] of this.humans) {
+      for (const device of human.devices) {
+        if (device instanceof PlaywrightDevice) {
+          const sel = `[data-testid="${SHEFA_RECIPROCITY.INFLOW_ROW}"] [data-testid="${SHEFA_RECIPROCITY.DELIVERED}"]`;
+          // Poll up to ~30s for cross-pod fetch to land. The minimal PWPage
+          // stub doesn't expose waitForFunction, so iterate.
+          const deadline = Date.now() + 30_000;
+          while (Date.now() < deadline) {
+            const values = await readBytesAttribute(device, sel);
+            if (values.some(v => v > 0)) {
+              return;
+            }
+            await device.page.waitForTimeout(500);
+          }
+          assert.fail('delivered-bytes never became non-zero within 30s');
+        }
+      }
+    }
+    assert.fail(NO_PW_DEVICE);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Doorway operator dashboard topology tab
 // ---------------------------------------------------------------------------
 

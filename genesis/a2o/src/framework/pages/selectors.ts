@@ -547,6 +547,10 @@ export const SHEFA_RECIPROCITY = {
   INFLOW_EMPTY: 'reciprocity-inflow-empty',
   OUTFLOW_ROW: 'reciprocity-outflow-row',
   OUTFLOW_EMPTY: 'reciprocity-outflow-empty',
+  // Cell-level testids on each row, scoped via INFLOW_ROW / OUTFLOW_ROW parents.
+  COUNTERPARTY: 'reciprocity-counterparty',
+  COMMITTED: 'reciprocity-committed',
+  DELIVERED: 'reciprocity-delivered',
   NET: 'reciprocity-net',
   CAPACITY: 'reciprocity-capacity',
 } as const;
