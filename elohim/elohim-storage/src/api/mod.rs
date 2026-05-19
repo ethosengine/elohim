@@ -296,9 +296,24 @@ pub async fn handle_api_request(
         // Phase 7: GraphQL surface — Apollo Federation v2 subgraph.
         // Hand-rolled hyper handler; reads body, executes against async-graphql schema,
         // serializes response. Returns 503 when graph engine is not available.
+        //
+        // Epic A (Task A2): also inject pool + Federator so viewer.hub resolvers work.
+        // Federator is built from p2p_handle (same pattern as cluster.rs); both are
+        // Optional — when absent the schema falls back gracefully.
         #[cfg(feature = "graph-native")]
         {
-            return crate::graphql::server::handle(req, method, graph_engine_ref).await;
+            let gql_federator: Option<std::sync::Arc<crate::services::federator::Federator>> =
+                p2p_handle.as_ref().map(|h| {
+                    std::sync::Arc::new(crate::services::federator::Federator::new(h.clone()))
+                });
+            return crate::graphql::server::handle(
+                req,
+                method,
+                graph_engine_ref,
+                Some(&pool),
+                gql_federator.as_ref(),
+            )
+            .await;
         }
         #[cfg(not(feature = "graph-native"))]
         {

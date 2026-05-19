@@ -24,21 +24,33 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Incoming, Method, Request, Response, StatusCode};
 
+use crate::db::DbPool;
 use crate::error::StorageError;
 use crate::graph::engine::GraphEngine;
 use crate::graphql::resolvers::QueryRoot;
+use crate::services::federator::Federator;
 
 /// The compiled schema type.
 pub type AppSchema = Schema<QueryRoot, EmptyMutation, EmptySubscription>;
 
-/// Build the GraphQL schema, injecting the graph engine as shared context.
+/// Build the GraphQL schema, injecting shared context data.
+///
+/// `graph_engine` — CozoDB engine for EPR graph queries (existing resolvers).
+/// `pool`         — Diesel connection pool for topology resolvers (viewer.hub etc.).
+/// `federator`    — View-federation handle for cluster fan-out.
 ///
 /// The schema is `Clone + Send + Sync` — callers may store it in an `Arc` or
-/// clone it cheaply per request. The engine Arc is reference-counted; no
+/// clone it cheaply per request. All Arcs are reference-counted; no additional
 /// heap allocation beyond what the schema's internal registry needs.
-pub fn build_schema(graph_engine: Arc<GraphEngine>) -> AppSchema {
+pub fn build_schema(
+    graph_engine: Arc<GraphEngine>,
+    pool: DbPool,
+    federator: Arc<Federator>,
+) -> AppSchema {
     Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
         .data(graph_engine)
+        .data(pool)
+        .data(federator)
         .finish()
 }
 
@@ -47,10 +59,16 @@ pub fn build_schema(graph_engine: Arc<GraphEngine>) -> AppSchema {
 /// GET returns a minimal JSON hint. POST executes the GraphQL query against the
 /// schema built from `graph_engine`. When `graph_engine` is `None` (engine not
 /// yet initialised — Phase 8 owns main.rs wiring), returns 503.
+///
+/// `pool` and `federator` are optional — when either is `None` the schema is
+/// still built (existing EPR/contributor resolvers still work), but any
+/// `viewer.hub` call will return a resolver error rather than panic.
 pub async fn handle(
     req: Request<Incoming>,
     method: Method,
     graph_engine: Option<&Arc<GraphEngine>>,
+    pool: Option<&DbPool>,
+    federator: Option<&Arc<Federator>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let Some(engine) = graph_engine else {
         return Ok(Response::builder()
@@ -62,7 +80,18 @@ pub async fn handle(
             .unwrap());
     };
 
-    let schema = build_schema(Arc::clone(engine));
+    // Build schema with whatever context is available. When pool or federator is
+    // absent, viewer.hub will return a resolver error instead of a 503.
+    let schema = match (pool, federator) {
+        (Some(p), Some(f)) => build_schema(Arc::clone(engine), p.clone(), Arc::clone(f)),
+        _ => {
+            // Fallback: build without pool/federator — existing EPR resolvers still work;
+            // viewer.hub will return "requested extension is not available" error.
+            Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
+                .data(Arc::clone(engine))
+                .finish()
+        }
+    };
 
     match method {
         Method::POST => execute_graphql(req, &schema).await,
