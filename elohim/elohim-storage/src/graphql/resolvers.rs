@@ -519,6 +519,182 @@ impl HubView {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Viewer root — peers lens (Epic A, Task A3)
+// ---------------------------------------------------------------------------
+
+/// Per-household reciprocation edge in the peer topology view.
+///
+/// `last_sync_sec` and `net_diff` are `String` to preserve precision across the
+/// JS boundary (u64/i64 can exceed 2^53). `u32` CID counts fit `Int!` cleanly.
+pub struct PeerHouseholdEdgeGql {
+    pub household_id: String,
+    pub display_name: Option<String>,
+    pub online: bool,
+    pub last_sync_sec: Option<String>,
+    pub my_cids_hosted_by_them: i32,
+    pub their_cids_hosted_by_me: i32,
+    pub net_diff: Option<String>,
+    pub is_critical_for_me: Option<bool>,
+    pub i_am_critical_for_them: Option<bool>,
+}
+
+impl From<crate::views::PeerHouseholdEdge> for PeerHouseholdEdgeGql {
+    fn from(e: crate::views::PeerHouseholdEdge) -> Self {
+        PeerHouseholdEdgeGql {
+            household_id: e.household_id,
+            display_name: e.display_name,
+            online: e.online,
+            last_sync_sec: e.last_sync_sec.map(|v| v.to_string()),
+            my_cids_hosted_by_them: e.my_cids_hosted_by_them as i32,
+            their_cids_hosted_by_me: e.their_cids_hosted_by_me as i32,
+            net_diff: e.net_diff.map(|v| v.to_string()),
+            is_critical_for_me: e.is_critical_for_me,
+            i_am_critical_for_them: e.i_am_critical_for_them,
+        }
+    }
+}
+
+#[Object]
+impl PeerHouseholdEdgeGql {
+    /// Household identifier for this peer edge.
+    async fn household_id(&self) -> &str {
+        &self.household_id
+    }
+
+    /// Display name of the peer household, if available.
+    async fn display_name(&self) -> Option<&str> {
+        self.display_name.as_deref()
+    }
+
+    /// Whether this peer was online at aggregation time.
+    async fn online(&self) -> bool {
+        self.online
+    }
+
+    /// Seconds since last successful sync with this peer; null when not yet synced.
+    async fn last_sync_sec(&self) -> Option<&str> {
+        self.last_sync_sec.as_deref()
+    }
+
+    /// Number of this agent's CIDs currently hosted by this peer.
+    async fn my_cids_hosted_by_them(&self) -> i32 {
+        self.my_cids_hosted_by_them
+    }
+
+    /// Number of this peer's CIDs currently hosted by this agent.
+    async fn their_cids_hosted_by_me(&self) -> i32 {
+        self.their_cids_hosted_by_me
+    }
+
+    /// Signed net CID diff (positive = net recipient, negative = net donor);
+    /// null when either side has not been probed.
+    async fn net_diff(&self) -> Option<&str> {
+        self.net_diff.as_deref()
+    }
+
+    /// Whether this peer is a sole replicator for at least one of this agent's CIDs.
+    async fn is_critical_for_me(&self) -> Option<bool> {
+        self.is_critical_for_me
+    }
+
+    /// Whether this agent is a sole replicator for at least one of this peer's CIDs.
+    async fn i_am_critical_for_them(&self) -> Option<bool> {
+        self.i_am_critical_for_them
+    }
+}
+
+/// Sole-replica risk row — a peer household that is the only replicator of
+/// one or more CIDs this agent cares about.
+pub struct ResilienceCliffGql {
+    pub household_id: String,
+    pub sole_replica_cid_count: i32,
+}
+
+impl From<crate::views::ResilienceCliff> for ResilienceCliffGql {
+    fn from(c: crate::views::ResilienceCliff) -> Self {
+        ResilienceCliffGql {
+            household_id: c.household_id,
+            sole_replica_cid_count: c.sole_replica_cid_count as i32,
+        }
+    }
+}
+
+#[Object]
+impl ResilienceCliffGql {
+    /// Household identifier of the sole replicator.
+    async fn household_id(&self) -> &str {
+        &self.household_id
+    }
+
+    /// Number of CIDs for which this household is the only replicator.
+    async fn sole_replica_cid_count(&self) -> i32 {
+        self.sole_replica_cid_count
+    }
+}
+
+/// Peer topology view — reciprocation edges + resilience cliffs for this agent.
+///
+/// The GraphQL field is `viewer.peers` (the `viewer` wrapper already implies
+/// "mine"; "peers" reads naturally as "households I exchange with"). The type
+/// name `PeerTopology` preserves the intrinsically topological shape.
+pub struct PeerTopology {
+    pub agent_cid: String,
+    pub edges: Vec<PeerHouseholdEdgeGql>,
+    pub reciprocation_count: i32,
+    pub resilience_cliffs: Vec<ResilienceCliffGql>,
+    pub freshness: FreshnessGql,
+}
+
+impl From<crate::views::PeerTopologyView> for PeerTopology {
+    fn from(v: crate::views::PeerTopologyView) -> Self {
+        PeerTopology {
+            agent_cid: v.agent_cid,
+            edges: v
+                .edges
+                .into_iter()
+                .map(PeerHouseholdEdgeGql::from)
+                .collect(),
+            reciprocation_count: v.reciprocation_count as i32,
+            resilience_cliffs: v
+                .resilience_cliffs
+                .into_iter()
+                .map(ResilienceCliffGql::from)
+                .collect(),
+            freshness: v.freshness.into(),
+        }
+    }
+}
+
+#[Object]
+impl PeerTopology {
+    /// Agent CID for which this peer topology was aggregated.
+    async fn agent_cid(&self) -> &str {
+        &self.agent_cid
+    }
+
+    /// Reciprocation edges — one per distinct peer household that returned data.
+    async fn edges(&self) -> &[PeerHouseholdEdgeGql] {
+        &self.edges
+    }
+
+    /// Number of peer households where `online == true` (live reciprocation count).
+    async fn reciprocation_count(&self) -> i32 {
+        self.reciprocation_count
+    }
+
+    /// Sole-replica risk rows; empty when no CIDs are at cliff risk.
+    async fn resilience_cliffs(&self) -> &[ResilienceCliffGql] {
+        &self.resilience_cliffs
+    }
+
+    /// Roll-up freshness state: `Live` when bindings are empty; `AllOffline`
+    /// when all peers are offline (common under `P2PHandle::for_testing()`).
+    async fn freshness(&self) -> &FreshnessGql {
+        &self.freshness
+    }
+}
+
 /// Viewer root — agent-scoped lens over hub topology.
 ///
 /// Holds only the agent CID; actual data is resolved lazily per field.
@@ -545,6 +721,21 @@ impl Viewer {
         .await
         .map_err(|e| async_graphql::Error::new(e.to_string()))?;
         Ok(HubView::from(view))
+    }
+
+    /// Peer topology view: reciprocation edges, resilience cliffs, and freshness
+    /// for households this agent exchanges with.
+    async fn peers(&self, ctx: &Context<'_>) -> FieldResult<PeerTopology> {
+        let pool = ctx.data::<DbPool>()?;
+        let federator = ctx.data::<Arc<Federator>>()?;
+        let view = crate::services::peer_topology_view::aggregate_peer_topology_view(
+            pool,
+            federator,
+            &self.agent_cid,
+        )
+        .await
+        .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+        Ok(PeerTopology::from(view))
     }
 }
 
