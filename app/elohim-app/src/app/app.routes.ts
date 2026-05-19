@@ -64,6 +64,14 @@ export const routes: Routes = [
         m => m.ContentViewerComponent
       ),
   },
+  // Raw content node viewport — no app chrome, no renderer plugins, direct wire data
+  {
+    path: 'raw/:resourceId',
+    loadComponent: async () =>
+      import('./lamad/components/raw-content-viewport/raw-content-viewport.component').then(
+        m => m.RawContentViewportComponent
+      ),
+  },
   // Spatial map — cross-pillar geospatial view (Places, resources, governance)
   {
     path: 'map',
