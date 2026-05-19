@@ -1,7 +1,4 @@
-<div
-  class="content-viewer-container focused-view-container"
-  [class.focused-view-active]="isFocusedView"
->
+<div class="content-viewer-container">
   <!-- Loading state -->
   <div *ngIf="isLoading" class="loading-state">
     <div class="spinner"></div>
@@ -229,25 +226,18 @@
 
     <!-- Tab Content -->
     <div [ngSwitch]="activeTab" class="tab-content">
-      <!-- Content Toolbar (fixed at top in focused view) -->
+      <!-- Content Toolbar -->
       <div class="content-toolbar">
-        <app-focused-view-toggle
-          [isActive]="isFocusedView"
-          (toggled)="onFocusedViewToggle($event)"
-        ></app-focused-view-toggle>
+        <button
+          type="button"
+          class="open-raw"
+          (click)="openInRawViewport()"
+          data-testid="viewer-open-raw"
+          aria-label="Open in raw viewport"
+        >
+          Raw view ↗
+        </button>
       </div>
-
-      <!-- Protocol Omnibar (shown in focused view — EPR provenance pill + back button) -->
-      <app-protocol-omnibar
-        *ngIf="isFocusedView && node"
-        [contentId]="node.id"
-        [contentAddress]="omnibarContentAddress"
-        [stewards]="omnibarStewards"
-        [reach]="omnibarReach"
-        [deliverySource]="omnibarDeliverySource"
-        [showBack]="true"
-        (backRequested)="onFocusedViewToggle(false)"
-      ></app-protocol-omnibar>
 
       <!-- Content Tab -->
       <section *ngSwitchCase="'content'">

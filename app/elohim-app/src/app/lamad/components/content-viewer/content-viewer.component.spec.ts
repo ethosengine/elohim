@@ -763,46 +763,6 @@ describe('ContentViewerComponent', () => {
     });
   });
 
-  describe('focused view mode', () => {
-    beforeEach(fakeAsync(() => {
-      fixture.detectChanges();
-      tick();
-    }));
-
-    it('should toggle focused view on', () => {
-      expect(component.isFocusedView).toBe(false);
-
-      component.onFocusedViewToggle(true);
-
-      expect(component.isFocusedView).toBe(true);
-    });
-
-    it('should toggle focused view off', () => {
-      component.isFocusedView = true;
-
-      component.onFocusedViewToggle(false);
-
-      expect(component.isFocusedView).toBe(false);
-    });
-
-    it('should exit focused view on escape key', () => {
-      component.isFocusedView = true;
-
-      component.onEscapeKey();
-
-      expect(component.isFocusedView).toBe(false);
-    });
-
-    it('should not exit if not in focused view', () => {
-      component.isFocusedView = false;
-      vi.spyOn(component, 'onFocusedViewToggle');
-
-      component.onEscapeKey();
-
-      expect(component.onFocusedViewToggle).not.toHaveBeenCalled();
-    });
-  });
-
   describe('renderer completion events', () => {
     beforeEach(fakeAsync(() => {
       fixture.detectChanges();
@@ -1132,5 +1092,23 @@ describe('ContentViewerComponent', () => {
         fixture.nativeElement.querySelector('[data-testid="viewer-distribution-info"]'),
       ).toBeFalsy();
     }));
+  });
+
+  describe('openInRawViewport', () => {
+    it('navigates to /raw/:resourceId when invoked with a loaded node', async () => {
+      const router = TestBed.inject(Router);
+      const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+      component['nodeId'] = 'cn-42';
+      component.openInRawViewport();
+      expect(spy).toHaveBeenCalledWith(['/raw', 'cn-42']);
+    });
+
+    it('is a no-op when no node has loaded yet', () => {
+      const router = TestBed.inject(Router);
+      const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+      component['nodeId'] = null;
+      component.openInRawViewport();
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 });
