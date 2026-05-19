@@ -1,0 +1,163 @@
+{
+  "handle": "topology-surfaces",
+  "title": "P2P-native topology surfaces with EPR/REA contract trace",
+  "vision_quotes": [
+    {
+      "text": "The substrate is invisible. A visitor cannot tell 'this network actually works.' A steward cannot see 'my devices, my replication, my reciprocity.' An operator cannot see their doorway's projection coverage. Without these views, the protocol's core resilience claim — P2P hosting that doesn't go down — is unverifiable from the surface.",
+      "source": "genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md:12"
+    },
+    {
+      "text": "Help communities build spaces that have the intimacy of a group chat and the openness of a public square. And help those spaces connect to each other when it matters.",
+      "source": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md:18"
+    }
+  ],
+  "plan_deliverables": [
+    {
+      "id": "distribution-badge-on-content",
+      "text": "Per-content distribution badge — replicas + projectors + reach + health, visible to visitors with no auth",
+      "source": "genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md:16",
+      "user_visible": true
+    },
+    {
+      "id": "my-cluster-page",
+      "text": "/shefa/cluster — steward's stewarded compute footprint, federated across their device bindings",
+      "source": "genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md:17",
+      "user_visible": true
+    },
+    {
+      "id": "peer-topology-page",
+      "text": "/shefa/peers — cross-household replication / resilience graph",
+      "source": "genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md:18",
+      "user_visible": true
+    },
+    {
+      "id": "reciprocity-page",
+      "text": "/shefa/reciprocity — committed-vs-delivered ledger over REA Commitments + EconomicEvents",
+      "source": "genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md:19",
+      "user_visible": true
+    },
+    {
+      "id": "storage-distribution-rollup",
+      "text": "Storage content distribution 3-tab operator rollup (By Type / By Reach / By Node)",
+      "source": "app/elohim-app/src/app/shefa/components/storage-distribution/storage-distribution.component.html:84-263",
+      "user_visible": true
+    },
+    {
+      "id": "doorway-dashboard-topology-tab",
+      "text": "Doorway dashboard topology — federation peers, cache metrics, route registry, local view of connected stewards",
+      "source": "genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md:20",
+      "user_visible": true
+    },
+    {
+      "id": "rea-contract-trace",
+      "text": "EPR/REA contract backing the compute — operator-doorway Commitment substrate visible/traceable through the topology surfaces",
+      "source": "genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md:1-200",
+      "user_visible": true
+    }
+  ],
+  "manifesto_anchors": [
+    {
+      "deliverable_id": "all-six-surfaces",
+      "why": "If the substrate works but cannot be SEEN working, the protocol's resilience claim is unverifiable. Every surface above is the human-visible falsifier for a substrate primitive (custody, stewardship, operator commitment, blob hosting reciprocity)."
+    },
+    {
+      "deliverable_id": "rea-contract-trace",
+      "why": "EPR/REA contract backing compute is the substrate Layer that makes operator authority a notarized social fact, not a server config. The visible surfaces must reflect this — otherwise the architecture is invisible work."
+    }
+  ],
+  "scenarios_existing": [
+    "genesis/a2o/features/resilience/observable-distribution.feature: Operator can see their household device cluster",
+    "genesis/a2o/features/resilience/observable-distribution.feature: Peer-topology page aggregates by household, not by peer",
+    "genesis/a2o/features/resilience/observable-distribution.feature: Reciprocity page shows inflow, outflow, and net hosting",
+    "genesis/a2o/features/resilience/observable-distribution.feature: Doorway operator dashboard topology tab is reachable",
+    "genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature: Cluster page shows Matthew's device tile with real metrics (@wip)",
+    "genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature: Peer topology page shows Terrance's household (@wip)",
+    "genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature: Reciprocity page shows inflow from Terrance (@wip)",
+    "genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature: Manifesto chapter content viewer shows distribution badge (@wip)",
+    "genesis/a2o/features/browser/doorway-dashboard-health.feature: Dashboard overview tab loads cleanly"
+  ],
+  "scenarios_missing": [
+    {
+      "intent": "Visible REA/EPR contract trace — operator-doorway commitment surfaces on the topology pages with its custody+steward chain references",
+      "proposed_location": "genesis/a2o/features/shefa/operator-authority-trace.feature (new)"
+    },
+    {
+      "intent": "Storage-distribution rollup component is reachable, mounted, and renders all 3 tabs with non-stub data",
+      "proposed_location": "genesis/a2o/features/shefa/storage-distribution-rollup.feature (new)"
+    }
+  ],
+  "screenshot_targets": [
+    {
+      "scenario": "Operator can see their household device cluster",
+      "url": "/shefa/cluster",
+      "what_should_be_visible": "Topology nav group in sidenav with My Cluster / Peer Topology / Reciprocity links visible. At least one device-tile component with archetype label (node/desktop/mobile/steward) and non-zero storage usage. No 401 errors in console."
+    },
+    {
+      "scenario": "Peer-topology page aggregates by household",
+      "url": "/shefa/peers",
+      "what_should_be_visible": "At least one peer-household-card rendered with the counterparty's display name and connection status. No 401 in console."
+    },
+    {
+      "scenario": "Reciprocity page shows inflow, outflow, net",
+      "url": "/shefa/reciprocity",
+      "what_should_be_visible": "Inflow table with at least one row when commitments exist. Outflow table. Capacity bar. The reach-aware row classification (intimate/regional-private/commons). No 401."
+    },
+    {
+      "scenario": "Doorway operator dashboard topology tab",
+      "url": "/dashboard?tab=topology (doorway-app)",
+      "what_should_be_visible": "Federation peer rows with direction + shared CID counts (not all OutboundOnly/0). Storage stewards listed (not Vec::new()). Projection coverage (already shown 3/3). Public surface state. Operator gate applied."
+    },
+    {
+      "scenario": "Distribution badge on content viewer",
+      "url": "/resource/manifesto",
+      "what_should_be_visible": "Distribution badge component in the header showing replica count, replica health, projector count, diversity hint. Reach class label."
+    },
+    {
+      "scenario": "Storage-distribution rollup is mounted",
+      "url": "/shefa/dashboard (or dedicated route)",
+      "what_should_be_visible": "3-tab toggle (By Type / By Reach / By Node) and at least one tab populated with real data (not stub model)."
+    }
+  ],
+  "scope": {
+    "in_scope": [
+      "app/elohim-app/src/app/shefa/**",
+      "app/elohim-app/src/app/lamad/**",
+      "app/elohim-app/src/app/elohim/components/distribution-badge/**",
+      "doorway/doorway-app/src/app/components/dashboard/tabs/topology-tab.component.ts",
+      "elohim/elohim-storage/src/api/reciprocity.rs",
+      "elohim/elohim-storage/src/api/peer_topology.rs",
+      "elohim/elohim-storage/src/services/*_view.rs",
+      "doorway/doorway-service/src/auth/operator.rs",
+      "genesis/a2o/features/**",
+      "genesis/data/lamad/**",
+      "elohim/sdk/schemas/v1/views/**"
+    ],
+    "consent_required_paths": [
+      "**/*.production.*",
+      ".github/workflows/**",
+      "elohim/holochain/dna/**/integrity/**",
+      "**/jwt_secret*",
+      "**/STEWARD_AGENT_KEY*"
+    ]
+  },
+  "search_trail": [
+    {"location": "genesis/docs/superpowers/specs/", "hit": true, "result": "2026-05-01-light-up-the-topology-design.md is the canonical spec; 6 surfaces defined"},
+    {"location": "genesis/docs/plans/", "hit": true, "result": "2026-05-19-topology-resilience-qahal-synthesis.md re-baselines plan; §1.2 names delivery gaps; 2026-05-19-doorway-stewardship-chain-design.md captures the L3 substrate"},
+    {"location": "genesis/docs/content/elohim-protocol/", "hit": true, "result": "resilience/README.md gives the manifesto-level WHY"},
+    {"location": "genesis/a2o/features/", "hit": true, "result": "observable-distribution.feature (4 scenarios run in CI), m1-matthew-terrance-delivery.feature (5 @wip scenarios), doorway-dashboard-health.feature"},
+    {"location": ".claude/shifts/", "hit": true, "result": "2026-05-18 sprint result on CI propagation — Plan 3.A + resilience"},
+    {"location": "memory entries", "hit": true, "result": "project_alpha_topology_bootstrap_pair, project_doorway_full_facilitator_sprint, project_storage_actor_vs_forwarder_patterns and ~30 related entries"},
+    {"location": "code surface (app/elohim-app/src/app/shefa)", "hit": true, "result": "pages exist for cluster, peer-topology, reciprocity-ledger; storage-distribution component exists unmounted"},
+    {"location": "code surface (elohim-storage api+services)", "hit": true, "result": "reciprocity_view, cluster_view, peer_topology_view, distribution_view all live; storage_distribution backend endpoint MISSING (phantom)"},
+    {"location": "git log --grep 'topology'", "hit": true, "result": "Epic A (commits e41aab21e, 0c8faa435, 0b9414df5, 74048ecb9, d023fe4b8, ac17260e2) added GraphQL viewer.hub + viewer.peers + REST↔GraphQL parity"},
+    {"location": ".claude/deliver/manifest.json", "hit": true, "result": "exists, currently empty/no prior verdicts on topology handle"}
+  ],
+  "rendered_at": {
+    "build": "elohim-genesis/dev #1016",
+    "build_url": "https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1016/",
+    "result": "UNSTABLE",
+    "timestamp": "2026-05-19",
+    "fresh_trigger": false,
+    "note": "Build #1016 happened BEFORE today's L1 sidenav fix and the L3 substrate landing — does not reflect those changes. A fresh trigger is needed to render the current dev state."
+  }
+}
