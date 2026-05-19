@@ -127,6 +127,15 @@ spec:
               value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090"
             - name: STORAGE_URLS
               value: "STORAGE_URLS_PLACEHOLDER"
+            # Auto-register doorway's storage as a publisher of html5-app
+            # content on boot. storage_registration.rs reads this env var
+            # and calls register_content_server on the infrastructure zome
+            # with wildcard content_hash="*" and capabilities
+            # [blob, html5_app] — making the alpha doorway discoverable as
+            # a publisher of the elohim-host-landing bundle. Value MUST be
+            # the string "true" (matches `v == "true" || v == "1"`).
+            - name: ELOHIM_STORAGE_AUTO_REGISTER
+              value: "true"
             - name: ROOT_APP_SLUG
               value: "lamad"
             # Elohim Agent SDK sidecar (runs in same pod)
