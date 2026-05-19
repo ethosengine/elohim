@@ -61,4 +61,13 @@ describe('ProtocolSignalBadgeComponent', () => {
     const pill = fixture.nativeElement.querySelector('[data-testid="protocol-signal-badge-pill"]');
     expect(pill).toBeNull();
   });
+
+  it('does NOT suppress when window.__TAURI__ is explicitly set to false', () => {
+    (globalThis as Record<string, unknown>)['__TAURI__'] = false;
+    fixture = TestBed.createComponent(ProtocolSignalBadgeComponent);
+    fixture.componentRef.setInput('contentId', 'test-content-id');
+    fixture.detectChanges();
+    const pill = fixture.nativeElement.querySelector('[data-testid="protocol-signal-badge-pill"]');
+    expect(pill).not.toBeNull();
+  });
 });
