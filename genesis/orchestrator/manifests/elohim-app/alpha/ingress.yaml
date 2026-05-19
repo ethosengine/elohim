@@ -11,6 +11,15 @@ metadata:
     app.kubernetes.io/managed-by: jenkins
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      # ELOHIM_HOST_LANDING_ROOT_REWRITE — set by raw-viewport-landing-dogfood branch.
+      # Map bare "/" to the elohim-host-landing html5-app bundle entry; everything
+      # else falls through to the doorway's normal routing (SPA fallback, /apps,
+      # /blob, /api/v1, /lamad/*, etc.). Reversal: drop this annotation + restore
+      # the `/` → elohim-site-alpha-service rule below.
+      location = / {
+        return 302 /apps/elohim-host-landing/index.html;
+      }
 spec:
   ingressClassName: public
   rules:
@@ -71,11 +80,19 @@ spec:
               number: 8080
         path: /lamad/path
         pathType: Prefix
+      # Root-route dogfood: serve elohim-host-landing ContentNode via doorway.
+      # The doorway exposes html5-app content at /apps/<slug>/<entry>. The
+      # `nginx.ingress.kubernetes.io/configuration-snippet` annotation above
+      # 302-redirects bare GET / to /apps/elohim-host-landing/index.html, which
+      # doorway then serves from the html5-app bundle blob.
+      #
+      # Reversal: revert this commit to restore elohim-site-alpha-service:80 as
+      # the static SPA fallback. The pod and service must remain deployed.
       - backend:
           service:
-            name: elohim-site-alpha-service
+            name: elohim-doorway-alpha
             port:
-              number: 80
+              number: 8080
         path: /
         pathType: Prefix
   tls:
