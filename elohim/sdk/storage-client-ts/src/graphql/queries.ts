@@ -88,6 +88,35 @@ export const VIEWER_PEERS_QUERY = `
   }
 `;
 
+export const VIEWER_RECIPROCITY_QUERY = `
+  query ViewerReciprocity($agentCid: ID!) {
+    viewer(agentCid: $agentCid) {
+      agentCid
+      reciprocity {
+        agentCid
+        inflow {
+          counterpartyHouseholdId
+          displayName
+          committedBytes
+          deliveredBytes
+          honoredPercent
+          online
+        }
+        outflow {
+          counterpartyHouseholdId
+          displayName
+          committedBytes
+          deliveredBytes
+          honoredPercent
+          online
+        }
+        netHostedBytes
+        capacityAvailableBytes
+      }
+    }
+  }
+`;
+
 // ---------------------------------------------------------------------------
 // Enums — string-unions matching async-graphql's SCREAMING_SNAKE_CASE
 // serialization of the Rust `Enum`-derived variants in resolvers.rs.
@@ -190,6 +219,33 @@ export interface PeerTopologyGql {
   freshness: FreshnessGql;
 }
 
+/**
+ * Per-counterparty row in the reciprocity view's inflow / outflow ledger.
+ *
+ * Byte counters are `string` to preserve precision across the JS boundary
+ * (u64 can exceed 2^53). `honoredPercent` stays `number` (f64). `online`
+ * is `null` on cold-cache reads (no live swarm context).
+ */
+export interface ReciprocityRowGql {
+  counterpartyHouseholdId: string;
+  displayName: string | null;
+  committedBytes: string;
+  deliveredBytes: string;
+  honoredPercent: number;
+  online: boolean | null;
+}
+
+/** Reciprocity view — agent-scoped inflow/outflow ledger. */
+export interface ReciprocityViewGql {
+  agentCid: string;
+  inflow: ReciprocityRowGql[];
+  outflow: ReciprocityRowGql[];
+  /** Signed net hosting position (stringified i64). Positive = others host more for the viewer than the viewer does for them. */
+  netHostedBytes: string;
+  /** Spare capacity the viewer can offer to expand reciprocity (stringified u64). */
+  capacityAvailableBytes: string;
+}
+
 // ---------------------------------------------------------------------------
 // Operation response shapes (the `data` payload inside the GraphQL envelope)
 // ---------------------------------------------------------------------------
@@ -207,6 +263,14 @@ export interface ViewerPeersResponse {
   viewer: {
     agentCid: string;
     peers: PeerTopologyGql;
+  };
+}
+
+/** Response payload for `VIEWER_RECIPROCITY_QUERY`. */
+export interface ViewerReciprocityResponse {
+  viewer: {
+    agentCid: string;
+    reciprocity: ReciprocityViewGql;
   };
 }
 

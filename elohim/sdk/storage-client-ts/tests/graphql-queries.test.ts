@@ -17,12 +17,14 @@ import { describe, expect, it } from 'vitest';
 import {
   VIEWER_HUB_QUERY,
   VIEWER_PEERS_QUERY,
+  VIEWER_RECIPROCITY_QUERY,
   type DeviceArchetype,
   type FreshnessState,
   type GraphQLEnvelope,
   type ViewerHubResponse,
   type ViewerPeersResponse,
   type ViewerQueryVariables,
+  type ViewerReciprocityResponse,
 } from '../src/graphql';
 
 // ---------------------------------------------------------------------------
@@ -123,6 +125,47 @@ describe('VIEWER_PEERS_QUERY', () => {
 
   it('selects all ResilienceCliff fields', () => {
     expect(VIEWER_PEERS_QUERY).toContain('soleReplicaCidCount');
+  });
+});
+
+describe('VIEWER_RECIPROCITY_QUERY', () => {
+  it('is a non-empty string', () => {
+    expect(typeof VIEWER_RECIPROCITY_QUERY).toBe('string');
+    expect(VIEWER_RECIPROCITY_QUERY.trim().length).toBeGreaterThan(0);
+  });
+
+  it('declares the ViewerReciprocity operation with $agentCid: ID! variable', () => {
+    expect(VIEWER_RECIPROCITY_QUERY).toMatch(
+      /query\s+ViewerReciprocity\s*\(\s*\$agentCid:\s*ID!\s*\)/,
+    );
+    expect(VIEWER_RECIPROCITY_QUERY).toContain('viewer(agentCid: $agentCid)');
+  });
+
+  it('selects all reciprocity-level fields', () => {
+    const required = [
+      'reciprocity',
+      'inflow',
+      'outflow',
+      'netHostedBytes',
+      'capacityAvailableBytes',
+    ];
+    for (const field of required) {
+      expect(VIEWER_RECIPROCITY_QUERY).toContain(field);
+    }
+  });
+
+  it('selects all ReciprocityRow fields the resolver exposes', () => {
+    const fields = [
+      'counterpartyHouseholdId',
+      'displayName',
+      'committedBytes',
+      'deliveredBytes',
+      'honoredPercent',
+      'online',
+    ];
+    for (const field of fields) {
+      expect(VIEWER_RECIPROCITY_QUERY).toContain(field);
+    }
   });
 });
 
@@ -278,5 +321,66 @@ describe('viewer GraphQL response types', () => {
   it('DeviceArchetype string-union covers every Rust variant', () => {
     const variants: DeviceArchetype[] = ['NODE', 'DESKTOP', 'MOBILE', 'STEWARD'];
     expect(variants).toHaveLength(4);
+  });
+
+  it('ViewerReciprocityResponse accepts a fully-populated literal', () => {
+    const envelope: GraphQLEnvelope<ViewerReciprocityResponse> = {
+      data: {
+        viewer: {
+          agentCid: 'agent-cid-abc',
+          reciprocity: {
+            agentCid: 'agent-cid-abc',
+            inflow: [
+              {
+                counterpartyHouseholdId: 'household-terrance',
+                displayName: 'Terrance',
+                committedBytes: '1024',
+                deliveredBytes: '768',
+                honoredPercent: 0.75,
+                online: true,
+              },
+            ],
+            outflow: [
+              {
+                counterpartyHouseholdId: 'household-jessica',
+                displayName: null,
+                committedBytes: '2048',
+                deliveredBytes: '2048',
+                honoredPercent: 1.0,
+                online: false,
+              },
+            ],
+            netHostedBytes: '-1280',
+            capacityAvailableBytes: '8192',
+          },
+        },
+      },
+    };
+
+    expect(envelope.data?.viewer.reciprocity.inflow[0]?.counterpartyHouseholdId).toBe(
+      'household-terrance',
+    );
+    expect(envelope.data?.viewer.reciprocity.outflow[0]?.displayName).toBeNull();
+    expect(envelope.data?.viewer.reciprocity.netHostedBytes).toBe('-1280');
+  });
+
+  it('ViewerReciprocityResponse accepts cold-cache nullable online + empty arrays', () => {
+    const envelope: GraphQLEnvelope<ViewerReciprocityResponse> = {
+      data: {
+        viewer: {
+          agentCid: 'agent-cid-empty',
+          reciprocity: {
+            agentCid: 'agent-cid-empty',
+            inflow: [],
+            outflow: [],
+            netHostedBytes: '0',
+            capacityAvailableBytes: '0',
+          },
+        },
+      },
+    };
+
+    expect(envelope.data?.viewer.reciprocity.inflow).toHaveLength(0);
+    expect(envelope.data?.viewer.reciprocity.netHostedBytes).toBe('0');
   });
 });
