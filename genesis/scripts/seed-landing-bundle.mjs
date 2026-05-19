@@ -99,9 +99,6 @@ async function main() {
     return;
   }
   seed.blobHash = remoteHash;
-  if (seed.metadata) {
-    seed.metadata.blobHash = remoteHash;
-  }
   seed.updatedAt = new Date().toISOString();
   await writeFile(SEED_PATH, JSON.stringify(seed, null, 2) + '\n');
   console.log(`[seed-landing-bundle] patched ${SEED_PATH}`);
