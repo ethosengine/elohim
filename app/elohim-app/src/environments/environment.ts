@@ -23,6 +23,11 @@ export const environment: Environment = {
     // elohim-storage sidecar URL (for direct mode blob storage)
     storageUrl: 'http://localhost:8090',
   },
+  features: {
+    // Set to true to route topology fetches through /api/v1/graphql instead of REST.
+    // A7 Cypress parity scenario enforces identical rendered output in both modes.
+    useGraphqlTopology: false,
+  },
   // ElohimClient configuration
   // Drives content operations (browser→doorway, tauri→local storage)
   client: {
