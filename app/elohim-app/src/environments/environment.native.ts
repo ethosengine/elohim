@@ -31,4 +31,10 @@ export const environment: Environment = {
   projectionApi: {
     enabled: false,
   },
+  features: {
+    // Routes topology fetches through /api/v1/graphql on the local
+    // elohim-storage sidecar. See environment.ts for rationale.
+    // Flipped 2026-05-19 (L6 viewer.* symmetry pass).
+    useGraphqlTopology: true,
+  },
 };

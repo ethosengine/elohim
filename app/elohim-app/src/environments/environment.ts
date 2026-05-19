@@ -24,9 +24,10 @@ export const environment: Environment = {
     storageUrl: 'http://localhost:8090',
   },
   features: {
-    // Set to true to route topology fetches through /api/v1/graphql instead of REST.
-    // A7 Cypress parity scenario enforces identical rendered output in both modes.
-    useGraphqlTopology: false,
+    // Routes topology fetches through /api/v1/graphql. Vitest parity at
+    // shefa/services/topology-parity.spec.ts asserts structural equivalence
+    // with the REST path. Flipped 2026-05-19 (L6 viewer.* symmetry pass).
+    useGraphqlTopology: true,
   },
   // ElohimClient configuration
   // Drives content operations (browser→doorway, tauri→local storage)

@@ -25,4 +25,9 @@ export const environment: Environment = {
     holochainHAppId: 'elohim',
     holochainConductorUrl: DOORWAY_ALPHA_WSS,
   },
+  features: {
+    // Routes topology fetches through /api/v1/graphql. See environment.ts
+    // for rationale. Flipped 2026-05-19 (L6 viewer.* symmetry pass).
+    useGraphqlTopology: true,
+  },
 };

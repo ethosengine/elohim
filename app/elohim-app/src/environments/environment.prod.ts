@@ -31,4 +31,10 @@ export const environment: Environment = {
     // publish dependency is reliable in the build graph.
     preferWasm: false,
   },
+  features: {
+    // Routes topology fetches through /api/v1/graphql. See environment.ts
+    // for rationale; Vitest parity at shefa/services/topology-parity.spec.ts
+    // asserts structural equivalence with REST. Flipped 2026-05-19 (L6).
+    useGraphqlTopology: true,
+  },
 };
