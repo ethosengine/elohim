@@ -1,0 +1,1115 @@
+Responsible Tech Guide 2025
+
+Human Agency
+
+Human Agency is at the heart of shaping our technological future. While technology often feels like an unstoppable force, it is ultimately designed, deployed, and governed by people. Our choices, values, and institutions determine its trajectory.
+
+The name of our organization, All Tech Is Human, signifies our deep belief in Human Agency. This stands in contrast to a purely deterministic view where technology evolves on its own, independent of human direction. By exercising collective responsibility, we can steer tech toward futures that align with our values and is aligned with societal wellbeing. This happens through design, regulation, advocacy, and talent pipelines, and more. Agency puts humans at the center of decision-making in creating a future we want to live in.
+
+Tech Determinism
+
+Technological Determinism is the concept that technology develops according to its own logic and then drives social, cultural, and political change. Change, therefore, is often portrayed as if it's outside of human control. This stands in direct contrast with Agency.
+
+For strong believers of Tech Determinism, after a technology exists we are on an inevitable path. Contrasted with Human Agency, Tech Determinism is focused on technology shaping society, as opposed to society actively shaping technology. All Tech Is Human, by its very name, rejects Tech Determinism and views the concept as a useful worldview to reduce responsibility.
+
+Welcome to the Responsible Tech Movement
+
+There are two prevailing media narratives around our tech future: one views technology as a panacea for all of society's problems, and the other views technology as the key driver creating society's problems. All Tech Is Human sits in the less salacious middle, recognizing that humans are central to driving our future.
+
+The Responsible Tech movement recognizes the significance of technology's impact in shaping us on a personal and societal level, but also our right and responsibility to actively shape technology to fit our interests. The question is never whether technology will influence society, but how, and who gets to decide. I deeply believe in the power of our Agency, which is why I started All Tech Is Human in 2018. It's right there in the name.
+
+The Responsible Tech Guide exists because so many of us, no matter our backgrounds, share the same aspiration: to build a future where technology aligns with our values, strengthens our democracy, and supports human flourishing. But entering this space can feel overwhelming. The field is broad, the language is varied, and the pathways aren't always clear. This confusion reduces the broad participation that the ecosystem needs.
+
+Our guide is meant to serve as a helpful roadmap and invitation. It's a roadmap for those seeking to find their place within Responsible Tech—whether as a student, policymaker, designer, technologist, academic, or advocate. And it's an invitation to join a growing global community that believes technology should be designed and governed with intention, inclusivity, and accountability.
+
+As you read, I hope you see yourself reflected in these pages. Responsible Tech is not a single discipline or profession. It's a movement; one that thrives when we bring together diverse perspectives to tackle our shared challenges. Your voice, skills, and experiences are essential to shaping technology that works for everyone. Together, we can reimagine and reshape our tech future in our collective direction.
+
+David Ryan Polgar
+Founder & President, All Tech Is Human
+New York, New York
+
+Ten Action Items Following the Responsible Tech Guide
+
+01 Join Our Community
+There is a vibrant global community of tens of thousands; join All Tech Is Human's Slack and many virtual livestreams and in-person gatherings.
+
+02 Practice Ethical Foresight
+Before starting or supporting a project, ask: Who might be harmed? Who benefits? What values are embedded? Apply these questions to your daily work.
+
+03 Collaborate Across Disciplines
+Reach out to colleagues and peers outside your domain (lawyers, designers, ethicists, engineers) to co-create solutions. Responsible Tech thrives on interdisciplinary input.
+
+04 Commit to Continuous Learning
+Responsible Tech is fast-moving. Set aside regular time to explore new research, attend webinars, and participate in conferences.
+
+05 Stay Informed on Policy & Regulation
+Subscribe to newsletters (i.e., Tech Policy Press) and listen to podcasts for timely discussions to stay abreast of a rapidly evolving regulatory landscape.
+
+06 Jump Into the Sandbox
+New toolkits, algorithmic audits, and impact assessment templates are being released every year. Experiment with these frameworks and methods.
+
+07 Be an Advocate Inside Your Organization or Company
+Responsible Tech isn't just a movement, it's a mindset. Have conversations with individuals inside your organization and advocate for being more thoughtful.
+
+08 Map Your Skills to Responsible Tech Roles
+How do your skills match up with roles in Responsible Tech? Here is a ten-question quiz you can take. (This quiz was created using Anthropic's Claude. See our AI Policy.)
+
+09 Explore Career Pathways
+Review job postings on our Responsible Tech Job Board and organizations in the ecosystem, and find mentorship opportunities for learning and crucial networking.
+
+10 Pay Your Knowledge Forward
+Teaching others reinforces your knowledge and spreads awareness. And as you advance in your career, remember to help others through mentorship and support.
+
+Our Approach to Tackling Thorny Problems
+
+What happens after the general public widely understands and agrees that we have a "tech problem"? While many organizations and activists focus on awareness-building—a crucial stage since people won't solve problems they don't recognize—All Tech Is Human (ATIH) has always focused on the next stage: solution-making.
+
+Our organization acts as a connector, convener, and catalyst for an interdisciplinary, multistakeholder network. By cultivating collaboration, fostering pathways, and centering public interest, ATIH helps society navigate the complex relationship between technology and humanity with ethics, accountability, and human-centeredness at the core. Our approach helps shift the Responsible Tech conversation away from siloed, reactive measures and toward collaborative, adaptive, and holistic solutions that reflect the complexity of real-world tech & society challenges.
+
+Key Parts of Our Approach
+
+Create a Conducive Environment While we have numerous advocacy organizations woven into our network, ATIH is designed to be a sandbox that welcomes the surfacing of values, tensions, tradeoffs, and best practices among all stakeholders.
+
+The Outcome Is Not Predetermined The goal of ATIH is not just to socialize our concepts, but to have continuous points of input from both experts and the general public to collectively understand an issue and work towards mitigation and alignment.
+
+Take a Systems Thinking Approach Tech & society are not separate spheres, but deeply interconnected systems where changes in one area ripple across many others. Instead of treating isolated harms, our approach is on holistic problem-solving that considers the wider social, political, cultural, and economic context.
+
+Bridging the Technical and Humanistic Communities Technical fixes alone will not solve the complex problems we are focused on. Our approach naturally weaves together technologists, designers, ethicists, attorneys, and everyone in between.
+
+Encouraging Community and Collaboration Tackling thorny tech & society issues requires a cohesive ecosystem where we can learn from each other, cross-pollinate our ideas, and collaborate.
+
+An Example of a Thorny Problem
+
+A major topic of recent discussion and media coverage is the rise of so-called "nudify" apps, which have caused disruption in high schools and beyond. These tools use artificial intelligence (AI) or other image-editing techniques to generate fake nude images of people, most often women, from otherwise clothed photos. They fall under the broader category of deepfake or non-consensual intimate image (NCII) tools and are widely condemned for facilitating harassment, exploitation, and abuse.
+
+The issue of nudify apps spans ethics, education, technical interventions, parenting, policy, payment systems, and more. The Responsible Tech workforce addressing these harms sits at the intersection of Trust & Safety (T&S) and Responsible AI (RAI).
+
+This is a classic example of a thorny tech and society challenge that demands a holistic response, weaving together diverse disciplines, stakeholders, and levers of change. It also highlights a persistent tension between privacy protections on the one hand, and harm reduction on the other. Efforts by major platforms to remove non-consensual images have often driven their distribution to more privacy-oriented platforms, such as Telegram, as well as to the dark web.
+
+Another key question is where to focus mitigation efforts. Options include targeting perpetrators who generate or share the images, the creators of the underlying AI models, the platforms that distribute or host the content, or the payment systems that support these services. Some jurisdictions also criminalize possession or viewing of such content – for example, South Korea has pursued this approach. When perpetrators are minors, additional challenges arise in ensuring penalties are proportionate to both the harm caused and the offender's age; the earlier "sexting" debates exposed the need to calibrate legal responses accordingly.
+
+The challenges posed by nudify apps underscore the interplay between civil society, government, industry, and academia. In many cases, research and advocacy by civil society groups have informed and influenced policymakers. In the United States, Congress passed the TAKE IT DOWN Act in May 2025, which criminalizes the publication of non-consensual intimate images. The law increases pressure on platforms to act, which in turn shapes their policies and enforcement.
+
+Every intervention, such as the TAKE IT DOWN Act, can trigger unintended consequences, illustrating why addressing nudify apps requires an iterative, adaptive approach that balances evolving technology, harm reduction, and the protection of civil liberties. ATIH has researched the topic of balancing privacy and child safety in encrypted environments, visit our website to learn more.
+
+Executive Summary
+
+The Responsible Tech Guide is an annual resource produced by our non-profit organization All Tech Is Human. First released in September 2020, the Responsible Tech Guide has been instrumental in accelerating the Responsible Tech movement, uniting silos into a more cohesive and collaborative ecosystem, and inspiring the next generation of responsible technologists and changemakers. This year's edition pays special attention to intersections between communities and disciplines, along with the role of our Agency.
+
+The Responsible Tech Guide aims to make the complex and rapidly evolving field of Responsible Tech accessible and actionable. Our resource aims to provide clear pathways for individuals and organizations to engage, highlight key roles and players across the ecosystem, and emphasize the need for ethical reflection to ensure that technology aligns with human values. By connecting people and ideas, the guide helps grow a diverse talent pipeline and strengthens the movement to build more intentional technology, incorporates our values, and is aligned with the public interest.
+
+Our guide is a portal to connect to resources produced by All Tech Is Human, along with the Responsible Tech community at large. It acts as a nucleus connected to hundreds of resources, organizations, and tens of thousands of individuals. Key areas of focus include:
+
+Demystifying the Field of Responsible Tech
+Responsible Tech can feel overwhelming and scattered across many disciplines (AI ethics, digital rights, Trust & Safety, policy). Our guide organizes the space, explaining core concepts, values, and practices in clear and accessible language.
+
+Providing Practical Pathways into Responsible Tech
+We aim to help people understand how to get involved in the Responsible Tech ecosystem, whether you are a student exploring career options, someone advancing in your career, or an individual transitioning into the space.
+
+Connecting the Ecosystem
+Understanding the ecosystem is essential to knowing how to navigate your career. Our guide highlights some key individuals and organizations, highlighting intersecting work and goals. This encourages collaboration rather than siloed work, building a more inclusive movement.
+
+Highlighting the Role of Agency in Determining Our Tech Future
+The Responsible Tech Guide is a counter-narrative to the presumption that our tech future is inevitable and outside of our control. The guide's call to action is to be part of the ecosystem and, therefore, in the proverbial driver's seat for change.
+
+Featured Profiles
+
+Alexios Mantzarlis
+Director - Security, Trust, and Safety Initiative, Cornell Tech
+
+Alice Hunsberger
+Head of Trust & Safety, Musubi
+
+Camille Stewart Gloster
+CEO, CAS Strategies
+
+Divya Siddarth
+Founder & Exec Director, The Collective Intelligence Project
+
+Francesca Bosco
+Chief Strategy Officer, CyberPeace Institute
+
+Kathy Pham
+VP AI, Workday; Faculty & Senior Fellow, Harvard; Founding Member, USDS
+
+Renée Cummings
+Senior Fellow - AI, Data & Public Policy, All Tech Is Human
+
+Vilas Dhar
+President, Patrick J. McGovern Foundation
+
+Plus, we revisit our Responsible Tech Guide 2024 for visions of a better tech future and how to get there from Audrey Tang, Cansu Canca, Camille François and more.
+
+Contents
+
+Current State
+What is Responsible Tech?
+State of Responsible Tech
+Responsible Tech Ecosystem
+Moments That Mattered in 2025
+
+Pathways & Pipelines
+Responsible Tech Careers
+Responsible Tech Careers: Responsible AI
+Typical Roles in Responsible Tech: RAI
+Responsible Tech Careers: Trust & Safety
+Typical Roles in Responsible Tech: T&S
+Responsible Tech Careers: Public Interest Technology
+Typical Roles in Responsible Tech: PIT
+Responsible Tech Career Landscape
+Excerpts From Our 2025 Careers Report
+
+Intersections & Considerations
+Cross-Pollination of Disciplines
+Intersection 1: Responsible AI and Trust & Safety
+Intersection 1: Interviews
+Intersection 2: Responsible AI and Public Interest Technology
+Intersection 2: Interviews
+Considerations: Identifying Concerns Around AI Companions
+Considerations: A Holistic Approach to AI Governance
+
+Get Involved
+Learn From Hundreds of Responsible Tech Orgs
+Visions for a Better Tech Future
+16 Responsible Tech Books to Read
+Tackling Hard Problems Depends on a Strong Ecosystem
+Driving Forward: A Call to Action
+All Tech Is Human's Responsible AI Courses
+
+About Us
+All Tech Is Human Overview
+Geographic Expansion & ATIHx
+All Tech Is Human Team
+Fiscal Sponsor & Funders
+How to Support All Tech Is Human
+Thank You
+
+Current State
+
+"Community requires a shared sense of norms and practices, but it also requires some comfort (or, at least, the willingness to tolerate discomfort) with differences—as long as there is a baseline of mutual respect."
+
+Amanda Menking, Research & Program Director, Trust and Safety Foundation
+
+What Is Responsible Tech?
+
+Responsible Tech is the interdisciplinary movement and mindset to design, build, and govern technology in ways that align with human values and societal well-being. It ensures that innovation is aligned with the public interest and that technology benefits people while minimizing harm.
+
+The Responsible Tech mindset focuses on avoiding harm, promoting fairness, respecting rights, and being held accountable. It is about shaping technology intentionally, with ethics, humanity, and societal good at the forefront.
+
+Responsible Tech also elevates the role of our Human Agency in shaping our future, as opposed to the future being outside of our control.
+
+Key Principles of Responsible Tech
+
+HUMAN-CENTRIC
+Technology should serve people's well-being, not just efficiency or profit.
+
+ETHICAL
+Address issues of fairness, bias, privacy, and accountability.
+
+PLURALISTIC
+Value a cross-pollination of different backgrounds, disciplines, and perspectives.
+
+TRANSPARENT & EXPLAINABLE
+Make systems understandable to users and stakeholders.
+
+SUSTAINABLE
+Technology should consider environmental impact and long-term consequences.
+
+ACCOUNTABLE
+Organizations and creators must take responsibility for the impacts of their products.
+
+State of Responsible Tech
+
+Responsible Tech has moved from a niche conversation among ethicists and digital rights advocates into mainstream policy, corporate strategy, and media. Responsible Tech is no longer an emerging idea; it's an established but fragmented field wrestling with its identity, impact, and power in shaping the trajectory of technology. Most large tech companies now have ethics teams, governance frameworks, or external advisory boards, and governments worldwide are building regulatory regimes around AI, data, and platforms. However, layoffs in some Responsible Tech-oriented teams (Google, Twitter/X, Microsoft, Meta, among others) highlight tensions between profit and responsibility.
+
+With this maturation of Responsible Tech from the periphery to being institutionalized, there are now more career tracks, certifications, and standards akin to medicine, law, or engineering. One area that has experienced this maturation is the field of Trust & Safety, which now has major conferences like TrustCon and the Trust and Safety Research Conference, academic programs upskilling the next generation, and organizations such as the Integrity Institute and the Trust & Safety Professional Association (TSPA), strengthening community and shared learning. At the same time, it is increasingly under threat as companies cut back moderation budgets and actions are framed in a partisan manner.
+
+Responsible AI Versus AI Safety
+
+There's an undeniable friction between long-term existential risk narratives (AGI alignment, catastrophic risks) and near-term justice-centered work (bias, equity, labor harms). Do we focus on the harms happening today or the theoretical harms that may occur tomorrow? Beneath the surface, a battle over the narrative is being waged to determine which of these two harms should center in our concerns and our strategy of how to best respond to them. While organizations focused on immediate harm are often underfunded, movements like Effective Altruism that are more aligned with "AI Safety" have significant resources and numerous offshoot organizations that influence company culture, build infrastructure to shape discussions on college campuses, and steer the overall media narrative.
+
+Tension Between Profit & Ethics
+
+The tension between profit and ethics plays out in how companies, governments, and civil society approach the design, deployment, and governance of technology. Tech companies operate in hyper-competitive markets where scale, speed, and revenue growth dominate, which can be perceived as being at odds with considerations such as fairness and privacy. The goals of Responsible Tech can be viewed as in conflict with shareholder value maximization, especially when addressing harms means changing currently profitable systems. This occurs when Responsible Tech is seen as a constraint, as opposed to a value proposition. The future of Responsible Tech depends on whether the second model gains enough traction to outweigh short-term profit imperatives.
+
+State of Responsible Tech (continued)
+
+Regulatory Frameworks Differ Across Geographies
+
+Regulatory frameworks and perspectives vary significantly across the globe, reflecting different political systems, cultural values, and economic priorities. Europe has positioned itself as a global leader in tech regulation, most notably with the General Data Protection Regulation (GDPR) and the EU AI Act, both of which emphasize individual rights, transparency, and accountability. The European approach is risk-based and precautionary, seeking to shape not just domestic practices but also global norms, since companies worldwide often adapt to EU standards. The United States, by contrast, has taken a more fragmented and sector-specific approach. The U.S. relies on agencies like the FTC for enforcement, state-level initiatives such as the California Consumer Privacy Act (CCPA), and voluntary corporate commitments. This reflects a more market-driven philosophy, balancing innovation with selective accountability.
+
+In the Global South, regulatory approaches are diverse and still developing. Countries like India are advancing large-scale data governance laws, while Kenya, Brazil, and others are experimenting with rules around digital IDs, content moderation, and online safety. These regions often face a capacity gap: the harms of technology are significant, but the resources for enforcement, oversight, and technical expertise are limited. Meanwhile, China has built a model of state-driven governance, combining strict data and AI regulations with extensive state surveillance and control, aligning regulation with national security and political priorities rather than civil liberties.
+
+Collectively, this patchwork of approaches highlights a global tension: while technology is borderless, regulation remains highly localized and value-dependent, creating challenges for companies, policymakers, and civil society trying to establish consistent standards for Responsible Tech.
+
+Bridging Technical and Non-Technical Communities
+
+Bridging technical and non-technical communities is at the heart of Responsible Tech, since the most pressing challenges (i.e., algorithmic bias, online safety, and data governance) cannot be solved from a single vantage point. Technologists bring expertise in how systems are built and deployed, while policymakers, ethicists, advocates, and community leaders offer critical insight into social impacts, governance needs, and crucial lived experience. Creating shared spaces for dialogue helps translate complex technical concepts into accessible language for non-specialists, while also ensuring that social values and public concerns are meaningfully incorporated into technical design. Bridging these communities into a multidisciplinary, participatory effort, where diverse voices guide the development of technologies that serve the public good, is challenging but essential.
+
+Responsible Tech Ecosystem
+
+ENVIRONMENTAL STUDIES
+How are technologies and computing altering our environment?
+
+COMPUTER SCIENCE + ENGINEERING
+How can I develop technologies responsibly?
+
+INTERNATIONAL RELATIONS
+What role can technology play in international affairs and politics?
+
+ANTHROPOLOGY
+How does technology and culture influence one another?
+
+ECONOMICS
+In what ways can we balance responsible innovation and economic growth?
+
+STATISTICS
+How can we demystify the statistical foundations of "AI" and "Big Data"?
+
+DIGITAL DESIGN
+What is the impact of thoughtful design on technology?
+
+PHILOSOPHY
+How can we harness theories of philosophy and ethics to better shape technology?
+
+INFORMATION SCIENCE
+How is information stored and disseminated online?
+
+EDUCATION
+How will technology shape the way we learn?
+
+SOCIOLOGY
+In what ways does technology impact our social organizations and relationships?
+
+PSYCHOLOGY
+How can technology influence our minds and behavior?
+
+LAW
+How can we ensure the legal protections of individuals in digital spaces?
+
+SOCIAL WORK
+How can we apprise individuals about their digital rights and protections?
+
+ART
+How does technology shape the way we view art and media?
+
+HEALTH
+What role can technology play in developing a more equitable healthcare system?
+
+COMMUNITY DEVELOPMENT
+How can communities leverage technology for equity and access?
+
+POLICY
+As technology becomes more ingrained in society, how can policy evolve to the voice of citizens?
+
+Moments That Mattered in 2025
+
+With major data centers being built that consume significant energy, there is a rising focus on environmental and sustainability issues related to AI. (Ongoing)
+
+Regulatory Sandbox proposal in the U.S., which would allow companies temporary exemptions or waivers from certain regulations while developing AI. (September)
+
+The European Union finalized a voluntary Code of Practice intended to guide companies offering "general purpose" AI models in complying with the EU AI Act. (July)
+
+Major media publishers in the U.S. launched a campaign called "Support Responsible AI" calling on the government to regulate how AI uses copyrighted content for training. (April)
+
+2025 Singapore Conference on AI (SCAI): International Scientific Exchange which led to the Singapore Consensus on Global AI Safety Research Priorities. (April)
+
+International AI Safety Report, commissioned by 30 nations and the UN, representing work by 100 AI experts to advance shared international understanding of advanced AI risks. (February)
+
+Throughout 2025, U.S. states have increasingly taken initiative in passing AI-focused laws, especially around transparency, accountability, and safety. (Ongoing)
+
+Release of Trump Administration America's AI Action Plan, focused on three pillars: accelerate AI innovation, build American AI infrastructure, and lead international AI diplomacy. (July)
+
+TAKE IT DOWN Act becomes law in the U.S., criminalizing non-consensual publication of intimate images, including AI-generated deepfakes. (May)
+
+Release of ISO/IEC 42005:2025, which provides guidance for performing impact assessments on AI systems. (April)
+
+AI Action Summit held in Paris — Co-chaired by France and India; this summit brought together over 1,000 participants from more than 100 countries. (February)
+
+Find more moments that mattered to our community on ATIH's Slack.
+
+Pathways & Pipelines
+
+"To create better tech we need inclusive innovation that typically occurs at the intersections of different disciplines, communities, and cultures."
+
+Dhanaraj Thakur, Research Director, Center for Democracy & Technology
+
+Responsible Tech Careers
+
+Working in Responsible Tech is important because it ensures that the technologies defining our future are designed with humanity, fairness, and accountability at their core. It's about shifting from "what can we build?" to "what should we build—and how do we build it responsibly?"
+
+Responsible Tech is a chance to connect personal and societal values with professional work. It's a career path that combines technical skills, ethics, and social impact, making it deeply fulfilling and intellectually stimulating. The most crucial skills are a blend of technical and "soft" or humanistic skills.
+
+2025 Crucial Skills
+
+TECHNICAL SKILLS
+
+AI System Evaluation: Not building models, but systematically testing them for bias, reliability, and safety
+
+Regulatory Implementation: Translating legal requirements into technical specifications
+
+Cross-Platform Integration: Making responsible AI work across different tech stacks
+
+Incident Response: Managing AI failures and public relations crises
+
+Data Quality Assessment: Understanding and improving data integrity for AI applications
+
+HUMAN "SOFT" SKILLS
+
+Institutional Navigation: Understanding how decisions really get made
+
+Coalition Building: Creating alliances across competing interests
+
+Anticipatory Thinking: Identifying problems before they become crises
+
+Complexity Communication: Explaining nuanced trade-offs to diverse audiences
+
+Community Engagement: Facilitating meaningful participation in AI governance
+
+Responsible Tech Careers (continued)
+
+Important impacts of building a career in Responsible Tech include:
+
+Recognizing that Technology Shapes Everything
+Technology has significant impacts—it impacts democracy, economies, education, health, culture, etc. Therefore, the decisions made today affect our tomorrow. Working in Responsible Tech ensures those decisions put a premium on aligning with societal wellbeing.
+
+Creating Safeguards
+Without foresight, technology can enable bias, misinformation, surveillance, exploitation, or exclusion. Responsible Tech professionals anticipate risks and build safeguards.
+
+Reducing Harm
+Mitigating or minimizing the damage or negative consequences connected with the development, deployment, and use of technology. The reduction of harm is a reactive measure deriving from feedback, research around impact, and the misuse of technology from its intended purposes.
+
+Building Trust
+Trust in technology is eroding due to exposure of data misuse, harmful algorithms, and opaque decision-making. Responsible Tech restores trust by embedding transparency, accountability, and fairness. Trust is essential: without it, adoption slows, backlash grows, and innovation stalls.
+
+Driving Inclusive Innovation
+Responsible Tech expands who gets a voice in shaping technology—not just engineers or executives, but also ethicists, civil society, policymakers, and impacted communities. This inclusivity leads to better products and more equitable outcomes.
+
+Responding to Regulation & Global Change
+Governments worldwide (EU AI Act, U.S. state laws, UN initiatives) are now demanding oversight of AI and digital platforms. Working in Responsible Tech means being at the forefront of shaping standards and compliance frameworks that will define the next decade and beyond.
+
+Responsible Tech Careers: Responsible AI
+
+Responsible AI (RAI) refers to the design, development, deployment, and governance of artificial intelligence systems in a way that aligns with ethical principles, respects human rights, ensures transparency and accountability, and mitigates harm to individuals, communities, and society.
+
+RAI emphasizes that technological progress must be guided by values such as fairness, inclusivity, safety, privacy, and social good, with particular concern given to human-centered, multistakeholder, and participatory processes.
+
+RAI roles exist in large tech companies, AI startups, consulting firms, governmental and multilateral organizations, and research and policy organizations. By embracing RAI practices, companies can build trust with consumers, comply with emerging regulations, and contribute to a sustainable digital future.
+
+RAI practitioners possess a socio-technical skillset; in addition to staying informed on the evolving policy landscape, "soft" skills like critical thinking, ethical reasoning, and multistakeholder collaboration are essential to building an impactful and rewarding career in RAI.
+
+Daily tasks may include assessing built and bought AI systems for risk, conducting rigorous testing to ensure algorithmic fairness, and collaborating with diverse teams to address potential societal impacts.
+
+Job titles for RAI practitioners include:
+- AI Ethics & Safety Manager
+- Sr. Director, Responsible AI Testing, Evaluation, and Alignment
+- Technical AI Ethicist/AI Red Teamer
+- Director, Responsible AI
+- Research Scientist, Model Safety
+- Applied Scientist, Responsible AI
+- AI/ML Privacy Engineer
+- Data Scientist, Responsible AI
+- Research Engineer, Trustworthy AI
+- VP, AI Governance
+
+View ATIH's Building a Career in Responsible AI for more info.
+
+Typical Roles in Responsible Tech: RAI
+
+A Director of Responsible AI is a senior professional who oversees an organization's strategy, governance, and implementation of ethical and responsible AI practices. This role is about moving beyond principles into practice: ensuring that AI systems are developed, deployed, and monitored in ways that are fair, transparent, safe, and compliant with emerging regulations. The role typically sits at the intersection of tech strategy, governance, and ethics. This role can be found at major consulting firms, large tech companies, multilateral organizations, and highly regulated industries such as finance or pharmaceuticals. This role provides strategic direction, oversees governance frameworks, and works with cross-functional teams to embed responsible practices into the AI lifecycle.
+
+Key Responsibilities
+Strategy & Governance: Define and oversee the organization's Responsible AI framework, policies, and standards.
+Risk Oversight: Lead risk assessments for AI models (bias, safety, privacy, explainability, environmental impact).
+Compliance: Ensure alignment with legal and regulatory requirements (e.g., EU AI Act, U.S. state-level AI laws, GDPR).
+Cross-Functional Collaboration: Partner with product, engineering, legal, and compliance teams to embed Responsible AI practices from design to deployment.
+Transparency & Accountability: Oversee documentation practices (model cards, impact assessments, transparency reports).
+External Engagement: Represent the organization in industry groups, regulatory consultations, and public forums on AI governance.
+Education & Culture: Drive employee training and awareness programs on Responsible AI principles and practices.
+Monitoring & Auditing: Establish ongoing evaluation of AI systems and coordinate internal/external audits.
+
+Minimum Qualifications
+Bachelor's degree in Computer Science, Data Science, Law, Public Policy, or related field; Master's or PhD preferred.
+7+ years of experience in AI, compliance, or governance, with leadership experience.
+Strong understanding of AI/ML systems, risks (bias, fairness, explainability, safety), and societal impacts.
+Familiarity with AI governance frameworks (NIST AI RMF, OECD Principles, ISO/IEC standards).
+Excellent communication and leadership skills, able to influence executives and technical teams.
+
+Typical Roles in Responsible Tech: RAI (continued)
+
+A Technical AI Ethicist or AI Red Teamer is a data scientist who brings technical depth to the assessment of AI products, models, and applications, in order to identify the best technical mitigations to identified risks, testing AI models through an adversarial approach. These professionals help organizations gain a deep understanding of how models and products may be leveraged by malign actors or through unanticipated use to cause harm. In addition to adversarial testing, an AI Red Teamer analyzes current safety trends and develops solutions to detect and mitigate risk, while working cross-functionally with security, engineering, data science, and AI Research teams.
+
+Key Responsibilities
+Adversarial Testing: Provide technical leadership in designing, prototyping, and implementing comprehensive adversarial testing strategies, including both automated and manual adversarial testing approaches.
+Safety and Robustness: Contribute to the development of detection models and safety guardrails to prevent and mitigate risks posed by bad actors. Research and implement innovative techniques for enhancing AI safety and robustness, drawing from both open-source and internal tools.
+Technical Research & Implementation: Write clean, efficient, well-documented code (in Python) to support research efforts and facilitate the evaluation of AI systems.
+Testing Execution and Collaboration: Participate in scoping, documenting, and implementing tests with partner teams, including the implementation of mitigations identified during testing. Test for technical vulnerabilities, model vulnerabilities, and harm/abuse including but not limited to bias, toxicity, and inaccuracy.
+Reporting, Documentation, and Continuous Learning: Write reports covering the goals and outcomes of testing operations, including significant observations and recommendations.
+
+Minimum Qualifications
+A related technical degree required.
+5-7 years experience in Software Engineering, AI ethics, AI research, or similar roles.
+Experience creating heuristic-based detection logic and rules for identifying anomalous or suspicious activity in systems and networks (e.g. log analysis, user behavior analytics).
+Experience using SQL and relational databases. Ability to use Python, R, or other scripting languages to perform data analysis at scale.
+Excellent written and oral communication skills, as well as social skills, including the ability to articulate technical concepts to both technical and non-technical audiences.
+
+Responsible Tech Careers: Trust & Safety
+
+Trust & Safety (T&S) refers to the strategies, policies, and practices organizations implement to protect users, employees, and stakeholders from harm while fostering a secure and trustworthy environment. This concept typically applies to online platforms, social media, e-commerce, and technology companies, focusing on minimizing risks such as fraud, abuse, harassment, and harmful content.
+
+In a broader context, 'Trust' refers to the confidence that users or stakeholders have in a platform or organization to act in their best interests, uphold privacy, and maintain security. 'Safety' refers to the measures put in place to protect individuals from threats, both physical and digital, ensuring a safe user experience. Together, Trust & Safety efforts aim to create environments where users feel protected, respected, and confident in their interactions.
+
+The Trust & Safety field is evolving, and difficult tradeoffs and challenges are emerging in the work of promoting a secure and trustworthy digital ecosystem. T&S roles exist in social media platforms, gaming companies, third-party vendors, AI companies, consulting firms, research institutions, and governmental and regulatory bodies.
+
+Job titles for T&S practitioners:
+- Policy Enforcement Analyst
+- Content Moderator
+- Risk & Compliance Analyst
+- Safety Operations Specialist
+- Threat Analyst
+- Community Engagement Manager
+- Child Safety Specialist
+- Content Policy Manager
+- Integrity Policy Manager
+- Escalations Manager
+- Policy Enforcement Lead
+- Director of Online Safety Policy
+- Head of Risk and Response
+- Trust & Safety Counsel
+
+View ATIH's Building a Career in Trust & Safety for more info.
+
+Typical Roles in Responsible Tech: T&S
+
+A Trust & Safety (T&S) Manager is a professional who leads the teams, policies, and processes that keep digital platforms safe and trustworthy. They balance user safety, platform integrity, and legal/regulatory compliance while protecting freedom of expression and fostering healthy communities. A Trust & Safety Manager is most often hired by digital platforms with user-generated content, online marketplaces, financial/fintech platforms, and regulators—anywhere safety, integrity, and trust are core to the product or service. This includes social media platforms, large tech companies, and gaming companies.
+
+Key Responsibilities
+Policy & Standards: Develop, implement, and update community guidelines, safety policies, and enforcement procedures.
+Team Leadership: Manage and support a team of Trust & Safety specialists, analysts, or moderators.
+Incident Response: Lead responses to urgent safety issues, escalations, or crises (e.g., harmful content, account compromise, misinformation).
+Risk Assessment: Identify and evaluate emerging safety risks, trends, and abuse vectors on the platform.
+Cross-Functional Collaboration: Partner with Legal, Product, Engineering, and Communications teams to embed safety into product design.
+Stakeholder Engagement: Liaise with NGOs, regulators, and law enforcement regarding safety issues, compliance, and reporting obligations.
+Training & Education: Provide ongoing education and guidance to internal teams on evolving trust & safety issues.
+Metrics & Reporting: Track enforcement metrics (content removals, appeals, escalations) and produce transparency reports.
+
+Minimum Qualifications
+Bachelor's degree in Public Policy, Law, International Relations, Social Sciences, or a related field.
+5+ years of experience in Trust & Safety, content moderation, digital policy, or risk management.
+Strong knowledge of online safety risks (e.g., disinformation, child safety, hate speech, extremism, fraud).
+Demonstrated experience managing teams and projects.
+Excellent communication skills, with the ability to make judgment calls under pressure.
+
+Typical Roles in Responsible Tech: T&S (continued)
+
+A Child Safety Specialist protects children from online harms such as child exploitative behavior, grooming, CSAM (child sexual abuse material), harmful content, inappropriate interactions, and other endangerment risks. A Child Safety Specialist is responsible for helping ensure a safe online environment for children, working to identify, escalate, and remove harmful content. This role involves collaboration across Legal, Policy, Product, and Operations teams to shape policy, improve enforcement workflows, and respond effectively to incidents. Major tech companies such as Meta, Google, Snap, TikTok, Discord, Roblox, and OpenAI hire child safety specialists. In addition, non-profits such as Thorn employ child safety specialists and researchers.
+
+Key Responsibilities
+Detect, review, and escalate content violations linked to child endangerment (e.g. CSAM, grooming, explicit content).
+Execute decisions on ambiguous or 'gray area' cases involving child safety, balancing sensitivity, risk, and legal obligations.
+Manage escalated incidents, including those from Law Enforcement or external partners.
+Influence product and feature design by evaluating how new or existing product features might introduce child safety risks; partner with product/engineering to mitigate those risks.
+Provide training and resources to content moderators, legal/policy teams, and other internal stakeholders on child safety issues, content standards, and evolving threats.
+Monitor metrics and performance of child safety programs, analyze trends, and suggest improvements.
+Stay up to date with relevant laws, legislation, and best practices regarding child protection, online safety, and compliance obligations.
+Developing and enforcing child safety policies and content standards.
+
+Minimum Qualifications
+Bachelor's degree (or equivalent experience) in a relevant field (e.g. social sciences, digital policy, law, human rights, psychology).
+2-5+ years of experience in Trust & Safety, content moderation, policy enforcement, or related fields — particularly handling sensitive or harmful content.
+Knowledge of child safety policies, best practices, and legislation (e.g. national/international laws on child exploitation, reporting obligations).
+Experience working with or responding to Law Enforcement or similar entities.
+Emotional resilience: able to work with disturbing or sensitive content, maintain well-being, and use appropriate self-care strategies.
+
+Responsible Tech Careers: Public Interest Tech
+
+Public Interest Technology (PIT) often refers to the development, deployment, and governance of technology in ways that prioritize the public good, equity, and ethical considerations. PIT encompasses a multidisciplinary approach, bringing together technologists, policymakers, activists, and citizens to ensure that technology serves the needs of all people, particularly marginalized or underserved populations. It involves the use of technology to solve societal problems, enhance civic engagement, and improve the delivery of public services.
+
+A career in PIT often involves implementing practices that make the use of technology in public life transparent and accountable to the public. Ultimately, the goal of PIT is to harness the power of technology to tackle complex social problems, improve public services, and create a more just and equitable society.
+
+By prioritizing the public interest in technological development and implementation, practitioners seek to ensure that advancements in fields such as artificial intelligence, data analytics, and digital platforms serve humanity as a whole rather than narrow commercial or political interests.
+
+Job titles for PIT practitioners include:
+- Civic Technologist
+- Climate Tech Software Engineer
+- Data Governance Specialist
+- Data Rights Researcher
+- GovTech Project Manager
+- Municipal Chief Technology Officer
+- Nonprofit Data Scientist
+- Research Director, Societal Impacts
+- Tech Nonprofit Program Director
+- Tech Policy Analyst
+
+View ATIH's Building a Career in Public Interest Technology, for more info, and check out comPITences (Fordham University, PIT-UN, and ATIH).
+
+Typical Roles in Responsible Tech: PIT
+
+A Tech Policy Advisor is a professional who guides governments, organizations, or companies on how technology should be governed, regulated, or strategically deployed. They work at the intersection of technology, law, and public policy, helping decision-makers understand the implications of emerging technologies and crafting policy responses. A Tech Policy Advisor is a translator between the worlds of technology and policy, helping shape laws and organizational strategies to ensure innovation aligns with societal values and regulatory requirements. Tech Policy Advisors are hired by state and national governments, multinational bodies, large tech companies, non-profits, and industry associations. We are looking for a Tech Policy Advisor to support our efforts in shaping policies and strategies around emerging technologies. The successful candidate will help bridge the gap between technical innovation, societal impact, and public policy, ensuring our organization is both compliant with regulations and proactive in advocating for responsible tech governance.
+
+Key Responsibilities
+Research and analyze legislation, regulations, and policy trends on AI, data privacy, cybersecurity, digital platforms, and other emerging technologies.
+Develop policy briefs, reports, and recommendations for senior leadership.
+Advise on compliance requirements and risk implications of new tech-related regulations.
+Represent the organization in consultations, working groups, and conferences with policymakers, regulators, and civil society.
+Engage cross-functionally with legal, engineering, product, and communications teams to ensure alignment on policy positions.
+Build and maintain relationships with external stakeholders, including government agencies, NGOs, and industry coalitions.
+Provide foresight and scenario analysis on the societal and regulatory impacts of future technologies.
+
+Minimum Qualifications
+Bachelor's degree in Public Policy, Law, Political Science, International Relations, or a related field (advanced degree preferred).
+3-5+ years of experience in tech policy, government relations, public affairs, or a related role.
+Strong understanding of emerging technology issues.
+Excellent research, analytical, and writing skills.
+Strong interpersonal and communication skills, with experience engaging diverse stakeholders.
+
+Typical Roles in Responsible Tech: PIT (continued)
+
+A Data Ethics Officer is a professional responsible for ensuring that an organization's use of data is ethical, transparent, fair, and aligned with human rights and societal values. While Data Protection Officers (DPOs) focus primarily on legal compliance (like GDPR), a Data Ethics Officer goes beyond compliance to consider broader ethical implications of data collection, storage, sharing, and analysis. A Data Ethics Officer ensures that an organization not only complies with data laws but also earns trust by embedding fairness, transparency, and accountability into all its data practices. Data Ethics Officers are most often found where data is sensitive, high-impact, and under scrutiny—large tech companies, AI companies, finance, healthcare, government, and NGOs setting global norms. A Data Ethics Officer leads efforts in ensuring that our use of data aligns with ethical standards and societal expectations. The role goes beyond regulatory compliance, focusing on fairness, accountability, transparency, and respect for human rights in all data-driven initiatives.
+
+Key Responsibilities
+Develop and maintain a Data Ethics Framework to guide responsible data collection, use, and sharing.
+Conduct ethical risk assessments for data-driven projects, particularly in areas such as AI, analytics, and customer insights.
+Partner with the Data Protection Officer (DPO) and Compliance teams to ensure policies meet both legal and ethical standards.
+Provide guidance to product, engineering, and research teams on integrating ethical considerations into data lifecycle management.
+Oversee data transparency efforts, ensuring clear communication to users and stakeholders about how data is used.
+Lead or participate in data ethics review boards and ensure decisions are well-documented and auditable.
+Monitor emerging ethical, regulatory, and societal trends in data and AI to proactively adapt organizational practices.
+Deliver training and awareness programs to employees on responsible data practices.
+
+Minimum Qualifications
+Bachelor's degree in Data Science, Law, Ethics, Public Policy, or a related field (advanced degree preferred).
+5+ years of experience in data governance, compliance, AI ethics, or a related field.
+Strong knowledge of data protection laws (e.g., GDPR, CCPA) and ethical frameworks for data use.
+Proven ability to manage cross-functional projects and influence diverse stakeholders.
+
+Responsible Tech Career Landscape
+
+The Responsible Tech sector is experiencing significant changes, with the job market being reshaped by technological, political, social, and economic factors. Our 2025 careers report "Navigating the Shifting Sands of the Responsible Tech Job Market", written by ATIH Fellow Deb Donig and based on a survey of our community and broader industry data, provides a snapshot of this evolving landscape.
+
+According to the careers report, Responsible Tech professionals face a complex environment characterized by a "paradox of abundance and scarcity." There are more opportunities than ever before, but they require a unique combination of skills that may not have existed a few years ago. This period is described as "the great recalibration," driven by the rapid advancement of AI, regulatory complexities, and the need for professionals who can effectively translate between technical, policy, and business domains.
+
+The most severely impacted group is entry-level candidates, who are caught in a "double impossibility": they cannot get jobs without experience, nor can they get experience without a job. The aforementioned report highlights that about 75% of jobs labeled "entry-level" require prior experience. This dilemma is a major reason that our organization is heavily focused on providing mentorship and community building, along with working groups and volunteer opportunities. Entry-level candidates increasingly are looking for initial experience to break into the field.
+
+The ATIH survey utilized in our report revealed a significant gap between the skills listed in job descriptions and the skills professionals actually need to succeed. The most crucial skills are a blend of technical and "soft" or humanistic skills. The latter is often the differentiator that determines who gets hired. The highest-value skill emerging from our data is "translation," which involves blending business, ethical, technical, and legal frameworks and communicating effectively across different teams and organizational structures.
+
+Overall, success in the current Responsible Tech job market depends on the ability to navigate ambiguity, translate between conflicting demands, and create value by blending deep competence in one domain (technical, policy, or ethics) with practical experience in the others.
+
+Excerpts From Our 2025 Careers Report
+
+The compensation gaps are significant. The Oxford AI Institute found that "AI skills themselves attract a 23% wage premium compared to 13% for a master's degree and 33% for a PhD," demonstrating how the market values practical AI expertise over traditional credentials.
+
+Tech salaries are rising, with AI/ML engineers earning $120,000-$200,000+ annually, but Responsible Tech roles show extreme variance. Our analysis reveals clear patterns in compensation that reflect both market dynamics and the perceived value of different types of work.
+
+Career tracks at the high end of the salary scale:
+- Startup founders building responsible AI: Equity upside is significant
+- Government technical program managers: $140,000+ with benefits
+- Big Tech responsible AI research: $180,000+
+- EU compliance specialists: €120,000+ with high demand
+- AI infrastructure security specialists: $120,000-$180,000
+
+The global implications are staggering. According to recent analysis published by Staffing Industry Analysts, AI-related job postings have "jumped by 21% annually since 2019, with compensation growing 11% annually over the same period." Yet the number of qualified candidates hasn't kept pace, creating a widening talent gap that's reshaping how organizations think about hiring and skills development.
+
+Overall, the 2025 Responsible Tech job market is being pulled in different, often competing, directions.
+
+Download ATIH's 2025 careers report, Navigating the Shifting Sands of the Responsible Tech Job Market.
+
+Intersections & Considerations
+
+"In my experience, building community starts with creating spaces for people to feel heard and understood – so I actively seek out diverse perspectives, knowing that the best ideas often emerge from unexpected collaborations."
+
+Cassie Coccaro, Communications Lead, Thorn
+
+Cross-Pollination of Disciplines
+
+As the Responsible Tech ecosystem continues to evolve, so do the disciplines and the teams that drive and define it. Whether driven by an organization's decision to reduce its siloed practice or a team's deeper desire to collaborate and combine their efforts to design, deliver, and deploy responsible systems and sustainable solutions, it's clear that cross-pollination is becoming more necessary to process and production across industry.
+
+There are two intersections emerging, both of which include Responsible AI as a key component:
+
+Intersection 1: Responsible AI and Trust & Safety
+Taken together, T&S and RAI form a continuum of accountability that travels from design to deployment to enforcement.
+
+Intersection 2: Responsible AI and Public Interest Technology
+Both fields stress inclusion and equity, highlighting how marginalized communities are disproportionately affected by technological harms.
+
+Intersection 1: Responsible AI and Trust & Safety
+
+Responsible AI and Trust & Safety
+Trust & Safety (T&S) and Responsible AI (RAI) are distinct but increasingly interconnected fields. T&S traditionally focuses on platform governance and user safety, tackling issues like misinformation, harassment, hate speech, and scams through policy enforcement and content moderation. Responsible AI, on the other hand, emphasizes the ethical design and deployment of AI systems, addressing fairness, accountability, transparency, and bias. As platforms and services increasingly rely on AI models to filter, recommend, and generate content, these two domains overlap: T&S depends on RAI to ensure enforcement tools are fair and explainable, while RAI relies on T&S to ground its principles in real-world harms.
+
+This intersection is most visible in areas like algorithmic recommendation, automated moderation, and generative AI misuse. Together, the two fields face shared challenges of scale, bias, resource pressures, and global variation in norms. Viewed as a continuum, Responsible AI shapes the upstream design of systems, while Trust & Safety manages downstream harms in deployment and use. Their integration is becoming critical as regulators, industry, and civil society increasingly treat ethical AI design and platform safety as inseparable pillars of responsible technology governance.
+
+Why has this intersection occurred?
+- While T&S teams have traditionally moderated content, it is increasingly AI models that now decide what to amplify or recommend.
+- RAI provides the technical guardrails (e.g., red-teaming, model alignment, safety filters) that feed into T&S enforcement.
+- T&S rules are only as fair as the tools enforcing them, which intersect with the RAI teams responsible for the tools.
+- Both RAI and T&S rely on automation to handle massive scale, but automation introduces bias and error. The fields are facing the same challenge.
+- Some companies are merging or closely aligning their T&S and Responsible AI functions to reduce silos.
+- Safety and fairness can't be achieved without tackling both system design (RAI) and platform governance (T&S).
+- Both T&S and RAI are part of the same "river." T&S is often focused on downstream harm management, while RAI is focused on upstream harm management.
+
+Kathy Pham
+VP AI - Workday; Faculty & Senior Fellow - Harvard; Founding Member - United States Digital Service
+
+Tell us about your career journey. What key steps brought you to your current role, and what guidance would you give someone following a similar path?
+
+My career has been about intentionally following meaning and purpose across sectors. I started in computer science and product management, but I knew from the beginning that I wanted to use technology in service of people, regardless of field or job title. That path took me from Google and IBM to helping launch the U.S. Digital Service at the White House, building the first Office of Technology at the FTC, teaching product management at Harvard, advising Fortune 500 companies, building responsible computing initiatives at Mozilla, and now leading AI at Workday.
+
+The throughline has never been about titles, but about asking: Where can my skills make the most impact? Sometimes that meant creating roles that didn't exist before. The guidance I'd offer is this: state your intentions out loud, even before you know how they'll happen, because others can help bring them to life. Be open to moving across sectors and disciplines, since the most important work often happens at the intersections. And don't be afraid to honor both your personal values and your professional ambitions; the most fulfilling roles will let you bring both!
+
+This year's Responsible Tech Guide explores how different fields intersect - like Responsible AI and Trust & Safety. What disciplines or domains intersect in your work?
+
+I live at intersections and love finding value at the intersections! In my work, the intersections are the most powerful parts. Responsible AI connects directly with trust and safety, and also with product management, software engineering, law, policy, design, anthropology, and more. Responsible AI requires the understanding of how we as people operate in our societies and then seeing how technology fits into that. Responsible AI is about how technology shows up in a product, how a customer experiences it, and how regulators or policymakers will view it.
+
+I have also seen that progress comes when engineers, product managers, and responsible tech teams actually learn each other's language and respect each others' expertise. That's why I care so much about weaving responsible technology into the product lifecycle (and teach a class on it called Product Management and Society at Harvard), so it isn't a separate domain, but a shared responsibility across disciplines.
+
+Read more of Kathy's thoughts on our ATIH blog.
+
+Alexios Mantzarlis
+Director, Security, Trust, and Safety Initiative - Cornell Tech
+
+Describe your current role. How does your work address complex technology and society challenges?
+
+The Security, Trust, and Safety Initiative (SETS) is a hub for cybersecurity, privacy, and Trust & Safety at Cornell Tech. We help prevent and mitigate digital harms through graduate education, active communities of practice, and research.
+
+My primary goal with SETS is to help Cornell Tech students develop a well-rounded understanding of how crucial digital safety is to well-functioning societies -- and how reckless product design and platform management can endanger them. I pursue this goal primarily through (i) a technical Trust & Safety course and certificate heavy on ethical frameworks and hands-on activities (ii) a Red Team clinic that supports nonprofits deploying AI for good, and (iii) a broad effort to engage industry leaders with students through talks, panels, and research projects.
+
+My aspiration is that SETS graduates are both able and motivated to place digital safety at the heart of whatever career they end up pursuing in tech -- and that this will make our online spaces a bit better for everyone.
+
+What are the biggest barriers you've encountered in advancing responsible technology within your field, and how have you addressed them?
+
+Business goals can sometimes get in the way of responsible technology. Political motivations can often do that too. But I think the biggest challenge in advancing T&S goals I encountered was the lack of sound metrics to counter opposing arguments.
+
+It is often hard to precisely quantify the impact of a great Trust & Safety intervention at a user, platform, or society level. Some of it comes down to measuring a counterfactual — how do you know exactly how much damage didn't happen thanks to a content policy? — but some of this is also because the right data isn't being collected. It's a little trite to say that if you can't count something, it risks not getting counted, but that has been my experience.
+
+Read more of Alexios' thoughts on our ATIH blog.
+
+Alice Hunsberger
+Head of Trust & Safety - Musubi
+
+Describe your current role. How does your work address complex technology and society challenges?
+
+As the Head of Trust & Safety at Musubi, I'm focused on integrating cutting-edge AI technology with real-world human needs and designing a more ethical and effective approach to online safety. I serve as a translator between the needs of Trust & Safety teams and users into the core design of our technology.
+
+My daily work ranges from using precise language in prompt engineering, to building out educational resources for practitioners, to creating transparent and accountable systems. I am particularly passionate about designing human-in-the-loop systems that give human teams the tools and autonomy to focus on the most challenging, high-stakes cases and make systemic changes instead of moderating one-by-one.
+
+This year's Responsible Tech Guide explores how different fields intersect - like Responsible AI and Trust & Safety. What disciplines or domains intersect in your work?
+
+The most critical intersection in my work is between Trust & Safety and Responsible AI. Historically, these have been treated as separate functions within tech companies. Trust & Safety teams focused on the "what" (enforcing policy against bad actors) while Responsible AI teams focused on the "how" (ensuring the fairness and transparency of the technology itself). As AI gets integrated into our technology more deeply, it's critical that the two spheres of T&S and AI ethics are not siloed. They must be one and the same.
+
+T&S teams are now at the forefront of AI governance, managing the systems that moderate users and creating guardrails for new generative AI products. At the same time, we are seeing a rise of AI-generated harms, and are struggling with societal issues around how AI is built and used, and the delicate balance between freedom of expression, safety, and privacy. How AI technology is built and deployed directly affects how it is received and how it must be governed. The risks and solutions are completely intertwined, and we need to work together to ensure ethical outcomes.
+
+Read more of Alice's thoughts on our ATIH blog.
+
+Vilas Dhar
+President - Patrick J. McGovern Foundation
+
+What do you think is the most pressing tech and society issue today?
+
+The preparedness of our social and political institutions to keep pace with the technological systems we've already built. Artificial intelligence now shapes labor markets, information flows, and even the practice of democracy. Yet our governance frameworks are slow, fragmented, and rooted in an earlier industrial era. We risk a critical erosion of how we organize power, accountability, and public trust if we fail to adapt. We are challenged with an opportunity to design new institutions, global, inclusive, and responsive, that can meet this moment. That is the defining tech and society issue of our time.
+
+Describe your current role. How does your work address complex technology and society challenges?
+
+I serve as President of the Patrick J. McGovern Foundation, a global philanthropy dedicated to advancing AI and data for public good. Our work spans three dimensions: equipping nonprofits with AI tools and expertise, building solutions designed for purpose over profit, and investing in the governance structures that will define how societies live with technology. Philanthropy in the 21st century needs to be more than a source of capital, and act as a translator, a convener, and a partner in shaping our digital future. The role requires holding together both the promise of innovation and the responsibility to safeguard human dignity, and I take seriously the opportunity to build institutions that reflect our highest values in an age of rapid change.
+
+What are the biggest barriers you've encountered in advancing responsible technology within your field, and how have you addressed them?
+
+The greatest barrier isn't technological complexity, but institutional inertia. We continue to treat emerging technology as a marginal issue when it actually sits at the heart of every economic, political, and social system. Many leaders lack the vocabulary or frameworks to engage with moral courage. To address this, I invest heavily in translation — equipping nonprofit boards, policymakers, and global institutions with the tools to understand and act. By creating shared language and shared spaces for decision-making, we can overcome inertia and bring foresight into the center of leadership.
+
+Read more of Vilas' thoughts on our ATIH blog.
+
+Intersection 2: Responsible AI and Public Interest Technology
+
+Responsible AI and Public Interest Technology
+Responsible AI (RAI) and Public Interest Technology (PIT) share a common goal of ensuring that technology benefits society, but they approach it from different starting points. RAI focuses on the design and governance of AI systems, emphasizing fairness, accountability, transparency, privacy, and bias mitigation. It often works at the technical and policy levels, developing tools and frameworks to ensure AI systems are built responsibly. PIT, by contrast, takes a broader view of technology's role in society, encompassing areas like digital government, civic tech, broadband access, and cybersecurity, with an emphasis on serving the public good and aligning technology with democratic values.
+
+The intersection between the two is strongest where AI impacts public life — such as welfare allocation, healthcare, education, and policing. Here, RAI provides the ethical and technical safeguards, while PIT supplies the civic and institutional structures to apply them. Both fields stress inclusion and equity, highlighting how marginalized communities are disproportionately affected by technological harms. Together, they represent complementary efforts: Responsible AI focuses on how to build AI systems responsibly, while Public Interest Technology ensures those systems—and technology more broadly—are deployed in ways that genuinely advance the public interest.
+
+Why has this intersection occurred?
+- Both emphasize inclusion and harm reduction, particularly for marginalized communities who are often disproportionately impacted by algorithmic systems.
+- Many professionals in RAI move into the public sector, non-profits, or academia under the PIT umbrella, bringing technical skills into civic spaces.
+- Universities, think tanks, and philanthropy invest in both PIT and RAI as part of a broader movement for Responsible Tech.
+- Both fields aim to ensure technology serves people, not just profit — RAI at the system design level, PIT at the societal and governance level.
+
+While Responsible AI focuses on how we build AI systems responsibly and Public Interest Technology focuses on how technology serves democratic, civic, and societal goals, the increasing concern to ensure that AI systems are aligned with democratic and societal goals intertwines the fields.
+
+Divya Siddarth
+Founder and Executive Director - Collective Intelligence Project
+
+All Tech Is Human tackles complex technology and society challenges like misinformation, hate speech, and child safety online. What do you think is the most pressing tech and society issue today?
+
+Humanity is not good at making wise collective decisions at speed and scale. We're going to need to get much better, fast. While AI systems grow more powerful, the gap between those who build these technologies and the billions whose lives they transform continues to widen.
+
+We're seeing AI reshape everything from emotional support to civic engagement—our research found that one in three adults now uses AI for emotional support weekly, and nearly 40% trust their chatbots more than elected representatives. We need mechanisms that give people genuine agency over the AI systems shaping their futures.
+
+Describe your current role. How does your work address complex technology and society challenges?
+
+As Executive Director of the Collective Intelligence Project, I'm focused on making sure that society has the tools and institutions for collective agency. Part of that is to bridge the gap between AI development and democratic participation. We create scalable mechanisms for public input into AI systems—from constitutional AI training with Anthropic to contextual evaluations with communities around the world with Weval. For instance, our alignment assemblies in Taiwan helped craft legislation addressing deepfake scams, while our Weval platform enables communities worldwide to have their input shape AI. We're building the infrastructure for collective intelligence—proving that involving people at scale isn't just ethically necessary but produces better, more robust AI systems.
+
+What does a better tech future look like to you, and how can we get there?
+
+A better tech future moves from artificial general intelligence to augmented collective intelligence, where AI amplifies rather than replaces human agency. We're pretty bad at this already and we're about to get worse. So we need to build civic infrastructure now, create leverage points in AI development for public input, develop tools that make participation as diverse and responsive as possible, and prove repeatedly that collective intelligence produces better outcomes than closed development. A lot depends on it.
+
+Read more of Divya's thoughts on our ATIH blog.
+
+Camille Stewart Gloster
+CEO and Principal - CAS Strategies
+
+All Tech Is Human tackles complex technology and society challenges like misinformation, hate speech, and child safety online. What do you think is the most pressing tech and society issue today?
+
+The most pressing issue isn't one technology or harm, but the systemic fragility created when they all collide. AI, misinformation, child safety, online hate, and weak security don't operate in silos—they compound and amplify each other. We're stacking powerful tools on brittle foundations: low digital literacy, outdated governance, and incentives that reward speed over safety. Without stronger safety, security, and resilience at the core—and closer collaboration among practitioners in each field—every new innovation risks deepening fractures in society instead of repairing them.
+
+All Tech Is Human values diverse perspectives to address complex technology and society challenges. What backgrounds or voices do you think are underrepresented in the Responsible Tech space?
+
+Indigenous voices are profoundly underrepresented in the Responsible Tech space. Technology is reshaping land, identity, and governance in ways that directly affect Indigenous communities, yet their perspectives rarely shape the policies or products being deployed. When I served in the White House and in other roles, I worked to bring Indigenous leaders into the conversation, and I continue to seek meaningful partnerships and to learn to be a better ally.
+
+The same is true for Black and Latino communities, which often experience the sharpest edge of technological harms—algorithmic bias, digital exclusion, surveillance—without having proportional influence over how technology is designed or governed. These gaps only deepen at the intersections of race, gender, and gender identity, where women and gender minorities face compounding risks and even less visibility in shaping solutions. Responsible Tech cannot succeed if it ignores the lived realities of those most impacted. Inclusion must be more than symbolic; it requires building structures for sustained engagement, co-creation, and accountability. My goal has been to use my platform to widen the table, not just take a seat at it.
+
+Read more of Camille's thoughts on our ATIH blog.
+
+Francesca Bosco
+Chief Strategy Officer - CyberPeace Institute
+
+This year's Responsible Tech Guide explores how different fields intersect - like Responsible AI and Trust & Safety. What disciplines or domains intersect in your work?
+
+My work sits at the intersection of law, cybersecurity, human rights, and emerging technologies—fields that rarely converge but are essential to building responsible, resilient digital systems. On one hand, international law and human rights provide the ethical and normative frameworks that guide how technology should operate. On the other, cybersecurity and threat analysis provide the practical tools to protect people and institutions from harm. Layered on top of this is the rapidly evolving world of AI and digital innovation, which creates both opportunity and risk.
+
+Bridging these domains requires collaboration across multiple sectors. I work with governments and public institutions to shape policy, with civil society to understand human impact, with industry to influence practices, and with donors to ensure that resources reach the most vulnerable organizations. At the CyberPeace Institute, this multidisciplinary approach also informs our Responsible AI work, integrating technical safeguards with ethical principles and practical implementation strategies.
+
+Ultimately, the intersections in my work—law and cybersecurity, ethics and AI, policy and operational resilience—reflect a core belief: technology cannot be ethical, safe, or trustworthy in isolation. It requires dialogue across disciplines and sectors, grounded in human-centered principles and a commitment to protect those most at risk.
+
+What are the biggest barriers you've encountered in advancing responsible technology within your field, and how have you addressed them?
+
+One of the greatest barriers in advancing responsible technology is the gap between capacity and need. Many organizations—particularly NGOs, local governments, and community-based institutions—face growing cyber risks but often lack the technical expertise, funding, or infrastructure to respond effectively. This creates a situation where ethical frameworks and safeguards exist in principle but cannot be implemented equitably on the ground.
+
+Read more of Francesca's thoughts on our ATIH blog.
+
+Considerations: Identifying Concerns Around AI Companions
+
+How do we unpack the issues related to AI companions and chatbots?
+
+AI companions are a hotly debated topic, and an area where our organization has felt well-positioned to help surface its values, tensions, and tradeoffs. Unpacking the multitude of issues related to AI companions (technical, ethical, legal, psychological, sociological) requires broad participation, while courses of action require a cross-pollination of ideas, intersecting disciplines, and multistakeholder collaboration.
+
+The six categories of concern are as follows:
+- Emotional and Psychological Impact
+- Human Relationships and Social Skills
+- Privacy and Data Security
+- Ethical and Business Model Conflicts
+- Credibility, Trust, and Transparency
+- Safety and User Vulnerability
+
+Leveraging All Tech Is Human's broad global network, which weaves together individuals across civil society, government, industry, and academia, we recently collected observations from one central question: In your opinion, what is the most important issue when it comes to creating or interacting with AI companions?
+
+The graphic above reflects the six key themes we surfaced when analyzing the submissions from over 150 individuals. This thorny issue showcases the need to marry broad public insight with access to an expert network that can be assembled on an ad hoc basis. The rise and adoption of AI companions and chatbots highlights the gulf between the speed of innovation and the slowness of our societal consideration, which often leads to — which it certainly has in this scenario — a game of playing catch-up.
+
+Unlike the example of "nudify apps" mentioned elsewhere in this guide, AI companions and chatbots present the more nuanced dilemma of a technology associated with both harm and benefit.
+
+Considerations: A Holistic Approach to AI Governance
+
+How do we translate theory into practice?
+
+As mentioned throughout the Responsible Tech Guide, no issue can be treated in a siloed fashion. Instead, we must consider how any issue is impacted by culture, policy, economic pressure, psychology, and more. One area of heavy focus for All Tech Is Human recently has been AI Assurance and Governance, an issue we explored with recent workshops in London and NYC.
+
+Surveying our broad community, we examined 275 responses to a posed question: What is your biggest concern about AI Governance this year?
+
+Ten key areas emerged:
+1. Regulatory Lag and Fragmentation
+2. Political Pressures
+3. Global Governance Challenges
+4. Concentration of Power
+5. Accountability Gaps
+6. Individual Harms
+7. Societal Scale Impacts
+8. Complexity Outpacing Governance
+9. Public Engagement and Literacy Gaps
+10. Implementation Gaps
+
+This highlights the need for a multi-prong holistic approach to AI Governance, along with the interconnected nature between technology and society. To our organization, this also highlights the need for a cohesive multistakeholder ecosystem that has a conducive environment for solution-making. Furthermore, given the dramatic current differences in how these issues in being approached across the world, it also showcases learnings that can occur with collaboration and knowledge-sharing on a global scale.
+
+Navigating this widely different regulatory landscape was a topic of discussion during our London workshop (in collaboration with techUK and Trilligent); if interested, you can download the workshop summary report.
+
+Get Involved
+
+"For me, building community begins with identifying spaces where collaboration can catalyze change, then creating an infrastructure for people to connect, grow, and learn from one another."
+
+Daniella Raposo, Manager of Programs & Partnerships, Consumer Reports
+
+Learn From Hundreds of Responsible Tech Orgs
+
+All Tech Is Human has tracked and featured more than 600 Responsible Tech organizations in our previous guides, reports, blog posts, and other resources. You can find our current Responsible Tech Organizations list, along with submitting your suggestions to us.
+
+All Tech Is Human takes a "big tent" approach, recognizing the value of cross-pollination and the need to promote knowledge-sharing and collaboration throughout the ecosystem. Our Responsible Tech organizations list spans several areas of focus (i.e., Responsible AI, Trust & Safety, Tech & Democracy, Youth, Tech & Wellbeing) and describes the role each plays in the ecosystem.
+
+We regularly update our list, where you'll find Responsible Tech organizations that are:
+- Research-focused, such as Data & Society, Center for Democracy & Technology, Berkman Klein Center, the Distributed AI Research Institute (DAIR), and the Ada Lovelace Institute.
+- Advocacy-focused, such as the Algorithmic Justice League, Center for Humane Technology, Design It for Us, and the Young People's Alliance.
+- Underlining the importance of Agency, such as the Sustainable Media Center and The Rithm Project.
+- Developing a community of practice, including Humane Intelligence, Integrity Institute, and the Trust & Safety Professional Association.
+- Reimagining our tech future, like New_ Public, The Collective Intelligence Project, and Plurality Institute.
+- Education-focused, such as AI4ALL, aiEDU, and Break Through Tech.
+- Committing to building alliances, like Partnership on AI, Project Liberty, and the WeProtect Global Alliance.
+
+How does ATIH define a Responsible Tech organization?
+Generally speaking, we consider a Responsible Tech organization one that:
+- Aligns with the broader goal of technology working in the public interest.
+- Engages across disciplines for a full perspective of tech & society issues.
+- Produces resources that are freely available to the community.
+- Centers human impact in the design, development, and deployment of technologies.
+- Values public input and feedback in their process.
+
+Visions for a Better Tech Future
+Excerpts From Last Year's Responsible Tech Guide (2024)
+
+"My vision of a better tech future is one that reflects the diverse aspirations of society, not just those of a select few with outsized resources. It's a future where we adopt a long-term lens to planning, allowing us to proactively shape the future rather than simply react to it."
+
+Sinead Bovell, Futurist - WAYE Founder
+
+"My vision of a better tech future centers on 'pro-social media,' a transformative approach that prioritizes bridging divides over amplifying conflicts."
+
+Audrey Tang, Senior Fellow - Project Liberty Institute
+
+"Technology exists to serve humanity, and its purpose should align with our most fundamental values. As philosophers have long argued, this boils down to reducing suffering (of all sentient beings), enhancing self-determination, and upholding fairness and justice. By keeping these principles at the core of AI development, we can work toward a future where technology genuinely elevates humanity."
+
+Cansu Canca, Founder & Director - AI Ethics Lab; Director of Responsible AI Practice & Research Associate Professor in Philosophy - Northeastern University
+
+"My vision for a better tech future is one where innovation not only advances rapidly but remains deeply aligned with human values. As we push the boundaries of technology, including the development of non-human intelligence and superintelligent systems, it is imperative that these advancements are in service of humanity."
+
+Navrina Singh, Founder & CEO - Credo AI
+
+"I'd like our technological futures to be open, preferably open source when that can be on the menu, with a generous side of pluralism and safety."
+
+Camille François, Professor - Columbia University School of International & Public Affairs
+
+"My vision for a better tech future is one where technology truly centers equity and justice, enabling people to support their communities, run their businesses, and explore their interests."
+
+Afua Bruce, Author - The Tech That Comes Next; Principal - ANB Advisory Group
+
+16 Responsible Tech Books to Read
+
+All Tech Is Human creates an annual Responsible Tech Summer Reading List, and has also featured dozens of authors in our reports, livestreams, and on stage at our gatherings. This list is by no means a ranking, just a helpful curated list.
+
+The Age of Surveillance Capitalism: The Fight for a Human Future at the New Frontier of Power, Shoshana Zuboff
+
+The AI Mirror: How to Reclaim Our Humanity in an Age of Machine Thinking, Shannon Vallor
+
+The Algorithm: How AI Decides Who Gets Hired, Monitored, Promoted, and Fired and Why We Need to Fight Back Now, Hilke Schellmann
+
+Algorithms of Oppression: How Search Engines Reinforce Racism, Safiya Umoja Noble
+
+Empire of AI: Dreams and Nightmares in Sam Altman's OpenAI, Karen Hao
+
+Enshittification: Why Everything Suddenly Got Worse and What to Do About It, Cory Doctorow
+
+Ethical Machines: Your Concise Guide to Totally Unbiased, Transparent, and Respectful AI, Reid Blackman
+
+Internet for the People: The Fight for Our Digital Future, Ben Tarnoff
+
+More than a Glitch: Confronting Race, Gender, and Ability Bias in Tech, Meredith Broussard
+
+Race After Technology: Abolitionist Tools for the New Jim Code, Ruha Benjamin
+
+System Error: Where Big Tech Went Wrong and How We Can Reboot, Rob Reich, Mehran Sahami, and Jeremy M. Weinstein
+
+Team Human, Douglas Rushkoff
+
+Tech Agnostic: How Technology Became the World's Most Powerful Religion, and Why It Desperately Needs a Reformation, Greg M. Epstein
+
+Unmasking AI: My Mission to Protect What Is Human in a World of Machines, Joy Buolamwini
+
+The Worlds I See: Curiosity, Exploration, and Discovery at the Dawn of AI, Fei-Fei Li
+
+Your Face Belongs to Us: A Secretive Startup's Quest to End Privacy as We Know It, Kashmir Hill
+
+Several of these authors have appeared on our stage and on our livestreams including Karen Hao, Cory Doctorow, Douglas Rushkoff, Greg M. Epstein, Joy Buolamwini, Kashmir Hill and many more.
+
+Tackling Hard Problems Depends on a Strong Ecosystem
+
+Thorny tech & society issues are not problems with simple solutions; they're systemic challenges with technical, legal, cultural, and economic roots. No single discipline (whether that's computer science, law, policy, or design) can see the whole picture, much less solve it alone. Responsible Tech, as a concept, is a shift from siloed thinking towards one based on interdisciplinary appreciation, cross-pollination, and collaboration.
+
+A strong Responsible Tech ecosystem creates the necessary environment for solution-making; one where diverse expertise and lived experience meet, translate, and iterate. A vibrant and cohesive ecosystem leads to a common language and standards, clear career pathways that allow for broader talent to come in, and communities of practice that shorten the distance between a problem surfaced and a solution tested. When researchers, product teams, civil society, and policymakers can move from siloed discussions to collaboration, we also move from reactive to proactive.
+
+Incentives also change in an ecosystem. Companies gain peers and pressure to internalize safety and fairness as markers of quality, not just compliance. Policymakers gain timely, technical input before rules calcify. Journalists and advocates gain credible, up-to-date context to inform the public. Most importantly, impacted communities gain channels to shape how technologies are imagined, built, and deployed—not after the fact, but upstream where choices are made.
+
+If we want real progress, we have to invest not only in better models or laws, but in the connective tissue between them. Convenings that welcome disagreement, repositories that make the good work being done easy to adopt, and networks that move quickly across borders and sectors. That's how Responsible Tech becomes less about principles and more about practiced habits and best practices. This, in turn, takes us from a reactive state to one where we can co-create towards a better tech future.
+
+Driving Forward: A Call to Action
+
+After reading our Responsible Tech Guide, we hope that you'll become an active part of the community.
+
+Your involvement is essential for multiple reasons:
+- Complex tech & society issues require broad participation from a diverse range of backgrounds, disciplines, and lived experiences.
+- The Responsible Tech ecosystem benefits from individuals "paying their knowledge forward" through mentorship and support.
+- Increasing the "speed of tech consideration" depends on a cohesive ecosystem benefiting from knowledge-sharing and collaboration.
+
+Our tech future is not predestined or inevitable; it is formed from the compounding decisions of yesterday and today. While considering the issues related to technology can feel daunting, it is essential to know that there are thousands of people across the globe with your same level of concern, curiosity, and passion.
+
+All Tech Is Human has numerous ways for you to stay plugged into the Responsible Tech ecosystem, no matter your level of experience or geographic location. Read the pages that follow to see all of the ways that you can add your voice, learn from others in the vibrant ecosystem, and find areas of collaboration.
+
+How will you help shape our tech future?
+
+Positive change occurs through multiple avenues of involvement, including working within a system (e.g., at a large tech company), providing necessary oversight and beneficial research, or reimagining the status quo. The Responsible Tech movement aims to be agnostic to how change occurs, recognizing that thorny tech & society issues require a holistic approach that simultaneously works towards proper safeguards, an engaged and educated citizenry, an always-on understanding of the impacts of technology, and a Responsible Tech workforce with interdisciplinary appreciation.
+
+Driving Forward: A Call to Action (continued)
+
+In-person Gatherings
+Attend ATIH in-person gatherings in NYC, Washington DC, San Francisco, and London. You can also join the ranks of cities like Barcelona, Paris, Toronto, Boston, and Philadelphia to host independently-organized gatherings through ATIHx.
+
+Virtual Livestreams
+Join us for bi-monthly conversations with authors, academics and industry movers and shakers who are actively shaping the Responsible Tech ecosystem in Responsible AI, Trust & Safety, Public Interest Technology and much more.
+
+Bi-monthly Newsletters
+Read our Responsible Tech newsletter to stay abreast of the Responsible Tech ecosystem. And, check out our Careers newsletter featuring the latest Responsible Tech career-related news and roles to help you plan your next move.
+
+Slack Community
+Join our Slack community with over 13K members across 114 countries. Find vibrant channels with conversations that are centered around specific cities and regions, learning about events and jobs, as well as sharing your projects and research.
+
+Curated Job Board
+Our Responsible Tech Job Board highlights new career opportunities in Responsible AI, Trust & Safety, Public Interest Technology and more. It is the premiere resource in the field for people exploring a career change or new role.
+
+Responsible AI Courses
+On October 22, 2025, ATIH is launching a five course Responsible AI certificate pathway designed for aspiring practitioners and AI Governance professionals as well as those preparing to build AI Governance programs within an organization.
+
+All Tech Is Human's Responsible AI Courses
+
+All Tech Is Human is launching a dynamic new Responsible AI certification pathway comprised of five courses designed for aspiring RAI practitioners and AI Governance professionals as well as those preparing to build AI Governance programs within an organization.
+
+Rooted in practical insights and real-world applications, the courses offer a foundational understanding of Responsible AI: its principles, history, and evolution as a field, as well as an exploration of current roles, industry best practices, and the evolving governance landscape.
+
+Led by ATIH Executive Director, Rebekah Tweed, and award-winning AI Ethicist, Professor Renée Cummings, with contributions from ATIH affiliates Heidi Hysell and Savannah Thais and ATIH's RAI working group, these courses will equip participants with the essential foundational knowledge to begin the process of effectively operationalizing Responsible AI and AI governance programs within organizations.
+
+On October 22, 2025, ATIH will release all five courses. Visit RAIcourse.com to learn more.
+
+By the end of this set of courses, what skills or insights do you hope participants will have learned that can help them lead or influence Responsible AI work in their organizations or communities?
+
+Participants will leave with the confidence and capacity to see Responsible AI as a strategic advantage and a civic duty. They will learn how to embed fairness, transparency, and accountability into AI systems and recognize how these practices fuel innovation, trust, and sustain competitiveness. Most importantly, participants will come to see Responsible AI as a way of life, as instinctive as looking left and right before crossing the street. They will understand that Responsible AI is about due diligence and duty of care, the awareness and mindfulness we bring to our daily lives, and the duty to warn we expect in society.
+
+Read our Five Questions for Renée Cummings
+
+About Us
+
+"Community is not just about connecting with people and building a network, it is about empathy. Providing help and support, celebrating wins, and showing compassion during tough times."
+
+Aimee Bataclan, Head of Communications, Partnership on AI
+
+All Tech Is Human Overview
+
+Unwavering Commitment
+
+All Tech Is Human convenes a global community of over 50,000 people committed to tackling thorny tech and society issues through collective understanding, involvement, and action. Founded in 2018, we provide the relational infrastructure for the Responsible Tech ecosystem, creating a conducive environment for solution-making, and rapidly distributing key concepts, and leveraging best practices across our extensive network.
+
+We specialize in initiatives that naturally weave together multiple stakeholders, disciplines, and perspectives to surface values, tensions, trade-offs, and best practices for problem-solving. Together, we make and mobilize change toward co-creating a better tech future for all.
+
+Our Next Chapter Begins
+
+The Story of All Tech Is Human outlines the need to more participatory, less top-down, more agile, and capable of distributing collective intelligence and insight across a multistakeholder network while moving quickly. This progress happens in two stages:
+
+Stage 1: Shift the narrative and build a cohesive multistakeholder, multidisciplinary community that can understand important values, tensions, tradeoffs, and best practices.
+
+Stage 2: Utilize the power of a global network to inform and influence key levers of change. Have a tech future that is better aligned with the public interest by having a structure that offers crucial insight and involvement. All Tech Is Human will evolve into a necessary component to speed up the flow of information between stakeholders across civil society, government, industry, and academia.
+
+The shift from stage 1 to stage 2 shows how All Tech Is Human is evolving from being a civil society organization to more of a complex adaptive system that is designed to understand community sentiment, provide access to an extensive interdisciplinary network, and mobilize activity.
+
+Now in stage 2, we remain committed to bringing a range of new activities to those working all levels in Responsible Tech – from ones breaking into the industry to ones defining and running organizations.
+
+To learn more about why All Tech Is Human exists and understand where we are headed, read our Story.
+
+Geographic Expansion & ATIHx
+
+In 2018, All Tech Is Human hosted its first gathering of a couple of hundred people in Manhattan NY. Today, our community has expanded to tens of thousands and is represented across 114 countries.
+
+Albania, Algeria, Argentina, Armenia, Australia, Austria, Bangladesh, Barbados, Belize, Belgium, Bermuda, Bosnia and Herzegovina, Botswana, Brazil, Bulgaria, Burundi, Cambodia, Cameroon, Canada, Chile, China, Colombia, Côte d'Ivoire, Costa Rica, Croatia, Cyprus, Czech Republic, Denmark, Dominican Republic, Ecuador, Egypt, England, Estonia, Ethiopia, Finland, France, Georgia, Germany, Ghana, Greece, Hungary, India, Indonesia, Ireland, Israel, Italy, Jamaica, Japan, Jordan, Kazakhstan, Kenya, Korea, Kuwait, Laos, Latvia, Lebanon, Liberia, Lithuania, Luxembourg, Madagascar, Malaysia, Mali, Mexico, Moldova, Montenegro, Morocco, Myanmar, Namibia, Nepal, Netherlands, New Zealand, Nigeria, North Macedonia, Northern Ireland, Norway, Pakistan, Panama, Paraguay, Peru, Philippines, Poland, Portugal, Qatar, Romania, Russia, Rwanda, Saudi Arabia, Scotland, Serbia, Singapore, Slovenia, Slovakia, South Africa, Spain, Sri Lanka, Sweden, Switzerland, Syria, Taiwan, Tanzania, Thailand, Trinidad and Tobago, Tunisia, Republic of Türkiye, Uganda, Ukraine, United Arab Emirates, United States, Uruguay, Venezuela, Vietnam, Wales, Zambia, Zimbabwe
+
+Geographic Expansion & ATIHx (continued)
+
+All Tech Is Human encourages our global community to independently-organize and meet in-person through an initiative introduced in 2025, ATIHx. Since the announcement, ATIHx gatherings have surfaced in Toronto, Boston, Philadelphia, Paris, and Barcelona, bringing a wider lens to discussions on how we can collectively affect, inform, and improve the Responsible Tech ecosystem.
+
+ATIHx cities: Toronto, Boston, Philadelphia, Barcelona, Paris
+
+Learn more on hosting ATIHx events in your city.
+
+All Tech Is Human Team
+
+Our Team
+
+David Ryan Polgar
+Founder & President
+
+Rebekah Tweed
+Executive Director & Responsible AI Lead
+
+Sandra Khalil
+Associate Director & Trust & Safety Lead
+
+Deb Donig
+Research Fellow, Public Interest Tech — Siegel Family Endowment
+
+Alexis Crews
+Senior Fellow, Information Integrity
+
+Sherine Kazim
+Executive Director, Strategy & Operations
+
+2025 Fellows
+
+Renée Cummings
+Senior Fellow, AI, Data & Public Policy
+
+Fiscal Sponsor & Funders
+
+Our Fiscal Sponsor
+
+The Social Science Research Council (SSRC) is a US-based, independent, international 501(c)3 nonprofit organization dedicated to advancing research in the social sciences and related disciplines.
+
+The Social Science Research Council mobilizes social science for the public good. For 100 years the Social Science Research Council has connected the public, private, and nonprofit sectors to social scientists working to illuminate and address our most pressing societal challenges.
+
+In collaboration with their partners, SSRC administers fellowships and research grants that create new relevant knowledge, support emerging fields of study that illuminate and address new societal challenges, produce and translate timely, accessible, and actionable research, convene innovation networks connecting researchers, practitioners, and stakeholders, support new generations of researchers and innovators, and provide efficient and responsive fiscal sponsorship for mission-adjacent projects.
+
+Our Funders
+
+Maintaining a community-first spirit requires generous support from patrons, sponsors, and funders who share our mission to co-create a better tech future.
+
+Some of our current funders include:
+
+Siegel Family Endowment
+Siegel Family Endowment is a philanthropic foundation that aims to understand and shape the impact of technology on society by supporting organizations working at the intersections of learning, workforce, and infrastructure.
+
+Patrick J McGovern Foundation
+The Patrick J. McGovern Foundation (PJMF) is a philanthropic organization dedicated to advancing artificial intelligence and data science solutions to create a thriving, equitable, and sustainable future for all.
+
+How to Support All Tech Is Human
+
+All Tech Is Human is committed to offering access to in-person and virtual gatherings, programs, resources, reports and white papers.
+
+Our key initiatives include:
+
+Responsible Tech Summit - This highly curated event takes place annually in NYC and holds an important space for people who work in industry, academia, civil society, and government to discuss the impact that technology has on our individual rights, wellbeing, societal cohesiveness, and the vibrancy and health of our democracy.
+
+Maintaining a Slack community for the Responsible Tech ecosystem - Our Slack community weaves together over 13,000 members across 114 countries. Individuals come from all different backgrounds and experience levels to learn from each other, share research, events, jobs, and meet up in person with our new ATIHx initiative.
+
+Responsible Tech Guide - Our annual flagship guide is the go-to resource for anyone working under the umbrella of Responsible Tech. Read by thousands of people globally, it provides an understanding of the ever-evolving ecosystem and features timely perspectives from key individuals across Responsible AI, Trust & Safety, and Public Interest Technology.
+
+Responsible Tech Job Board - The premier resource in the field for people exploring a career change or a new role, as well as those interested in growing the Responsible Tech discipline within their organization. Updated daily, our curated board highlights new opportunities in a rapidly evolving ecosystem, featuring roles focused on mitigating the harms of technology, diversifying the tech pipeline, and ensuring that tech is aligned with the public interest.
+
+Responsible AI Certificate Pathway (coming October 22, 2025) - Our forthcoming courses, designed for aspiring RAI practitioners and those preparing to build AI Governance programs, will lay the RAI foundation (its history and evolution as a field) and explore emerging best practices for building an industry AI Governance program.
+
+Four ways to support our community, careers and education efforts:
+
+Sponsorship - Selective support for specific or individual initiatives including reports, workshops, roundtables, events and services.
+
+Partnership - Formalized, strategic relationship with a shared responsibility for process, materials, and outcomes.
+
+Funding - Single or multiyear support for broad initiatives, including research efforts and reports, programs, and general organizational operations.
+
+Donation - If you are an individual or company that would like to support All Tech Is Human through a donation, you can learn more here.
+
+Thank You
+
+Our Deepest Gratitude
+
+Our Responsible Tech Guide, first released in 2020, is an evolving initiative that builds off of previous versions along with your continuous feedback.
+
+This 2025 Guide, our sixth edition, was informed by our Braintrust, 13,000+ members in our Slack community that regularly share resources, insights, and feedback, guest speakers from our Livestreams and in-person gatherings in NYC, Washington DC, San Francisco and London, our fellows, and our global network of 50,000+ people.
+
+Thank you to everyone who has believed in our mission and helped spread the word. Your participation and presence in our various initiatives helps us create a stronger hub of knowledge to the benefit of the entire community. We're eternally grateful that you have chosen to be a part of All Tech Is Human.
+
+Let's Co-create a Better Tech Future
