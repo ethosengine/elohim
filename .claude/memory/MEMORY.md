@@ -104,6 +104,7 @@
 - [elohim-hub elevation](project_elohim_hub_elevation.md) — elohim-node graduates into hub runtime; hub-to-hub = Tier 3 story.
 - [REA prefix is redundant — drop it long-term](project_rea_prefix_redundant.md) — REA is the pattern; resolve asymmetry by dropping prefix, never adding it.
 - [Cascade-halt masks failures](feedback_cascade_halt_masks_failures.md) — green-driving surfaces buried failures one layer at a time; budget extra iterations.
+- [Pre-dispatch hard-fail vs post-dispatch UNSTABLE](project_pre_dispatch_hard_fail_post_dispatch_unstable.md) — orchestrator Jenkinsfile: stages BEFORE dispatch may hard-fail; observational stages AFTER dispatch must catchError → UNSTABLE so they don't blank downstream truth.
 - [Sweettest cross-agent needs DHT consistency](feedback_sweettest_cross_agent_consistency.md) — two_agent_conductors needs exchange_peer_info + await_consistency.
 - [Docker include_str! path mirroring](feedback_docker_include_str_path_mirroring.md) — resolves relative to source in container; parent-dir refs need COPY mirrors.
 - [Build-manifest.json required](feedback_orchestrator_build_manifest_required.md) — PIPELINES map alone won't trigger; graph-walker.mjs is authoritative.
