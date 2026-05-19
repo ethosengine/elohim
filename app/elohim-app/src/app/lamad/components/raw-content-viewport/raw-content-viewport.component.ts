@@ -9,12 +9,13 @@ import {
   ViewChild,
   ViewContainerRef,
   inject,
+  signal,
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
 import { takeUntil } from 'rxjs/operators';
 
-import { Subject, Subscription } from 'rxjs';
+import { Subject } from 'rxjs';
 
 import { ProtocolSignalBadgeComponent } from '@app/elohim/components/protocol-signal-badge/protocol-signal-badge.component';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
@@ -46,11 +47,10 @@ export class RawContentViewportComponent implements OnInit, OnDestroy, AfterView
   @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
   rendererHost?: ViewContainerRef;
 
-  node: ContentNode | null = null;
-  error: string | null = null;
+  readonly node = signal<ContentNode | null>(null);
+  readonly error = signal<string | null>(null);
 
   private rendererRef: ComponentRef<ContentRenderer> | null = null;
-  private rendererSub: Subscription | null = null;
   private pendingLoad = false;
 
   private readonly destroy$ = new Subject<void>();
@@ -63,7 +63,7 @@ export class RawContentViewportComponent implements OnInit, OnDestroy, AfterView
     this.route.paramMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
       const resourceId = params.get('resourceId');
       if (!resourceId) {
-        this.error = 'Missing resource id';
+        this.error.set('Missing resource id');
         return;
       }
       this.dataLoader
@@ -72,21 +72,21 @@ export class RawContentViewportComponent implements OnInit, OnDestroy, AfterView
         .subscribe({
           next: node => {
             if (!node) {
-              this.error = 'Content not found';
+              this.error.set('Content not found');
               return;
             }
-            this.node = node;
+            this.node.set(node);
             this.pendingLoad = true;
           },
           error: () => {
-            this.error = 'Failed to load content';
+            this.error.set('Failed to load content');
           },
         });
     });
   }
 
   ngAfterViewChecked(): void {
-    if (this.pendingLoad && this.node && this.rendererHost) {
+    if (this.pendingLoad && this.node() && this.rendererHost) {
       this.pendingLoad = false;
       this.mountRenderer();
     }
@@ -103,22 +103,19 @@ export class RawContentViewportComponent implements OnInit, OnDestroy, AfterView
   }
 
   private mountRenderer(): void {
-    if (!this.node || !this.rendererHost) return;
+    const node = this.node();
+    if (!node || !this.rendererHost) return;
     this.tearDownRenderer();
     this.rendererHost.clear();
 
-    const rendererComponent = this.rendererRegistry.getRenderer(this.node);
+    const rendererComponent = this.rendererRegistry.getRenderer(node);
     if (!rendererComponent) return;
 
     this.rendererRef = this.rendererHost.createComponent(rendererComponent);
-    this.rendererRef.setInput('node', this.node);
+    this.rendererRef.setInput('node', node);
   }
 
   private tearDownRenderer(): void {
-    if (this.rendererSub) {
-      this.rendererSub.unsubscribe();
-      this.rendererSub = null;
-    }
     if (this.rendererRef) {
       this.rendererRef.destroy();
       this.rendererRef = null;
