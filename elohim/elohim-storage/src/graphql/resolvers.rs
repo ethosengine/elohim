@@ -695,6 +695,124 @@ impl PeerTopology {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Reciprocity view — viewer-scoped REA inflow/outflow ledger
+// ---------------------------------------------------------------------------
+
+/// Per-counterparty row in a `ReciprocityView`'s inflow/outflow ledger.
+///
+/// `committed_bytes` and `delivered_bytes` are `String` to preserve precision
+/// across the JS boundary (u64 can exceed 2^53). `honored_percent` stays `f64`.
+pub struct ReciprocityRowGql {
+    pub counterparty_household_id: String,
+    pub display_name: Option<String>,
+    pub committed_bytes: String,
+    pub delivered_bytes: String,
+    pub honored_percent: f64,
+    pub online: Option<bool>,
+}
+
+impl From<crate::views::ReciprocityRow> for ReciprocityRowGql {
+    fn from(r: crate::views::ReciprocityRow) -> Self {
+        ReciprocityRowGql {
+            counterparty_household_id: r.counterparty_household_id,
+            display_name: r.display_name,
+            committed_bytes: r.committed_bytes.to_string(),
+            delivered_bytes: r.delivered_bytes.to_string(),
+            honored_percent: r.honored_percent,
+            online: r.online,
+        }
+    }
+}
+
+#[Object]
+impl ReciprocityRowGql {
+    /// Household identifier on the other side of the reciprocity ledger.
+    async fn counterparty_household_id(&self) -> &str {
+        &self.counterparty_household_id
+    }
+
+    /// Human-readable counterparty label; `None` when the binding has no name.
+    async fn display_name(&self) -> Option<&str> {
+        self.display_name.as_deref()
+    }
+
+    /// Bytes committed via REA Commitment entries (stringified u64).
+    async fn committed_bytes(&self) -> &str {
+        &self.committed_bytes
+    }
+
+    /// Bytes actually delivered via EconomicEvent observations (stringified u64).
+    async fn delivered_bytes(&self) -> &str {
+        &self.delivered_bytes
+    }
+
+    /// `delivered_bytes / committed_bytes` as a fraction (0.0–1.0+; can exceed
+    /// 1.0 when over-delivered).
+    async fn honored_percent(&self) -> f64 {
+        self.honored_percent
+    }
+
+    /// Whether the counterparty has an online peer at request time. `None` on
+    /// cold-cache reads (no live swarm context).
+    async fn online(&self) -> Option<bool> {
+        self.online
+    }
+}
+
+/// Per-agent reciprocity ledger.
+///
+/// `net_hosted_bytes` and `capacity_available_bytes` are stringified for JS
+/// precision parity with `committed_bytes`/`delivered_bytes` on the rows.
+pub struct ReciprocityViewGql {
+    pub agent_cid: String,
+    pub inflow: Vec<ReciprocityRowGql>,
+    pub outflow: Vec<ReciprocityRowGql>,
+    pub net_hosted_bytes: String,
+    pub capacity_available_bytes: String,
+}
+
+impl From<crate::views::ReciprocityView> for ReciprocityViewGql {
+    fn from(v: crate::views::ReciprocityView) -> Self {
+        ReciprocityViewGql {
+            agent_cid: v.agent_cid,
+            inflow: v.inflow.into_iter().map(ReciprocityRowGql::from).collect(),
+            outflow: v.outflow.into_iter().map(ReciprocityRowGql::from).collect(),
+            net_hosted_bytes: v.net_hosted_bytes.to_string(),
+            capacity_available_bytes: v.capacity_available_bytes.to_string(),
+        }
+    }
+}
+
+#[Object]
+impl ReciprocityViewGql {
+    /// Agent CID this reciprocity view is scoped to.
+    async fn agent_cid(&self) -> &str {
+        &self.agent_cid
+    }
+
+    /// Rows where a counterparty hosted content for this viewer.
+    async fn inflow(&self) -> &[ReciprocityRowGql] {
+        &self.inflow
+    }
+
+    /// Rows where this viewer hosted content for a counterparty.
+    async fn outflow(&self) -> &[ReciprocityRowGql] {
+        &self.outflow
+    }
+
+    /// Signed net hosting position (stringified i64). Positive = others host
+    /// more for the viewer than the viewer does for them.
+    async fn net_hosted_bytes(&self) -> &str {
+        &self.net_hosted_bytes
+    }
+
+    /// Spare capacity the viewer can offer to expand reciprocity (stringified u64).
+    async fn capacity_available_bytes(&self) -> &str {
+        &self.capacity_available_bytes
+    }
+}
+
 /// Viewer root — agent-scoped lens over hub topology.
 ///
 /// Holds only the agent CID; actual data is resolved lazily per field.
@@ -736,6 +854,37 @@ impl Viewer {
         .await
         .map_err(|e| async_graphql::Error::new(e.to_string()))?;
         Ok(PeerTopology::from(view))
+    }
+
+    /// Reciprocity view: inflow/outflow REA flows per counterparty household,
+    /// net hosting position, and available capacity.
+    ///
+    /// Stewardship-aligned name (no `my*` prefix) — see the L6 viewer.*
+    /// symmetry note in
+    /// `genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md` §2.
+    async fn reciprocity(&self, ctx: &Context<'_>) -> FieldResult<ReciprocityViewGql> {
+        let pool = ctx.data::<DbPool>()?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| async_graphql::Error::new(format!("pool error: {}", e)))?;
+        let now_iso = chrono::Utc::now().to_rfc3339();
+        let bindings = crate::db::peer_identity_bindings::list_active_for_agent(
+            &mut conn,
+            &self.agent_cid,
+            &now_iso,
+        )
+        .map_err(|e| async_graphql::Error::new(format!("bindings lookup failed: {}", e)))?;
+        drop(conn);
+        let connected_peers = std::collections::HashSet::new();
+        let view = crate::services::reciprocity_view::aggregate_reciprocity_view(
+            pool,
+            &self.agent_cid,
+            &bindings,
+            &connected_peers,
+        )
+        .await
+        .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+        Ok(ReciprocityViewGql::from(view))
     }
 }
 
