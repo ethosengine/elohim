@@ -25,7 +25,7 @@ Per `.claude/skills/p2p-design-gate/SKILL.md`, this synthesis introduces **zero 
 | `rea_commitments` / `rea_economic_events` (Diesel projections) | `elohim/elohim-storage/src/db/rea_projection.rs` | **C — operational** | Holochain DHT: REA `Commitment` and `EconomicEvent` Content entries (notarized). | Content CID. | Replay matching `ElohimContentSignal` through `rea_projector::handle_content_signal`. |
 | `peer_identity_bindings` (Diesel projection) | `elohim/elohim-storage/src/db/peer_identity_bindings.rs` | **C — operational** | Holochain DHT: imagodei `AgentPeerBinding` entry. | `dht_anchor_hash` column links back to the canonical entry. | Signal replay. |
 | `HumanRelationship` (joined into peer-topology edges, Epic D) | imagodei DHT entry type, projected through existing relationship views | **A — notarized** | Holochain DHT: existing imagodei `HumanRelationship` Content entries. No new DHT type. | Content CID. | Already projected; no new surface. |
-| GraphQL types (`Viewer`, `MyCluster`, `MyTopology`, `MyReciprocity`, `PeerHouseholdEdge`, `Collective`, `ContentDistribution`, `Device`) | `elohim/elohim-storage/src/graphql/resolvers.rs` (Epic A→F) | n/a — **wire shape**, not a store | Composes the relations above. Resolvers do reads only; no writes. | n/a (transport type). | n/a (no storage). |
+| GraphQL types (`Viewer`, `HubView`, `PeerTopology`, `ReciprocityView`, `PeerHouseholdEdge`, `Collective`, `ContentDistribution`, `Device`) | `elohim/elohim-storage/src/graphql/resolvers.rs` (Epic A→F) | n/a — **wire shape**, not a store | Composes the relations above. Resolvers do reads only; no writes. | n/a (transport type). | n/a (no storage). |
 
 **Rules this declaration enforces:**
 - No GraphQL resolver in this sprint introduces a write path; every resolver is a read against existing relations.
@@ -76,16 +76,17 @@ This means the M1 plan's hand-rolled `services/cluster_view.rs`, `services/peer_
 The six topology surfaces collapse to one Apollo Federation v2 subgraph. Per-surface sketches:
 
 ```graphql
-# Viewer-scoped root — replaces the per-view HTTP endpoints
+# Viewer-scoped root — replaces the per-view HTTP endpoints.
+# Stewardship-aligned field naming (no `my*` prefix) — see L6 scope note below.
 type Viewer {
   agent: Agent!
-  myCluster: MyCluster!            # /shefa/cluster
-  myTopology: MyTopology!          # /shefa/peers
-  myReciprocity: MyReciprocity!    # /shefa/reciprocity (NEW)
-  myCollectives: [Collective!]!    # /qahal/* (NEW, qahal lens)
+  hub: HubView!                    # /shefa/cluster (shipped: Epic A2)
+  peers: PeerTopology!             # /shefa/peers   (shipped: Epic A3)
+  reciprocity: ReciprocityView!    # /shefa/reciprocity (Epic B, L6 plan)
+  collectives: [Collective!]!      # /qahal/* (Epic E, future)
 }
 
-type MyCluster {
+type HubView {
   devices: [Device!]!
   totals: ClusterTotals!
 }
@@ -101,7 +102,7 @@ type Device {
   stewardTier: StewardTier         # shefa overlay
 }
 
-type MyTopology {
+type PeerTopology {
   reciprocationCount: Int!
   edges: [PeerHouseholdEdge!]!
   resilienceCliffs: [ResilienceCliff!]!
@@ -119,9 +120,9 @@ type PeerHouseholdEdge {
   iAmCriticalForThem: Boolean!
 }
 
-type MyReciprocity {
-  inflowByReach: [ReciprocityFlow!]!     # commitments delivered to me, classified by reach
-  outflowByReach: [ReciprocityFlow!]!    # commitments I delivered, classified by reach
+type ReciprocityView {
+  inflowByReach: [ReciprocityFlow!]!     # commitments delivered to the viewer, classified by reach
+  outflowByReach: [ReciprocityFlow!]!    # commitments the viewer delivered, classified by reach
   byHousehold: [HouseholdReciprocity!]!  # committed-vs-delivered per peer-household
 }
 
@@ -149,6 +150,8 @@ type Collective {                       # qahal pillar (NEW)
   contributionRecognition: [ContributionRecord!]!  # reputation-by-contribution (slide 45)
 }
 ```
+
+**Viewer.* symmetry — L6 scope note (2026-05-19):** the field-level naming above (`hub`, `peers`, `reciprocity`, `collectives`) is the stewardship-aligned surface per `project_no_sovereignty_stewardship_over_ownership`. The shipped fields `Viewer.hub` and `Viewer.peers` already conform (`elohim/elohim-storage/src/graphql/resolvers.rs:713,728`). Internal Rust view types still carry `MyClusterView` / `MyTopologyView` names (`elohim/elohim-views/src/infrastructure.rs:1680`); the existing `impl From<MyClusterView> for HubView` keeps wire/internal nomenclature decoupled. Renaming internal types is a follow-on hygiene pass; the L6 plan leaves them alone to keep blast radius small.
 
 The projector (`elohim-storage/src/graph/projector.rs`) is already fanning `EprHead` atoms into CozoDB relations (existing surfaces — see Source-of-Truth Declaration above). The work for this sprint is (a) confirm the relations cover the schema above, (b) add resolvers in `graphql/resolvers.rs`, (c) point existing Angular services at the GraphQL endpoint instead of the per-view HTTP routes.
 
@@ -191,6 +194,8 @@ These are the visual-delivery gates. A scenario is "visually delivered" when its
 Supersedes the obsolete portions of the 2026-05-07 M1 plan. Tasks are grouped by epic; each task names its file targets and its gating a2o scenario.
 
 ### Epic A — Graph-native GraphQL surface over existing topology services (PLAN-GRADE)
+
+**Status (2026-05-19):** landed as commit `ac17260e2` with stewardship-aligned field names (`Viewer.hub` / `Viewer.peers`) instead of the original `myCluster` / `myTopology` sketched below. Where this section uses `myCluster` / `myTopology` / `MyClusterGql` / `MyTopologyGql`, the as-shipped names are `hub` / `peers` / `HubView` / `PeerTopology` — see the L6 viewer.* symmetry scope note in §2 above. The descriptive prose below is preserved as the design record; for current-state nomenclature consult the source.
 
 **Goal:** expose `/api/v1/cluster` and `/api/v1/peer-topology` data through GraphQL `{ viewer { myCluster ... myTopology ... } }`; migrate Angular `my-cluster.service` and `peer-topology.service` behind a feature flag; verify visual parity. The HTTP routes stay live; the GraphQL surface is additive.
 
@@ -714,13 +719,15 @@ git commit -m "test(e2e): topology graphql parity scenarios + step defs"
 - **`MyClusterView`/`PeerTopologyView` carry enums that conflict with async-graphql derives.** Mitigation: don't `derive(SimpleObject)` on the View structs directly; use wrapper types `MyClusterGql(MyClusterView)` so async-graphql derives don't pollute the existing serde/ts-rs surface.
 - **The `connected_peers` snapshot Arc-of-Fn pattern leaks lifetime concerns into resolver signatures.** Mitigation: confirm exact swarm-handle pattern at A2 Step 3; may need to capture an `mpsc::Receiver` or shared state behind a Mutex instead. Consult `elohim/elohim-storage/src/p2p/mod.rs:F-T20 responder arm` for the existing pattern.
 - **DB pool exhaustion under GraphQL load.** Mitigation: A2 reuses the existing connection pool; no new pool needed. If query rate becomes a concern in prod, add per-resolver concurrency limit; out of scope for this Epic.
-- **Schema-introspection surface accidentally leaks internal types.** Mitigation: only `Viewer`, `MyClusterGql`, `MyTopologyGql`, and their children are public; the EprHead/Contributor types from prior Phase 7 remain.
+- **Schema-introspection surface accidentally leaks internal types.** Mitigation: only `Viewer`, `HubView`, `PeerTopology`, and their children are public; the EprHead/Contributor types from prior Phase 7 remain.
 
 ### Epic B — Deliver the missing `/shefa/reciprocity` page
 
 **Gating scenario:** `shefa/m1-matthew-terrance-delivery.feature @wip` (reciprocity row)
 
-- [ ] B1. Add `Viewer.myReciprocity` to GraphQL schema + resolver; back with existing `rea_commitments` + `rea_economic_events` relations (existing surfaces — see Source-of-Truth Declaration above; no new storage)
+Detail plan: `genesis/docs/plans/2026-05-19-viewer-symmetry-reciprocity-qahal-substrate.md` (L6 pass).
+
+- [ ] B1. Add `Viewer.reciprocity` to GraphQL schema + resolver; back with existing `rea_commitments` + `rea_economic_events` relations (existing surfaces — see Source-of-Truth Declaration above; no new storage)
 - [ ] B2. Create Angular route `/shefa/reciprocity` + component `app/elohim-app/src/app/shefa/pages/reciprocity/`
 - [ ] B3. Render committed-vs-delivered per household; classify by reach
 - [ ] B4. Lift `@wip` on the reciprocity scenarios in `m1-matthew-terrance-delivery.feature`
