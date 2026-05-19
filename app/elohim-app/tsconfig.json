@@ -29,6 +29,7 @@
       "@elohim/storage-client/generated": ["node_modules/@elohim/storage-client/dist/generated/index"],
       "@elohim/storage-client/wire-types": ["node_modules/@elohim/storage-client/dist/wire-types/index"],
       "@elohim/storage-client/wire-types/*": ["node_modules/@elohim/storage-client/dist/wire-types/*/index"],
+      "@elohim/storage-client/graphql": ["node_modules/@elohim/storage-client/dist/graphql/index"],
       "@holochain/client": ["node_modules/@holochain/client"],
       "@holochain/client/*": ["node_modules/@holochain/client/*"]
     },

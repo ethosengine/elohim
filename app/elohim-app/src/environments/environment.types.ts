@@ -84,6 +84,21 @@ export interface CacheEnvironmentConfig {
 }
 
 /**
+ * Runtime feature flags. All flags default to false when absent so that
+ * production and non-dev variants require no changes to opt out.
+ */
+export interface FeatureFlags {
+  /**
+   * When true, ClusterService.getMyCluster() and
+   * PeerTopologyService.getMyPeerTopology() fetch via GraphQL
+   * (POST /api/v1/graphql) instead of the REST endpoints.
+   * Default false. Flip to true in environment.ts to exercise the GraphQL path.
+   * A7 will enforce visual parity between the two paths with a Cypress scenario.
+   */
+  useGraphqlTopology?: boolean;
+}
+
+/**
  * Environment configuration interface
  */
 export interface Environment {
@@ -102,4 +117,6 @@ export interface Environment {
   client?: ClientEnvironmentConfig;
   /** Cache layer configuration (WASM gating, reach-aware toggles) */
   cache?: CacheEnvironmentConfig;
+  /** Runtime feature flags (all default to false when absent) */
+  features?: FeatureFlags;
 }

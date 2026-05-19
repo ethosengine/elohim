@@ -20,6 +20,10 @@
     "./wire-types/*": {
       "types": "./dist/wire-types/*/index.d.ts",
       "default": "./dist/wire-types/*/index.js"
+    },
+    "./graphql": {
+      "types": "./dist/graphql/index.d.ts",
+      "default": "./dist/graphql/index.js"
     }
   },
   "files": [

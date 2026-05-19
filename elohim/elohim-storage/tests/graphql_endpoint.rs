@@ -10,6 +10,9 @@ use std::sync::Arc;
 
 use elohim_storage::graph::{engine::GraphEngine, schema::apply_core_schema};
 use elohim_storage::graphql::server::build_schema;
+use elohim_storage::services::federator::Federator;
+use elohim_storage::test_util::test_pool;
+use elohim_storage::P2PHandle;
 
 fn open_seeded_engine() -> Arc<GraphEngine> {
     let tmp = tempfile::tempdir().unwrap();
@@ -21,12 +24,16 @@ fn open_seeded_engine() -> Arc<GraphEngine> {
     engine
 }
 
+fn stub_federator() -> Arc<Federator> {
+    Arc::new(Federator::new(P2PHandle::for_testing()))
+}
+
 /// POST /api/v1/graphql with `{ "query": "{ __schema { types { name } } }" }`
 /// must return a response with __schema.types non-empty.
 #[tokio::test]
 async fn graphql_endpoint_serves_introspection() {
     let engine = open_seeded_engine();
-    let schema = build_schema(engine);
+    let schema = build_schema(engine, test_pool(), stub_federator());
 
     let result = schema.execute("{ __schema { types { name } } }").await;
 
@@ -49,7 +56,7 @@ async fn graphql_endpoint_serves_introspection() {
 #[tokio::test]
 async fn graphql_schema_exposes_epr_head_and_contributor() {
     let engine = open_seeded_engine();
-    let schema = build_schema(engine);
+    let schema = build_schema(engine, test_pool(), stub_federator());
 
     let result = schema.execute("{ __schema { types { name } } }").await;
     assert!(result.errors.is_empty(), "{:?}", result.errors);

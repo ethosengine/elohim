@@ -142,3 +142,17 @@ Feature: Human Resilience Profile
     When elohim assesses the resilience of Matthew's private-reach medical data
     Then elohim should suggest an institutional custodian for medical data
     And the suggestion should note that household backup alone is insufficient for medical records
+
+  # --- GraphQL Topology Parity --------------------------------------------
+
+  # Backed by app/elohim-app/src/app/shefa/services/topology-parity.spec.ts —
+  # the adapter contract is locked at unit level; this scenario covers the
+  # runtime UX expectation that the flip is invisible to the human.
+
+  @wip @graphql-parity @browser
+  Scenario: Operator flips useGraphqlTopology — human sees the same cluster numbers
+    Given human "Matthew" is logged in on doorway "alpha" with device
+    And Matthew's cluster dashboard shows 2 devices with a combined storage total
+    When the operator sets "useGraphqlTopology" to true and the dashboard reloads
+    Then Matthew sees the same device count and storage totals as before the flip
+    And no resilience cliff or peer count has changed

@@ -14,6 +14,9 @@ use elohim_storage::graph::{
     engine::GraphEngine, projector::GraphProjector, schema::apply_core_schema,
 };
 use elohim_storage::graphql::server::{build_schema, AppSchema};
+use elohim_storage::services::federator::Federator;
+use elohim_storage::test_util::test_pool;
+use elohim_storage::P2PHandle;
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -81,7 +84,11 @@ fn build_lamad_schema() -> AppSchema {
         )
         .unwrap();
 
-    build_schema(engine)
+    build_schema(
+        engine,
+        test_pool(),
+        Arc::new(Federator::new(P2PHandle::for_testing())),
+    )
 }
 
 /// Build a shefa-seeded schema: matthew and jessica belong to household-h1.
@@ -135,7 +142,11 @@ fn build_shefa_schema() -> AppSchema {
         )
         .unwrap();
 
-    build_schema(engine)
+    build_schema(
+        engine,
+        test_pool(),
+        Arc::new(Federator::new(P2PHandle::for_testing())),
+    )
 }
 
 // ---------------------------------------------------------------------------

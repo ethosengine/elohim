@@ -47,3 +47,6 @@ export { AutomergeSync, SyncResult, createSync } from './sync';
 
 // Generated types from Rust via ts-rs
 export * from './generated';
+
+// GraphQL query documents + response types (viewer.hub, viewer.peers)
+export * from './graphql';
