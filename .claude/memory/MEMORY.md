@@ -1,3 +1,4 @@
+- [Qahal collective view — slide 45 reference](project_qahal_collective_view_slide45_reference.md) — Bay Area Dawn Runners mock; layout + 5 features (norms-visible, AI-coordinator, live-co-presence, contribution-reputation, smart-matching); png+pdf in /projects/research/after-the-feed-2026-05/.
 - [Tiered quilt spec (2026-05-11)](project_tiered_quilt_spec_landed_2026_05_11.md) — 8-wave; zero new DHT types; MinIO not Garage; grandma cluster bar.
 - [Agentic context graph model](project_agentic_context_graph_model.md) — skill-graph + typed baton + velocity-tiered memory; Dreams = consolidation primitive.
 - [Memory lifecycle = comet shape](project_memory_lifecycle_comet_shape.md) — 99% head + dwindling tail + memorialized core; deliberate forgetting.
