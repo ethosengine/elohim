@@ -19,8 +19,8 @@ Feature: Elohim Protocol landing page is dogfooded as protocol content
 
   Scenario: The landing bundle serves at the /apps path
     When I GET "/apps/elohim-host-landing/index.html" from the doorway
-    Then the response status is 200
-    And the response Content-Type contains "text/html"
+    Then the doorway response status is 200
+    And the doorway response Content-Type contains "text/html"
 
   Scenario: An in-kind REA Commitment declares Matthew's hosting agreement
     When I list active REA commitments where provider is "matthew"
