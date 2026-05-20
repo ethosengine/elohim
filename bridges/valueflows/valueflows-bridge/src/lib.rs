@@ -20,6 +20,15 @@ pub mod schema;
 /// M1: returns 503 for any non-tracer-bullet query; fixture `EconomicEvent`
 /// data for the M1 tracer-bullet query. M2+ will wire identity bridge,
 /// authority gate, EPR atom emit, and real hREA projection.
+///
+/// # Lifetime note
+///
+/// The schema is built per-request via [`schema::build_schema`]. This is
+/// acceptable in M1 because the schema has no injected context — the build
+/// is essentially free. M2 will introduce `qahal-authority` context
+/// injection, at which point this function should be refactored to accept
+/// a `&BridgeSchema` parameter so the caller can build the schema once at
+/// startup and inject context through async-graphql's `Schema::data`.
 pub async fn handle_request(
     req: Request<Incoming>,
 ) -> Result<Response<Full<Bytes>>, BridgeError> {
@@ -58,7 +67,7 @@ pub async fn handle_request(
 
     Response::builder()
         .status(StatusCode::OK)
-        .header("content-type", "application/json")
+        .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body)))
         .map_err(|e| BridgeError::BuildResponse(e.to_string()))
 }
@@ -73,6 +82,7 @@ pub enum BridgeError {
     BuildResponse(String),
 }
 
+#[allow(clippy::expect_used)]
 fn error_response(status: StatusCode, code: &str, message: &str) -> Response<Full<Bytes>> {
     let body = serde_json::json!({
         "errors": [{
@@ -83,9 +93,10 @@ fn error_response(status: StatusCode, code: &str, message: &str) -> Response<Ful
     let body_bytes = serde_json::to_vec(&body).unwrap_or_else(|_| b"{}".to_vec());
     Response::builder()
         .status(status)
-        .header("content-type", "application/json")
+        .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body_bytes)))
-        .expect("static response always builds")
+        // static error_response builder is infallible (no fallible inputs)
+        .expect("static error_response builder is infallible (no fallible inputs)")
 }
 
 #[cfg(test)]

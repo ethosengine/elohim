@@ -11,11 +11,11 @@ use async_graphql::{Object, ID};
 /// `/projects/research/vf-graphql/lib/schemas/observation.gql`); elohim
 /// extensions (Reach, sidecar links) land in M3+.
 pub struct EconomicEventGql {
-    pub id: String,
-    pub action: String,        // VF action id (e.g., "transfer", "use")
-    pub provider_id: String,   // VF Agent id (M1 fixture)
-    pub receiver_id: String,   // VF Agent id (M1 fixture)
-    pub note: Option<String>,
+    pub(crate) id: String,
+    pub(crate) action: String,        // VF action id (e.g., "transfer", "use")
+    pub(crate) provider_id: String,   // VF Agent id (M1 fixture)
+    pub(crate) receiver_id: String,   // VF Agent id (M1 fixture)
+    pub(crate) note: Option<String>,
 }
 
 impl EconomicEventGql {
@@ -46,14 +46,16 @@ impl EconomicEventGql {
         &self.action
     }
 
-    /// VF Agent id of the provider.
-    async fn provider_id(&self) -> &str {
-        &self.provider_id
+    /// VF Agent id of the provider (M1: scalar ID; M3 swaps to Agent reference).
+    #[graphql(name = "provider")]
+    async fn provider_id(&self) -> ID {
+        ID::from(self.provider_id.clone())
     }
 
-    /// VF Agent id of the receiver.
-    async fn receiver_id(&self) -> &str {
-        &self.receiver_id
+    /// VF Agent id of the receiver (M1: scalar ID; M3 swaps to Agent reference).
+    #[graphql(name = "receiver")]
+    async fn receiver_id(&self) -> ID {
+        ID::from(self.receiver_id.clone())
     }
 
     /// Optional free-form note.

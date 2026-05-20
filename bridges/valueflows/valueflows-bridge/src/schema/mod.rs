@@ -37,12 +37,22 @@ mod tests {
     async fn schema_serves_fixture_economic_event() {
         let schema = build_schema();
         let req = Request::new(
-            r#"query { economicEvent(id: "test-id") { id action } }"#.to_string(),
+            r#"query { economicEvent(id: "test-id") { id action provider receiver note } }"#
+                .to_string(),
         );
         let resp = schema.execute(req).await;
         assert!(resp.errors.is_empty(), "errors: {:?}", resp.errors);
         let data = resp.data.into_json().expect("data");
         assert_eq!(data["economicEvent"]["id"], "test-id");
         assert!(!data["economicEvent"]["action"].is_null());
+        assert_eq!(data["economicEvent"]["provider"], "agent-fixture-provider");
+        assert_eq!(data["economicEvent"]["receiver"], "agent-fixture-receiver");
+        let note_text = data["economicEvent"]["note"]
+            .as_str()
+            .expect("note is a string");
+        assert!(
+            note_text.contains("M1 tracer-bullet"),
+            "fixture note should mention M1: got {note_text}"
+        );
     }
 }
