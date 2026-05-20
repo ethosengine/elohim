@@ -1,0 +1,11 @@
+<div class="doorway-layout">
+  <nav class="doorway-layout__sidenav" data-testid="doorway-sidenav" aria-label="Doorway sections">
+    <a routerLink="." routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+      Dashboard
+    </a>
+    <a routerLink="config" routerLinkActive="active">Configuration</a>
+  </nav>
+  <main class="doorway-layout__main">
+    <router-outlet></router-outlet>
+  </main>
+</div>

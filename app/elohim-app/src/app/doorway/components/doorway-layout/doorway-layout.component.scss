@@ -1,0 +1,44 @@
+.doorway-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    var(--lamad-bg-primary, #0f172a) 0%,
+    var(--lamad-bg-secondary, #1e293b) 100%
+  );
+  color: var(--lamad-text-secondary, #cbd5e1);
+
+  &__sidenav {
+    border-right: 1px solid var(--lamad-border, rgba(148, 163, 184, 0.2));
+    padding: 1rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    a {
+      padding: 0.5rem 0.75rem;
+      border-radius: 4px;
+      text-decoration: none;
+      color: var(--lamad-text-muted, #64748b);
+      transition:
+        background-color 0.2s,
+        color 0.2s;
+
+      &:hover {
+        background: var(--lamad-surface-hover, rgba(51, 65, 85, 0.9));
+        color: var(--lamad-text-secondary, #cbd5e1);
+      }
+
+      &.active {
+        background: var(--lamad-surface, rgba(30, 41, 59, 0.8));
+        color: var(--lamad-text-primary, #f1f5f9);
+      }
+    }
+  }
+
+  &__main {
+    padding: 1.5rem;
+    overflow-y: auto;
+  }
+}
