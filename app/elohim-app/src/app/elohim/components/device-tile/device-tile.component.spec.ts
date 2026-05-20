@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 
 import { DeviceTileComponent, DeviceSummary } from './device-tile.component';
+import type { ComputeTriptychGql } from '@elohim/storage-client/graphql';
 
 function mk(p: Partial<DeviceSummary> = {}): DeviceSummary {
   return {
@@ -57,5 +58,32 @@ describe('DeviceTileComponent', () => {
     fixture.detectChanges();
     const tile = fixture.nativeElement.querySelector('[data-testid="device-tile"]');
     expect(tile?.classList.contains('offline')).toBe(true);
+  });
+
+  it('renders the compute triptych when compute is present', () => {
+    const compute: ComputeTriptychGql = {
+      free: '9500000',
+      used: '500000',
+      stewarded: '250000',
+    };
+    fixture.componentInstance.device = mk({ compute } as any);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="compute-free-bytes"]')?.textContent?.trim()).toContain(
+      '9.5'
+    );
+    expect(el.querySelector('[data-testid="compute-used-bytes"]')?.textContent?.trim()).toContain(
+      '500'
+    );
+    expect(
+      el.querySelector('[data-testid="compute-stewarded-bytes"]')?.textContent?.trim()
+    ).toContain('250');
+  });
+
+  it('hides the compute triptych when compute is null', () => {
+    fixture.componentInstance.device = mk({ compute: null } as any);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.compute-triptych')).toBeNull();
   });
 });

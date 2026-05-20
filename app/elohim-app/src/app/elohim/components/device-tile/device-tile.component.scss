@@ -29,3 +29,44 @@
     color: var(--text-secondary, #666);
   }
 }
+
+.compute-triptych {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--device-offline, #888);
+  width: 100%;
+
+  &__title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary, #666);
+    margin: 0 0 0.375rem 0;
+  }
+
+  &__values {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.375rem;
+    margin: 0;
+  }
+
+  &__cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+
+    dt {
+      font-size: 0.65rem;
+      color: var(--text-secondary, #666);
+    }
+
+    dd {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
