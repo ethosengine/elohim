@@ -21,10 +21,6 @@ import { BehaviorSubject, Observable, Subject, Subscription, forkJoin, of } from
 import { ContentAnalyticsComponent } from '@app/elohim/components/content-analytics/content-analytics.component';
 import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
 import { GateFeedbackTriggerComponent } from '@app/elohim/components/gate-feedback';
-import {
-  ProtocolOmnibarComponent,
-  OmnibarSteward,
-} from '@app/elohim/components/protocol-omnibar/protocol-omnibar.component';
 import { TrustBadge } from '@app/elohim/models/trust-badge.model';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { AgentService } from '@app/elohim/services/agent.service';
@@ -81,6 +77,7 @@ import {
 } from '../../services/resilience.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
+import { ProtocolSignalBadgeComponent } from '@app/elohim/components/protocol-signal-badge/protocol-signal-badge.component';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 
@@ -101,8 +98,8 @@ import type { ContentStewardshipView } from '@elohim/storage-client/generated';
     GraduatedFeedbackComponent,
     FeedbackMechanismGatewayComponent,
     FocusedViewToggleComponent,
+    ProtocolSignalBadgeComponent,
     ContentAnalyticsComponent,
-    ProtocolOmnibarComponent,
     EprRelationshipsPanelComponent,
     ResilienceSnapshotComponent,
     DistributionBadgeComponent,
@@ -162,11 +159,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   isFocusedView = false;
   private readonly TRANSITION_DURATION = 300; // Match CSS transition duration
 
-  // Protocol omnibar data (shown in focused view — like browser padlock)
-  omnibarStewards: OmnibarSteward[] = [];
-  omnibarContentAddress = '';
-  omnibarReach = '';
-  omnibarDeliverySource = '';
+  /** CSS class for focused view mode */
+  private readonly FOCUSED_VIEW_MODE_CLASS = 'focused-view-mode';
 
   // Dynamic renderer hosting
   @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
@@ -201,7 +195,6 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly pathContextService = inject(PathContextService);
   private readonly governanceService = inject(GovernanceService);
   private readonly signalService = inject(GovernanceSignalService);
-  private readonly document = inject(DOCUMENT);
   private readonly signalHarness = inject(SignalHarnessService);
   private readonly stewardshipService = inject(StewardshipAllocationService);
   private readonly resilienceService = inject(ResilienceService);
@@ -209,14 +202,12 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly householdResilienceService = inject(HouseholdResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
   private readonly eprResolver = inject(EprResolverService);
+  private readonly document = inject(DOCUMENT);
 
   eprRelationships: EprRelationship[] = [];
 
   /** Default feedback profile type for learning content */
   private readonly LEARNING_CONTENT_PROFILE = 'learning-content';
-
-  /** CSS class for focused view mode */
-  private readonly FOCUSED_VIEW_MODE_CLASS = 'focused-view-mode';
 
   ngOnInit(): void {
     // Handle direct content access: /lamad/resource/:resourceId
@@ -402,13 +393,6 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
             updatedAt: contentNode.updatedAt,
           });
 
-          // Populate protocol omnibar data (shown in focused view)
-          this.omnibarContentAddress = contentNode.id;
-          this.omnibarReach = (contentNode.reach as string) || 'commons';
-          this.omnibarDeliverySource = globalThis.location.hostname;
-          // Omnibar stewards populated from allocation data in loadStewardship()
-          this.omnibarStewards = [];
-
           // Get current affinity
           this.affinity = this.affinityService.getAffinity(nodeId);
 
@@ -514,27 +498,11 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       .subscribe({
         next: stewardship => {
           this.stewardship = stewardship;
-          this.updateOmnibarStewards();
         },
         error: () => {
           // Stewardship is supplemental — don't block on failure
         },
       });
-  }
-
-  /**
-   * Update omnibar stewards from allocation data.
-   */
-  private updateOmnibarStewards(): void {
-    if (!this.stewardship?.allocations?.length) {
-      this.omnibarStewards = [];
-      return;
-    }
-    this.omnibarStewards = this.stewardship.allocations.map(a => ({
-      humanId: a.stewardPresenceId || '',
-      displayName: a.steward?.displayName || a.stewardPresenceId || 'Unknown',
-      ratio: a.allocationRatio ?? 0,
-    }));
   }
 
   /**

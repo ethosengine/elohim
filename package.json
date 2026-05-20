@@ -28,6 +28,7 @@
     "ajv-formats": "^3.0.1",
     "husky": "^9.1.7",
     "json-schema-to-typescript": "^15.0.4",
+    "jszip": "^3.10.1",
     "picomatch": "^4.0.4"
   },
   "scripts": {

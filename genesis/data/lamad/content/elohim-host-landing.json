@@ -1,0 +1,47 @@
+{
+  "id": "elohim-host-landing",
+  "contentType": "collective",
+  "title": "Elohim Protocol",
+  "name": "Elohim Protocol — landing surface",
+  "description": "The Elohim Protocol's own landing page, dogfooded as a ContentNode served through the protocol's content-addressing path. Composed from the elohim-app browser bundle with the home route as entry.",
+  "url": "https://alpha.elohim.host/",
+  "content": {
+    "slug": "elohim-host-landing",
+    "entryPoint": "index.html",
+    "fallbackUrl": "https://alpha.elohim.host/"
+  },
+  "contentFormat": "html5-app",
+  "sourcePath": "app/elohim-app/dist/elohim-app/browser",
+  "tags": [
+    "landing-page",
+    "elohim-protocol",
+    "dogfood",
+    "html5-app"
+  ],
+  "relatedNodeIds": [],
+  "blobHash": "PLACEHOLDER_REPLACED_BY_SEED_SCRIPT",
+  "metadata": {
+    "category": "protocol-surface",
+    "author": "Matthew Dowell",
+    "embedStrategy": "iframe",
+    "requiredCapabilities": ["javascript"],
+    "securityPolicy": {
+      "sandbox": ["allow-scripts", "allow-same-origin", "allow-forms"],
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:"
+    },
+    "originalContentType": "landing-surface",
+    "originalContentFormat": "html5-app"
+  },
+  "reach": "commons",
+  "trustScore": 1,
+  "did": "did:web:elohim.host:content:elohim-host-landing",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1,
+      "role": "author"
+    }
+  ],
+  "createdAt": "2026-05-19T00:00:00.000000",
+  "updatedAt": "2026-05-19T00:00:00.000000"
+}

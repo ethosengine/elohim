@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/co
 
 // @coverage: 88.0% (2026-02-24)
 
+import { ProtocolSignalBadgeComponent } from '../../elohim/components/protocol-signal-badge/protocol-signal-badge.component';
 import { AnalyticsService } from '../../services/analytics.service';
 import { ConfigService } from '../../services/config.service';
 import { DomInteractionService } from '../../services/dom-interaction.service';
@@ -30,6 +31,7 @@ import { VisionComponent } from '../vision/vision.component';
     PathForwardComponent,
     CallToActionComponent,
     FooterComponent,
+    ProtocolSignalBadgeComponent,
   ],
   templateUrl: './home.component.html',
   styleUrl: './home.component.css',

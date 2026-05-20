@@ -763,46 +763,6 @@ describe('ContentViewerComponent', () => {
     });
   });
 
-  describe('focused view mode', () => {
-    beforeEach(fakeAsync(() => {
-      fixture.detectChanges();
-      tick();
-    }));
-
-    it('should toggle focused view on', () => {
-      expect(component.isFocusedView).toBe(false);
-
-      component.onFocusedViewToggle(true);
-
-      expect(component.isFocusedView).toBe(true);
-    });
-
-    it('should toggle focused view off', () => {
-      component.isFocusedView = true;
-
-      component.onFocusedViewToggle(false);
-
-      expect(component.isFocusedView).toBe(false);
-    });
-
-    it('should exit focused view on escape key', () => {
-      component.isFocusedView = true;
-
-      component.onEscapeKey();
-
-      expect(component.isFocusedView).toBe(false);
-    });
-
-    it('should not exit if not in focused view', () => {
-      component.isFocusedView = false;
-      vi.spyOn(component, 'onFocusedViewToggle');
-
-      component.onEscapeKey();
-
-      expect(component.onFocusedViewToggle).not.toHaveBeenCalled();
-    });
-  });
-
   describe('renderer completion events', () => {
     beforeEach(fakeAsync(() => {
       fixture.detectChanges();

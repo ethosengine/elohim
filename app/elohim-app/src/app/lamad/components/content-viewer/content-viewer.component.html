@@ -229,7 +229,7 @@
 
     <!-- Tab Content -->
     <div [ngSwitch]="activeTab" class="tab-content">
-      <!-- Content Toolbar (fixed at top in focused view) -->
+      <!-- Content Toolbar (houses focus toggle) -->
       <div class="content-toolbar">
         <app-focused-view-toggle
           [isActive]="isFocusedView"
@@ -237,17 +237,8 @@
         ></app-focused-view-toggle>
       </div>
 
-      <!-- Protocol Omnibar (shown in focused view — EPR provenance pill + back button) -->
-      <app-protocol-omnibar
-        *ngIf="isFocusedView && node"
-        [contentId]="node.id"
-        [contentAddress]="omnibarContentAddress"
-        [stewards]="omnibarStewards"
-        [reach]="omnibarReach"
-        [deliverySource]="omnibarDeliverySource"
-        [showBack]="true"
-        (backRequested)="onFocusedViewToggle(false)"
-      ></app-protocol-omnibar>
+      <!-- Protocol Signal Badge — always visible when a node is loaded -->
+      <app-protocol-signal-badge *ngIf="node" [contentId]="node.id"></app-protocol-signal-badge>
 
       <!-- Content Tab -->
       <section *ngSwitchCase="'content'">
