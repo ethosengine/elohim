@@ -17,7 +17,9 @@ use elohim_storage::services::distribution_view::{
     replica_target_for, DistributionContext,
 };
 use elohim_storage::test_util::test_pool;
-use elohim_storage::views::{DeviceArchetype, DiversityHint, MyRole, ReachClass, ReplicaHealth};
+use elohim_storage::views::{
+    DeviceArchetype, DiversityHint, MyRole, PlacementGapKind, ReachClass, ReplicaHealth,
+};
 
 // ============================================================================
 // Pure function tests
@@ -594,14 +596,9 @@ async fn details_steward_includes_commitment_references() {
     );
 }
 
-/// C1 graduated `DistributionDetails.placement_gaps` from `Vec<JsonVal>` to
-/// `Vec<PlacementGapRow>` (hub-abstract typed shape). The old DB query that mapped
-/// `PlacementGapView`-shaped rows into the loose JsonVal is stubbed to return empty
-/// until C4 wires hub-abstract `PlacementGapKind` emission in the replication path.
-///
-/// TODO(C4): restore the assertion `details.placement_gaps.len() == 1` and validate
-/// the typed `PlacementGapRow` fields (kind, shortfall) once C4 re-introduces the
-/// DB→view mapping in `load_placement_gaps_for`.
+/// C4: `load_placement_gaps_for` now emits real `HubDiversity` gap rows via
+/// `hub_summary`. Content replicated to only one peer (one computed hub) falls
+/// below the C4 target of 2 hubs → a gap row must be present.
 #[tokio::test]
 async fn details_includes_placement_gaps_for_blob() {
     let pool = test_pool();
@@ -609,6 +606,7 @@ async fn details_includes_placement_gaps_for_blob() {
     {
         let mut conn = pool.get().unwrap();
         seed_content_with_reach(&mut conn, hash, "collective");
+        // One peer, no identity binding → one computed hub → below target of 2.
         seed_inventory(&mut conn, "peer-gap-1", hash);
         seed_placement_gap(&mut conn, "gap-001", hash);
     }
@@ -617,12 +615,23 @@ async fn details_includes_placement_gaps_for_blob() {
         .await
         .expect("compose should succeed");
 
-    // C1: stubbed to empty; C4 re-wires typed PlacementGapRow emission.
-    // The typed shape is verified in schema_contract::distribution_details_placement_gaps_typed.
-    assert_eq!(
-        details.placement_gaps.len(),
-        0,
-        "C1 stub: placement_gaps returns empty until C4 wires hub-abstract emission"
+    // C4: gap row emitted because observed hubs (1) < target (2).
+    let hub_gap = details
+        .placement_gaps
+        .iter()
+        .find(|g| matches!(g.kind, PlacementGapKind::HubDiversity));
+    assert!(
+        hub_gap.is_some(),
+        "expected a HubDiversity gap for single-hub content; gaps: {:#?}",
+        details.placement_gaps
+    );
+    let gap = hub_gap.unwrap();
+    assert_eq!(gap.content_id, hash);
+    assert!(
+        gap.shortfall.observed < gap.shortfall.target,
+        "observed ({}) must be less than target ({})",
+        gap.shortfall.observed,
+        gap.shortfall.target
     );
 }
 
@@ -663,5 +672,125 @@ async fn details_recent_projection_events_stubbed_empty() {
     assert!(
         details.recent_projection_events.is_empty(),
         "recent_projection_events must be empty when no ack-projection events have been recorded"
+    );
+}
+
+// ============================================================================
+// C4 hub-diversity gap helpers
+// ============================================================================
+
+fn seed_human_with_household(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+    agent_pub_key: &str,
+    household_id: &str,
+) {
+    // Uses raw SQL to avoid depending on NewHuman's full required-field list.
+    diesel::sql_query(format!(
+        "INSERT OR REPLACE INTO humans \
+         (id, display_name, affinities, profile_reach, h_app_id, created_at, updated_at, \
+          agent_pub_key, household_id) \
+         VALUES ('{human_id}', 'Test {human_id}', '[]', 'commons', 'lamad', \
+                 '2026-05-20T12:00:00Z', '2026-05-20T12:00:00Z', \
+                 '{agent_pub_key}', '{household_id}')",
+    ))
+    .execute(conn)
+    .expect("seed human with household");
+}
+
+/// Seed a single peer into `peer_blob_inventory` with no identity binding.
+/// The peer will be classified as a single `Computed` hub → 1 hub < 2 target → gap emitted.
+async fn seed_content_with_single_hub(
+    pool: &elohim_storage::db::DbPool,
+    blob_hash: &str,
+) {
+    let mut conn = pool.get().unwrap();
+    seed_content_with_reach(&mut conn, blob_hash, "community");
+    // One peer, no binding → hub_summary returns one Computed hub.
+    seed_inventory(&mut conn, "peer-single-hub-1", blob_hash);
+}
+
+/// Seed content replicated across `hub_count` distinct households.
+/// Each household contributes one peer. hub_count must be >= 1.
+async fn seed_content_with_multi_hub(
+    pool: &elohim_storage::db::DbPool,
+    blob_hash: &str,
+    hub_count: usize,
+) {
+    let mut conn = pool.get().unwrap();
+    seed_content_with_reach(&mut conn, blob_hash, "community");
+    for i in 0..hub_count {
+        let peer_id = format!("peer-multi-hub-{blob_hash}-{i}");
+        let agent_cid = format!("agent-multi-hub-{blob_hash}-{i}");
+        let human_id = format!("human-multi-hub-{blob_hash}-{i}");
+        let household_id = format!("household-multi-hub-{blob_hash}-{i}");
+        seed_inventory(&mut conn, &peer_id, blob_hash);
+        seed_binding(&mut conn, &peer_id, &agent_cid);
+        seed_human_with_household(&mut conn, &human_id, &agent_cid, &household_id);
+    }
+}
+
+// ============================================================================
+// C4 hub-diversity gap tests
+// ============================================================================
+
+/// A content item replicated to a single peer (one computed hub) is below the
+/// C4 floor of 2 hubs. A `HubDiversity` gap row must be emitted with
+/// `observed < target` and `content_id` matching the blob hash.
+#[tokio::test]
+async fn distribution_details_emits_hub_diversity_gap_when_single_hub() {
+    let pool = test_pool();
+    let blob_hash = "hash-c4-single-hub-lonely";
+
+    seed_content_with_single_hub(&pool, blob_hash).await;
+
+    let details = compose_distribution_details(&pool, blob_hash, DistributionContext::Visitor)
+        .await
+        .expect("compose_distribution_details should succeed");
+
+    let hub_diversity = details
+        .placement_gaps
+        .iter()
+        .find(|g| matches!(g.kind, PlacementGapKind::HubDiversity))
+        .expect("expected a HubDiversity gap for single-hub content");
+
+    assert!(
+        hub_diversity.shortfall.observed < hub_diversity.shortfall.target,
+        "observed ({}) must be less than target ({}) for a real gap",
+        hub_diversity.shortfall.observed,
+        hub_diversity.shortfall.target
+    );
+    assert_eq!(
+        hub_diversity.content_id, blob_hash,
+        "content_id must match the queried blob hash"
+    );
+    assert!(
+        hub_diversity.remediation.is_some(),
+        "remediation hint must be present"
+    );
+}
+
+/// A content item replicated across 3 distinct households meets the C4 hub floor.
+/// No `HubDiversity` gap row should be emitted.
+#[tokio::test]
+async fn distribution_details_no_gap_when_multi_hub() {
+    let pool = test_pool();
+    let blob_hash = "hash-c4-multi-hub-spread";
+
+    seed_content_with_multi_hub(&pool, blob_hash, 3).await;
+
+    let details = compose_distribution_details(&pool, blob_hash, DistributionContext::Visitor)
+        .await
+        .expect("compose_distribution_details should succeed");
+
+    let hub_diversity = details
+        .placement_gaps
+        .iter()
+        .find(|g| matches!(g.kind, PlacementGapKind::HubDiversity));
+
+    assert!(
+        hub_diversity.is_none(),
+        "expected no HubDiversity gap when content is replicated across 3 hubs; gaps: {:#?}",
+        details.placement_gaps
     );
 }
