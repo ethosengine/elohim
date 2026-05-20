@@ -16,40 +16,50 @@ export const DOORWAY_ROUTES: Routes = [
   {
     path: '',
     loadComponent: async () =>
-      import('./components/doorway-dashboard/doorway-dashboard.component').then(
-        m => m.DoorwayDashboardComponent
+      import('./components/doorway-layout/doorway-layout.component').then(
+        m => m.DoorwayLayoutComponent
       ),
-    data: {
-      title: 'Doorway - Web Hosting',
-      seo: {
-        title: 'Doorway Web Hosting',
-        description:
-          'Configure web hosting, SSL, and domain settings for your always-on Holochain nodes.',
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        loadComponent: async () =>
+          import('./components/doorway-dashboard/doorway-dashboard.component').then(
+            m => m.DoorwayDashboardComponent
+          ),
+        data: {
+          title: 'Doorway — Dashboard',
+          seo: {
+            title: 'Doorway Web Hosting',
+            description:
+              'Configure web hosting, SSL, and domain settings for your always-on Holochain nodes.',
+          },
+        },
       },
-    },
-  },
-  {
-    path: 'elohim',
-    loadComponent: async () =>
-      import('../elohim/components/elohim-config/elohim-config.component').then(
-        m => m.ElohimConfigComponent
-      ),
-    data: {
-      title: 'Elohim Backend',
-    },
-  },
-  {
-    path: 'config',
-    loadComponent: async () =>
-      import('./components/doorway-dashboard/doorway-dashboard.component').then(
-        m => m.DoorwayDashboardComponent
-      ),
-    data: {
-      title: 'Doorway Configuration',
-      seo: {
-        title: 'Doorway Configuration',
-        description: 'SSL certificates, custom domains, and reverse proxy settings.',
+      {
+        path: 'elohim',
+        loadComponent: async () =>
+          import('../elohim/components/elohim-config/elohim-config.component').then(
+            m => m.ElohimConfigComponent
+          ),
+        data: {
+          title: 'Elohim Backend',
+        },
       },
-    },
+      {
+        path: 'config',
+        loadComponent: async () =>
+          import('./components/doorway-dashboard/doorway-dashboard.component').then(
+            m => m.DoorwayDashboardComponent
+          ),
+        data: {
+          title: 'Doorway — Configuration',
+          seo: {
+            title: 'Doorway Configuration',
+            description: 'SSL certificates, custom domains, and reverse proxy settings.',
+          },
+        },
+      },
+    ],
   },
 ];
