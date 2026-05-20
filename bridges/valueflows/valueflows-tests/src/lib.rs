@@ -1,1 +1,3 @@
-// Stub — integration tests in later Wave 3 tasks.
+//! Integration tests for the valueflows bridge.
+//!
+//! Real tests live in `tests/`. This file is the package marker.
