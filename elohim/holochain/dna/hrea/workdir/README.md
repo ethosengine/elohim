@@ -21,13 +21,26 @@ The `hrea.dna` binary is **not in git** (it's a built artifact from
 upstream releases). To populate this directory:
 
 ```bash
-# From repo root. Replace VERSION with the version pinned in happ.yaml.
-VERSION=$(grep -A 2 "name: hrea" elohim/holochain/dna/elohim/workdir/happ.yaml \
-            | grep "version_pin" | awk '{print $2}' | tr -d '"')
+# From repo root. Replace VERSION with the version pinned in happ.yaml's
+# `# version_pin: ...` comment above the hrea role.
+VERSION=$(grep "^  # version_pin:" elohim/holochain/dna/elohim/workdir/happ.yaml \
+            | awk '{print $3}' | tr -d '"')
+if [ -z "$VERSION" ] || [ "$VERSION" = "0.0.0" ]; then
+    echo "ERROR: no real version pinned in happ.yaml yet (still 0.0.0 placeholder)"
+    exit 1
+fi
 mkdir -p elohim/holochain/dna/hrea/workdir
 curl -L -o elohim/holochain/dna/hrea/workdir/hrea.dna \
     "https://github.com/h-REA/hREA/releases/download/${VERSION}/hrea.dna"
+curl -L -o elohim/holochain/dna/hrea/workdir/hrea.dna.sha256 \
+    "https://github.com/h-REA/hREA/releases/download/${VERSION}/hrea.dna.sha256"
+cd elohim/holochain/dna/hrea/workdir && sha256sum --check hrea.dna.sha256
 ```
+
+Note: sha256 file availability depends on hREA upstream releases. If the
+pinned version does not publish a `.sha256` file, the script will fail at
+the `curl` step — which is the correct failure mode. Silently accepting an
+unverified binary is not acceptable.
 
 If the upstream URL changes, update both this README and the happ.yaml
 `version_pin` comment.

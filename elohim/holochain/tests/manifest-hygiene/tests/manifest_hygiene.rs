@@ -61,7 +61,15 @@ struct HappManifest {
 #[derive(Debug, Deserialize)]
 struct HappRole {
     name: String,
+    #[serde(default)]
+    provisioning: Option<RoleProvisioning>,
     dna: HappRoleDna,
+}
+
+#[derive(Debug, Deserialize)]
+struct RoleProvisioning {
+    #[serde(default)]
+    deferred: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -162,7 +170,7 @@ fn every_dna_has_stable_alpha_network_seed() -> Result<()> {
 // is tracked separately (rna module, NETWORK_UPGRADES.md, future brainstorm).
 
 #[test]
-fn happ_is_version_0_and_has_all_five_roles() -> Result<()> {
+fn happ_is_version_0_and_has_required_elohim_roles() -> Result<()> {
     let h = load_happ_manifest()?;
     if h.manifest_version != "0" {
         bail!(
@@ -170,13 +178,43 @@ fn happ_is_version_0_and_has_all_five_roles() -> Result<()> {
             h.manifest_version
         );
     }
-    let expected_roles = ["lamad", "infrastructure", "imagodei", "mishpat", "node_registry"];
+    let expected_roles = [
+        "lamad",
+        "infrastructure",
+        "imagodei",
+        "mishpat",
+        "node_registry",
+        "hrea",
+    ];
     let got: Vec<&str> = h.roles.iter().map(|r| r.name.as_str()).collect();
     for role in expected_roles.iter() {
         if !got.contains(role) {
             bail!("happ.yaml is missing role {:?}; got {:?}", role, got);
         }
     }
+
+    // Wave 3 M1: hrea is the only deferred role. Other roles eagerly
+    // provision at conductor startup; hrea cells are created lazily
+    // during the VFBinding handshake (per M2). If another role becomes
+    // deferred, that's a substantive architectural change that should
+    // fail this test.
+    let deferred_roles: Vec<&str> = h
+        .roles
+        .iter()
+        .filter(|r| {
+            r.provisioning
+                .as_ref()
+                .map(|p| p.deferred)
+                .unwrap_or(false)
+        })
+        .map(|r| r.name.as_str())
+        .collect();
+    assert_eq!(
+        deferred_roles,
+        vec!["hrea"],
+        "expected exactly one deferred role (hrea); got: {deferred_roles:?}"
+    );
+
     Ok(())
 }
 
