@@ -1,0 +1,41 @@
+[workspace]
+resolver = "2"
+members = [
+    "valueflows-types",
+    "valueflows-bridge",
+    "valueflows-tests",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Elohim Protocol"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.43", features = ["full", "macros", "sync"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# GraphQL — match elohim-storage's version exactly
+async-graphql = "7"
+
+# HTTP types — match elohim-storage
+hyper = { version = "1.6", features = ["http1", "http2", "server"] }
+http-body-util = "0.1"
+bytes = "1.10"
+
+# Diesel — for ledger writes
+diesel = { version = "2", features = ["sqlite", "r2d2", "chrono"] }
+
+# Utilities
+thiserror = "2.0"
+anyhow = "1.0"
+tracing = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+
+# Test utilities
+tokio-test = "0.4"
