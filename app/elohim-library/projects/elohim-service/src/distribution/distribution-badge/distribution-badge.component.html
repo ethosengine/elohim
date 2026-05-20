@@ -4,7 +4,11 @@
   [class.at_risk]="summary.replicaHealth === 'at_risk'"
   [class.critical]="summary.replicaHealth === 'critical'"
   data-testid="distribution-badge"
+  tabindex="0"
   (mouseenter)="onTooltipExpand()"
+  (mouseleave)="onHoverLeave()"
+  (focus)="onTooltipExpand()"
+  (blur)="onHoverLeave()"
 >
   <span class="dots" data-testid="distribution-badge-dots">
     @for (_ of dotIndices(summary.replicaCount); track $index) {
@@ -24,14 +28,32 @@
   }
 
   @if (expanded()) {
-    <div class="tooltip" data-testid="distribution-badge-tooltip">
-      <div class="tooltip-row">Reach: {{ summary.reachClass }}</div>
+    <div
+      class="tooltip"
+      role="tooltip"
+      data-testid="distribution-tooltip"
+    >
       <div class="tooltip-row">
-        Replicas: {{ summary.replicaCount }} / {{ summary.replicaTarget }}
+        {{ summary.replicaCount }} replicas across {{ hubCountLabel() }}.
       </div>
+      <div class="tooltip-row">
+        Reach: {{ summary.reachClass }} · Diversity: {{ summary.diversityHint.kind }}
+      </div>
+      <div class="tooltip-row">Replicas: {{ summary.replicaCount }} / {{ summary.replicaTarget }}</div>
       <div class="tooltip-row">Projectors: {{ summary.projectorCount }}</div>
       <div class="tooltip-row">Health: {{ summary.replicaHealth }}</div>
       <div class="tooltip-row">This fetch: {{ summary.thisFetchSource }}</div>
+
+      @if (details() && details()!.placementGaps.length > 0) {
+        <ul class="tooltip-gaps" data-testid="placement-gaps-row">
+          @for (rawGap of details()!.placementGaps; track $index) {
+            <li>
+              {{ gapLabel(asGapRow(rawGap)) }}:
+              {{ asGapRow(rawGap).shortfall.observed }}/{{ asGapRow(rawGap).shortfall.target }}
+            </li>
+          }
+        </ul>
+      }
 
       @if (blobHash) {
         <details data-testid="distribution-badge-show-details">

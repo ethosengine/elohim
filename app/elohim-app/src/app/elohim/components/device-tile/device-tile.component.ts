@@ -2,9 +2,13 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 
 import type { MyClusterView } from '@app/generated/my-cluster-view';
+import type { ComputeTriptychGql } from '@elohim/storage-client/graphql';
 
-export type DeviceSummary = MyClusterView['devices'][number];
-export type DeviceArchetype = DeviceSummary['archetype'];
+export type DeviceSummary = MyClusterView['devices'][number] & {
+  /** Compute capacity triptych. Present when the GraphQL path is active; absent on the REST path. */
+  compute?: ComputeTriptychGql | null;
+};
+export type DeviceArchetype = MyClusterView['devices'][number]['archetype'];
 
 const ARCHETYPE_LABEL: Record<DeviceArchetype, string> = {
   node: 'Home server',
@@ -41,6 +45,27 @@ const ARCHETYPE_LABEL: Record<DeviceArchetype, string> = {
           asleep · {{ staleAgo(device.freshness.staleSinceMs) }}
         }
       </span>
+      @if (device.compute) {
+        <section class="compute-triptych" aria-label="Compute breakdown">
+          <h4 class="compute-triptych__title">Compute</h4>
+          <dl class="compute-triptych__values">
+            <div class="compute-triptych__cell">
+              <dt>Free</dt>
+              <dd data-testid="compute-free-bytes">{{ formatBytes(device.compute.free) }}</dd>
+            </div>
+            <div class="compute-triptych__cell">
+              <dt>Used</dt>
+              <dd data-testid="compute-used-bytes">{{ formatBytes(device.compute.used) }}</dd>
+            </div>
+            <div class="compute-triptych__cell">
+              <dt>Stewarded</dt>
+              <dd data-testid="compute-stewarded-bytes">
+                {{ formatBytes(device.compute.stewarded) }}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      }
     </div>
   `,
   styleUrls: ['./device-tile.component.scss'],
@@ -60,5 +85,15 @@ export class DeviceTileComponent {
     const min = Math.floor(sec / 60);
     if (min < 60) return `${min} min ago`;
     return `${Math.floor(min / 60)} h ago`;
+  }
+
+  formatBytes(value: string | null | undefined): string {
+    if (!value) return '—';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    if (n >= 1e9) return `${(n / 1e9).toFixed(1)} GB`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)} MB`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)} KB`;
+    return `${n} B`;
   }
 }

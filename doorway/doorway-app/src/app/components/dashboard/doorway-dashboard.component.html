@@ -6,6 +6,20 @@
       <p class="subtitle">Compute Resources & Network Health</p>
     </div>
     <div class="header-actions">
+      <div class="capabilities-badge" data-testid="dashboard-capabilities-badge" aria-label="Doorway capabilities">
+        @for (cap of capabilityEntries(); track cap.key) {
+          <span
+            class="capability-chip"
+            [class.enabled]="cap.enabled"
+            [class.disabled]="!cap.enabled"
+            [attr.data-testid]="'dashboard-capability-' + cap.key"
+            [attr.data-enabled]="cap.enabled"
+            [title]="cap.label + ': ' + (cap.enabled ? 'enabled' : 'disabled')">
+            <span class="capability-dot" aria-hidden="true"></span>
+            <span class="capability-label">{{ cap.label }}</span>
+          </span>
+        }
+      </div>
       <span class="connection-status" [class]="connectionState()">
         <span class="status-dot"></span>
         {{ connectionState() | titlecase }}
@@ -72,7 +86,7 @@
       </section>
     } @else {
       <section class="quick-stats">
-        <div class="stat-card unavailable-notice">
+        <div class="stat-card unavailable-notice" data-testid="capability-placeholder-orchestrator">
           <div class="stat-label">Orchestrator not enabled on this doorway</div>
         </div>
       </section>
@@ -159,7 +173,7 @@
       <!-- Overview Tab -->
       @if (activeTab() === 'overview') {
         @if (!orchestratorAvailable()) {
-          <div class="empty-state">
+          <div class="empty-state" data-testid="overview-no-orchestrator">
             <p>Orchestrator not enabled on this doorway</p>
           </div>
         }
@@ -327,8 +341,8 @@
       <!-- Nodes Tab -->
       @if (activeTab() === 'nodes') {
         @if (!orchestratorAvailable()) {
-          <div class="empty-state">
-            <p>Orchestrator not enabled on this doorway</p>
+          <div class="empty-state" data-testid="nodes-no-orchestrator">
+            <p>No orchestrator configured for this doorway</p>
           </div>
         } @else {
         <div class="nodes-panel">
@@ -419,7 +433,7 @@
       <!-- Resources Tab -->
       @if (activeTab() === 'resources') {
         @if (!orchestratorAvailable()) {
-          <div class="empty-state">
+          <div class="empty-state" data-testid="resources-no-orchestrator">
             <p>Orchestrator not enabled on this doorway</p>
           </div>
         } @else {

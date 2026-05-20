@@ -35,15 +35,28 @@
     z-index: 10;
     margin-top: 0.25rem;
     padding: 0.5rem;
-    background: white;
+    background: var(--surface-1, white);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     border-radius: 4px;
     min-width: 240px;
     font-size: 0.85rem;
+    color: var(--text-default, inherit);
   }
 
   .tooltip-row {
     margin: 0.15rem 0;
+  }
+
+  .tooltip-gaps {
+    margin: 0.4rem 0 0.2rem;
+    padding-left: 1rem;
+    list-style: disc;
+
+    li {
+      margin: 0.15rem 0;
+      color: var(--warning-600, #d97706);
+      font-size: 0.8rem;
+    }
   }
 
   .peer-row,

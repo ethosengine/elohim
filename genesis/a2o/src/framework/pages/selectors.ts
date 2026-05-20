@@ -43,6 +43,12 @@ export const THRESHOLD_REGISTER = {
 export const DOORWAY_DASHBOARD = {
   REFRESH: 'dashboard-refresh',
   ERROR_RETRY: 'dashboard-error-retry',
+  CAPABILITIES_BADGE: 'dashboard-capabilities-badge',
+  CAPABILITY_CHIP_PREFIX: 'dashboard-capability-', // suffix with capability key
+  CAPABILITY_PLACEHOLDER_PREFIX: 'capability-placeholder-', // suffix with capability key
+  OVERVIEW_NO_ORCHESTRATOR: 'overview-no-orchestrator',
+  NODES_NO_ORCHESTRATOR: 'nodes-no-orchestrator',
+  RESOURCES_NO_ORCHESTRATOR: 'resources-no-orchestrator',
   TAB_OVERVIEW: 'dashboard-tab-overview',
   TAB_NODES: 'dashboard-tab-nodes',
   TAB_USERS: 'dashboard-tab-users',

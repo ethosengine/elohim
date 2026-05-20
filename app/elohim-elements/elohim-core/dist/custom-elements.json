@@ -62,6 +62,33 @@
               "description": "Disabled state. Suppresses click and applies aria-disabled.",
               "attribute": "disabled",
               "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
             }
           ],
           "events": [
@@ -93,12 +120,55 @@
               "fieldName": "disabled"
             }
           ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
           "superclass": {
             "name": "LitElement",
             "package": "lit"
           },
           "tagName": "elohim-button",
-          "customElement": true
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
         }
       ],
       "exports": [
@@ -132,6 +202,14 @@
             "name": "ElohimButtonVariant",
             "module": "./elohim-button.js"
           }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/index.js"
+          }
         }
       ]
     },
@@ -146,6 +224,759 @@
           "declaration": {
             "name": "ElohimButton",
             "module": "/src/elohim-button.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/certainty.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "UNKNOWN_CERTAINTY",
+          "type": {
+            "text": "ContentCertainty"
+          },
+          "description": "The safe default when no certainty has been provided. Elements MUST NOT render\ncanonical visuals when their certainty is unknown."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "UNKNOWN_CERTAINTY",
+          "declaration": {
+            "name": "UNKNOWN_CERTAINTY",
+            "module": "src/capability/certainty.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/context.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "capabilityProfileContext"
+        },
+        {
+          "kind": "variable",
+          "name": "contentCertaintyContext"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "capabilityProfileContext",
+          "declaration": {
+            "name": "capabilityProfileContext",
+            "module": "src/capability/context.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "contentCertaintyContext",
+          "declaration": {
+            "name": "contentCertaintyContext",
+            "module": "src/capability/context.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/index.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/profile.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/certainty.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/standing.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/context.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/mixin.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/mixin.ts",
+      "declarations": [
+        {
+          "kind": "mixin",
+          "description": "",
+          "name": "CapabilityAwareElement",
+          "members": [
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }"
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "Base",
+              "type": {
+                "text": "TBase"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "CapabilityAwareElement",
+          "declaration": {
+            "name": "CapabilityAwareElement",
+            "module": "src/capability/mixin.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/profile.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "LENS_ORDER",
+          "type": {
+            "text": "[\n  'minimal',\n  'simple',\n  'standard',\n  'detail',\n  'debug',\n  'trace',\n]"
+          },
+          "default": "[ 'minimal', 'simple', 'standard', 'detail', 'debug', 'trace', ]"
+        },
+        {
+          "kind": "variable",
+          "name": "STIMULUS_ORDER",
+          "type": {
+            "text": "['still', 'gentle', 'lively']"
+          },
+          "default": "['still', 'gentle', 'lively']"
+        },
+        {
+          "kind": "variable",
+          "name": "DEFAULT_PROFILE",
+          "type": {
+            "text": "{\n  lens: 'standard',\n  theme: 'auto',\n  contrast: 'auto',\n  locale: 'auto',\n  stimulus: 'still',\n  textuality: 'textual',\n  standings: [],\n  lock: { kind: 'pilot' },\n  origin: 'pilot',\n}"
+          },
+          "default": "{ lens: 'standard', theme: 'auto', contrast: 'auto', locale: 'auto', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot', }",
+          "description": "The Sabbath default. Stillness in the type system; textual for the literate-adult baseline.\nStewards may pin pre-literate/symbolic, locked-lens, locked-locale, etc."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "LENS_ORDER",
+          "declaration": {
+            "name": "LENS_ORDER",
+            "module": "src/capability/profile.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "STIMULUS_ORDER",
+          "declaration": {
+            "name": "STIMULUS_ORDER",
+            "module": "src/capability/profile.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "DEFAULT_PROFILE",
+          "declaration": {
+            "name": "DEFAULT_PROFILE",
+            "module": "src/capability/profile.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/standing.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "parseStandingRequirement",
+          "return": {
+            "type": {
+              "text": "readonly Standing[][]"
+            }
+          },
+          "parameters": [
+            {
+              "name": "requirement",
+              "type": {
+                "text": "readonly string[]"
+              }
+            }
+          ],
+          "description": "Parses the contract DSL into normalized form: outer array is AND, inner array is OR.\nEach inner array element is a Standing name."
+        },
+        {
+          "kind": "function",
+          "name": "satisfiesRequirement",
+          "return": {
+            "type": {
+              "text": "boolean"
+            }
+          },
+          "parameters": [
+            {
+              "name": "held",
+              "type": {
+                "text": "readonly Standing[]"
+              }
+            },
+            {
+              "name": "requirement",
+              "type": {
+                "text": "readonly string[]"
+              }
+            }
+          ],
+          "description": "Returns true if `held` satisfies `requirement`.\nAND across outer groups; OR within each group."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "parseStandingRequirement",
+          "declaration": {
+            "name": "parseStandingRequirement",
+            "module": "src/capability/standing.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "satisfiesRequirement",
+          "declaration": {
+            "name": "satisfiesRequirement",
+            "module": "src/capability/standing.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/runtime.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "type": {
+            "text": "string"
+          },
+          "default": "'en'"
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "['es', 'he']"
+          },
+          "default": "['es', 'he']"
+        },
+        {
+          "kind": "variable",
+          "name": "{ getLocale, setLocale }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "{ getLocale, setLocale }",
+          "declaration": {
+            "name": "{ getLocale, setLocale }",
+            "module": "src/localize/runtime.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/source-locale.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "smokeGreeting",
+          "parameters": [
+            {
+              "name": "name",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "smokeGreeting",
+          "declaration": {
+            "name": "smokeGreeting",
+            "module": "src/localize/source-locale.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/testing/a11y.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "axeScan",
+          "return": {
+            "type": {
+              "text": "Promise<AxeResult>"
+            }
+          },
+          "parameters": [
+            {
+              "name": "element",
+              "type": {
+                "text": "Element"
+              }
+            }
+          ],
+          "description": "Scans the element subtree with axe-core. Returns violations.\nFail your test on `violations.length > 0`."
+        },
+        {
+          "kind": "function",
+          "name": "expectKeyboardFocusable",
+          "return": {
+            "type": {
+              "text": "Promise<void>"
+            }
+          },
+          "parameters": [
+            {
+              "name": "element",
+              "type": {
+                "text": "HTMLElement"
+              }
+            }
+          ],
+          "description": "Asserts the element is keyboard-focusable. Either the host receives focus\ndirectly or focus delegates to a descendant via delegatesFocus.\nThrows if focus does not land on the host or any of its shadow descendants."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "axeScan",
+          "declaration": {
+            "name": "axeScan",
+            "module": "src/testing/a11y.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "expectKeyboardFocusable",
+          "declaration": {
+            "name": "expectKeyboardFocusable",
+            "module": "src/testing/a11y.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/testing/i18n.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "renderInLocale",
+          "return": {
+            "type": {
+              "text": "Promise<T>"
+            }
+          },
+          "parameters": [
+            {
+              "name": "locale",
+              "type": {
+                "text": "string"
+              }
+            },
+            {
+              "name": "template",
+              "type": {
+                "text": "TemplateResult"
+              }
+            }
+          ],
+          "description": "Renders a Lit template under a specific locale, setting document direction\nand the localize runtime. Restores prior state afterward."
+        },
+        {
+          "kind": "function",
+          "name": "scanForHardcodedStrings",
+          "return": {
+            "type": {
+              "text": "string[]"
+            }
+          },
+          "parameters": [
+            {
+              "name": "renderedHtml",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Scans rendered HTML for likely hardcoded user-facing strings.\nHeuristic: visible text or aria-* attribute values that are not pure\nwhitespace, not numeric, and not template placeholder syntax.\n\nReturns the offending fragments."
+        },
+        {
+          "kind": "function",
+          "name": "requiresLogicalProperties",
+          "return": {
+            "type": {
+              "text": "string[]"
+            }
+          },
+          "parameters": [
+            {
+              "name": "css",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Returns CSS property labels that should have been logical properties."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "renderInLocale",
+          "declaration": {
+            "name": "renderInLocale",
+            "module": "src/testing/i18n.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "scanForHardcodedStrings",
+          "declaration": {
+            "name": "scanForHardcodedStrings",
+            "module": "src/testing/i18n.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "requiresLogicalProperties",
+          "declaration": {
+            "name": "requiresLogicalProperties",
+            "module": "src/testing/i18n.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/testing/index.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/testing/a11y.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/testing/i18n.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/testing/ua-prefs.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/testing/ua-prefs.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "setMediaQuery",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "pref",
+              "type": {
+                "text": "MediaPref"
+              }
+            },
+            {
+              "name": "value",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Force a specific OS preference state for the next matchMedia query."
+        },
+        {
+          "kind": "function",
+          "name": "clearMediaQueries",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "description": "Reset all overrides; restores original window.matchMedia."
+        },
+        {
+          "kind": "function",
+          "name": "effectiveStimulusCeiling",
+          "return": {
+            "type": {
+              "text": "Stimulus"
+            }
+          },
+          "description": "Computes the effective stimulus ceiling from OS preferences alone.\nSee spec §2.5: effectiveStimulus = min(profile.stimulus, osCeiling)."
+        },
+        {
+          "kind": "function",
+          "name": "measureLuminanceChanges",
+          "return": {
+            "type": {
+              "text": "Promise<LuminanceMeasurement>"
+            }
+          },
+          "parameters": [
+            {
+              "name": "el",
+              "type": {
+                "text": "Element"
+              }
+            },
+            {
+              "name": "opts",
+              "default": "{}",
+              "type": {
+                "text": "LuminanceOptions"
+              }
+            }
+          ],
+          "description": "Measures luminance changes in an element over time by sampling computed background.\nLightweight approximation: reads computed-style backgrounds for the element and its\nfirst descendant; counts crossings of a brightness threshold. Intended as a\nregression-detector, not a real visual analyzer.\n\nFor accurate testing, use a tool like FlashTest or Visual A11y. This harness flags\nthe obvious cases (full-element strobing) and gives a starting point."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "setMediaQuery",
+          "declaration": {
+            "name": "setMediaQuery",
+            "module": "src/testing/ua-prefs.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "clearMediaQueries",
+          "declaration": {
+            "name": "clearMediaQueries",
+            "module": "src/testing/ua-prefs.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "effectiveStimulusCeiling",
+          "declaration": {
+            "name": "effectiveStimulusCeiling",
+            "module": "src/testing/ua-prefs.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "measureLuminanceChanges",
+          "declaration": {
+            "name": "measureLuminanceChanges",
+            "module": "src/testing/ua-prefs.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/generated/es.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "templates",
+          "type": {
+            "text": "object"
+          },
+          "default": "{ sdda0ebeb9a270e53: str`Hola, ${0}`, }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "templates",
+          "declaration": {
+            "name": "templates",
+            "module": "src/localize/generated/es.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/generated/he.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "templates",
+          "type": {
+            "text": "object"
+          },
+          "default": "{ sdda0ebeb9a270e53: str`Hello, ${0}`, }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "templates",
+          "declaration": {
+            "name": "templates",
+            "module": "src/localize/generated/he.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/generated/locale-codes.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "default": "`en`",
+          "description": "The locale code that templates in this source code are written in."
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "[`es`, `he`]"
+          },
+          "default": "[`es`, `he`]",
+          "description": "The other locale codes that this application is localized into. Sorted\nlexicographically."
+        },
+        {
+          "kind": "variable",
+          "name": "allLocales",
+          "type": {
+            "text": "[`en`, `es`, `he`]"
+          },
+          "default": "[`en`, `es`, `he`]",
+          "description": "All valid project locale codes. Sorted lexicographically."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/generated/locale-codes.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/generated/locale-codes.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "allLocales",
+          "declaration": {
+            "name": "allLocales",
+            "module": "src/localize/generated/locale-codes.ts"
           }
         }
       ]

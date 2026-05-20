@@ -17,7 +17,6 @@ Feature: Doorway Dashboard Health
     Then the dashboard should render without JavaScript errors
     And the overview tab should be active
 
-  @wip
   Scenario: Dashboard shows capabilities status
     When Matthew opens the doorway dashboard
     Then the capabilities badge should indicate which features are enabled

@@ -391,10 +391,7 @@ Then(
   }
 );
 
-async function readBytesAttribute(
-  device: PlaywrightDevice,
-  selector: string
-): Promise<number[]> {
+async function readBytesAttribute(device: PlaywrightDevice, selector: string): Promise<number[]> {
   const cells = device.page.locator(selector);
   const n = await cells.count();
   const values: number[] = [];
@@ -443,6 +440,97 @@ Then(
             await device.page.waitForTimeout(500);
           }
           assert.fail('delivered-bytes never became non-zero within 30s');
+        }
+      }
+    }
+    assert.fail(NO_PW_DEVICE);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Compute triptych — free / used / stewarded breakdown on device tiles
+// (m1-matthew-terrance-delivery.feature @compute-triptych scenario)
+//
+// The triptych renders only when device.compute is non-null (GraphQL path).
+// formatBytes() produces "—" for null/empty values and "N B" / "N.N KB|MB|GB"
+// otherwise — so a non-empty cell is anything other than "—".
+// ---------------------------------------------------------------------------
+
+When(/^he locates his laptop's device tile$/, async function (this: E2EWorld) {
+  for (const [, human] of this.humans) {
+    for (const device of human.devices) {
+      if (device instanceof PlaywrightDevice) {
+        const tile = device.page.locator(`[data-testid="${SHEFA_CLUSTER.DEVICE_TILE}"]`).first();
+        await tile.waitFor({ state: 'visible', timeout: 15_000 });
+        return;
+      }
+    }
+  }
+  assert.fail(NO_PW_DEVICE);
+});
+
+Then('the device tile shows a compute triptych', async function (this: E2EWorld) {
+  for (const [, human] of this.humans) {
+    for (const device of human.devices) {
+      if (device instanceof PlaywrightDevice) {
+        const triptych = device.page.locator('.compute-triptych').first();
+        await triptych.waitFor({ state: 'visible', timeout: 15_000 });
+        return;
+      }
+    }
+  }
+  assert.fail(NO_PW_DEVICE);
+});
+
+function computeCellTestId(label: string): string {
+  // "Free" -> "compute-free-bytes", "Used" -> "compute-used-bytes",
+  // "Stewarded" -> "compute-stewarded-bytes"
+  return `compute-${label.toLowerCase()}-bytes`;
+}
+
+Then(
+  /^the compute triptych "([^"]+)" cell has a non-empty byte value$/,
+  async function (this: E2EWorld, label: string) {
+    for (const [, human] of this.humans) {
+      for (const device of human.devices) {
+        if (device instanceof PlaywrightDevice) {
+          const sel = `[data-testid="${computeCellTestId(label)}"]`;
+          await device.page.locator(sel).first().waitFor({ state: 'visible', timeout: 15_000 });
+          const text = ((await device.page.locator(sel).first().textContent()) ?? '').trim();
+          assert.ok(text.length > 0, `compute-triptych "${label}" cell was empty`);
+          assert.notEqual(
+            text,
+            '—',
+            `compute-triptych "${label}" cell rendered the em-dash placeholder; expected a real byte value`
+          );
+          return;
+        }
+      }
+    }
+    assert.fail(NO_PW_DEVICE);
+  }
+);
+
+Then(
+  /^the compute triptych "([^"]+)" cell shows non-zero bytes when ([A-Z][a-zA-Z]+) is hosting for another peer$/,
+  async function (this: E2EWorld, label: string, _humanName: string) {
+    for (const [, human] of this.humans) {
+      for (const device of human.devices) {
+        if (device instanceof PlaywrightDevice) {
+          const sel = `[data-testid="${computeCellTestId(label)}"]`;
+          await device.page.locator(sel).first().waitFor({ state: 'visible', timeout: 15_000 });
+          const text = ((await device.page.locator(sel).first().textContent()) ?? '').trim();
+          // Non-zero shape: must contain at least one digit AND not be a bare "0 B".
+          assert.ok(
+            /\d/.test(text),
+            `compute-triptych "${label}" cell did not contain any digit; got "${text}"`
+          );
+          assert.notEqual(
+            text,
+            '0 B',
+            `compute-triptych "${label}" cell read 0 B; expected non-zero stewarded bytes`
+          );
+          return;
         }
       }
     }

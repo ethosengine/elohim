@@ -42,3 +42,12 @@ Feature: Matthew sees real topology data after M1 substrate completion
     When Matthew opens the M1 manifesto chapter resource in the content viewer
     Then he sees the resilience-snapshot component rendered side-by-side with the distribution-badge
     And the resilience snapshot displays the replica distribution across his connected peers
+
+  @wip @compute-triptych @resilience-p1
+  Scenario: Matthew's device tile shows free / used / stewarded compute breakdown
+    When Matthew opens the cluster topology page at "/shefa/cluster"
+    And he locates his laptop's device tile
+    Then the device tile shows a compute triptych
+    And the compute triptych "Free" cell has a non-empty byte value
+    And the compute triptych "Used" cell has a non-empty byte value
+    And the compute triptych "Stewarded" cell shows non-zero bytes when Matthew is hosting for another peer

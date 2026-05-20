@@ -176,6 +176,7 @@ pub struct ObservationReportView {
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod federation_canonical_tests {
     use super::*;
 

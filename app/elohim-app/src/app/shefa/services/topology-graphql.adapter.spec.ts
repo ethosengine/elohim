@@ -100,6 +100,7 @@ describe('adaptHubResponse', () => {
         hostingCount: 5,
         projectingCount: null,
         beaconAgeMs: '250',
+        compute: null,
       }],
     }));
     const device = view.devices[0];
@@ -127,6 +128,7 @@ describe('adaptHubResponse', () => {
         hostingCount: null,
         projectingCount: null,
         beaconAgeMs: null,
+        compute: null,
       }],
     }));
     expect(view.devices[0].archetype).toBe('desktop');
@@ -147,6 +149,7 @@ describe('adaptHubResponse', () => {
         hostingCount: null,
         projectingCount: null,
         beaconAgeMs: null,
+        compute: null,
       }],
     }));
     expect(view.devices[0].displayName).toBe('Phone');
@@ -167,9 +170,52 @@ describe('adaptHubResponse', () => {
         hostingCount: null,
         projectingCount: null,
         beaconAgeMs: null,
+        compute: null,
       }],
     }));
     expect('displayName' in view.devices[0]).toBe(false);
+  });
+
+  it('passes compute triptych through unchanged', () => {
+    const view = adaptHubResponse(makeHubResponse({
+      devices: [{
+        peerId: 'peer_M',
+        archetype: 'DESKTOP',
+        displayName: 'laptop',
+        online: true,
+        freshness: makeFreshnessGql('LIVE'),
+        storageUsedBytes: '500000',
+        storageTotalBytes: '10000000',
+        memoryUsedBytes: null,
+        memoryTotalBytes: null,
+        hostingCount: null,
+        projectingCount: null,
+        beaconAgeMs: null,
+        compute: { free: '9500000', used: '500000', stewarded: '250000' },
+      }],
+    }));
+    expect(view.devices[0].compute).toEqual({ free: '9500000', used: '500000', stewarded: '250000' });
+  });
+
+  it('omits compute when GraphQL compute is null', () => {
+    const view = adaptHubResponse(makeHubResponse({
+      devices: [{
+        peerId: 'peer_M',
+        archetype: 'NODE',
+        displayName: null,
+        online: true,
+        freshness: makeFreshnessGql('LIVE'),
+        storageUsedBytes: null,
+        storageTotalBytes: null,
+        memoryUsedBytes: null,
+        memoryTotalBytes: null,
+        hostingCount: null,
+        projectingCount: null,
+        beaconAgeMs: null,
+        compute: null,
+      }],
+    }));
+    expect('compute' in view.devices[0]).toBe(false);
   });
 
   it('omits staleSinceMs when null', () => {

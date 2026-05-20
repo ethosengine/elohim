@@ -15,11 +15,12 @@ use diesel::prelude::*;
 use diesel::sql_types::{Float, Nullable};
 use thiserror::Error;
 
-use crate::db::models::{PeerIdentityBindingRow, PlacementGapRow};
-use crate::db::DbPool;
+use crate::db::models::PeerIdentityBindingRow;
+use crate::db::{AppContext, DbPool};
 use crate::views::{
     DeviceArchetype, DistributionDetails, DistributionSummary, FetchSource, JsonVal, MyRole,
-    ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
+    PlacementGapKind, PlacementGapRow, PlacementGapShortfall, ProjectorIdentity, ReachClass,
+    ReplicaHealth, ReplicaPeer,
 };
 
 // ============================================================================
@@ -319,7 +320,7 @@ pub async fn compose_distribution_details(
         out
     };
 
-    let placement_gaps = load_placement_gaps_for(&mut conn, blob_hash)?;
+    let placement_gaps = load_placement_gaps_for(pool, &mut conn, blob_hash)?;
 
     // recent_projection_events: last 20 events as open-shape JSON.
     let recent_projection_events: Vec<JsonVal> = {
@@ -432,35 +433,54 @@ fn parse_archetype(s: &str) -> DeviceArchetype {
     }
 }
 
-/// Load placement_gap rows for the given blob_hash (matched on `shard_hash`).
-/// Each row is serialized as a `JsonVal` for the open-shape view field.
+/// Load hub-abstract `PlacementGapRow` view rows for the given blob_hash.
+///
+/// Calls `services::resilience::hub_summary` (C2) to classify peers into hubs,
+/// then emits a `HubDiversity` gap row when the observed hub count falls below
+/// the target. The target is currently a fixed floor of 2 — substrate-honest
+/// for any content that should survive the loss of a single hub.
+///
+/// TODO(reach-aware-targeting): replace the fixed `TARGET_HUBS = 2` with a
+/// value derived from the content's declared reach class on the EPR head.
+/// Wider reach classes should require proportionally more hubs (analogous to
+/// how `replica_target_for` scales with `ReachClass`). C4's job is to make
+/// hub-diversity gap emission real; reach-aware tuning is a follow-up task.
+///
+/// `ReplicaCount` and `ReachClass` gap kinds are separate tasks and are not
+/// emitted here.
 fn load_placement_gaps_for(
-    conn: &mut diesel::SqliteConnection,
+    pool: &DbPool,
+    _conn: &mut diesel::SqliteConnection,
     blob_hash: &str,
-) -> Result<Vec<JsonVal>, DistributionViewError> {
-    use crate::db::diesel_schema::placement_gaps::dsl as g;
+) -> Result<Vec<PlacementGapRow>, DistributionViewError> {
+    // Minimum distinct hubs required for content to survive a single-hub failure.
+    // Fixed floor for C4; reach-class-aware tuning is a follow-up (see TODO above).
+    const TARGET_HUBS: i32 = 2;
 
-    let rows: Vec<PlacementGapRow> = g::placement_gaps
-        .filter(g::shard_hash.eq(blob_hash))
-        .load::<PlacementGapRow>(conn)?;
+    // Use the default lamad AppContext — distribution_view does not carry its own
+    // AppContext today. hub_summary uses it only for future multi-tenant scoping;
+    // the hub classification queries are not yet app-id-filtered.
+    let ctx = AppContext::default_lamad();
 
-    Ok(rows
-        .into_iter()
-        .map(|r| {
-            JsonVal(serde_json::json!({
-                "id": r.id,
-                "contentId": r.content_id,
-                "shardHash": r.shard_hash,
-                "hAppId": r.h_app_id,
-                "requestedStewardCount": r.requested_steward_count,
-                "achievedStewardCount": r.achieved_steward_count,
-                "contractCoverage": r.contract_coverage,
-                "gapKind": r.gap_kind,
-                "firstSeenAt": r.first_seen_at,
-                "lastSeenAt": r.last_seen_at,
-            }))
-        })
-        .collect())
+    let hubs = crate::services::resilience::hub_summary(pool, &ctx, blob_hash)
+        .unwrap_or_default(); // permissive: lookup failure → treat as zero hubs
+
+    let observed = hubs.len() as i32;
+    let mut gaps = Vec::new();
+
+    if observed < TARGET_HUBS {
+        gaps.push(PlacementGapRow {
+            kind: PlacementGapKind::HubDiversity,
+            content_id: blob_hash.to_string(),
+            shortfall: PlacementGapShortfall {
+                target: TARGET_HUBS,
+                observed,
+            },
+            remediation: Some("Recruit a replica in another hub".to_string()),
+        });
+    }
+
+    Ok(gaps)
 }
 
 /// Load rea_commitment IDs where (`action='custody-blob'` AND

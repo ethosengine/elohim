@@ -1906,6 +1906,113 @@ fn distribution_details_matches_schema() {
     assert_source_of_truth_declared(&raw_schema, "distribution-details.schema.json");
 }
 
+// ── PlacementGapRow (hub-abstract) ─────────────────────────────
+
+#[test]
+fn placement_gap_row_schema_matches_struct() {
+    use elohim_storage::views::{PlacementGapKind, PlacementGapRow, PlacementGapShortfall};
+
+    // Full row with remediation hint
+    let row = PlacementGapRow {
+        kind: PlacementGapKind::HubDiversity,
+        content_id: "content-x".to_string(),
+        shortfall: PlacementGapShortfall {
+            target: 3,
+            observed: 1,
+        },
+        remediation: Some("Recruit a replica in another hub".to_string()),
+    };
+    let json = serde_json::to_value(&row).unwrap();
+    validate_against_schema("views/placement-gap-row.schema.json", &json);
+}
+
+#[test]
+fn placement_gap_row_all_kinds_validate() {
+    use elohim_storage::views::{PlacementGapKind, PlacementGapRow, PlacementGapShortfall};
+
+    for kind in [
+        PlacementGapKind::HubDiversity,
+        PlacementGapKind::ReplicaCount,
+        PlacementGapKind::ReachClass,
+    ] {
+        let row = PlacementGapRow {
+            kind,
+            content_id: "content-y".to_string(),
+            shortfall: PlacementGapShortfall {
+                target: 5,
+                observed: 2,
+            },
+            remediation: None,
+        };
+        let json = serde_json::to_value(&row).unwrap();
+        validate_against_schema("views/placement-gap-row.schema.json", &json);
+    }
+}
+
+#[test]
+fn placement_gap_row_schema_source_of_truth_declared() {
+    let raw_schema: Value = serde_json::from_str(
+        &fs::read_to_string(schema_dir().join("views/placement-gap-row.schema.json")).unwrap(),
+    )
+    .unwrap();
+    assert_source_of_truth_declared(&raw_schema, "placement-gap-row.schema.json");
+}
+
+#[test]
+fn distribution_details_placement_gaps_typed() {
+    // Verify that DistributionDetails serializes with typed PlacementGapRow,
+    // not open-shape JsonVal — the schema now refs placement-gap-row.schema.json.
+    use elohim_storage::views::{
+        DeviceArchetype, DistributionDetails, DistributionSummary, DiversityHint, FetchSource,
+        PlacementGapKind, PlacementGapRow, PlacementGapShortfall, ProjectorIdentity, ReachClass,
+        ReplicaHealth, ReplicaPeer,
+    };
+
+    let summary = DistributionSummary {
+        replica_count: 4,
+        replica_target: 5,
+        replica_health: ReplicaHealth::AtRisk,
+        projector_count: 1,
+        reach_class: ReachClass::Household,
+        diversity_hint: DiversityHint::RegionMetro(vec!["us-central".into()]),
+        this_fetch_source: FetchSource::ProjectedViaDoorway,
+        last_verified_seconds: 60,
+        my_role: None,
+        reciprocity_hint: None,
+    };
+
+    let details = DistributionDetails {
+        summary,
+        replica_peers: vec![ReplicaPeer {
+            peer_id: "12D3KooWReplica2".into(),
+            device_archetype: DeviceArchetype::Desktop,
+            last_seen_seconds: 10,
+            hop_hint: None,
+            household_id: None,
+            region_tier: None,
+        }],
+        projector_identities: vec![ProjectorIdentity {
+            doorway_hostname: "test.elohim.host".into(),
+            last_ack_seconds: 2,
+            region_tier: None,
+        }],
+        placement_gaps: vec![PlacementGapRow {
+            kind: PlacementGapKind::ReplicaCount,
+            content_id: "content-z".to_string(),
+            shortfall: PlacementGapShortfall {
+                target: 5,
+                observed: 4,
+            },
+            remediation: None,
+        }],
+        recent_projection_events: vec![],
+        commitment_references: None,
+    };
+
+    let json = serde_json::to_value(&details).unwrap();
+    validate_against_schema("views/distribution-details.schema.json", &json);
+}
+
 #[test]
 fn replica_peer_matches_schema() {
     use elohim_storage::views::{DeviceArchetype, ReplicaPeer};
@@ -1961,12 +2068,60 @@ fn my_cluster_view_matches_schema() {
             hosting_count: Some(1247),
             projecting_count: Some(802),
             beacon_age_ms: Some(0),
+            compute: None,
         }],
         totals: DeviceTotals {
             storage_used_bytes: 25_200_000_000,
             storage_total_bytes: 298_000_000_000,
             external_committed_bytes: 14_800_000_000,
             reciprocity_net_bytes: 5_200_000_000,
+        },
+        freshness: Freshness {
+            state: FreshnessState::Live,
+            stale_since_ms: None,
+        },
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/my-cluster-view.schema.json", &json);
+}
+
+#[test]
+fn compute_triptych_in_device_summary_matches_schema() {
+    use elohim_storage::views::{
+        ComputeTriptych, DeviceArchetype, DeviceSummary, DeviceTotals, Freshness, FreshnessState,
+        MyClusterView,
+    };
+
+    let sample = MyClusterView {
+        agent_cid: "agent_triptych_test".into(),
+        devices: vec![DeviceSummary {
+            peer_id: "12D3KooWTriptychPeer".into(),
+            archetype: DeviceArchetype::Node,
+            display_name: None,
+            online: true,
+            freshness: Freshness {
+                state: FreshnessState::Live,
+                stale_since_ms: None,
+            },
+            storage_used_bytes: Some(5_000_000_000),
+            storage_total_bytes: Some(500_000_000_000),
+            memory_used_bytes: None,
+            memory_total_bytes: None,
+            hosting_count: Some(300),
+            projecting_count: Some(150),
+            beacon_age_ms: Some(250),
+            compute: Some(ComputeTriptych {
+                free: Some(495_000_000_000),
+                used: Some(5_000_000_000),
+                stewarded: Some(2_000_000_000),
+            }),
+        }],
+        totals: DeviceTotals {
+            storage_used_bytes: 5_000_000_000,
+            storage_total_bytes: 500_000_000_000,
+            external_committed_bytes: 2_000_000_000,
+            reciprocity_net_bytes: 1_000_000_000,
         },
         freshness: Freshness {
             state: FreshnessState::Live,
@@ -2801,4 +2956,89 @@ fn governance_action_tally_view_matches_schema_no_votes_yet() {
 
     let json = serde_json::to_value(&view).unwrap();
     validate_against_schema("views/governance-action-tally-view.schema.json", &json);
+}
+
+// ── ResilienceHubView + HubSummary (C2) ───────────────────────
+
+#[test]
+fn resilience_hub_view_empty_hubs_matches_schema() {
+    use elohim_storage::views::{HubKind, HubSummary, ResilienceHubView};
+    let _ = (HubKind::Computed, HubSummary::default()); // ensure types are in scope
+
+    let view = ResilienceHubView {
+        content_id: "sha256-empty-test".to_string(),
+        hubs: vec![],
+    };
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/resilience-hub-view.schema.json", &json);
+}
+
+#[test]
+fn resilience_hub_view_computed_hub_matches_schema() {
+    use elohim_storage::views::{HubKind, HubSummary, ResilienceHubView};
+
+    let view = ResilienceHubView {
+        content_id: "sha256-computed-test".to_string(),
+        hubs: vec![HubSummary {
+            hub_id: "12D3KooWSinglePeer".to_string(),
+            kind: HubKind::Computed,
+            replica_count: 1,
+            last_verified_seconds: Some(120),
+            display_label: None,
+        }],
+    };
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/resilience-hub-view.schema.json", &json);
+    // Verify hub entry validates individually against hub-summary schema
+    validate_against_schema("views/hub-summary.schema.json", &json["hubs"][0]);
+}
+
+#[test]
+fn resilience_hub_view_all_kinds_validate() {
+    use elohim_storage::views::{HubKind, HubSummary, ResilienceHubView};
+
+    for (kind, hub_id) in [
+        (HubKind::Dwelling, "household-alpha"),
+        (HubKind::Collective, "collective-dawn-runners"),
+        (HubKind::Computed, "12D3KooWPeerSingle"),
+    ] {
+        let view = ResilienceHubView {
+            content_id: "sha256-all-kinds-test".to_string(),
+            hubs: vec![HubSummary {
+                hub_id: hub_id.to_string(),
+                kind,
+                replica_count: 2,
+                last_verified_seconds: None,
+                display_label: Some(format!("Test {hub_id}")),
+            }],
+        };
+        let json = serde_json::to_value(&view).unwrap();
+        validate_against_schema("views/resilience-hub-view.schema.json", &json);
+        validate_against_schema("views/hub-summary.schema.json", &json["hubs"][0]);
+    }
+}
+
+#[test]
+fn hub_summary_no_optional_fields_matches_schema() {
+    use elohim_storage::views::{HubKind, HubSummary};
+
+    // Minimal HubSummary — only required fields; optional fields omitted.
+    let summary = HubSummary {
+        hub_id: "household-minimal".to_string(),
+        kind: HubKind::Dwelling,
+        replica_count: 3,
+        last_verified_seconds: None,
+        display_label: None,
+    };
+    let json = serde_json::to_value(&summary).unwrap();
+    validate_against_schema("views/hub-summary.schema.json", &json);
+    // Ensure optional fields are absent in wire format
+    assert!(
+        json.get("lastVerifiedSeconds").is_none(),
+        "lastVerifiedSeconds must be absent when None"
+    );
+    assert!(
+        json.get("displayLabel").is_none(),
+        "displayLabel must be absent when None"
+    );
 }

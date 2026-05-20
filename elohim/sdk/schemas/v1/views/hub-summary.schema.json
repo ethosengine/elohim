@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:hub-summary",
+  "title": "HubSummary",
+  "description": "One hub's contribution to content resilience. Hub is a *role* (dial-up-by-capability), not a notarized entity — substrate stays kind-agnostic; kind classification (dwelling/collective/computed) happens at the projection layer. Source of truth: peer_blob_inventory (gossip operational) + peer-identity bindings (Category-A DHT) + hub-membership facts where notarized. Operational Category C — no DHT entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hubId", "kind", "replicaCount"],
+  "properties": {
+    "hubId": {
+      "type": "string",
+      "description": "Stable identifier for this hub. When hub-membership facts are not yet notarized, hubId is the peer_id of the single-device participant (Computed kind). Future: dwelling_id or collective_id when binding tables distinguish."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["dwelling", "collective", "computed"],
+      "description": "Hub kind. dwelling = single household; collective = qahal-scoped hub; computed = ad-hoc or single-device participation. New kinds slot in here without changing API shape."
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of blob inventory entries this hub holds for the content."
+    },
+    "lastVerifiedSeconds": {
+      "type": ["integer", "null"],
+      "description": "Seconds since the most recent inventory record for this hub, or null when last_seen_at is unavailable."
+    },
+    "displayLabel": {
+      "type": ["string", "null"],
+      "description": "Optional human-readable label for UI display. Absent when no label is known."
+    }
+  }
+}

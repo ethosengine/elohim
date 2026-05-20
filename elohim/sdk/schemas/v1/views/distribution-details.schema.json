@@ -29,8 +29,8 @@
     },
     "placementGaps": {
       "type": "array",
-      "items": { "type": "object" },
-      "description": "Open-shape placement-gap records describing missing target capacity. Schema kept loose during the lit-up topology bring-up; will graduate to a dedicated schema when stable."
+      "items": { "$ref": "placement-gap-row.schema.json" },
+      "description": "Concrete placement gaps for this content; empty if fully placed."
     },
     "recentProjectionEvents": {
       "type": "array",
