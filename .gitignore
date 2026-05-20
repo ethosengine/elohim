@@ -67,6 +67,7 @@ orchestrator/e2e/reports/
 
 # Rust/Holochain
 target/
+target-pool/
 *.happ
 *.dna
 bindings/
