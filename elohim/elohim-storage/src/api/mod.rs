@@ -327,6 +327,12 @@ pub async fn handle_api_request(
         // Stub-stage: serves fixture EconomicEvent via the bridge's GraphQL schema.
         // M2+ adds identity bridge (qahal-authority), M3+ adds real hREA projection.
         // See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+        // M1: every BridgeError variant is an infrastructure failure (body
+        // read, response serialize, response build) — Internal (500) is
+        // correct. M2+ will introduce auth/binding/authority denial variants
+        // that map to 4xx; this map_err must be updated at that boundary,
+        // ideally by adding `impl From<BridgeError> for StorageError` in the
+        // bridge crate so missing mappings fail at compile time.
         return valueflows_bridge::handle_request(req)
             .await
             .map_err(|e| StorageError::Internal(format!("vf-graphql bridge: {e}")));

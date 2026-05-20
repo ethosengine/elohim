@@ -9914,6 +9914,9 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::post("/api/v1/vf-graphql")
                 .handler("vf_graphql_handler")
                 .auth_required()
+                // M1 fixture path has no DHT cost; higher per-window allowance than
+                // reciprocity (20) is acceptable. Revisit at M3 when real hREA
+                // projection adds per-request DHT read cost.
                 .rate_limit(60)
                 .build(),
         )
@@ -10062,6 +10065,11 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/reciprocity"),
             "missing /api/v1/reciprocity (T32)"
+        );
+        // Wave 3 M1 — vf-graphql bridge endpoint
+        assert!(
+            paths.contains(&"/api/v1/vf-graphql"),
+            "missing /api/v1/vf-graphql (Wave 3 M1)"
         );
         // SSR-eligible lamad routes (Task 12) — verify paths and render field
         let lamad_routes: std::collections::HashMap<&str, _> = manifest
