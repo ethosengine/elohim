@@ -30,7 +30,8 @@ describe('i18n harness', () => {
           <span></span>
         `
       );
-      // Helper's finally block cleans up; subsequent calls in en should be ltr.
+      // Within the same test, a subsequent en call sets dir=ltr.
+      // Cross-test cleanup happens via afterEach (see i18n.ts).
       const el = await renderInLocale(
         'en',
         html`
@@ -40,20 +41,23 @@ describe('i18n harness', () => {
       expect(el.ownerDocument.documentElement.getAttribute('dir')).to.equal('ltr');
     });
 
-    it('restores dir attribute after rendering ends (cleanup test)', async () => {
-      // No prior calls — document root has no dir/lang
+    it('cleans up dir after the test (via afterEach)', async () => {
       document.documentElement.removeAttribute('dir');
-      document.documentElement.removeAttribute('lang');
-
       await renderInLocale(
         'he-IL',
         html`
           <span></span>
         `
       );
+      expect(document.documentElement.getAttribute('dir')).to.equal('rtl');
+      // After this test finishes, afterEach fires and restores dir.
+      // The next test in the same file can verify.
+    });
 
-      // After rendering, the helper restored the prior state (no dir/lang)
-      expect(document.documentElement.hasAttribute('dir')).to.be.false;
+    it('confirms dir is restored after a renderInLocale test', () => {
+      // Runs after the previous test's afterEach.
+      // dir should NOT still be 'rtl'.
+      expect(document.documentElement.getAttribute('dir')).to.not.equal('rtl');
     });
   });
 

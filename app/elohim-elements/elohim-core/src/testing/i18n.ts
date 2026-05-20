@@ -18,9 +18,32 @@ function isRtlLocale(locale: string): boolean {
   return (RTL_LOCALES as readonly string[]).includes(lang);
 }
 
+const restoreCallbacks: (() => void)[] = [];
+
+// Register a module-level afterEach that restores document state after every test
+// that called renderInLocale. This is what prevents cross-suite contamination
+// without breaking tests that need to observe the active dir/lang during assertions.
+const globalAfterEach = (globalThis as Record<string, unknown>)['afterEach'] as
+  | ((fn: () => void) => void)
+  | undefined;
+
+if (typeof globalAfterEach === 'function') {
+  globalAfterEach(() => {
+    while (restoreCallbacks.length > 0) {
+      const cb = restoreCallbacks.pop();
+      try {
+        cb?.();
+      } catch {
+        // best-effort
+      }
+    }
+  });
+}
+
 /**
  * Renders a Lit template under a specific locale, setting document direction
- * and the localize runtime. Restores prior state afterward.
+ * and the localize runtime. Restores prior document state via afterEach (after
+ * all assertions in the test complete), not inside this helper.
  */
 export async function renderInLocale<T extends Element = HTMLElement>(
   locale: string,
@@ -33,18 +56,7 @@ export async function renderInLocale<T extends Element = HTMLElement>(
   root.setAttribute('lang', locale);
   root.setAttribute('dir', isRtlLocale(locale) ? 'rtl' : 'ltr');
 
-  const baseLocale = locale.split('-')[0]!.toLowerCase();
-  if (baseLocale !== 'en') {
-    try {
-      await setLocale(baseLocale);
-    } catch {
-      // locale bundle absent — leave at source
-    }
-  }
-
-  try {
-    return await fixture<T>(template);
-  } finally {
+  restoreCallbacks.push(() => {
     if (priorDir === null) {
       root.removeAttribute('dir');
     } else {
@@ -55,7 +67,18 @@ export async function renderInLocale<T extends Element = HTMLElement>(
     } else {
       root.setAttribute('lang', priorLang);
     }
+  });
+
+  const baseLocale = locale.split('-')[0]!.toLowerCase();
+  if (baseLocale !== 'en') {
+    try {
+      await setLocale(baseLocale);
+    } catch {
+      // locale bundle absent — leave at source
+    }
   }
+
+  return await fixture<T>(template);
 }
 
 /**
