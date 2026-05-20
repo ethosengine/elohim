@@ -334,6 +334,49 @@ impl FreshnessGql {
     }
 }
 
+/// Compute capacity triptych for a device: free / used / stewarded bytes.
+///
+/// All three fields are `Option<String>` (not `Option<u64>`) to match the
+/// JS Number precision pattern used for every other byte counter on
+/// `DeviceSummaryGql`. The underlying `ComputeTriptych` view stays `Option<u64>`;
+/// stringification happens here at the GQL projection boundary.
+pub struct ComputeTriptychGql {
+    pub free: Option<String>,
+    pub used: Option<String>,
+    pub stewarded: Option<String>,
+}
+
+#[Object]
+impl ComputeTriptychGql {
+    /// Bytes available on this device's blob filesystem (`capacity - used`).
+    /// `null` when the system_metrics sample for this peer is not yet available.
+    async fn free(&self) -> Option<&str> {
+        self.free.as_deref()
+    }
+
+    /// Bytes currently occupied by blob storage on this device.
+    /// `null` when no system_metrics sample is available.
+    async fn used(&self) -> Option<&str> {
+        self.used.as_deref()
+    }
+
+    /// Bytes this peer has committed to host for others via `custody-blob`
+    /// REA Commitments. `null` when the REA ledger has no rows for this peer.
+    async fn stewarded(&self) -> Option<&str> {
+        self.stewarded.as_deref()
+    }
+}
+
+impl From<&crate::views::ComputeTriptych> for ComputeTriptychGql {
+    fn from(v: &crate::views::ComputeTriptych) -> Self {
+        ComputeTriptychGql {
+            free: v.free.map(|n| n.to_string()),
+            used: v.used.map(|n| n.to_string()),
+            stewarded: v.stewarded.map(|n| n.to_string()),
+        }
+    }
+}
+
 /// Per-device summary in the hub view.
 ///
 /// Byte counters are `String` to avoid JS integer-precision loss at 2^53.
@@ -351,6 +394,7 @@ pub struct DeviceSummaryGql {
     pub hosting_count: Option<i32>,
     pub projecting_count: Option<i32>,
     pub beacon_age_ms: Option<String>,
+    pub compute: Option<ComputeTriptychGql>,
 }
 
 impl From<crate::views::DeviceSummary> for DeviceSummaryGql {
@@ -368,6 +412,7 @@ impl From<crate::views::DeviceSummary> for DeviceSummaryGql {
             hosting_count: d.hosting_count.map(|v| v as i32),
             projecting_count: d.projecting_count.map(|v| v as i32),
             beacon_age_ms: d.beacon_age_ms.map(|v| v.to_string()),
+            compute: d.compute.as_ref().map(ComputeTriptychGql::from),
         }
     }
 }
@@ -427,6 +472,13 @@ impl DeviceSummaryGql {
     /// Age of the last beacon from this device (ms), null when not available.
     async fn beacon_age_ms(&self) -> Option<&str> {
         self.beacon_age_ms.as_deref()
+    }
+
+    /// Compute triptych: free / used / stewarded bytes for this device.
+    /// All three sub-fields are strings for JS Number precision safety.
+    /// `null` when no compute data is available for this peer.
+    async fn compute(&self) -> Option<&ComputeTriptychGql> {
+        self.compute.as_ref()
     }
 }
 
