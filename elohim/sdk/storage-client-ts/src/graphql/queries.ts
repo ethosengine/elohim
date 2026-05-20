@@ -41,6 +41,11 @@ export const VIEWER_HUB_QUERY = `
           hostingCount
           projectingCount
           beaconAgeMs
+          compute {
+            free
+            used
+            stewarded
+          }
         }
         totals {
           storageUsedBytes
@@ -152,6 +157,22 @@ export interface FreshnessGql {
 }
 
 /**
+ * Compute capacity triptych for a device: free / used / stewarded bytes.
+ *
+ * Byte counters are `string` to avoid JS integer-precision loss at 2^53.
+ * Each field is `null` when the underlying signal isn't yet available
+ * (no system_metrics sample for free/used; no REA commitment rows for stewarded).
+ */
+export interface ComputeTriptychGql {
+  /** Bytes available on this device's blob filesystem (`capacity - used`). */
+  free: string | null;
+  /** Bytes currently occupied by blob storage on this device. */
+  used: string | null;
+  /** Bytes this peer has committed to host for others via `custody-blob` REA Commitments. */
+  stewarded: string | null;
+}
+
+/**
  * Per-device summary in the hub view.
  *
  * Byte counters are `string` to avoid JS integer-precision loss at 2^53.
@@ -170,6 +191,8 @@ export interface DeviceSummaryGql {
   hostingCount: number | null;
   projectingCount: number | null;
   beaconAgeMs: string | null;
+  /** Compute capacity triptych. `null` when this peer has no compute signal yet. */
+  compute: ComputeTriptychGql | null;
 }
 
 /** Aggregated totals across the agent's devices. */
