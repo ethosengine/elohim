@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
+import { CapabilityAwareElement } from './capability/index.js';
 
 export type ElohimButtonVariant = 'primary' | 'secondary' | 'ghost';
 
@@ -23,8 +24,18 @@ export type ElohimButtonVariant = 'primary' | 'secondary' | 'ghost';
  * @cssprop --elohim-button-radius - Override border-radius
  *
  * @csspart button - The internal native <button> element
+ *
+ * @capabilityMaxLens standard
+ * @capabilityThemes light, dark
+ * @capabilityContrast normal, high
+ * @capabilityLocales en
+ * @capabilityMaxStimulus still
+ * @capabilityTextuality textual, symbolic
+ * @capabilityRequiredStandings pilot | steward | elohim-support
+ * @capabilityContentCertainty not-observed
+ * @capabilityStates empty:n/a, loading:n/a, error:n/a, stale:n/a, contested:n/a, offline:n/a, unauthorized:n/a
  */
-export class ElohimButton extends LitElement {
+export class ElohimButton extends CapabilityAwareElement(LitElement) {
   /** @ignore */
   static override readonly shadowRootOptions: ShadowRootInit = {
     ...LitElement.shadowRootOptions,
