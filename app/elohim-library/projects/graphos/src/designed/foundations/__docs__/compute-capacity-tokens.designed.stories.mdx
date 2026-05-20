@@ -1,0 +1,174 @@
+{/* compute-capacity-tokens.designed.stories.mdx
+ *
+ * Designed/Foundations/Compute Capacity Tokens
+ *
+ * Brand-binding catalog entry for <elohim-compute-tile>.
+ * Documents which --elohim-compute-tile-* override hooks map to which
+ * --el-* graphos brand tokens, and why each choice was made.
+ *
+ * Part of the Library B foundations layer (graphos-designer owns this).
+ * The primitive is unchanged; only the binding is authored here.
+ */}
+
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Designed/Foundations/Compute Capacity Tokens" />
+
+# Compute Capacity Tokens
+
+Brand-binding catalog for `<elohim-compute-tile>`. This entry documents how the element's
+`--elohim-compute-tile-*` override surface is resolved to `--el-*` graphos design tokens.
+
+The primitive ships with CSS system color defaults (`Canvas`, `CanvasText`, `ButtonFace`).
+The designed binding below replaces those defaults with the Elohim brand at the story decorator
+level — the element itself carries no Elohim values.
+
+---
+
+## The `--el-*` token set
+
+Declared in `genesis/graphos/elohim-protocol-design-spec.md §14`. Until a global graphos
+stylesheet injects them, each Library B story declares them inline in its decorator. When that
+stylesheet ships, the inline declarations can be removed without changing any bindings.
+
+```css
+:root {
+  /* Primary palette */
+  --el-green-deep:  #2D5F3B;  /* Vineyard — trust, primary actions */
+  --el-green-light: #7FB069;  /* New Growth — success, confirmation */
+  --el-amber:       #D4A03E;  /* Harvest Gold — accent, warmth, active states */
+  --el-clay:        #B8664F;  /* Terracotta — earthy caution (not "danger red") */
+  --el-cream:       #F5F0E8;  /* Linen — primary light background */
+  --el-stone:       #6B6157;  /* Hearthstone — body text, quiet UI chrome */
+
+  /* Secondary palette */
+  --el-sky:         #7BAFCB;  /* Morning — informational, flow metaphors */
+  --el-plum:        #6E4B6B;  /* Sabbath — rest states, "enough" indicators */
+  --el-starlight:   #E8E4D9;  /* Starlight — text on dark, constellation lines */
+  --el-night:       #0F1A12;  /* Deep Sky — dark mode background (forest-dark) */
+  --el-night-alt:   #1A1A2E;  /* Indigo Night — alternative dark */
+
+  /* Typography */
+  --el-font-display: 'Fraunces', Georgia, serif;
+  --el-font-body:    'Source Serif 4', Georgia, serif;
+  --el-font-ui:      'DM Sans', system-ui, sans-serif;
+  --el-font-mono:    'JetBrains Mono', monospace;
+
+  /* Spacing (8px base) */
+  --el-space-xs: 8px;  --el-space-sm: 16px;  --el-space-md: 24px;
+  --el-space-lg: 32px; --el-space-xl: 48px;  --el-space-2xl: 64px;
+
+  /* Radii */
+  --el-radius-sm: 4px;   --el-radius-md: 8px;   --el-radius-lg: 16px;
+
+  /* Shadows */
+  --el-shadow-soft:   0 2px 8px rgba(107, 97, 87, 0.08);
+  --el-shadow-medium: 0 4px 16px rgba(107, 97, 87, 0.12);
+}
+```
+
+---
+
+## Light-mode binding
+
+The "garden register" — working by daylight, Linen pages, Hearthstone ink.
+
+| `--elohim-compute-tile-*` | Resolves to | Hex | Reasoning |
+|---|---|---|---|
+| `bg` | `var(--el-cream)` | `#F5F0E8` | Linen surface — paper on a table. Breathing space. |
+| `fg` | `var(--el-stone)` | `#6B6157` | Hearthstone body text — warm gray, never cool-blue. |
+| `border` | `rgba(107,97,87,0.2)` | — | A whisper, not a wall. 20% opacity Hearthstone. |
+| `radius` | `var(--el-radius-md)` | `8px` | Soft enough to feel welcoming, not so round as to feel bubbly. |
+| `padding` | `var(--el-space-md) var(--el-space-lg)` | `24px 32px` | Generous margin — the interface breathes. |
+| `label-color` | `var(--el-stone)` | `#6B6157` | Same weight as body — the label earns attention through position, not color. |
+| `value-color` | `var(--el-green-deep)` | `#2D5F3B` | Vineyard for primary values — trust and health in the green spectrum. |
+| `secondary-color` | `var(--el-stone)` | `#6B6157` | Detail rows at body weight — present but not competing with the primary number. |
+| `state-color` | `var(--el-green-light)` | `#7FB069` | New Growth for healthy online states. |
+| `gauge-track` | `var(--el-starlight)` | `#E8E4D9` | Warm off-white track — the "full" horizon. |
+| `gauge-fill` | `var(--el-amber)` | `#D4A03E` | Harvest Gold fill — the golden-hour rule. Every composition carries amber warmth. |
+| `meta-color` | `var(--el-stone)` | `#6B6157` | Debug/trace meta in Hearthstone — warm monospace, not cold terminal. |
+
+**Font family:** `var(--el-font-ui)` (DM Sans) inherited from the wrapper. The primitive
+inherits `font: inherit`. Detail rows benefit from `var(--el-font-body)` (Source Serif 4)
+in a future story that specifically targets the detail and trace lenses — at those lenses
+the data reads like a ledger page, which Source Serif 4 carries well.
+
+---
+
+## Dark-mode binding
+
+The "constellation register" — reading stars by their own light, Deep Sky background.
+
+| `--elohim-compute-tile-*` | Resolves to | Hex | Reasoning |
+|---|---|---|---|
+| `bg` | `var(--el-night)` | `#0F1A12` | Deep Sky — forest-dark, not void-dark. The night carries a green undertone. |
+| `fg` | `var(--el-starlight)` | `#E8E4D9` | Starlight text — warm white, never blue-white. |
+| `border` | `none` | — | Dark mode: the shadow-soft carries the card boundary. No hard borders. |
+| `radius` | `var(--el-radius-md)` | `8px` | Unchanged — consistent card shape across themes. |
+| `padding` | `var(--el-space-md) var(--el-space-lg)` | `24px 32px` | Unchanged. |
+| `label-color` | `var(--el-starlight)` | `#E8E4D9` | Constellation lines — the label glows gently. |
+| `value-color` | `var(--el-amber)` | `#D4A03E` | Harvest Gold in dark mode — active nodes glow amber. Key data point is a lit star. |
+| `secondary-color` | `var(--el-starlight)` | `#E8E4D9` | Starlight for detail rows — visible but secondary to the amber primary. |
+| `state-color` | `var(--el-green-light)` | `#7FB069` | New Growth — health signal unchanged across themes. |
+| `gauge-track` | `rgba(232,228,217,0.12)` | — | Near-invisible track — the gauge fill (amber) is the only visible element. |
+| `gauge-fill` | `var(--el-amber)` | `#D4A03E` | Harvest Gold — the capacity glow. |
+| `meta-color` | `var(--el-starlight)` | `#E8E4D9` | Monospaced meta in Starlight — readable without competing. |
+
+---
+
+## High-contrast binding
+
+No opacity reductions. Explicit borders. Vineyard replaces Harvest Gold in the gauge for
+a stronger stroke at high contrast.
+
+| `--elohim-compute-tile-*` | Resolves to | Hex |
+|---|---|---|
+| `bg` | `var(--el-cream)` | `#F5F0E8` |
+| `fg` | `var(--el-night)` | `#0F1A12` |
+| `border` | `2px solid var(--el-night)` | explicit |
+| `value-color` | `var(--el-green-deep)` | `#2D5F3B` |
+| `secondary-color` | `var(--el-night)` | `#0F1A12` |
+| `gauge-track` | `var(--el-stone)` | `#6B6157` |
+| `gauge-fill` | `var(--el-green-deep)` | `#2D5F3B` |
+
+---
+
+## State-color vocabulary
+
+The `--elohim-compute-tile-state-color` token is overridden per content state to
+communicate the protocol's moral signal system (design spec §4 "Color as moral signal"):
+
+| State | Token | Hex | Why |
+|---|---|---|---|
+| `idle` / online | `--el-green-light` (New Growth) | `#7FB069` | Health. The node is alive and present. |
+| `stale` | `--el-plum` (Sabbath) | `#6E4B6B` | Rest register — "this is paused," not "this is broken." |
+| `error` | `--el-clay` (Terracotta) | `#B8664F` | Earthy caution. No "danger red" exists in this system. |
+| `offline` | `--el-stone` (Hearthstone) | `#6B6157` | The quietest signal — being offline is a natural state, not a failure. |
+| `loading` | default `--el-green-light` | `#7FB069` | Optimistic — the data is coming. |
+
+---
+
+## What was not changed
+
+The element's default CSS uses CSS system colors (`Canvas`, `CanvasText`, `ButtonFace`,
+`LinkText`). These remain the Library A defaults. The designed binding wraps above them
+via story decorators. When Library B stories render in a context without the brand tokens
+declared, they fall back gracefully to system colors — the primitive is always legible.
+
+The element's `font-family: ui-monospace` in the `.meta` section (debug/trace lens) is
+also unchanged. The meta section's `color` is overridden via `--elohim-compute-tile-meta-color`,
+but the font family itself has no corresponding `@cssprop`. This is the correct division:
+the element owns the structural font role; Library B binds color. If a `--elohim-compute-tile-meta-font`
+hook is desired for JetBrains Mono, that is a **component-architect follow-up**.
+
+---
+
+## Follow-ups
+
+- `rust-architect`: Define `HubComputeAggregateView` ts-rs view so hub fixtures
+  can use the generated type instead of the local `ComputeTileHubValue` interface.
+- `component-architect`: Consider adding `--elohim-compute-tile-meta-font` so Library B
+  can bind `var(--el-font-mono)` (JetBrains Mono) to the debug/trace meta section.
+- Graphos token stylesheet: When a global `graphos-tokens.css` ships (injected via
+  storybook preview or the Angular app's `styles.css`), the `EL_TOKENS` inline
+  declarations in every designed story can be removed — the bindings remain unchanged.
