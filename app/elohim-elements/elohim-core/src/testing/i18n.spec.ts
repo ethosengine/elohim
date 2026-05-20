@@ -30,7 +30,7 @@ describe('i18n harness', () => {
           <span></span>
         `
       );
-      // Helper cleans up after itself; subsequent calls in en should be ltr.
+      // Helper's finally block cleans up; subsequent calls in en should be ltr.
       const el = await renderInLocale(
         'en',
         html`
@@ -38,6 +38,22 @@ describe('i18n harness', () => {
         `
       );
       expect(el.ownerDocument.documentElement.getAttribute('dir')).to.equal('ltr');
+    });
+
+    it('restores dir attribute after rendering ends (cleanup test)', async () => {
+      // No prior calls — document root has no dir/lang
+      document.documentElement.removeAttribute('dir');
+      document.documentElement.removeAttribute('lang');
+
+      await renderInLocale(
+        'he-IL',
+        html`
+          <span></span>
+        `
+      );
+
+      // After rendering, the helper restored the prior state (no dir/lang)
+      expect(document.documentElement.hasAttribute('dir')).to.be.false;
     });
   });
 

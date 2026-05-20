@@ -27,6 +27,8 @@ export async function renderInLocale<T extends Element = HTMLElement>(
   template: TemplateResult
 ): Promise<T> {
   const root = document.documentElement;
+  const priorDir = root.getAttribute('dir');
+  const priorLang = root.getAttribute('lang');
 
   root.setAttribute('lang', locale);
   root.setAttribute('dir', isRtlLocale(locale) ? 'rtl' : 'ltr');
@@ -40,7 +42,20 @@ export async function renderInLocale<T extends Element = HTMLElement>(
     }
   }
 
-  return fixture<T>(template);
+  try {
+    return await fixture<T>(template);
+  } finally {
+    if (priorDir === null) {
+      root.removeAttribute('dir');
+    } else {
+      root.setAttribute('dir', priorDir);
+    }
+    if (priorLang === null) {
+      root.removeAttribute('lang');
+    } else {
+      root.setAttribute('lang', priorLang);
+    }
+  }
 }
 
 /**
