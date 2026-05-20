@@ -163,3 +163,15 @@ pub fn list_atoms(conn: &mut SqliteConnection, q: &EprListQuery) -> QueryResult<
         .limit(q.limit)
         .load::<EprAtom>(conn)
 }
+
+/// Fetch all coupling rows that point TO the given cid as target —
+/// i.e. atoms that couple this cid from their outbound legs. Used by the
+/// nav-context projection to populate `partOf`.
+pub fn fetch_reverse_coupling(
+    conn: &mut SqliteConnection,
+    target_cid: &str,
+) -> QueryResult<Vec<EprCouplingRow>> {
+    epr_coupling::table
+        .filter(epr_coupling::target_cid.eq(target_cid))
+        .load::<EprCouplingRow>(conn)
+}

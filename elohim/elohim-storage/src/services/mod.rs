@@ -39,6 +39,7 @@ pub mod epr_compose;
 pub mod epr_kind;
 pub mod epr_service;
 pub mod epr_store;
+pub mod epr_nav_context_view; // Category C read-only projection for nav-context endpoint
 pub mod events;
 pub mod exchange_service;
 pub mod federator;

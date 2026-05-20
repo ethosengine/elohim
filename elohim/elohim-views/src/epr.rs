@@ -125,3 +125,61 @@ pub struct EprProvidersView {
     pub providers: Vec<String>,
 }
 
+
+/// A lightweight reference to a related EPR atom, used in the nav-context
+/// projection. Label and resilience tier are best-effort — populated when the
+/// referenced atom is locally held; absent otherwise.
+///
+/// Category C — wire view only, no DHT entry type, no new table.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct EprNavRef {
+    /// CIDv1 base32 of the referenced atom.
+    pub cid: String,
+    /// Short human-readable label, populated when the atom is locally held.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Resilience tier string derived from the atom's `reach` field.
+    /// One of "high" | "medium" | "low" | "unknown". Absent when the atom is
+    /// not locally held.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resilience_tier: Option<String>,
+}
+
+/// Nav-context projection for GET /api/v1/epr/{cid}/nav-context.
+///
+/// Source of truth: existing `epr_atoms`, `epr_coupling`, `epr_supersedence`,
+/// and `epr_claims` tables (read-only projection). Zero new DHT entry types,
+/// zero new tables, zero migrations -- Category C per p2p-design-gate.
+///
+/// - `prev`: atom this one supersedes (the atom it replaces).
+/// - `next`: atom that supersedes this one (what replaced it).
+/// - `partOf`: coupling legs that point inward -- atoms that couple to this one.
+/// - `related`: outbound coupling legs from this atom (knowledge / value /
+///   governance targets) plus claim CIDs.
+/// - `derivedFrom`: list of relationship kinds that contributed entries
+///   (e.g. ["supersedence", "coupling", "claims"]) -- for client-side
+///   disclosure of which relationship types were consulted.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct EprNavContextView {
+    /// CIDv1 base32 of the focal atom.
+    pub cid: String,
+    /// Predecessor: atom this one supersedes (the one it replaced).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prev: Option<EprNavRef>,
+    /// Successor: atom that superseded this one (what replaced it).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next: Option<EprNavRef>,
+    /// Atoms that include this atom as a coupling target (reverse coupling).
+    #[serde(default)]
+    pub part_of: Vec<EprNavRef>,
+    /// Outbound coupling targets plus claim CIDs from this atom.
+    #[serde(default)]
+    pub related: Vec<EprNavRef>,
+    /// Relationship kinds that contributed entries to this view.
+    #[serde(default)]
+    pub derived_from: Vec<String>,
+}

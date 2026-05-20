@@ -9905,6 +9905,17 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/epr/:cid/nav-context — EPR nav-context projection (Category C read-only)
+        // Zero new DHT entry types; zero new tables; zero migrations.
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/epr/{cid}/nav-context")
+                .handler("get_epr_nav_context")
+                .cache_ttl(30)
+                .public_if_reach("commons")
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/vf-graphql — Wave 3 M1 valueflows bridge endpoint.
         // Stub-stage: serves fixture EconomicEvent via the bridge's GraphQL schema.
         // M2+ adds identity bridge, M3+ adds real hREA projection.

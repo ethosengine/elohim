@@ -114,6 +114,8 @@ export * from "./EconomicEventView";
 export * from "./EprCouplingView";
 export * from "./EprEnvelopeView";
 export * from "./EprListView";
+export * from "./EprNavContextView";
+export * from "./EprNavRef";
 export * from "./EprProvidersView";
 export * from "./EprPublishInput";
 export * from "./EprSignatureView";
