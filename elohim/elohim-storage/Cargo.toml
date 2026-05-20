@@ -25,6 +25,10 @@ constitution = { path = "../constitution" }
 # Doorway route registration
 doorway-client = { path = "../../crates/doorway-client" }
 
+# Wave 3 — valueflows bridge (hREA / VF-GraphQL interop).
+# See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+valueflows-bridge = { path = "../../bridges/valueflows/valueflows-bridge" }
+
 # Protocol cache substrate
 elohim-cache-core = { path = "../elohim-cache-core", features = ["native"] }
 

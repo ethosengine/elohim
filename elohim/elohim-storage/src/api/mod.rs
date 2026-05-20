@@ -322,6 +322,14 @@ pub async fn handle_api_request(
                 &serde_json::json!({"error": "graph-native feature not enabled"}),
             ));
         }
+    } else if sub_path == "vf-graphql" || sub_path == "vf-graphql/" {
+        // Wave 3 M1 — valueflows bridge endpoint.
+        // Stub-stage: serves fixture EconomicEvent via the bridge's GraphQL schema.
+        // M2+ adds identity bridge (qahal-authority), M3+ adds real hREA projection.
+        // See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+        return valueflows_bridge::handle_request(req)
+            .await
+            .map_err(|e| StorageError::Internal(format!("vf-graphql bridge: {e}")));
     } else if sub_path.starts_with("graph") {
         // Phase 6 Task 26: graph-native view routes.
         // Routes register unconditionally — handlers return 501 when the feature is off.
