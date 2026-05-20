@@ -22,7 +22,7 @@
 
 **The bridge-as-flywheel pattern.** Doorway is the bridge of web2 → elohim P2P. `bridges/valueflows` is the bridge of VF/hREA → elohim EPR-REA. Both bridges absorb external protocols, project our canonical substrate into their shape, and surface enough of elohim's distinctive value (extensions, structured error reasons, social-context fingerprints) that mutual benefit compounds. The standing argument for graduation builds with usage; we don't argue for it — we make it obvious.
 
-**Build-to-learn discipline.** We could argue convergent vs hybrid architecture in the abstract; instead we build the full instrumented translator and let empirical translation-friction data tell us which path Wave 4 should commit to. The translator's job isn't to hide the seams — it's to make them legible, count them, and produce evidence-backed recommendations for upstream contribution (to Lynn) and for our own future architecture (to ourselves at Gate C).
+**The bridge speaks both worlds honestly.** VF-shaped requests are answered in VF shape; underneath, the substrate stays elohim. The translator's job is to make the seams *legible* — to clients (via structured error payloads, extension fields, denial reasons), to operators (via the learning ledger), and to upstream maintainers (via the upstream-contribution inventory that aggregates what we've learned is genuinely worth carrying back to VF/hREA proper). Faithful translation, not absorption masquerading as cooperation.
 
 ## 2. Architecture
 
@@ -231,7 +231,7 @@ bridges/valueflows/
 │   │   │   └── opt_in.rs       # SDL directive + X-Elohim-Extensions header
 │   │   └── ledger/
 │   │       ├── mod.rs          # learning-ledger schema + writes
-│   │       └── report.rs       # end-of-Wave-3 evidence report generator
+│   │       └── report.rs       # M5 ledger aggregation → upstream-inventory + R&O compat
 │   ├── tests/                  # unit tests for translation functions
 │   └── Cargo.toml              # consumed-by: elohim-storage
 ├── valueflows-types/           # shared types (TranslationPoint, etc.)
@@ -272,7 +272,7 @@ pub enum TranslationKind {
 }
 
 pub enum SemanticCost {
-    Mechanical,        // pure paperwork → convergence would eliminate cleanly
+    Mechanical,        // shape-equivalent translation; pure routing
     JustifiedDistinct, // real semantic difference → keep distinct
     UnclearYet,        // need more usage to judge
 }
@@ -290,7 +290,7 @@ pub enum OntologicalCommitment {
 Stored in a dedicated Diesel table `translation_observations` in elohim-storage. End-of-Wave-3 report aggregates and produces:
 
 - **Upstream-contribution inventory**: list of `(TranslationKind::SemanticBridge | Sidecar, SemanticCost::JustifiedDistinct)` rows, grouped by VF type, with the elohim extension fields each touches. This becomes the PR-able list we hand to Lynn.
-- **Convergence-vs-hybrid evidence**: aggregate counts of `Mechanical` (convergence wins) vs `JustifiedDistinct` (hybrid wins) translations, per VF type. Wave 4 brainstorm reads this and decides per-type whether to consolidate.
+- **R&O compatibility report**: which R&O UI flows worked end-to-end, which failed, which translation points carried the failures. Feeds back into the upstream-contribution list and into our own substrate refinement.
 
 ## 5. Data flow
 
@@ -395,9 +395,8 @@ Per `feedback_shift_measure_jenkins`: CI-level validation runs on Jenkins. Local
 **M4 — Remaining VF types.** Mutations for EconomicEvent, Commitment, Agreement, ResourceSpecification. ElohimAgent entry type + dual-path translation (extension + compatibility). Multi-device fan-out as `Person.elohimAgentKeys[]`.
 
 **M5 — Learning ledger reports.** End-of-Wave-3 deliverables generated from ledger data:
-- Upstream-contribution inventory (PR candidates for VF/hREA)
-- Convergence-vs-hybrid evidence report (per-type recommendations for Wave 4)
-- R&O compatibility report (which flows work, which fail, why)
+- Upstream-contribution inventory (PR candidates for VF/hREA — extension fields, new types, structured error shapes we found genuinely useful)
+- R&O compatibility report (which flows work, which fail, which translation points carried the failures)
 
 **M6 (optional) — Apollo Federation.** Compose `/api/v1/graphql` (native Viewer.*) + `/api/v1/vf-graphql` (VF surface) into a single federated subgraph. Clients query both worlds in one round-trip. Optional — decision deferred to end-of-M5 based on whether evidence shows real benefit.
 
@@ -405,10 +404,10 @@ Each milestone ships independently; M6 can be retired if not justified.
 
 ## 8. What this spec deliberately does NOT do
 
-- Does not commit to convergent architecture. The hybrid-with-translator approach is deliberately taken to generate evidence; Wave 4 decides convergent-vs-hybrid per VF type using the M5 evidence report.
-- Does not engage Lynn Foster / Bob Haugen pre-implementation. Engagement happens at M5 when we have the evidence-backed upstream-contribution inventory in hand — a much stronger conversation than "we want to support VF, here's what we're thinking."
+- Does not retire or migrate our existing elohim REA primitives. The bridge translates between VF and our substrate; our REA stays in elohim DNAs, hREA holds its canonical types, the translator bridges them.
+- Does not engage Lynn Foster / Bob Haugen pre-implementation. Engagement happens at M5 when we have a concrete upstream-contribution inventory in hand and R&O compatibility validated — a more grounded conversation than "we want to support VF, here's what we're thinking."
 - Does not implement read-through projection for pending VF queries (deferred to Wave 3b unless usage data demands it).
-- Does not retire our existing elohim REA entry types in elohim DNA. They stay; VF mutations create hREA projections in parallel. The duplication is the cost of build-to-learn.
+- Does not unify the two REA primitives. Our elohim REA stays for elohim-specific surfaces (Reach, FeedbackSignal, sidecar entries); hREA primitives live in their DNA for VF-shape clients. The bridge translates between them.
 - Does not put VF-GraphQL on doorway. It's a protocol surface; lives in elohim-storage.
 - Does not block on Apollo Federation. M6 is optional.
 
@@ -451,4 +450,4 @@ Implementation plan to be authored next at `genesis/docs/superpowers/plans/2026-
 - FU-5: ElohimAgent authority delegation ceremony (separate imagodei spec)
 - FU-6: Cross-bridge denial coherence resolution (Wave 4 substrate work)
 
-The Wave 3 close gates Gate C in the cross-wave guidance — at M5's evidence-backed report, the next brainstorm decides Wave 4 framing.
+The Wave 3 close gates Gate C in the cross-wave guidance — at M5, with the bridge running, the upstream-contribution inventory in hand, and R&O compatibility validated, the next brainstorm sets Wave 4 framing.

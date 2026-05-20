@@ -243,6 +243,10 @@ chrono = { workspace = true }
 //! so the schema can be referenced by analysis tooling without pulling in
 //! the full bridge (which depends on async-graphql + hyper).
 //!
+//! The ledger records each translation event — direction, VF type, semantic
+//! cost — so we can produce an upstream-contribution inventory + R&O
+//! compatibility report at M5.
+//!
 //! Reference spec:
 //! `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 //! §4.2 (Learning Ledger Schema).
@@ -251,8 +255,8 @@ use serde::{Deserialize, Serialize};
 
 /// One observation of the bridge translating between VF-GraphQL and elohim's
 /// EPR-REA substrate. Written to the `translation_observations` Diesel table
-/// in elohim-storage; aggregated at end-of-Wave-3 (M5) into the upstream-
-/// contribution inventory and the convergence-vs-hybrid evidence report.
+/// in elohim-storage; aggregated at end-of-Wave-3 (M5) into the
+/// upstream-contribution inventory + R&O compatibility report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TranslationPoint {
     pub at_iso: String, // ISO-8601 UTC; chrono::Utc::now().to_rfc3339()
@@ -289,7 +293,7 @@ pub enum TranslationKind {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SemanticCost {
-    /// Pure paperwork — convergence would eliminate cleanly.
+    /// Shape-equivalent translation; pure routing.
     Mechanical,
     /// Real semantic difference — keep distinct.
     JustifiedDistinct,
@@ -794,8 +798,7 @@ M3+ real hREA projection."
 -- See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md §4.2
 --
 -- Each row is one TranslationPoint observation. End-of-Wave-3 (M5) aggregates
--- these to produce the upstream-contribution inventory and the convergence-
--- vs-hybrid evidence report.
+-- these to produce the upstream-contribution inventory + R&O compatibility report.
 CREATE TABLE translation_observations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     observed_at TEXT NOT NULL,                  -- ISO-8601 UTC
@@ -1081,7 +1084,7 @@ git -C /projects/elohim commit -m "feat(elohim-storage): translation_observation
 
 Per Wave 3 design §4.2 — each row is one TranslationPoint observation
 recorded by the valueflows bridge. M5 aggregates these into the
-upstream-contribution inventory + convergence-vs-hybrid evidence report.
+upstream-contribution inventory + R&O compatibility report.
 
 Includes Diesel model, From<TranslationPoint> conversion, insert helper,
 and observe_now() convenience constructor."
@@ -1169,8 +1172,8 @@ impl QueryRoot {
 //! VF `EconomicEvent` GraphQL object + M1 fixture resolver.
 //!
 //! Every resolve call writes a TranslationPoint observation to the ledger
-//! so the M5 evidence report has coverage data even for the M1 tracer
-//! bullet path.
+//! so the M5 upstream-contribution + R&O compatibility reports have
+//! coverage data even for the M1 tracer-bullet path.
 
 use async_graphql::{Object, ID};
 use chrono::Utc;
