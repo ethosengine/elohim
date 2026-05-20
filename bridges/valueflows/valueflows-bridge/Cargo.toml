@@ -24,7 +24,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-tokio-test = { workspace = true }
 # 0.27 + bundled: compiles sqlite3 from source for bridge-local tests.
 # elohim-storage uses 0.35 via Diesel — harmless because the valueflows
 # workspace is isolated from the elohim workspace; no shared `links`

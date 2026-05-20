@@ -15,11 +15,8 @@ tokio = { workspace = true }
 async-graphql = { workspace = true }
 serde_json = { workspace = true }
 diesel = { workspace = true }
-diesel_migrations = "2"
-r2d2 = "0.8"
+diesel_migrations = { workspace = true }
 
 # 0.27 + bundled: see same comment in valueflows-bridge/Cargo.toml
 libsqlite3-sys = { version = "0.27", features = ["bundled"] }
 
-[dev-dependencies]
-tokio-test = { workspace = true }

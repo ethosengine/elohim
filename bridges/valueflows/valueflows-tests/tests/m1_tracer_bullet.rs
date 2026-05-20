@@ -8,10 +8,10 @@
 //! This is the smallest end-to-end test that proves the M1 wire path.
 
 use diesel::prelude::*;
-use diesel::r2d2::ConnectionManager;
+use diesel::r2d2::{ConnectionManager, Pool};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use r2d2::Pool;
 use valueflows_bridge::{schema, BridgeContext, DbPool};
+use valueflows_types::TranslationKind;
 
 /// Re-embed the elohim-storage migrations directory at test build time so
 /// the in-memory sqlite has the `translation_observations` table.
@@ -51,14 +51,11 @@ async fn economic_event_query_returns_fixture_and_logs_observation() {
     assert_eq!(ee["action"], "transfer", "fixture action");
     assert_eq!(ee["provider"], "agent-fixture-provider");
     assert_eq!(ee["receiver"], "agent-fixture-receiver");
-    assert!(ee["note"].is_string(), "note present");
-
-    // Give the spawn_blocking ledger write a moment to complete.
-    // (It's awaited inside resolve, but the resolver may return before the
-    // observation has flushed to the in-memory db if the runtime schedules
-    // the join late. tokio::task::yield_now is enough on a single-thread
-    // runtime; a small sleep is safer across runtime configurations.)
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    assert_eq!(
+        ee["note"],
+        "M1 tracer-bullet fixture; M3 will return real hREA data",
+        "note matches fixture",
+    );
 
     // Verify a translation observation was written.
     let mut conn = pool.get().expect("get conn");
@@ -74,7 +71,11 @@ async fn economic_event_query_returns_fixture_and_logs_observation() {
     .get_result::<StringRow>(&mut conn)
     .expect("kind query")
     .c;
-    assert_eq!(kind, "IdentityShape", "M1 fixture is IdentityShape");
+    assert_eq!(
+        kind,
+        TranslationKind::IdentityShape.as_ledger_str(),
+        "M1 fixture is IdentityShape",
+    );
 }
 
 #[derive(QueryableByName)]

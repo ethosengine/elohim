@@ -30,6 +30,7 @@ bytes = "1.10"
 
 # Diesel — for ledger writes
 diesel = { version = "2.2", features = ["sqlite", "r2d2", "chrono"] }
+diesel_migrations = "2"
 
 # Utilities
 thiserror = "1"
@@ -38,4 +39,3 @@ tracing = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 
 # Test utilities
-tokio-test = "0.4"
