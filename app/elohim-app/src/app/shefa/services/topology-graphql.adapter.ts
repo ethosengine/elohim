@@ -27,6 +27,7 @@ import type { PeerHouseholdEdge, PeerTopologyView } from '@app/generated/peer-to
 import type { ReciprocityRow } from '@app/generated/reciprocity-row';
 import type { ReciprocityView } from '@app/generated/reciprocity-view';
 import type {
+  ComputeTriptychGql,
   DeviceSummaryGql,
   FreshnessGql,
   PeerHouseholdEdgeGql,
@@ -68,7 +69,9 @@ function adaptArchetype(gql: DeviceSummaryGql['archetype']): DeviceArchetype {
   return gql.toLowerCase() as DeviceArchetype;
 }
 
-function adaptDevice(gql: DeviceSummaryGql): MyClusterView['devices'][number] {
+function adaptDevice(
+  gql: DeviceSummaryGql,
+): MyClusterView['devices'][number] & { compute: ComputeTriptychGql | null } {
   return {
     peerId: gql.peerId,
     archetype: adaptArchetype(gql.archetype),
@@ -84,6 +87,7 @@ function adaptDevice(gql: DeviceSummaryGql): MyClusterView['devices'][number] {
     ...(gql.hostingCount !== null && { hostingCount: gql.hostingCount }),
     ...(gql.projectingCount !== null && { projectingCount: gql.projectingCount }),
     ...(gql.beaconAgeMs !== null && { beaconAgeMs: Number(gql.beaconAgeMs) }),
+    compute: gql.compute ?? null,
   };
 }
 
@@ -102,17 +106,30 @@ function adaptEdge(gql: PeerHouseholdEdgeGql): PeerHouseholdEdge {
 }
 
 // ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
+/**
+ * `MyClusterView` extended with the compute triptych on each device.
+ * The REST path omits `compute`; the GraphQL path always populates it
+ * (null when the peer has no compute signal yet).
+ */
+export type MyClusterViewWithCompute = Omit<MyClusterView, 'devices'> & {
+  devices: (MyClusterView['devices'][number] & { compute: ComputeTriptychGql | null })[];
+};
+
+// ---------------------------------------------------------------------------
 // Public adapters
 // ---------------------------------------------------------------------------
 
 /**
  * Adapt the `data` payload of a `VIEWER_HUB_QUERY` response into the
- * REST-equivalent `MyClusterView`.
+ * REST-equivalent `MyClusterView` (extended with per-device compute triptych).
  *
  * The caller is responsible for unwrapping the GraphQL envelope
  * (`{ data, errors }`); this function receives the typed `data` value.
  */
-export function adaptHubResponse(gql: ViewerHubResponse): MyClusterView {
+export function adaptHubResponse(gql: ViewerHubResponse): MyClusterViewWithCompute {
   const hub = gql.viewer.hub;
   return {
     agentCid: hub.agentCid,
