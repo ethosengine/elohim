@@ -100,8 +100,12 @@ pub async fn resolve(
 
 /// Insert the observation via a raw Diesel call. We inline the SQL here in
 /// M1 to avoid a circular dependency with elohim-storage (which consumes
-/// this crate). In M2+ this is refactored to call back into elohim-storage's
-/// `db::translation_observations::insert_observation`.
+/// this crate; calling INTO elohim-storage would re-create the cycle).
+///
+/// M3 resolution: move `insert_observation` and `observe_now` from
+/// elohim-storage's `db::translation_observations` into `valueflows-types`
+/// (which has no storage dep — it's a leaf crate). Then both the bridge
+/// and elohim-storage call the types-crate helper, no cycle.
 ///
 /// IMPORTANT: uses `.as_ledger_str()` (not `format!("{:?}", …)`) for all
 /// enum-to-string conversions. Debug format is not a stable wire format; a
@@ -109,9 +113,10 @@ pub async fn resolve(
 /// in the `translation_observations` migration.
 ///
 // Note: block_height is intentionally omitted from this INSERT — TranslationPoint::at_block_height
-// is always None in M1 (no conductor context). M3+ will add the column to the INSERT and switch
-// to elohim-storage's `db::translation_observations::insert_observation` once the circular-dep
-// concern is resolved (likely by exposing valueflows-types as the canonical helper home).
+// is always None in M1 (no conductor context). M3 will add the column once
+// `insert_observation` / `observe_now` move to `valueflows-types` (the leaf
+// crate with no storage dep), at which point both the bridge and
+// elohim-storage call the shared helper with no cycle.
 fn write_observation(
     ctx: &BridgeContext,
     p: TranslationPoint,

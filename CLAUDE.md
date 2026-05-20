@@ -84,6 +84,10 @@ Sophia is the **rendering layer only** - it produces Recognition callbacks. Sess
 
 Rust service consolidating three functions: bootstrap (agent discovery), signal (WebRTC), and gateway (conductor proxy + caching). Serves both hosted users (browser via doorway.elohim.host) and local dev (proxied via Angular dev server at localhost:8888).
 
+### Bridges (`bridges/`)
+
+Pluggable interop crates that translate external protocols to and from elohim's canonical EPR-REA substrate. Runtimes consume the bridges relevant to their job: `doorway-service` consumes web2 bridges (`atproto`, `activitypub`, planned); `elohim-storage` consumes protocol-shaped bridges (`valueflows` for hREA / VF-GraphQL). See `bridges/CLAUDE.md` for the pattern and `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md` for Wave 3 substrate work.
+
 ### Content Pipeline
 
 `genesis/` contains source content (markdown, Gherkin) and seeder tools. Content flows: genesis docs -> elohim-import CLI -> seed data JSON -> seeder -> elohim-storage -> doorway -> elohim-app.
