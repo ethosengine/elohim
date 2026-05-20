@@ -29,7 +29,7 @@ Feature: Observable + contract-aware auto-distribute
 
   # --- Content-viewer tooltip ----------------------------------------------
 
-  @wip @resilience-p1
+  @resilience-p1
   Scenario: Content-viewer resilience tooltip is live
     Given "content-alpha" has been distributed to at least 2 households
     When I open the content-viewer for "content-alpha"
