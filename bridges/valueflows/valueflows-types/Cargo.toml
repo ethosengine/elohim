@@ -1,0 +1,12 @@
+[package]
+name = "valueflows-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Stable type definitions for the valueflows bridge — TranslationPoint, enums."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }

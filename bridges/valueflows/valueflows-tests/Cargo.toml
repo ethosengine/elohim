@@ -1,0 +1,13 @@
+[package]
+name = "valueflows-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Integration tests for the valueflows bridge."
+
+[dependencies]
+valueflows-types = { path = "../valueflows-types" }
+valueflows-bridge = { path = "../valueflows-bridge" }
+serde = { workspace = true }
+serde_json = { workspace = true }

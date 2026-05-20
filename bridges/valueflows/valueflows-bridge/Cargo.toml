@@ -1,0 +1,13 @@
+[package]
+name = "valueflows-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "VF-GraphQL / hREA bridge for elohim's EPR-REA substrate."
+
+[dependencies]
+valueflows-types = { path = "../valueflows-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
