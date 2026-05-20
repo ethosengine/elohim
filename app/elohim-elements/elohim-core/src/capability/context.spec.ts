@@ -19,7 +19,9 @@ class TestProvider extends LitElement {
   certainty: ContentCertainty = UNKNOWN_CERTAINTY;
 
   override render() {
-    return html`<slot></slot>`;
+    return html`
+      <slot></slot>
+    `;
   }
 }
 customElements.define('test-provider', TestProvider);
@@ -34,7 +36,9 @@ class TestConsumer extends LitElement {
   certainty: ContentCertainty = UNKNOWN_CERTAINTY;
 
   override render() {
-    return html`<span data-lens=${this.profile.lens} data-state=${this.certainty.state}></span>`;
+    return html`
+      <span data-lens=${this.profile.lens} data-state=${this.certainty.state}></span>
+    `;
   }
 }
 customElements.define('test-consumer', TestConsumer);

@@ -4,13 +4,7 @@
  * See: genesis/docs/superpowers/specs/2026-05-20-capability-profile-element-contract-design.md §2
  */
 
-export type Lens =
-  | 'minimal'
-  | 'simple'
-  | 'standard'
-  | 'detail'
-  | 'debug'
-  | 'trace';
+export type Lens = 'minimal' | 'simple' | 'standard' | 'detail' | 'debug' | 'trace';
 
 export const LENS_ORDER: readonly Lens[] = [
   'minimal',

@@ -9,12 +9,12 @@
  */
 
 export type CertaintyState =
-  | 'canonical'   // fresh, fully reconciled, multiple confirming attestations
-  | 'partial'     // syncing in progress; some peers haven't responded yet
-  | 'stale'       // last reconciled long ago; may be out of date
-  | 'contested'   // multiple attestations disagree; no canonical view exists
+  | 'canonical' // fresh, fully reconciled, multiple confirming attestations
+  | 'partial' // syncing in progress; some peers haven't responded yet
+  | 'stale' // last reconciled long ago; may be out of date
+  | 'contested' // multiple attestations disagree; no canonical view exists
   | 'unreachable' // no peer currently serving; local cache only
-  | 'unknown';    // freshly opened, not yet probed
+  | 'unknown'; // freshly opened, not yet probed
 
 export interface ContentCertainty {
   state: CertaintyState;

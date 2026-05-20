@@ -6,13 +6,13 @@
 
 import { createContext } from '@lit/context';
 
-import type { CapabilityProfile } from './profile.js';
 import type { ContentCertainty } from './certainty.js';
+import type { CapabilityProfile } from './profile.js';
 
 export const capabilityProfileContext = createContext<CapabilityProfile>(
-  Symbol.for('elohim-capability-profile'),
+  Symbol.for('elohim-capability-profile')
 );
 
 export const contentCertaintyContext = createContext<ContentCertainty>(
-  Symbol.for('elohim-content-certainty'),
+  Symbol.for('elohim-content-certainty')
 );

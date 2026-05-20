@@ -19,7 +19,10 @@ import type { Standing } from './profile.js';
  */
 export function parseStandingRequirement(requirement: readonly string[]): readonly Standing[][] {
   return requirement.map(entry =>
-    entry.split('|').map(token => token.trim()).filter(token => token.length > 0)
+    entry
+      .split('|')
+      .map(token => token.trim())
+      .filter(token => token.length > 0)
   );
 }
 

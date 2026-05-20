@@ -15,7 +15,14 @@ describe('ContentCertainty / UNKNOWN_CERTAINTY', () => {
   });
 
   it('enumerates the six CertaintyState values', () => {
-    const states: CertaintyState[] = ['canonical', 'partial', 'stale', 'contested', 'unreachable', 'unknown'];
+    const states: CertaintyState[] = [
+      'canonical',
+      'partial',
+      'stale',
+      'contested',
+      'unreachable',
+      'unknown',
+    ];
     expect(states).to.have.lengthOf(6);
   });
 });

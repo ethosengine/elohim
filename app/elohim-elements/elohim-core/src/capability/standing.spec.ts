@@ -25,7 +25,10 @@ describe('Standing DSL', () => {
 
     it('trims whitespace around | tokens', () => {
       const parsed = parseStandingRequirement(['pilot|steward', 'pilot |  contributor']);
-      expect(parsed).to.deep.equal([['pilot', 'steward'], ['pilot', 'contributor']]);
+      expect(parsed).to.deep.equal([
+        ['pilot', 'steward'],
+        ['pilot', 'contributor'],
+      ]);
     });
   });
 
@@ -51,7 +54,8 @@ describe('Standing DSL', () => {
     });
 
     it('handles mixed: AND of (pilot OR steward) AND contributor', () => {
-      expect(satisfiesRequirement(['steward', 'contributor'], ['pilot | steward', 'contributor'])).to.be.true;
+      expect(satisfiesRequirement(['steward', 'contributor'], ['pilot | steward', 'contributor']))
+        .to.be.true;
       expect(satisfiesRequirement(['steward'], ['pilot | steward', 'contributor'])).to.be.false;
     });
 
