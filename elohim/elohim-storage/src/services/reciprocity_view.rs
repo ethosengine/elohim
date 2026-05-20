@@ -11,6 +11,7 @@
 //! committed P bytes to me, delivered Q." This is the per-agent reciprocity
 //! ledger that powers the topology UI's reciprocation-count drilldown.
 
+use std::collections::HashMap;
 use std::collections::HashSet;
 
 use diesel::dsl::sql;
@@ -98,6 +99,51 @@ pub async fn aggregate_reciprocity_view(
         net_hosted_bytes,
         capacity_available_bytes,
     })
+}
+
+/// Aggregate stewarded bytes per peer.
+///
+/// For each peer in `my_peer_ids`, SUMs the `resource_quantity_value` of all
+/// `rea_commitments` rows where `action = 'custody-blob'` and `provider = peer`.
+/// Returns a map from peer_id → total committed bytes (as `u64`).
+///
+/// Peers with no matching commitments are absent from the returned map.
+///
+/// ## Source-of-truth lineage
+/// Category-C operational projection over Category-A notarized REA Commitments
+/// (`rea_commitments` table). No federation needed — every node indexes the
+/// global REA flow via the `rea_projection` signal stream.
+///
+/// ## Care-class / compute-class isolation
+/// This function touches only `custody-blob` commitments, which are
+/// compute-class. The `action` filter prevents accidental co-mingling with
+/// care-class commitment kinds.
+pub async fn aggregate_stewarded_bytes_by_peer(
+    pool: &DbPool,
+    my_peer_ids: &[String],
+) -> Result<HashMap<String, u64>, ReciprocityViewError> {
+    use crate::db::diesel_schema::rea_commitments::dsl as rc;
+
+    let peer_strs: Vec<&str> = my_peer_ids.iter().map(String::as_str).collect();
+
+    let mut conn = pool
+        .get()
+        .map_err(|e| ReciprocityViewError::Pool(e.to_string()))?;
+
+    let rows: Vec<(String, Option<f32>)> = rc::rea_commitments
+        .filter(rc::action.eq("custody-blob"))
+        .filter(rc::provider.eq_any(&peer_strs))
+        .group_by(rc::provider)
+        .select((
+            rc::provider,
+            sql::<Nullable<Float>>("SUM(resource_quantity_value)"),
+        ))
+        .load::<(String, Option<f32>)>(&mut conn)?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|(peer, bytes)| bytes.map(|b| (peer, b.max(0.0) as u64)))
+        .collect())
 }
 
 /// Direction of byte flow relative to this agent's peer set.
