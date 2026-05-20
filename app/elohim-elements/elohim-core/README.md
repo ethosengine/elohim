@@ -36,11 +36,34 @@ pnpm --filter elohim-core run format:check
 
 Configs live at the umbrella `app/elohim-elements/` so all 8 packages inherit one source of truth.
 
+## Capability Profile
+
+`elohim-core` exports the **Capability Profile** primitive — a frozen context object that every element observes via the `CapabilityAwareElement` mixin. The profile carries:
+
+- `lens` — disclosure tier (minimal → trace)
+- `theme` / `contrast` / `locale` — visual + language register
+- `stimulus` — motion tier (**default: still**)
+- `textuality` — symbolic vs textual
+- `standings[]` — attested roles
+- `lock` — steward / elohim-support / pilot constraint set
+- `origin` — who set this profile
+
+Companion `ContentCertainty` describes the **content being rendered**: canonical / partial / stale / contested / unreachable / unknown.
+
+Elements declare a `capabilityContract` via JSDoc `@capability*` tags, which the CEM analyzer reads into `dist/custom-elements.json`. The contract is the single source of truth for *which cells the element implements* and *which states it has designed for*.
+
+Three **precondition gates** sit above all cells — a11y, i18n, ua-prefs (incl. photosensitive-flash). Failing any gate blocks every cell.
+
+For the full design, see `genesis/docs/superpowers/specs/2026-05-20-capability-profile-element-contract-design.md`.
+
 ## Adding a new atom
 
 1. **Write the failing test in `src/<your-atom>.spec.ts`** — describe the public contract (slot, properties, events, ARIA, axe-core scan). Tests are the spec; the implementation must satisfy them.
 2. **Implement `src/<your-atom>.ts`** extending `LitElement`. Use:
    - JSDoc tags (`@element`, `@prop`, `@fires`, `@slot`, `@cssprop`, `@csspart`) for the manifest analyzer
+   - `@capabilityMaxLens`, `@capabilityThemes`, `@capabilityContrast`, `@capabilityLocales`, `@capabilityMaxStimulus`, `@capabilityTextuality` for the visual contract
+   - `@capabilityRequiredStandings`, `@capabilityOptionalStandings` for role requirements
+   - `@capabilityContentCertainty observed | not-observed` and `@capabilityStates name:status, ...` for the orthogonal claims
    - `@property` decorators (NOT `@customElement` — registration lives in register.ts to keep index.ts side-effect-free)
    - `static readonly` on `shadowRootOptions` and `styles` (sonarjs lint rule)
    - `delegatesFocus: true` on `shadowRootOptions` for focusable atoms
