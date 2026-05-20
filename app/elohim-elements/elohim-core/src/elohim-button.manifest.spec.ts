@@ -86,3 +86,52 @@ describe('elohim-button custom-elements-manifest', () => {
     expect(eventNames).to.include('click');
   });
 });
+
+describe('<elohim-button> — capabilityContract manifest', () => {
+  let contract: any;
+
+  before(async () => {
+    const response = await fetch('/dist/custom-elements.json');
+    const cem = await response.json();
+    const decl = cem.modules.flatMap((m: any) => m.declarations || [])
+      .find((d: any) => d.name === 'ElohimButton');
+    contract = decl?.capabilityContract;
+  });
+
+  it('declares the precondition gate fields', () => {
+    expect(contract).to.exist;
+    expect(contract).to.have.property('a11y');
+    expect(contract).to.have.property('i18n');
+    expect(contract).to.have.property('uaPrefs');
+  });
+
+  it('claims maxLens=standard', () => {
+    expect(contract.maxLens).to.equal('standard');
+  });
+
+  it('claims maxStimulus=still (button does not animate beyond focus)', () => {
+    expect(contract.maxStimulus).to.equal('still');
+  });
+
+  it('claims both themes (light and dark)', () => {
+    expect(contract.themes).to.deep.equal(['light', 'dark']);
+  });
+
+  it('claims both contrast tiers (normal and high)', () => {
+    expect(contract.contrast).to.deep.equal(['normal', 'high']);
+  });
+
+  it('claims contentCertainty=not-observed (button has no content to evaluate)', () => {
+    expect(contract.contentCertainty).to.equal('not-observed');
+  });
+
+  it('marks all states as n/a (button has no state semantics)', () => {
+    expect(contract.states.empty).to.equal('n/a');
+    expect(contract.states.error).to.equal('n/a');
+    expect(contract.states.contested).to.equal('n/a');
+  });
+
+  it('requires pilot | steward | elohim-support standing', () => {
+    expect(contract.standings.required).to.deep.equal(['pilot | steward | elohim-support']);
+  });
+});
