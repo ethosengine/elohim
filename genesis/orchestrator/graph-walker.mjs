@@ -9,6 +9,7 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import picomatch from 'picomatch';
 import { loadManifests, resolveStep } from './manifest-utils.mjs';
+import { filterChanged } from './ci-ignore.mjs';
 
 /**
  * Topologically sort steps using Kahn's algorithm.
@@ -148,8 +149,13 @@ const isMain = import.meta.url === `file://${process.argv[1]}` ||
 
 if (isMain) {
   const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
-  const input = readFileSync('/dev/stdin', 'utf8');
-  const changedFiles = input.split('\n').map(f => f.trim()).filter(Boolean);
+  // Read stdin via fd 0 (works for both terminal and pipe; '/dev/stdin'
+  // fails with ENXIO when stdin is a child-process pipe).
+  const input = readFileSync(0, 'utf8');
+  const rawFiles = input.split('\n').map(f => f.trim()).filter(Boolean);
+  // Apply .ci-ignore at the CLI boundary so husky and any other stdin
+  // consumer see the same filtered list as the Jenkinsfile does.
+  const changedFiles = filterChanged(rawFiles);
   const manifests = loadManifests(ROOT);
   const result = walkGraph(manifests, changedFiles);
   process.stdout.write(JSON.stringify(result) + '\n');

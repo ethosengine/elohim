@@ -8,8 +8,12 @@
 #
 # This is the single source of truth. Consumed by:
 #   - genesis/orchestrator/Jenkinsfile         (auto-mode change detection)
-#   - genesis/orchestrator/orchestrator-strategy.mjs  (preview + tests)
-# Both load this file at runtime — no mirroring, no drift.
+#   - genesis/orchestrator/ci-ignore.mjs       (shared JS parser/matcher + CLI filter)
+#   - genesis/orchestrator/orchestrator-strategy.mjs  (preview + tests, via ci-ignore.mjs)
+#   - genesis/orchestrator/graph-walker.mjs    (CLI pre-filter, via ci-ignore.mjs)
+#   - .husky/pre-push                          (pipes $CHANGED through ci-ignore.mjs)
+# All load this file at runtime — no mirroring, no drift. (Jenkinsfile
+# is Groovy and reimplements the parser; drift is caught by tests.)
 #
 # Before adding a basename: verify NO project's build/storybook/test
 # pipeline reads the file by name as a real source input.

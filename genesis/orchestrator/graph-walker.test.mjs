@@ -1,5 +1,8 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { execFileSync } from 'node:child_process';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { walkGraph, topoSort } from './graph-walker.mjs';
 import { resolveStep } from './manifest-utils.mjs';
 
@@ -233,5 +236,51 @@ describe('output ordering', () => {
     ];
     const result = walkGraph(manifests, ['aaa/x.ts', 'bbb/y.ts']);
     assert.equal(result.projects.length, 2);
+  });
+});
+
+// ── CLI: .ci-ignore filter ───────────────────────────────────────
+// The CLI is what .husky/pre-push pipes $CHANGED into. It must drop
+// files listed in repo-root .ci-ignore (basenames like CLAUDE.md,
+// subtrees like .claude/, .husky/, .github/) BEFORE matching against
+// any manifest glob. A push that only touches CI-ignored paths must
+// emit zero projects, matching the Jenkinsfile orchestrator's behavior.
+
+describe('CLI .ci-ignore filtering', () => {
+  const CLI = resolve(dirname(fileURLToPath(import.meta.url)), 'graph-walker.mjs');
+
+  function runCli(stdinLines) {
+    const out = execFileSync('node', [CLI], {
+      input: stdinLines.join('\n'),
+      encoding: 'utf8',
+    });
+    return JSON.parse(out);
+  }
+
+  it('emits zero projects when only .claude/ files change', () => {
+    const result = runCli(['.claude/skills/foo/SKILL.md', '.claude/settings.json']);
+    assert.equal(result.projects.length, 0);
+  });
+
+  it('emits zero projects when only CLAUDE.md / AGENTS.md change', () => {
+    const result = runCli(['CLAUDE.md', 'app/elohim-app/AGENTS.md', 'sophia/CLAUDE.md']);
+    assert.equal(result.projects.length, 0);
+  });
+
+  it('emits zero projects when only .husky/ files change', () => {
+    const result = runCli(['.husky/pre-push']);
+    assert.equal(result.projects.length, 0);
+  });
+
+  it('still detects real source changes mixed with ignored ones', () => {
+    const result = runCli([
+      'CLAUDE.md',                                   // ignored
+      '.claude/skills/x.md',                          // ignored
+      'app/elohim-app/src/app/app.component.ts',     // real source — should match a manifest
+    ]);
+    // We don't pin which project — just that the ignored files didn't
+    // suppress the real one.
+    assert.ok(result.projects.length >= 1,
+      `expected at least one project for the real source change; got ${JSON.stringify(result.projects)}`);
   });
 });

@@ -83,6 +83,26 @@ if [ -z "$CHANGED" ]; then
   exit 0
 fi
 
+# ── .ci-ignore filter ─────────────────────────────────────────────
+#
+# Drop files that are listed in repo-root .ci-ignore (CLAUDE.md, .claude/,
+# .github/, .husky/, etc.) BEFORE any project-detection runs. Same parser
+# the Jenkinsfile and graph-walker use, so the manifest path, the fallback
+# grep path, and CI all agree on what counts as a "source" change.
+#
+# If node isn't on PATH (degraded shell), skip filtering — fail-open is
+# safer than refusing to push.
+if command -v node >/dev/null 2>&1 && [ -f genesis/orchestrator/ci-ignore.mjs ]; then
+  FILTERED=$(printf '%s\n' "$CHANGED" | node genesis/orchestrator/ci-ignore.mjs 2>/dev/null)
+  if [ $? -eq 0 ]; then
+    CHANGED="$FILTERED"
+  fi
+  if [ -z "$CHANGED" ]; then
+    echo "[pre-push] All changes are .ci-ignore'd (docs/agents/CI-only) — skipping gates."
+    exit 0
+  fi
+fi
+
 # ── Humans/Presences Schema Validation + Freshness ───────────────
 #
 # When genesis/data/humans/ or genesis/data/presences/ markdown changes,
@@ -559,3 +579,128 @@ brit_advisory() {
     REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" plan --target origin/dev 2>/dev/null || true
   fi
 }
+
+if [ -n "$RA_PIDS" ]; then
+  RA_COUNT=$(echo "$RA_PIDS" | wc -l | tr -d ' ')
+  echo "  Pausing $RA_COUNT rust-analyzer process(es) to free RAM..."
+  for pid in $RA_PIDS; do
+    kill -STOP "$pid" 2>/dev/null || true
+  done
+  trap resume_rust_analyzer EXIT INT TERM HUP
+fi
+
+# ── Run Gates ─────────────────────────────────────────────────────
+
+PROJECT_COUNT=$(echo "$PROJECTS" | wc -w | tr -d ' ')
+DISPLAY_LIST=$(echo "$PROJECTS" | tr ' ' ', ')
+
+echo ""
+echo "============================================"
+echo "  PRE-PUSH GATE: Changes detected"
+echo "============================================"
+echo "  Projects: $DISPLAY_LIST"
+echo ""
+
+TOTAL_START=$(date +%s)
+FAILED=""
+RESULTS=""
+INDEX=0
+
+if [ "$USE_MANIFEST" = true ]; then
+  set -- $MANIFEST_DIRS
+fi
+
+for PROJECT in $PROJECTS; do
+  INDEX=$((INDEX + 1))
+  PROJECT_START=$(date +%s)
+
+  # Map project name to directory
+  if [ "$USE_MANIFEST" = true ]; then
+    PROJECT_DIR="$1"
+    shift
+  else
+    case "$PROJECT" in
+      elohim-app)       PROJECT_DIR="app/elohim-app" ;;
+      elohim-library)   PROJECT_DIR="app/elohim-library" ;;
+      sophia)           PROJECT_DIR="sophia" ;;
+      doorway)          PROJECT_DIR="doorway/doorway-service" ;;
+      doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
+      elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
+      epr-storage)      PROJECT_DIR="elohim/elohim-storage" ;;
+      elohim-compute)   PROJECT_DIR="elohim/elohim-compute" ;;
+      elohim-epr)       PROJECT_DIR="elohim/epr" ;;
+      steward-node)     PROJECT_DIR="steward/node" ;;
+      genesis)          PROJECT_DIR="genesis/seeder" ;;
+      schema-validate)  PROJECT_DIR="." ;;
+      schema-dna)       PROJECT_DIR="." ;;
+      schema-codegen)   PROJECT_DIR="." ;;
+      constants-sync)   PROJECT_DIR="." ;;
+      genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
+      orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
+      domain-types)     PROJECT_DIR="." ;;
+      rakia-codegen)    PROJECT_DIR="." ;;
+      rakia-validate)   PROJECT_DIR="." ;;
+      cargo-coverage)   PROJECT_DIR="." ;;
+      manifest-hygiene) PROJECT_DIR="." ;;
+      sweettest-check) PROJECT_DIR="." ;;
+      elements-codegen) PROJECT_DIR="." ;;
+      *)                PROJECT_DIR="$PROJECT" ;;
+    esac
+  fi
+
+  run_gate "$PROJECT" "$PROJECT_DIR"
+  GATE_EXIT=$?
+
+  PROJECT_END=$(date +%s)
+  PROJECT_ELAPSED=$((PROJECT_END - PROJECT_START))
+
+  if [ $GATE_EXIT -ne 0 ]; then
+    echo "$PROJECT: FAILED (${PROJECT_ELAPSED}s)"
+    FAILED="$FAILED $PROJECT"
+  else
+    echo "$PROJECT: PASSED (${PROJECT_ELAPSED}s)"
+  fi
+  echo ""
+
+  RESULTS="$RESULTS  $PROJECT: $([ $GATE_EXIT -eq 0 ] && echo PASSED || echo FAILED) (${PROJECT_ELAPSED}s)\n"
+done
+
+TOTAL_END=$(date +%s)
+TOTAL_ELAPSED=$((TOTAL_END - TOTAL_START))
+
+# Trim leading space from FAILED
+FAILED=$(echo "$FAILED" | sed 's/^ //')
+
+if [ -n "$FAILED" ]; then
+  echo "============================================"
+  echo "  PRE-PUSH GATE: FAILED (${TOTAL_ELAPSED}s)"
+  echo "============================================"
+  echo "  Failed: $FAILED"
+  echo ""
+  echo "  Fix errors before pushing."
+  echo "  Bypass: HUSKY=0 git push"
+  echo "============================================"
+  exit 1
+fi
+
+echo "============================================"
+echo "  PRE-PUSH GATE: ALL CLEAR (${TOTAL_ELAPSED}s)"
+echo "============================================"
+echo ""
+
+# ── cargo-deny bans check ────────────────────────────────────────
+# Enforces the elohim-views/elohim-sdk boundary — see deny.toml for rules.
+if command -v cargo-deny >/dev/null 2>&1; then
+  echo ""
+  echo "── cargo deny check bans (elohim workspace) ───────────────────"
+  if ! (cd "$(git rev-parse --show-toplevel)" && cargo deny --manifest-path elohim/Cargo.toml check bans 2>&1 | tail -20); then
+    echo "✗ cargo-deny failed — boundary violation. See deny.toml for rules."
+    exit 1
+  fi
+  echo "── end cargo deny check ───────────────────────────────────────"
+fi
+
+# Stage 1a: advisory brit checks (never fail the push).
+brit_advisory
+
+exit 0

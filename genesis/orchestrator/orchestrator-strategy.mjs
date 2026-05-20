@@ -21,9 +21,6 @@
  * module and the Jenkinsfile read at runtime.
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 // ══════════════════════════════════════════════════════════════════
 // PIPELINES config — extracted from Jenkinsfile (keep in sync!)
@@ -116,56 +113,14 @@ export const PIPELINES = {
 // ══════════════════════════════════════════════════════════════════
 
 // ══════════════════════════════════════════════════════════════════
-// .ci-ignore — gitignore-style patterns for files that NEVER trigger
-// source pipelines. Loaded from repo root; same file read by the
-// Jenkinsfile.
+// .ci-ignore — re-exported from ci-ignore.mjs (shared with graph-walker
+// CLI and .husky/pre-push). The repo-root `.ci-ignore` file remains the
+// single source of truth; the Jenkinsfile mirrors the same logic in
+// Groovy because it can't import .mjs.
 // ══════════════════════════════════════════════════════════════════
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const CI_IGNORE_PATH = resolve(REPO_ROOT, '.ci-ignore');
-
-/**
- * Parse .ci-ignore text into a list of pattern objects.
- *
- * Pattern shapes (gitignore-flavored):
- *   - trailing '/'       → subtree prefix match
- *   - contains '/'       → exact path match (anchored)
- *   - no '/'             → basename match anywhere
- *
- * Returns array of `{ kind: 'prefix'|'exact'|'basename', value: string }`.
- */
-export function parseCiIgnore(text) {
-  return text
-    .split('\n')
-    .map(line => line.replace(/\s*#.*$/, '').trim())
-    .filter(Boolean)
-    .map(value => {
-      if (value.endsWith('/')) return { kind: 'prefix', value };
-      if (value.includes('/')) return { kind: 'exact', value };
-      return { kind: 'basename', value };
-    });
-}
-
-/**
- * Check a single file path against parsed .ci-ignore patterns.
- * Mirrors the same logic in Jenkinsfile's isCiIgnored helper.
- */
-export function matchesCiIgnore(file, patterns) {
-  for (const p of patterns) {
-    if (p.kind === 'prefix') {
-      if (file.startsWith(p.value)) return true;
-    } else if (p.kind === 'exact') {
-      if (file === p.value) return true;
-    } else {
-      const slash = file.lastIndexOf('/');
-      const basename = slash >= 0 ? file.slice(slash + 1) : file;
-      if (basename === p.value) return true;
-    }
-  }
-  return false;
-}
-
-export const CI_IGNORE_PATTERNS = parseCiIgnore(readFileSync(CI_IGNORE_PATH, 'utf8'));
+export { parseCiIgnore, matchesCiIgnore, CI_IGNORE_PATTERNS } from './ci-ignore.mjs';
+import { matchesCiIgnore, CI_IGNORE_PATTERNS } from './ci-ignore.mjs';
 
 /**
  * Mirrors Jenkinsfile analyzePipelineRequirements() — changeset analysis.
