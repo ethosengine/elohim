@@ -22,15 +22,14 @@ export class SessionNavStackService {
   readonly entries = this._stack.asReadonly();
   readonly length = (): number => this._stack().length;
   /**
-   * The entry to navigate back to. When the stack has 2+ entries, this is
-   * the second-to-last (the stop before the current one). When there is
-   * exactly one entry, that entry itself is the back destination — the
-   * visitor arrived here from it. Returns null when the stack is empty.
+   * The entry to navigate back to. Only defined when the stack has 2+
+   * entries — returns the second-to-last (the stop before the current one).
+   * Returns null for 0 or 1 entries so nav.back() falls through to the
+   * EPR-derived substrate signal rather than looping to the current page.
    */
   readonly previous = (): NavStackEntry | null => {
     const s = this._stack();
-    if (s.length === 0) return null;
-    return (s.length >= 2 ? s.at(-2) : s[0]) ?? null;
+    return s.length >= 2 ? (s[s.length - 2] ?? null) : null;
   };
 
   constructor() {
