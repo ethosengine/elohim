@@ -88,3 +88,20 @@ roles:
           progenitor_pubkey: ~  # bootstrap steward; override before alpha publish
       installed_hash: ~
       clone_limit: 0
+
+  # hREA DNA — Wave 3 substrate readiness.
+  # Lynn Foster's canonical hREA (h-REA/hREA). Pinned to a specific upstream
+  # release; bundle fetched out-of-band into ../hrea/workdir/hrea.dna.
+  # See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+  # version_pin: 0.0.0  <-- update when first real version is pinned
+  - name: hrea
+    provisioning:
+      strategy: create
+      deferred: true   # cells provisioned lazily in M2 (VFBinding handshake)
+    dna:
+      path: "../hrea/workdir/hrea.dna"
+      modifiers:
+        network_seed: "elohim_hrea_alpha"
+        properties: ~
+      installed_hash: ~
+      clone_limit: 0
