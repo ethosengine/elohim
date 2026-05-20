@@ -19,7 +19,11 @@ use serde::{Deserialize, Serialize};
 /// upstream-contribution inventory + R&O compatibility report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TranslationPoint {
-    pub at_iso: String, // ISO-8601 UTC; chrono::Utc::now().to_rfc3339()
+    pub at_iso: String, // ISO-8601 UTC; callers: chrono::Utc::now().to_rfc3339()
+    /// DHT block height when this observation was recorded; None during M1
+    /// fixture phase and any context without an active conductor (populated
+    /// from M3+ when real hREA writes happen).
+    pub at_block_height: Option<u64>,
     pub direction: Direction,
     pub vf_type: String, // "EconomicEvent", "Proposal", ...
     pub elohim_source: String, // "hREA::EconomicEvent" | "elohim::EprAtom" | ...
@@ -33,7 +37,9 @@ pub struct TranslationPoint {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Direction {
+    /// Observation of a VF read (query/field resolution).
     Read,
+    /// Observation of a VF write (mutation: create/update/delete).
     Write,
 }
 
@@ -88,6 +94,7 @@ mod tests {
     fn translation_point_roundtrips_through_serde() {
         let p = TranslationPoint {
             at_iso: "2026-05-20T00:00:00Z".to_string(),
+            at_block_height: None,
             direction: Direction::Read,
             vf_type: "EconomicEvent".to_string(),
             elohim_source: "fixture".to_string(),
@@ -109,5 +116,13 @@ mod tests {
         assert_eq!(json, serde_json::json!("Read"));
         let json = serde_json::to_value(TranslationKind::SemanticBridge).unwrap();
         assert_eq!(json, serde_json::json!("SemanticBridge"));
+        let json = serde_json::to_value(SemanticCost::JustifiedDistinct).unwrap();
+        assert_eq!(json, serde_json::json!("JustifiedDistinct"));
+        let json = serde_json::to_value(OntologicalCommitment::SovereigntyToStewardship).unwrap();
+        assert_eq!(json, serde_json::json!("SovereigntyToStewardship"));
+        let json = serde_json::to_value(ClientCapability::ElohimAware).unwrap();
+        assert_eq!(json, serde_json::json!("ElohimAware"));
+        let json = serde_json::to_value::<Option<OntologicalCommitment>>(None).unwrap();
+        assert_eq!(json, serde_json::json!(null));
     }
 }

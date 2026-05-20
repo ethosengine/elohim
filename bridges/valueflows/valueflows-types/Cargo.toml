@@ -9,4 +9,3 @@ description = "Stable type definitions for the valueflows bridge — Translation
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
-chrono = { workspace = true }
