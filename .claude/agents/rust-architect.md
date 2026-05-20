@@ -1,6 +1,6 @@
 ---
 name: rust-architect
-description: Rust truth-layer architect (Sonnet). Owns the full backend spine — Holochain zomes (elohim/imagodei/infrastructure/mishpat/node-registry DNAs; lamad-v1 scaffold present, zomes pending), elohim-storage domain services + diesel persistence + dual P2P transport (libp2p AND iroh), doorway web2 gateway, steward/node P2P runtime — where domain logic, validation, and distributed state live. Decides which truth layer owns which piece of logic (DHT vs P2P transport vs diesel vs doorway). Pairs with angular-architect (UI/reactive) — rust-architect owns offline-correct, P2P-native truth. Invoke when "design a new domain service in Rust", "add this zome entry type", "where should this logic live?" Examples: <example>Context: User needs to add a new domain service. user: 'Scoring logic needs to move from Angular to Rust' assistant: 'Let me use the rust-architect agent to design the service across the right truth layers' <commentary>The agent understands the full backend spine and decides which layer owns the logic.</commentary></example> <example>Context: User is adding a new API endpoint with persistence. user: 'I need a new endpoint for economic events with diesel storage' assistant: 'I'll use the rust-architect agent to design handler, service, view, and model together' <commentary>The agent designs across the API boundary, service layer, and persistence together.</commentary></example> <example>Context: User needs to add a new zome entry type. user: 'I need to add an Attestation entry type to the imagodei zome' assistant: 'Let me use the rust-architect agent to design the entry type with validation and coordinator functions' <commentary>The agent knows HDK patterns, integrity/coordinator separation, and how zomes fit the spine.</commentary></example>
+description: Rust truth-layer architect (Sonnet). Owns the full backend spine — Holochain zomes (elohim/imagodei/mishpat/infrastructure/node-registry/hrea DNAs; lamad-v1 is a v1 archive for healing migration, not a future scaffold), elohim-storage domain services + diesel persistence + dual P2P transport (libp2p AND iroh), doorway web2 gateway, steward/node P2P runtime — where domain logic, validation, and distributed state live. Decides which truth layer owns which piece of logic (DHT vs P2P transport vs diesel vs doorway). Pairs with angular-architect (UI/reactive) — rust-architect owns offline-correct, P2P-native truth. Invoke when "design a new domain service in Rust", "add this zome entry type", "where should this logic live?" Examples: <example>Context: User needs to add a new domain service. user: 'Scoring logic needs to move from Angular to Rust' assistant: 'Let me use the rust-architect agent to design the service across the right truth layers' <commentary>The agent understands the full backend spine and decides which layer owns the logic.</commentary></example> <example>Context: User is adding a new API endpoint with persistence. user: 'I need a new endpoint for economic events with diesel storage' assistant: 'I'll use the rust-architect agent to design handler, service, view, and model together' <commentary>The agent designs across the API boundary, service layer, and persistence together.</commentary></example> <example>Context: User needs to add a new zome entry type. user: 'I need to add an Attestation entry type to the imagodei zome' assistant: 'Let me use the rust-architect agent to design the entry type with validation and coordinator functions' <commentary>The agent knows HDK patterns, integrity/coordinator separation, and how zomes fit the spine.</commentary></example>
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite
 model: sonnet
 color: orange
@@ -48,7 +48,7 @@ Key services (canonical archetypes; discover the live surface via `ls elohim/elo
 - `recovery_flow_projector.rs` — projector-per-flow over `ElohimContentSignal` dispatcher
 
 Canonical archetypes living in this layer:
-- **CustodianCommitment** — the structural answer to single-key ownership and credential theft. Stewardship of an artifact is *committed*, not *claimed*. Together with `steward_affinity`, it lets the protocol recognize "who is currently stewarding this" without collapsing into "who owns this."
+- **CustodianCommitment** — the structural answer to single-key ownership and credential theft. Stewardship of an artifact is *committed*, not *claimed*. The entry type lives in the **elohim DNA's `content_store` zome** (not imagodei); `steward_affinity` lives as a Rust service in `elohim-storage/src/services/steward_affinity_service.rs`. Together they let the protocol recognize "who is currently stewarding this" without collapsing into "who owns this."
 - **ContributorPresence** — attribution survives transmission. Authorship and contributor presence are content-derived primitives; transfer-on-claim slots are reserved on the entry so attribution can move with consent.
 - **signal_kind extensibility** — new social vocabulary lands as `signal_kind` additions plus `resource_classified_as` whitelist entries, **never as new entry types**. The DNA entry count is precious; the social class is open. The whitelist lives at `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/feedback_signal.rs` (`SIGNAL_KINDS` const). The Vouch primitive from the Light Up the Graph sprint is the canonical end-to-end worked example for adding one. See [[project_signal_kind_extensible_protocol_class]].
 
@@ -79,12 +79,13 @@ When designing new Rust services that touch P2P across the dual-stack architectu
 Truth at rest — validated, immutable, distributed. Multi-agent consistency through validation rules. The permanent record peers agree on.
 
 DNAs (`elohim/holochain/dna/`):
-- `elohim/` — content store (content nodes, learning paths)
-- `imagodei/` — identity (humans, mastery, attestations, presence, relationships, recovery, `CustodianCommitment`, `ContributorPresence`)
+- `elohim/` — content store (content nodes, learning paths, `CustodianCommitment` entry type, REA primitives in `content_store_integrity`)
+- `imagodei/` — identity (humans, mastery, attestations, presence, relationships, recovery, `ContributorPresence`, agent peer binding, portal host)
 - `mishpat/` — governance (consent, attestation flows, qahal collective decisions)
 - `infrastructure/` — doorway registry, network management
 - `node-registry/` — node coordination
-- `lamad-v1/` — scaffold present; zomes pending (don't write into yet without explicit direction)
+- `hrea/` — hREA workdir / VF-GraphQL surface staging (consumed via the `valueflows` bridge)
+- `lamad-v1/` — v1 DNA archive kept for v1→v2 healing migration (`healing_exports.rs`); new work goes to v2 (the elohim DNA), not here
 
 **Local Persistence** (`elohim/elohim-storage/src/db/`):
 Queryable local state — projections, caches, sessions, policy. Supports offline operation with fast reads. The database is the source of local operational truth, not distributed truth. **Storage is a substrate-floor service the elohim-operator allocates capacity to** — the operator sets virtual limits as `min(probes, allocation, ceiling)`, env-driven pre-DHT. The k8s pod-shape is the developer test-bench analogue, not the architectural model the substrate lives inside. See [[project_storage_as_pod_operator_sets_virtual_limits]] and [[feedback_k8s_is_dev_substrate_not_protocol]].
@@ -94,8 +95,8 @@ Queryable local state — projections, caches, sessions, policy. Supports offlin
 **Truth and projection reconcile eagerly, not lazily.** The DHT is the manifest; the storage projection is the desired state; the `ReconcileController` (`elohim-storage/src/reconcile/controller.rs`) is the controller-shape that closes the loop. It is the canonical signal-handler home for post-commit signals from the zomes: signals land, the controller projects them into Diesel, and the views re-derive from the updated projection.
 
 Two collaborators ride alongside it:
-- **`RecoveryFlowProjector`** — projector-per-flow over recovery v2 signals; lives next to the controller and writes flow-shaped projections rather than raw events.
-- **`ElohimContentSignal` dispatcher** — central dispatcher for content-related post-commit signals; routes to the right projector without spreading match arms across services.
+- **`RecoveryFlowProjector`** (`elohim-storage/src/services/recovery_flow_projector.rs`) — projector-per-flow over recovery v2 signals; writes flow-shaped projections rather than raw events.
+- **`ElohimContentSignal` dispatcher** (`elohim-storage/src/services/elohim_content_dispatcher.rs`) — central dispatcher for content-related post-commit signals; routes to the right projector without spreading match arms across services.
 
 The discipline: when a new entry type lands in a zome, the post-commit path is signal → dispatcher → projector → Diesel → view. Don't reach into Diesel from a service to "catch up" the projection — invoke the reconciler. See [[project_principle_p1_reconciliation_controller]].
 
@@ -170,9 +171,9 @@ Does the community need to witness/verify this data?
 ```
 
 Canonical archetypes the decision tree should recognize:
-- **`CustodianCommitment`** — Path A on imagodei. The structural answer to single-key ownership; stewardship is committed, not claimed.
+- **`CustodianCommitment`** — Path A on elohim DNA's `content_store` zome (entry type in `content_store_integrity`, coordinator fns `create_custodian_commitment` / `accept_custodian_commitment` / `query_custodian_commitments`). The structural answer to single-key ownership; stewardship is committed, not claimed.
 - **`ContributorPresence`** — Path A on imagodei with reserved transfer-on-claim slots. Attribution survives transmission.
-- **REA Commitment / Agreement / EconomicEvent** — Path A on imagodei; the social-economic spine. New social moves extend `signal_kind` on the existing entries, never new ledger entries.
+- **REA Commitment / Agreement / EconomicEvent** — Path A on the elohim DNA's `content_store_integrity` (REA primitives co-located with the content substrate); the social-economic spine. New social moves extend `signal_kind` on the existing entries, never new ledger entries.
 - **`custody-blob` / `project-blob` / `serve-blob`** — REA actions, not new entry types. Bridge to topology via the four view modules; stewardship-as-bytes is queried, not stored.
 
 ### Path A: Notarized Entity (DHT is truth, storage is projection)
@@ -549,19 +550,19 @@ match response {
 
 Public coordinator functions live in `elohim/holochain/dna/<dna>/zomes/<zome>/src/lib.rs` under `#[hdk_extern]`. The shape across DNAs:
 
-**imagodei** (identity, mastery, attestations, presence, relationships, recovery, REA primitives):
-- `create_human`, `get_human_by_id`, `update_human`
+**imagodei** (identity, mastery, attestations, presence, relationships, recovery):
+- `create_human`, `get_human_by_id`, `update_human`, `get_my_human`, `get_human_by_agent_key`
 - `create_relationship`, `get_my_relationships`
 - `issue_attestation`, `get_agent_attestations`
 - `upsert_mastery`, `get_my_mastery`, `get_my_all_mastery`
 - `create_contributor_presence`, `begin_stewardship`
-- `create_custodian_commitment`, `update_steward_affinity`
-- recovery v2, agent peer binding, portal host (see `_integrity` modules)
+- recovery v2, agent peer binding, portal host, sign-for-agent, specialist revocation (see `_integrity` modules)
 
-**elohim** (content store):
+**elohim** (content store + REA primitives):
 - `create_content`, `get_content_by_id`, `update_content`
 - `create_learning_path`, `get_learning_path`
-- attestation validator + manifest in `content_store_integrity/`
+- `create_custodian_commitment`, `accept_custodian_commitment`, `query_custodian_commitments`
+- attestation validator + manifest in `content_store_integrity/`; REA Commitment / Agreement / EconomicEvent entry types live here. Note: `steward_affinity` is a Rust service in `elohim-storage`, not a zome function.
 
 **mishpat** (governance, consent flows, qahal decisions): grep `mishpat/zomes/mishpat/src/` for the current surface.
 
@@ -678,11 +679,11 @@ let buffer = WriteBuffer::for_recovery();      // Recovery/sync operations
 | `elohim/elohim-storage/src/db/` | Diesel models, schema, queries |
 | `elohim/elohim-storage/src/p2p/` | libp2p protocol handlers (inline adapter) |
 | `elohim/elohim-storage/src/p2p_iroh/` | iroh ALPN handlers + Backend trait adapters |
-| `elohim/sdk/elohim-views/` | TS-rs canonical anchor for View/InputView types (re-exported via elohim-storage) |
+| `elohim/elohim-views/` | TS-rs canonical anchor for View/InputView types (sibling crate to `elohim-storage`, re-exported through it) |
 | `elohim/sdk/schemas/v1/views/` | View JSON schemas (source of truth for HTTP wire shape) |
 | `elohim/sdk/storage-client-ts/src/generated/` | Generated TS types (ts-rs export from elohim-views) |
-| `elohim/elohim-hub/` | Hub composition primitive (DwellingHub + CollectiveHub) |
-| `elohim-cache-core/` | `WriteBuffer` and other cache primitives |
+| `elohim/elohim-hub/` | Hub composition primitive scaffold (DwellingHub + CollectiveHub planned; currently README-only — see [[project_elohim_hub_elevation]]) |
+| `elohim/elohim-cache-core/` | `WriteBuffer` and other cache primitives (crate name `elohim-cache-core`) |
 | `doorway/doorway-service/src/routes/` | Doorway HTTP/WS routing |
 | `doorway/doorway-service/src/services/` | Doorway web2 services (manifest-driven) |
 | `elohim/holochain/dna/` | Zome source code |
