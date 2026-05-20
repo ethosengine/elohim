@@ -169,7 +169,7 @@ fn device_summary_from_result(
                     .and_then(|v| v.as_u64())
                     .map(|x| x as u32),
                 beacon_age_ms: payload.get("beacon_age_ms").and_then(|v| v.as_u64()),
-                compute: None,
+                compute: None, // TODO(A3): populate from aggregate_stewarded_bytes_by_peer + system_metrics
             }
         }
         // Anything else → offline-shape with the freshness state preserved.
@@ -186,7 +186,7 @@ fn device_summary_from_result(
             hosting_count: None,
             projecting_count: None,
             beacon_age_ms: None,
-            compute: None,
+            compute: None, // TODO(A3): populate from aggregate_stewarded_bytes_by_peer + system_metrics
         },
     }
 }

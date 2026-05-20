@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "compute-triptych.schema.json",
+  "$id": "epr:schema:view:compute-triptych",
   "title": "ComputeTriptych",
   "description": "Source of truth: computed projection over system_metrics (free/used — Category C operational from infrastructure:system-sample observations) and rea_commitments (stewarded — Category A notarized custody-blob commitments). Reconstructed per request; not persisted.",
   "type": "object",
@@ -8,24 +8,18 @@
   "required": ["free", "used", "stewarded"],
   "properties": {
     "free": {
-      "oneOf": [
-        { "type": "null" },
-        { "type": "integer", "minimum": 0 }
-      ],
+      "type": ["integer", "null"],
+      "minimum": 0,
       "description": "Bytes available on device blob filesystem (capacity - used)"
     },
     "used": {
-      "oneOf": [
-        { "type": "null" },
-        { "type": "integer", "minimum": 0 }
-      ],
+      "type": ["integer", "null"],
+      "minimum": 0,
       "description": "Bytes occupied by blob storage on device"
     },
     "stewarded": {
-      "oneOf": [
-        { "type": "null" },
-        { "type": "integer", "minimum": 0 }
-      ],
+      "type": ["integer", "null"],
+      "minimum": 0,
       "description": "Bytes committed via rea_commitments where this peer is provider (action=custody-blob)"
     }
   }
