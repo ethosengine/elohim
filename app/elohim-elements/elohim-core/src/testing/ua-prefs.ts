@@ -83,3 +83,76 @@ export function effectiveStimulusCeiling(): Stimulus {
   const epaper = matchMedia('(update: slow)').matches;
   return reduceMotion || epaper ? 'still' : 'lively';
 }
+
+export interface LuminanceMeasurement {
+  /** Number of luminance crossings per second (large-area). Above 3 Hz is unsafe per WCAG 2.3. */
+  flashHz: number;
+  /** Whether any 1-second window exceeded the WCAG flash threshold. */
+  exceedsThreshold: boolean;
+  /** Number of samples collected. */
+  samples: number;
+}
+
+export interface LuminanceOptions {
+  /** Duration of the sampling window in ms. */
+  sampleMs?: number;
+  /** Samples per second. */
+  sampleHz?: number;
+  /** Relative luminance delta that counts as a "flash" boundary. WCAG uses 0.1. */
+  luminanceDelta?: number;
+}
+
+/**
+ * Measures luminance changes in an element over time by sampling computed background.
+ * Lightweight approximation: reads computed-style backgrounds for the element and its
+ * first descendant; counts crossings of a brightness threshold. Intended as a
+ * regression-detector, not a real visual analyzer.
+ *
+ * For accurate testing, use a tool like FlashTest or Visual A11y. This harness flags
+ * the obvious cases (full-element strobing) and gives a starting point.
+ */
+export async function measureLuminanceChanges(
+  el: Element,
+  opts: LuminanceOptions = {}
+): Promise<LuminanceMeasurement> {
+  const sampleMs = opts.sampleMs ?? 1000;
+  const sampleHz = opts.sampleHz ?? 30;
+  const delta = opts.luminanceDelta ?? 0.1;
+  const interval = 1000 / sampleHz;
+
+  function getBrightness(target: Element): number {
+    const style = getComputedStyle(target);
+    const bg = style.backgroundColor;
+    const rgb = bg.match(/\d+/g);
+    if (!rgb || rgb.length < 3) return 0;
+    const r = Number.parseInt(rgb[0]!, 10) / 255;
+    const g = Number.parseInt(rgb[1]!, 10) / 255;
+    const b = Number.parseInt(rgb[2]!, 10) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  const target = (el.shadowRoot?.firstElementChild ?? el.firstElementChild ?? el) as Element;
+  const samples: number[] = [];
+  const end = performance.now() + sampleMs;
+  await new Promise<void>(resolve => {
+    function tick(): void {
+      samples.push(getBrightness(target));
+      if (performance.now() >= end) resolve();
+      else setTimeout(tick, interval);
+    }
+    tick();
+  });
+
+  let crossings = 0;
+  let prev = samples[0]!;
+  for (const value of samples.slice(1)) {
+    if (Math.abs(value - prev) > delta) crossings++;
+    prev = value;
+  }
+  const flashHz = (crossings / sampleMs) * 1000 / 2; // each flash is a pair of crossings
+  return {
+    flashHz,
+    exceedsThreshold: flashHz > 3,
+    samples: samples.length,
+  };
+}

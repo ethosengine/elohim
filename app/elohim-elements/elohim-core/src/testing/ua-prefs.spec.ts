@@ -1,8 +1,10 @@
-import { expect } from '@open-wc/testing';
+import { expect, fixture as fxFixture, html as fxHtml } from '@open-wc/testing';
+import { LitElement } from 'lit';
 import {
   setMediaQuery,
   clearMediaQueries,
   effectiveStimulusCeiling,
+  measureLuminanceChanges,
 } from './ua-prefs.js';
 
 describe('ua-prefs harness', () => {
@@ -48,4 +50,23 @@ describe('ua-prefs harness', () => {
       expect(effectiveStimulusCeiling()).to.equal('lively');
     });
   });
+});
+
+class StableThing extends LitElement {
+  override render() {
+    return fxHtml`<div style="background: #fff; width: 50px; height: 50px;"></div>`;
+  }
+}
+customElements.define('stable-thing', StableThing);
+
+describe('photosensitive flash analyzer', () => {
+  it('reports zero high-luminance changes for a still element', async () => {
+    const el = await fxFixture<StableThing>(fxHtml`<stable-thing></stable-thing>`);
+    const result = await measureLuminanceChanges(el, { sampleMs: 1000, sampleHz: 30 });
+    expect(result.flashHz).to.be.lessThan(3);
+    expect(result.exceedsThreshold).to.be.false;
+  });
+
+  // Note: we don't test the positive case in unit tests because it's timing-sensitive.
+  // The presence of the API is what we're locking in.
 });
