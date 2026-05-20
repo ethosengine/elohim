@@ -25,6 +25,10 @@
       "import": "./dist/register.js",
       "types": "./dist/register.d.ts"
     },
+    "./testing": {
+      "import": "./dist/testing/index.js",
+      "types": "./dist/testing/index.d.ts"
+    },
     "./tokens.scss": "./tokens.scss",
     "./base.scss": "./base.scss",
     "./animations.scss": "./animations.scss",
