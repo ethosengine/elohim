@@ -4,4 +4,13 @@
 export { ElohimButton } from './elohim-button.js';
 export type { ElohimButtonVariant } from './elohim-button.js';
 
+export { ElohimComputeTile } from './elohim-compute-tile.js';
+export type {
+  ComputeTileValue,
+  ComputeTileHubValue,
+  ComputeTileDeviceValue,
+  ComputeTileArchetype,
+  ComputeTileState,
+} from './elohim-compute-tile.js';
+
 export * from './capability/index.js';

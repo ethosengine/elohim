@@ -1,4 +1,5 @@
 import { ElohimButton } from './elohim-button.js';
+import { ElohimComputeTile } from './elohim-compute-tile.js';
 
 // Registration lives here, not on the ElohimButton class via @customElement,
 // to keep ./index.ts truly side-effect-free. Importing from 'elohim-core'
@@ -17,4 +18,8 @@ import { ElohimButton } from './elohim-button.js';
 
 if (!customElements.get('elohim-button')) {
   customElements.define('elohim-button', ElohimButton);
+}
+
+if (!customElements.get('elohim-compute-tile')) {
+  customElements.define('elohim-compute-tile', ElohimComputeTile);
 }

@@ -184,6 +184,453 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-compute-tile.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "`<elohim-compute-tile>` — polymorphic compute-capacity tile.\n\nRenders the compute triptych (free / used / stewarded bytes) for either a\nhub aggregate or a single device, with **progressive disclosure** matching\nthe viewer's capability lens.\n\n| Lens     | What's shown                                                   |\n|----------|----------------------------------------------------------------|\n| minimal  | Qualitative summary (\"You have enough.\" when free is healthy) |\n| simple   | \"5 GB free\"                                                    |\n| standard | \"5 GB of 15 GB free\"                                          |\n| detail   | \"5 GB of 15 GB · 12 GB stewarded\"                             |\n| debug    | Above + peer-id / hub-id / freshness timestamp                 |\n| trace    | Above + source-route annotation                                |",
+          "name": "ElohimComputeTile",
+          "cssProperties": [
+            {
+              "description": "Tile background color",
+              "name": "--elohim-compute-tile-bg"
+            },
+            {
+              "description": "Tile foreground text color",
+              "name": "--elohim-compute-tile-fg"
+            },
+            {
+              "description": "Tile border style",
+              "name": "--elohim-compute-tile-border"
+            },
+            {
+              "description": "Tile border-radius",
+              "name": "--elohim-compute-tile-radius"
+            },
+            {
+              "description": "Tile padding",
+              "name": "--elohim-compute-tile-padding"
+            },
+            {
+              "description": "Contextual label color",
+              "name": "--elohim-compute-tile-label-color"
+            },
+            {
+              "description": "Primary value color (free bytes)",
+              "name": "--elohim-compute-tile-value-color"
+            },
+            {
+              "description": "Secondary value color (used/stewarded)",
+              "name": "--elohim-compute-tile-secondary-color"
+            },
+            {
+              "description": "State indicator color (stale, offline, error)",
+              "name": "--elohim-compute-tile-state-color"
+            },
+            {
+              "description": "Capacity bar track color",
+              "name": "--elohim-compute-tile-gauge-track"
+            },
+            {
+              "description": "Capacity bar fill color",
+              "name": "--elohim-compute-tile-gauge-fill"
+            },
+            {
+              "description": "Debug/trace metadata text color",
+              "name": "--elohim-compute-tile-meta-color"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The outer tile container",
+              "name": "container"
+            },
+            {
+              "description": "Label + status row",
+              "name": "header"
+            },
+            {
+              "description": "Contextual label (hub name / device name)",
+              "name": "label"
+            },
+            {
+              "description": "Online/offline indicator dot",
+              "name": "status-dot"
+            },
+            {
+              "description": "Main content area",
+              "name": "body"
+            },
+            {
+              "description": "The primary free-bytes value",
+              "name": "value-primary"
+            },
+            {
+              "description": "Detail row (triptych breakdown)",
+              "name": "value-detail"
+            },
+            {
+              "description": "Symbolic capacity gauge (symbolic textuality mode)",
+              "name": "gauge"
+            },
+            {
+              "description": "Loading / error / stale / offline state banner",
+              "name": "state-banner"
+            },
+            {
+              "description": "Debug/trace metadata section",
+              "name": "meta"
+            }
+          ],
+          "slots": [
+            {
+              "description": "Optional override for the contextual label (hub name / device name).",
+              "name": "label"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "value",
+              "type": {
+                "text": "ComputeTileValue | null"
+              },
+              "default": "null",
+              "description": "Input data: hub or device shape."
+            },
+            {
+              "kind": "field",
+              "name": "tileState",
+              "type": {
+                "text": "ComputeTileState"
+              },
+              "default": "'idle'",
+              "description": "Content state of the tile.",
+              "attribute": "tile-state",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "lastSampleAt",
+              "type": {
+                "text": "string | null"
+              },
+              "default": "null",
+              "description": "ISO-8601 timestamp of last metric sample (debug+).",
+              "attribute": "last-sample-at"
+            },
+            {
+              "kind": "field",
+              "name": "sourceRoute",
+              "type": {
+                "text": "string | null"
+              },
+              "default": "null",
+              "description": "Source-route annotation for trace lens.",
+              "attribute": "source-route"
+            },
+            {
+              "kind": "method",
+              "name": "_qualitativeSummary",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "unknown"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "free",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_freeOfTotalText",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "unknown"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "freeStr",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "totalStr",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "total",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_renderBody",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "lens",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "isSymbolic",
+                  "type": {
+                    "text": "boolean"
+                  }
+                },
+                {
+                  "name": "free",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                },
+                {
+                  "name": "used",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                },
+                {
+                  "name": "stewarded",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                },
+                {
+                  "name": "total",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                },
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_renderGauge",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "free",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                },
+                {
+                  "name": "total",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_renderMetaIdLine",
+              "privacy": "private"
+            },
+            {
+              "kind": "method",
+              "name": "_renderMeta",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "lens",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_renderState",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "state",
+                  "type": {
+                    "text": "ComputeTileState"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "_contextLabel",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "_ariaLabel",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "free",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                },
+                {
+                  "name": "total",
+                  "type": {
+                    "text": "bigint | null"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "attributes": [
+            {
+              "name": "tile-state",
+              "type": {
+                "text": "ComputeTileState"
+              },
+              "default": "'idle'",
+              "description": "Content state of the tile.",
+              "fieldName": "tileState"
+            },
+            {
+              "name": "last-sample-at",
+              "type": {
+                "text": "string | null"
+              },
+              "default": "null",
+              "description": "ISO-8601 timestamp of last metric sample (debug+).",
+              "fieldName": "lastSampleAt"
+            },
+            {
+              "name": "source-route",
+              "type": {
+                "text": "string | null"
+              },
+              "default": "null",
+              "description": "Source-route annotation for trace lens.",
+              "fieldName": "sourceRoute"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-compute-tile",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "trace",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "observed",
+            "states": {
+              "empty": "designed",
+              "loading": "designed",
+              "error": "designed",
+              "stale": "designed",
+              "contested": "n/a",
+              "offline": "designed",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimComputeTile",
+          "declaration": {
+            "name": "ElohimComputeTile",
+            "module": "src/elohim-compute-tile.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/index.ts",
       "declarations": [],
       "exports": [
@@ -201,6 +648,54 @@
           "declaration": {
             "name": "ElohimButtonVariant",
             "module": "./elohim-button.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimComputeTile",
+          "declaration": {
+            "name": "ElohimComputeTile",
+            "module": "./elohim-compute-tile.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ComputeTileValue",
+          "declaration": {
+            "name": "ComputeTileValue",
+            "module": "./elohim-compute-tile.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ComputeTileHubValue",
+          "declaration": {
+            "name": "ComputeTileHubValue",
+            "module": "./elohim-compute-tile.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ComputeTileDeviceValue",
+          "declaration": {
+            "name": "ComputeTileDeviceValue",
+            "module": "./elohim-compute-tile.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ComputeTileArchetype",
+          "declaration": {
+            "name": "ComputeTileArchetype",
+            "module": "./elohim-compute-tile.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ComputeTileState",
+          "declaration": {
+            "name": "ComputeTileState",
+            "module": "./elohim-compute-tile.js"
           }
         },
         {
@@ -224,6 +719,14 @@
           "declaration": {
             "name": "ElohimButton",
             "module": "/src/elohim-button.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-compute-tile",
+          "declaration": {
+            "name": "ElohimComputeTile",
+            "module": "/src/elohim-compute-tile.js"
           }
         }
       ]
@@ -671,7 +1174,7 @@
               }
             }
           ],
-          "description": "Renders a Lit template under a specific locale, setting document direction\nand the localize runtime. Restores prior state afterward."
+          "description": "Renders a Lit template under a specific locale, setting document direction\nand the localize runtime. Restores prior document state via afterEach (after\nall assertions in the test complete), not inside this helper."
         },
         {
           "kind": "function",
