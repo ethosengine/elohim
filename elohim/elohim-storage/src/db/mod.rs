@@ -150,6 +150,10 @@ pub mod recovery_approval_gate;
 // Category C operational — write target of T22 extern; read by the responder
 pub mod custodian_shares;
 
+// Wave 3 M1 — valueflows bridge learning ledger (Category C operational)
+// Each row is one TranslationPoint observation; aggregated at M5.
+pub mod translation_observations;
+
 use std::path::Path;
 use std::time::Duration;
 

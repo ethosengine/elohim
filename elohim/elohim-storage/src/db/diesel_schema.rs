@@ -1506,6 +1506,27 @@ diesel::table! {
     }
 }
 
+// Wave 3 M1 — translation_observations learning ledger (Category C operational).
+// Source of truth: local write (valueflows-bridge call sites).
+// Aggregated at M5 into upstream-contribution inventory + R&O compatibility report.
+// See migration 2026-05-20-000000_translation_observations.
+diesel::table! {
+    translation_observations (id) {
+        id -> Integer,
+        observed_at -> Text,
+        block_height -> Nullable<BigInt>,
+        direction -> Text,
+        vf_type -> Text,
+        elohim_source -> Text,
+        translation_kind -> Text,
+        semantic_cost -> Text,
+        ontological_commitment -> Nullable<Text>,
+        client_capability -> Text,
+        code_location -> Text,
+        notes -> Nullable<Text>,
+    }
+}
+
 // Phase 4 — projection_events append-only log
 // Source of truth: DHT (EconomicEvent entry, content_store zome, action='ack-projection').
 // Rebuildable from rea_projection signal stream. Category C operational.
@@ -1704,5 +1725,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_decay_events,
     token_mint_events,
     token_transfers,
+    translation_observations,
     votes,
 );
