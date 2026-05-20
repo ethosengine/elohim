@@ -28,7 +28,8 @@ by the kind of traffic it absorbs (web2 = doorway; protocol = storage).
    `handle_request` entry point.
 3. Document which runtime consumes it.
 4. Pull `qahal-authority` (from `elohim/qahal-authority`) if the bridge
-   absorbs external writes.
+   absorbs external writes (planned for M2 of Wave 3 — not yet available;
+   see Wave 3 spec §2.3).
 
 ## Reference spec
 

@@ -1,2 +1,5 @@
-target/
+# Library crate - don't commit Cargo.lock
+# Downstream consumers use their own lock file
 Cargo.lock
+
+target/

@@ -14,7 +14,7 @@ authors = ["Elohim Protocol"]
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1.43", features = ["full", "macros", "sync"] }
+tokio = { version = "1.43", features = ["full"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -29,10 +29,10 @@ http-body-util = "0.1"
 bytes = "1.10"
 
 # Diesel — for ledger writes
-diesel = { version = "2", features = ["sqlite", "r2d2", "chrono"] }
+diesel = { version = "2.2", features = ["sqlite", "r2d2", "chrono"] }
 
 # Utilities
-thiserror = "2.0"
+thiserror = "1"
 anyhow = "1.0"
 tracing = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
