@@ -20,6 +20,7 @@ export type Theme = 'light' | 'dark' | 'auto';
 export type Contrast = 'normal' | 'high' | 'auto';
 
 /** BCP 47 language tag, or 'auto' to resolve from navigator.language. */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias; preserves intent at consumer sites
 export type Locale = string;
 
 export type Stimulus = 'still' | 'gentle' | 'lively' | 'auto';
@@ -42,6 +43,7 @@ export interface ProfileLock {
   expiresAt?: number;
 }
 
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias; preserves intent at consumer sites
 export type Standing = string;
 
 export interface CapabilityProfile {

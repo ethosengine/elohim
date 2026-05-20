@@ -18,6 +18,7 @@ import { DEFAULT_PROFILE } from './profile.js';
 
 import type { CapabilityProfile } from './profile.js';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TypeScript mixin pattern requires `any[]` for rest constructor args (TS2545)
 type Constructor<T = object> = new (...args: any[]) => T;
 
 export interface CapabilityAware {
@@ -28,15 +29,18 @@ export function CapabilityAwareElement<TBase extends Constructor<LitElement>>(
   Base: TBase
 ): TBase & Constructor<CapabilityAware> {
   class Mixed extends Base {
-    static properties: PropertyDeclarations = {
+    static readonly properties: PropertyDeclarations = {
       ...(Base as unknown as { properties?: PropertyDeclarations }).properties,
       profile: { attribute: false, state: true },
     };
 
     profile: CapabilityProfile = DEFAULT_PROFILE;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TypeScript mixin pattern requires `any[]` for rest constructor args (TS2545)
     constructor(...args: any[]) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- mixin super-call; args are typed any[] by TS mixin constraint
       super(...args);
+      // eslint-disable-next-line sonarjs/constructor-for-side-effects -- ContextConsumer registers itself as a reactive controller on `this` (Lit pattern)
       new ContextConsumer(this, {
         context: capabilityProfileContext,
         callback: (value: CapabilityProfile) => {

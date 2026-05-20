@@ -70,6 +70,7 @@
                 "text": "PropertyDeclarations"
               },
               "static": true,
+              "readonly": true,
               "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
               "inheritedFrom": {
                 "name": "CapabilityAwareElement",
@@ -346,6 +347,7 @@
                 "text": "PropertyDeclarations"
               },
               "static": true,
+              "readonly": true,
               "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }"
             },
             {

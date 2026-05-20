@@ -15,6 +15,7 @@ export const { getLocale, setLocale } = configureLocalization({
   sourceLocale,
   targetLocales: [...targetLocales],
   loadLocale: async (locale: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- dynamic locale import; shape verified at runtime by lit-localize
     return import(`./generated/${locale}.js`);
   },
 });
