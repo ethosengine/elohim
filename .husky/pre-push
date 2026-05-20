@@ -375,6 +375,10 @@ run_gate() {
     echo "[$PROJECT_NAME] just not found, using fallback..."
     case "$PROJECT_NAME" in
       elohim-app)
+        # Rebuild @elohim/storage-client dist first (gitignored; type
+        # changes in its src/generated/ don't reach consumers otherwise).
+        # Mirrors the `deps` step in app/elohim-app/justfile.
+        pnpm --filter @elohim/storage-client build 2>&1 && \
         pnpm exec eslint src --ext .ts,.html 2>&1 && \
         pnpm exec ng build --configuration=development 2>&1 && \
         pnpm exec vitest run --config vite.config.ts 2>&1

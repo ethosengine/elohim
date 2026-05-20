@@ -40,5 +40,11 @@ fmt-check:
 fmt:
     pnpm exec prettier --write "src/**/*.{ts,html,scss}"
 
-# Quality gate: build + test
-gate: build test
+# Rebuild workspace deps that elohim-app consumes via dist/.
+# @elohim/storage-client's dist/ is gitignored, so type changes in its
+# src/generated/ don't reach consumers until tsc reruns. Fast (~5s).
+deps:
+    pnpm --filter @elohim/storage-client build
+
+# Quality gate: dep freshness + build + test
+gate: deps build test
