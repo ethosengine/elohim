@@ -662,6 +662,60 @@ describe('PathNavigatorComponent', () => {
     });
   });
 
+  describe('focused view mode', () => {
+    it('should toggle focused view on', () => {
+      fixture.detectChanges();
+      expect(component.isFocusedView).toBe(false);
+
+      component.onFocusedViewToggle(true);
+
+      expect(component.isFocusedView).toBe(true);
+      expect(component.sidebarOpen).toBe(false);
+    });
+
+    it('should toggle focused view off', () => {
+      fixture.detectChanges();
+      component.isFocusedView = true;
+
+      component.onFocusedViewToggle(false);
+
+      expect(component.isFocusedView).toBe(false);
+    });
+
+    it('should exit focused view on escape key', () => {
+      fixture.detectChanges();
+      component.isFocusedView = true;
+
+      component.onEscapeKey();
+
+      expect(component.isFocusedView).toBe(false);
+    });
+
+    it('should not exit focused view on escape if not in focused view', () => {
+      fixture.detectChanges();
+      component.isFocusedView = false;
+
+      component.onEscapeKey();
+
+      expect(component.isFocusedView).toBe(false);
+    });
+
+    it('should increment content refresh key when toggling focused view', () => {
+      vi.useFakeTimers();
+      try {
+        fixture.detectChanges();
+        const initialKey = component.contentRefreshKey;
+
+        component.onFocusedViewToggle(true);
+        vi.advanceTimersByTime(350);
+
+        expect(component.contentRefreshKey).toBeGreaterThan(initialKey);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('path context service integration', () => {
     it('should enter path context on load', () => {
       const pathContextService = TestBed.inject(PathContextService);

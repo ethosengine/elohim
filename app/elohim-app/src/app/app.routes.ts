@@ -64,16 +64,6 @@ export const routes: Routes = [
         m => m.ContentViewerComponent
       ),
   },
-  // Raw, full-window protocol viewport — mounts the registered renderer
-  // for a content node and hosts the protocol-signal badge in a corner.
-  // Replaces the previous in-place Focus Mode.
-  {
-    path: 'raw/:resourceId',
-    loadComponent: async () =>
-      import('./lamad/components/raw-content-viewport/raw-content-viewport.component').then(
-        m => m.RawContentViewportComponent
-      ),
-  },
   // Spatial map — cross-pillar geospatial view (Places, resources, governance)
   {
     path: 'map',

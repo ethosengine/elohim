@@ -1,4 +1,7 @@
-<div class="content-viewer-container">
+<div
+  class="content-viewer-container focused-view-container"
+  [class.focused-view-active]="isFocusedView"
+>
   <!-- Loading state -->
   <div *ngIf="isLoading" class="loading-state">
     <div class="spinner"></div>
@@ -226,18 +229,16 @@
 
     <!-- Tab Content -->
     <div [ngSwitch]="activeTab" class="tab-content">
-      <!-- Content Toolbar -->
+      <!-- Content Toolbar (houses focus toggle) -->
       <div class="content-toolbar">
-        <button
-          type="button"
-          class="open-raw"
-          (click)="openInRawViewport()"
-          data-testid="viewer-open-raw"
-          aria-label="Open in raw viewport"
-        >
-          Raw view ↗
-        </button>
+        <app-focused-view-toggle
+          [isActive]="isFocusedView"
+          (toggled)="onFocusedViewToggle($event)"
+        ></app-focused-view-toggle>
       </div>
+
+      <!-- Protocol Signal Badge — always visible when a node is loaded -->
+      <app-protocol-signal-badge *ngIf="node" [contentId]="node.id"></app-protocol-signal-badge>
 
       <!-- Content Tab -->
       <section *ngSwitchCase="'content'">

@@ -1,10 +1,15 @@
-<div class="path-player-container focused-view-container" [class.sidebar-collapsed]="!sidebarOpen">
+<div
+  class="path-player-container focused-view-container"
+  [class.sidebar-collapsed]="!sidebarOpen"
+  [class.focused-view-active]="isFocusedView"
+>
   <!-- PATH TOOLING: Mobile Toggle -->
   <button
     type="button"
     class="sidebar-toggle"
     (click)="toggleSidebar()"
     aria-label="Toggle Navigation"
+    [hidden]="isFocusedView"
     data-testid="path-nav-sidebar-toggle"
   >
     <span class="icon">{{ sidebarOpen ? '✕' : '☰' }}</span>
@@ -154,6 +159,10 @@
           <span class="separator">/</span>
           <span class="crumb current">{{ stepView.step.stepTitle }}</span>
         </div>
+        <app-focused-view-toggle
+          [isActive]="isFocusedView"
+          (toggled)="onFocusedViewToggle($event)"
+        ></app-focused-view-toggle>
       </nav>
 
       <div class="content-scroll-container">
@@ -202,6 +211,7 @@
               <app-lesson-view
                 [content]="stepView.content"
                 [pathContext]="buildPathContext()"
+                [refreshKey]="contentRefreshKey"
                 explorationMode="path"
                 (exploreContent)="onExploreContent($event)"
                 (exploreInGraph)="onExploreInGraph()"

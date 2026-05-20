@@ -1093,22 +1093,4 @@ describe('ContentViewerComponent', () => {
       ).toBeFalsy();
     }));
   });
-
-  describe('openInRawViewport', () => {
-    it('navigates to /raw/:resourceId when invoked with a loaded node', async () => {
-      const router = TestBed.inject(Router);
-      const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-      component['nodeId'] = 'cn-42';
-      component.openInRawViewport();
-      expect(spy).toHaveBeenCalledWith(['/raw', 'cn-42']);
-    });
-
-    it('is a no-op when no node has loaded yet', () => {
-      const router = TestBed.inject(Router);
-      const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-      component['nodeId'] = null;
-      component.openInRawViewport();
-      expect(spy).not.toHaveBeenCalled();
-    });
-  });
 });
