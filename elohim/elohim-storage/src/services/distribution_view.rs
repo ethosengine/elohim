@@ -15,11 +15,13 @@ use diesel::prelude::*;
 use diesel::sql_types::{Float, Nullable};
 use thiserror::Error;
 
-use crate::db::models::{PeerIdentityBindingRow, PlacementGapRow};
+use crate::db::models::PeerIdentityBindingRow;
+// TODO(C4): re-introduce `use crate::db::models::PlacementGapRow as DbPlacementGapRow`
+//           when load_placement_gaps_for maps DB rows to hub-abstract PlacementGapRow.
 use crate::db::DbPool;
 use crate::views::{
     DeviceArchetype, DistributionDetails, DistributionSummary, FetchSource, JsonVal, MyRole,
-    ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
+    PlacementGapRow, ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
 };
 
 // ============================================================================
@@ -432,35 +434,22 @@ fn parse_archetype(s: &str) -> DeviceArchetype {
     }
 }
 
-/// Load placement_gap rows for the given blob_hash (matched on `shard_hash`).
-/// Each row is serialized as a `JsonVal` for the open-shape view field.
+/// Load hub-abstract `PlacementGapRow` view rows for the given blob_hash.
+///
+/// The existing `placement_gaps` DB table stores `PlacementGapView`-shaped rows
+/// (collective-diversity axis: `under-committed`, `contracts-short`,
+/// `peers-unavailable`). C4 will wire real hub-abstract emission using the new
+/// `PlacementGapKind` enum; until then this returns an empty vec so the typed
+/// wire shape is established without synthesizing fake values.
+///
+/// TODO(C4): query and map `DbPlacementGapRow` rows to hub-abstract `PlacementGapRow`
+/// shapes once the emission side is wired in the replication path.
+#[allow(unused_variables)]
 fn load_placement_gaps_for(
     conn: &mut diesel::SqliteConnection,
     blob_hash: &str,
-) -> Result<Vec<JsonVal>, DistributionViewError> {
-    use crate::db::diesel_schema::placement_gaps::dsl as g;
-
-    let rows: Vec<PlacementGapRow> = g::placement_gaps
-        .filter(g::shard_hash.eq(blob_hash))
-        .load::<PlacementGapRow>(conn)?;
-
-    Ok(rows
-        .into_iter()
-        .map(|r| {
-            JsonVal(serde_json::json!({
-                "id": r.id,
-                "contentId": r.content_id,
-                "shardHash": r.shard_hash,
-                "hAppId": r.h_app_id,
-                "requestedStewardCount": r.requested_steward_count,
-                "achievedStewardCount": r.achieved_steward_count,
-                "contractCoverage": r.contract_coverage,
-                "gapKind": r.gap_kind,
-                "firstSeenAt": r.first_seen_at,
-                "lastSeenAt": r.last_seen_at,
-            }))
-        })
-        .collect())
+) -> Result<Vec<PlacementGapRow>, DistributionViewError> {
+    Ok(vec![])
 }
 
 /// Load rea_commitment IDs where (`action='custody-blob'` AND

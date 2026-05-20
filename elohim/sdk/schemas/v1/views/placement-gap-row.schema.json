@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:placement-gap-row",
+  "title": "PlacementGapRow",
+  "description": "Source of truth: peer_blob_inventory (gossip-synced operational truth) + peer-identity bindings (DHT Category-A) + declared reach class on EPR head (DHT Category-A). Hub-abstract: kind enum stays substrate-agnostic; classification of which hub kind (dwelling/collective/computed) is the gap happens at the projection layer in ResilienceHubView. Operational Category C — no DHT entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "contentId", "shortfall"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["hub_diversity", "replica_count", "reach_class"],
+      "description": "Which diversity/redundancy axis fell short. hub_diversity is hub-kind-agnostic; concrete hub kinds (dwelling/collective/computed) appear in ResilienceHubView per C2."
+    },
+    "contentId": {
+      "type": "string"
+    },
+    "shortfall": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Concrete delta: target vs observed",
+      "required": ["target", "observed"],
+      "properties": {
+        "target": { "type": "integer", "minimum": 0 },
+        "observed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "remediation": {
+      "type": ["string", "null"],
+      "description": "Optional hint about what action would close the gap"
+    }
+  }
+}

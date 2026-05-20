@@ -1626,13 +1626,52 @@ pub struct DistributionDetails {
     pub summary: DistributionSummary,
     pub replica_peers: Vec<ReplicaPeer>,
     pub projector_identities: Vec<ProjectorIdentity>,
-    /// Open-shape placement-gap records during bring-up; will graduate to a
-    /// typed schema once stable.
-    pub placement_gaps: Vec<JsonVal>,
+    pub placement_gaps: Vec<PlacementGapRow>,
     /// Open-shape rea projection-event records relevant to this CID.
     pub recent_projection_events: Vec<JsonVal>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commitment_references: Option<Vec<String>>,
+}
+
+/// Hub-abstract placement-gap row. Describes one axis on which a content item's
+/// achieved placement falls short of target. Substrate stays kind-agnostic
+/// ([[project_hub_archetype_abstraction]]); classification of which hub kind
+/// (dwelling/collective/computed) is the gap happens at the projection layer in
+/// `ResilienceHubView` (C2). Operational Category C — no DHT entry.
+///
+/// Wire format: `elohim/sdk/schemas/v1/views/placement-gap-row.schema.json`
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PlacementGapRow {
+    pub kind: PlacementGapKind,
+    pub content_id: String,
+    pub shortfall: PlacementGapShortfall,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remediation: Option<String>,
+}
+
+/// Hub-abstract gap kind. New gap kinds slot in here without changing hub schema.
+///
+/// - `hub_diversity`: not enough distinct hub kinds stewarding this content
+/// - `replica_count`: raw replica count below target
+/// - `reach_class`: content's declared reach class requires wider distribution than achieved
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub enum PlacementGapKind {
+    HubDiversity,
+    ReplicaCount,
+    ReachClass,
+}
+
+/// Concrete target-vs-observed delta for a `PlacementGapRow`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PlacementGapShortfall {
+    pub target: i32,
+    pub observed: i32,
 }
 
 /// Three-number compute picture for a single device: free / used / stewarded bytes.
