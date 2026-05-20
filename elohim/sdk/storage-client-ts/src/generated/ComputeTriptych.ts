@@ -9,6 +9,15 @@
  *
  * Not persisted; reconstructed when the cluster view is assembled.
  * A3 (`ClusterView`) composes `aggregate_stewarded_bytes_by_peer` (A1) + this struct (A2).
+ *
+ * **Precision note:** these `Option<u64>` fields serialize as JSON integers
+ * for the HTTP wire (via ts-rs `bigint | null` on the TypeScript side). The
+ * adjacent `DeviceSummaryGql` byte fields (`storage_used_bytes`,
+ * `storage_total_bytes`, etc.) are exposed as `Option<String>` on the
+ * GraphQL surface for JS Number precision safety. A4 (the GraphQL field
+ * resolver for `compute`) must follow that pattern — stringify all three
+ * fields when projecting `ComputeTriptychGql` — to keep the GraphQL wire
+ * shape consistent. The HTTP wire stays integer; the asymmetry is by design.
  */
 export type ComputeTriptych = { 
 /**

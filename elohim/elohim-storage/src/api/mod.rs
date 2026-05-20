@@ -337,9 +337,9 @@ pub async fn handle_api_request(
         let bridge_ctx = valueflows_bridge::BridgeContext {
             pool: pool.clone(),
         };
-        return valueflows_bridge::handle_request(req, bridge_ctx)
+        valueflows_bridge::handle_request(req, bridge_ctx)
             .await
-            .map_err(|e| StorageError::Internal(format!("vf-graphql bridge: {e}")));
+            .map_err(|e| StorageError::Internal(format!("vf-graphql bridge: {e}")))
     } else if sub_path.starts_with("graph") {
         // Phase 6 Task 26: graph-native view routes.
         // Routes register unconditionally — handlers return 501 when the feature is off.
