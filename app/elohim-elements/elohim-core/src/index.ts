@@ -3,3 +3,5 @@
 
 export { ElohimButton } from './elohim-button.js';
 export type { ElohimButtonVariant } from './elohim-button.js';
+
+export * from './capability/index.js';
