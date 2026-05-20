@@ -39,7 +39,10 @@ export class ProtocolNavigationService {
   back(): EprNavRef | null {
     const prior = this.session.previous();
     if (prior) {
-      return { cid: prior.cid, label: prior.label };
+      // NavStackEntry.label is string|undefined; EprNavRef.label is string|null.
+      // Session entries don't carry substrate-derived resilienceTier — that's
+      // an EPR-projection field, so null is the honest value here.
+      return { cid: prior.cid, label: prior.label ?? null, resilienceTier: null };
     }
     return this._ctx()?.prev ?? null;
   }
