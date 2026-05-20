@@ -35,6 +35,11 @@ describe('i18n harness', () => {
       const findings = scanForHardcodedStrings('<span aria-label="{{label}}">{{text}}</span>');
       expect(findings).to.deep.equal([]);
     });
+
+    it('flags hardcoded text that appears after whitespace (prettified HTML)', () => {
+      const findings = scanForHardcodedStrings('<span>\n  Save\n</span>');
+      expect(findings).to.include('Save');
+    });
   });
 
   describe('requiresLogicalProperties', () => {

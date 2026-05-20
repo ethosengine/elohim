@@ -52,7 +52,7 @@ export async function renderInLocale<T extends Element = HTMLElement>(
 export function scanForHardcodedStrings(renderedHtml: string): string[] {
   const findings: string[] = [];
   // text content between tags
-  const textMatches = renderedHtml.matchAll(/>([^<>{}\s][^<>{}]*?)</g);
+  const textMatches = renderedHtml.matchAll(/>([^<>{}]*?)</g);
   for (const m of textMatches) {
     const text = m[1]!.trim();
     if (text.length > 0 && !/^[\d\s.,:;%-]+$/.test(text)) findings.push(text);
