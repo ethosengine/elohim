@@ -10,14 +10,23 @@ CREATE TABLE translation_observations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     observed_at TEXT NOT NULL,                  -- ISO-8601 UTC
     block_height BIGINT,                        -- DHT block height; nullable (None during M1 fixture phase)
-    direction TEXT NOT NULL,                    -- 'Read' | 'Write'
-    vf_type TEXT NOT NULL,                      -- 'EconomicEvent', 'Proposal', ...
-    elohim_source TEXT NOT NULL,                -- 'fixture' | 'hREA::EconomicEvent' | ...
-    translation_kind TEXT NOT NULL,             -- 'IdentityShape' | 'FieldRename' | ...
-    semantic_cost TEXT NOT NULL,                -- 'Mechanical' | 'JustifiedDistinct' | 'UnclearYet'
-    ontological_commitment TEXT,                -- nullable; enum string when set
-    client_capability TEXT NOT NULL,            -- 'StockVf' | 'ElohimAware'
-    code_location TEXT NOT NULL,                -- file:line
+    direction TEXT NOT NULL CHECK (direction IN ('Read', 'Write')),
+    vf_type TEXT NOT NULL,                      -- 'EconomicEvent', 'Proposal', ... (open-ended; grows with new VF types)
+    elohim_source TEXT NOT NULL,                -- 'fixture' | 'hREA::EconomicEvent' | ... (open-ended; grows with new backends)
+    translation_kind TEXT NOT NULL CHECK (translation_kind IN (
+        'IdentityShape', 'FieldRename', 'SemanticBridge',
+        'Reconciliation', 'Sidecar'
+    )),
+    semantic_cost TEXT NOT NULL CHECK (semantic_cost IN (
+        'Mechanical', 'JustifiedDistinct', 'UnclearYet'
+    )),
+    ontological_commitment TEXT CHECK (ontological_commitment IN (
+        'SovereigntyToStewardship', 'KeyAuthorityToSocialAuthority',
+        'FixedAudienceToReachClass', 'BilateralToRelational',
+        'IndividualWillToContribution', 'EntryToEprAtom'
+    )),
+    client_capability TEXT NOT NULL CHECK (client_capability IN ('StockVf', 'ElohimAware')),
+    code_location TEXT NOT NULL,                -- file:line (open-ended)
     notes TEXT                                  -- free-form
 );
 

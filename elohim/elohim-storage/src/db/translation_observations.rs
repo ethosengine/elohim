@@ -84,6 +84,11 @@ pub fn insert_observation(
 }
 
 /// Convenience: build a now-stamped TranslationPoint with the given fields.
+///
+/// `at_block_height` is always `None` — block height is populated from M3+
+/// when live conductor context is available. M3 callers needing to attach
+/// a real block height should construct `TranslationPoint` directly rather
+/// than going through `observe_now`.
 #[allow(clippy::too_many_arguments)]
 pub fn observe_now(
     direction: Direction,
