@@ -7,6 +7,7 @@ export const routes: Routes = [
     path: '',
     loadComponent: async () =>
       import('./components/home/home.component').then(m => m.HomeComponent),
+    data: { protocolContent: true, fallbackCid: 'elohim-host-landing' },
   },
   {
     path: 'lamad',
@@ -63,6 +64,7 @@ export const routes: Routes = [
       import('./lamad/components/content-viewer/content-viewer.component').then(
         m => m.ContentViewerComponent
       ),
+    data: { protocolContent: true },
   },
   // Spatial map — cross-pillar geospatial view (Places, resources, governance)
   {

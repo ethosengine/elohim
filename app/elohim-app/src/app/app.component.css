@@ -1,1 +1,10 @@
 /* App root styles */
+
+:host {
+  display: block;
+}
+
+:host.with-omni {
+  padding-top: 2.5rem;
+  transition: padding-top 150ms ease-out;
+}

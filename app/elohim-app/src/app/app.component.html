@@ -1,6 +1,11 @@
 <!-- Skip navigation link for keyboard accessibility -->
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
+<!-- Protocol omni — top-of-viewport chrome, gated by route protocolContent flag -->
+@if (protocolRouteCtx.isProtocol() && protocolRouteCtx.cid(); as cid) {
+  <app-protocol-omni [contentId]="cid"></app-protocol-omni>
+}
+
 <!-- Floating theme toggle button (only on root landing page) -->
 <app-theme-toggle *ngIf="showFloatingToggle"></app-theme-toggle>
 

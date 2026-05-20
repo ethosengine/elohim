@@ -7,6 +7,7 @@ import { Observable, Subject } from 'rxjs';
 
 import { AppComponent } from './app.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
+import { ProtocolRouteContextService } from './elohim/services/protocol-route-context.service';
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
@@ -19,6 +20,10 @@ describe('AppComponent', () => {
   let mockAuthService: { isAuthenticated: ReturnType<typeof signal<boolean>> };
   let mockTauriAuth: any;
   let mockBlobBootstrap: any;
+  const mockProtocolRouteCtx = {
+    isProtocol: () => false,
+    cid: () => null,
+  };
 
   beforeEach(async () => {
     routerEventsSubject = new Subject();
@@ -61,6 +66,7 @@ describe('AppComponent', () => {
         { provide: AuthService, useValue: mockAuthService },
         { provide: TauriAuthService, useValue: mockTauriAuth },
         { provide: BlobBootstrapService, useValue: mockBlobBootstrap },
+        { provide: ProtocolRouteContextService, useValue: mockProtocolRouteCtx },
       ],
     }).compileComponents();
   });
@@ -87,6 +93,13 @@ describe('AppComponent', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('router-outlet')).toBeTruthy();
+  });
+
+  it('should not render protocol omni when isProtocol() is false', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('app-protocol-omni')).toBeFalsy();
   });
 
   it('should show floating toggle on root landing page (/)', () => {
