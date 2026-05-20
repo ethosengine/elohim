@@ -26,7 +26,7 @@ export function CapabilityAwareElement<TBase extends Constructor<LitElement>>(
   Base: TBase
 ): TBase & Constructor<CapabilityAware> {
   class Mixed extends Base {
-    static override properties: PropertyDeclarations = {
+    static properties: PropertyDeclarations = {
       ...(Base as unknown as { properties?: PropertyDeclarations }).properties,
       profile: { attribute: false, state: true },
     };
