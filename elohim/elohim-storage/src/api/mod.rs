@@ -49,6 +49,7 @@ pub mod reciprocity;
 pub mod recognition;
 pub mod registry;
 pub mod resilience;
+pub mod resilience_hub;
 pub mod resources;
 pub mod risk;
 pub mod routing;

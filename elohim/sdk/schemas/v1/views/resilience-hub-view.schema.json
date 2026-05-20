@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:resilience-hub-view",
+  "title": "ResilienceHubView",
+  "description": "Polymorphic hub projection for a content item. Lists every hub (dwelling / collective / computed) known to hold at least one replica of the content, derived from peer_blob_inventory (gossip operational) cross-referenced with peer-identity bindings (DHT Category-A). Hub is a *role*, not a notarized entity — kind classification is a projection-layer concern. Operational Category C — no DHT entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contentId", "hubs"],
+  "properties": {
+    "contentId": {
+      "type": "string",
+      "description": "The content item whose hub distribution is described."
+    },
+    "hubs": {
+      "type": "array",
+      "items": { "$ref": "hub-summary.schema.json" },
+      "description": "Zero or more hubs known to hold replicas. Empty when the content is unknown or has no inventory records."
+    }
+  }
+}

@@ -43,6 +43,11 @@ pub async fn handle(
             let content_id = p.strip_suffix("/household").unwrap_or("");
             handle_get_household_resilience(content_id, pool, ctx, &req).await
         }
+        // GET /api/v1/resilience/{content_id}/hub — C2 polymorphic hub projection
+        (&Method::GET, p) if p.ends_with("/hub") => {
+            let content_id = p.strip_suffix("/hub").unwrap_or("");
+            super::resilience_hub::handle(req, method, content_id, pool, ctx).await
+        }
         // GET /api/v1/resilience/{content_id}
         (&Method::GET, content_id) if !content_id.is_empty() && !content_id.contains('/') => {
             handle_get_resilience(content_id, pool, ctx, graph_engine).await

@@ -68,6 +68,7 @@ pub mod relationship_density;
 pub mod relationship_service;
 pub mod resource_nature;
 pub mod resource_service;
+pub mod resilience; // C2 — hub projection for /api/v1/resilience/{id}/hub
 pub mod response;
 pub mod responsibility_demand_service;
 pub mod risk_alert;

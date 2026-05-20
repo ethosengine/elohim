@@ -2957,3 +2957,88 @@ fn governance_action_tally_view_matches_schema_no_votes_yet() {
     let json = serde_json::to_value(&view).unwrap();
     validate_against_schema("views/governance-action-tally-view.schema.json", &json);
 }
+
+// ── ResilienceHubView + HubSummary (C2) ───────────────────────
+
+#[test]
+fn resilience_hub_view_empty_hubs_matches_schema() {
+    use elohim_storage::views::{HubKind, HubSummary, ResilienceHubView};
+    let _ = (HubKind::Computed, HubSummary::default()); // ensure types are in scope
+
+    let view = ResilienceHubView {
+        content_id: "sha256-empty-test".to_string(),
+        hubs: vec![],
+    };
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/resilience-hub-view.schema.json", &json);
+}
+
+#[test]
+fn resilience_hub_view_computed_hub_matches_schema() {
+    use elohim_storage::views::{HubKind, HubSummary, ResilienceHubView};
+
+    let view = ResilienceHubView {
+        content_id: "sha256-computed-test".to_string(),
+        hubs: vec![HubSummary {
+            hub_id: "12D3KooWSinglePeer".to_string(),
+            kind: HubKind::Computed,
+            replica_count: 1,
+            last_verified_seconds: Some(120),
+            display_label: None,
+        }],
+    };
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/resilience-hub-view.schema.json", &json);
+    // Verify hub entry validates individually against hub-summary schema
+    validate_against_schema("views/hub-summary.schema.json", &json["hubs"][0]);
+}
+
+#[test]
+fn resilience_hub_view_all_kinds_validate() {
+    use elohim_storage::views::{HubKind, HubSummary, ResilienceHubView};
+
+    for (kind, hub_id) in [
+        (HubKind::Dwelling, "household-alpha"),
+        (HubKind::Collective, "collective-dawn-runners"),
+        (HubKind::Computed, "12D3KooWPeerSingle"),
+    ] {
+        let view = ResilienceHubView {
+            content_id: "sha256-all-kinds-test".to_string(),
+            hubs: vec![HubSummary {
+                hub_id: hub_id.to_string(),
+                kind,
+                replica_count: 2,
+                last_verified_seconds: None,
+                display_label: Some(format!("Test {hub_id}")),
+            }],
+        };
+        let json = serde_json::to_value(&view).unwrap();
+        validate_against_schema("views/resilience-hub-view.schema.json", &json);
+        validate_against_schema("views/hub-summary.schema.json", &json["hubs"][0]);
+    }
+}
+
+#[test]
+fn hub_summary_no_optional_fields_matches_schema() {
+    use elohim_storage::views::{HubKind, HubSummary};
+
+    // Minimal HubSummary — only required fields; optional fields omitted.
+    let summary = HubSummary {
+        hub_id: "household-minimal".to_string(),
+        kind: HubKind::Dwelling,
+        replica_count: 3,
+        last_verified_seconds: None,
+        display_label: None,
+    };
+    let json = serde_json::to_value(&summary).unwrap();
+    validate_against_schema("views/hub-summary.schema.json", &json);
+    // Ensure optional fields are absent in wire format
+    assert!(
+        json.get("lastVerifiedSeconds").is_none(),
+        "lastVerifiedSeconds must be absent when None"
+    );
+    assert!(
+        json.get("displayLabel").is_none(),
+        "displayLabel must be absent when None"
+    );
+}

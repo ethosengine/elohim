@@ -1674,6 +1674,89 @@ pub struct PlacementGapShortfall {
     pub observed: i32,
 }
 
+// ============================================================================
+// C2 — ResilienceHubView (polymorphic hub projection)
+// ============================================================================
+//
+// Source of truth: peer_blob_inventory (gossip operational) + peer-identity
+// bindings (Category-A DHT) + hub-membership facts where notarized.
+// Hub is a *role* (dial-up-by-capability), not a notarized entity — substrate
+// stays kind-agnostic; kind classification happens at the projection layer.
+// Operational Category C — no DHT entry.
+//
+// Wire format: `elohim/sdk/schemas/v1/views/resilience-hub-view.schema.json`
+//              `elohim/sdk/schemas/v1/views/hub-summary.schema.json`
+
+/// Polymorphic hub projection for a content item.
+///
+/// Lists every hub (dwelling / collective / computed) known to hold at least
+/// one replica of the content, derived from `peer_blob_inventory` cross-
+/// referenced with peer-identity bindings. When hub-membership facts are not
+/// yet notarized, every peer is its own `Computed` hub (substrate-honest stub;
+/// future work adds richer classification from binding tables).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ResilienceHubView {
+    pub content_id: String,
+    pub hubs: Vec<HubSummary>,
+}
+
+/// One hub's contribution to content resilience. Polymorphic projection —
+/// hub is a *role*, not a notarized entity. New hub kinds slot in here
+/// without changing the API shape.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct HubSummary {
+    /// Stable identifier for this hub. When hub-membership facts are not yet
+    /// notarized, `hub_id` is the `peer_id` of the single-device participant
+    /// (Computed kind). Future: `dwelling_id` or `collective_id` when binding
+    /// tables distinguish dwelling vs collective membership.
+    pub hub_id: String,
+    pub kind: HubKind,
+    /// Number of blob inventory entries this hub holds for the content.
+    pub replica_count: i32,
+    /// Seconds since the most recent inventory record, or None when unavailable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_verified_seconds: Option<i64>,
+    /// Optional human-readable label for UI display.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_label: Option<String>,
+}
+
+/// Hub kind. Polymorphic projection — hub is a *role* (dial-up-by-capability),
+/// not a notarized entity. Substrate stays kind-agnostic; UI resolves labels.
+/// New hub kinds slot in here without changing the API shape.
+///
+/// Classification logic ([[project_hub_archetype_abstraction]],
+/// [[project_hub_optional_floor]]):
+/// - Dwelling  → peer has a notarized `humans.household_id` binding
+/// - Collective → peer has a notarized `collective_participations` binding
+/// - Computed  → no notarized membership found; single-device participant or
+///               operator-configured ad-hoc role
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub enum HubKind {
+    /// Single household / dwelling-scoped hub.
+    Dwelling,
+    /// Collective (qahal-scoped) hub.
+    Collective,
+    /// Computed / ad-hoc hub (single-device participation, or
+    /// operator-configured ad-hoc roles).
+    Computed,
+}
+
+impl Default for HubKind {
+    /// Most permissive default — a hub with unknown membership classification
+    /// falls to Computed. This is the substrate-honest choice: the substrate
+    /// never pre-classifies; projection defaults to the widest bucket.
+    fn default() -> Self {
+        Self::Computed
+    }
+}
+
 /// Three-number compute picture for a single device: free / used / stewarded bytes.
 ///
 /// Category C operational projection — derived per-request from:
