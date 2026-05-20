@@ -114,6 +114,8 @@ const INTERFACE_FILES = [
   { src: 'views/navigation-context-view.ts', dest: 'navigation-context-view.ts' },
   { src: 'views/atom-version-chain.ts', dest: 'atom-version-chain.ts' },
   { src: 'views/topology-overview-view.ts', dest: 'topology-overview-view.ts' },
+  // EPR nav-context projection -- Category C read-only, no new DHT types
+  { src: 'views/epr-nav-context-view.ts', dest: 'epr-nav-context-view.ts' },
 ];
 
 /**

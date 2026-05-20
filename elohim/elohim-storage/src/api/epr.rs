@@ -11,6 +11,7 @@
 //!   GET  /api/v1/epr/:cid/payload           → get_payload
 //!   GET  /api/v1/epr/:cid/verify            → get_verify
 //!   GET  /api/v1/epr/:cid/providers         → get_providers
+//!   GET  /api/v1/epr/:cid/nav-context       → get_nav_context
 //!   PUT  /api/v1/epr/:cid                   → put_epr
 //!
 //! Phase 3.5 — Light Up the Graph (T17/T19):
@@ -180,6 +181,12 @@ pub async fn handle(
         (&Method::GET, p) if p.ends_with("/providers") && p.split('/').count() == 2 => {
             let cid = p.trim_end_matches("/providers");
             get_providers(req, cid, pool, ctx, swarm_tx).await
+        }
+
+        // GET /api/v1/epr/:cid/nav-context
+        (&Method::GET, p) if p.ends_with("/nav-context") && p.split('/').count() == 2 => {
+            let cid = p.trim_end_matches("/nav-context");
+            get_nav_context(req, cid, pool, ctx).await
         }
 
         // GET /api/v1/epr/:cid  (plain CID — must not contain '/')
@@ -886,6 +893,44 @@ async fn list_epr(
         items,
         next_cursor,
     }))
+}
+
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/epr/:cid/nav-context
+// ---------------------------------------------------------------------------
+
+async fn get_nav_context(
+    req: Request<Incoming>,
+    cid: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+
+    // Reach check on the focal atom: load directly to check reach before
+    // delegating to the projection service.
+    let store = crate::services::epr_store::default_epr_store(
+        None, None, None, ctx.local_libp2p_peer_id.clone(),
+    );
+    if let Some(outcome) = store.fetch(&mut conn, cid)? {
+        if !reach_visible_to(&outcome.fetched.atom.reach, &req) {
+            return Ok(response::not_found(&format!("epr not found: {cid}")));
+        }
+    }
+
+    match crate::services::epr_nav_context_view::project(&mut conn, cid)? {
+        None => Ok(response::not_found(&format!("epr not found: {cid}"))),
+        Some(view) => {
+            let body = serde_json::to_vec(&view)
+                .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+            Ok(Response::builder()
+                .status(hyper::StatusCode::OK)
+                .header(hyper::header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(body)))
+                .unwrap())
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

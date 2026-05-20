@@ -57,6 +57,7 @@ export * from './views/elohim-capability-profile';
 export * from './views/elohim-reputation-profile-view';
 export * from './views/epr-envelope-view';
 export * from './views/epr-list-view';
+export * from './views/epr-nav-context-view';
 export * from './views/epr-providers-view';
 export * from './views/epr-verify-view';
 export * from './views/epr-view';

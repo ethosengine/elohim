@@ -1,0 +1,86 @@
+<ng-container *ngIf="!suppressed()">
+  <button
+    type="button"
+    class="omni-chip"
+    data-testid="protocol-omni-chip"
+    (click)="toggleExpanded()"
+    [attr.aria-expanded]="expanded()"
+    aria-controls="protocol-omni-toolbar"
+    aria-label="Elohim Protocol — click for details"
+  >
+    <span class="omni-glyph" aria-hidden="true">&#x2BC2;</span>
+    <span class="omni-label">elohim-protocol</span>
+  </button>
+
+  <div
+    *ngIf="expanded()"
+    id="protocol-omni-toolbar"
+    class="omni-toolbar"
+    data-testid="protocol-omni-toolbar"
+    role="region"
+    aria-label="Protocol context"
+  >
+    <button
+      *ngIf="back() as b"
+      type="button"
+      class="omni-nav omni-nav-back"
+      data-testid="protocol-omni-back"
+      (click)="navigateBack()"
+      [attr.title]="b.label || 'Back'"
+    >
+      &larr; {{ b.label || 'Back' }}
+    </button>
+
+    <button
+      type="button"
+      class="omni-epr"
+      data-testid="protocol-omni-epr"
+      (click)="copyCid()"
+      title="Click to copy content identifier"
+      aria-label="Copy content identifier"
+    >
+      <span class="omni-epr-label">EPR</span>
+      <code class="omni-epr-value">{{ shortCid() }}</code>
+    </button>
+
+    <span
+      class="omni-resilience"
+      data-testid="protocol-omni-resilience"
+      title="Resilience tier (placeholder — wires to elohim-resilience-snapshot in a follow-up)"
+      aria-label="Resilience indicator"
+    >
+      &#x25C9;
+    </span>
+
+    <button
+      *ngIf="forward() as f"
+      type="button"
+      class="omni-nav omni-nav-forward"
+      data-testid="protocol-omni-forward"
+      (click)="navigateForward()"
+      [attr.title]="f.label || 'Forward'"
+    >
+      {{ f.label || 'Forward' }} &rarr;
+    </button>
+
+    <a
+      *ngIf="authenticated()"
+      class="omni-account"
+      data-testid="protocol-omni-account"
+      [routerLink]="accountHref()"
+      aria-label="Account"
+    >
+      &#x25D0;
+    </a>
+
+    <button
+      type="button"
+      class="omni-collapse"
+      data-testid="protocol-omni-collapse"
+      (click)="collapse()"
+      aria-label="Collapse"
+    >
+      &times;
+    </button>
+  </div>
+</ng-container>

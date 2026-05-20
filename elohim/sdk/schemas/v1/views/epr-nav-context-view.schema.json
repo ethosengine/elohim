@@ -1,0 +1,68 @@
+{
+  "$id": "epr:schema:view:epr-nav-context",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EprNavContextView",
+  "description": "Nav-context projection for GET /api/v1/epr/{cid}/nav-context. Source of truth: existing epr_atoms, epr_coupling, epr_supersedence, and epr_claims tables (read-only projection). Zero new DHT entry types, zero new tables, zero migrations — Category C per p2p-design-gate.",
+  "type": "object",
+  "required": ["cid", "partOf", "related", "derivedFrom"],
+  "additionalProperties": false,
+  "properties": {
+    "cid": {
+      "type": "string",
+      "description": "CIDv1 base32 of the focal atom"
+    },
+    "prev": {
+      "oneOf": [
+        { "$ref": "#/$defs/EprNavRef" },
+        { "type": "null" }
+      ],
+      "description": "Predecessor: atom this one supersedes (the one it replaced)"
+    },
+    "next": {
+      "oneOf": [
+        { "$ref": "#/$defs/EprNavRef" },
+        { "type": "null" }
+      ],
+      "description": "Successor: atom that superseded this one (what replaced it)"
+    },
+    "partOf": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/EprNavRef" },
+      "description": "Atoms that include this atom as a coupling target (reverse coupling)"
+    },
+    "related": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/EprNavRef" },
+      "description": "Outbound coupling targets plus claim CIDs from this atom"
+    },
+    "derivedFrom": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Relationship kinds that contributed entries to this view (e.g. supersedence, coupling, claims)"
+    }
+  },
+  "$defs": {
+    "EprNavRef": {
+      "title": "EprNavRef",
+      "description": "A lightweight reference to a related EPR atom. Label and resilience tier are best-effort — populated when the referenced atom is locally held; absent otherwise.",
+      "type": "object",
+      "required": ["cid"],
+      "additionalProperties": false,
+      "properties": {
+        "cid": {
+          "type": "string",
+          "description": "CIDv1 base32 of the referenced atom"
+        },
+        "label": {
+          "type": "string",
+          "description": "Short human-readable label, populated when the atom is locally held"
+        },
+        "resilienceTier": {
+          "type": "string",
+          "enum": ["high", "medium", "low", "unknown"],
+          "description": "Resilience tier derived from the atom's reach field"
+        }
+      }
+    }
+  }
+}

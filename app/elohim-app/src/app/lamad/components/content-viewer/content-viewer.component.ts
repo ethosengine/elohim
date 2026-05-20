@@ -77,7 +77,6 @@ import {
 } from '../../services/resilience.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
-import { ProtocolSignalBadgeComponent } from '@app/elohim/components/protocol-signal-badge/protocol-signal-badge.component';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 
@@ -98,7 +97,6 @@ import type { ContentStewardshipView } from '@elohim/storage-client/generated';
     GraduatedFeedbackComponent,
     FeedbackMechanismGatewayComponent,
     FocusedViewToggleComponent,
-    ProtocolSignalBadgeComponent,
     ContentAnalyticsComponent,
     EprRelationshipsPanelComponent,
     ResilienceSnapshotComponent,
