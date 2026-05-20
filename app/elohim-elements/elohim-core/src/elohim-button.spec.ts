@@ -5,6 +5,7 @@ import './register.js';
 import type { ElohimButton } from './elohim-button.js';
 import { ElohimButton as ElohimButtonClass } from './elohim-button.js';
 import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
+import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
 
 describe('<elohim-button>', () => {
   it('renders the default slot content', async () => {
@@ -232,5 +233,32 @@ describe('<elohim-button> — ua-prefs precondition gate', () => {
     const rect = inner.getBoundingClientRect();
     expect(rect.width).to.be.at.least(44);
     expect(rect.height).to.be.at.least(44);
+  });
+});
+
+describe('<elohim-button> — i18n precondition gate', () => {
+  it('renders the slotted label unchanged in en (label comes from slot, not internal strings)', async () => {
+    const el = await renderInLocale<ElohimButton>('en', html`<elohim-button>Submit</elohim-button>`);
+    const slot = el.shadowRoot!.querySelector('slot')!;
+    const text = slot.assignedNodes({ flatten: true }).map(n => n.textContent).join('').trim();
+    expect(text).to.equal('Submit');
+  });
+
+  it('renders correctly in RTL document direction (he-IL)', async () => {
+    const el = await renderInLocale<ElohimButton>('he-IL', html`<elohim-button>שלח</elohim-button>`);
+    expect(el).to.exist;
+    expect(document.documentElement.getAttribute('dir')).to.equal('rtl');
+    // Confirm the inner button is laid out — bounding box has nonzero dimensions
+    const inner = el.shadowRoot!.querySelector('button')!;
+    const rect = inner.getBoundingClientRect();
+    expect(rect.width).to.be.greaterThan(0);
+    expect(rect.height).to.be.greaterThan(0);
+  });
+
+  it('uses no physical CSS properties (only logical or non-positional)', () => {
+    // The button's static styles string contains its declared CSS. We scan it.
+    const cssText = (ElohimButtonClass as unknown as { styles: { cssText: string } }).styles.cssText;
+    const findings = requiresLogicalProperties(cssText);
+    expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });
 });
