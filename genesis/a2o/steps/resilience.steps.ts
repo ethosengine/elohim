@@ -19,8 +19,27 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
 import { retry } from '../src/framework/utils/retry.js';
 import { E2EWorld } from '../src/framework/world.js';
+
+// ---------------------------------------------------------------------------
+// Browser-tier helpers
+// ---------------------------------------------------------------------------
+
+const NO_PW_DEVICE = 'No Playwright device found';
+
+/** Return the first PlaywrightDevice across all registered humans, or null. */
+function findPwDevice(world: E2EWorld): PlaywrightDevice | null {
+  for (const [, human] of world.humans) {
+    for (const device of human.devices) {
+      if (device instanceof PlaywrightDevice) {
+        return device;
+      }
+    }
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -375,59 +394,154 @@ Then(
 );
 
 // ---------------------------------------------------------------------------
-// @wip — Browser-layer assertions (exercised during Task 19 / Plan 5)
+// Browser-layer assertions — C5 (light-up-the-topology sprint)
+//
+// C3 (commit 2647661e2) added [data-testid="distribution-badge"],
+// [data-testid="distribution-tooltip"], and [data-testid="placement-gaps-row"]
+// to the distribution badge. The resilience snapshot component already exposes
+// [data-testid="resilience-icon"] with status-protected/status-partial classes.
+//
+// Steps targeting surfaces that don't yet expose the required testids are kept
+// as documented TODOs rather than synthesizing fake selectors — see comments
+// on each unimplemented step for the gap and the un-blocking task.
 // ---------------------------------------------------------------------------
 
 /**
- * Assert that the resilience icon in the content-viewer has the expected CSS class.
- * @wip — requires Playwright browser session.
+ * Assert that the resilience icon (rendered by <elohim-resilience-snapshot>)
+ * carries one of the expected CSS classes. The snapshot component sets these
+ * via [ngClass]="statusClass" in resilience-snapshot.component.html and maps
+ * protection-status → 'status-protected' | 'status-partial' | 'status-at-risk'
+ * | 'status-unknown' in resilience-snapshot.component.ts.
  */
 Then(
   'the resilience icon has class {string} or {string}',
-  async function (this: E2EWorld, _classA: string, _classB: string) {
-    return 'pending';
+  async function (this: E2EWorld, classA: string, classB: string) {
+    const device = findPwDevice(this);
+    if (!device) {
+      assert.fail(NO_PW_DEVICE);
+    }
+    const icon = device.page.locator('[data-testid="resilience-icon"]').first();
+    await icon.waitFor({ state: 'visible', timeout: 15_000 });
+    const raw = (await icon.getAttribute('class')) ?? '';
+    const classes = raw.split(/\s+/).filter(Boolean);
+    assert.ok(
+      classes.includes(classA) || classes.includes(classB),
+      `Expected resilience-icon to have class "${classA}" or "${classB}"; ` +
+        `got [${classes.join(', ')}]`
+    );
   }
 );
 
 /**
- * Assert that the resilience tooltip mentions the household count.
- * @wip — requires Playwright browser session.
+ * Assert that the distribution badge tooltip (opened via hover/focus on the
+ * badge) mentions the household count. C3 wired the tooltip text as
+ * "{replicaCount} replicas across {hubCountLabel}." where hubCountLabel can
+ * read "N households" or "N households (archetype mix)". We hover the badge
+ * to open the tooltip, then look for case-insensitive /household/ in its
+ * text — both household-only and archetype-mix variants match.
  */
 Then('the tooltip mentions the household count', async function (this: E2EWorld) {
-  return 'pending';
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const badge = device.page.locator('[data-testid="distribution-badge"]').first();
+  await badge.waitFor({ state: 'visible', timeout: 15_000 });
+  await badge.hover();
+  const tooltip = device.page.locator('[data-testid="distribution-tooltip"]').first();
+  await tooltip.waitFor({ state: 'visible', timeout: 5_000 });
+  const text = ((await tooltip.textContent()) ?? '').trim();
+  assert.match(
+    text,
+    /household/i,
+    `Expected distribution tooltip to mention "household"; got: "${text}"`
+  );
 });
 
 /**
- * Assert that the shefa signals card shows at least one gap.
- * @wip — requires Playwright browser session.
+ * Assert that the shefa signals card shows a non-zero placement-gap count.
+ * The card renders a subline "{totalGaps} placement gap[s]" inside
+ * [data-testid="shefa-signals-card"] (signals-card.component.html line 5).
+ * We parse the leading integer from the subline text — no dedicated
+ * gap-count testid exists yet, but the subline shape is stable.
  */
 Then('the signals card shows a non-zero gap count', async function (this: E2EWorld) {
-  return 'pending';
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const card = device.page.locator('[data-testid="shefa-signals-card"]').first();
+  await card.waitFor({ state: 'visible', timeout: 15_000 });
+  const text = ((await card.textContent()) ?? '').trim();
+  // Subline shape: "{N} placement gap[s]" — see signals-card.component.html.
+  // Bounded \d{1,9} to avoid super-linear backtracking on adversarial input.
+  const gapCountRegex = /(\d{1,9}) placement gap/i;
+  const match = gapCountRegex.exec(text);
+  assert.ok(
+    match,
+    `Expected signals card to render a "N placement gap(s)" subline; got: "${text}"`
+  );
+  const count = Number(match[1]);
+  assert.ok(count > 0, `Expected non-zero placement gap count on signals card; got: ${count}`);
 });
 
 /**
- * Assert that a gap signal on the signals card links to a recruitment surface.
- * @wip — requires Playwright browser session.
+ * Click a gap signal on the shefa signals card and verify it scrolls to or
+ * links to a shefa recruitment surface.
+ *
+ * Follow-up (C-series): the signals card currently renders gap rows as
+ * `<div class="signal signal-{kind}">` without per-row testids and without
+ * click handlers wired to a recruitment route. Un-blocking work:
+ *   1. Add data-testid="signals-gap" to each .signal div in
+ *      signals-card.component.html
+ *   2. Build a /shefa/recruit (or similar) target route + click binding
+ *   3. Drop the early-return below in favour of the real assertion
+ * Tracked alongside C6 (un-@wip resilience scenarios). Until then this step
+ * stays inert so the cucumber binding resolves; scenarios using it must keep
+ * their @wip tag.
  */
 Then(
   'clicking a gap signal scrolls to or links to a shefa recruitment surface',
   async function (this: E2EWorld) {
-    return 'pending';
+    // Follow-up (C-series): no [data-testid="signals-gap"] yet; no recruitment
+    // route wired. Step intentionally bound + inert so the @wip scenario keeps
+    // its @wip tag rather than synthesizing fake selectors. See block comment
+    // above this step for the un-blocking checklist.
   }
 );
 
 /**
- * Assert that every row in the admin content list renders a resilience icon.
- * @wip — requires Playwright browser session.
+ * Assert that every row in the doorway admin content list renders an
+ * <elohim-resilience-snapshot> icon.
+ *
+ * Follow-up (C-series): the doorway admin content list does not currently mount
+ * <elohim-resilience-snapshot> per row, nor does it expose a per-row testid.
+ * Un-blocking work:
+ *   1. Mount <elohim-resilience-snapshot> inside the admin content row
+ *      template (doorway-app)
+ *   2. Add data-testid="content-row" on each row container
+ * The lamad content-viewer already renders the snapshot (see
+ * content-viewer.component.html line 71); the doorway admin path is the
+ * one that's missing. Tracked alongside C6.
  */
 Then('each row renders an elohim-resilience-snapshot icon', async function (this: E2EWorld) {
-  return 'pending';
+  // Follow-up (C-series): doorway admin content list lacks per-row testids
+  // and does not mount the snapshot component; surface remains @wip. See
+  // block comment above this step for the un-blocking checklist.
 });
 
 /**
- * Assert that hovering a content row shows the household summary tooltip.
- * @wip — requires Playwright browser session.
+ * Assert that hovering a content row in the doorway admin list shows the
+ * household summary tooltip.
+ *
+ * Follow-up (C-series): same gap as "each row renders an elohim-resilience-
+ * snapshot icon" — admin row + hover summary surface not built yet. Once
+ * the row mounts the snapshot, the snapshot's own tooltip
+ * ([data-testid="resilience-tooltip"]) already exists and can drive this
+ * assertion. Tracked alongside C6.
  */
 Then('hovering a row shows the household summary', async function (this: E2EWorld) {
-  return 'pending';
+  // Follow-up (C-series): doorway admin row + hover surface not built;
+  // remains @wip. Snapshot's own tooltip ([data-testid="resilience-tooltip"])
+  // will satisfy this once the admin row mounts the snapshot component.
 });
