@@ -11,12 +11,11 @@
 //! committed P bytes to me, delivered Q." This is the per-agent reciprocity
 //! ledger that powers the topology UI's reciprocation-count drilldown.
 
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use diesel::dsl::sql;
 use diesel::prelude::*;
-use diesel::sql_types::{Float, Nullable};
+use diesel::sql_types::{Double, Float, Nullable};
 use thiserror::Error;
 
 use crate::db::models::PeerIdentityBindingRow;
@@ -124,21 +123,28 @@ pub async fn aggregate_stewarded_bytes_by_peer(
 ) -> Result<HashMap<String, u64>, ReciprocityViewError> {
     use crate::db::diesel_schema::rea_commitments::dsl as rc;
 
+    if my_peer_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
     let peer_strs: Vec<&str> = my_peer_ids.iter().map(String::as_str).collect();
 
     let mut conn = pool
         .get()
         .map_err(|e| ReciprocityViewError::Pool(e.to_string()))?;
 
-    let rows: Vec<(String, Option<f32>)> = rc::rea_commitments
+    // Use Double (f64) for the SUM so multi-TB aggregates retain full precision.
+    // The underlying column is f32, but SQLite REAL is 64-bit — widening here is
+    // lossless at the DB layer and prevents ~10⁶-byte truncation at multi-TB scale.
+    let rows: Vec<(String, Option<f64>)> = rc::rea_commitments
         .filter(rc::action.eq("custody-blob"))
         .filter(rc::provider.eq_any(&peer_strs))
         .group_by(rc::provider)
         .select((
             rc::provider,
-            sql::<Nullable<Float>>("SUM(resource_quantity_value)"),
+            sql::<Nullable<Double>>("SUM(resource_quantity_value)"),
         ))
-        .load::<(String, Option<f32>)>(&mut conn)?;
+        .load::<(String, Option<f64>)>(&mut conn)?;
 
     Ok(rows
         .into_iter()
