@@ -70,8 +70,8 @@ function adaptArchetype(gql: DeviceSummaryGql['archetype']): DeviceArchetype {
 }
 
 function adaptDevice(
-  gql: DeviceSummaryGql,
-): MyClusterView['devices'][number] & { compute: ComputeTriptychGql | null } {
+  gql: DeviceSummaryGql
+): MyClusterView['devices'][number] & { compute?: ComputeTriptychGql | null } {
   return {
     peerId: gql.peerId,
     archetype: adaptArchetype(gql.archetype),
@@ -87,7 +87,9 @@ function adaptDevice(
     ...(gql.hostingCount !== null && { hostingCount: gql.hostingCount }),
     ...(gql.projectingCount !== null && { projectingCount: gql.projectingCount }),
     ...(gql.beaconAgeMs !== null && { beaconAgeMs: Number(gql.beaconAgeMs) }),
-    compute: gql.compute ?? null,
+    // compute: omit the key entirely when null/undefined so that `'compute' in obj`
+    // returns false — matches the REST shape and the null-omission parity convention.
+    ...(gql.compute !== null && { compute: gql.compute }),
   };
 }
 
@@ -115,7 +117,7 @@ function adaptEdge(gql: PeerHouseholdEdgeGql): PeerHouseholdEdge {
  * (null when the peer has no compute signal yet).
  */
 export type MyClusterViewWithCompute = Omit<MyClusterView, 'devices'> & {
-  devices: (MyClusterView['devices'][number] & { compute: ComputeTriptychGql | null })[];
+  devices: (MyClusterView['devices'][number] & { compute?: ComputeTriptychGql | null })[];
 };
 
 // ---------------------------------------------------------------------------

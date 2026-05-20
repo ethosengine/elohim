@@ -197,7 +197,7 @@ describe('adaptHubResponse', () => {
     expect(view.devices[0].compute).toEqual({ free: '9500000', used: '500000', stewarded: '250000' });
   });
 
-  it('passes null compute through as null', () => {
+  it('omits compute when GraphQL compute is null', () => {
     const view = adaptHubResponse(makeHubResponse({
       devices: [{
         peerId: 'peer_M',
@@ -215,7 +215,7 @@ describe('adaptHubResponse', () => {
         compute: null,
       }],
     }));
-    expect(view.devices[0].compute).toBeNull();
+    expect('compute' in view.devices[0]).toBe(false);
   });
 
   it('omits staleSinceMs when null', () => {
