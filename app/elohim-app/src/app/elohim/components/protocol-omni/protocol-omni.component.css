@@ -1,0 +1,114 @@
+:host {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 2147483000;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  line-height: 1.2;
+  pointer-events: none;
+
+  --omni-bg: rgba(255, 255, 255, 0.92);
+  --omni-fg: rgba(20, 22, 30, 0.96);
+  --omni-muted: rgba(20, 22, 30, 0.55);
+  --omni-border: rgba(20, 22, 30, 0.14);
+  --omni-accent: rgba(20, 22, 30, 0.96);
+  --omni-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --omni-bg: rgba(22, 23, 28, 0.92);
+    --omni-fg: rgba(232, 234, 240, 0.96);
+    --omni-muted: rgba(232, 234, 240, 0.55);
+    --omni-border: rgba(232, 234, 240, 0.16);
+    --omni-accent: rgba(232, 234, 240, 0.96);
+    --omni-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.omni-chip,
+.omni-toolbar {
+  pointer-events: auto;
+}
+
+.omni-chip {
+  position: absolute;
+  top: 0.45rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.7rem;
+  background: var(--omni-bg);
+  color: var(--omni-fg);
+  border: 1px solid var(--omni-border);
+  border-radius: 999px;
+  box-shadow: var(--omni-shadow);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.omni-glyph {
+  font-size: 13px;
+  line-height: 1;
+  color: var(--omni-accent);
+}
+
+.omni-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--omni-bg);
+  color: var(--omni-fg);
+  border-bottom: 1px solid var(--omni-border);
+  box-shadow: var(--omni-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.omni-toolbar button,
+.omni-toolbar a {
+  background: transparent;
+  border: 1px solid var(--omni-border);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font: inherit;
+  color: var(--omni-fg);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.omni-toolbar button:hover,
+.omni-toolbar a:hover {
+  border-color: var(--omni-accent);
+}
+
+.omni-epr {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.omni-epr-label {
+  color: var(--omni-muted);
+}
+
+.omni-epr-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.omni-resilience {
+  color: var(--omni-accent);
+  padding: 0 0.25rem;
+}
+
+.omni-collapse {
+  margin-left: auto;
+}
