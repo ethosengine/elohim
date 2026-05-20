@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, Input, computed, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, computed, inject, isDevMode } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
 
@@ -163,11 +163,12 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   private readonly authService = inject(AuthService);
 
   /**
-   * Available context apps - includes Doorway when user has web-hosting capable nodes
+   * Available context apps - includes Doorway when user has web-hosting capable nodes,
+   * or always in dev mode so the route is discoverable during local development.
    */
   readonly contextApps = computed(() => {
     const apps = [...this.baseContextApps];
-    if (this.runningContext.hasDoorwayCapableNode()) {
+    if (this.runningContext.hasDoorwayCapableNode() || isDevMode()) {
       apps.push(this.doorwayApp);
     }
     return apps;
