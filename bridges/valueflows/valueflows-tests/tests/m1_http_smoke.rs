@@ -5,22 +5,9 @@
 //! (schema-level test) by going one layer deeper.
 
 use bytes::Bytes;
-use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use http_body_util::BodyExt;
-use valueflows_bridge::{handle_request_for_test, BridgeContext, DbPool};
-
-const MIGRATIONS: EmbeddedMigrations =
-    embed_migrations!("../../../elohim/elohim-storage/migrations");
-
-fn build_test_pool() -> DbPool {
-    let manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-    let pool = Pool::builder().max_size(1).build(manager).expect("build pool");
-    let mut conn = pool.get().expect("get conn");
-    conn.run_pending_migrations(MIGRATIONS).expect("migrations");
-    pool
-}
+use valueflows_bridge::{handle_request_for_test, BridgeContext};
+use valueflows_tests::build_test_pool;
 
 #[tokio::test]
 async fn vf_graphql_returns_fixture_economic_event_via_handler_for_test() {
@@ -51,10 +38,10 @@ async fn vf_graphql_returns_fixture_economic_event_via_handler_for_test() {
     let resp_json: serde_json::Value =
         serde_json::from_slice(&resp_body).expect("parse response json");
 
+    let errors = &resp_json["errors"];
     assert!(
-        resp_json["errors"].is_null() || resp_json["errors"].as_array().unwrap().is_empty(),
-        "no graphql errors: {:?}",
-        resp_json["errors"]
+        errors.is_null() || errors.as_array().map(|a| a.is_empty()).unwrap_or(false),
+        "no graphql errors: {errors:?}",
     );
     let ee = &resp_json["data"]["economicEvent"];
     assert_eq!(ee["id"], "smoke");

@@ -8,27 +8,9 @@
 //! This is the smallest end-to-end test that proves the M1 wire path.
 
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use valueflows_bridge::{schema, BridgeContext, DbPool};
+use valueflows_bridge::{schema, BridgeContext};
+use valueflows_tests::build_test_pool;
 use valueflows_types::TranslationKind;
-
-/// Re-embed the elohim-storage migrations directory at test build time so
-/// the in-memory sqlite has the `translation_observations` table.
-const MIGRATIONS: EmbeddedMigrations =
-    embed_migrations!("../../../elohim/elohim-storage/migrations");
-
-fn build_test_pool() -> DbPool {
-    let manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-    let pool = Pool::builder()
-        .max_size(1) // single conn so migrations + queries share state
-        .build(manager)
-        .expect("build pool");
-    let mut conn = pool.get().expect("get conn");
-    conn.run_pending_migrations(MIGRATIONS)
-        .expect("run migrations");
-    pool
-}
 
 #[tokio::test]
 async fn economic_event_query_returns_fixture_and_logs_observation() {

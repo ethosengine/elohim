@@ -50,37 +50,27 @@ pub async fn handle_request(
         .map_err(|e| BridgeError::ReadBody(e.to_string()))?
         .to_bytes();
 
-    let gql_request: async_graphql::Request = match serde_json::from_slice(&body_bytes) {
-        Ok(r) => r,
-        Err(e) => {
-            return Ok(error_response(
-                StatusCode::BAD_REQUEST,
-                "invalid_graphql_request",
-                &format!("could not parse body as GraphQL request: {e}"),
-            ));
-        }
-    };
-
-    let schema = schema::build_schema(bridge_ctx);
-    let gql_response = schema.execute(gql_request).await;
-
-    let body = serde_json::to_vec(&gql_response)
-        .map_err(|e| BridgeError::SerializeResponse(e.to_string()))?;
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .body(Full::new(Bytes::from(body)))
-        .map_err(|e| BridgeError::BuildResponse(e.to_string()))
+    execute_gql_request(body_bytes, bridge_ctx).await
 }
 
-/// Test helper: same logic as `handle_request` but accepts raw bytes instead of
-/// `Request<Incoming>`. Used by `valueflows-tests`; not exposed via the
-/// production handler (hyper::body::Incoming is not constructible from raw
-/// bytes outside hyper's internals, so a parallel entry point is the cleanest
-/// way to exercise the full body-bytes → schema → response path in tests).
+/// Test helper: accepts raw bytes instead of `Request<Incoming>`. Used by
+/// `valueflows-tests`; not exposed via the production handler
+/// (hyper::body::Incoming is not constructible from raw bytes outside hyper's
+/// internals, so a parallel entry point is the cleanest way to exercise the
+/// full body-bytes → schema → response path in tests).
 #[doc(hidden)]
 pub async fn handle_request_for_test(
+    body_bytes: Bytes,
+    bridge_ctx: schema::BridgeContext,
+) -> Result<Response<Full<Bytes>>, BridgeError> {
+    execute_gql_request(body_bytes, bridge_ctx).await
+}
+
+/// Shared body-parse → schema execute → response build path. Called by both
+/// `handle_request` (production HTTP entry) and `handle_request_for_test`
+/// (test helper that bypasses hyper::body::Incoming). Keeping the logic in
+/// one place prevents silent drift when M2+ extends the handler.
+async fn execute_gql_request(
     body_bytes: Bytes,
     bridge_ctx: schema::BridgeContext,
 ) -> Result<Response<Full<Bytes>>, BridgeError> {
