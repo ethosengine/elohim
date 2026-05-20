@@ -19,9 +19,10 @@ use thiserror::Error;
 use crate::db::models::PeerIdentityBindingRow;
 use crate::db::DbPool;
 use crate::services::federator::{FederationResult, Federator};
+use crate::services::reciprocity_view::aggregate_stewarded_bytes_by_peer;
 use crate::views::{
-    DeviceArchetype, DeviceSummary, DeviceTotals, Freshness, FreshnessState, MyClusterView,
-    ViewKind,
+    ComputeTriptych, DeviceArchetype, DeviceSummary, DeviceTotals, Freshness, FreshnessState,
+    MyClusterView, ViewKind,
 };
 
 const FEDERATION_TIMEOUT_MS: u64 = 3000;
@@ -95,10 +96,25 @@ pub async fn aggregate_my_cluster_view(
         )
         .await;
 
+    // 3a) Aggregate stewarded bytes per peer (custody-blob REA commitments where
+    // this agent's peers are the provider). Failures are permissive — a
+    // stewardship-lookup error must not blank the entire cluster view.
+    let my_peer_ids: Vec<String> = bindings.iter().map(|b| b.peer_id.clone()).collect();
+    let stewarded_map = aggregate_stewarded_bytes_by_peer(pool, &my_peer_ids)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(
+                agent_cid,
+                error = %e,
+                "aggregate_stewarded_bytes_by_peer failed; stewarded will be None for all peers"
+            );
+            std::collections::HashMap::new()
+        });
+
     // 4) Build per-device summaries.
     let devices: Vec<DeviceSummary> = results
         .iter()
-        .map(|r| device_summary_from_result(r, &bindings))
+        .map(|r| device_summary_from_result(r, &bindings, &stewarded_map))
         .collect();
 
     // 5) Totals + freshness rollup.
@@ -136,6 +152,7 @@ pub async fn aggregate_my_cluster_view(
 fn device_summary_from_result(
     r: &FederationResult,
     bindings: &[PeerIdentityBindingRow],
+    stewarded_map: &std::collections::HashMap<String, u64>,
 ) -> DeviceSummary {
     let archetype = bindings
         .iter()
@@ -147,6 +164,8 @@ fn device_summary_from_result(
         // Live + slice present → fill in fields from payload.
         (FreshnessState::Live, Some(slice)) => {
             let payload = &slice.payload.0;
+            let storage_used_bytes = payload.get("storage_used_bytes").and_then(|v| v.as_u64());
+            let storage_total_bytes = payload.get("storage_total_bytes").and_then(|v| v.as_u64());
             DeviceSummary {
                 peer_id: r.peer_id.clone(),
                 archetype,
@@ -156,8 +175,8 @@ fn device_summary_from_result(
                     .map(String::from),
                 online: true,
                 freshness: r.freshness.clone(),
-                storage_used_bytes: payload.get("storage_used_bytes").and_then(|v| v.as_u64()),
-                storage_total_bytes: payload.get("storage_total_bytes").and_then(|v| v.as_u64()),
+                storage_used_bytes,
+                storage_total_bytes,
                 memory_used_bytes: payload.get("memory_used_bytes").and_then(|v| v.as_u64()),
                 memory_total_bytes: payload.get("memory_total_bytes").and_then(|v| v.as_u64()),
                 hosting_count: payload
@@ -169,10 +188,19 @@ fn device_summary_from_result(
                     .and_then(|v| v.as_u64())
                     .map(|x| x as u32),
                 beacon_age_ms: payload.get("beacon_age_ms").and_then(|v| v.as_u64()),
-                compute: None, // TODO(A3): populate from aggregate_stewarded_bytes_by_peer + system_metrics
+                compute: Some(ComputeTriptych {
+                    free: match (storage_total_bytes, storage_used_bytes) {
+                        (Some(t), Some(u)) => Some(t.saturating_sub(u)),
+                        _ => None,
+                    },
+                    used: storage_used_bytes,
+                    stewarded: stewarded_map.get(&r.peer_id).copied(),
+                }),
             }
         }
         // Anything else → offline-shape with the freshness state preserved.
+        // storage bytes are unavailable (no slice), so free/used are None.
+        // stewarded is still populated from the REA ledger projection.
         _ => DeviceSummary {
             peer_id: r.peer_id.clone(),
             archetype,
@@ -186,7 +214,11 @@ fn device_summary_from_result(
             hosting_count: None,
             projecting_count: None,
             beacon_age_ms: None,
-            compute: None, // TODO(A3): populate from aggregate_stewarded_bytes_by_peer + system_metrics
+            compute: Some(ComputeTriptych {
+                free: None,
+                used: None,
+                stewarded: stewarded_map.get(&r.peer_id).copied(),
+            }),
         },
     }
 }
