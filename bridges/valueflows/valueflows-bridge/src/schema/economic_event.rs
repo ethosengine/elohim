@@ -8,7 +8,8 @@ use async_graphql::{Object, ID};
 use chrono::Utc;
 use diesel::prelude::*;
 use valueflows_types::{
-    ClientCapability, Direction, SemanticCost, TranslationKind, TranslationPoint,
+    ClientCapability, Direction, OntologicalCommitment, SemanticCost, TranslationKind,
+    TranslationPoint,
 };
 
 use super::BridgeContext;
@@ -82,10 +83,16 @@ pub async fn resolve(
         notes: Some("M1 tracer bullet — fixture resolver".to_string()),
     };
 
-    // Fire-and-forget the ledger write; resolver succeeds even if ledger
-    // insert fails (the response is the canonical artifact).
-    if let Err(e) = write_observation(ctx, point) {
-        tracing::warn!("translation_observations insert failed: {e}");
+    // Fire-and-forget the ledger write in a blocking task so the Tokio
+    // executor isn't starved by r2d2 pool.get(). Resolver succeeds even
+    // if the ledger insert fails (the response is the canonical artifact).
+    let ctx_clone = ctx.clone();
+    let observation_result =
+        tokio::task::spawn_blocking(move || write_observation(&ctx_clone, point)).await;
+    match observation_result {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => tracing::warn!("translation_observations insert failed: {e}"),
+        Err(e) => tracing::warn!("translation_observations spawn_blocking panic: {e}"),
     }
 
     Ok(Some(EconomicEventGql::fixture(id)))
@@ -95,6 +102,16 @@ pub async fn resolve(
 /// M1 to avoid a circular dependency with elohim-storage (which consumes
 /// this crate). In M2+ this is refactored to call back into elohim-storage's
 /// `db::translation_observations::insert_observation`.
+///
+/// IMPORTANT: uses `.as_ledger_str()` (not `format!("{:?}", …)`) for all
+/// enum-to-string conversions. Debug format is not a stable wire format; a
+/// custom Debug impl on any enum would silently break the CHECK constraints
+/// in the `translation_observations` migration.
+///
+// Note: block_height is intentionally omitted from this INSERT — TranslationPoint::at_block_height
+// is always None in M1 (no conductor context). M3+ will add the column to the INSERT and switch
+// to elohim-storage's `db::translation_observations::insert_observation` once the circular-dep
+// concern is resolved (likely by exposing valueflows-types as the canonical helper home).
 fn write_observation(
     ctx: &BridgeContext,
     p: TranslationPoint,
@@ -105,10 +122,10 @@ fn write_observation(
         .get()
         .map_err(|e| diesel::result::Error::QueryBuilderError(Box::new(e)))?;
 
-    let ontological = p
+    let ontological: Option<String> = p
         .ontological_commitment
-        .map(|o| format!("{:?}", o))
-        .unwrap_or_default();
+        .map(OntologicalCommitment::as_ledger_str)
+        .map(str::to_string);
 
     sql_query(
         r#"INSERT INTO translation_observations
@@ -118,19 +135,13 @@ fn write_observation(
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
     )
     .bind::<diesel::sql_types::Text, _>(p.at_iso)
-    .bind::<diesel::sql_types::Text, _>(format!("{:?}", p.direction))
+    .bind::<diesel::sql_types::Text, _>(p.direction.as_ledger_str())
     .bind::<diesel::sql_types::Text, _>(p.vf_type)
     .bind::<diesel::sql_types::Text, _>(p.elohim_source)
-    .bind::<diesel::sql_types::Text, _>(format!("{:?}", p.translation_kind))
-    .bind::<diesel::sql_types::Text, _>(format!("{:?}", p.semantic_cost))
-    .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(
-        if ontological.is_empty() {
-            None
-        } else {
-            Some(ontological)
-        },
-    )
-    .bind::<diesel::sql_types::Text, _>(format!("{:?}", p.client_capability))
+    .bind::<diesel::sql_types::Text, _>(p.translation_kind.as_ledger_str())
+    .bind::<diesel::sql_types::Text, _>(p.semantic_cost.as_ledger_str())
+    .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(ontological)
+    .bind::<diesel::sql_types::Text, _>(p.client_capability.as_ledger_str())
     .bind::<diesel::sql_types::Text, _>(p.code_location)
     .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(p.notes)
     .execute(&mut conn)?;

@@ -48,6 +48,12 @@ impl QueryRoot {
 mod tests {
     use super::*;
 
+    /// Unit-level test verifies only that schema construction succeeds.
+    /// End-to-end resolver execution (against a real migrated pool) lives
+    /// in the `valueflows-tests` crate at
+    /// `tests/m1_tracer_bullet.rs` — Task 7 of the M1 plan adds that.
+    /// Adding it here would duplicate the migration-embedding scaffolding
+    /// that Task 7's integration crate already needs.
     #[test]
     fn schema_builds_with_empty_pool() {
         // Build a pool against an in-memory sqlite for the schema test.

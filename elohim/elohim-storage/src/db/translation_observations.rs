@@ -56,15 +56,15 @@ impl From<TranslationPoint> for NewTranslationObservation {
             // u64 → i64. Block heights below 2^63 are safe; above that is far beyond
             // any realistic chain. Saturate on overflow rather than panic.
             block_height: p.at_block_height.map(|h| i64::try_from(h).unwrap_or(i64::MAX)),
-            direction: direction_string(p.direction).to_string(),
+            direction: p.direction.as_ledger_str().to_string(),
             vf_type: p.vf_type,
             elohim_source: p.elohim_source,
-            translation_kind: translation_kind_string(p.translation_kind).to_string(),
-            semantic_cost: semantic_cost_string(p.semantic_cost).to_string(),
+            translation_kind: p.translation_kind.as_ledger_str().to_string(),
+            semantic_cost: p.semantic_cost.as_ledger_str().to_string(),
             ontological_commitment: p
                 .ontological_commitment
-                .map(|o| ontological_commitment_string(o).to_string()),
-            client_capability: client_capability_string(p.client_capability).to_string(),
+                .map(|o| o.as_ledger_str().to_string()),
+            client_capability: p.client_capability.as_ledger_str().to_string(),
             code_location: p.code_location,
             notes: p.notes,
         }
@@ -112,49 +112,6 @@ pub fn observe_now(
         client_capability,
         code_location: code_location.to_string(),
         notes: None,
-    }
-}
-
-fn direction_string(d: Direction) -> &'static str {
-    match d {
-        Direction::Read => "Read",
-        Direction::Write => "Write",
-    }
-}
-
-fn translation_kind_string(k: TranslationKind) -> &'static str {
-    match k {
-        TranslationKind::IdentityShape => "IdentityShape",
-        TranslationKind::FieldRename => "FieldRename",
-        TranslationKind::SemanticBridge => "SemanticBridge",
-        TranslationKind::Reconciliation => "Reconciliation",
-        TranslationKind::Sidecar => "Sidecar",
-    }
-}
-
-fn semantic_cost_string(c: SemanticCost) -> &'static str {
-    match c {
-        SemanticCost::Mechanical => "Mechanical",
-        SemanticCost::JustifiedDistinct => "JustifiedDistinct",
-        SemanticCost::UnclearYet => "UnclearYet",
-    }
-}
-
-fn ontological_commitment_string(o: OntologicalCommitment) -> &'static str {
-    match o {
-        OntologicalCommitment::SovereigntyToStewardship => "SovereigntyToStewardship",
-        OntologicalCommitment::KeyAuthorityToSocialAuthority => "KeyAuthorityToSocialAuthority",
-        OntologicalCommitment::FixedAudienceToReachClass => "FixedAudienceToReachClass",
-        OntologicalCommitment::BilateralToRelational => "BilateralToRelational",
-        OntologicalCommitment::IndividualWillToContribution => "IndividualWillToContribution",
-        OntologicalCommitment::EntryToEprAtom => "EntryToEprAtom",
-    }
-}
-
-fn client_capability_string(c: ClientCapability) -> &'static str {
-    match c {
-        ClientCapability::StockVf => "StockVf",
-        ClientCapability::ElohimAware => "ElohimAware",
     }
 }
 

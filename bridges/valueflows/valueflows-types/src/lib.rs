@@ -43,6 +43,19 @@ pub enum Direction {
     Write,
 }
 
+impl Direction {
+    /// Canonical string used in the `translation_observations.direction`
+    /// SQL column (matched by the CHECK constraint). Stable wire format —
+    /// do not use Debug format for SQL writes; a future custom Debug impl
+    /// would silently break every CHECK-constrained insert.
+    pub fn as_ledger_str(self) -> &'static str {
+        match self {
+            Direction::Read => "Read",
+            Direction::Write => "Write",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TranslationKind {
     /// Identical shape — pure routing.
@@ -57,6 +70,19 @@ pub enum TranslationKind {
     Sidecar,
 }
 
+impl TranslationKind {
+    /// Canonical string for the `translation_observations.translation_kind` SQL column.
+    pub fn as_ledger_str(self) -> &'static str {
+        match self {
+            TranslationKind::IdentityShape => "IdentityShape",
+            TranslationKind::FieldRename => "FieldRename",
+            TranslationKind::SemanticBridge => "SemanticBridge",
+            TranslationKind::Reconciliation => "Reconciliation",
+            TranslationKind::Sidecar => "Sidecar",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SemanticCost {
     /// Shape-equivalent translation; pure routing.
@@ -65,6 +91,17 @@ pub enum SemanticCost {
     JustifiedDistinct,
     /// Need more usage to judge.
     UnclearYet,
+}
+
+impl SemanticCost {
+    /// Canonical string for the `translation_observations.semantic_cost` SQL column.
+    pub fn as_ledger_str(self) -> &'static str {
+        match self {
+            SemanticCost::Mechanical => "Mechanical",
+            SemanticCost::JustifiedDistinct => "JustifiedDistinct",
+            SemanticCost::UnclearYet => "UnclearYet",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -77,6 +114,22 @@ pub enum OntologicalCommitment {
     EntryToEprAtom,
 }
 
+impl OntologicalCommitment {
+    /// Canonical string for the `translation_observations.ontological_commitment` SQL column.
+    pub fn as_ledger_str(self) -> &'static str {
+        match self {
+            OntologicalCommitment::SovereigntyToStewardship => "SovereigntyToStewardship",
+            OntologicalCommitment::KeyAuthorityToSocialAuthority => {
+                "KeyAuthorityToSocialAuthority"
+            }
+            OntologicalCommitment::FixedAudienceToReachClass => "FixedAudienceToReachClass",
+            OntologicalCommitment::BilateralToRelational => "BilateralToRelational",
+            OntologicalCommitment::IndividualWillToContribution => "IndividualWillToContribution",
+            OntologicalCommitment::EntryToEprAtom => "EntryToEprAtom",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ClientCapability {
     /// Stock VF/hREA client; ignores elohim extension fields.
@@ -84,6 +137,16 @@ pub enum ClientCapability {
     /// Client advertised support for `extensions.elohim.*` (via SDL
     /// `@elohim` directive or `X-Elohim-Extensions: 1` request header).
     ElohimAware,
+}
+
+impl ClientCapability {
+    /// Canonical string for the `translation_observations.client_capability` SQL column.
+    pub fn as_ledger_str(self) -> &'static str {
+        match self {
+            ClientCapability::StockVf => "StockVf",
+            ClientCapability::ElohimAware => "ElohimAware",
+        }
+    }
 }
 
 #[cfg(test)]
@@ -108,6 +171,19 @@ mod tests {
         let json = serde_json::to_string(&p).expect("serialize");
         let back: TranslationPoint = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(p, back);
+    }
+
+    #[test]
+    fn as_ledger_str_matches_serde_string_form() {
+        assert_eq!(Direction::Read.as_ledger_str(), "Read");
+        assert_eq!(Direction::Write.as_ledger_str(), "Write");
+        assert_eq!(TranslationKind::SemanticBridge.as_ledger_str(), "SemanticBridge");
+        assert_eq!(SemanticCost::JustifiedDistinct.as_ledger_str(), "JustifiedDistinct");
+        assert_eq!(
+            OntologicalCommitment::SovereigntyToStewardship.as_ledger_str(),
+            "SovereigntyToStewardship"
+        );
+        assert_eq!(ClientCapability::ElohimAware.as_ledger_str(), "ElohimAware");
     }
 
     #[test]

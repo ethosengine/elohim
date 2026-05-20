@@ -25,6 +25,9 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }
-# bundled = compile sqlite3 from source; avoids -lsqlite3 system library
-# dependency during bridge-local tests where no libsqlite3.so symlink exists.
+# 0.27 + bundled: compiles sqlite3 from source for bridge-local tests.
+# elohim-storage uses 0.35 via Diesel — harmless because the valueflows
+# workspace is isolated from the elohim workspace; no shared `links`
+# conflict. If both workspaces are ever merged, upgrade to match
+# elohim-storage's transitive pin.
 libsqlite3-sys = { version = "0.27", features = ["bundled"] }
