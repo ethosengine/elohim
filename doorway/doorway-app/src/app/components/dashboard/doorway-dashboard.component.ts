@@ -98,6 +98,24 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   // Orchestrator availability from capabilities
   readonly orchestratorAvailable = this.adminService.orchestratorAvailable;
 
+  // Full capabilities signal (for the capabilities badge)
+  readonly capabilities = this.adminService.capabilities;
+
+  /**
+   * Flat list of capability entries for the dashboard capabilities badge.
+   * Drives both the enabled/disabled chips in the header and the per-feature
+   * placeholders that render in place of error states when a feature is off.
+   */
+  readonly capabilityEntries = computed(() => {
+    const caps = this.capabilities();
+    return [
+      { key: 'orchestrator', label: 'Orchestrator', enabled: caps?.orchestrator ?? false },
+      { key: 'federation', label: 'Federation', enabled: caps?.federation ?? false },
+      { key: 'conductorPool', label: 'Conductor Pool', enabled: caps?.conductorPool ?? false },
+      { key: 'nats', label: 'NATS', enabled: caps?.nats ?? false },
+    ];
+  });
+
   // Connection state
   readonly connectionState = this.adminService.connectionState;
   readonly isConnected = this.adminService.isConnected;

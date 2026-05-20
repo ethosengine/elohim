@@ -68,4 +68,39 @@ export class DoorwayDashboardPage extends BasePage {
   async hasError(): Promise<boolean> {
     return this.testId(DOORWAY_DASHBOARD.ERROR_RETRY).isVisible();
   }
+
+  /** Whether the capabilities badge is rendered. */
+  async hasCapabilitiesBadge(): Promise<boolean> {
+    return this.testId(DOORWAY_DASHBOARD.CAPABILITIES_BADGE).isVisible();
+  }
+
+  /**
+   * Read the set of capability chips and their enabled state.
+   * Returns a map keyed by capability key (e.g. 'orchestrator') -> enabled boolean.
+   */
+  async readCapabilities(): Promise<Record<string, boolean>> {
+    const chips = this.page.locator(`[data-testid^="${DOORWAY_DASHBOARD.CAPABILITY_CHIP_PREFIX}"]`);
+    const count = await chips.count();
+    const result: Record<string, boolean> = {};
+    for (let i = 0; i < count; i++) {
+      const chip = chips.nth(i);
+      const testId = await chip.getAttribute('data-testid');
+      if (!testId) continue;
+      const key = testId.replace(DOORWAY_DASHBOARD.CAPABILITY_CHIP_PREFIX, '');
+      const enabledAttr = await chip.getAttribute('data-enabled');
+      result[key] = enabledAttr === 'true';
+    }
+    return result;
+  }
+
+  /** Whether the placeholder for a specific (disabled) capability is visible. */
+  async hasCapabilityPlaceholder(key: string): Promise<boolean> {
+    const locator = this.testId(`${DOORWAY_DASHBOARD.CAPABILITY_PLACEHOLDER_PREFIX}${key}`);
+    return locator.first().isVisible();
+  }
+
+  /** Whether the nodes-tab "No orchestrator" message is visible. */
+  async hasNodesNoOrchestrator(): Promise<boolean> {
+    return this.testId(DOORWAY_DASHBOARD.NODES_NO_ORCHESTRATOR).isVisible();
+  }
 }

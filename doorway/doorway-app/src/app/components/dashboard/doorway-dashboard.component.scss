@@ -43,6 +43,44 @@
   }
 }
 
+.capabilities-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+
+  .capability-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--dw-border, rgba(0, 0, 0, 0.12));
+    background: var(--dw-surface-2, rgba(0, 0, 0, 0.04));
+    color: var(--dw-text-secondary, #4b5563);
+
+    .capability-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--dw-text-muted, #9ca3af);
+    }
+
+    &.enabled {
+      color: var(--dw-success, #15803d);
+      border-color: var(--dw-success, #15803d);
+      .capability-dot { background: var(--dw-success, #15803d); }
+    }
+
+    &.disabled {
+      color: var(--dw-text-muted, #6b7280);
+      opacity: 0.7;
+      .capability-dot { background: var(--dw-text-muted, #9ca3af); }
+    }
+  }
+}
+
 .connection-status {
   display: flex;
   align-items: center;
