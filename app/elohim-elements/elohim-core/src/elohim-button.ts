@@ -65,11 +65,16 @@ export class ElohimButton extends CapabilityAwareElement(LitElement) {
       border-radius: var(--elohim-button-radius, 0.375rem);
       border: var(--elohim-button-border, 1px solid transparent);
       cursor: pointer;
-      transition:
-        background-color 150ms ease,
-        border-color 150ms ease,
-        color 150ms ease,
-        transform 80ms ease;
+    }
+
+    @media (prefers-reduced-motion: no-preference) and (update: fast) {
+      button {
+        transition:
+          background-color 150ms ease,
+          border-color 150ms ease,
+          color 150ms ease,
+          transform 80ms ease;
+      }
     }
 
     button:focus-visible {

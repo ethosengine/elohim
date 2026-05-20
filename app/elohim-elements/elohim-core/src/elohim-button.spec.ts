@@ -3,6 +3,8 @@ import axe from 'axe-core';
 
 import './register.js';
 import type { ElohimButton } from './elohim-button.js';
+import { ElohimButton as ElohimButtonClass } from './elohim-button.js';
+import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
 
 describe('<elohim-button>', () => {
   it('renders the default slot content', async () => {
@@ -189,5 +191,46 @@ describe('<elohim-button>', () => {
     `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
+  });
+});
+
+describe('<elohim-button> — ua-prefs precondition gate', () => {
+  afterEach(() => clearMediaQueries());
+
+  it('CSS gates transitions behind prefers-reduced-motion / update media queries', () => {
+    // setMediaQuery only patches JS matchMedia, not CSS @media evaluation.
+    // Instead we verify the structural contract: transitions MUST be wrapped
+    // in @media (prefers-reduced-motion: no-preference) and (update: fast)
+    // so that reduced-motion and e-paper displays receive no transitions.
+    const cssText = (ElohimButtonClass as unknown as { styles: { cssText: string } }).styles
+      .cssText;
+    expect(cssText).to.contain('prefers-reduced-motion: no-preference');
+    expect(cssText).to.contain('update: fast');
+  });
+
+  it('CSS omits transitions outside the motion/update guard (reduce + slow states have no transition)', () => {
+    // Complementary structural check: the only place 'transition:' appears in
+    // the button styles is inside the media query gate.  This ensures the rule
+    // can't accidentally fire under prefers-reduced-motion: reduce or update: slow.
+    const cssText = (ElohimButtonClass as unknown as { styles: { cssText: string } }).styles
+      .cssText;
+    const transitionIdx = cssText.indexOf('transition:');
+    const mediaIdx = cssText.indexOf('@media (prefers-reduced-motion: no-preference)');
+    // transition: must appear AFTER the @media rule opening
+    expect(transitionIdx).to.be.greaterThan(mediaIdx);
+  });
+
+  it('passes the photosensitive-flash analyzer (no luminance flicker)', async () => {
+    const el = await fixture<ElohimButton>(html`<elohim-button>x</elohim-button>`);
+    const result = await measureLuminanceChanges(el, { sampleMs: 600, sampleHz: 30 });
+    expect(result.exceedsThreshold).to.be.false;
+  });
+
+  it('has a touch target of at least 44×44 px under coarse pointer', async () => {
+    const el = await fixture<ElohimButton>(html`<elohim-button>x</elohim-button>`);
+    const inner = el.shadowRoot!.querySelector('button')!;
+    const rect = inner.getBoundingClientRect();
+    expect(rect.width).to.be.at.least(44);
+    expect(rect.height).to.be.at.least(44);
   });
 });
