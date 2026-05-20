@@ -62,6 +62,32 @@
               "description": "Disabled state. Suppresses click and applies aria-disabled.",
               "attribute": "disabled",
               "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
             }
           ],
           "events": [
@@ -93,12 +119,55 @@
               "fieldName": "disabled"
             }
           ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
           "superclass": {
             "name": "LitElement",
             "package": "lit"
           },
           "tagName": "elohim-button",
-          "customElement": true
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
         }
       ],
       "exports": [
@@ -816,7 +885,7 @@
           "type": {
             "text": "object"
           },
-          "default": "{ 'sdda0ebeb9a270e53': str`Hola, ${0}`, }"
+          "default": "{ sdda0ebeb9a270e53: str`Hola, ${0}`, }"
         }
       ],
       "exports": [
@@ -840,7 +909,7 @@
           "type": {
             "text": "object"
           },
-          "default": "{ 'sdda0ebeb9a270e53': str`Hello, ${0}`, }"
+          "default": "{ sdda0ebeb9a270e53: str`Hello, ${0}`, }"
         }
       ],
       "exports": [
@@ -868,18 +937,18 @@
           "kind": "variable",
           "name": "targetLocales",
           "type": {
-            "text": "[\n  `es`,\n  `he`,\n]"
+            "text": "[`es`, `he`]"
           },
-          "default": "[ `es`, `he`, ]",
+          "default": "[`es`, `he`]",
           "description": "The other locale codes that this application is localized into. Sorted\nlexicographically."
         },
         {
           "kind": "variable",
           "name": "allLocales",
           "type": {
-            "text": "[\n  `en`,\n  `es`,\n  `he`,\n]"
+            "text": "[`en`, `es`, `he`]"
           },
-          "default": "[ `en`, `es`, `he`, ]",
+          "default": "[`en`, `es`, `he`]",
           "description": "All valid project locale codes. Sorted lexicographically."
         }
       ],
