@@ -21,12 +21,12 @@ type MediaPref =
   | 'hover';
 
 const overrides = new Map<string, string>();
-let originalMatchMedia: typeof window.matchMedia | null = null;
+let originalMatchMedia: typeof globalThis.matchMedia | null = null;
 
 function ensurePatched(): void {
   if (originalMatchMedia) return;
-  originalMatchMedia = window.matchMedia.bind(window);
-  window.matchMedia = (query: string): MediaQueryList => {
+  originalMatchMedia = globalThis.matchMedia.bind(globalThis);
+  globalThis.matchMedia = (query: string): MediaQueryList => {
     const matches = matchesOverride(query);
     if (matches !== null) {
       return makeFakeMediaQueryList(query, matches);
@@ -37,7 +37,7 @@ function ensurePatched(): void {
 
 function matchesOverride(query: string): boolean | null {
   for (const [pref, value] of overrides) {
-    const match = query.match(new RegExp(`\\(${pref}:\\s*([^)]+)\\)`));
+    const match = new RegExp(String.raw`\(${pref}:\s*([^)]+)\)`, 'u').exec(query);
     if (match) {
       const wanted = match[1]!.trim();
       return wanted === value;
@@ -51,10 +51,14 @@ function makeFakeMediaQueryList(query: string, matches: boolean): MediaQueryList
     matches,
     media: query,
     onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    addListener: (): void => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    removeListener: (): void => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    addEventListener: (): void => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    removeEventListener: (): void => {},
     dispatchEvent: () => false,
   } as unknown as MediaQueryList;
 }
@@ -69,7 +73,7 @@ export function setMediaQuery(pref: MediaPref, value: string): void {
 export function clearMediaQueries(): void {
   overrides.clear();
   if (originalMatchMedia) {
-    window.matchMedia = originalMatchMedia;
+    globalThis.matchMedia = originalMatchMedia;
     originalMatchMedia = null;
   }
 }
@@ -123,15 +127,15 @@ export async function measureLuminanceChanges(
   function getBrightness(target: Element): number {
     const style = getComputedStyle(target);
     const bg = style.backgroundColor;
-    const rgb = bg.match(/\d+/g);
+    const rgb = bg.match(/\d+/gu);
     if (!rgb || rgb.length < 3) return 0;
-    const r = Number.parseInt(rgb[0]!, 10) / 255;
-    const g = Number.parseInt(rgb[1]!, 10) / 255;
-    const b = Number.parseInt(rgb[2]!, 10) / 255;
+    const r = Number.parseInt(rgb[0] ?? '0', 10) / 255;
+    const g = Number.parseInt(rgb[1] ?? '0', 10) / 255;
+    const b = Number.parseInt(rgb[2] ?? '0', 10) / 255;
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
 
-  const target = (el.shadowRoot?.firstElementChild ?? el.firstElementChild ?? el) as Element;
+  const target = el.shadowRoot?.firstElementChild ?? el.firstElementChild ?? el;
   const samples: number[] = [];
   const end = performance.now() + sampleMs;
   await new Promise<void>(resolve => {
@@ -144,12 +148,12 @@ export async function measureLuminanceChanges(
   });
 
   let crossings = 0;
-  let prev = samples[0]!;
+  let prev = samples[0] ?? 0;
   for (const value of samples.slice(1)) {
     if (Math.abs(value - prev) > delta) crossings++;
     prev = value;
   }
-  const flashHz = (crossings / sampleMs) * 1000 / 2; // each flash is a pair of crossings
+  const flashHz = ((crossings / sampleMs) * 1000) / 2; // each flash is a pair of crossings
   return {
     flashHz,
     exceedsThreshold: flashHz > 3,

@@ -4,7 +4,9 @@ import { renderInLocale, scanForHardcodedStrings, requiresLogicalProperties } fr
 
 class HardcodedThing extends LitElement {
   override render() {
-    return html`<span aria-label="Save">Save</span>`;
+    return html`
+      <span aria-label="Save">Save</span>
+    `;
   }
 }
 customElements.define('hardcoded-thing', HardcodedThing);
@@ -12,21 +14,38 @@ customElements.define('hardcoded-thing', HardcodedThing);
 describe('i18n harness', () => {
   describe('renderInLocale', () => {
     it('renders the element with the document direction set for he-IL', async () => {
-      const el = await renderInLocale('he-IL', html`<span></span>`);
+      const el = await renderInLocale(
+        'he-IL',
+        html`
+          <span></span>
+        `
+      );
       expect(el.ownerDocument.documentElement.getAttribute('dir')).to.equal('rtl');
     });
 
     it('restores LTR direction after rendering ends', async () => {
-      await renderInLocale('he-IL', html`<span></span>`);
+      await renderInLocale(
+        'he-IL',
+        html`
+          <span></span>
+        `
+      );
       // Helper cleans up after itself; subsequent calls in en should be ltr.
-      const el = await renderInLocale('en', html`<span></span>`);
+      const el = await renderInLocale(
+        'en',
+        html`
+          <span></span>
+        `
+      );
       expect(el.ownerDocument.documentElement.getAttribute('dir')).to.equal('ltr');
     });
   });
 
   describe('scanForHardcodedStrings', () => {
     it('flags element render output with hardcoded text content', async () => {
-      const el = await fixture<HardcodedThing>(html`<hardcoded-thing></hardcoded-thing>`);
+      const el = await fixture<HardcodedThing>(html`
+        <hardcoded-thing></hardcoded-thing>
+      `);
       const findings = scanForHardcodedStrings(el.shadowRoot!.innerHTML);
       expect(findings.length).to.be.greaterThan(0);
     });
