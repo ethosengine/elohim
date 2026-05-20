@@ -8,6 +8,13 @@
  * and state='active' (Operational, Category C — reconstructed from the
  * notarized Commitment entry; no separate persistent table). Capability set
  * is parsed from resource_classified_as; successionRole + reachScope from
- * metadata_json (per operator-classification.schema.json, schemaVersion 1).
+ * metadata_json (per operator-classification.schema.json).
+ *
+ * Custody + steward chain: schemaVersion=2 carries custodyAttestationHash and
+ * stewardAttestationHash references — the two-layer attestation chain ABOVE
+ * the operator commitment. v1 commitments have these None during the
+ * transition window. Auth chain resolution (verify_custody_chain) walks
+ * commitment -> steward attestation -> custody attestation, returning
+ * orphaned if any link has been superseded.
  */
-export type DoorwayOperatorBindingView = { commitmentId: string, doorwayId: string, operatorAgent: string, capabilities: Array<string>, successionRole: string, reachScope: string, state: string, agreementId: string, hasBeginning: string | null, hasEnd: string | null, dhtAnchorHash: string, createdAt: string, };
+export type DoorwayOperatorBindingView = { commitmentId: string, doorwayId: string, operatorAgent: string, capabilities: Array<string>, successionRole: string, reachScope: string, state: string, agreementId: string, hasBeginning: string | null, hasEnd: string | null, dhtAnchorHash: string, custodyAttestationHash: string | null, stewardAttestationHash: string | null, createdAt: string, };

@@ -1635,6 +1635,29 @@ pub struct DistributionDetails {
     pub commitment_references: Option<Vec<String>>,
 }
 
+/// Three-number compute picture for a single device: free / used / stewarded bytes.
+///
+/// Category C operational projection — derived per-request from:
+/// - `system_metrics` (free + used; Category C from `infrastructure:system-sample` observations)
+/// - `rea_commitments` (stewarded; Category A notarized `custody-blob` commitments)
+///
+/// Not persisted; reconstructed when the cluster view is assembled.
+/// A3 (`ClusterView`) composes `aggregate_stewarded_bytes_by_peer` (A1) + this struct (A2).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ComputeTriptych {
+    /// Bytes available on device blob filesystem (capacity - used). `None` when
+    /// system_metrics has no current sample for this peer.
+    pub free: Option<u64>,
+    /// Bytes occupied by blob storage on device. `None` when system_metrics has
+    /// no current sample for this peer.
+    pub used: Option<u64>,
+    /// Bytes committed via `rea_commitments` where this peer is provider
+    /// (`action = "custody-blob"`). `None` when REA ledger has no rows for this peer.
+    pub stewarded: Option<u64>,
+}
+
 /// Per-device summary in `MyClusterView`.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
@@ -1660,6 +1683,8 @@ pub struct DeviceSummary {
     pub projecting_count: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beacon_age_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compute: Option<ComputeTriptych>,
 }
 
 /// Aggregated totals across the agent's devices.

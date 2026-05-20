@@ -48,6 +48,7 @@ pub fn build(engine: &GraphEngine, agent_cid: &str) -> Result<MyClusterView, Gra
                 hosting_count: None,
                 projecting_count: None,
                 beacon_age_ms: None,
+                compute: None,
             }
         })
         .collect();

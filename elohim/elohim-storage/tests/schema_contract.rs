@@ -1961,12 +1961,60 @@ fn my_cluster_view_matches_schema() {
             hosting_count: Some(1247),
             projecting_count: Some(802),
             beacon_age_ms: Some(0),
+            compute: None,
         }],
         totals: DeviceTotals {
             storage_used_bytes: 25_200_000_000,
             storage_total_bytes: 298_000_000_000,
             external_committed_bytes: 14_800_000_000,
             reciprocity_net_bytes: 5_200_000_000,
+        },
+        freshness: Freshness {
+            state: FreshnessState::Live,
+            stale_since_ms: None,
+        },
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/my-cluster-view.schema.json", &json);
+}
+
+#[test]
+fn compute_triptych_in_device_summary_matches_schema() {
+    use elohim_storage::views::{
+        ComputeTriptych, DeviceArchetype, DeviceSummary, DeviceTotals, Freshness, FreshnessState,
+        MyClusterView,
+    };
+
+    let sample = MyClusterView {
+        agent_cid: "agent_triptych_test".into(),
+        devices: vec![DeviceSummary {
+            peer_id: "12D3KooWTriptychPeer".into(),
+            archetype: DeviceArchetype::Node,
+            display_name: None,
+            online: true,
+            freshness: Freshness {
+                state: FreshnessState::Live,
+                stale_since_ms: None,
+            },
+            storage_used_bytes: Some(5_000_000_000),
+            storage_total_bytes: Some(500_000_000_000),
+            memory_used_bytes: None,
+            memory_total_bytes: None,
+            hosting_count: Some(300),
+            projecting_count: Some(150),
+            beacon_age_ms: Some(250),
+            compute: Some(ComputeTriptych {
+                free: Some(495_000_000_000),
+                used: Some(5_000_000_000),
+                stewarded: Some(2_000_000_000),
+            }),
+        }],
+        totals: DeviceTotals {
+            storage_used_bytes: 5_000_000_000,
+            storage_total_bytes: 500_000_000_000,
+            external_committed_bytes: 2_000_000_000,
+            reciprocity_net_bytes: 1_000_000_000,
         },
         freshness: Freshness {
             state: FreshnessState::Live,

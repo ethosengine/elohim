@@ -2068,6 +2068,7 @@ version = "2.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e130c806dccc85428c564f2dc5a96e05b6615a27c9a28776bd7761a9af4bb552"
 dependencies = [
+ "chrono",
  "diesel_derives",
  "downcast-rs",
  "libsqlite3-sys",
@@ -2445,6 +2446,8 @@ dependencies = [
  "ts-rs",
  "url",
  "uuid 1.18.1",
+ "valueflows-bridge",
+ "valueflows-types",
  "wiremock",
  "zip 2.4.2",
 ]
@@ -10240,6 +10243,32 @@ name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
+
+[[package]]
+name = "valueflows-bridge"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "bytes",
+ "chrono",
+ "diesel",
+ "http-body-util",
+ "hyper 1.8.1",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "valueflows-types",
+]
+
+[[package]]
+name = "valueflows-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vcpkg"

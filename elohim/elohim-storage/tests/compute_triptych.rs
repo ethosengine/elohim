@@ -1,4 +1,5 @@
-//! TDD tests for `services::reciprocity_view::aggregate_stewarded_bytes_by_peer`.
+//! TDD tests for `services::reciprocity_view::aggregate_stewarded_bytes_by_peer`
+//! and `views::ComputeTriptych` wire-format struct.
 //!
 //! A1 substrate seed: verifies that the helper SUMs custody-blob REA
 //! commitments per peer (where that peer is the provider) to compute
@@ -12,6 +13,7 @@ use elohim_storage::db::diesel_schema::rea_commitments;
 use elohim_storage::db::models::NewReaCommitment;
 use elohim_storage::services::reciprocity_view::aggregate_stewarded_bytes_by_peer;
 use elohim_storage::test_util::test_pool;
+use elohim_views::ComputeTriptych;
 
 // ============================================================================
 // Seed helper
@@ -125,4 +127,34 @@ async fn stewarded_bytes_ignores_non_custody_blob_actions() {
         .await
         .expect("aggregate");
     assert!(result.is_empty() || result.get("peer_X").copied() == Some(0));
+}
+
+// ============================================================================
+// A2: ComputeTriptych wire-format tests
+// ============================================================================
+
+#[test]
+fn compute_triptych_serializes_camel_case() {
+    let triptych = ComputeTriptych {
+        free: Some(1_000),
+        used: Some(500),
+        stewarded: Some(250),
+    };
+    let json = serde_json::to_value(&triptych).unwrap();
+    assert_eq!(json["free"], 1000);
+    assert_eq!(json["used"], 500);
+    assert_eq!(json["stewarded"], 250);
+}
+
+#[test]
+fn compute_triptych_allows_null_fields() {
+    let triptych = ComputeTriptych {
+        free: None,
+        used: None,
+        stewarded: None,
+    };
+    let json = serde_json::to_value(&triptych).unwrap();
+    assert!(json["free"].is_null());
+    assert!(json["used"].is_null());
+    assert!(json["stewarded"].is_null());
 }

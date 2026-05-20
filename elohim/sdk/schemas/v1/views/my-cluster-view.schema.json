@@ -29,7 +29,14 @@
           "memoryTotalBytes": { "type": "integer", "minimum": 0 },
           "hostingCount": { "type": "integer", "minimum": 0 },
           "projectingCount": { "type": "integer", "minimum": 0 },
-          "beaconAgeMs": { "type": "integer", "minimum": 0 }
+          "beaconAgeMs": { "type": "integer", "minimum": 0 },
+          "compute": {
+            "oneOf": [
+              { "type": "null" },
+              { "$ref": "compute-triptych.schema.json" }
+            ],
+            "description": "Three-number compute picture for this device (free/used/stewarded bytes)."
+          }
         }
       },
       "description": "Per-device summary rows, one per registered AgentPeerBinding for this agent."
