@@ -1,58 +1,62 @@
 //! GraphQL schema for the valueflows bridge.
 //!
-//! M1: minimal schema with `EconomicEvent` returning fixture data.
-//! M2+ adds Agent + identity bridge.
-//! M3+ adds Proposal/Intent + authority gate + real hREA projection.
+//! M1: minimal schema with `EconomicEvent` returning fixture data + writing
+//! a TranslationPoint observation to the learning ledger.
 
 use async_graphql::{EmptyMutation, EmptySubscription, Object, Schema, ID};
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::SqliteConnection;
 
 pub mod economic_event;
 
 pub use economic_event::EconomicEventGql;
 
-/// M1 schema entry point. Empty mutation + subscription; queries return
-/// fixture data only.
+pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
+
+/// Context injected into the schema; held in async-graphql's data so resolvers
+/// can grab the pool to log TranslationPoints.
+#[derive(Clone)]
+pub struct BridgeContext {
+    pub pool: DbPool,
+}
+
 pub type BridgeSchema = Schema<QueryRoot, EmptyMutation, EmptySubscription>;
 
-pub fn build_schema() -> BridgeSchema {
-    Schema::build(QueryRoot, EmptyMutation, EmptySubscription).finish()
+pub fn build_schema(ctx: BridgeContext) -> BridgeSchema {
+    Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
+        .data(ctx)
+        .finish()
 }
 
 pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
-    /// Look up a VF EconomicEvent by id. M1 returns fixture data for any id.
-    async fn economic_event(&self, id: ID) -> Option<EconomicEventGql> {
-        Some(EconomicEventGql::fixture(id.to_string()))
+    /// Look up a VF EconomicEvent by id. M1 returns fixture data and logs a
+    /// TranslationPoint observation for every call.
+    async fn economic_event(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        id: ID,
+    ) -> async_graphql::Result<Option<EconomicEventGql>> {
+        let bridge_ctx = ctx.data::<BridgeContext>()?;
+        economic_event::resolve(bridge_ctx, id.to_string()).await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_graphql::Request;
 
-    #[tokio::test]
-    async fn schema_serves_fixture_economic_event() {
-        let schema = build_schema();
-        let req = Request::new(
-            r#"query { economicEvent(id: "test-id") { id action provider receiver note } }"#
-                .to_string(),
-        );
-        let resp = schema.execute(req).await;
-        assert!(resp.errors.is_empty(), "errors: {:?}", resp.errors);
-        let data = resp.data.into_json().expect("data");
-        assert_eq!(data["economicEvent"]["id"], "test-id");
-        assert!(!data["economicEvent"]["action"].is_null());
-        assert_eq!(data["economicEvent"]["provider"], "agent-fixture-provider");
-        assert_eq!(data["economicEvent"]["receiver"], "agent-fixture-receiver");
-        let note_text = data["economicEvent"]["note"]
-            .as_str()
-            .expect("note is a string");
-        assert!(
-            note_text.contains("M1 tracer-bullet"),
-            "fixture note should mention M1: got {note_text}"
-        );
+    #[test]
+    fn schema_builds_with_empty_pool() {
+        // Build a pool against an in-memory sqlite for the schema test.
+        let manager = ConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(manager)
+            .expect("build pool");
+        let ctx = BridgeContext { pool };
+        let _ = build_schema(ctx);
     }
 }

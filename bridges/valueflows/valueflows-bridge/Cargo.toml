@@ -12,6 +12,7 @@ valueflows-types = { path = "../valueflows-types" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
+diesel = { workspace = true }
 
 async-graphql = { workspace = true }
 hyper = { workspace = true }
@@ -24,3 +25,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }
+# bundled = compile sqlite3 from source; avoids -lsqlite3 system library
+# dependency during bridge-local tests where no libsqlite3.so symlink exists.
+libsqlite3-sys = { version = "0.27", features = ["bundled"] }

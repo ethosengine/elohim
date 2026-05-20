@@ -12,6 +12,8 @@ use hyper::{body::Incoming, Method, Request, Response, StatusCode};
 
 pub mod schema;
 
+pub use schema::{BridgeContext, DbPool};
+
 /// Handle a single HTTP request arriving at `/api/v1/vf-graphql`.
 ///
 /// Mirrors the existing `elohim-storage::graphql::server::handle_graphql` shape
@@ -24,13 +26,13 @@ pub mod schema;
 /// # Lifetime note
 ///
 /// The schema is built per-request via [`schema::build_schema`]. This is
-/// acceptable in M1 because the schema has no injected context — the build
-/// is essentially free. M2 will introduce `qahal-authority` context
-/// injection, at which point this function should be refactored to accept
-/// a `&BridgeSchema` parameter so the caller can build the schema once at
-/// startup and inject context through async-graphql's `Schema::data`.
+/// acceptable in M1 because schema construction is essentially free.
+/// M2 will introduce `qahal-authority` context injection and this function
+/// may be refactored to accept a pre-built schema. BridgeContext is cloned
+/// cheaply (Pool is Arc-backed) on each call.
 pub async fn handle_request(
     req: Request<Incoming>,
+    bridge_ctx: schema::BridgeContext,
 ) -> Result<Response<Full<Bytes>>, BridgeError> {
     if req.method() != Method::POST {
         return Ok(error_response(
@@ -59,7 +61,7 @@ pub async fn handle_request(
         }
     };
 
-    let schema = schema::build_schema();
+    let schema = schema::build_schema(bridge_ctx);
     let gql_response = schema.execute(gql_request).await;
 
     let body = serde_json::to_vec(&gql_response)
