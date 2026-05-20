@@ -102,6 +102,19 @@ No new HTTP routes for A or B. C adds **one** new route — `/api/v1/resilience/
 
 ## Sub-Project A: Compute Triptych
 
+### Design note — primary surface is the hub aggregate (2026-05-20 amendment)
+
+The per-device `ComputeTriptych` this sub-project lands is the **substrate input layer**, not the primary human-visible surface. When a human opens `/shefa/cluster`, they should see the **hub aggregate** (sum of member-device capacities, projected with progressive disclosure by driver capability — [[project_hub_compute_aggregate_primary]]):
+
+- **Grandma / kid surface:** "5GB / 15GB available"
+- **Default human surface:** "5GB free of 15GB"
+- **Power-user surface:** "5GB free of 15GB (12GB stewarded to others, 3GB allocated to self)"
+- **Drill-down:** per-device tiles with the full triptych
+
+When someone slides a blade into the rack at home, the hub jumps from e.g. "5GB / 15GB available" to "5GB / 100GB available" — the human's experience of "my hub" is steady; the capacity changes underneath. This is hub-as-storage-pool ([[project_household_horizontal_scaling]], [[project_hub_optional_floor]]).
+
+The operator is running a parallel sprint to formalize the progressive-UX capability axis. **Tasks A1–A5 (substrate) are unchanged** — the hub aggregate derives from per-device truth and the per-device probes + REA commitment SUMs + ts-rs export + GraphQL field are identical regardless of UX surface. **Tasks A6–A8 are provisional pending the parallel sprint** — the per-device triptych they render is correct as a drill-down/power-user view, but the primary `/shefa/cluster` surface likely needs a hub-aggregate component layered in front. Treat A6's component placement as not-yet-final.
+
 ### Task A1: Add `aggregate_stewarded_bytes_by_peer` helper in `reciprocity_view.rs`
 
 **Files:**
