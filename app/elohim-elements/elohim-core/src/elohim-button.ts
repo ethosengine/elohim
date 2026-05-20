@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
+
 import { CapabilityAwareElement } from './capability/index.js';
 
 export type ElohimButtonVariant = 'primary' | 'secondary' | 'ghost';

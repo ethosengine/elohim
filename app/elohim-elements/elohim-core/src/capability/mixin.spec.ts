@@ -14,21 +14,27 @@ class ContextProvider extends LitElement {
   profile: CapabilityProfile = DEFAULT_PROFILE;
 
   override render() {
-    return html`<slot></slot>`;
+    return html`
+      <slot></slot>
+    `;
   }
 }
 customElements.define('ctx-provider', ContextProvider);
 
 class CapAwareThing extends CapabilityAwareElement(LitElement) {
   override render() {
-    return html`<span data-lens=${this.profile.lens}></span>`;
+    return html`
+      <span data-lens=${this.profile.lens}></span>
+    `;
   }
 }
 customElements.define('cap-aware-thing', CapAwareThing);
 
 describe('CapabilityAwareElement mixin', () => {
   it('exposes a profile property that defaults to DEFAULT_PROFILE when no provider', async () => {
-    const el = await fixture<CapAwareThing>(html`<cap-aware-thing></cap-aware-thing>`);
+    const el = await fixture<CapAwareThing>(html`
+      <cap-aware-thing></cap-aware-thing>
+    `);
     expect(el.profile).to.deep.equal(DEFAULT_PROFILE);
   });
 

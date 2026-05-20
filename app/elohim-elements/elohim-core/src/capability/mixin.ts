@@ -9,11 +9,13 @@
  * See: genesis/docs/superpowers/specs/2026-05-20-capability-profile-element-contract-design.md §3.1
  */
 
-import { ContextConsumer } from '@lit/context';
 import type { LitElement, PropertyDeclarations } from 'lit';
+
+import { ContextConsumer } from '@lit/context';
 
 import { capabilityProfileContext } from './context.js';
 import { DEFAULT_PROFILE } from './profile.js';
+
 import type { CapabilityProfile } from './profile.js';
 
 type Constructor<T = object> = new (...args: any[]) => T;

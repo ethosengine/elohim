@@ -88,14 +88,15 @@ describe('elohim-button custom-elements-manifest', () => {
 });
 
 describe('<elohim-button> — capabilityContract manifest', () => {
-  let contract: any;
+  let contract: Record<string, unknown>;
 
   before(async () => {
     const response = await fetch('/dist/custom-elements.json');
-    const cem = await response.json();
-    const decl = cem.modules.flatMap((m: any) => m.declarations || [])
-      .find((d: any) => d.name === 'ElohimButton');
-    contract = decl?.capabilityContract;
+    const cem = (await response.json()) as CemManifest;
+    const decl = cem.modules
+      .flatMap(m => m.declarations || [])
+      .find(d => d.name === 'ElohimButton');
+    contract = decl?.capabilityContract ?? {};
   });
 
   it('declares the precondition gate fields', () => {

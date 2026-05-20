@@ -172,7 +172,7 @@ describe('<elohim-button>', () => {
     // somewhere meaningful on this component.
     const inner = el.shadowRoot!.querySelector('button')!;
     const active = document.activeElement;
-    expect(active === el || active === inner).to.equal(true);
+    expect(active === el || active === inner).to.be.true;
   });
 
   it('passes axe-core a11y scan in default state', async () => {
@@ -203,8 +203,11 @@ describe('<elohim-button> — ua-prefs precondition gate', () => {
     // Instead we verify the structural contract: transitions MUST be wrapped
     // in @media (prefers-reduced-motion: no-preference) and (update: fast)
     // so that reduced-motion and e-paper displays receive no transitions.
-    const cssText = (ElohimButtonClass as unknown as { styles: { cssText: string } }).styles
-      .cssText;
+    const cssText = (
+      ElohimButtonClass as {
+        styles: { cssText: string };
+      }
+    ).styles.cssText;
     expect(cssText).to.contain('prefers-reduced-motion: no-preference');
     expect(cssText).to.contain('update: fast');
   });
@@ -213,8 +216,11 @@ describe('<elohim-button> — ua-prefs precondition gate', () => {
     // Complementary structural check: the only place 'transition:' appears in
     // the button styles is inside the media query gate.  This ensures the rule
     // can't accidentally fire under prefers-reduced-motion: reduce or update: slow.
-    const cssText = (ElohimButtonClass as unknown as { styles: { cssText: string } }).styles
-      .cssText;
+    const cssText = (
+      ElohimButtonClass as {
+        styles: { cssText: string };
+      }
+    ).styles.cssText;
     const transitionIdx = cssText.indexOf('transition:');
     const mediaIdx = cssText.indexOf('@media (prefers-reduced-motion: no-preference)');
     // transition: must appear AFTER the @media rule opening
@@ -222,13 +228,17 @@ describe('<elohim-button> — ua-prefs precondition gate', () => {
   });
 
   it('passes the photosensitive-flash analyzer (no luminance flicker)', async () => {
-    const el = await fixture<ElohimButton>(html`<elohim-button>x</elohim-button>`);
+    const el = await fixture<ElohimButton>(html`
+      <elohim-button>x</elohim-button>
+    `);
     const result = await measureLuminanceChanges(el, { sampleMs: 600, sampleHz: 30 });
     expect(result.exceedsThreshold).to.be.false;
   });
 
   it('has a touch target of at least 44×44 px under coarse pointer', async () => {
-    const el = await fixture<ElohimButton>(html`<elohim-button>x</elohim-button>`);
+    const el = await fixture<ElohimButton>(html`
+      <elohim-button>x</elohim-button>
+    `);
     const inner = el.shadowRoot!.querySelector('button')!;
     const rect = inner.getBoundingClientRect();
     expect(rect.width).to.be.at.least(44);
@@ -238,14 +248,28 @@ describe('<elohim-button> — ua-prefs precondition gate', () => {
 
 describe('<elohim-button> — i18n precondition gate', () => {
   it('renders the slotted label unchanged in en (label comes from slot, not internal strings)', async () => {
-    const el = await renderInLocale<ElohimButton>('en', html`<elohim-button>Submit</elohim-button>`);
+    const el = await renderInLocale<ElohimButton>(
+      'en',
+      html`
+        <elohim-button>Submit</elohim-button>
+      `
+    );
     const slot = el.shadowRoot!.querySelector('slot')!;
-    const text = slot.assignedNodes({ flatten: true }).map(n => n.textContent).join('').trim();
+    const text = slot
+      .assignedNodes({ flatten: true })
+      .map(n => n.textContent)
+      .join('')
+      .trim();
     expect(text).to.equal('Submit');
   });
 
   it('renders correctly in RTL document direction (he-IL)', async () => {
-    const el = await renderInLocale<ElohimButton>('he-IL', html`<elohim-button>שלח</elohim-button>`);
+    const el = await renderInLocale<ElohimButton>(
+      'he-IL',
+      html`
+        <elohim-button>שלח</elohim-button>
+      `
+    );
     expect(el).to.exist;
     expect(document.documentElement.getAttribute('dir')).to.equal('rtl');
     // Confirm the inner button is laid out — bounding box has nonzero dimensions
@@ -257,7 +281,11 @@ describe('<elohim-button> — i18n precondition gate', () => {
 
   it('uses no physical CSS properties (only logical or non-positional)', () => {
     // The button's static styles string contains its declared CSS. We scan it.
-    const cssText = (ElohimButtonClass as unknown as { styles: { cssText: string } }).styles.cssText;
+    const cssText = (
+      ElohimButtonClass as {
+        styles: { cssText: string };
+      }
+    ).styles.cssText;
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });
