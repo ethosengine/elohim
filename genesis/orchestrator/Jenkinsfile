@@ -156,7 +156,7 @@ def getHealthEndpoints() {
 }
 
 def getGitCommitHash() {
-    return sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+    return sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
 }
 
 // CI Summary helpers for Claude triage

@@ -36,7 +36,7 @@ def loadBuildVars() {
 
     if (!fileExists(path)) {
         echo "WARNING: build.env not found at ${path}, using defaults"
-        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        def gitHash = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
         def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
         return [
             BASE_VERSION: 'dev',
@@ -177,7 +177,7 @@ def runSimulationTest() {
  */
 def deployEdgeWithManifest(String env, String namespace, String manifestTemplate, String envFile, String resourceName = 'elohim-edgenode') {
     def versions = readProperties(file: envFile)
-    def deployVersion = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+    def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
     def sedArgs = [
         "s/EDGENODE_TAG_PLACEHOLDER/${versions.EDGENODE_TAG}/g",
         "s/DOORWAY_TAG_PLACEHOLDER/${versions.DOORWAY_TAG}/g",
@@ -434,7 +434,7 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
  */
 def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     def versions = readProperties(file: envFile)
-    def deployVersion = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+    def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
     def envConfig = getEnvConfig()[humanConfig.env]
     def p2pNodes = computeP2PBootstrapNodes(humanConfig, allHumans)
 
@@ -595,7 +595,7 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     def conductorUrls = computeConductorUrls(targetEnv, allHumans)
     def storageUrls = computeStorageUrls(targetEnv, allHumans)
     def versions = readProperties(file: envFile)
-    def deployVersion = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+    def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
 
     def sedArgs = [
         "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
@@ -898,7 +898,7 @@ spec:
 
                         // Parse VERSION file with component-specific versions
                         def versionMap = parseVersionFile()
-                        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        def gitHash = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
                         def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
 
                         // Compute tag: main→baseVersion, others→baseVersion-branch-hash

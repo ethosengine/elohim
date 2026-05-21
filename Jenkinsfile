@@ -374,7 +374,7 @@ spec:
                         echo "Change request: ${env.CHANGE_ID ?: 'None'}"
 
                         // Verify git state
-                        sh 'git rev-parse --short HEAD'
+                        sh 'git rev-parse HEAD | cut -c1-8'
                         sh 'git status'
 
                         // Enable pnpm via corepack (uses packageManager field in root package.json)
@@ -418,7 +418,7 @@ spec:
 
                         // Get git hash
                         def gitHash = sh(
-                            script: 'git rev-parse --short HEAD',
+                            script: 'git rev-parse HEAD | cut -c1-8',
                             returnStdout: true
                         ).trim()
                         echo "DEBUG - Git hash: '${gitHash}'"
@@ -484,7 +484,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         if (env.BRANCH_NAME == 'main') {
                             happVersion = baseVersion
                         } else {
-                            def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            def gitHash = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
                             def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
                             happVersion = "${baseVersion}-${sanitizedBranch}-${gitHash}"
                         }

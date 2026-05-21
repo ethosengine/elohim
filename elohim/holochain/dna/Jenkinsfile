@@ -27,7 +27,7 @@ def loadBuildVars() {
 
     if (!fileExists(path)) {
         echo "WARNING: build.env not found at ${path}, using defaults"
-        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        def gitHash = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
         def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
         return [
             BASE_VERSION: 'dev',
@@ -271,7 +271,7 @@ spec:
                         // Use HAPP_VERSION for DNA builds, fall back to APP_VERSION
                         def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
 
-                        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        def gitHash = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
                         def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
 
                         def imageTag = (env.BRANCH_NAME == 'main')
@@ -475,7 +475,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     echo "=== Injecting version metadata into hApp manifest ==="
                                     cd ../elohim
                                     _hv=$(grep HAPP_VERSION ../../../../VERSION | cut -d= -f2)
-                                    _gc=$(git -C ../../../.. rev-parse --short HEAD)
+                                    _gc=$(git -C ../../../.. rev-parse HEAD | cut -c1-8)
                                     sed -i "2a # Build: HAPP_VERSION=${_hv} commit=${_gc}" workdir/happ.yaml
 
                                     echo "=== Packaging hApp (all 4 DNAs) ==="

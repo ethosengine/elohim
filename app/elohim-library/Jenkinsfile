@@ -134,7 +134,7 @@ spec:
                     checkout scm
                     script {
                         sh 'git config --global --add safe.directory "*"'
-                        env.GIT_COMMIT_HASH = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        env.GIT_COMMIT_HASH = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
                     }
                 }
             }
