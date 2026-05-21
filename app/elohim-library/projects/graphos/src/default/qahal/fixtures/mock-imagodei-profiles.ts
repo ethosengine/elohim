@@ -170,15 +170,49 @@ const gertrudeDowell: MockImagodeiProfile = {
 };
 
 /**
- * DOWELL_FAMILY — the five members of the Dowell household Qahal as the canonical
- * narrative renders them: Matthew and Jessica as co-stewards, James as their child,
- * Sheila as core-family, Gertrude as elder under guardianship.
+ * Susan Dowell — Matthew's sister-in-law (or other core-family relation named in
+ * the canonical narratives alongside Sheila as core-family visibility members of
+ * the Dowell household). Appears in the member ring in muted color because she has
+ * chosen `standing-visible-only-when-active` on her profile; she has not done care
+ * work in the household this week and does not pretend she has. Her ring renders
+ * muted-when-inactive — she is present in the ring layout but her standing indicator
+ * is suppressed until she contributes care work again.
+ *
+ * Narrative grounding: §4.1 — "in slightly muted color because they have chosen
+ * *core-family* visibility into this household without being members of it, Susan
+ * and Sheila." Susan's ring is muted because she has chosen
+ * *standing-visible-only-when-active* on her profile.
+ *
+ * Cross-reference: `mock-social-compute-topology.ts` DOWELL_HOUSEHOLD_TOPOLOGY
+ * `weStewardFor` references `stewardId: 'susan-household'` — this profile's id
+ * `'susan-household'` is the matching stable identifier for that topology entry.
+ *
+ * Affiliated with `cofc-congregation` because the canonical narrative places her
+ * within the same fellowship network as Matthew and Sheila; `susan-household` is
+ * her own household node that holds a cross-household stewardship share.
+ */
+const susanDowell: MockImagodeiProfile = {
+  id: 'susan-household',
+  name: 'Susan Dowell',
+  standingTier: 'contributor',
+  bloomTier: 'evaluate',
+  capabilityTier: 'contributor',
+  affiliations: ['susan-household', 'cofc-congregation'],
+};
+
+/**
+ * DOWELL_FAMILY — the six profiles that the Dowell household member ring renders:
+ * Matthew and Jessica as co-stewards, James as their child, Sheila and Susan as
+ * core-family (ring muted per their profile settings), Gertrude as elder under
+ * guardianship. The canonical narrative (§4.1) names Susan alongside Sheila as
+ * the two core-family faces in the muted portion of the ring.
  */
 export const DOWELL_FAMILY: MockImagodeiProfile[] = [
   matthewDowell,
   jessicaDowell,
   jamesDowell,
   sheilaHardin,
+  susanDowell,
   gertrudeDowell,
 ];
 
