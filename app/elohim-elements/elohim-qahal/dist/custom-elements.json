@@ -220,6 +220,225 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-collective-switcher.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Collective switcher — far-left column listing Qahals the operator participates in.\n\nUsed in the Qahal homepage 4-column chrome as the leftmost icon strip.\nEach button represents one Qahal; clicking one emits `collective-changed`.",
+          "name": "ElohimQahalCollectiveSwitcher",
+          "members": [
+            {
+              "kind": "field",
+              "name": "collectives",
+              "type": {
+                "text": "CollectiveDescriptor[]"
+              },
+              "default": "[]",
+              "description": "Array of Qahal descriptors",
+              "attribute": "collectives"
+            },
+            {
+              "kind": "field",
+              "name": "activeCollectiveId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The currently-active collective's id",
+              "attribute": "active-collective-id"
+            },
+            {
+              "kind": "method",
+              "name": "handleClick",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "id",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "name": "collective-changed",
+              "type": {
+                "text": "CustomEvent<{id: string}>"
+              },
+              "description": "When user clicks a different collective"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "collectives",
+              "type": {
+                "text": "CollectiveDescriptor[]"
+              },
+              "default": "[]",
+              "description": "Array of Qahal descriptors",
+              "fieldName": "collectives"
+            },
+            {
+              "name": "active-collective-id",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The currently-active collective's id",
+              "fieldName": "activeCollectiveId"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-collective-switcher",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "supported",
+              "error": "supported",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalCollectiveSwitcher",
+          "declaration": {
+            "name": "ElohimQahalCollectiveSwitcher",
+            "module": "src/elohim-qahal-collective-switcher.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-context-column.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Qahal context column — fourth column. Right-context panels.\n\nUsed in the Qahal homepage 4-column chrome as the rightmost column.\nProvides three named slots for co-steward, rules, and discovery content.",
+          "name": "ElohimQahalContextColumn",
+          "slots": [
+            {
+              "description": "The commons-elohim co-steward view (always present)",
+              "name": "co-steward"
+            },
+            {
+              "description": "Condensed rules summary",
+              "name": "rules"
+            },
+            {
+              "description": "Graph discovery suggestions",
+              "name": "discovery"
+            }
+          ],
+          "members": [],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-context-column",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "supported",
+              "error": "supported",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalContextColumn",
+          "declaration": {
+            "name": "ElohimQahalContextColumn",
+            "module": "src/elohim-qahal-context-column.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-imagodei-badge.ts",
       "declarations": [
         {
@@ -367,6 +586,105 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-main-viewer.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Qahal main viewer — third column. Holds the active panel's rendered content.\n\nUsed in the Qahal homepage 4-column chrome as the primary content area.\nThe default slot accepts the active panel element; `activePanelName` is used\nfor ARIA labelling of the `<main>` region.",
+          "name": "ElohimQahalMainViewer",
+          "slots": [
+            {
+              "description": "The active panel's element",
+              "name": ""
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "activePanelName",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Name of the currently-active panel (for ARIA labelling)",
+              "attribute": "active-panel-name"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "active-panel-name",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Name of the currently-active panel (for ARIA labelling)",
+              "fieldName": "activePanelName"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-main-viewer",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "supported",
+              "error": "supported",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalMainViewer",
+          "declaration": {
+            "name": "ElohimQahalMainViewer",
+            "module": "src/elohim-qahal-main-viewer.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-provenance-marker.ts",
       "declarations": [
         {
@@ -474,6 +792,117 @@
           "declaration": {
             "name": "ElohimQahalProvenanceMarker",
             "module": "src/elohim-qahal-provenance-marker.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-sidebar.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Qahal sidebar — second column. Layout container for resource list sections.\n\nUsed in the Qahal homepage 4-column chrome as the second column.\nProvides four named slots for the four resource-list section types.",
+          "name": "ElohimQahalSidebar",
+          "slots": [
+            {
+              "description": "The protocol panels list section",
+              "name": "panels"
+            },
+            {
+              "description": "The curated EPRs section",
+              "name": "curated"
+            },
+            {
+              "description": "The external hyperlinks section",
+              "name": "external"
+            },
+            {
+              "description": "The power-user expandables section",
+              "name": "power-user"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "qahalName",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Display name of the active Qahal",
+              "attribute": "qahal-name"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "qahal-name",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Display name of the active Qahal",
+              "fieldName": "qahalName"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-sidebar",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "supported",
+              "error": "supported",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalSidebar",
+          "declaration": {
+            "name": "ElohimQahalSidebar",
+            "module": "src/elohim-qahal-sidebar.ts"
           }
         }
       ]
