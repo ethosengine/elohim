@@ -17,7 +17,17 @@ metadata:
       # else falls through to the doorway's normal routing (SPA fallback, /apps,
       # /blob, /api/v1, /lamad/*, etc.). Reversal: drop this annotation + restore
       # the `/` → elohim-site-alpha-service rule below.
-      location = / {
+      #
+      # IMPORTANT: use `if ($request_uri = "/")` rather than a nested `location = /`
+      # block. nginx-ingress duplicates `configuration-snippet` into every per-path
+      # location block (one per `paths:` entry below), so a nested `location = /`
+      # would become `location /lamad/concept/ { ... location = / { ... } }` —
+      # invalid nginx ("location \"/\" is outside location \"/lamad/concept/\"")
+      # which silently fails reload and leaves the controller serving last-good
+      # in-memory config. The `if` form evaluates per-request and only matches
+      # when the URI is literally "/", so duplication is a no-op everywhere else.
+      # See memory: nginx_ingress_configuration_snippet_location_trap.
+      if ($request_uri = "/") {
         return 302 /apps/elohim-host-landing/index.html;
       }
 spec:
