@@ -1,0 +1,153 @@
+{
+  "schemaVersion": "1.0.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-imagodei-badge.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Inline imagodei badge — avatar + name + standing ring, lensed through current Qahal.\n\nUsed in stream items, member-ring drill-downs, and co-steward observations.\nSubstrate primitive for \"who is this person in this Qahal.\"",
+          "name": "ElohimQahalImagodeiBadge",
+          "cssProperties": [
+            {
+              "description": "Override avatar size (default 1.5rem)",
+              "name": "--elohim-qahal-imagodei-badge-size"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "name",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The human's display name",
+              "attribute": "name"
+            },
+            {
+              "kind": "field",
+              "name": "avatarUrl",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional avatar image URL; falls back to initials when absent",
+              "attribute": "avatar-url"
+            },
+            {
+              "kind": "field",
+              "name": "standingTier",
+              "type": {
+                "text": "StandingTier"
+              },
+              "default": "'visitor'",
+              "description": "Their standing in this Qahal's lens",
+              "attribute": "standing-tier",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "initials",
+              "type": {
+                "text": "string"
+              },
+              "privacy": "private",
+              "readonly": true
+            }
+          ],
+          "attributes": [
+            {
+              "name": "name",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The human's display name",
+              "fieldName": "name"
+            },
+            {
+              "name": "avatar-url",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional avatar image URL; falls back to initials when absent",
+              "fieldName": "avatarUrl"
+            },
+            {
+              "name": "standing-tier",
+              "type": {
+                "text": "StandingTier"
+              },
+              "default": "'visitor'",
+              "description": "Their standing in this Qahal's lens",
+              "fieldName": "standingTier"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-imagodei-badge",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "supported",
+              "error": "supported",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "supported"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalImagodeiBadge",
+          "declaration": {
+            "name": "ElohimQahalImagodeiBadge",
+            "module": "src/elohim-qahal-imagodei-badge.ts"
+          }
+        }
+      ]
+    }
+  ]
+}
