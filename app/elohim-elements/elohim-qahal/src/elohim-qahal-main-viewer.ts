@@ -29,7 +29,8 @@ export class ElohimQahalMainViewer extends CapabilityAwareElement(LitElement) {
   static override readonly styles = css`
     :host {
       display: block;
-      padding: 1.5rem;
+      padding-block: 1.5rem;
+      padding-inline: 1.5rem;
       background: var(--elohim-color-surface-0, #fff);
       block-size: 100%;
       overflow-y: auto;
@@ -40,7 +41,7 @@ export class ElohimQahalMainViewer extends CapabilityAwareElement(LitElement) {
 
   override render() {
     return html`
-      <main role="main" aria-label=${this.activePanelName || 'Active panel'}>
+      <main aria-label=${this.activePanelName || 'Active panel'}>
         <slot></slot>
       </main>
     `;

@@ -27,7 +27,8 @@ export class ElohimQahalContextColumn extends CapabilityAwareElement(LitElement)
   static override readonly styles = css`
     :host {
       display: block;
-      padding: 1rem;
+      padding-block: 1rem;
+      padding-inline: 1rem;
       background: var(--elohim-color-surface-1, #fafafa);
       border-inline-start: 1px solid var(--elohim-color-border, #ddd);
       block-size: 100%;

@@ -46,12 +46,13 @@ describe('<elohim-qahal-main-viewer>', () => {
     expect(main!.getAttribute('aria-label')).to.equal('Active panel');
   });
 
-  it('<main> element has role="main"', async () => {
+  it('<main> element exists in shadow DOM (implicit role="main" is sufficient)', async () => {
     const el = await fixture<ElohimQahalMainViewer>(html`
       <elohim-qahal-main-viewer active-panel-name="Members"></elohim-qahal-main-viewer>
     `);
     const main = el.shadowRoot!.querySelector('main');
-    expect(main!.getAttribute('role')).to.equal('main');
+    expect(main).to.exist;
+    // <main> carries an implicit ARIA role of "main"; no explicit attribute needed
   });
 
   it('passes axe accessibility audit', async () => {
