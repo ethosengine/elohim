@@ -2,12 +2,16 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 
 import type { MyClusterView } from '@app/generated/my-cluster-view';
-import type { ComputeTriptychGql } from '@elohim/storage-client/graphql';
 
-export type DeviceSummary = MyClusterView['devices'][number] & {
-  /** Compute capacity triptych. Present when the GraphQL path is active; absent on the REST path. */
-  compute?: ComputeTriptychGql | null;
-};
+/**
+ * Device row consumed by the tile. After the HubComputeAggregateView landing
+ * (92cad4734) `compute` is a first-class field on `MyClusterView['devices'][number]`
+ * — the canonical `ComputeTriptych` (number-typed bytes). The
+ * GraphQL adapter (`topology-graphql.adapter.ts`) converts gql string-typed
+ * bytes to numbers before populating it, so this consumer doesn't see the
+ * `ComputeTriptychGql` shape.
+ */
+export type DeviceSummary = MyClusterView['devices'][number];
 export type DeviceArchetype = MyClusterView['devices'][number]['archetype'];
 
 const ARCHETYPE_LABEL: Record<DeviceArchetype, string> = {
@@ -87,9 +91,9 @@ export class DeviceTileComponent {
     return `${Math.floor(min / 60)} h ago`;
   }
 
-  formatBytes(value: string | null | undefined): string {
-    if (!value) return '—';
-    const n = Number(value);
+  formatBytes(value: string | number | null | undefined): string {
+    if (value === null || value === undefined) return '—';
+    const n = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(n)) return '—';
     if (n >= 1e9) return `${(n / 1e9).toFixed(1)} GB`;
     if (n >= 1e6) return `${(n / 1e6).toFixed(1)} MB`;

@@ -69,9 +69,7 @@ function adaptArchetype(gql: DeviceSummaryGql['archetype']): DeviceArchetype {
   return gql.toLowerCase() as DeviceArchetype;
 }
 
-function adaptDevice(
-  gql: DeviceSummaryGql
-): MyClusterView['devices'][number] & { compute?: ComputeTriptychGql | null } {
+function adaptDevice(gql: DeviceSummaryGql): MyClusterView['devices'][number] {
   return {
     peerId: gql.peerId,
     archetype: adaptArchetype(gql.archetype),
@@ -89,7 +87,25 @@ function adaptDevice(
     ...(gql.beaconAgeMs !== null && { beaconAgeMs: Number(gql.beaconAgeMs) }),
     // compute: omit the key entirely when null/undefined so that `'compute' in obj`
     // returns false — matches the REST shape and the null-omission parity convention.
-    ...(gql.compute !== null && { compute: gql.compute }),
+    // Convert the GraphQL string-typed bytes to numbers so the device-level
+    // compute matches the canonical `MyClusterView['devices'][number].compute`
+    // shape (`ComputeTriptych` with `number | null` fields).
+    ...(gql.compute != null && { compute: adaptComputeTriptych(gql.compute) }),
+  };
+}
+
+/**
+ * Adapt the GraphQL `ComputeTriptychGql` (string-typed bytes for JS precision
+ * safety) to the canonical `ComputeTriptych` shape consumed by the REST view
+ * (number-typed). Same precision trade-off as the other byte counters above.
+ */
+function adaptComputeTriptych(
+  gql: ComputeTriptychGql
+): MyClusterView['devices'][number]['compute'] {
+  return {
+    free: gql.free !== null ? Number(gql.free) : null,
+    used: gql.used !== null ? Number(gql.used) : null,
+    stewarded: gql.stewarded !== null ? Number(gql.stewarded) : null,
   };
 }
 
@@ -115,10 +131,14 @@ function adaptEdge(gql: PeerHouseholdEdgeGql): PeerHouseholdEdge {
  * `MyClusterView` extended with the compute triptych on each device.
  * The REST path omits `compute`; the GraphQL path always populates it
  * (null when the peer has no compute signal yet).
+ *
+ * After the HubComputeAggregateView landing (92cad4734), `compute` is part
+ * of the canonical `MyClusterView['devices'][number]` shape with
+ * number-typed bytes. The intersection used to widen the canonical type
+ * with the gql string-typed variant; that's now redundant. We keep the
+ * alias for downstream call-site readability.
  */
-export type MyClusterViewWithCompute = Omit<MyClusterView, 'devices'> & {
-  devices: (MyClusterView['devices'][number] & { compute?: ComputeTriptychGql | null })[];
-};
+export type MyClusterViewWithCompute = MyClusterView;
 
 // ---------------------------------------------------------------------------
 // Public adapters

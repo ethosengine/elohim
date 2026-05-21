@@ -11,7 +11,7 @@ import {
 
 import { DistributionService } from '../distribution.service';
 
-import type { DistributionDetails } from '../../generated/distribution-details';
+import type { DistributionDetails, PlacementGapRow } from '../../generated/distribution-details';
 import type { DistributionSummary } from '../../generated/distribution-summary';
 
 /**
@@ -118,13 +118,19 @@ export class DistributionBadgeComponent implements OnChanges {
    * Cast a raw open-shape gap record to GapRow for display.
    * Safe: we only read fields if they exist, rendering '-' otherwise.
    */
-  protected asGapRow(raw: Record<string, unknown>): GapRow {
-    const shortfall = raw['shortfall'] as { target: number; observed: number } | undefined;
+  // After the schema codegen catch-up (040724c80) DistributionDetails.placementGaps
+  // is now typed as PlacementGapRow[] rather than Record<string, unknown>[]. We
+  // accept either shape (open-shape from older REST callers, typed shape from
+  // newer codegen) and read fields defensively — the runtime guards still
+  // protect against unexpected nulls.
+  protected asGapRow(raw: Record<string, unknown> | PlacementGapRow): GapRow {
+    const r = raw as Record<string, unknown>;
+    const shortfall = r['shortfall'] as { target: number; observed: number } | undefined;
     return {
-      kind: typeof raw['kind'] === 'string' ? raw['kind'] : 'unknown',
-      contentId: typeof raw['contentId'] === 'string' ? raw['contentId'] : '',
+      kind: typeof r['kind'] === 'string' ? r['kind'] : 'unknown',
+      contentId: typeof r['contentId'] === 'string' ? r['contentId'] : '',
       shortfall: shortfall ?? { target: 0, observed: 0 },
-      remediation: typeof raw['remediation'] === 'string' ? raw['remediation'] : null,
+      remediation: typeof r['remediation'] === 'string' ? r['remediation'] : null,
     };
   }
 

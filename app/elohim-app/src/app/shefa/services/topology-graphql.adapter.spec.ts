@@ -176,7 +176,11 @@ describe('adaptHubResponse', () => {
     expect('displayName' in view.devices[0]).toBe(false);
   });
 
-  it('passes compute triptych through unchanged', () => {
+  it('converts compute triptych string bytes to numbers', () => {
+    // After the HubComputeAggregateView landing (92cad4734) the canonical
+    // MyClusterView['devices'][number].compute is `ComputeTriptych` with
+    // number-typed bytes. The adapter converts gql string bytes via Number()
+    // following the same precision trade-off as the storage/memory counters.
     const view = adaptHubResponse(makeHubResponse({
       devices: [{
         peerId: 'peer_M',
@@ -194,7 +198,7 @@ describe('adaptHubResponse', () => {
         compute: { free: '9500000', used: '500000', stewarded: '250000' },
       }],
     }));
-    expect(view.devices[0].compute).toEqual({ free: '9500000', used: '500000', stewarded: '250000' });
+    expect(view.devices[0].compute).toEqual({ free: 9500000, used: 500000, stewarded: 250000 });
   });
 
   it('omits compute when GraphQL compute is null', () => {
