@@ -7,10 +7,10 @@
  * CSS custom properties mapped to `--el-*` brand tokens.
  *
  * Sources of truth (per elohim-library/CLAUDE.md):
- *   1. Types — `ComputeTileHubValue` / `ComputeTileDeviceValue` from `elohim-core`
- *      (no `HubComputeAggregateView` ts-rs view yet — using locally-typed hub
- *      fixtures matching elohim-core's local interface, same as Library A default
- *      story. Follow-up for rust-architect: define HubComputeAggregateView.)
+ *   1. Types — `ComputeTileHubValue` and `ComputeTileDeviceValue` from
+ *      `elohim-core`, which type-alias the protocol's generated
+ *      `HubComputeAggregateView` and `DeviceSummary` views (ts-rs from
+ *      `@elohim/storage-client`).
  *   2. Manifest vocabulary — none referenced directly in this tile (no contentType
  *      or contentFormat fields in the compute shape).
  *   3. Brand tokens — inline `EL_TOKENS` constant declares the full `--el-*`
@@ -41,7 +41,6 @@ import { html } from 'lit';
 import 'elohim-core/register';
 
 import type {
-  ComputeTileValue,
   ComputeTileHubValue,
   ComputeTileDeviceValue,
 } from 'elohim-core';
@@ -147,25 +146,25 @@ const TILE_TOKENS_HIGH_CONTRAST = `
 
 /**
  * Household hub aggregate. Primary UX surface per hub-compute-aggregate-primary
- * design note. Matthew, Jessica, and James sharing a household pool.
- *
- * Local interface (no ts-rs HubComputeAggregateView yet — see module JSDoc).
- * Structurally equivalent to Library A's householdHub fixture.
+ * design note. Matthew, Jessica, and James sharing a household pool. Shape
+ * comes from the canonical `HubComputeAggregateView` (ts-rs).
  */
 const householdHub: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:matthew-jessica-james',
+  hubKind: 'dwelling',
   displayLabel: "Matthew's household",
-  free: 5_368_709_120n,     //  5 GB free
-  used: 10_737_418_240n,    // 10 GB used
-  stewarded: 12_884_901_888n, // 12 GB stewarded for neighbors
+  compute: {
+    free: 5_368_709_120n,     //  5 GB free
+    used: 10_737_418_240n,    // 10 GB used
+    stewarded: 12_884_901_888n, // 12 GB stewarded for neighbors
+  },
   memberDeviceCount: 3,
 };
 
 /**
- * Per-device drill-down — Matthew's laptop.
- * Compute field is structurally compatible with ComputeTriptych from
- * @elohim/storage-client; assign directly without cast.
+ * Per-device drill-down — Matthew's laptop. Shape comes from the canonical
+ * `DeviceSummary` (ts-rs); the element renders the compute subset.
  */
 const matthewLaptop: ComputeTileDeviceValue = {
   kind: 'device',
@@ -184,10 +183,13 @@ const matthewLaptop: ComputeTileDeviceValue = {
 const hubOfOne: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:solo-device',
+  hubKind: 'computed',
   displayLabel: 'Solo device hub',
-  free: 1_073_741_824n,
-  used: 2_147_483_648n,
-  stewarded: 0n,
+  compute: {
+    free: 1_073_741_824n,
+    used: 2_147_483_648n,
+    stewarded: 0n,
+  },
   memberDeviceCount: 1,
 };
 
@@ -195,10 +197,9 @@ const hubOfOne: ComputeTileHubValue = {
 const freshNode: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:fresh-node',
+  hubKind: 'computed',
   displayLabel: 'Fresh node',
-  free: null,
-  used: null,
-  stewarded: null,
+  compute: null,
   memberDeviceCount: 1,
 };
 

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:hub-compute-aggregate",
+  "title": "HubComputeAggregateView",
+  "description": "Hub-level compute aggregate — sums per-device ComputeTriptych across all devices belonging to a hub. Primary UX surface for household compute capacity rendering; per-device drill-down is secondary. Hub is a *role* (dial-up-by-capability), not a notarized entity — substrate stays kind-agnostic; kind classification (dwelling/collective/computed) happens at the projection layer. Source of truth: hub-membership graph (notarized humans.household_id or collective_participations) + per-device ComputeTriptych aggregation (A2 inputs, summed). Operational Category C — reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hubId", "hubKind", "memberDeviceCount"],
+  "properties": {
+    "hubId": {
+      "type": "string",
+      "description": "Stable identifier for this hub. When hub-membership facts are not yet notarized, hubId is the peer_id of the single-device participant (Computed kind). Future: dwelling_id or collective_id when binding tables distinguish."
+    },
+    "hubKind": {
+      "type": "string",
+      "enum": ["dwelling", "collective", "computed"],
+      "description": "Hub kind. dwelling = single household; collective = qahal-scoped hub; computed = ad-hoc or single-device participation. New kinds slot in here without changing API shape. Mirrors HubKind enum."
+    },
+    "displayLabel": {
+      "type": ["string", "null"],
+      "description": "Optional human-readable label for UI display. Absent or null when no label is known."
+    },
+    "compute": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "compute-triptych.schema.json" }
+      ],
+      "description": "Aggregated compute triptych across all member devices. Null when no devices have a current sample, or when no REA commitments exist for any member."
+    },
+    "memberDeviceCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of member devices contributing to this aggregate. Zero is valid for a freshly-created hub with no devices yet joined."
+    }
+  }
+}

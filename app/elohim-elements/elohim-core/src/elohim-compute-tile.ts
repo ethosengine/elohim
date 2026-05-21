@@ -5,79 +5,52 @@ import { property } from 'lit/decorators.js';
 import { CapabilityAwareElement } from './capability/index.js';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types — consumed directly from the protocol's generated ts-rs views
 // ---------------------------------------------------------------------------
+
+import type {
+  ComputeTriptych,
+  DeviceSummary,
+  HubComputeAggregateView,
+} from '@elohim/storage-client/generated';
 
 /**
  * Hardware/deployment archetype for the device-kind variant.
- * Mirrors `DeviceArchetype` from `@elohim/storage-client` (substrate-local
- * copy to keep elohim-core independent of application-layer packages).
+ * Derived from the protocol's `DeviceSummary.archetype` field. The
+ * ts-rs-generated `DeviceArchetype` type is intentionally not imported
+ * directly — the GraphQL surface defines a same-named type with different
+ * enum casing, and the root `@elohim/storage-client` index re-exports both
+ * wildcards. Accessing it via `DeviceSummary['archetype']` sidesteps that
+ * collision while still tracking the canonical view.
  */
-export type ComputeTileArchetype = 'node' | 'desktop' | 'mobile' | 'steward';
+export type ComputeTileArchetype = DeviceSummary['archetype'];
 
 /**
- * Substrate-local structural equivalent of `ComputeTriptych` from
- * `@elohim/storage-client`. Structurally compatible — TypeScript's structural
- * typing means the generated type can be assigned to this interface without
- * an explicit cast.
- *
- * elohim-core does not depend on `@elohim/storage-client` to remain a
- * blank-slate substrate independent of application-layer packages.
- * Story fixtures in elohim-library import the real generated type.
+ * Compute triptych shape. Direct alias of the protocol's `ComputeTriptych`
+ * view (`free` / `used` / `stewarded` bytes). Re-exported for consumers that
+ * want to type their own data flowing into the tile.
  */
-export interface ComputeTriptychShape {
-  free: bigint | null;
-  used: bigint | null;
-  stewarded: bigint | null;
-}
+export type ComputeTriptychShape = ComputeTriptych;
 
 /**
- * Hub-aggregate input shape.
+ * Hub-aggregate input shape — `HubComputeAggregateView` from the protocol
+ * tagged with a `kind: 'hub'` discriminator for the polymorphic union.
  *
- * No ts-rs view exists for a HubComputeAggregate yet — this is a locally
- * typed operational projection. The fields mirror `ComputeTriptych` (three
- * `bigint | null` triptych fields) plus hub-contextual chrome.
- *
- * Follow-up: rust-architect should define a `HubComputeAggregateView` so
- * this local interface can be replaced with the generated type.
+ * The protocol view nests the triptych under `.compute` (matching the
+ * per-device shape); the element's `extractTriptych` reads from there.
  */
-export interface ComputeTileHubValue {
-  kind: 'hub';
-  /** Opaque hub identifier — e.g. 'hub:household:matthew-jessica-james' */
-  hubId: string;
-  /** Optional human-readable label for the hub. */
-  displayLabel?: string;
-  /** Bytes available across all member devices. null when no sample. */
-  free: bigint | null;
-  /** Bytes used across all member devices. null when no sample. */
-  used: bigint | null;
-  /** Bytes stewarded (committed via rea_commitments) across member devices. null when no sample. */
-  stewarded: bigint | null;
-  /** Number of member devices contributing to this aggregate. */
-  memberDeviceCount?: number;
-}
+export type ComputeTileHubValue = HubComputeAggregateView & { kind: 'hub' };
 
 /**
- * Per-device input shape.
- * Uses the subset of `DeviceSummary` fields needed for compute rendering.
+ * Per-device input shape — the subset of `DeviceSummary` fields the tile
+ * actually renders, tagged with `kind: 'device'`. A real `DeviceSummary`
+ * value satisfies this type via TypeScript's structural typing; extra
+ * fields on the source view are ignored.
  */
-export interface ComputeTileDeviceValue {
-  kind: 'device';
-  /** Peer identifier — e.g. 'peer:12D3KooW…' */
-  peerId: string;
-  /** Human-readable device name. null when not set. */
-  displayName: string | null;
-  /** Hardware/deployment archetype. */
-  archetype: ComputeTileArchetype;
-  /** Whether the device is currently online. */
-  online: boolean;
-  /**
-   * Compute triptych. Structurally compatible with `ComputeTriptych` from
-   * `@elohim/storage-client` — assign directly without cast.
-   * null when no sample yet.
-   */
-  compute: ComputeTriptychShape | null;
-}
+export type ComputeTileDeviceValue = Pick<
+  DeviceSummary,
+  'peerId' | 'displayName' | 'archetype' | 'online' | 'compute'
+> & { kind: 'device' };
 
 export type ComputeTileValue = ComputeTileHubValue | ComputeTileDeviceValue;
 
@@ -91,17 +64,12 @@ export type ComputeTileState = 'idle' | 'loading' | 'error' | 'stale' | 'offline
 // ---------------------------------------------------------------------------
 
 /**
- * Extract the triptych numbers from either value shape.
+ * Extract the triptych numbers from either value shape. The hub and device
+ * views both store the triptych under `.compute`, so the projection is
+ * uniform; null means "no sample available."
  */
-function extractTriptych(value: ComputeTileValue): ComputeTriptychShape {
-  if (value.kind === 'hub') {
-    return { free: value.free, used: value.used, stewarded: value.stewarded };
-  }
-  return {
-    free: value.compute?.free ?? null,
-    used: value.compute?.used ?? null,
-    stewarded: value.compute?.stewarded ?? null,
-  };
+function extractTriptych(value: ComputeTileValue): ComputeTriptych {
+  return value.compute ?? { free: null, used: null, stewarded: null };
 }
 
 /**

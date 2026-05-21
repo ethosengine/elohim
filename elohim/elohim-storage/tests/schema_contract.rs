@@ -2134,6 +2134,58 @@ fn compute_triptych_in_device_summary_matches_schema() {
 }
 
 #[test]
+fn hub_compute_aggregate_view_matches_schema() {
+    use elohim_storage::views::{ComputeTriptych, HubComputeAggregateView, HubKind};
+
+    // Household hub — 3 devices, full triptych populated.
+    let populated = HubComputeAggregateView {
+        hub_id: "hub:household:matthew-jessica-james".into(),
+        hub_kind: HubKind::Dwelling,
+        display_label: Some("Matthew's household".into()),
+        compute: Some(ComputeTriptych {
+            free: Some(5_368_709_120),
+            used: Some(10_737_418_240),
+            stewarded: Some(12_884_901_888),
+        }),
+        member_device_count: 3,
+    };
+    validate_against_schema(
+        "views/hub-compute-aggregate.schema.json",
+        &serde_json::to_value(&populated).unwrap(),
+    );
+
+    // Fresh node — no samples yet, no commitments. The empty-state shape.
+    let empty = HubComputeAggregateView {
+        hub_id: "hub:household:fresh-node".into(),
+        hub_kind: HubKind::Computed,
+        display_label: None,
+        compute: None,
+        member_device_count: 1,
+    };
+    validate_against_schema(
+        "views/hub-compute-aggregate.schema.json",
+        &serde_json::to_value(&empty).unwrap(),
+    );
+
+    // Collective hub — wire-shape sanity for the qahal-scoped variant.
+    let collective = HubComputeAggregateView {
+        hub_id: "hub:collective:shem-research-cluster".into(),
+        hub_kind: HubKind::Collective,
+        display_label: Some("Shem research cluster".into()),
+        compute: Some(ComputeTriptych {
+            free: Some(214_748_364_800),
+            used: Some(107_374_182_400),
+            stewarded: Some(53_687_091_200),
+        }),
+        member_device_count: 6,
+    };
+    validate_against_schema(
+        "views/hub-compute-aggregate.schema.json",
+        &serde_json::to_value(&collective).unwrap(),
+    );
+}
+
+#[test]
 fn peer_topology_view_matches_schema() {
     use elohim_storage::views::{
         Freshness, FreshnessState, PeerHouseholdEdge, PeerTopologyView, ResilienceCliff,

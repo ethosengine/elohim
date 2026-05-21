@@ -29,7 +29,9 @@
  *   transition animation. Stillness is the floor; the comparison is the story.
  *
  * Sources of truth:
- *   Types: ComputeTileHubValue / ComputeTileDeviceValue from elohim-core
+ *   Types: ComputeTileHubValue / ComputeTileDeviceValue from elohim-core,
+ *          which type-alias the canonical `HubComputeAggregateView` and
+ *          `DeviceSummary` views generated from the Rust ts-rs boundary.
  *   Brand tokens: --el-* from design spec §14, declared inline as EL_TOKENS
  */
 
@@ -117,10 +119,13 @@ function profile(lens: string = 'standard', locale: string = 'en') {
 const matthewHouseholdBefore: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:matthew',
+  hubKind: 'computed',          // single-device participant — no notarized binding yet
   displayLabel: "Matthew's household",
-  free: 2_147_483_648n,     //  2 GB free
-  used: 5_368_709_120n,     //  5 GB used
-  stewarded: 0n,            //  no REA commitments yet — fresh participant
+  compute: {
+    free: 2_147_483_648n,       //  2 GB free
+    used: 5_368_709_120n,       //  5 GB used
+    stewarded: 0n,              //  no REA commitments yet — fresh participant
+  },
   memberDeviceCount: 1,
 };
 
@@ -145,15 +150,20 @@ const matthewLaptop: ComputeTileDeviceValue = {
  * AFTER: The same household hub — three devices now contributing.
  * Matthew's laptop + a blade slid into the rack + Jessica's home server.
  * Same hubId. The identity is stable; the aggregate has grown.
+ * Hub-kind upgrades from `computed` to `dwelling` once the household binding
+ * is notarized.
  * ~100 GB total capacity.
  */
 const matthewHouseholdAfter: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:matthew',           // same hub identity
-  displayLabel: "Matthew's household",       // same display name
-  free: 53_687_091_200n,    //  50 GB free (blade contributes most)
-  used: 53_687_091_200n,    //  50 GB used across all three
-  stewarded: 21_474_836_480n, // 20 GB stewarded for neighbors — commitments accumulate
+  hubKind: 'dwelling',                      // notarized household binding now in place
+  displayLabel: "Matthew's household",      // same display name
+  compute: {
+    free: 53_687_091_200n,                  //  50 GB free (blade contributes most)
+    used: 53_687_091_200n,                  //  50 GB used across all three
+    stewarded: 21_474_836_480n,             // 20 GB stewarded for neighbors
+  },
   memberDeviceCount: 3,
 };
 

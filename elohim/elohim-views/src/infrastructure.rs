@@ -1789,6 +1789,51 @@ pub struct ComputeTriptych {
     pub stewarded: Option<u64>,
 }
 
+/// Hub-level compute aggregate — sums the per-device `ComputeTriptych` across
+/// all devices belonging to a hub. Primary UX surface for household compute
+/// capacity rendering (per the hub-compute-aggregate-primary design note);
+/// per-device drill-down is the secondary surface.
+///
+/// Hub is a *role* (dial-up-by-capability), not a notarized entity —
+/// substrate stays kind-agnostic; kind classification (dwelling / collective /
+/// computed) happens at the projection layer. See [[HubKind]].
+///
+/// Category C operational projection — composed from:
+/// - hub-membership graph (notarized `humans.household_id` or
+///   `collective_participations` bindings),
+/// - per-device `ComputeTriptych` aggregation (A2 inputs, summed).
+///
+/// Not persisted; reconstructed per request.
+///
+/// **Precision note:** matches `ComputeTriptych` — `Option<u64>` on the HTTP
+/// wire (`bigint | null` in TypeScript). A GraphQL surface would stringify
+/// for JS `Number` precision safety (see `DeviceSummaryGql` pattern).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct HubComputeAggregateView {
+    /// Stable identifier for this hub. When hub-membership facts are not yet
+    /// notarized, this is the `peer_id` of the single-device participant
+    /// (Computed kind). Future: `dwelling_id` or `collective_id` when binding
+    /// tables distinguish.
+    pub hub_id: String,
+    /// Hub classification (dwelling / collective / computed). Mirrors
+    /// [[HubKind]].
+    pub hub_kind: HubKind,
+    /// Optional human-readable label for UI display. Absent when no label
+    /// is known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_label: Option<String>,
+    /// Aggregated compute triptych across all member devices. `None` when no
+    /// devices have a current sample, or when no REA commitments exist for
+    /// any member.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compute: Option<ComputeTriptych>,
+    /// Number of member devices contributing to this aggregate. Zero is
+    /// valid for a freshly-created hub with no devices yet joined.
+    pub member_device_count: u32,
+}
+
 /// Per-device summary in `MyClusterView`.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]

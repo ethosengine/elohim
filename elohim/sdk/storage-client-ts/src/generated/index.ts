@@ -263,3 +263,19 @@ export * from "./WeatherDataPoint";
 export * from "./WeatherEntrySummaryView";
 export * from "./WeatherForecastView";
 export * from "./WeatherRisk";
+
+// Compute-capacity views — consumed by <elohim-compute-tile> in
+// app/elohim-elements/elohim-core to render canonical per-device and
+// hub-level compute aggregates without redeclaring the wire shape.
+//
+// NOTE: `DeviceArchetype` is intentionally NOT re-exported here. A
+// type with the same name exists in `./graphql` (with uppercase enum
+// values for the GraphQL wire), and the root `src/index.ts` re-exports
+// `./generated` AND `./graphql` via wildcard — exporting `DeviceArchetype`
+// from both produces TS2308. Consumers that need it should access it
+// via `DeviceSummary['archetype']` or import the file directly.
+export * from "./ComputeTriptych";
+export * from "./DeviceSummary";
+export * from "./Freshness";
+export * from "./HubComputeAggregateView";
+export * from "./HubKind";

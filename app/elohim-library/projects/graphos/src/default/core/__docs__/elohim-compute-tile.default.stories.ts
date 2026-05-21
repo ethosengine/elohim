@@ -4,12 +4,10 @@
  * Proves the element works as a blank-slate primitive: no brand tokens bound,
  * CSS system colors as defaults, override surface honest.
  *
- * NOTE: The hub-kind input shape uses a locally-typed fixture because no ts-rs
- * `HubComputeAggregateView` exists yet. The device-kind `compute` field uses
- * `ComputeTriptychShape` from `elohim-core` (structurally compatible with
- * `ComputeTriptych` from `@elohim/storage-client`). Follow-up: rust-architect
- * should define `HubComputeAggregateView` so the hub fixture can use the
- * generated type.
+ * Fixtures consume the protocol's generated ts-rs views directly —
+ * `HubComputeAggregateView` and `DeviceSummary` from `@elohim/storage-client`.
+ * Adding `kind: 'hub' | 'device'` tags those views into the element's
+ * discriminated union without redefining the wire shape.
  */
 
 import type { Meta, StoryObj } from '@storybook/web-components';
@@ -24,29 +22,31 @@ import type {
 } from 'elohim-core';
 
 // ---------------------------------------------------------------------------
-// Fixtures
+// Fixtures — typed against the canonical protocol views
 // ---------------------------------------------------------------------------
 
 /**
- * Household hub aggregate — the primary UX surface per the hub-compute-aggregate-primary
- * design note. Three member devices contributing to a single pool.
- *
- * Local interface (no ts-rs HubComputeAggregateView yet — see module JSDoc).
+ * Household hub aggregate — the primary UX surface per the
+ * hub-compute-aggregate-primary design note. Three member devices contributing
+ * to a single pool. Shape comes from `HubComputeAggregateView` (ts-rs).
  */
 const householdHub: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:matthew-jessica-james',
+  hubKind: 'dwelling',
   displayLabel: "Matthew's household",
-  free: 5_368_709_120n, //  5 GB
-  used: 10_737_418_240n, // 10 GB
-  stewarded: 12_884_901_888n, // 12 GB
+  compute: {
+    free: 5_368_709_120n, //  5 GB
+    used: 10_737_418_240n, // 10 GB
+    stewarded: 12_884_901_888n, // 12 GB
+  },
   memberDeviceCount: 3,
 };
 
 /**
- * Per-device drill-down — Matthew's laptop.
- * The `compute` field is structurally compatible with `ComputeTriptych` from
- * `@elohim/storage-client`; assign directly without cast.
+ * Per-device drill-down — Matthew's laptop. Shape comes from `DeviceSummary`
+ * (ts-rs); the element renders the `peerId / displayName / archetype /
+ * online / compute` subset.
  */
 const matthewLaptop: ComputeTileDeviceValue = {
   kind: 'device',
@@ -65,21 +65,23 @@ const matthewLaptop: ComputeTileDeviceValue = {
 const hubOfOne: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:solo-device',
+  hubKind: 'computed',
   displayLabel: 'Solo device hub',
-  free: 1_073_741_824n,
-  used: 2_147_483_648n,
-  stewarded: 0n,
+  compute: {
+    free: 1_073_741_824n,
+    used: 2_147_483_648n,
+    stewarded: 0n,
+  },
   memberDeviceCount: 1,
 };
 
-/** Stewarded-zero — fresh node with no REA commitments yet. */
+/** Stewarded-zero — fresh node with no system_metrics sample yet, no commitments. */
 const freshNode: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:fresh-node',
+  hubKind: 'computed',
   displayLabel: 'Fresh node',
-  free: null,
-  used: null,
-  stewarded: null,
+  compute: null,
   memberDeviceCount: 1,
 };
 
