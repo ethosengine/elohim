@@ -18,10 +18,13 @@ import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
 const hubValue: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:matthew-jessica-james',
+  hubKind: 'dwelling',
   displayLabel: "Matthew's household",
-  free: 5_368_709_120n,
-  used: 10_737_418_240n,
-  stewarded: 12_884_901_888n,
+  compute: {
+    free: 5_368_709_120n,
+    used: 10_737_418_240n,
+    stewarded: 12_884_901_888n,
+  },
   memberDeviceCount: 3,
 };
 
@@ -50,20 +53,22 @@ const offlineDevice: ComputeTileDeviceValue = {
 const hubOfOne: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:solo-device',
+  hubKind: 'computed',
   displayLabel: 'Solo device hub',
-  free: 1_073_741_824n,
-  used: 2_147_483_648n,
-  stewarded: 0n,
+  compute: {
+    free: 1_073_741_824n,
+    used: 2_147_483_648n,
+    stewarded: 0n,
+  },
   memberDeviceCount: 1,
 };
 
 const freshNode: ComputeTileHubValue = {
   kind: 'hub',
   hubId: 'hub:household:fresh-node',
+  hubKind: 'computed',
   displayLabel: 'Fresh node',
-  free: null,
-  used: null,
-  stewarded: null,
+  compute: null,
   memberDeviceCount: 1,
 };
 
@@ -97,7 +102,7 @@ describe('<elohim-compute-tile> — lens coverage', () => {
     `);
     el.value = {
       ...hubValue,
-      free: 500_000_000n,
+      compute: { ...hubValue.compute!, free: 500_000_000n },
     };
     el.profile = { ...el.profile, lens: 'minimal' };
     await elementUpdated(el);
