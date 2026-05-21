@@ -51,6 +51,24 @@ spec:
      mountPath: /run/containerd/containerd.sock
    - name: buildkit-run
      mountPath: /run/buildkit
+ - name: playwright
+   # Sidecar with @playwright/test + bundled chromium-headless-shell.
+   # Used by the Smoke-Test Stories stage which runs @storybook/test-runner
+   # against the just-built static bundle. Mirrors the genesis pipeline's
+   # browser-stage pattern (genesis/Jenkinsfile:350-361). ci-builder
+   # alone cannot launch a browser; this sidecar carries node20 + pnpm
+   # + the playwright cache.
+   image: harbor.ethosengine.com/ethosengine/ci-playwright:latest
+   command:
+   - cat
+   tty: true
+   resources:
+     requests:
+       ephemeral-storage: "2Gi"
+       memory: "1Gi"
+     limits:
+       ephemeral-storage: "4Gi"
+       memory: "3Gi"
  - name: buildkitd
    image: moby/buildkit:v0.12.5
    securityContext:
@@ -208,15 +226,23 @@ spec:
             // gets reduced to an empty `__namedExportsOrder` shell. Without
             // this stage that failure mode rides all the way to the deployed
             // storybook.elohim.host before a human notices.
+            //
+            // Runs in the `playwright` sidecar (ci-playwright image) — the
+            // `builder` (ci-builder) image lacks the chromium-headless-shell
+            // binary that test-runner needs. The workspace volume is shared
+            // across all pod containers, so dist/storybook/ built by the
+            // previous stage (in `builder`) is visible here.
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
-                container('builder') {
+                container('playwright') {
                     sh '''#!/bin/bash
                         set -euo pipefail
                         cd app/elohim-library
-                        # `pnpm exec playwright install chromium` inside the
-                        # script is idempotent — first build downloads the
-                        # browser (~112MB), subsequent builds reuse the cache.
+                        # The ci-playwright image ships chromium-headless-shell
+                        # pre-cached. `pnpm exec playwright install chromium`
+                        # inside the test-storybook-ci.sh script remains as
+                        # a safety net if the image's cache and the script's
+                        # playwright version ever drift.
                         pnpm run test-storybook:ci
                     '''
                 }
