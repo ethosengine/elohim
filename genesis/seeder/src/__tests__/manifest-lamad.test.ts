@@ -65,9 +65,37 @@ interface Manifest {
 
 let manifest: Manifest;
 
+/**
+ * Recursively resolve `$ref` pointers to sibling files in the modular
+ * manifest tree. Mirrors the helper in
+ * `elohim/sdk/domains/lamad/scripts/codegen.mjs` — only the
+ * `./manifest/*` / `../*` flavor (the modularization $refs); leaves
+ * schema $refs and JSON-pointer fragments alone.
+ *
+ * Without this, after the manifest modularization (b7ee6d739 et al.)
+ * `manifest.vocabulary.observations` is `{ $ref: "./manifest/observations.json" }`
+ * instead of the inlined map, and every content/observation test fails.
+ */
+function resolveRefs(value: unknown, baseDir: string): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((v) => resolveRefs(v, baseDir));
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.$ref === 'string' &&
+    (v.$ref.startsWith('./manifest/') || v.$ref.startsWith('../'))
+  ) {
+    const refPath = path.resolve(baseDir, v.$ref);
+    const raw = JSON.parse(fs.readFileSync(refPath, 'utf8'));
+    return resolveRefs(raw, path.dirname(refPath));
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, vv] of Object.entries(v)) out[k] = resolveRefs(vv, baseDir);
+  return out;
+}
+
 beforeAll(() => {
-  const raw = fs.readFileSync(MANIFEST_PATH, 'utf8');
-  manifest = JSON.parse(raw) as Manifest;
+  const raw = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+  manifest = resolveRefs(raw, path.dirname(MANIFEST_PATH)) as Manifest;
 });
 
 describe('Lamad manifest: app identity', () => {
