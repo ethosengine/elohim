@@ -107,6 +107,119 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-care-economy-marker.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Care-economy marker — small inline REA event indicator.\n\nUsed inline within stream items to surface care-economy contributions\n(+care, +presence, +repair, +growth, +time).",
+          "name": "ElohimQahalCareEconomyMarker",
+          "members": [
+            {
+              "kind": "field",
+              "name": "kind",
+              "type": {
+                "text": "CareEconomyKind"
+              },
+              "default": "'care'",
+              "description": "Which kind of care-economy contribution",
+              "attribute": "kind",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "tokens",
+              "type": {
+                "text": "number"
+              },
+              "default": "1",
+              "description": "Count of tokens (default 1)",
+              "attribute": "tokens"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "kind",
+              "type": {
+                "text": "CareEconomyKind"
+              },
+              "default": "'care'",
+              "description": "Which kind of care-economy contribution",
+              "fieldName": "kind"
+            },
+            {
+              "name": "tokens",
+              "type": {
+                "text": "number"
+              },
+              "default": "1",
+              "description": "Count of tokens (default 1)",
+              "fieldName": "tokens"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-care-economy-marker",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalCareEconomyMarker",
+          "declaration": {
+            "name": "ElohimQahalCareEconomyMarker",
+            "module": "src/elohim-qahal-care-economy-marker.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-imagodei-badge.ts",
       "declarations": [
         {

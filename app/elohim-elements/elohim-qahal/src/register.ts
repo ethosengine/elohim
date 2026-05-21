@@ -3,9 +3,14 @@
 // to make all custom elements available.
 
 import { ElohimQahalCapabilityTierChip } from './elohim-qahal-capability-tier-chip.js';
+import { ElohimQahalCareEconomyMarker } from './elohim-qahal-care-economy-marker.js';
 import { ElohimQahalImagodeiBadge } from './elohim-qahal-imagodei-badge.js';
 import { ElohimQahalProvenanceMarker } from './elohim-qahal-provenance-marker.js';
 import { ElohimQahalStandingRing } from './elohim-qahal-standing-ring.js';
+
+if (!customElements.get('elohim-qahal-care-economy-marker')) {
+  customElements.define('elohim-qahal-care-economy-marker', ElohimQahalCareEconomyMarker);
+}
 
 if (!customElements.get('elohim-qahal-capability-tier-chip')) {
   customElements.define('elohim-qahal-capability-tier-chip', ElohimQahalCapabilityTierChip);

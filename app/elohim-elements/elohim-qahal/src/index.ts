@@ -2,6 +2,9 @@
 // Consumers import the element classes for type annotations:
 // `import type { ElohimQahalFoo } from 'elohim-qahal';`
 
+export { ElohimQahalCareEconomyMarker } from './elohim-qahal-care-economy-marker.js';
+export type { CareEconomyKind } from './elohim-qahal-care-economy-marker.js';
+
 export { ElohimQahalCapabilityTierChip } from './elohim-qahal-capability-tier-chip.js';
 export type { CapabilityTier } from './elohim-qahal-capability-tier-chip.js';
 
