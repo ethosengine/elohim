@@ -178,13 +178,19 @@ fn happ_is_version_0_and_has_required_elohim_roles() -> Result<()> {
             h.manifest_version
         );
     }
+    // The `hrea` role is intentionally absent until a real hREA `version_pin`
+    // lands in elohim/holochain/dna/elohim/workdir/happ.yaml AND the Jenkins
+    // pipeline fetches the upstream bundle into ../hrea/workdir/hrea.dna.
+    // See the commented-out role block in happ.yaml and
+    // elohim/holochain/dna/hrea/workdir/README.md. When that lands,
+    // re-add "hrea" to expected_roles below and restore the deferred-role
+    // assertion that follows.
     let expected_roles = [
         "lamad",
         "infrastructure",
         "imagodei",
         "mishpat",
         "node_registry",
-        "hrea",
     ];
     let got: Vec<&str> = h.roles.iter().map(|r| r.name.as_str()).collect();
     for role in expected_roles.iter() {
@@ -193,11 +199,11 @@ fn happ_is_version_0_and_has_required_elohim_roles() -> Result<()> {
         }
     }
 
-    // Wave 3 M1: hrea is the only deferred role. Other roles eagerly
-    // provision at conductor startup; hrea cells are created lazily
-    // during the VFBinding handshake (per M2). If another role becomes
-    // deferred, that's a substantive architectural change that should
-    // fail this test.
+    // Wave 3 M1: hrea was the only deferred role; other roles eagerly
+    // provision at conductor startup. With the hrea role temporarily
+    // commented out (pending real version_pin + Jenkinsfile fetch), no
+    // role should be deferred at the moment. When hrea returns, this
+    // becomes `assert_eq!(deferred_roles, vec!["hrea"])` again.
     let deferred_roles: Vec<&str> = h
         .roles
         .iter()
@@ -209,10 +215,10 @@ fn happ_is_version_0_and_has_required_elohim_roles() -> Result<()> {
         })
         .map(|r| r.name.as_str())
         .collect();
+    let expected_deferred: Vec<&str> = vec![];
     assert_eq!(
-        deferred_roles,
-        vec!["hrea"],
-        "expected exactly one deferred role (hrea); got: {deferred_roles:?}"
+        deferred_roles, expected_deferred,
+        "no role should be deferred while hrea is commented out; got: {deferred_roles:?}"
     );
 
     Ok(())

@@ -93,19 +93,30 @@ roles:
   # Lynn Foster's canonical hREA (h-REA/hREA). Pinned to a specific upstream
   # release; bundle fetched out-of-band into ../hrea/workdir/hrea.dna.
   # See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+  #
   # version_pin: 0.0.0  <-- update when first real version is pinned
-  # NOTE: network_seed below is the elohim-overlay DHT partition for our
-  # hREA cells — it has no relationship to hREA's upstream network seed.
-  # Our per-human hREA cells live in this partition; they are NOT joined
-  # to any public hREA network.
-  - name: hrea
-    provisioning:
-      strategy: create
-      deferred: true   # cells provisioned lazily in M2 (VFBinding handshake)
-    dna:
-      path: "../hrea/workdir/hrea.dna"
-      modifiers:
-        network_seed: "elohim_hrea_alpha"
-        properties: ~
-      installed_hash: ~
-      clone_limit: 0
+  #
+  # NOTE: network_seed (when re-enabled) is the elohim-overlay DHT partition
+  # for our hREA cells — it has no relationship to hREA's upstream network
+  # seed. Our per-human hREA cells live in this partition; they are NOT
+  # joined to any public hREA network.
+  #
+  # ──────────────────────────────────────────────────────────────────────
+  # ROLE COMMENTED OUT until version_pin is set to a real hREA release.
+  # `hc app pack` canonicalizes every `dna.path` at build time, even for
+  # `deferred: true` roles, so referencing the missing ../hrea/workdir/hrea.dna
+  # bundle breaks the elohim-holochain pipeline (see #1249–#1253). Once a
+  # real version is pinned AND the Jenkinsfile fetches the bundle (or it's
+  # cached at the agent level), uncomment the role definition below.
+  # ──────────────────────────────────────────────────────────────────────
+  # - name: hrea
+  #   provisioning:
+  #     strategy: create
+  #     deferred: true   # cells provisioned lazily in M2 (VFBinding handshake)
+  #   dna:
+  #     path: "../hrea/workdir/hrea.dna"
+  #     modifiers:
+  #       network_seed: "elohim_hrea_alpha"
+  #       properties: ~
+  #     installed_hash: ~
+  #     clone_limit: 0
