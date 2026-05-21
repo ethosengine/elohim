@@ -200,6 +200,29 @@ spec:
             }
         }
 
+        stage('Smoke-Test Stories') {
+            // Drive @storybook/test-runner (Playwright) against the just-built
+            // static bundle. Catches per-story runtime errors that Vite's
+            // bundle step cannot — notably the "Cannot destructure property
+            // 'id' of 'e' as it is undefined" class where every story chunk
+            // gets reduced to an empty `__namedExportsOrder` shell. Without
+            // this stage that failure mode rides all the way to the deployed
+            // storybook.elohim.host before a human notices.
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+                        cd app/elohim-library
+                        # `pnpm exec playwright install chromium` inside the
+                        # script is idempotent — first build downloads the
+                        # browser (~112MB), subsequent builds reuse the cache.
+                        pnpm run test-storybook:ci
+                    '''
+                }
+            }
+        }
+
         stage('Build Image') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {

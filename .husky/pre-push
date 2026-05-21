@@ -460,6 +460,17 @@ run_gate() {
         echo "[$PROJECT_NAME] Running Storybook 10 build (validates .storybook config + story discovery + index)..."
         pnpm run build-storybook 2>&1
         rc=$?
+        # Per-story runtime smoke pass via @storybook/test-runner. The build
+        # step above only checks that the static bundle compiles and that
+        # index.json gets emitted; it can NOT see that every story crashes
+        # with "Cannot destructure property 'id' of 'e' as it is undefined"
+        # in `processCSFFileWithCache`. test-runner drives chromium through
+        # every entry in index.json and asserts each one renders.
+        if [ "$rc" -eq 0 ]; then
+          echo "[$PROJECT_NAME] Smoke-testing every story via @storybook/test-runner..."
+          pnpm run test-storybook:ci 2>&1
+          rc=$?
+        fi
         ;;
       genesis)
         python3 genesis/scripts/validate-human-ids.py 2>&1 && \
