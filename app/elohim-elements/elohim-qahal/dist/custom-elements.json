@@ -254,6 +254,117 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-provenance-marker.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Provenance marker — symbol denoting which substrate category an item belongs to.\n\nUsed in the resource list sidebar to distinguish protocol-panel, curated EPR,\ninstalled-applet, and external-hyperlink items at a glance.",
+          "name": "ElohimQahalProvenanceMarker",
+          "members": [
+            {
+              "kind": "field",
+              "name": "category",
+              "type": {
+                "text": "ProvenanceCategory"
+              },
+              "default": "'protocol-panel'",
+              "attribute": "category",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "offline",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "attribute": "offline",
+              "reflects": true
+            }
+          ],
+          "attributes": [
+            {
+              "type": {
+                "text": "ProvenanceCategory"
+              },
+              "description": "The provenance category (protocol-panel | curated-epr | installed-applet | external-hyperlink)",
+              "name": "category",
+              "default": "'protocol-panel'",
+              "fieldName": "category"
+            },
+            {
+              "type": {
+                "text": "boolean"
+              },
+              "description": "When true, render in greyed-out style (applicable to external-hyperlink)",
+              "name": "offline",
+              "default": "false",
+              "fieldName": "offline"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-provenance-marker",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalProvenanceMarker",
+          "declaration": {
+            "name": "ElohimQahalProvenanceMarker",
+            "module": "src/elohim-qahal-provenance-marker.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-standing-ring.ts",
       "declarations": [
         {
