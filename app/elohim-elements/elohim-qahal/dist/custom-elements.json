@@ -122,7 +122,7 @@
             ],
             "standings": {
               "required": [
-                "visitor | engaged | contributor | steward | elohim-support"
+                "visitor | engaged | contributor | steward"
               ]
             },
             "contentCertainty": "observed-private",

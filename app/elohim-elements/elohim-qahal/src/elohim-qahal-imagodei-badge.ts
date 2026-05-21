@@ -24,7 +24,7 @@ export type StandingTier = 'visitor' | 'engaged' | 'contributor' | 'steward';
  * @capabilityLocales en
  * @capabilityMaxStimulus still
  * @capabilityTextuality textual, symbolic
- * @capabilityRequiredStandings visitor | engaged | contributor | steward | elohim-support
+ * @capabilityRequiredStandings visitor | engaged | contributor | steward
  * @capabilityContentCertainty observed-private
  * @capabilityStates empty:supported, loading:supported, error:supported, stale:supported, contested:n/a, offline:supported, unauthorized:supported
  */
@@ -37,8 +37,8 @@ export class ElohimQahalImagodeiBadge extends CapabilityAwareElement(LitElement)
     }
 
     .avatar {
-      width: var(--elohim-qahal-imagodei-badge-size, 1.5rem);
-      height: var(--elohim-qahal-imagodei-badge-size, 1.5rem);
+      inline-size: var(--elohim-qahal-imagodei-badge-size, 1.5rem);
+      block-size: var(--elohim-qahal-imagodei-badge-size, 1.5rem);
       border-radius: 50%;
       background: var(--elohim-color-surface-2, #eee);
       display: inline-flex;
@@ -51,8 +51,8 @@ export class ElohimQahalImagodeiBadge extends CapabilityAwareElement(LitElement)
     }
 
     .avatar img {
-      width: 100%;
-      height: 100%;
+      inline-size: 100%;
+      block-size: 100%;
       border-radius: 50%;
       object-fit: cover;
     }
