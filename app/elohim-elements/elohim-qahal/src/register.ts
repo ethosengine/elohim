@@ -8,12 +8,12 @@ import { ElohimQahalImagodeiBadge } from './elohim-qahal-imagodei-badge.js';
 import { ElohimQahalProvenanceMarker } from './elohim-qahal-provenance-marker.js';
 import { ElohimQahalStandingRing } from './elohim-qahal-standing-ring.js';
 
-if (!customElements.get('elohim-qahal-care-economy-marker')) {
-  customElements.define('elohim-qahal-care-economy-marker', ElohimQahalCareEconomyMarker);
-}
-
 if (!customElements.get('elohim-qahal-capability-tier-chip')) {
   customElements.define('elohim-qahal-capability-tier-chip', ElohimQahalCapabilityTierChip);
+}
+
+if (!customElements.get('elohim-qahal-care-economy-marker')) {
+  customElements.define('elohim-qahal-care-economy-marker', ElohimQahalCareEconomyMarker);
 }
 
 if (!customElements.get('elohim-qahal-imagodei-badge')) {

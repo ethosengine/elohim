@@ -29,8 +29,8 @@ const LABELS: Record<ProvenanceCategory, string> = {
  * installed-applet, and external-hyperlink items at a glance.
  *
  * @element elohim-qahal-provenance-marker
- * @attr {string} category - The provenance category (protocol-panel | curated-epr | installed-applet | external-hyperlink)
- * @attr {boolean} offline - When true, render in greyed-out style (applicable to external-hyperlink)
+ * @prop {string} category - The provenance category (protocol-panel | curated-epr | installed-applet | external-hyperlink)
+ * @prop {boolean} offline - When true, render in greyed-out style (applicable to external-hyperlink)
  *
  * @capabilityMaxLens standard
  * @capabilityThemes light, dark

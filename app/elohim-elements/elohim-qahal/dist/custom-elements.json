@@ -378,9 +378,10 @@
               "kind": "field",
               "name": "category",
               "type": {
-                "text": "ProvenanceCategory"
+                "text": "string"
               },
               "default": "'protocol-panel'",
+              "description": "The provenance category (protocol-panel | curated-epr | installed-applet | external-hyperlink)",
               "attribute": "category",
               "reflects": true
             },
@@ -391,27 +392,28 @@
                 "text": "boolean"
               },
               "default": "false",
+              "description": "When true, render in greyed-out style (applicable to external-hyperlink)",
               "attribute": "offline",
               "reflects": true
             }
           ],
           "attributes": [
             {
-              "type": {
-                "text": "ProvenanceCategory"
-              },
-              "description": "The provenance category (protocol-panel | curated-epr | installed-applet | external-hyperlink)",
               "name": "category",
+              "type": {
+                "text": "string"
+              },
               "default": "'protocol-panel'",
+              "description": "The provenance category (protocol-panel | curated-epr | installed-applet | external-hyperlink)",
               "fieldName": "category"
             },
             {
+              "name": "offline",
               "type": {
                 "text": "boolean"
               },
-              "description": "When true, render in greyed-out style (applicable to external-hyperlink)",
-              "name": "offline",
               "default": "false",
+              "description": "When true, render in greyed-out style (applicable to external-hyperlink)",
               "fieldName": "offline"
             }
           ],

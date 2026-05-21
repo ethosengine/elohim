@@ -63,3 +63,9 @@ Protected-tier marking is applied in `willUpdate` (not `render`) so the
 exercise tier-change transitions must use `elementUpdated` from
 `@open-wc/testing` to await the Lit update cycle after mutating a property
 on a live element.
+
+---
+
+## JSDoc tag convention
+
+Capability JSDoc uses `@prop` (not `@attr`) for all `@property`-decorated Lit fields. `@attr` is reserved for HTML-spec attributes that are NOT mapped via a Lit `@property` decorator. The canonical reference is `app/elohim-elements/elohim-core/src/elohim-button.ts`.
