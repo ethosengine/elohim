@@ -2,13 +2,76 @@
   "name": "elohim-qahal",
   "version": "0.0.0",
   "private": true,
-  "sideEffects": false,
-  "description": "Community pillar styles — governance, affinity, consent.",
+  "type": "module",
+  "sideEffects": [
+    "./src/register.ts",
+    "./dist/register.js",
+    "*.css",
+    "*.scss"
+  ],
+  "description": "Community pillar — Qahal homepage elements: chrome, panels, resource list.",
   "style": "./index.scss",
   "sass": "./index.scss",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "customElements": "./dist/custom-elements.json",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./register": {
+      "import": "./dist/register.js",
+      "types": "./dist/register.d.ts"
+    },
+    "./tokens.scss": "./tokens.scss"
+  },
   "files": [
+    "dist",
     "*.scss",
-    "**/*.scss",
     "README.md"
-  ]
+  ],
+  "scripts": {
+    "analyze": "cem analyze --config custom-elements-manifest.config.mjs",
+    "build": "vite build && cem analyze --config custom-elements-manifest.config.mjs",
+    "dev": "vite build --watch",
+    "test": "wtr",
+    "format": "prettier --config ../.prettierrc.js --ignore-path ../.prettierignore --write \"src/**/*.ts\" \"*.scss\"",
+    "format:check": "prettier --config ../.prettierrc.js --ignore-path ../.prettierignore --check \"src/**/*.ts\" \"*.scss\"",
+    "lint": "eslint --config ../eslint.config.js src",
+    "lint:css": "stylelint --config ../.stylelintrc.json --ignore-path ../.stylelintignore \"src/**/*.{ts,scss}\" \"*.scss\"",
+    "lint:fix": "eslint --config ../eslint.config.js src --fix",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lit": "^3.2.1",
+    "elohim-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@custom-elements-manifest/analyzer": "^0.10.4",
+    "@eslint/js": "^9.39.2",
+    "@open-wc/testing": "^4.0.0",
+    "@web/dev-server-esbuild": "^1.0.4",
+    "@web/test-runner": "^0.20.0",
+    "@web/test-runner-playwright": "^0.11.0",
+    "axe-core": "^4.10.2",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-lit": "^2.1.1",
+    "eslint-plugin-lit-a11y": "^4.1.4",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-sonarjs": "^3.0.5",
+    "eslint-plugin-unicorn": "^62.0.0",
+    "eslint-plugin-wc": "^3.0.1",
+    "postcss-lit": "^1.2.0",
+    "prettier": "^3.8.1",
+    "stylelint": "^16.10.0",
+    "stylelint-config-standard": "^36.0.1",
+    "stylelint-config-standard-scss": "^14.0.0",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.16.0",
+    "vite": "^6.0.0",
+    "vite-plugin-dts": "^4.5.0"
+  }
 }
