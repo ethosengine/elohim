@@ -73,6 +73,7 @@ RUN sed -i \
     -e 's|chrono.workspace = true|chrono = { version = "0.4", features = ["serde"] }|' \
     -e 's|uuid.workspace = true|uuid = { version = "1.16", features = ["v4", "serde"] }|' \
     -e 's|ts-rs = { workspace = true, optional = true }|ts-rs = { version = "10.0", optional = true }|' \
+    -e 's|tokio-test = { workspace = true }|tokio-test = "0.4"|' \
     constitution/Cargo.toml
 
 # elohim-epr crate uses workspace inheritance too — inline the values.
