@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing';
+import { elementUpdated, expect, fixture, html } from '@open-wc/testing';
 import axe from 'axe-core';
 import {
   clearMediaQueries,
@@ -62,6 +62,34 @@ describe('<elohim-qahal-capability-tier-chip>', () => {
     `);
     expect(el.getAttribute('protected')).to.be.null;
     expect(el.shadowRoot!.textContent).to.include('unknown tier');
+  });
+
+  it('removes protected attribute when tier changes from protected to standard', async () => {
+    const el = await fixture<ElohimQahalCapabilityTierChip>(html`
+      <elohim-qahal-capability-tier-chip tier="child"></elohim-qahal-capability-tier-chip>
+    `);
+    expect(el.getAttribute('protected')).to.not.be.null;
+    el.tier = 'steward';
+    await elementUpdated(el);
+    expect(el.getAttribute('protected')).to.be.null;
+  });
+
+  it('retains protected attribute when switching between two protected tiers', async () => {
+    const el = await fixture<ElohimQahalCapabilityTierChip>(html`
+      <elohim-qahal-capability-tier-chip tier="child"></elohim-qahal-capability-tier-chip>
+    `);
+    expect(el.getAttribute('protected')).to.not.be.null;
+    el.tier = 'idd_member';
+    await elementUpdated(el);
+    expect(el.getAttribute('protected')).to.not.be.null;
+  });
+
+  it('renders with no attributes as visitor tier without protected attr', async () => {
+    const el = await fixture<ElohimQahalCapabilityTierChip>(html`
+      <elohim-qahal-capability-tier-chip></elohim-qahal-capability-tier-chip>
+    `);
+    expect(el.tier).to.equal('visitor');
+    expect(el.getAttribute('protected')).to.be.null;
   });
 
   it('passes axe accessibility audit', async () => {
