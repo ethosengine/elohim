@@ -20,9 +20,9 @@ export interface DistributionDetails {
    */
   projectorIdentities: ProjectorIdentity[];
   /**
-   * Open-shape placement-gap records describing missing target capacity. Schema kept loose during the lit-up topology bring-up; will graduate to a dedicated schema when stable.
+   * Concrete placement gaps for this content; empty if fully placed.
    */
-  placementGaps: Record<string, unknown>[];
+  placementGaps: PlacementGapRow[];
   /**
    * Recent rea projection-event records relevant to this CID. Open-shape during bring-up.
    */
@@ -137,4 +137,25 @@ export interface ProjectorIdentity {
    * Coarse region tier of the doorway, when known.
    */
   regionTier?: string;
+}
+/**
+ * Source of truth: peer_blob_inventory (gossip-synced operational truth) + peer-identity bindings (DHT Category-A) + declared reach class on EPR head (DHT Category-A). Hub-abstract: kind enum stays substrate-agnostic; classification of which hub kind (dwelling/collective/computed) is the gap happens at the projection layer in ResilienceHubView. Operational Category C — no DHT entry.
+ */
+export interface PlacementGapRow {
+  /**
+   * Which diversity/redundancy axis fell short. hub_diversity is hub-kind-agnostic; concrete hub kinds (dwelling/collective/computed) appear in ResilienceHubView per C2.
+   */
+  kind: 'hub_diversity' | 'replica_count' | 'reach_class';
+  contentId: string;
+  /**
+   * Concrete delta: target vs observed
+   */
+  shortfall: {
+    target: number;
+    observed: number;
+  };
+  /**
+   * Optional hint about what action would close the gap
+   */
+  remediation?: string | null;
 }

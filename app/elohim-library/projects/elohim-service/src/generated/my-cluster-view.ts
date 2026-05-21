@@ -30,6 +30,10 @@ export interface MyClusterView {
     hostingCount?: number;
     projectingCount?: number;
     beaconAgeMs?: number;
+    /**
+     * Three-number compute picture for this device (free/used/stewarded bytes).
+     */
+    compute?: null | ComputeTriptych;
   }[];
   /**
    * Aggregated totals across all devices in the cluster.
@@ -66,6 +70,23 @@ export interface Freshness {
    * Milliseconds since the last fresh signal, when state != live.
    */
   staleSinceMs?: number;
+}
+/**
+ * Source of truth: computed projection over system_metrics (free/used — Category C operational from infrastructure:system-sample observations) and rea_commitments (stewarded — Category A notarized custody-blob commitments). Reconstructed per request; not persisted.
+ */
+export interface ComputeTriptych {
+  /**
+   * Bytes available on device blob filesystem (capacity - used)
+   */
+  free: number | null;
+  /**
+   * Bytes occupied by blob storage on device
+   */
+  used: number | null;
+  /**
+   * Bytes committed via rea_commitments where this peer is provider (action=custody-blob)
+   */
+  stewarded: number | null;
 }
 /**
  * Overall cluster freshness — worst-of-devices when any device is offline, live when all live.
