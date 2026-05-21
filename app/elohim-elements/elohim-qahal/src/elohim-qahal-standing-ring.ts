@@ -35,6 +35,7 @@ export class ElohimQahalStandingRing extends CapabilityAwareElement(LitElement) 
     [role='img'] {
       font-family: monospace;
       letter-spacing: -0.1em;
+      white-space: nowrap;
       color: var(--elohim-color-fg-2, #555);
     }
   `;
@@ -43,7 +44,8 @@ export class ElohimQahalStandingRing extends CapabilityAwareElement(LitElement) 
   bloomTier: BloomTier = 'remember';
 
   override render() {
-    const idx = TIERS.indexOf(this.bloomTier) + 1;
+    const found = TIERS.indexOf(this.bloomTier);
+    const idx = found === -1 ? 1 : found + 1;
     const filled = '●'.repeat(idx);
     const empty = '○'.repeat(6 - idx);
     return html`

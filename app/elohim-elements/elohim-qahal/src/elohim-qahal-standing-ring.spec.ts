@@ -33,9 +33,17 @@ describe('<elohim-qahal-standing-ring>', () => {
     const el = await fixture<ElohimQahalStandingRing>(html`
       <elohim-qahal-standing-ring bloom-tier="apply"></elohim-qahal-standing-ring>
     `);
-    expect(el.shadowRoot!.querySelector('[role="img"]')?.getAttribute('aria-label')).to.include(
-      'apply'
+    expect(el.shadowRoot!.querySelector('[role="img"]')?.getAttribute('aria-label')).to.equal(
+      'Bloom tier: apply (3 of 6)'
     );
+  });
+
+  it('falls back to 1 filled dot when bloom-tier is not a known tier', async () => {
+    const el = await fixture<ElohimQahalStandingRing>(html`
+      <elohim-qahal-standing-ring bloom-tier="mastery"></elohim-qahal-standing-ring>
+    `);
+    const trimmed = (el.shadowRoot!.querySelector('[role="img"]')?.textContent ?? '').trim();
+    expect(trimmed).to.equal('●○○○○○');
   });
 
   it('renders correct filled/empty dot count for each tier', async () => {
