@@ -895,7 +895,6 @@ async fn list_epr(
     }))
 }
 
-
 // ---------------------------------------------------------------------------
 // GET /api/v1/epr/:cid/nav-context
 // ---------------------------------------------------------------------------
@@ -911,7 +910,10 @@ async fn get_nav_context(
     // Reach check on the focal atom: load directly to check reach before
     // delegating to the projection service.
     let store = crate::services::epr_store::default_epr_store(
-        None, None, None, ctx.local_libp2p_peer_id.clone(),
+        None,
+        None,
+        None,
+        ctx.local_libp2p_peer_id.clone(),
     );
     if let Some(outcome) = store.fetch(&mut conn, cid)? {
         if !reach_visible_to(&outcome.fetched.atom.reach, &req) {

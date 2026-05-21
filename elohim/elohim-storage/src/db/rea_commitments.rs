@@ -419,7 +419,10 @@ mod operator_helper_tests {
     fn doorway_scope_produces_canonical_json_array() {
         // Single-element JSON array per operator-classification.schema.json
         // scopes pattern. The composite index relies on this exact encoding.
-        assert_eq!(doorway_scope("alpha-elohim-host"), r#"["doorway:alpha-elohim-host"]"#);
+        assert_eq!(
+            doorway_scope("alpha-elohim-host"),
+            r#"["doorway:alpha-elohim-host"]"#
+        );
     }
 
     #[test]

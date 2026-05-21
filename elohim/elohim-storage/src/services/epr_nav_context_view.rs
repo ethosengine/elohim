@@ -20,9 +20,7 @@
 
 use diesel::prelude::*;
 
-use crate::db::epr_atoms::{
-    self, EprCouplingRow, EprClaimRow,
-};
+use crate::db::epr_atoms::{self, EprClaimRow, EprCouplingRow};
 use crate::error::StorageError;
 use crate::views::{EprNavContextView, EprNavRef};
 
@@ -46,10 +44,7 @@ fn reach_to_resilience_tier(reach: &str) -> &'static str {
 /// Build an `EprNavRef` for a CID. Attempts a local lookup to enrich with
 /// label (schema_key) and resilience tier. Returns a bare CID ref when the
 /// atom is not held locally.
-fn nav_ref_for_cid(
-    conn: &mut SqliteConnection,
-    cid: &str,
-) -> Result<EprNavRef, StorageError> {
+fn nav_ref_for_cid(conn: &mut SqliteConnection, cid: &str) -> Result<EprNavRef, StorageError> {
     match epr_atoms::fetch_atom_by_cid(conn, cid)
         .map_err(|e| StorageError::Database(e.to_string()))?
     {
@@ -112,13 +107,11 @@ pub fn project(
     };
 
     // 4. related — outbound coupling targets + claim CIDs.
-    let coupling_rows: Vec<EprCouplingRow> =
-        epr_atoms::fetch_coupling_for_atom(conn, cid)
-            .map_err(|e| StorageError::Database(e.to_string()))?;
+    let coupling_rows: Vec<EprCouplingRow> = epr_atoms::fetch_coupling_for_atom(conn, cid)
+        .map_err(|e| StorageError::Database(e.to_string()))?;
 
-    let claim_rows: Vec<EprClaimRow> =
-        epr_atoms::fetch_claims_for_atom(conn, cid)
-            .map_err(|e| StorageError::Database(e.to_string()))?;
+    let claim_rows: Vec<EprClaimRow> = epr_atoms::fetch_claims_for_atom(conn, cid)
+        .map_err(|e| StorageError::Database(e.to_string()))?;
 
     let mut related: Vec<EprNavRef> = Vec::new();
     if !coupling_rows.is_empty() {
@@ -135,9 +128,8 @@ pub fn project(
     }
 
     // 5. part_of — atoms that couple TO this one (reverse coupling).
-    let reverse_rows: Vec<EprCouplingRow> =
-        epr_atoms::fetch_reverse_coupling(conn, cid)
-            .map_err(|e| StorageError::Database(e.to_string()))?;
+    let reverse_rows: Vec<EprCouplingRow> = epr_atoms::fetch_reverse_coupling(conn, cid)
+        .map_err(|e| StorageError::Database(e.to_string()))?;
 
     let mut part_of: Vec<EprNavRef> = Vec::new();
     if !reverse_rows.is_empty() {

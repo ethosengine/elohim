@@ -37,9 +37,9 @@ pub mod economic_event_service;
 pub mod elohim_gate;
 pub mod epr_compose;
 pub mod epr_kind;
+pub mod epr_nav_context_view; // Category C read-only projection for nav-context endpoint
 pub mod epr_service;
 pub mod epr_store;
-pub mod epr_nav_context_view; // Category C read-only projection for nav-context endpoint
 pub mod events;
 pub mod exchange_service;
 pub mod federator;
@@ -67,9 +67,9 @@ pub mod reciprocity_view;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
 pub mod relationship_service;
+pub mod resilience; // C2 — hub projection for /api/v1/resilience/{id}/hub
 pub mod resource_nature;
 pub mod resource_service;
-pub mod resilience; // C2 — hub projection for /api/v1/resilience/{id}/hub
 pub mod response;
 pub mod responsibility_demand_service;
 pub mod risk_alert;

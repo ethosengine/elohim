@@ -55,7 +55,9 @@ impl From<TranslationPoint> for NewTranslationObservation {
             observed_at: p.at_iso,
             // u64 → i64. Block heights below 2^63 are safe; above that is far beyond
             // any realistic chain. Saturate on overflow rather than panic.
-            block_height: p.at_block_height.map(|h| i64::try_from(h).unwrap_or(i64::MAX)),
+            block_height: p
+                .at_block_height
+                .map(|h| i64::try_from(h).unwrap_or(i64::MAX)),
             direction: p.direction.as_ledger_str().to_string(),
             vf_type: p.vf_type,
             elohim_source: p.elohim_source,

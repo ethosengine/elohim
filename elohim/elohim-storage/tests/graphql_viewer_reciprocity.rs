@@ -106,11 +106,17 @@ async fn reciprocity_no_bindings_returns_empty_ledger() {
     let reciprocity = &viewer["reciprocity"];
     assert_eq!(reciprocity["agentCid"], "agent_reciprocity_empty");
     assert!(
-        reciprocity["inflow"].as_array().expect("inflow array").is_empty(),
+        reciprocity["inflow"]
+            .as_array()
+            .expect("inflow array")
+            .is_empty(),
         "expected empty inflow"
     );
     assert!(
-        reciprocity["outflow"].as_array().expect("outflow array").is_empty(),
+        reciprocity["outflow"]
+            .as_array()
+            .expect("outflow array")
+            .is_empty(),
         "expected empty outflow"
     );
     // u64/i64 surface as stringified for JS precision safety.
@@ -175,7 +181,10 @@ async fn reciprocity_with_binding_no_commitments_returns_empty_ledger() {
         "no commitments seeded — inflow must be empty"
     );
     assert!(
-        reciprocity["outflow"].as_array().expect("outflow").is_empty(),
+        reciprocity["outflow"]
+            .as_array()
+            .expect("outflow")
+            .is_empty(),
         "no commitments seeded — outflow must be empty"
     );
     assert_eq!(reciprocity["netHostedBytes"], "0");

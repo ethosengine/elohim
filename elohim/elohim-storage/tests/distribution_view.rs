@@ -700,10 +700,7 @@ fn seed_human_with_household(
 
 /// Seed a single peer into `peer_blob_inventory` with no identity binding.
 /// The peer will be classified as a single `Computed` hub → 1 hub < 2 target → gap emitted.
-async fn seed_content_with_single_hub(
-    pool: &elohim_storage::db::DbPool,
-    blob_hash: &str,
-) {
+async fn seed_content_with_single_hub(pool: &elohim_storage::db::DbPool, blob_hash: &str) {
     let mut conn = pool.get().unwrap();
     seed_content_with_reach(&mut conn, blob_hash, "community");
     // One peer, no binding → hub_summary returns one Computed hub.

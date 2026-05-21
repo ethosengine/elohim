@@ -197,8 +197,8 @@ fn resilience_hub_endpoint_handles_single_device_hub() {
     insert_inventory(&mut conn, peer_id, blob_hash);
     drop(conn);
 
-    let hubs = resilience::hub_summary(&pool, &ctx, blob_hash)
-        .expect("hub_summary should not error");
+    let hubs =
+        resilience::hub_summary(&pool, &ctx, blob_hash).expect("hub_summary should not error");
 
     assert_eq!(hubs.len(), 1, "expected exactly one hub");
     assert_eq!(hubs[0].hub_id, peer_id, "hub_id should be peer_id");
@@ -247,8 +247,8 @@ fn resilience_hub_endpoint_returns_polymorphic_hubs() {
 
     drop(conn);
 
-    let hubs = resilience::hub_summary(&pool, &ctx, blob_hash)
-        .expect("hub_summary should not error");
+    let hubs =
+        resilience::hub_summary(&pool, &ctx, blob_hash).expect("hub_summary should not error");
 
     // We expect two distinct hub entries: one Dwelling (household-alpha) and one Computed (peer_b)
     assert_eq!(hubs.len(), 2, "expected 2 hubs (dwelling + computed)");
@@ -268,7 +268,10 @@ fn resilience_hub_endpoint_returns_polymorphic_hubs() {
     );
 
     let d = dwelling.unwrap();
-    assert_eq!(d.hub_id, household_a, "dwelling hub_id must be household_id");
+    assert_eq!(
+        d.hub_id, household_a,
+        "dwelling hub_id must be household_id"
+    );
     assert_eq!(d.replica_count, 1);
 
     let c = computed.unwrap();
@@ -320,15 +323,12 @@ fn resilience_hub_peer_with_collective_participation_is_collective() {
     insert_collective_participation(&mut conn, human_c, collective_c);
     drop(conn);
 
-    let hubs = resilience::hub_summary(&pool, &ctx, blob_hash)
-        .expect("hub_summary should not error");
+    let hubs =
+        resilience::hub_summary(&pool, &ctx, blob_hash).expect("hub_summary should not error");
 
     assert_eq!(hubs.len(), 1, "expected exactly one hub");
     assert_eq!(hubs[0].kind, HubKind::Collective, "kind must be collective");
-    assert_eq!(
-        hubs[0].hub_id, collective_c,
-        "hub_id must be collective_id"
-    );
+    assert_eq!(hubs[0].hub_id, collective_c, "hub_id must be collective_id");
     assert_eq!(hubs[0].replica_count, 1);
 
     // Wire-format
@@ -362,8 +362,8 @@ fn resilience_hub_same_household_grouped_with_summed_replica_count() {
     }
     drop(conn);
 
-    let hubs = resilience::hub_summary(&pool, &ctx, blob_hash)
-        .expect("hub_summary should not error");
+    let hubs =
+        resilience::hub_summary(&pool, &ctx, blob_hash).expect("hub_summary should not error");
 
     assert_eq!(hubs.len(), 1, "all three peers in same household → one hub");
     assert_eq!(hubs[0].kind, HubKind::Dwelling);

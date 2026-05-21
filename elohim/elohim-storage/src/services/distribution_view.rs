@@ -462,8 +462,7 @@ fn load_placement_gaps_for(
     // the hub classification queries are not yet app-id-filtered.
     let ctx = AppContext::default_lamad();
 
-    let hubs = crate::services::resilience::hub_summary(pool, &ctx, blob_hash)
-        .unwrap_or_default(); // permissive: lookup failure → treat as zero hubs
+    let hubs = crate::services::resilience::hub_summary(pool, &ctx, blob_hash).unwrap_or_default(); // permissive: lookup failure → treat as zero hubs
 
     let observed = hubs.len() as i32;
     let mut gaps = Vec::new();

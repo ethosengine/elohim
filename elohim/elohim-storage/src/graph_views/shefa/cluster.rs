@@ -49,10 +49,10 @@ pub fn build(engine: &GraphEngine, agent_cid: &str) -> Result<MyClusterView, Gra
                 projecting_count: None,
                 beacon_age_ms: None,
                 compute: None, // Left None (A3-followup): this is the graph-native branch whose
-                              // build() signature takes only &GraphEngine — no DbPool in scope.
-                              // Populating stewarded requires a DbPool for the REA ledger query;
-                              // that composition belongs in a follow-up that threads DbPool into
-                              // this path or merges the graph and federated paths upstream.
+                               // build() signature takes only &GraphEngine — no DbPool in scope.
+                               // Populating stewarded requires a DbPool for the REA ledger query;
+                               // that composition belongs in a follow-up that threads DbPool into
+                               // this path or merges the graph and federated paths upstream.
             }
         })
         .collect();

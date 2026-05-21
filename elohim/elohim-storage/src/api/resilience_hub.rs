@@ -47,9 +47,7 @@ pub async fn handle(
                 error = %e,
                 "resilience hub projection failed"
             );
-            Ok(response::internal_error(&format!(
-                "resilience hub: {e}"
-            )))
+            Ok(response::internal_error(&format!("resilience hub: {e}")))
         }
     }
 }

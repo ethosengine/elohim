@@ -106,11 +106,7 @@ pub fn hub_summary(
 
     let human_rows: Vec<(String, Option<String>, Option<String>)> = humans::table
         .filter(humans::agent_pub_key.eq_any(&agent_cids))
-        .select((
-            humans::id,
-            humans::agent_pub_key,
-            humans::household_id,
-        ))
+        .select((humans::id, humans::agent_pub_key, humans::household_id))
         .load::<(String, Option<String>, Option<String>)>(&mut conn)
         .map_err(|e| StorageError::Internal(format!("humans query: {e}")))?;
 
@@ -145,8 +141,7 @@ pub fn hub_summary(
 
     // human_id → collective_id (first active one wins; richer multi-collective
     // grouping is a follow-up when the UI can display it)
-    let human_to_collective: HashMap<String, String> =
-        collective_rows.into_iter().collect();
+    let human_to_collective: HashMap<String, String> = collective_rows.into_iter().collect();
 
     // -----------------------------------------------------------------------
     // Step 5: compute seconds-since-last-seen for each peer.
@@ -171,8 +166,7 @@ pub fn hub_summary(
     // -----------------------------------------------------------------------
 
     // hub_key → (kind, replica_count, earliest_last_seen_secs, display_label)
-    let mut hub_map: HashMap<String, (HubKind, i32, Option<i64>, Option<String>)> =
-        HashMap::new();
+    let mut hub_map: HashMap<String, (HubKind, i32, Option<i64>, Option<String>)> = HashMap::new();
 
     for (peer_id, last_seen_at, _seq) in &inventory_rows {
         let last_seen_secs = parse_iso8601_to_epoch_secs(last_seen_at);
@@ -198,14 +192,16 @@ pub fn hub_summary(
                 }
             } else {
                 // No identity binding for this peer — Computed (peer-of-one hub)
-                (peer_id.clone(), HubKind::Computed, label_from_peer_id(peer_id))
+                (
+                    peer_id.clone(),
+                    HubKind::Computed,
+                    label_from_peer_id(peer_id),
+                )
             };
 
-        let entry = hub_map
-            .entry(hub_key)
-            .or_insert((kind, 0, None, label));
+        let entry = hub_map.entry(hub_key).or_insert((kind, 0, None, label));
         entry.1 += 1; // increment replica_count
-        // Track the most recent last_seen (smallest seconds_ago value)
+                      // Track the most recent last_seen (smallest seconds_ago value)
         entry.2 = match (entry.2, seconds_ago) {
             (None, s) => s,
             (Some(existing), Some(new)) => Some(existing.min(new)),
@@ -257,20 +253,18 @@ fn parse_iso8601_to_epoch_secs(ts: &str) -> Option<i64> {
     if parts.len() != 2 {
         return None;
     }
-    let date_parts: Vec<u32> = parts[0]
-        .split('-')
-        .filter_map(|p| p.parse().ok())
-        .collect();
-    let time_parts: Vec<u32> = parts[1]
-        .split(':')
-        .filter_map(|p| p.parse().ok())
-        .collect();
+    let date_parts: Vec<u32> = parts[0].split('-').filter_map(|p| p.parse().ok()).collect();
+    let time_parts: Vec<u32> = parts[1].split(':').filter_map(|p| p.parse().ok()).collect();
     if date_parts.len() != 3 || time_parts.len() < 2 {
         return None;
     }
     // Simple Julian-day-to-epoch without external crate.
     // Good enough for "seconds since last seen" in the range of 2020–2040.
-    let (y, m, d) = (date_parts[0] as i64, date_parts[1] as i64, date_parts[2] as i64);
+    let (y, m, d) = (
+        date_parts[0] as i64,
+        date_parts[1] as i64,
+        date_parts[2] as i64,
+    );
     let (hh, mm, ss) = (
         time_parts[0] as i64,
         time_parts[1] as i64,

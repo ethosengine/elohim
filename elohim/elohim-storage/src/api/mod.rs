@@ -334,9 +334,7 @@ pub async fn handle_api_request(
         // that map to 4xx; this map_err must be updated at that boundary,
         // ideally by adding `impl From<BridgeError> for StorageError` in the
         // bridge crate so missing mappings fail at compile time.
-        let bridge_ctx = valueflows_bridge::BridgeContext {
-            pool: pool.clone(),
-        };
+        let bridge_ctx = valueflows_bridge::BridgeContext { pool: pool.clone() };
         valueflows_bridge::handle_request(req, bridge_ctx)
             .await
             .map_err(|e| StorageError::Internal(format!("vf-graphql bridge: {e}")))
