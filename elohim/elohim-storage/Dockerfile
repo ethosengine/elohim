@@ -72,6 +72,7 @@ RUN sed -i \
     -e 's|tracing.workspace = true|tracing = "0.1"|' \
     -e 's|chrono.workspace = true|chrono = { version = "0.4", features = ["serde"] }|' \
     -e 's|uuid.workspace = true|uuid = { version = "1.16", features = ["v4", "serde"] }|' \
+    -e 's|ts-rs = { workspace = true, optional = true }|ts-rs = { version = "10.0", optional = true }|' \
     constitution/Cargo.toml
 
 # elohim-epr crate uses workspace inheritance too — inline the values.
@@ -86,6 +87,14 @@ RUN sed -i \
     -e 's|ts-rs = { workspace = true, features = \["chrono-impl", "serde-compat"\] }|ts-rs = { version = "10.0", features = ["chrono-impl", "serde-compat"] }|' \
     -e 's|hex.workspace = true|hex = "0.4"|' \
     epr/Cargo.toml
+
+# elohim-compute crate uses workspace inheritance too — inline the values.
+RUN sed -i \
+    -e 's|serde = { workspace = true }|serde = { version = "1.0", features = ["derive"] }|' \
+    -e 's|serde_json = { workspace = true }|serde_json = "1.0"|' \
+    -e 's|dashmap = { workspace = true }|dashmap = "6.1"|' \
+    -e 's|chrono = { workspace = true }|chrono = { version = "0.4", features = ["serde"] }|' \
+    elohim-compute/Cargo.toml
 
 # Create dummy src + bench placeholders to build dependencies.
 # Any `[[bin]]`, `[[bench]]`, or `[[example]]` entry declared in Cargo.toml
