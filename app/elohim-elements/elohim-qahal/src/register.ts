@@ -2,8 +2,13 @@
 // Each element registers its tag here so consumers can `import 'elohim-qahal/register'`
 // to make all custom elements available.
 
+import { ElohimQahalCapabilityTierChip } from './elohim-qahal-capability-tier-chip.js';
 import { ElohimQahalImagodeiBadge } from './elohim-qahal-imagodei-badge.js';
 import { ElohimQahalStandingRing } from './elohim-qahal-standing-ring.js';
+
+if (!customElements.get('elohim-qahal-capability-tier-chip')) {
+  customElements.define('elohim-qahal-capability-tier-chip', ElohimQahalCapabilityTierChip);
+}
 
 if (!customElements.get('elohim-qahal-imagodei-badge')) {
   customElements.define('elohim-qahal-imagodei-badge', ElohimQahalImagodeiBadge);

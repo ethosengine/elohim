@@ -4,6 +4,109 @@
   "modules": [
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-capability-tier-chip.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Capability tier chip — inline label for a tier with visual distinction for protected tiers.\n\nUsed for capability-gating affordances and protected-tier marking on imagodei profiles.",
+          "name": "ElohimQahalCapabilityTierChip",
+          "members": [
+            {
+              "kind": "field",
+              "name": "tier",
+              "type": {
+                "text": "CapabilityTier"
+              },
+              "default": "'visitor'",
+              "description": "The tier to display",
+              "attribute": "tier",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "label",
+              "type": {
+                "text": "string"
+              },
+              "privacy": "private",
+              "readonly": true
+            }
+          ],
+          "attributes": [
+            {
+              "name": "tier",
+              "type": {
+                "text": "CapabilityTier"
+              },
+              "default": "'visitor'",
+              "description": "The tier to display",
+              "fieldName": "tier"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-capability-tier-chip",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalCapabilityTierChip",
+          "declaration": {
+            "name": "ElohimQahalCapabilityTierChip",
+            "module": "src/elohim-qahal-capability-tier-chip.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-imagodei-badge.ts",
       "declarations": [
         {
