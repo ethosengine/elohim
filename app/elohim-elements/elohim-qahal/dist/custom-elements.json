@@ -148,6 +148,99 @@
           }
         }
       ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-standing-ring.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Standing ring — Bloom-tier dots indicating capability tier at a glance.\n\nRenders six dots (●●●○○○-style) showing the cumulative tier at the current Bloom level.\nUsed in member-ring drill-downs and standing-inspector panels.",
+          "name": "ElohimQahalStandingRing",
+          "members": [
+            {
+              "kind": "field",
+              "name": "bloomTier",
+              "type": {
+                "text": "BloomTier"
+              },
+              "default": "'remember'",
+              "description": "The tier to render (remember | understand | apply | analyze | evaluate | create)",
+              "attribute": "bloom-tier",
+              "reflects": true
+            }
+          ],
+          "attributes": [
+            {
+              "name": "bloom-tier",
+              "type": {
+                "text": "BloomTier"
+              },
+              "default": "'remember'",
+              "description": "The tier to render (remember | understand | apply | analyze | evaluate | create)",
+              "fieldName": "bloomTier"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-standing-ring",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalStandingRing",
+          "declaration": {
+            "name": "ElohimQahalStandingRing",
+            "module": "src/elohim-qahal-standing-ring.ts"
+          }
+        }
+      ]
     }
   ]
 }

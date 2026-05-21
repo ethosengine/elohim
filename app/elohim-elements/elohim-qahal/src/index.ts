@@ -4,3 +4,6 @@
 
 export { ElohimQahalImagodeiBadge } from './elohim-qahal-imagodei-badge.js';
 export type { StandingTier } from './elohim-qahal-imagodei-badge.js';
+
+export { ElohimQahalStandingRing } from './elohim-qahal-standing-ring.js';
+export type { BloomTier } from './elohim-qahal-standing-ring.js';
