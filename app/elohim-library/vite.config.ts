@@ -13,6 +13,7 @@ export default defineConfig({
       'src/**/*.spec.ts',
       'projects/elohim-service/src/resilience/**/*.spec.ts',
       'projects/elohim-service/src/distribution/**/*.spec.ts',
+      'projects/graphos/src/**/*.spec.ts',
     ],
     exclude: ['node_modules', 'dist'],
     pool: 'forks',
