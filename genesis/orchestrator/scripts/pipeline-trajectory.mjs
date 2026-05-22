@@ -26,7 +26,8 @@
  */
 
 import process from 'node:process';
-import { PIPELINES as PIPELINE_REGISTRY } from '../orchestrator-strategy.mjs';
+import { nonManualPipelines } from '../orchestrator-strategy.mjs';
+import { isSuccess, isFailure, isWasted } from '../pipeline-results.mjs';
 
 const JENKINS_URL = process.env.JENKINS_URL;
 if (!JENKINS_URL) {
@@ -48,9 +49,7 @@ function argFlag(name) {
 }
 const N = Number(argVal('--builds', '10'));
 const BRANCH = argVal('--branch', 'dev');
-const DEFAULT_PIPELINES = Object.keys(PIPELINE_REGISTRY)
-  .filter(k => !PIPELINE_REGISTRY[k].manualOnly)
-  .join(',');
+const DEFAULT_PIPELINES = nonManualPipelines().join(',');
 const PIPELINES = argVal('--pipelines', DEFAULT_PIPELINES).split(',').filter(Boolean);
 const EMIT_JSON = argFlag('--json');
 const COMPUTE_BASELINE_LAG = argFlag('--since-baseline');
@@ -220,7 +219,7 @@ async function main() {
         };
       });
       const completed = stream.filter(s => s.result != null);
-      const success = stream.filter(s => s.result === 'SUCCESS' || s.result === 'UNSTABLE').length;
+      const success = stream.filter(s => isSuccess(s.result)).length;
       return [
         job,
         {
@@ -238,7 +237,7 @@ async function main() {
   // Persistent failure: same pipeline FAILURE in M of last N completed.
   for (const [job, t] of Object.entries(trajectories)) {
     const completed = t.stream.filter(s => s.result != null);
-    const failures = completed.filter(s => s.result === 'FAILURE').length;
+    const failures = completed.filter(s => isFailure(s.result)).length;
     if (completed.length >= 3 && failures >= Math.ceil(completed.length / 2)) {
       patterns.push({
         kind: 'persistent-failure',
@@ -251,7 +250,7 @@ async function main() {
 
   // Supersede waste: ABORTED runs adjacent to short-duration runs.
   for (const [job, t] of Object.entries(trajectories)) {
-    const aborted = t.stream.filter(s => s.result === 'ABORTED').length;
+    const aborted = t.stream.filter(s => isWasted(s.result)).length;
     if (aborted >= 2) {
       patterns.push({
         kind: 'supersede-waste',
@@ -264,9 +263,7 @@ async function main() {
 
   // Orchestrator failure streak.
   const orchCompleted = rows.filter(r => r.result != null && r.result !== 'NOT_BUILT');
-  const orchSuccess = orchCompleted.filter(
-    r => r.result === 'SUCCESS' || r.result === 'UNSTABLE',
-  ).length;
+  const orchSuccess = orchCompleted.filter(r => isSuccess(r.result)).length;
   if (orchCompleted.length >= 3 && orchSuccess === 0) {
     patterns.push({
       kind: 'orchestrator-failure-streak',
