@@ -488,18 +488,26 @@ describe('DeviceStewardshipComponent', () => {
 
     it('should show stage progression chips', () => {
       const chips = fixture.nativeElement.querySelectorAll('.stage-chip');
+      // 4 progression stages: visitor → hosted → app-steward → node-steward.
+      // hosted-steward is a recovery mode (doorway-hosted conductor when the
+      // steward's device is offline), not a step on the upgrade ladder, so
+      // it does NOT render as a chip — see PROGRESSION_STAGES in agency.model.ts.
       expect(chips.length).toBe(4);
     });
 
     it('should highlight current stage', () => {
       const currentChip = fixture.nativeElement.querySelector('.stage-chip.current');
       expect(currentChip).toBeTruthy();
-      expect(currentChip.textContent).toContain('Hosted User');
+      // 'hosted' stage renders as "Hosted Visitor" — see AGENCY_STAGES.hosted.label.
+      // (Renamed from "Hosted User" in the agency-portal refactor.)
+      expect(currentChip.textContent).toContain('Hosted Visitor');
     });
 
     it('should highlight next stage', () => {
       const nextChip = fixture.nativeElement.querySelector('.stage-chip.next');
       expect(nextChip).toBeTruthy();
+      // getNextStage('hosted') skips the recovery-mode 'hosted-steward' and
+      // returns 'app-steward' — the next step on the progression ladder.
       expect(nextChip.textContent).toContain('App Steward');
     });
 

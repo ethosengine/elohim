@@ -4,7 +4,7 @@ import { RouterModule } from '@angular/router';
 
 // @coverage: 88.0% (2026-04-19)
 
-import { AGENCY_STAGES, getNextStage } from '@app/imagodei/models/agency.model';
+import { AGENCY_STAGES, PROGRESSION_STAGES, getNextStage } from '@app/imagodei/models/agency.model';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { getTriggerLabel, formatPoints } from '@app/lamad/models/learning-points.model';
 import { MasteryService } from '@app/lamad/services/mastery.service';
@@ -1080,7 +1080,12 @@ export class DeviceStewardshipComponent implements OnInit {
     return next ? AGENCY_STAGES[next] : null;
   });
 
-  readonly stageList = Object.values(AGENCY_STAGES);
+  // Stage progression chips. Uses PROGRESSION_STAGES (visitor → hosted →
+  // app-steward → node-steward), which excludes recovery modes like
+  // hosted-steward. hosted-steward is a fallback (doorway temporarily hosts
+  // conductor compute when a graduated steward's device is offline) — it is
+  // not a step on the upgrade ladder, so it doesn't render as a chip.
+  readonly stageList = PROGRESSION_STAGES;
 
   readonly agencyLabel = computed(() => {
     const stage = this.identityService.identity().agencyStage;

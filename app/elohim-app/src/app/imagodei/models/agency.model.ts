@@ -1,23 +1,54 @@
 /**
  * Agency Model - Human-centered autonomy representation.
  *
- * Philosophy:
- * - Make human agency visible and understandable
- * - Show users where their data lives and who controls it
- * - Provide clear upgrade paths for more autonomy
- * - Emphasize capacity to act within relational networks
+ * Stages have two roles:
+ *   1. **Progression stages** (visitor → hosted → app-steward → node-steward)
+ *      form the identity-authority graduation ladder. UI surfaces like the
+ *      stage-progression chips and `getNextStage()` walk this ladder.
+ *   2. **Recovery modes** (hosted-steward) name in-between states a steward
+ *      may temporarily occupy when their authoritative peer-native portal is
+ *      unreachable.
  *
- * Four-Stage Progression:
- * 1. Visitor - Browser session, anonymous, no persistence
- * 2. Hosted User - Custodial keys on server, full DHT participation
- * 3. App Steward - Local Holochain on device, intermittent connectivity
- * 4. Node Steward - Always-on infrastructure, full network participation
+ * Happy path when a graduated steward signs in through a doorway: the
+ * doorway handles routing and the elohim-storage captive-OAuth portal
+ * ceremony only — the DHT/conductor/agent compute happens on the steward's
+ * own device or home node, NOT the doorway. The session shows as
+ * `app-steward` (or `node-steward`). The doorway is purely a router/proxy
+ * in this case; the steward's peer-native portal is the identity provider
+ * end-to-end.
+ *
+ * Failover (hosted-steward) — recovery mode: when the steward's own device
+ * is unreachable, the doorway temporarily provides DHT/conductor compute
+ * for the steward (the same way it does for `hosted` users) so they can
+ * see their content (via DHT shards + resilient backups), register a new
+ * device, and restore reciprocal commitments. Identity authority still
+ * belongs to the steward's peer-native portal — the doorway is a relying
+ * party here, not an identity provider. Once the steward's portal/device
+ * comes back online, they return to `app-steward` or `node-steward`.
+ *
+ * Conductor-compute / identity-authority matrix:
+ *
+ *   | Stage          | Conductor compute     | Identity authority           |
+ *   |----------------|-----------------------|------------------------------|
+ *   | visitor        | none (session-only)   | none                         |
+ *   | hosted         | doorway               | doorway (IdP + relying party)|
+ *   | hosted-steward | doorway (recovery)    | steward's peer-native portal |
+ *   | app-steward    | steward's device      | steward's peer-native portal |
+ *   | node-steward   | steward's home node   | steward's peer-native portal |
+ *
+ * Recovery modes carry `isRecoveryMode: true` and are excluded from the
+ * progression ladder (chip display, `getNextStage()`).
+ *
+ * See genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
+ * and project_m5_reframe_auth_portal_convergence in memory.
  */
 
-/**
- * The four stages of human agency in data ownership within the Elohim network.
- */
-export type AgencyStage = 'visitor' | 'hosted' | 'app-steward' | 'node-steward';
+export type AgencyStage =
+  | 'visitor'
+  | 'hosted'
+  | 'hosted-steward'
+  | 'app-steward'
+  | 'node-steward';
 
 /**
  * Detailed information about each agency stage.
@@ -31,6 +62,17 @@ export interface AgencyStageInfo {
   benefits: string[];
   limitations: string[];
   order: number;
+  /**
+   * When true, this stage is a recovery / fallback mode rather than a step
+   * on the identity-authority progression ladder. The stage-progression UI
+   * skips recovery modes, and `getNextStage()` walks over them.
+   *
+   * Currently only `hosted-steward` carries this flag — it names the state
+   * of a graduated steward signing in through a doorway because their own
+   * device or node is unreachable. Authoritative identity still lives on
+   * the steward's peer-native portal.
+   */
+  isRecoveryMode?: boolean;
 }
 
 /**
@@ -165,10 +207,10 @@ export const AGENCY_STAGES: Record<AgencyStage, AgencyStageInfo> = {
 
   hosted: {
     stage: 'hosted',
-    label: 'Hosted User',
-    tagline: 'Keys held by Elohim',
+    label: 'Hosted Visitor',
+    tagline: 'A doorway holds your keys',
     description:
-      'Your identity and progress are stored securely on Elohim servers. Easy setup, full network participation.',
+      'You are visiting through a doorway that hosts your identity. Easy onboarding; the doorway is both your relying party and your identity provider until you graduate.',
     icon: 'cloud',
     benefits: [
       'Progress saved permanently',
@@ -177,11 +219,33 @@ export const AGENCY_STAGES: Record<AgencyStage, AgencyStageInfo> = {
       'Easy setup - no app install',
     ],
     limitations: [
-      'Keys managed by Elohim',
-      'Dependent on Elohim servers',
-      'Less agency than self-hosting',
+      'Keys managed by the doorway steward',
+      'Dependent on this doorway',
+      'No peer-native agency yet',
     ],
     order: 2,
+  },
+
+  'hosted-steward': {
+    stage: 'hosted-steward',
+    label: 'Hosted Steward',
+    tagline: 'A steward in recovery — doorway temporarily hosts your conductor',
+    description:
+      'Your own device is unreachable, so you have signed in through a doorway. While in this recovery mode the doorway temporarily provides DHT/conductor compute for you (the same way it does for a hosted user), letting you see your content (sharded across your resilient peer backups), register a new device, and restore reciprocal commitments. Identity authority still belongs to your peer-native portal — the doorway is a relying party here, not an identity provider. Once your portal/device comes back online you return to App Steward (or Node Steward). This is a recovery mode, not a step on the upgrade ladder.',
+    icon: 'cloud_done',
+    benefits: [
+      'See all your content via DHT shards + resilient backups',
+      'Register a new device to restore your own native compute',
+      'Restore reciprocal commitments after device loss',
+      'Identity authority remains on your peer-native portal',
+    ],
+    limitations: [
+      'Doorway-hosted conductor compute — not your own device',
+      'Some sensitive actions require your portal to be reachable',
+      'Recovery flow — not a long-term home',
+    ],
+    order: 3,
+    isRecoveryMode: true,
   },
 
   'app-steward': {
@@ -197,7 +261,7 @@ export const AGENCY_STAGES: Record<AgencyStage, AgencyStageInfo> = {
       'True data ownership',
     ],
     limitations: ['Must keep device secure', 'Syncs only when online', 'Requires app installation'],
-    order: 3,
+    order: 4,
   },
 
   'node-steward': {
@@ -218,18 +282,39 @@ export const AGENCY_STAGES: Record<AgencyStage, AgencyStageInfo> = {
       'Server/hardware costs',
       'Maintenance responsibility',
     ],
-    order: 4,
+    order: 5,
   },
 };
 
 /**
- * Get the next upgrade stage.
+ * Get the next stage on the progression ladder.
+ *
+ * Walks AGENCY_STAGES by `order`, skipping any stage with `isRecoveryMode: true`.
+ * For example, `getNextStage('hosted')` returns `'app-steward'` — `hosted-steward`
+ * is a recovery mode, not a step on the upgrade ladder.
  */
 export function getNextStage(current: AgencyStage): AgencyStage | null {
+  if (AGENCY_STAGES[current].isRecoveryMode) {
+    // A recovery mode has no "next" on the progression ladder. The steward's
+    // resolution is to restore peer-native authority, not graduate further.
+    return null;
+  }
   const order = AGENCY_STAGES[current].order;
-  const next = Object.values(AGENCY_STAGES).find(s => s.order === order + 1);
+  const next = Object.values(AGENCY_STAGES)
+    .filter(s => !s.isRecoveryMode)
+    .sort((a, b) => a.order - b.order)
+    .find(s => s.order > order);
   return next?.stage ?? null;
 }
+
+/**
+ * The progression ladder — all stages excluding recovery modes, sorted by order.
+ * UI surfaces (e.g. the stage-progression chips on the device-stewardship upgrade
+ * prompt) should iterate this rather than Object.values(AGENCY_STAGES).
+ */
+export const PROGRESSION_STAGES: AgencyStageInfo[] = Object.values(AGENCY_STAGES)
+  .filter(s => !s.isRecoveryMode)
+  .sort((a, b) => a.order - b.order);
 
 /**
  * Check if a stage has greater agency than another.

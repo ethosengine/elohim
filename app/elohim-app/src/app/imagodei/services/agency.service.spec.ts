@@ -539,7 +539,7 @@ describe('AgencyService', () => {
       expect(state.migrationTarget).toBe('hosted');
     });
 
-    it('should indicate migration available from hosted to app-user', () => {
+    it('should indicate migration available from hosted to app-steward', () => {
       connectionSignal.set({
         state: 'connected',
         adminWs: null,
@@ -555,6 +555,9 @@ describe('AgencyService', () => {
 
       const state = service.agencyState();
       expect(state.migrationAvailable).toBe(true);
+      // The progression ladder is visitor → hosted → app-steward → node-steward.
+      // hosted-steward is a recovery mode (isRecoveryMode: true) and is skipped
+      // by getNextStage(), so 'hosted' migrates directly to 'app-steward'.
       expect(state.migrationTarget).toBe('app-steward');
     });
 

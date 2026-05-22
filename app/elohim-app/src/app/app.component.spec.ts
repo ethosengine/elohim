@@ -1,10 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, NavigationEnd } from '@angular/router';
 
 import { Observable, Subject } from 'rxjs';
 
+import { environment } from '../environments/environment';
 import { AppComponent } from './app.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { ProtocolRouteContextService } from './elohim/services/protocol-route-context.service';
@@ -25,7 +27,20 @@ describe('AppComponent', () => {
     cid: () => null,
   };
 
+  let savedDoorwayUrl: string | undefined;
+
   beforeEach(async () => {
+    // AppComponent.testDoorwayConnection() calls native fetch() against
+    // environment.client.doorwayUrl during ngOnInit. In jsdom there is no
+    // server listening; the fetch would hang or stack up across tests and
+    // make async tests that await fixture.whenStable() trip the 10s timeout.
+    // Short-circuit the probe by clearing doorwayUrl — testDoorwayConnection
+    // returns false immediately when it is missing (see app.component.ts:222-224).
+    savedDoorwayUrl = environment.client?.doorwayUrl;
+    if (environment.client) {
+      environment.client.doorwayUrl = '';
+    }
+
     routerEventsSubject = new Subject();
     mockRouter = {
       events: routerEventsSubject.asObservable(),
@@ -61,6 +76,7 @@ describe('AppComponent', () => {
       providers: [
         provideRouter([]),
         provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: Router, useValue: mockRouter },
         { provide: HolochainClientService, useValue: mockHolochainClient },
         { provide: AuthService, useValue: mockAuthService },
@@ -74,6 +90,10 @@ describe('AppComponent', () => {
   afterEach(() => {
     // Clean up all component instances and their timers
     TestBed.resetTestingModule();
+    // Restore doorwayUrl
+    if (environment.client) {
+      environment.client.doorwayUrl = savedDoorwayUrl ?? '';
+    }
   });
 
   it('should create the app', () => {
@@ -377,10 +397,18 @@ describe('AppComponent', () => {
       // Simulate previous failed attempts
       (app as any).connectionAttempt = 2;
 
-      fixture.detectChanges();
-      await fixture.whenStable();
+      // Drive attemptConnection directly rather than through fixture.detectChanges() →
+      // ngOnInit + constructor effects, which both fire void initializeHolochainConnection()
+      // concurrently and race with each other. The previous test in this block uses the
+      // same direct-call pattern.
+      mockHolochainClient.connect.mockReturnValue(Promise.resolve());
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      await (app as any).attemptConnection();
 
       expect((app as any).connectionAttempt).toBe(0);
+
+      // Clean up
+      app.ngOnDestroy();
     });
   });
 
