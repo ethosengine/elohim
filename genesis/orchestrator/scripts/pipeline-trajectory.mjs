@@ -20,6 +20,11 @@
  *   --json                emit structured JSON instead of a table
  *   --since-baseline      additionally compute baseline-lag in builds + commits
  *                          (extra Jenkins reads — slower; default off)
+ *   --with-stages         additionally fetch per-stage results via wfapi —
+ *                          surfaces persistent-stage-failure (which stage is
+ *                          the gating leg) and stage-time-dominant (which
+ *                          stage is consuming the build budget). Extra
+ *                          fetches; default off.
  *
  * Read-only. No side effects. Anonymous-read against the orchestrator's
  * OIDC-fronted Jenkins (sending auth headers triggers an OIDC redirect).
@@ -58,6 +63,7 @@ const DEFAULT_PIPELINES = nonManualPipelines().join(',');
 const PIPELINES = argVal('--pipelines', DEFAULT_PIPELINES).split(',').filter(Boolean);
 const EMIT_JSON = argFlag('--json');
 const COMPUTE_BASELINE_LAG = argFlag('--since-baseline');
+const WITH_STAGES = argFlag('--with-stages');
 
 // ─── pattern thresholds ───────────────────────────────────────────────────
 // Tuned for a 10-build window. Adjust if --builds is wildly different.
@@ -138,6 +144,37 @@ async function getOrchestratorArtifact(branch, buildNum, name) {
   return jenArtifact(
     `/job/elohim-orchestrator/job/${branch}/${buildNum}/artifact/${name}`,
   );
+}
+
+/**
+ * Returns the stages of a build, each with { name, result, duration }.
+ * Uses the wfapi (Pipeline Stage View) plugin which exposes:
+ *   /job/<job>/job/<branch>/<build>/wfapi/describe
+ * Returns [] if wfapi unavailable or the build has no stages.
+ *
+ * wfapi status vocabulary differs slightly from build result vocabulary:
+ *   - FAILED (past-tense)  → normalized to FAILURE for pipeline-results.mjs
+ *   - NOT_EXECUTED         → normalized to NOT_BUILT
+ *   - IN_PROGRESS          → normalized to null (matches build.result==null convention)
+ *   - SUCCESS, UNSTABLE, ABORTED → passed through
+ */
+async function getBuildStages(jobName, branch, buildNumber) {
+  try {
+    const data = await jen(
+      `/job/${jobName}/job/${branch}/${buildNumber}/wfapi/describe`,
+    );
+    return (data.stages || []).map(s => ({
+      name: s.name,
+      result: s.status === 'FAILED' ? 'FAILURE'
+            : s.status === 'NOT_EXECUTED' ? 'NOT_BUILT'
+            : s.status === 'IN_PROGRESS' ? null
+            : s.status,
+      duration: s.durationMillis,
+    }));
+  } catch (e) {
+    console.error(`WARN: stages for ${jobName}#${buildNumber} unreachable (${e.message})`);
+    return [];
+  }
 }
 
 // ─── derivation ───────────────────────────────────────────────────────────
@@ -231,6 +268,24 @@ async function main() {
       downstream,
     };
   });
+
+  // Conditionally fetch per-build stage data in parallel (--with-stages).
+  // Builds that didn't complete (pb.result == null) are skipped — still in progress.
+  if (WITH_STAGES) {
+    await Promise.all(
+      rows.flatMap(r =>
+        PIPELINES.flatMap(job => {
+          const pb = r.downstream[job];
+          if (!pb || pb.result == null) return [];
+          return [
+            getBuildStages(job, BRANCH, pb.number).then(stages => {
+              pb.stages = stages;
+            }),
+          ];
+        }),
+      ),
+    );
+  }
 
   // ─── trajectories (per-pipeline streams) ────────────────────────────────
   const trajectories = Object.fromEntries(
@@ -332,6 +387,64 @@ async function main() {
     });
   }
 
+  if (WITH_STAGES) {
+    // Persistent-failure at stage granularity — far more actionable than
+    // pipeline-level because it names the gating leg.
+    for (const job of PIPELINES) {
+      const stagesByName = new Map();
+      for (const r of rows) {
+        const pb = r.downstream[job];
+        if (!pb?.stages) continue;
+        for (const s of pb.stages) {
+          if (!stagesByName.has(s.name)) stagesByName.set(s.name, []);
+          stagesByName.get(s.name).push(s);
+        }
+      }
+      for (const [name, history] of stagesByName) {
+        const completed = history.filter(s => s.result != null);
+        const failures = completed.filter(s => isFailure(s.result)).length;
+        if (
+          completed.length >= 3 &&
+          failures / completed.length >= PATTERN_THRESHOLDS.persistentFailureFraction
+        ) {
+          patterns.push({
+            kind: 'persistent-stage-failure',
+            pipeline: job,
+            stage: name,
+            rate: `${failures}/${completed.length}`,
+            note: `stage '${name}' in ${shortPipelineName(job)} failed in more than half of recent builds — gating leg`,
+          });
+        }
+      }
+    }
+
+    // Stage-duration outliers — surface stages that take >30% of total build time.
+    // Track which (pipeline, stageName) tuples we've already emitted so a
+    // dominant stage shows once, not N times.
+    const dominantSeen = new Set();
+    for (const job of PIPELINES) {
+      for (const r of rows) {
+        const pb = r.downstream[job];
+        if (!pb?.stages || !pb.duration) continue;
+        for (const s of pb.stages) {
+          if (s.duration && s.duration / pb.duration >= 0.3) {
+            const key = `${job}::${s.name}`;
+            if (!dominantSeen.has(key)) {
+              dominantSeen.add(key);
+              patterns.push({
+                kind: 'stage-time-dominant',
+                pipeline: job,
+                stage: s.name,
+                rate: `${Math.round(100 * s.duration / pb.duration)}% of build`,
+                note: `stage '${s.name}' dominates ${shortPipelineName(job)} wall-time — sharding/cache target`,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
   // ─── output ─────────────────────────────────────────────────────────────
   if (EMIT_JSON) {
     console.log(JSON.stringify({ rows, trajectories, patterns }, null, 2));
@@ -400,11 +513,43 @@ async function main() {
     console.log(`  ${pad(shortPipelineName(job), 12)} ${pad(stream, 24)}  rate=${rate}`);
   }
 
+  if (WITH_STAGES) {
+    console.log('');
+    console.log('## per-stage trajectory (within each pipeline, most recent first)');
+    for (const job of PIPELINES) {
+      // Collect stages across the row stream, keyed by stage name.
+      const stagesByName = new Map();
+      for (const r of rows) {
+        const pb = r.downstream[job];
+        if (!pb?.stages) continue;
+        for (const s of pb.stages) {
+          if (!stagesByName.has(s.name)) stagesByName.set(s.name, []);
+          stagesByName.get(s.name).push(s);
+        }
+      }
+      if (stagesByName.size === 0) continue;
+      console.log(`  ── ${shortPipelineName(job)} ──`);
+      for (const [name, history] of stagesByName) {
+        const stream = history.map(s => resultGlyph(s.result)).join(' ');
+        const completed = history.filter(s => s.result != null);
+        const success = completed.filter(s => isSuccess(s.result)).length;
+        const rate = completed.length === 0 ? '0/0' : `${success}/${completed.length}`;
+        const maxDur = Math.max(...history.map(s => s.duration ?? 0));
+        console.log(`    ${pad(name, 32)} ${pad(stream, 24)}  rate=${rate}  max=${durationMin(maxDur)}`);
+      }
+    }
+  }
+
   if (patterns.length > 0) {
     console.log('');
     console.log('## patterns detected');
     for (const p of patterns) {
-      console.log(`  ⚠ ${p.kind}${p.pipeline ? ` (${p.pipeline})` : ''}: ${p.rate} — ${p.note}`);
+      const ctx = p.pipeline
+        ? p.stage
+          ? ` (${shortPipelineName(p.pipeline)} / ${p.stage})`
+          : ` (${p.pipeline})`
+        : '';
+      console.log(`  ⚠ ${p.kind}${ctx}: ${p.rate} — ${p.note}`);
     }
   } else {
     console.log('');
