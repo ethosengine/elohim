@@ -54,6 +54,20 @@ const PIPELINES = argVal('--pipelines', DEFAULT_PIPELINES).split(',').filter(Boo
 const EMIT_JSON = argFlag('--json');
 const COMPUTE_BASELINE_LAG = argFlag('--since-baseline');
 
+// ─── pattern thresholds ───────────────────────────────────────────────────
+// Tuned for a 10-build window. Adjust if --builds is wildly different.
+const PATTERN_THRESHOLDS = {
+  // persistent-failure: at least this fraction of completed builds failed
+  persistentFailureFraction: 0.5,
+  // supersede-waste: require BOTH an absolute count AND a fraction of the window
+  supersedeWasteAbsolute: 3,
+  supersedeWasteFraction: 0.3,
+  // orchestrator-failure-streak: zero successes in window when ≥ this many built
+  orchestratorStreakMinCompleted: 3,
+  // baseline-drift: distinct baselines in window
+  baselineDriftMin: 5,
+};
+
 // ─── Jenkins fetchers ─────────────────────────────────────────────────────
 const RETRY_DELAYS_MS = [0, 1500, 4000]; // immediate, then backoff
 async function jenRequest(path, { allow404 = false } = {}) {
@@ -241,7 +255,7 @@ async function main() {
   for (const [job, t] of Object.entries(trajectories)) {
     const completed = t.stream.filter(s => s.result != null);
     const failures = completed.filter(s => isFailure(s.result)).length;
-    if (completed.length >= 3 && failures >= Math.ceil(completed.length / 2)) {
+    if (completed.length >= 3 && failures >= Math.ceil(completed.length * PATTERN_THRESHOLDS.persistentFailureFraction)) {
       patterns.push({
         kind: 'persistent-failure',
         pipeline: job,
@@ -254,7 +268,10 @@ async function main() {
   // Supersede waste: ABORTED runs adjacent to short-duration runs.
   for (const [job, t] of Object.entries(trajectories)) {
     const aborted = t.stream.filter(s => isWasted(s.result)).length;
-    if (aborted >= 2) {
+    if (
+      aborted >= PATTERN_THRESHOLDS.supersedeWasteAbsolute &&
+      aborted / t.stream.length >= PATTERN_THRESHOLDS.supersedeWasteFraction
+    ) {
       patterns.push({
         kind: 'supersede-waste',
         pipeline: job,
@@ -267,7 +284,7 @@ async function main() {
   // Orchestrator failure streak.
   const orchCompleted = rows.filter(r => r.result != null && r.result !== 'NOT_BUILT');
   const orchSuccess = orchCompleted.filter(r => isSuccess(r.result)).length;
-  if (orchCompleted.length >= 3 && orchSuccess === 0) {
+  if (orchCompleted.length >= PATTERN_THRESHOLDS.orchestratorStreakMinCompleted && orchSuccess === 0) {
     patterns.push({
       kind: 'orchestrator-failure-streak',
       rate: `0/${orchCompleted.length}`,
@@ -283,7 +300,7 @@ async function main() {
       const sha = baselines[b.number]?.__global__;
       if (sha && sha !== latestBaselineSha) drift++;
     }
-    if (drift >= 5) {
+    if (drift >= PATTERN_THRESHOLDS.baselineDriftMin) {
       patterns.push({
         kind: 'baseline-drift',
         rate: `${drift} builds with different __global__ in last ${orchBuilds.length}`,
