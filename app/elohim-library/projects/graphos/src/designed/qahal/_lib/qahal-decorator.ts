@@ -147,7 +147,7 @@ function buildWrapperStyle(themeTokens: string, background: string, color: strin
   `.replace(/\s+/g, ' ');
 }
 
-export function qahalLightDecorator(story: () => TemplateResult): TemplateResult {
+export function qahalLightDecorator(story: () => unknown): TemplateResult {
   return html`
     <div style="${buildWrapperStyle(QAHAL_TOKENS_LIGHT, 'var(--el-cream)', 'var(--el-stone)')}">
       ${story()}
@@ -155,7 +155,7 @@ export function qahalLightDecorator(story: () => TemplateResult): TemplateResult
   `;
 }
 
-export function qahalDarkDecorator(story: () => TemplateResult): TemplateResult {
+export function qahalDarkDecorator(story: () => unknown): TemplateResult {
   return html`
     <div style="${buildWrapperStyle(QAHAL_TOKENS_DARK, 'var(--el-night)', 'var(--el-starlight)')}">
       ${story()}
@@ -163,7 +163,7 @@ export function qahalDarkDecorator(story: () => TemplateResult): TemplateResult 
   `;
 }
 
-export function qahalHighContrastDecorator(story: () => TemplateResult): TemplateResult {
+export function qahalHighContrastDecorator(story: () => unknown): TemplateResult {
   return html`
     <div style="${buildWrapperStyle(QAHAL_TOKENS_HIGH_CONTRAST, 'var(--el-cream)', 'var(--el-night)')}">
       ${story()}

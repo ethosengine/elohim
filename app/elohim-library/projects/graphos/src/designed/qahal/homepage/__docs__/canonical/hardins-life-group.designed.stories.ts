@@ -1,11 +1,11 @@
-import type { Decorator, Meta, StoryObj } from '@storybook/web-components';
+import type { Meta, StoryObj } from '@storybook/web-components';
 import { qahalLightDecorator } from '../../../_lib/qahal-decorator';
 import { renderQahalHomepage } from '../../../_lib/render-qahal-homepage';
 import { hardinsLifeGroupTuesdayEvening } from '../../../../../default/qahal/fixtures/canonical/hardins-life-group-tuesday-evening';
 
 const meta: Meta = {
   title: 'Designed/Qahal/Homepage/Canonical/Hardins Life-Group',
-  decorators: [qahalLightDecorator as unknown as Decorator],
+  decorators: [qahalLightDecorator],
   parameters: {
     docs: {
       description: {

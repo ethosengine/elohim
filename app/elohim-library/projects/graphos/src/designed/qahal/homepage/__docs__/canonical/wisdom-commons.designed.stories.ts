@@ -1,11 +1,11 @@
-import type { Decorator, Meta, StoryObj } from '@storybook/web-components';
+import type { Meta, StoryObj } from '@storybook/web-components';
 import { qahalLightDecorator } from '../../../_lib/qahal-decorator';
 import { renderQahalHomepage } from '../../../_lib/render-qahal-homepage';
 import { wisdomCommonsThursdayAfternoon } from '../../../../../default/qahal/fixtures/canonical/wisdom-commons-thursday-afternoon';
 
 const meta: Meta = {
   title: 'Designed/Qahal/Homepage/Canonical/Wisdom Commons',
-  decorators: [qahalLightDecorator as unknown as Decorator],
+  decorators: [qahalLightDecorator],
   parameters: {
     docs: {
       description: {

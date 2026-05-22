@@ -1,11 +1,11 @@
-import type { Decorator, Meta, StoryObj } from '@storybook/web-components';
+import type { Meta, StoryObj } from '@storybook/web-components';
 import { qahalLightDecorator } from '../../../_lib/qahal-decorator';
 import { renderQahalHomepage } from '../../../_lib/render-qahal-homepage';
 import { cofcCongregationSundayMorning } from '../../../../../default/qahal/fixtures/canonical/cofc-congregation-sunday-morning';
 
 const meta: Meta = {
   title: 'Designed/Qahal/Homepage/Canonical/CofC Congregation',
-  decorators: [qahalLightDecorator as unknown as Decorator],
+  decorators: [qahalLightDecorator],
   parameters: {
     docs: {
       description: {
