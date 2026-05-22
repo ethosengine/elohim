@@ -4,6 +4,98 @@
   "modules": [
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-attestations-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Attestations panel — viewer's attestation history in this Qahal.\n\nVisual stub at MVP. Renders a recent-count headline, a by-kind breakdown\ntable, and the last-attestation timestamp. Per-attestation drill-down +\nprovenance trace are deferred to post-MVP.",
+          "name": "ElohimQahalAttestationsPanel",
+          "members": [
+            {
+              "kind": "field",
+              "name": "attestations",
+              "type": {
+                "text": "AttestationSummary"
+              },
+              "default": "null",
+              "description": "The viewer's attestation summary in this Qahal",
+              "attribute": "attestations"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "attestations",
+              "type": {
+                "text": "AttestationSummary"
+              },
+              "default": "null",
+              "description": "The viewer's attestation summary in this Qahal",
+              "fieldName": "attestations"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-attestations-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalAttestationsPanel",
+          "declaration": {
+            "name": "ElohimQahalAttestationsPanel",
+            "module": "src/elohim-qahal-attestations-panel.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-capability-tier-chip.ts",
       "declarations": [
         {
@@ -544,6 +636,111 @@
           "declaration": {
             "name": "ElohimQahalContextColumn",
             "module": "src/elohim-qahal-context-column.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-graph-discovery-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Graph discovery panel — adjacent Qahals + federation candidates.\n\nVisual stub at MVP. Renders a list of discovery suggestions with kind,\nlabel, and relevance score. Full graph-walk discovery + commons-elohim\nfederation-candidate generation are deferred to post-MVP.",
+          "name": "ElohimQahalGraphDiscoveryPanel",
+          "members": [
+            {
+              "kind": "field",
+              "name": "suggestions",
+              "type": {
+                "text": "DiscoverySuggestion[]"
+              },
+              "default": "[]",
+              "description": "Discovery suggestions to render",
+              "attribute": "suggestions"
+            },
+            {
+              "kind": "method",
+              "name": "_renderSuggestion",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "s",
+                  "type": {
+                    "text": "DiscoverySuggestion"
+                  }
+                }
+              ]
+            }
+          ],
+          "attributes": [
+            {
+              "name": "suggestions",
+              "type": {
+                "text": "DiscoverySuggestion[]"
+              },
+              "default": "[]",
+              "description": "Discovery suggestions to render",
+              "fieldName": "suggestions"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-graph-discovery-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalGraphDiscoveryPanel",
+          "declaration": {
+            "name": "ElohimQahalGraphDiscoveryPanel",
+            "module": "src/elohim-qahal-graph-discovery-panel.ts"
           }
         }
       ]
@@ -1126,6 +1323,98 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-shefa-resources-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Shefa resources panel — REA flows summary for this Qahal.\n\nVisual stub at MVP. Renders the key REA economic flow dimensions as labelled\nrows: inflows, outflows, commons-share balance, and agreement clauses. Full\nREA flow visualization + Agreement cascade rules are deferred to a post-MVP\nshefa-pillar wiring sprint.",
+          "name": "ElohimQahalShefaResourcesPanel",
+          "members": [
+            {
+              "kind": "field",
+              "name": "shefa",
+              "type": {
+                "text": "ShefaSummary"
+              },
+              "default": "null",
+              "description": "The REA flows summary for this Qahal",
+              "attribute": "shefa"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "shefa",
+              "type": {
+                "text": "ShefaSummary"
+              },
+              "default": "null",
+              "description": "The REA flows summary for this Qahal",
+              "fieldName": "shefa"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-shefa-resources-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalShefaResourcesPanel",
+          "declaration": {
+            "name": "ElohimQahalShefaResourcesPanel",
+            "module": "src/elohim-qahal-shefa-resources-panel.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-sidebar.ts",
       "declarations": [
         {
@@ -1337,6 +1626,99 @@
           "declaration": {
             "name": "ElohimQahalSocialComputePanel",
             "module": "src/elohim-qahal-social-compute-panel.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-standing-inspector-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Standing inspector panel — viewer's standing breakdown in this Qahal.\n\nVisual stub at MVP. Renders the key standing dimensions as labelled rows\nusing Phase 1 primitives (capability-tier-chip, standing-ring). Full\nattestation-chain walk + back-propagation traceback are deferred to\npost-MVP (Sprint 6+).",
+          "name": "ElohimQahalStandingInspectorPanel",
+          "members": [
+            {
+              "kind": "field",
+              "name": "standing",
+              "type": {
+                "text": "StandingBreakdown"
+              },
+              "default": "null",
+              "description": "The viewer's standing breakdown in this Qahal",
+              "attribute": "standing"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "standing",
+              "type": {
+                "text": "StandingBreakdown"
+              },
+              "default": "null",
+              "description": "The viewer's standing breakdown in this Qahal",
+              "fieldName": "standing"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-standing-inspector-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalStandingInspectorPanel",
+          "declaration": {
+            "name": "ElohimQahalStandingInspectorPanel",
+            "module": "src/elohim-qahal-standing-inspector-panel.ts"
           }
         }
       ]
