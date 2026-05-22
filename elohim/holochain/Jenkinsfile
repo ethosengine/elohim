@@ -810,7 +810,12 @@ spec:
 
     options {
         timeout(time: 120, unit: 'MINUTES')
-        disableConcurrentBuilds()
+        // abortPrevious: true — when a new orchestrator dispatch arrives while a
+        // previous build of this pipeline is in-flight, abort the old one. Without
+        // this, the previous orchestrator's downstream queues up behind the in-flight
+        // build (60+ min wait) while the orchestrator itself has already been aborted.
+        // See memory: _orchestrator_abort_baseline_rollback.
+        disableConcurrentBuilds(abortPrevious: true)
         preserveStashes(buildCount: 5)
         overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
         // Skip implicit Declarative: Checkout SCM — same fix as elohim-orchestrator;
