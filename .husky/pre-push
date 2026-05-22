@@ -220,6 +220,12 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "^app/elohim-library/"; then
     PROJECTS="$PROJECTS elohim-library"
   fi
+  # elohim-storybook: registry-defined paths include graphos source content
+  # (genesis/docs/content/elohim-protocol/**, genesis/graphos/**, genesis/a2o/features/**)
+  # — keep this grep aligned with orchestrator-strategy.mjs PIPELINES['elohim-storybook'].changePatterns.
+  if echo "$CHANGED" | grep -qE "^app/elohim-library/|^genesis/docs/content/elohim-protocol/|^genesis/graphos/|^genesis/a2o/features/"; then
+    PROJECTS="$PROJECTS elohim-storybook"
+  fi
   if echo "$CHANGED" | grep -q "^genesis/"; then
     PROJECTS="$PROJECTS genesis"
   fi
