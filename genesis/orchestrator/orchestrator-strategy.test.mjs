@@ -11,7 +11,7 @@
 
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadManifests } from './manifest-utils.mjs';
@@ -843,4 +843,19 @@ describe('PIPELINES changePatterns covered by manifest source globs', () => {
       });
     }
   }
+});
+
+describe('pipeline-list.json drift', () => {
+  it('pipeline-list.json is in sync with PIPELINES (regenerate via just ci-pipeline-list)', () => {
+    const listPath = resolve(__dirname, 'pipeline-list.json');
+    assert.ok(existsSync(listPath), 'pipeline-list.json must exist');
+    const json = JSON.parse(readFileSync(listPath, 'utf8'));
+    const jsonNames = new Set(json.pipelines.map(p => p.name));
+    const registryNames = new Set(Object.keys(PIPELINES));
+    assert.deepEqual(
+      [...jsonNames].sort(),
+      [...registryNames].sort(),
+      'pipeline-list.json names differ from PIPELINES — regenerate with just ci-pipeline-list',
+    );
+  });
 });
