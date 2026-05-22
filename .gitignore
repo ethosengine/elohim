@@ -67,10 +67,16 @@ orchestrator/e2e/reports/
 
 # Rust/Holochain
 target/
+# cargo-target-pool creates symlinks named "target"; the rule above only
+# matches directories, so we need a separate non-directory pattern.
+target
 target-pool/
 *.happ
 *.dna
 bindings/
+
+# Local holochain dev-stack scratch (cargo-pool / hc-dev-orchestrator)
+**/local-dev/
 research/matrix/pinecone
 
 # Genesis blob cache (regenerated during pack/seed)
