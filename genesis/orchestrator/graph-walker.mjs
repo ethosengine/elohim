@@ -158,5 +158,17 @@ if (isMain) {
   const changedFiles = filterChanged(rawFiles);
   const manifests = loadManifests(ROOT);
   const result = walkGraph(manifests, changedFiles);
+
+  if (process.argv.includes('--shell-lines')) {
+    // Tab-separated lines that shell scripts can parse with awk -F'\t' instead
+    // of eval'ing a constructed shell string (which has historically been the
+    // source of silent partial failures in .husky/pre-push). The PROJECTS line
+    // and DIRS line are positionally aligned (i-th project corresponds to i-th
+    // dir).
+    process.stdout.write('PROJECTS\t' + result.projects.map(p => p.name).join(' ') + '\n');
+    process.stdout.write('DIRS\t' + result.projects.map(p => p.dir).join(' ') + '\n');
+    process.exit(0);
+  }
+
   process.stdout.write(JSON.stringify(result) + '\n');
 }

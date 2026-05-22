@@ -164,19 +164,14 @@ PROJECTS=""
 USE_MANIFEST=false
 
 if command -v node >/dev/null 2>&1; then
-  MANIFEST_RESULT=$(echo "$CHANGED" | node genesis/orchestrator/graph-walker.mjs 2>/dev/null)
-  if [ $? -eq 0 ] && [ -n "$MANIFEST_RESULT" ]; then
-    MANIFEST_DIRS_RAW=$(echo "$MANIFEST_RESULT" | node -e "
-      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-      const names = [], dirs = [];
-      for (const p of d.projects) { names.push(p.name); dirs.push(p.dir); }
-      if (names.length > 0) {
-        console.log('PROJECTS=\"' + names.join(' ') + '\"');
-        console.log('MANIFEST_DIRS=\"' + dirs.join(' ') + '\"');
-      }
-    " 2>/dev/null)
-    if [ -n "$MANIFEST_DIRS_RAW" ]; then
-      eval "$MANIFEST_DIRS_RAW"
+  # Two-line TSV (PROJECTS\t..., DIRS\t...) — parsed via awk without eval to
+  # avoid the silent-partial-failure surface of eval'ing a shell-constructed
+  # string. See genesis/orchestrator/graph-walker.mjs --shell-lines.
+  MANIFEST_LINES=$(echo "$CHANGED" | node genesis/orchestrator/graph-walker.mjs --shell-lines 2>/dev/null)
+  if [ $? -eq 0 ] && [ -n "$MANIFEST_LINES" ]; then
+    PROJECTS=$(echo "$MANIFEST_LINES" | awk -F'\t' '$1=="PROJECTS"{print $2}')
+    MANIFEST_DIRS=$(echo "$MANIFEST_LINES" | awk -F'\t' '$1=="DIRS"{print $2}')
+    if [ -n "$PROJECTS" ]; then
       USE_MANIFEST=true
     fi
   fi
