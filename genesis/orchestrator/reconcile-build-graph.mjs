@@ -14,10 +14,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { ORCHESTRATOR } from './build-artifacts.mjs';
+import { SUCCESSFUL_RESULTS } from './pipeline-results.mjs';
 
 // ── Reconciliation primitives ──────────────────────────────────────
 
-const SUCCESSFUL_RESULTS = new Set(['SUCCESS', 'UNSTABLE']);
 const UNSUCCESSFUL_TERMINAL = new Set(['FAILURE', 'ABORTED', 'NOT_BUILT', 'ERROR']);
 
 function classifyResult(name, info) {
