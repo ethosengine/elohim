@@ -106,7 +106,7 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
                   required
                   autocomplete="username"
                   placeholder="username"
-                  pattern="[^@\s]+"
+                  pattern="[^@\\s]+"
                   inputmode="text"
                   class="identifier-input"
                 />
