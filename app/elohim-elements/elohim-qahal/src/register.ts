@@ -8,10 +8,14 @@ import { ElohimQahalCareEconomyMarker } from './elohim-qahal-care-economy-marker
 import { ElohimQahalCoStewardPanel } from './elohim-qahal-co-steward-panel.js';
 import { ElohimQahalCollectiveSwitcher } from './elohim-qahal-collective-switcher.js';
 import { ElohimQahalContextColumn } from './elohim-qahal-context-column.js';
+import { ElohimQahalCuratedEprList } from './elohim-qahal-curated-epr-list.js';
+import { ElohimQahalExternalLinkList } from './elohim-qahal-external-link-list.js';
 import { ElohimQahalGraphDiscoveryPanel } from './elohim-qahal-graph-discovery-panel.js';
 import { ElohimQahalImagodeiBadge } from './elohim-qahal-imagodei-badge.js';
 import { ElohimQahalMainViewer } from './elohim-qahal-main-viewer.js';
 import { ElohimQahalMemberRingPanel } from './elohim-qahal-member-ring-panel.js';
+import { ElohimQahalPowerUserExpandable } from './elohim-qahal-power-user-expandable.js';
+import { ElohimQahalProtocolPanelList } from './elohim-qahal-protocol-panel-list.js';
 import { ElohimQahalProvenanceMarker } from './elohim-qahal-provenance-marker.js';
 import { ElohimQahalRulesPanel } from './elohim-qahal-rules-panel.js';
 import { ElohimQahalShefaResourcesPanel } from './elohim-qahal-shefa-resources-panel.js';
@@ -45,6 +49,14 @@ if (!customElements.get('elohim-qahal-context-column')) {
   customElements.define('elohim-qahal-context-column', ElohimQahalContextColumn);
 }
 
+if (!customElements.get('elohim-qahal-curated-epr-list')) {
+  customElements.define('elohim-qahal-curated-epr-list', ElohimQahalCuratedEprList);
+}
+
+if (!customElements.get('elohim-qahal-external-link-list')) {
+  customElements.define('elohim-qahal-external-link-list', ElohimQahalExternalLinkList);
+}
+
 if (!customElements.get('elohim-qahal-graph-discovery-panel')) {
   customElements.define('elohim-qahal-graph-discovery-panel', ElohimQahalGraphDiscoveryPanel);
 }
@@ -61,8 +73,16 @@ if (!customElements.get('elohim-qahal-member-ring-panel')) {
   customElements.define('elohim-qahal-member-ring-panel', ElohimQahalMemberRingPanel);
 }
 
+if (!customElements.get('elohim-qahal-power-user-expandable')) {
+  customElements.define('elohim-qahal-power-user-expandable', ElohimQahalPowerUserExpandable);
+}
+
 if (!customElements.get('elohim-qahal-provenance-marker')) {
   customElements.define('elohim-qahal-provenance-marker', ElohimQahalProvenanceMarker);
+}
+
+if (!customElements.get('elohim-qahal-protocol-panel-list')) {
+  customElements.define('elohim-qahal-protocol-panel-list', ElohimQahalProtocolPanelList);
 }
 
 if (!customElements.get('elohim-qahal-rules-panel')) {

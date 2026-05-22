@@ -18,6 +18,12 @@ export type { CollectiveDescriptor } from './elohim-qahal-collective-switcher.js
 
 export { ElohimQahalContextColumn } from './elohim-qahal-context-column.js';
 
+export { ElohimQahalCuratedEprList } from './elohim-qahal-curated-epr-list.js';
+export type { CuratedEpr } from './elohim-qahal-curated-epr-list.js';
+
+export { ElohimQahalExternalLinkList } from './elohim-qahal-external-link-list.js';
+export type { ExternalLink, ExternalLinkVisibilityMap } from './elohim-qahal-external-link-list.js';
+
 export { ElohimQahalGraphDiscoveryPanel } from './elohim-qahal-graph-discovery-panel.js';
 export type { DiscoverySuggestion } from './elohim-qahal-graph-discovery-panel.js';
 
@@ -29,8 +35,13 @@ export { ElohimQahalMainViewer } from './elohim-qahal-main-viewer.js';
 export { ElohimQahalMemberRingPanel } from './elohim-qahal-member-ring-panel.js';
 export type { MemberEntry, MemberTier } from './elohim-qahal-member-ring-panel.js';
 
+export { ElohimQahalPowerUserExpandable } from './elohim-qahal-power-user-expandable.js';
+
 export { ElohimQahalProvenanceMarker } from './elohim-qahal-provenance-marker.js';
 export type { ProvenanceCategory } from './elohim-qahal-provenance-marker.js';
+
+export { ElohimQahalProtocolPanelList } from './elohim-qahal-protocol-panel-list.js';
+export type { ProtocolPanelDescriptor } from './elohim-qahal-protocol-panel-list.js';
 
 export { ElohimQahalRulesPanel } from './elohim-qahal-rules-panel.js';
 export type { BloomMapping, BloomTierKey, Rubric } from './elohim-qahal-rules-panel.js';

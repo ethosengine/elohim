@@ -642,6 +642,285 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-curated-epr-list.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Curated EPR list — lists curated EPR pointers with ◆ provenance markers.\n\nEach item composes an `<elohim-qahal-provenance-marker category=\"curated-epr\">` for the ◆ icon\nnext to the label. Clicking an item emits `epr-selected` with the EPR id.",
+          "name": "ElohimQahalCuratedEprList",
+          "members": [
+            {
+              "kind": "field",
+              "name": "eprs",
+              "type": {
+                "text": "CuratedEpr[]"
+              },
+              "default": "[]",
+              "description": "Array of curated EPR descriptors",
+              "attribute": "eprs"
+            },
+            {
+              "kind": "method",
+              "name": "_handleClick",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "id",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "name": "epr-selected",
+              "type": {
+                "text": "CustomEvent<{id: string}>"
+              },
+              "description": "When user clicks an EPR item"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "eprs",
+              "type": {
+                "text": "CuratedEpr[]"
+              },
+              "default": "[]",
+              "description": "Array of curated EPR descriptors",
+              "fieldName": "eprs"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-curated-epr-list",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalCuratedEprList",
+          "declaration": {
+            "name": "ElohimQahalCuratedEprList",
+            "module": "src/elohim-qahal-curated-epr-list.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-external-link-list.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "External link list — capability-gated external links with offline-grey treatment.\n\nLooks up `visibilityMap[viewerTier]` to determine whether to show links fully,\nwith a filtered-via-co-steward annotation, or not at all. When offline, link entries\nrender in greyed-out style via the provenance-marker's offline attribute.\n\nEach rendered link composes `<elohim-qahal-provenance-marker category=\"external-hyperlink\">`\nfor the ⤤ marker. Anchors use `target=\"_blank\" rel=\"noopener noreferrer\"`.",
+          "name": "ElohimQahalExternalLinkList",
+          "members": [
+            {
+              "kind": "field",
+              "name": "links",
+              "type": {
+                "text": "ExternalLink[]"
+              },
+              "default": "[]",
+              "description": "Array of external link descriptors",
+              "attribute": "links"
+            },
+            {
+              "kind": "field",
+              "name": "visibilityMap",
+              "type": {
+                "text": "ExternalLinkVisibilityMap"
+              },
+              "default": "{}",
+              "description": "Map from tier string to visibility level",
+              "attribute": "visibilityMap"
+            },
+            {
+              "kind": "field",
+              "name": "viewerTier",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The current viewer's capability tier",
+              "attribute": "viewer-tier"
+            },
+            {
+              "kind": "field",
+              "name": "offline",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "When true, render links in greyed-out style",
+              "attribute": "offline",
+              "reflects": true
+            },
+            {
+              "kind": "method",
+              "name": "_renderLink",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "link",
+                  "type": {
+                    "text": "ExternalLink"
+                  }
+                }
+              ]
+            }
+          ],
+          "attributes": [
+            {
+              "name": "links",
+              "type": {
+                "text": "ExternalLink[]"
+              },
+              "default": "[]",
+              "description": "Array of external link descriptors",
+              "fieldName": "links"
+            },
+            {
+              "name": "visibilityMap",
+              "type": {
+                "text": "ExternalLinkVisibilityMap"
+              },
+              "default": "{}",
+              "description": "Map from tier string to visibility level",
+              "fieldName": "visibilityMap"
+            },
+            {
+              "name": "viewer-tier",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The current viewer's capability tier",
+              "fieldName": "viewerTier"
+            },
+            {
+              "name": "offline",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "When true, render links in greyed-out style",
+              "fieldName": "offline"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-external-link-list",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "supported"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalExternalLinkList",
+          "declaration": {
+            "name": "ElohimQahalExternalLinkList",
+            "module": "src/elohim-qahal-external-link-list.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-graph-discovery-panel.ts",
       "declarations": [
         {
@@ -1112,6 +1391,263 @@
           "declaration": {
             "name": "ElohimQahalMemberRingPanel",
             "module": "src/elohim-qahal-member-ring-panel.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-power-user-expandable.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Power-user expandable — renders the protocol panels list only when the imagodei\npower-user-enabled setting is active.\n\nThe element honors the `powerUserEnabled` setting silently — no toggle is exposed\non this element itself. The Qahal sidebar is responsible for sourcing the setting\nfrom the imagodei settings palette and passing it here.\n\nWhen `powerUserEnabled` is false the element renders nothing (an empty nav with no\nvisible content).",
+          "name": "ElohimQahalPowerUserExpandable",
+          "members": [
+            {
+              "kind": "field",
+              "name": "panels",
+              "type": {
+                "text": "ProtocolPanelDescriptor[]"
+              },
+              "default": "[]",
+              "description": "Array of protocol panel descriptors",
+              "attribute": "panels"
+            },
+            {
+              "kind": "field",
+              "name": "powerUserEnabled",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Sourced from imagodei settings palette; when false renders nothing",
+              "attribute": "power-user-enabled"
+            },
+            {
+              "kind": "method",
+              "name": "_handleClick",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "id",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "name": "panel-changed",
+              "type": {
+                "text": "CustomEvent<{id: string}>"
+              },
+              "description": "When user clicks a panel item (only fires when enabled)"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "panels",
+              "type": {
+                "text": "ProtocolPanelDescriptor[]"
+              },
+              "default": "[]",
+              "description": "Array of protocol panel descriptors",
+              "fieldName": "panels"
+            },
+            {
+              "name": "power-user-enabled",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Sourced from imagodei settings palette; when false renders nothing",
+              "fieldName": "powerUserEnabled"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-power-user-expandable",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ProtocolPanelDescriptor",
+          "declaration": {
+            "name": "ProtocolPanelDescriptor",
+            "module": "./elohim-qahal-protocol-panel-list.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimQahalPowerUserExpandable",
+          "declaration": {
+            "name": "ElohimQahalPowerUserExpandable",
+            "module": "src/elohim-qahal-power-user-expandable.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-protocol-panel-list.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Protocol panel list — lists the protocol panels available in this Qahal.\n\nClicking a panel item emits a `panel-changed` event with the panel id.\nThe active panel is marked with `aria-current=\"page\"`.",
+          "name": "ElohimQahalProtocolPanelList",
+          "members": [
+            {
+              "kind": "field",
+              "name": "panels",
+              "type": {
+                "text": "ProtocolPanelDescriptor[]"
+              },
+              "default": "[]",
+              "description": "Array of protocol panel descriptors",
+              "attribute": "panels"
+            },
+            {
+              "kind": "method",
+              "name": "_handleClick",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "id",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "name": "panel-changed",
+              "type": {
+                "text": "CustomEvent<{id: string}>"
+              },
+              "description": "When user clicks a panel item"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "panels",
+              "type": {
+                "text": "ProtocolPanelDescriptor[]"
+              },
+              "default": "[]",
+              "description": "Array of protocol panel descriptors",
+              "fieldName": "panels"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-protocol-panel-list",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalProtocolPanelList",
+          "declaration": {
+            "name": "ElohimQahalProtocolPanelList",
+            "module": "src/elohim-qahal-protocol-panel-list.ts"
           }
         }
       ]
