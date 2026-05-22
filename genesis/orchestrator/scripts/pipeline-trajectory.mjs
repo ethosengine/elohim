@@ -118,22 +118,20 @@ async function getOrchestratorArtifact(branch, buildNum, name) {
 }
 
 // ─── derivation ───────────────────────────────────────────────────────────
-function pipelineBuildForOrchestrator(orchestratorBuild, pipelineBuilds, orchestratorJob = 'elohim-orchestrator') {
-  // A pipeline build "belongs to" an orchestrator build if its upstream cause
-  // names that orchestrator's build number.
+function buildUpstreamIndex(pipelineBuilds, orchestratorJob = 'elohim-orchestrator') {
+  // Build a Map from orchestrator build number -> downstream pipeline build.
+  // Single pre-pass per pipeline; subsequent lookups are O(1) instead of the
+  // O(N×M) scan the original pipelineBuildForOrchestrator performed.
+  const index = new Map();
   for (const pb of pipelineBuilds) {
     const causes = (pb.actions || []).flatMap(a => a.causes || []);
     for (const c of causes) {
-      if (
-        c.upstreamProject &&
-        c.upstreamProject.includes(orchestratorJob) &&
-        c.upstreamBuild === orchestratorBuild.number
-      ) {
-        return pb;
+      if (c.upstreamProject && c.upstreamProject.includes(orchestratorJob)) {
+        index.set(c.upstreamBuild, pb);
       }
     }
   }
-  return null;
+  return index;
 }
 
 function resultGlyph(result) {
@@ -190,11 +188,16 @@ async function main() {
     );
   }
 
+  // Build an index per pipeline once, then O(1) lookup per orchestrator build.
+  const pipelineIndexes = Object.fromEntries(
+    PIPELINES.map(job => [job, buildUpstreamIndex(pipelineBuildLists[job] || [])]),
+  );
+
   // Compose per-build rows.
   const rows = orchBuilds.map(ob => {
     const downstream = {};
     for (const job of PIPELINES) {
-      downstream[job] = pipelineBuildForOrchestrator(ob, pipelineBuildLists[job] || []);
+      downstream[job] = pipelineIndexes[job].get(ob.number) || null;
     }
     return {
       number: ob.number,
