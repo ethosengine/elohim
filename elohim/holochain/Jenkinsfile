@@ -1147,14 +1147,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                // CACHE_BUST=${GIT_COMMIT_HASH} forces re-execution of the cargo build
-                                // layer when source changes. BuildKit retains layer cache for unchanged
-                                // COPY+RUN pairs (base image, apt installs, cargo deps), which is what
-                                // we want — removing --no-cache restores ~15 min savings on rebuilds
-                                // with no source change. Earlier "stale Rust versions" concern is
-                                // addressed by pinning the base image tag.
+                                # CACHE_BUST=\${GIT_COMMIT_HASH} forces re-execution of the cargo build
+                                # layer when source changes. BuildKit retains layer cache for unchanged
+                                # COPY+RUN pairs (base image, apt installs, cargo deps), which is what
+                                # we want — removing --no-cache restores ~15 min savings on rebuilds
+                                # with no source change. Earlier "stale Rust versions" concern is
+                                # addressed by pinning the base image tag.
 
-                                // Pull fresh base image to avoid stale cached Rust versions
+                                # Pull fresh base image to avoid stale cached Rust versions
                                 nerdctl -n k8s.io pull rust:1.88.0-slim-bookworm || true
 
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
