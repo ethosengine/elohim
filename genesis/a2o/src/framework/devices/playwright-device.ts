@@ -41,6 +41,12 @@ export interface PWPage {
   reload(options?: Record<string, unknown>): Promise<unknown>;
   on(event: string, handler: (...args: unknown[]) => void): void;
   fill(selector: string, value: string): Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  waitForFunction(
+    fn: (arg: any) => unknown,
+    arg?: unknown,
+    options?: Record<string, unknown>
+  ): Promise<unknown>;
 }
 
 export interface PWLocator {
@@ -57,6 +63,7 @@ export interface PWLocator {
   getAttribute(name: string): Promise<string | null>;
   locator(selector: string): PWLocator;
   allTextContents(): Promise<string[]>;
+  inputValue(): Promise<string>;
 }
 
 interface PWBrowserContext {

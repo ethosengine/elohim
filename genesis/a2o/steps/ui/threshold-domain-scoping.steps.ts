@@ -37,7 +37,7 @@ async function ensureInspector(world: E2EWorld): Promise<PlaywrightDevice> {
   try {
     human = world.getHuman(INSPECTOR_NAME);
   } catch {
-    human = new Human(INSPECTOR_NAME, { identifier: '', password: '' });
+    human = new Human(INSPECTOR_NAME, { identifier: '', password: '', displayName: INSPECTOR_NAME });
     world.addHuman(INSPECTOR_NAME, human);
   }
 
@@ -148,7 +148,7 @@ Then('the identifier input value is {string}', async function (this: E2EWorld, e
   // The two-way binding strips '@'-segments via onIdentifierChange — wait
   // for the projection to settle.
   await page.waitForFunction(
-    ({ selector, expected }) => {
+    ({ selector, expected }: { selector: string; expected: string }) => {
       const el = document.querySelector(selector) as HTMLInputElement | null;
       return el?.value === expected;
     },
