@@ -25,6 +25,10 @@
  *                          the gating leg) and stage-time-dominant (which
  *                          stage is consuming the build budget). Extra
  *                          fetches; default off.
+ *   --watch <seconds>     polling mode — re-fetch and re-render every <seconds>
+ *                          until Ctrl-C. Useful during shifts to watch builds
+ *                          progress without re-running the command. Default: 0
+ *                          (run once and exit).
  *
  * Read-only. No side effects. Anonymous-read against the orchestrator's
  * OIDC-fronted Jenkins (sending auth headers triggers an OIDC redirect).
@@ -35,8 +39,9 @@ import { nonManualPipelines } from '../orchestrator-strategy.mjs';
 import { isSuccess, isFailure, isWasted } from '../pipeline-results.mjs';
 
 // Tracks pipelines whose Jenkins job was unreachable (404 / network error).
-// Module-level so it accumulates across calls; fine in single-run mode and
-// harmless in --watch mode (drift is stable across iterations).
+// Module-level so renderOnce() can clear it at the start of each tick —
+// a transient 404 on tick 1 won't persist into tick 2 if the job was
+// (re)created in the interim.
 const unreachablePipelines = new Set();
 
 const JENKINS_URL = process.env.JENKINS_URL;
@@ -64,6 +69,7 @@ const PIPELINES = argVal('--pipelines', DEFAULT_PIPELINES).split(',').filter(Boo
 const EMIT_JSON = argFlag('--json');
 const COMPUTE_BASELINE_LAG = argFlag('--since-baseline');
 const WITH_STAGES = argFlag('--with-stages');
+const WATCH_SECONDS = Number(argVal('--watch', '0'));
 
 // ─── pattern thresholds ───────────────────────────────────────────────────
 // Tuned for a 10-build window. Adjust if --builds is wildly different.
@@ -222,11 +228,16 @@ function isoMin(ms) {
 }
 
 // ─── main ─────────────────────────────────────────────────────────────────
-async function main() {
+async function renderOnce() {
+  // Reset on each tick — a transient 404 from tick 1 must not persist into
+  // tick 2 if the Jenkins job was (re)created in the interim.
+  unreachablePipelines.clear();
+
   const orchBuilds = await getOrchestratorBuilds(BRANCH, N);
   if (orchBuilds.length === 0) {
     console.error('No orchestrator builds found.');
-    process.exit(1);
+    // Return instead of process.exit so the --watch loop can retry next tick.
+    return;
   }
 
   // Fetch each tracked pipeline's recent builds in parallel.
@@ -558,6 +569,17 @@ async function main() {
 
   console.log('');
   console.log('# legend: ✓ SUCCESS  ⚠ UNSTABLE  ✗ FAILURE  × ABORTED  · NOT_BUILT  ↻ RUNNING');
+}
+
+async function main() {
+  do {
+    await renderOnce();
+    if (WATCH_SECONDS > 0) {
+      console.log(`\n(refresh in ${WATCH_SECONDS}s — Ctrl-C to exit)\n`);
+      await new Promise(r => setTimeout(r, WATCH_SECONDS * 1000));
+      console.clear();
+    }
+  } while (WATCH_SECONDS > 0);
 }
 
 main().catch(e => {
