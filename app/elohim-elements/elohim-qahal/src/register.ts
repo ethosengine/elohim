@@ -13,6 +13,7 @@ import { ElohimQahalMemberRingPanel } from './elohim-qahal-member-ring-panel.js'
 import { ElohimQahalProvenanceMarker } from './elohim-qahal-provenance-marker.js';
 import { ElohimQahalRulesPanel } from './elohim-qahal-rules-panel.js';
 import { ElohimQahalSidebar } from './elohim-qahal-sidebar.js';
+import { ElohimQahalSocialComputePanel } from './elohim-qahal-social-compute-panel.js';
 import { ElohimQahalStandingRing } from './elohim-qahal-standing-ring.js';
 import { ElohimQahalStreamPanel } from './elohim-qahal-stream-panel.js';
 
@@ -58,6 +59,10 @@ if (!customElements.get('elohim-qahal-rules-panel')) {
 
 if (!customElements.get('elohim-qahal-sidebar')) {
   customElements.define('elohim-qahal-sidebar', ElohimQahalSidebar);
+}
+
+if (!customElements.get('elohim-qahal-social-compute-panel')) {
+  customElements.define('elohim-qahal-social-compute-panel', ElohimQahalSocialComputePanel);
 }
 
 if (!customElements.get('elohim-qahal-standing-ring')) {

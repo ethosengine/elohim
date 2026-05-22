@@ -1237,6 +1237,112 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-social-compute-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Social-compute topology panel — renders the Qahal's resilience topology.\n\nDisplays the shefa↔qahal intersection: the self hub status, compute-stewards\nproviding resilience for this Qahal (with health markers and reciprocal\nrelationships), and recovery readiness with Shamir threshold and drill cadence.\n\nAccepts any object matching the ComputeTopology shape — real or mock. This\nkeeps the panel decoupled from Phase 2 fixture types while remaining\nwire-compatible with MockComputeTopology.",
+          "name": "ElohimQahalSocialComputePanel",
+          "members": [
+            {
+              "kind": "field",
+              "name": "topology",
+              "type": {
+                "text": "ComputeTopology"
+              },
+              "default": "null",
+              "description": "The compute topology data to render",
+              "attribute": "topology"
+            },
+            {
+              "kind": "method",
+              "name": "_renderSteward",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "s",
+                  "type": {
+                    "text": "ComputeStewardRelationship"
+                  }
+                }
+              ]
+            }
+          ],
+          "attributes": [
+            {
+              "name": "topology",
+              "type": {
+                "text": "ComputeTopology"
+              },
+              "default": "null",
+              "description": "The compute topology data to render",
+              "fieldName": "topology"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-social-compute-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "supported",
+              "error": "supported",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "supported"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalSocialComputePanel",
+          "declaration": {
+            "name": "ElohimQahalSocialComputePanel",
+            "module": "src/elohim-qahal-social-compute-panel.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-standing-ring.ts",
       "declarations": [
         {

@@ -31,6 +31,13 @@ export type { BloomMapping, BloomTierKey, Rubric } from './elohim-qahal-rules-pa
 
 export { ElohimQahalSidebar } from './elohim-qahal-sidebar.js';
 
+export { ElohimQahalSocialComputePanel } from './elohim-qahal-social-compute-panel.js';
+export type {
+  ComputeHubStatus,
+  ComputeStewardRelationship,
+  ComputeTopology,
+} from './elohim-qahal-social-compute-panel.js';
+
 export { ElohimQahalStandingRing } from './elohim-qahal-standing-ring.js';
 export type { BloomTier } from './elohim-qahal-standing-ring.js';
 
