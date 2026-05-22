@@ -48,6 +48,17 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml
 
+# Crates under ./crates reference elohim-views via `../../elohim/elohim-views`
+# (the source-tree layout: crates/<name>/ → ../../elohim/elohim-views/). In the
+# container, elohim-views is COPYd to /app/elohim-views (without the nested
+# `elohim/` segment), so the relative path resolves to a nonexistent dir and
+# cargo aborts with "failed to read /app/elohim/elohim-views/Cargo.toml — No
+# such file or directory". Rewrite the path in every crates/<name>/Cargo.toml
+# that references elohim-views to drop the extra segment.
+RUN sed -i 's|path = "../../elohim/elohim-views"|path = "../../elohim-views"|' \
+        crates/elohim-sdk/Cargo.toml \
+        crates/elohim-storage-client/Cargo.toml
+
 # Strip the optional `elohim-render` path-dep + the `ssr` feature that
 # selects it. elohim-render is the V8/deno_core SSR runtime — it lives
 # in the doorway image, not here. The `ssr` feature is opt-in and not
