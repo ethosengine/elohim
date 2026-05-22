@@ -31,6 +31,13 @@
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
 # Falls back to inline commands if `just` is not installed.
+# Fallback arms exist only for projects without a justfile gate (elohim-compute,
+# elohim-epr, epr-storage, epr-ts, elohim-library, genesis-a2o), for deferred
+# projects whose fallback does more than their justfile gate (elohim-app, genesis,
+# orchestrator — see DEFERRED comments inside), and for virtual/orchestrator-defined
+# gates (schema-validate, constants-sync, rakia-codegen, etc.) that have no
+# per-project justfile. Projects with a sufficient justfile gate run ONLY via
+# `just gate`; their fallback arms have been removed.
 # This prevents pushing broken code that wastes CI time.
 
 # ── Load toolchains (git hooks run in minimal shell) ────────────
@@ -393,44 +400,22 @@ run_gate() {
     just gate 2>&1
     rc=$?
   else
+    # Fallback case arms below are for projects without a justfile gate, or
+    # for synthesized virtual gates (schema-validate, constants-sync, etc.) that
+    # are orchestrator-defined rather than per-project. Anything with a justfile
+    # MUST be invoked via `just gate` — do not duplicate logic here.
     echo "[$PROJECT_NAME] just not found, using fallback..."
     case "$PROJECT_NAME" in
       elohim-app)
         # Rebuild @elohim/storage-client dist first (gitignored; type
         # changes in its src/generated/ don't reach consumers otherwise).
         # Mirrors the `deps` step in app/elohim-app/justfile.
+        # DEFERRED: fallback includes eslint lint step that justfile gate omits.
+        # Delete only after app/elohim-app/justfile gate: adds lint.
         pnpm --filter @elohim/storage-client build 2>&1 && \
         pnpm exec eslint src --ext .ts,.html 2>&1 && \
         pnpm exec ng build --configuration=development 2>&1 && \
         pnpm exec vitest run --config vite.config.ts 2>&1
-        rc=$?
-        ;;
-      doorway)
-        cargo fmt --check 2>&1 && \
-        RUSTFLAGS="" cargo clippy -- -D warnings 2>&1 && \
-        RUSTFLAGS="" cargo test --lib --bins 2>&1
-        rc=$?
-        ;;
-      steward-node)
-        cargo fmt --check 2>&1 && \
-        RUSTFLAGS="" cargo clippy -- -D warnings 2>&1 && \
-        RUSTFLAGS="" cargo test 2>&1
-        rc=$?
-        ;;
-      doorway-app)
-        pnpm exec eslint src --ext .ts,.html 2>&1 && \
-        pnpm exec ng build --configuration=development 2>&1 && \
-        pnpm exec vitest run --config vite.config.ts 2>&1
-        rc=$?
-        ;;
-      sophia)
-        pnpm lint 2>&1 && pnpm typecheck 2>&1 && pnpm test -- --ci 2>&1
-        rc=$?
-        ;;
-      elohim-storage)
-        cargo fmt --check 2>&1 && \
-        RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy -- -D warnings 2>&1 && \
-        RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test 2>&1
         rc=$?
         ;;
       epr-storage)
@@ -494,6 +479,9 @@ run_gate() {
         fi
         ;;
       genesis)
+        # DEFERRED: fallback includes python3 validate-human-ids.py and pnpm run
+        # typecheck that the genesis/seeder justfile gate omits.
+        # Delete only after genesis/seeder/justfile gate: adds both steps.
         python3 genesis/scripts/validate-human-ids.py 2>&1 && \
         pnpm install --frozen-lockfile --ignore-scripts 2>&1 && \
         pnpm run validate 2>&1 && \
@@ -502,6 +490,9 @@ run_gate() {
         rc=$?
         ;;
       orchestrator)
+        # DEFERRED: fallback runs node --test *.mjs tests that the
+        # genesis/orchestrator justfile gate (gate: lint) omits.
+        # Delete only after genesis/orchestrator/justfile gate: adds node tests.
         bash scripts/lint-jenkinsfiles-fast.sh 2>&1 && \
         node --test orchestrator-strategy.test.mjs graph-walker.test.mjs 2>&1
         rc=$?
