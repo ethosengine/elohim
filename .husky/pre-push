@@ -563,7 +563,8 @@ run_gate() {
     esac
   fi
 
-  cd "$OLDPWD" || true
+  # CWD is now contained by the subshell wrapper around the run_gate call —
+  # no manual restoration needed.
   return $rc
 }
 
@@ -682,7 +683,7 @@ for PROJECT in $PROJECTS; do
     esac
   fi
 
-  run_gate "$PROJECT" "$PROJECT_DIR"
+  (run_gate "$PROJECT" "$PROJECT_DIR")
   GATE_EXIT=$?
 
   PROJECT_END=$(date +%s)
