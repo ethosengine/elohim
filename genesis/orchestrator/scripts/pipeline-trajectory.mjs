@@ -8,27 +8,34 @@
  * re-discover the same facts via ad-hoc curl every shift.
  *
  * Usage:
- *   JENKINS_URL=... JENKINS_TOKEN=... node pipeline-trajectory.mjs [opts]
+ *   JENKINS_URL=... node pipeline-trajectory.mjs [opts]
  *
  *   --builds <N>          how many orchestrator builds to include (default 10)
  *   --branch <name>       orchestrator branch (default 'dev')
- *   --pipelines <list>    comma-separated downstream pipeline jobs to track
- *                          (default: storybook,holochain,edge,elohim,genesis,sophia)
+ *   --pipelines <list>    comma-separated downstream pipeline jobs to track.
+ *                          Defaults to all non-manualOnly pipelines from
+ *                          orchestrator-strategy.mjs PIPELINES (single source
+ *                          of truth — keeps this tool from drifting from the
+ *                          orchestrator's actual dispatch set).
  *   --json                emit structured JSON instead of a table
  *   --since-baseline      additionally compute baseline-lag in builds + commits
  *                          (extra Jenkins reads — slower; default off)
  *
- * Read-only. No side effects.
+ * Read-only. No side effects. Anonymous-read against the orchestrator's
+ * OIDC-fronted Jenkins (sending auth headers triggers an OIDC redirect).
  */
 
 import process from 'node:process';
+import { PIPELINES as PIPELINE_REGISTRY } from '../orchestrator-strategy.mjs';
 
 const JENKINS_URL = process.env.JENKINS_URL;
-const JENKINS_TOKEN = process.env.JENKINS_TOKEN;
-if (!JENKINS_URL || !JENKINS_TOKEN) {
-  console.error('FATAL: JENKINS_URL and JENKINS_TOKEN must be set');
+if (!JENKINS_URL) {
+  console.error('FATAL: JENKINS_URL must be set');
   process.exit(2);
 }
+// This Jenkins is OIDC-fronted with anonymous read enabled for the orchestrator
+// + downstream jobs; sending an auth header triggers a redirect to the OIDC
+// provider and breaks the read. See memory: jenkins_mcp_anonymous_mode.
 
 // ─── arg parsing ──────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -41,28 +48,41 @@ function argFlag(name) {
 }
 const N = Number(argVal('--builds', '10'));
 const BRANCH = argVal('--branch', 'dev');
-const PIPELINES = argVal(
-  '--pipelines',
-  'elohim-storybook,elohim-holochain,elohim-edge,elohim,elohim-genesis,elohim-sophia',
-).split(',').filter(Boolean);
+const DEFAULT_PIPELINES = Object.keys(PIPELINE_REGISTRY)
+  .filter(k => !PIPELINE_REGISTRY[k].manualOnly)
+  .join(',');
+const PIPELINES = argVal('--pipelines', DEFAULT_PIPELINES).split(',').filter(Boolean);
 const EMIT_JSON = argFlag('--json');
 const COMPUTE_BASELINE_LAG = argFlag('--since-baseline');
 
 // ─── Jenkins fetchers ─────────────────────────────────────────────────────
+const RETRY_DELAYS_MS = [0, 1500, 4000]; // immediate, then backoff
+async function jenRequest(path, { allow404 = false } = {}) {
+  let lastErr;
+  for (const delay of RETRY_DELAYS_MS) {
+    if (delay) await new Promise(r => setTimeout(r, delay));
+    try {
+      const res = await fetch(`${JENKINS_URL}${path}`);
+      if (res.ok) return await res.json();
+      if (allow404 && res.status === 404) return null;
+      // Retry on transient server errors only; 4xx (other than allowed 404) is terminal.
+      if (res.status >= 500 && res.status < 600) {
+        lastErr = new Error(`${res.status} ${res.statusText} on ${path}`);
+        continue;
+      }
+      throw new Error(`${res.status} ${res.statusText} on ${path}`);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
 async function jen(path) {
-  const res = await fetch(`${JENKINS_URL}${path}`, {
-    headers: { 'Jenkins-Token': JENKINS_TOKEN },
-  });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} on ${path}`);
-  return res.json();
+  return jenRequest(path);
 }
 async function jenArtifact(path) {
-  const res = await fetch(`${JENKINS_URL}${path}`, {
-    headers: { 'Jenkins-Token': JENKINS_TOKEN },
-  });
-  if (!res.ok) return null;
   try {
-    return await res.json();
+    return await jenRequest(path, { allow404: true });
   } catch {
     return null;
   }
@@ -84,7 +104,10 @@ async function getPipelineBuilds(jobName, branch, n) {
         `?tree=builds[number,result,timestamp,duration,actions[causes[upstreamBuild,upstreamProject,shortDescription]]]{0,${n * 3}}`,
     );
     return data.builds || [];
-  } catch {
+  } catch (e) {
+    // Visible warning, not silent empty — empty rows otherwise look like
+    // "pipeline has nothing recent" instead of "we couldn't see it."
+    console.error(`WARN: ${jobName}/${branch} unreachable (${e.message}) — row will render as not-built`);
     return [];
   }
 }

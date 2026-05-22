@@ -325,6 +325,9 @@ run_gate() {
         ;;
       constants-sync)
         echo "[$PROJECT_NAME] Running constants sync (schema ↔ generated enums ↔ seed data)..."
+        # Verify codegen freshness first — a stale generated/schema-enums.ts
+        # would make the seed-vs-enum equality check below a tautology.
+        pnpm run schema:codegen:ts -- --verify 2>&1 && \
         (cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts) 2>&1
         rc=$?
         ;;
@@ -495,7 +498,10 @@ run_gate() {
         ;;
       constants-sync)
         echo "Running constants sync (schema ↔ generated enums ↔ seed data)..."
-        pnpm run schema:codegen:ts 2>&1 && \
+        # --verify (not mutate) so a stale generated/schema-enums.ts fails the
+        # gate locally instead of silently regenerating + passing here but
+        # failing CI on the missing commit.
+        pnpm run schema:codegen:ts -- --verify 2>&1 && \
         (cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts) 2>&1
         rc=$?
         ;;
