@@ -167,24 +167,54 @@ spec:
             }
         }
 
-        stage('Build Elohim Core') {
+        stage('Build Elohim Elements') {
+            // Build every pillar element package that has a `build` script.
+            // pnpm -r topologically orders by inter-workspace deps so elohim-core
+            // (the atom layer that the pillar elements depend on) builds first.
+            // --if-present silently skips scaffolded-but-empty pillar packages
+            // (elohim-avodah/doorway/lamad/shefa/shell as of this writing).
+            //
+            // Library B's designed stories side-effect-import pillar registers
+            // (e.g. render-qahal-homepage.ts imports both elohim-qahal/register
+            // and elohim-imagodei/register). When only elohim-core was built
+            // here, Rollup hard-failed the storybook bundle on unresolved
+            // imports. This stage closes that gap and stays future-proof —
+            // when a new pillar grows a build script, it builds automatically.
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     sh '''#!/bin/bash
                         set -euo pipefail
-                        echo "Building elohim-core (vite library + custom-elements-manifest)..."
-                        pnpm --filter elohim-core run build
+                        echo "Building all elohim-elements pillar packages (topologically ordered)..."
+                        pnpm --filter "./app/elohim-elements/**" --if-present run build
 
-                        if [ ! -f app/elohim-elements/elohim-core/dist/register.js ]; then
-                            echo "ERROR: elohim-core/dist/register.js missing after build"
+                        echo "Verifying dist/register.js for every package that has a build script..."
+                        FAILED=0
+                        for pkg in app/elohim-elements/*/; do
+                            if node -e "process.exit(require('./${pkg}package.json').scripts?.build ? 0 : 1)" 2>/dev/null; then
+                                if [ ! -f "${pkg}dist/register.js" ]; then
+                                    echo "  ✗ ${pkg}dist/register.js missing after build"
+                                    FAILED=1
+                                else
+                                    echo "  ✓ ${pkg}dist/register.js"
+                                fi
+                            else
+                                echo "  - ${pkg}: no build script (skipped)"
+                            fi
+                        done
+                        if [ "${FAILED}" -ne 0 ]; then
+                            echo "ERROR: one or more pillar packages did not produce dist/register.js"
                             exit 1
                         fi
+
+                        # elohim-core is special — also produces a dist/index.js
+                        # consumed by the library's bundler entry. Keep this gate
+                        # to surface a vite-config regression in elohim-core.
                         if [ ! -f app/elohim-elements/elohim-core/dist/index.js ]; then
                             echo "ERROR: elohim-core/dist/index.js missing after build"
                             exit 1
                         fi
-                        echo "elohim-core build OK"
+                        echo "elohim-elements build OK"
                     '''
                 }
             }
