@@ -123,6 +123,16 @@ export { parseCiIgnore, matchesCiIgnore, CI_IGNORE_PATTERNS } from './ci-ignore.
 import { matchesCiIgnore, CI_IGNORE_PATTERNS } from './ci-ignore.mjs';
 
 /**
+ * Returns the names of all pipelines that the orchestrator may auto-dispatch
+ * (i.e., excluding manualOnly entries like elohim-steward). Single source of
+ * truth for tools that need to enumerate the orchestrator's dispatchable set
+ * — count-pipeline-failures.sh, pipeline-trajectory.mjs, registry-cluster-drift.mjs.
+ */
+export function nonManualPipelines() {
+  return Object.keys(PIPELINES).filter(name => !PIPELINES[name].manualOnly);
+}
+
+/**
  * Mirrors Jenkinsfile analyzePipelineRequirements() — changeset analysis.
  * Simplified: no per-pipeline baselines (not needed for strategy tests).
  */

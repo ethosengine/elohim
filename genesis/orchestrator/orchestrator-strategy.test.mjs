@@ -33,6 +33,7 @@ import {
   parseCommitTags,
   parseSkipCi,
   simulate,
+  nonManualPipelines,
 } from './orchestrator-strategy.mjs';
 
 // ══════════════════════════════════════════════════════════════════
@@ -748,6 +749,28 @@ describe('drift detection: mirror vs live Jenkinsfile', () => {
       drifted.map((d) =>
         `  ${d.name}:\n    mirror: ${JSON.stringify(d.mirror)}\n    live:   ${JSON.stringify(d.live)}`
       ).join('\n'));
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// nonManualPipelines helper
+// ══════════════════════════════════════════════════════════════════
+
+describe('nonManualPipelines', () => {
+  it('excludes manualOnly entries', () => {
+    const result = nonManualPipelines();
+    assert.ok(Array.isArray(result), 'returns an array');
+    assert.ok(!result.includes('elohim-steward'), 'elohim-steward (manualOnly) excluded');
+    assert.ok(result.includes('elohim-holochain'), 'elohim-holochain included');
+    assert.ok(result.includes('elohim-epr'), 'elohim-epr included');
+  });
+
+  it('returns names matching PIPELINES keys', () => {
+    const result = nonManualPipelines();
+    for (const name of result) {
+      assert.ok(PIPELINES[name], `${name} is a known pipeline`);
+      assert.ok(!PIPELINES[name].manualOnly, `${name} is not manualOnly`);
+    }
   });
 });
 
