@@ -14,18 +14,18 @@
 set -u
 JENKINS_URL="${JENKINS_URL:-https://jenkins.ethosengine.com}"
 
-# Auto-dispatched pipelines on dev (manual-only ones excluded).
-# Source of truth: genesis/orchestrator/orchestrator-strategy.mjs PIPELINES.
-PIPELINES=(
-  "elohim-orchestrator"
-  "elohim-holochain"
-  "elohim-edge"
-  "elohim"
-  "elohim-genesis"
-  "elohim-sophia"
-  "elohim-epr"
-  "elohim-storybook"
-)
+# Read pipeline names from pipeline-list.json (generated from
+# orchestrator-strategy.mjs by scripts/generate-pipeline-list.mjs).
+# Include elohim-orchestrator explicitly because it's the orchestrator
+# itself and not in the dispatchable downstream set.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+PIPELINE_LIST="$REPO_ROOT/genesis/orchestrator/pipeline-list.json"
+if [ ! -f "$PIPELINE_LIST" ]; then
+  echo "ERROR: $PIPELINE_LIST not found; run 'just -d genesis/orchestrator ci-pipeline-list'" >&2
+  exit 2
+fi
+# shellcheck disable=SC2207
+PIPELINES=( "elohim-orchestrator" $(jq -r '.pipelines[] | select(.manualOnly | not) | .name' "$PIPELINE_LIST") )
 
 fails=0
 unreachable=0
