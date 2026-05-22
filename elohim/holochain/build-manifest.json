@@ -68,13 +68,14 @@
       }
     },
     "deploy-manifests": {
-      "description": "k8s manifests applied during edge deploy (doorway ingress, infra). Listed here so manifest-only changes mark elohim-edge stale; actual kubectl apply runs in the existing Deploy Edge Node stages.",
+      "description": "k8s manifests + render-time data applied during edge deploy. Listed here so manifest-only or deployment-record-only changes mark elohim-edge stale; actual kubectl apply runs in the existing Deploy Edge Node stages. genesis/orchestrator/data/** covers deployments.json (per-human StatefulSet records consumed by elohim/holochain/Jenkinsfile line 243 via readJSON to render edge nodes).",
       "inputs": {
         "sources": [
           "genesis/orchestrator/manifests/doorway/**",
           "genesis/orchestrator/manifests/infra/**",
           "genesis/orchestrator/manifests/humans/**",
-          "genesis/orchestrator/environments/**"
+          "genesis/orchestrator/environments/**",
+          "genesis/orchestrator/data/**"
         ],
         "buildProcess": ["elohim/holochain/Jenkinsfile"]
       },
