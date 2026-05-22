@@ -41,8 +41,8 @@ export interface PWPage {
   reload(options?: Record<string, unknown>): Promise<unknown>;
   on(event: string, handler: (...args: unknown[]) => void): void;
   fill(selector: string, value: string): Promise<void>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   waitForFunction(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     fn: (arg: any) => unknown,
     arg?: unknown,
     options?: Record<string, unknown>

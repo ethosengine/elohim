@@ -37,7 +37,11 @@ async function ensureInspector(world: E2EWorld): Promise<PlaywrightDevice> {
   try {
     human = world.getHuman(INSPECTOR_NAME);
   } catch {
-    human = new Human(INSPECTOR_NAME, { identifier: '', password: '', displayName: INSPECTOR_NAME });
+    human = new Human(INSPECTOR_NAME, {
+      identifier: '',
+      password: '',
+      displayName: INSPECTOR_NAME,
+    });
     world.addHuman(INSPECTOR_NAME, human);
   }
 
@@ -149,7 +153,7 @@ Then('the identifier input value is {string}', async function (this: E2EWorld, e
   // for the projection to settle.
   await page.waitForFunction(
     ({ selector, expected }: { selector: string; expected: string }) => {
-      const el = document.querySelector(selector) as HTMLInputElement | null;
+      const el = document.querySelector<HTMLInputElement>(selector);
       return el?.value === expected;
     },
     { selector: `[data-testid="${THRESHOLD.IDENTIFIER}"]`, expected },
