@@ -32,14 +32,21 @@ COPY elohim/epr ./epr
 # depends on it directly. Without this COPY the build aborts at resolve time:
 # "failed to read /elohim-views/Cargo.toml: No such file".
 COPY elohim/elohim-views ./elohim-views
+# Wave 3 — valueflows bridge crates (hREA / VF-GraphQL interop) are
+# unconditional path-deps in Cargo.toml; copy them in so the
+# build-context contains their source.
+COPY bridges ./bridges
 
 # Fix the paths to local crates (now relative to /app)
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
+    sed -i 's|path = "../../crates/elohim-sdk"|path = "crates/elohim-sdk"|' Cargo.toml && \
     sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml && \
     sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
     sed -i 's|path = "../elohim-views"|path = "elohim-views"|' Cargo.toml && \
-    sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml
+    sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml && \
+    sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
+    sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml
 
 # Strip the optional `elohim-render` path-dep + the `ssr` feature that
 # selects it. elohim-render is the V8/deno_core SSR runtime — it lives
