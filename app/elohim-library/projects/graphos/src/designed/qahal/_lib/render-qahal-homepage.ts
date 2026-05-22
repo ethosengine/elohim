@@ -62,6 +62,28 @@ export function renderQahalHomepage(scene: Scene, opts: RenderOpts): TemplateRes
 }
 
 // ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves the list of stream-event IDs that are awaiting acknowledgment.
+ *
+ * Two sources contribute:
+ *   1. Per-event `acknowledgmentPending` flag on individual stream events
+ *      (the in-place signal authored on the event itself).
+ *   2. Scene-level `pendingAcknowledgments` array (a denormalized id list
+ *      that lets a scene fixture flag events without rewriting each one).
+ *
+ * Both the `co-steward` panel branch and the persistent right-nav context
+ * column need the same resolved list, so the derivation lives here.
+ */
+function derivePendingIds(scene: Scene): string[] {
+  return scene.streamEvents
+    .filter((e) => e.acknowledgmentPending || scene.pendingAcknowledgments.includes(e.id))
+    .map((e) => e.id);
+}
+
+// ---------------------------------------------------------------------------
 // Column 1 — collective switcher
 // ---------------------------------------------------------------------------
 
@@ -105,13 +127,23 @@ function renderExternalLinkSection(
   // The element expects ExternalLink { id, url, label }. The Scene's
   // ExternalLink carries { id, title, url, visibilityRequirement[] }, so
   // map title→label and pre-filter for the filtered_via_co_steward case.
+  //
+  // Responsibility split (deliberate — do not collapse without reading both
+  // call sites):
+  //   - The COMPOSER (here) decides WHICH links exist in the DOM. For
+  //     `filtered_via_co_steward`, only links whose visibilityRequirement
+  //     includes the viewer's tier are passed to the element. For `full`,
+  //     all links are passed. For `hidden`, the section is DOM-absent.
+  //   - The ELEMENT (elohim-qahal-external-link-list) decides HOW to
+  //     present the surviving links: when viewer-tier resolves to
+  //     `filtered_via_co_steward` via .visibilityMap, it wraps the list in
+  //     a "filtered via co-steward" annotation so the viewer knows the set
+  //     was curated. Both layers cooperate; neither is redundant.
   const sourceLinks =
     visibility === 'filtered_via_co_steward'
       ? scene.externalLinks.filter((l) => l.visibilityRequirement.includes(opts.viewerTier))
       : scene.externalLinks;
   const elementLinks = sourceLinks.map((l) => ({ id: l.id, url: l.url, label: l.title }));
-  // The element also takes a visibilityMap + viewer-tier so it can render the
-  // filtered-via-co-steward annotation when appropriate.
   return html`
     <elohim-qahal-external-link-list
       slot="external"
@@ -186,17 +218,13 @@ function renderActivePanel(
     }
     case 'rules':
       return html`<elohim-qahal-rules-panel .rubric=${scene.rubric}></elohim-qahal-rules-panel>`;
-    case 'co-steward': {
-      const pending = scene.streamEvents
-        .filter((e) => e.acknowledgmentPending || scene.pendingAcknowledgments.includes(e.id))
-        .map((e) => e.id);
+    case 'co-steward':
       return html`
         <elohim-qahal-co-steward-panel
           primary-observation=${scene.coStewardObservation}
-          .pendingAcknowledgments=${pending}
+          .pendingAcknowledgments=${derivePendingIds(scene)}
         ></elohim-qahal-co-steward-panel>
       `;
-    }
     case 'social-compute':
       return html`
         <elohim-qahal-social-compute-panel
@@ -219,9 +247,7 @@ function renderActivePanel(
 // ---------------------------------------------------------------------------
 
 function renderContextColumn(scene: Scene, _opts: RenderOpts): TemplateResult {
-  const pending = scene.streamEvents
-    .filter((e) => e.acknowledgmentPending || scene.pendingAcknowledgments.includes(e.id))
-    .map((e) => e.id);
+  const pending = derivePendingIds(scene);
   return html`
     <elohim-qahal-context-column>
       <elohim-qahal-co-steward-panel
