@@ -414,18 +414,97 @@ def cleanupOrphanedHumans(List allHumans) {
  * slowest single human. This was the dominant factor in the 60min edge
  * pipeline timeout that aborted #958, #962, #964.
  *
+ * Each per-peer rollout is treated as a test case (not a build step). A
+ * partial cluster-side failure (one peer's StatefulSet doesn't reach Ready
+ * within the rollout-status timeout, or kubectl apply fails on an immutable
+ * field, etc.) marks the parent stage UNSTABLE instead of FAILURE — so the
+ * orchestrator can settle UNSTABLE-or-better and downstream pipelines see
+ * the actual per-peer truth rather than a blank-cascade. junit XML is
+ * emitted (one testcase per peer) so Jenkins surfaces partial failures in
+ * the test report tab. Rationale: a single peer's resource floor being too
+ * tight (e.g. the 2026-05-22 james OOM that drove edge #983–#985 FAILURE
+ * even though 14/15 peers were healthy) is a per-peer test failure, not a
+ * pipeline-broken-shape problem.
+ *
  * Localizes humanConfig per closure to avoid Groovy's capture-by-reference
  * trap in loops.
  */
 def deployHumansInParallel(List humans, String envFile, List allHumans) {
+    if (!humans) {
+        echo "deployHumansInParallel: no humans to deploy — skipping"
+        return
+    }
+    // Synchronized map: parallel branches each write their own key, no
+    // collisions, but the wrapper guarantees memory visibility on read.
+    def outcomes = java.util.Collections.synchronizedMap([:])
     def branches = [:]
     humans.each { humanConfig ->
         def hc = humanConfig
         branches["deploy-${hc.resourcePrefix}"] = {
-            deployHumanManifest(hc, envFile, allHumans)
+            catchError(
+                buildResult: 'UNSTABLE',
+                stageResult: 'UNSTABLE',
+                message: "deploy ${hc.resourcePrefix}: rollout failed — see junit testcase (kubectl describe pod -n ${hc.namespace} -l app.kubernetes.io/name=${hc.resourcePrefix} for cluster-side reason)",
+            ) {
+                deployHumanManifest(hc, envFile, allHumans)
+                // Only reached on clean return — catchError swallows
+                // exceptions before this line on any failure path.
+                outcomes[hc.resourcePrefix] = true
+            }
         }
     }
     parallel(branches)
+    emitDeployJunit((humans[0]?.env ?: 'unknown'), humans, outcomes)
+}
+
+/**
+ * Emit a junit-style XML report for the parallel per-peer deploy. One
+ * testcase per peer, classname = `elohim-edge.deploy.<env>`. Archived as
+ * a build artifact and registered via `junit` so Jenkins' test-report tab
+ * surfaces partial failures (and the `getTestResults` MCP / API can read
+ * per-peer outcomes without scraping logs).
+ *
+ * outcomes[resourcePrefix] == true iff the peer's rollout returned cleanly
+ * inside the catchError block. Absent or non-true = failed.
+ */
+def emitDeployJunit(String envName, List humans, Map outcomes) {
+    def cases = humans.collect { hc ->
+        [
+            name: hc.resourcePrefix,
+            archetype: (hc.deviceArchetype ?: 'unknown'),
+            passed: outcomes[hc.resourcePrefix] == true,
+        ]
+    }
+    def passed = cases.count { it.passed }
+    def failed = cases.size() - passed
+
+    def lines = cases.collect { c ->
+        def attrs = "classname=\"elohim-edge.deploy.${envName}\" name=\"${c.name}\" time=\"0\""
+        if (c.passed) {
+            "  <testcase ${attrs}/>"
+        } else {
+            def msg = "StatefulSet ${c.name} (archetype=${c.archetype}) did not reach Ready within rollout-status timeout, or kubectl apply failed. See build log for the specific kubectl error; run `kubectl describe pod -l app.kubernetes.io/name=${c.name}` against the alpha cluster for the pod-level reason (OOMKilled, CrashLoopBackOff, ImagePullBackOff, PVC pending, etc.)."
+            // Minimal XML escape for the attribute value.
+            msg = msg.replace('&', '&amp;').replace('<', '&lt;').replace('"', '&quot;')
+            "  <testcase ${attrs}><failure message=\"${msg}\" type=\"rollout-failed\"/></testcase>"
+        }
+    }
+    def xml = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        "<testsuite name=\"elohim-edge.deploy.${envName}\" tests=\"${cases.size()}\" failures=\"${failed}\">",
+        lines.join('\n'),
+        '</testsuite>',
+    ].join('\n')
+
+    def reportFile = "deploy-${envName}-junit.xml"
+    writeFile(file: reportFile, text: xml)
+    archiveArtifacts(artifacts: reportFile, allowEmptyArchive: true)
+    junit(testResults: reportFile, allowEmptyResults: true)
+    echo "Edge deploy result for ${envName}: ${passed}/${cases.size()} peers Ready"
+    if (failed > 0) {
+        def failedNames = cases.findAll { !it.passed }.collect { it.name }.join(', ')
+        echo "Edge deploy partial failure: ${failed}/${cases.size()} peers did not reach Ready — ${failedNames}. Stage marked UNSTABLE (test-result shape); downstream pipelines proceed."
+    }
 }
 
 /**
@@ -629,6 +708,51 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     sh "kubectl apply -f ${outputFile}"
     sh "kubectl rollout restart deployment/${depName} -n elohim-${targetEnv}"
     sh "kubectl rollout status deployment/${depName} -n elohim-${targetEnv} --timeout=300s"
+}
+
+/**
+ * Deploy the canonical doorway for an environment + (alpha-only) the alpha-b
+ * federation peer, with each deploy treated as one test case. A failure in
+ * either (ingress hostname conflict, broken manifest, hub PVC pending, etc.)
+ * marks the parent stage UNSTABLE rather than FAILURE — matching the
+ * per-human deploy shape from deployHumansInParallel — so the orchestrator
+ * can settle UNSTABLE-or-better when humans are healthy but federation is
+ * mid-cutover. Emits a junit XML report (testsuite name
+ * `elohim-edge.deploy.<env>-doorway`) so Jenkins' test-report tab surfaces
+ * which doorway-shape deploy failed.
+ *
+ * Extracted from the Deploy Edge Node - Alpha stage to keep that stage's
+ * CPS method body under the JVM 64KB size limit (cf. edge #922
+ * method-too-large + the 11000-byte HARD limit enforced by the
+ * jenkinsfile-method-size.py pre-commit hook).
+ */
+def deployDoorwaysWithTestShape(String targetEnv, String envFile, List allHumans) {
+    def outcomes = java.util.Collections.synchronizedMap([:])
+    def cases = [
+        [resourcePrefix: "elohim-doorway-${targetEnv}", env: targetEnv, deviceArchetype: "doorway-${targetEnv}"],
+    ]
+    catchError(
+        buildResult: 'UNSTABLE',
+        stageResult: 'UNSTABLE',
+        message: "doorway-${targetEnv} deploy failed (see junit testcase)",
+    ) {
+        deployDoorwayManifest(targetEnv, envFile, allHumans)
+        outcomes["elohim-doorway-${targetEnv}"] = true
+    }
+    if (targetEnv == 'alpha') {
+        cases.add([resourcePrefix: 'elohim-doorway-alpha-b', env: 'alpha', deviceArchetype: 'doorway-alpha-federation'])
+        catchError(
+            buildResult: 'UNSTABLE',
+            stageResult: 'UNSTABLE',
+            message: 'doorway-alpha-b federation peer deploy failed (see junit testcase — common cause: ingress hostname conflict on elohim.host)',
+        ) {
+            deployDoorwayManifest('alpha', envFile, allHumans,
+                'genesis/orchestrator/manifests/doorway/alpha-b.yaml',
+                'elohim-doorway-alpha-b')
+            outcomes['elohim-doorway-alpha-b'] = true
+        }
+    }
+    emitDeployJunit("${targetEnv}-doorway", cases, outcomes)
 }
 
 // DEPLOY_ONLY pre-flight: Setup Version was skipped, so loadBuildVars'
@@ -1621,25 +1745,13 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                                 }
 
                                 // Deploy each human in parallel — see deployHumansInParallel
-                                // for rationale (rollout-status wait dominates; sequential =
-                                // ~30min for 3 humans, parallel = ~slowest single human).
+                                // for rationale. Per-peer test-result shape; partial
+                                // failures → UNSTABLE (stage), junit XML per peer.
                                 deployHumansInParallel(envHumans, ec.envFile, allHumans)
 
-                                // Deploy doorway with computed URLs
-                                deployDoorwayManifest(targetEnv, ec.envFile, allHumans)
-
-                                // Alpha-only: deploy doorway-alpha-b as the federation peer
-                                // sharing the alpha conductor pool. Apex hostname elohim.host
-                                // (see manifests/doorway/alpha-b.yaml). Mirrors the staging-read
-                                // precedent below — same conductor pool, distinct deployment
-                                // name and service selector. FEDERATION_PEERS in alpha.yaml +
-                                // alpha-b.yaml each point at the other so peer-discovery,
-                                // DHT-registration, and heartbeat exercise a 2-doorway topology.
-                                if (targetEnv == 'alpha') {
-                                    deployDoorwayManifest('alpha', ec.envFile, allHumans,
-                                        'genesis/orchestrator/manifests/doorway/alpha-b.yaml',
-                                        'elohim-doorway-alpha-b')
-                                }
+                                // Deploy doorway + (alpha-only) alpha-b federation peer with
+                                // the same test-result shape — see deployDoorwaysWithTestShape.
+                                deployDoorwaysWithTestShape(targetEnv, ec.envFile, allHumans)
                             }
 
                             // Cleanup orphaned StatefulSets from previous topology
