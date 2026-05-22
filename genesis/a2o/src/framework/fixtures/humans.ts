@@ -332,12 +332,12 @@ export function isAnyNodePoolAvailable(pools: NodePool[]): boolean {
 /** Counter of humans auto-skipped this run due to node-pool unavailability.
  * Test runner can read this at end-of-run and mark the build UNSTABLE if > 0
  * (i.e. some scenarios skipped because of test-bench scaling, not failures). */
-let _autoSkippedHumans: Set<string> = new Set();
+let _autoSkippedHumans = new Set<string>();
 
 /** Snapshot of which humans were auto-skipped by node-pool gating. Returns a
  * copy so callers can't mutate internal state. */
 export function autoSkippedHumans(): string[] {
-  return [..._autoSkippedHumans].sort();
+  return [..._autoSkippedHumans].sort((a, b) => a.localeCompare(b));
 }
 
 /** Reset auto-skip tracking. Test runners call this at start-of-run. */

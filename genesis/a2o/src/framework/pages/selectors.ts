@@ -24,6 +24,9 @@ export const THRESHOLD = {
   ERROR_DISMISS: 'threshold-error-dismiss',
   FEDERATED_LOGIN: 'threshold-federated-login',
   REGISTER_LINK: 'threshold-register-link',
+  DOMAIN_SUFFIX: 'threshold-domain-suffix',
+  DIFFERENT_DOORWAY_HINT: 'threshold-different-doorway-hint',
+  RETRY: 'threshold-retry',
 } as const;
 
 // Doorway threshold register (doorway-app: threshold-register.component.ts)

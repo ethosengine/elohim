@@ -18,7 +18,14 @@ export function isSpaRoutingNoise(log: CapturedConsoleLog): boolean {
     log.text.includes('Failed to load resource: the server responded with a status of 0') ||
     // Browser logs 403 when admin endpoints deny access — the Angular app
     // handles this gracefully via catchError, but the browser still reports it.
-    log.text.includes('Failed to load resource: the server responded with a status of 403')
+    log.text.includes('Failed to load resource: the server responded with a status of 403') ||
+    // doorway-app's DoorwayAdmin service auto-fires /auth/account on every page
+    // (including unauthenticated routes like /login). When rendered against
+    // doorway-app dev-server directly (E2E_DOORWAY_ALPHA=localhost:8081),
+    // there's no doorway-service to handle the proxy and the dev-server
+    // returns index.html, which fails JSON parsing. The Angular app handles
+    // the result via catchError and the failure is cosmetic.
+    log.text.includes('[DoorwayAdmin] getAccount failed')
   );
 }
 
