@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { BehaviorSubject, of } from 'rxjs';
 
@@ -287,6 +289,8 @@ describe('DeviceStewardshipComponent', () => {
       imports: [DeviceStewardshipComponent],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: DeviceStewardshipService, useValue: mockService },
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: PointsService, useValue: mockPointsService },

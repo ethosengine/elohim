@@ -6,6 +6,8 @@
 
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { AgencyService } from './agency.service';
 import { AuthService } from './auth.service';
@@ -71,6 +73,8 @@ describe('AgencyService', () => {
     TestBed.configureTestingModule({
       providers: [
         AgencyService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: HolochainClientService, useValue: mockHolochainClient },
         { provide: AuthService, useValue: mockAuthService },
       ],
