@@ -79,19 +79,22 @@ async function jenRequest(path, { allow404 = false } = {}) {
   let lastErr;
   for (const delay of RETRY_DELAYS_MS) {
     if (delay) await new Promise(r => setTimeout(r, delay));
+    let res;
     try {
-      const res = await fetch(`${JENKINS_URL}${path}`);
-      if (res.ok) return await res.json();
-      if (allow404 && res.status === 404) return null;
-      // Retry on transient server errors only; 4xx (other than allowed 404) is terminal.
-      if (res.status >= 500 && res.status < 600) {
-        lastErr = new Error(`${res.status} ${res.statusText} on ${path}`);
-        continue;
-      }
-      throw new Error(`${res.status} ${res.statusText} on ${path}`);
+      res = await fetch(`${JENKINS_URL}${path}`);
     } catch (e) {
+      // Network error — retryable.
       lastErr = e;
+      continue;
     }
+    if (res.ok) return await res.json();
+    if (allow404 && res.status === 404) return null;
+    // Retry on transient server errors only; 4xx (other than allowed 404) is terminal.
+    if (res.status >= 500 && res.status < 600) {
+      lastErr = new Error(`${res.status} ${res.statusText} on ${path}`);
+      continue;
+    }
+    throw new Error(`${res.status} ${res.statusText} on ${path}`);
   }
   throw lastErr;
 }
