@@ -220,6 +220,117 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-co-steward-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Co-steward panel — observational right-context view from the commons-elohim.\n\nRenders the commons-elohim's primary observation prominently. When pending\nacknowledgments are present, lists them with a soft no-urgency footer.\nTone discipline: no \"alert\", \"warning\", or exclamation marks in any\nrendered content.",
+          "name": "ElohimQahalCoStewardPanel",
+          "members": [
+            {
+              "kind": "field",
+              "name": "primaryObservation",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The co-steward's primary observation text",
+              "attribute": "primary-observation"
+            },
+            {
+              "kind": "field",
+              "name": "pendingAcknowledgments",
+              "type": {
+                "text": "string[]"
+              },
+              "default": "[]",
+              "description": "Optional list of pending care acknowledgment labels",
+              "attribute": "pendingAcknowledgments"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "primary-observation",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The co-steward's primary observation text",
+              "fieldName": "primaryObservation"
+            },
+            {
+              "name": "pendingAcknowledgments",
+              "type": {
+                "text": "string[]"
+              },
+              "default": "[]",
+              "description": "Optional list of pending care acknowledgment labels",
+              "fieldName": "pendingAcknowledgments"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-co-steward-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalCoStewardPanel",
+          "declaration": {
+            "name": "ElohimQahalCoStewardPanel",
+            "module": "src/elohim-qahal-co-steward-panel.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-collective-switcher.ts",
       "declarations": [
         {
@@ -685,6 +796,131 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-qahal-member-ring-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Member-ring panel — tier-aware member drill-down with network reach headline.\n\nRenders the stratified member view: a network reach headline followed by\nfour tier sections, each showing a label, count, imagodei badges (up to 8),\nand a \"+ N more\" indicator for overflow. Selected tiers include contextual notes.",
+          "name": "ElohimQahalMemberRingPanel",
+          "members": [
+            {
+              "kind": "field",
+              "name": "reach",
+              "type": {
+                "text": "number"
+              },
+              "default": "0",
+              "description": "Total network reach count",
+              "attribute": "reach"
+            },
+            {
+              "kind": "field",
+              "name": "tiers",
+              "type": {
+                "text": "MemberTier[]"
+              },
+              "default": "[]",
+              "description": "Array of member tier sections to render",
+              "attribute": "tiers"
+            },
+            {
+              "kind": "method",
+              "name": "_renderTier",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "tier",
+                  "type": {
+                    "text": "MemberTier"
+                  }
+                }
+              ]
+            }
+          ],
+          "attributes": [
+            {
+              "name": "reach",
+              "type": {
+                "text": "number"
+              },
+              "default": "0",
+              "description": "Total network reach count",
+              "fieldName": "reach"
+            },
+            {
+              "name": "tiers",
+              "type": {
+                "text": "MemberTier[]"
+              },
+              "default": "[]",
+              "description": "Array of member tier sections to render",
+              "fieldName": "tiers"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-member-ring-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalMemberRingPanel",
+          "declaration": {
+            "name": "ElohimQahalMemberRingPanel",
+            "module": "src/elohim-qahal-member-ring-panel.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-qahal-provenance-marker.ts",
       "declarations": [
         {
@@ -792,6 +1028,98 @@
           "declaration": {
             "name": "ElohimQahalProvenanceMarker",
             "module": "src/elohim-qahal-provenance-marker.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-rules-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Rules panel — renders the Qahal rubric in human-readable form.\n\nDisplays the rubric name, standing honors, Bloom-tier progression mapping,\ncadence, friction-gradient note, configured-by, and last-revised date.",
+          "name": "ElohimQahalRulesPanel",
+          "members": [
+            {
+              "kind": "field",
+              "name": "rubric",
+              "type": {
+                "text": "Rubric | null"
+              },
+              "default": "null",
+              "description": "The rubric to render; null renders empty state",
+              "attribute": "rubric"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "rubric",
+              "type": {
+                "text": "Rubric | null"
+              },
+              "default": "null",
+              "description": "The rubric to render; null renders empty state",
+              "fieldName": "rubric"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-rules-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalRulesPanel",
+          "declaration": {
+            "name": "ElohimQahalRulesPanel",
+            "module": "src/elohim-qahal-rules-panel.ts"
           }
         }
       ]
@@ -996,6 +1324,112 @@
           "declaration": {
             "name": "ElohimQahalStandingRing",
             "module": "src/elohim-qahal-standing-ring.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-qahal-stream-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Stream panel — renders the commons stream as a feed.\n\nConsumes an array of StreamEvent objects and renders each as a list item\nwith an author badge, timestamp, content, and optional care-economy marker.\nEvents with acknowledgmentPending=true receive visual emphasis.\nEvents authored by commons-elohim receive distinct styling.",
+          "name": "ElohimQahalStreamPanel",
+          "members": [
+            {
+              "kind": "field",
+              "name": "events",
+              "type": {
+                "text": "StreamEvent[]"
+              },
+              "default": "[]",
+              "description": "Array of stream events to render",
+              "attribute": "events"
+            },
+            {
+              "kind": "method",
+              "name": "_renderItem",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "event",
+                  "type": {
+                    "text": "StreamEvent"
+                  }
+                }
+              ]
+            }
+          ],
+          "attributes": [
+            {
+              "name": "events",
+              "type": {
+                "text": "StreamEvent[]"
+              },
+              "default": "[]",
+              "description": "Array of stream events to render",
+              "fieldName": "events"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "package": "elohim-core"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-qahal-stream-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "visitor | engaged | contributor | steward"
+              ]
+            },
+            "contentCertainty": "observed-private",
+            "states": {
+              "empty": "supported",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "supported",
+              "contested": "n/a",
+              "offline": "supported",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimQahalStreamPanel",
+          "declaration": {
+            "name": "ElohimQahalStreamPanel",
+            "module": "src/elohim-qahal-stream-panel.ts"
           }
         }
       ]
