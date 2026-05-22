@@ -29,6 +29,11 @@ import process from 'node:process';
 import { nonManualPipelines } from '../orchestrator-strategy.mjs';
 import { isSuccess, isFailure, isWasted } from '../pipeline-results.mjs';
 
+// Tracks pipelines whose Jenkins job was unreachable (404 / network error).
+// Module-level so it accumulates across calls; fine in single-run mode and
+// harmless in --watch mode (drift is stable across iterations).
+const unreachablePipelines = new Set();
+
 const JENKINS_URL = process.env.JENKINS_URL;
 if (!JENKINS_URL) {
   console.error('FATAL: JENKINS_URL must be set');
@@ -121,6 +126,7 @@ async function getPipelineBuilds(jobName, branch, n) {
     // Visible warning, not silent empty — empty rows otherwise look like
     // "pipeline has nothing recent" instead of "we couldn't see it."
     console.error(`WARN: ${jobName}/${branch} unreachable (${e.message}) — row will render as not-built`);
+    unreachablePipelines.add(jobName);
     return [];
   }
 }
@@ -307,6 +313,20 @@ async function main() {
         note: 'baseline has shifted significantly — verify lastCompleted() is advancing as expected',
       });
     }
+  }
+
+  // Registry vs cluster drift — surface pipelines whose Jenkins job was
+  // unreachable (persistent 404 / network error). High-signal because
+  // transient 5xx errors are retried; only jobs that don't exist on this
+  // branch reach the catch path. Run scripts/registry-cluster-drift.mjs for
+  // the full bidirectional report (registry-only + cluster-only).
+  for (const job of unreachablePipelines) {
+    patterns.push({
+      kind: 'registry-cluster-drift',
+      pipeline: job,
+      rate: 'no Jenkins builds visible',
+      note: 'pipeline declared in registry but Jenkins job unreachable — run scripts/registry-cluster-drift.mjs',
+    });
   }
 
   // ─── output ─────────────────────────────────────────────────────────────
