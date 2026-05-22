@@ -309,9 +309,16 @@ def matchesCiIgnore(String file, List patterns) {
  *
  * Priority order:
  *   1. FORCE_COMMIT parameter (manual override)
- *   2. Stored global baseline (advances on every completed build, even UNSTABLE)
- *   3. GIT_PREVIOUS_SUCCESSFUL_COMMIT (Jenkins Git plugin - only advances on SUCCESS)
- *   4. HEAD~1 fallback (only diffs the latest push)
+ *   2. Stored global baseline (from pipeline-baselines.json of lastCompleted)
+ *   3. GIT_PREVIOUS_COMMIT (Jenkins Git plugin - any result, always set after first build)
+ *   4. GIT_PREVIOUS_SUCCESSFUL_COMMIT (Jenkins Git plugin - only advances on SUCCESS)
+ *   5. HEAD~1 fallback (only diffs the latest push)
+ *
+ * Priority 3 (GIT_PREVIOUS_COMMIT) prevents the "stuck baseline" cascade where
+ * a string of FAILUREs makes GIT_PREVIOUS_SUCCESSFUL_COMMIT lag arbitrarily far
+ * behind HEAD. Using the immediately-previous build's HEAD (any result) instead
+ * means the diff window is bounded to "since the last orchestrator dispatched",
+ * which is what change-detection actually needs.
  */
 // DEPRECATED: advisory only, will be removed
 def analyzeChangeset(storedGlobalBaseline = null) {
@@ -324,7 +331,17 @@ def analyzeChangeset(storedGlobalBaseline = null) {
         echo "Using stored global baseline: ${baseCommit.take(8)}"
     }
 
-    // 3. Jenkins Git plugin automatic tracking (only updates on SUCCESS)
+    // 3. Jenkins Git plugin: previous build's commit (any result). Available
+    //    after the first build on this branch. Preferred over the
+    //    success-gated variant because a streak of FAILUREs must not stretch
+    //    the baseline back arbitrarily far.
+    if (!baseCommit && env.GIT_PREVIOUS_COMMIT) {
+        baseCommit = env.GIT_PREVIOUS_COMMIT
+        echo "Using GIT_PREVIOUS_COMMIT (previous build, any result): ${baseCommit.take(8)}"
+    }
+
+    // 4. Jenkins Git plugin: last successful build's commit (only advances on
+    //    SUCCESS). Last-resort fallback before HEAD~1.
     if (!baseCommit) {
         baseCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
     }
@@ -595,21 +612,25 @@ def propagateDependencies(pipelines, analysis) {
 def loadPipelineBaselines() {
     def baselines = [:]
     try {
-        // Selector intentionally lastSuccessful (not lastCompleted): an ABORTED
-        // build (e.g. SCM checkout interrupted, pod evicted, Harbor outage) still
-        // runs its post.always archive step but has no per-pipeline baselines
-        // to record because Execute Builds never ran. lastCompleted() would pick
-        // that up and copy an empty/stub archive, leaving baselines = {} and
-        // tipping the next build into the "Large changeset / Building all
-        // matching pipelines" fallback for no good reason.
+        // Selector: lastCompleted() — every completed orchestrator run advances
+        // the baseline, not only SUCCESS/UNSTABLE ones. Required because a
+        // string of FAILUREs (genesis flake, downstream brokenness) would
+        // otherwise freeze the baseline at the last UNSTABLE run, causing
+        // every later build's changeset to balloon to "everything since then"
+        // and dispatch the full cascade including hour-long DNA recompiles
+        // that re-do uncovered work three runs in a row.
         //
-        // lastSuccessful() (copyartifact plugin) treats SUCCESS *and* UNSTABLE
-        // as successful, which is what we want: the last orchestrator run that
-        // actually completed Execute Builds and saved real baselines.
+        // Safe to use lastCompleted() because archivePipelineBaselines() always
+        // writes at minimum __global__ = current HEAD on every checkpoint
+        // (plan / execute / post), so a run that reached even the 'plan'
+        // checkpoint produces a valid baseline regardless of subsequent
+        // pipeline outcomes. A run hard-killed before 'plan' archives nothing
+        // — copyArtifacts(optional: true) handles that silently and the
+        // GIT_PREVIOUS_COMMIT fallback in analyzeChangeset takes over.
         copyArtifacts(
             projectName: env.JOB_NAME,
             filter: 'pipeline-baselines.json',
-            selector: lastSuccessful(),
+            selector: lastCompleted(),
             optional: true,
             flatten: true
         )
