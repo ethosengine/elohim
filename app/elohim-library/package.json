@@ -30,6 +30,8 @@
     "@angular/router": "^19.2.0",
     "@holochain/client": "0.20.0",
     "elohim-core": "workspace:*",
+    "elohim-imagodei": "workspace:*",
+    "elohim-qahal": "workspace:*",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"

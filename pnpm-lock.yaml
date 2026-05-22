@@ -553,6 +553,12 @@ importers:
       elohim-core:
         specifier: workspace:*
         version: link:../elohim-elements/elohim-core
+      elohim-imagodei:
+        specifier: workspace:*
+        version: link:../elohim-elements/elohim-imagodei
+      elohim-qahal:
+        specifier: workspace:*
+        version: link:../elohim-elements/elohim-qahal
       rxjs:
         specifier: ~7.8.0
         version: 7.8.2
