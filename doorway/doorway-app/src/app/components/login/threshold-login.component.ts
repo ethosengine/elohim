@@ -43,6 +43,12 @@ interface AuthResponse {
   agentPubKey: string;
   expiresAt: string;
   identifier: string;
+  /** True when this human is a confirmed steward at the substrate level. */
+  isSteward?: boolean;
+  /** First reachable portal host URL when the human is a steward — the
+   *  peer-native OAuth portal that owns their identity. Doorway is the
+   *  relying party here, not the identity provider. */
+  portalHostUrl?: string;
 }
 
 /** State machine for login flow */
@@ -74,7 +80,13 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
         @if (error()) {
           <div class="error-banner" data-testid="threshold-error">
             <span>{{ error() }}</span>
-            <button class="dismiss" (click)="clearError()" data-testid="threshold-error-dismiss">×</button>
+            <button
+              class="dismiss"
+              type="button"
+              aria-label="Dismiss error"
+              (click)="clearError()"
+              data-testid="threshold-error-dismiss"
+            >×</button>
           </div>
         }
 
@@ -89,15 +101,25 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
                   id="identifier"
                   name="identifier"
                   data-testid="threshold-identifier"
-                  [(ngModel)]="form.identifier"
+                  [ngModel]="form.identifier"
+                  (ngModelChange)="onIdentifierChange($event)"
                   required
                   autocomplete="username"
                   placeholder="username"
+                  pattern="[^@\s]+"
+                  inputmode="text"
                   class="identifier-input"
                 />
-                <span class="domain-suffix">&#64;{{ gatewayDomain() }}</span>
+                <span class="domain-suffix" data-testid="threshold-domain-suffix"
+                  >&#64;{{ gatewayDomain() }}</span
+                >
               </div>
-              <p class="input-hint">Or use your full email address</p>
+              <p class="input-hint">
+                Logging in at <strong>{{ gatewayDomain() }}</strong>.
+                <a [href]="federatedLoginUrl()" data-testid="threshold-different-doorway-hint"
+                  >Use a different doorway</a
+                >
+              </p>
             </div>
 
             <div class="form-group">
@@ -146,7 +168,14 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
 
         @if (state() === 'error') {
           <div class="error-state">
-            <button class="btn-secondary" (click)="retry()">Try Again</button>
+            <button
+              class="btn-secondary"
+              type="button"
+              data-testid="threshold-retry"
+              (click)="retry()"
+            >
+              Try Again
+            </button>
           </div>
         }
 
@@ -267,6 +296,16 @@ export class ThresholdLoginComponent implements OnInit {
     }
   }
 
+  /**
+   * Strip any '@' segment a paste or muscle-memory may have introduced —
+   * the gateway suffix is enforced by the doorway, not chosen by the user.
+   * Federation routing lives behind the "Use a different doorway" link.
+   */
+  onIdentifierChange(value: string): void {
+    const atIndex = value.indexOf('@');
+    this.form.identifier = atIndex === -1 ? value : value.slice(0, atIndex);
+  }
+
   async onSubmit(): Promise<void> {
     if (!this.form.identifier || !this.form.password) {
       return;
@@ -276,23 +315,41 @@ export class ThresholdLoginComponent implements OnInit {
     this.error.set('');
 
     try {
-      // Authenticate with doorway
       const authResult = await this.authenticate();
 
       if (!authResult) {
         throw new Error('Authentication failed');
       }
 
-      // Store token so the auth interceptor can attach it to subsequent requests
+      // Steward handoff — doorway never owns a steward's login portal.
+      // When the auth response carries a reachable portalHostUrl, the human
+      // is a graduated steward and their peer-native portal is the
+      // authoritative identity provider. Doorway becomes the relying party
+      // here: hand the session to the portal host, which will complete the
+      // OAuth code dance back at the original client_id.
+      if (authResult.portalHostUrl) {
+        this.state.set('authorizing');
+        const params = this.oauthParams();
+        const handoff = new URL(authResult.portalHostUrl);
+        handoff.searchParams.set('session_token', authResult.token);
+        if (params) {
+          handoff.searchParams.set('client_id', params.clientId);
+          handoff.searchParams.set('redirect_uri', params.redirectUri);
+          handoff.searchParams.set('response_type', params.responseType);
+          handoff.searchParams.set('state', params.state);
+          if (params.scope) handoff.searchParams.set('scope', params.scope);
+        }
+        window.location.href = handoff.toString();
+        return;
+      }
+
       this.authState.storeToken(authResult.token);
 
-      // If OAuth flow, generate authorization code
       const params = this.oauthParams();
       if (params) {
         this.state.set('authorizing');
         await this.authorizeOAuth(authResult.token, params);
       } else {
-        // Direct login (no OAuth) - refresh auth state and redirect to dashboard
         await this.authState.refresh();
         this.router.navigate(['/dashboard']);
       }

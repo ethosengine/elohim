@@ -179,6 +179,22 @@ pub struct AuthResponse {
     /// Human profile (returned on registration)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile: Option<HumanProfileResponse>,
+    /// True when the authenticated human's stewardship is confirmed at the
+    /// substrate level (`UserDoc.is_steward`). Mirrors the claim embedded
+    /// in the JWT; surfaced explicitly so the client doesn't have to decode
+    /// the JWT just to choose between the hosted-visitor and hosted-steward
+    /// surfaces.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default)]
+    pub is_steward: bool,
+    /// First reachable portal host URL for this human, when `is_steward` is
+    /// true and at least one registered host responds to a health probe.
+    /// The client uses this to redirect the steward to their peer-native
+    /// OAuth portal — doorway is the relying party, the portal host is the
+    /// identity provider.
+    /// Omitted when not a steward or when no host is reachable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub portal_host_url: Option<String>,
 }
 
 /// Human profile response (from imagodei zome)
@@ -1206,7 +1222,8 @@ async fn handle_register(
             None, // No conductor_id yet for dev-mode register
             false,
             false,
-        );
+        )
+        .await;
     }
 
     // Production flow: use MongoDB
@@ -1372,6 +1389,7 @@ async fn handle_register(
         false, // New registrations are never stewards
         false,
     )
+    .await
 }
 
 /// POST /auth/login
@@ -1432,7 +1450,8 @@ async fn handle_login(
             None,  // No conductor_id in dev mode
             false, // Dev mode: not a steward
             false,
-        );
+        )
+        .await;
     }
 
     // Production flow: verify against MongoDB
@@ -1618,6 +1637,7 @@ async fn handle_login(
         user.is_steward,
         user.conductor_id.is_some(),
     )
+    .await
 }
 
 /// POST /auth/logout
@@ -1693,6 +1713,7 @@ async fn handle_refresh(
         old_claims.is_steward,
         old_claims.has_local_conductor,
     )
+    .await
 }
 
 /// GET /auth/me
@@ -3944,9 +3965,16 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>
     }
 }
 
-/// Generate a successful auth response with JWT token
+/// Generate a successful auth response with JWT token.
+///
+/// When `is_steward` is true, the function opportunistically probes the
+/// human's registered portal hosts and populates `portal_host_url` with the
+/// first reachable one (1 s timeout per host). The client uses this to hand
+/// the session off to the peer-native OAuth portal — doorway is the relying
+/// party, the portal host is the identity provider. Mirrors the probe used
+/// by `handle_exchange_session`.
 #[allow(clippy::too_many_arguments)]
-fn generate_auth_response(
+async fn generate_auth_response(
     jwt: &JwtValidator,
     state: &AppState,
     human_id: &str,
@@ -3979,6 +4007,17 @@ fn generate_auth_response(
         has_local_conductor,
     };
 
+    let portal_host_url = if is_steward {
+        let storage_base = state
+            .args
+            .storage_url
+            .as_deref()
+            .unwrap_or("http://127.0.0.1:8090");
+        probe_first_portal_host(storage_base, agent_pub_key).await
+    } else {
+        None
+    };
+
     match jwt.generate_token(input) {
         Ok(token) => {
             let claims = jwt.verify_token(&token);
@@ -3996,6 +4035,8 @@ fn generate_auth_response(
                     doorway_url,
                     installed_app_id,
                     profile,
+                    is_steward,
+                    portal_host_url,
                 },
             )
         }

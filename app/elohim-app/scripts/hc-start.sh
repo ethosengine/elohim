@@ -43,7 +43,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
-HC_DIR="$APP_DIR/../holochain"
+HC_DIR="$APP_DIR/../../elohim/holochain"
 LOCAL_DEV_DIR="$HC_DIR/local-dev"
 HAPP_PATH="$HC_DIR/dna/elohim/workdir/elohim.happ"
 HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
@@ -147,10 +147,22 @@ if [ ! -f "$HAPP_PATH" ] || [ "$FORCE_BUILD" = true ]; then
     RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
     hc dna pack . -o "$WORKDIR/infrastructure.dna"
 
+    echo "📦 Building mishpat DNA..."
+    cd "$HC_DIR/dna/mishpat"
+    RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
+    hc dna pack . -o "$WORKDIR/mishpat.dna"
+
+    echo "📦 Building node-registry DNA..."
+    cd "$HC_DIR/dna/node-registry"
+    RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
+    # happ.yaml references ../../node-registry/node-registry.dna (peer-level), so
+    # output the bundle next to the DNA's own dna.yaml rather than under elohim/workdir/.
+    hc dna pack . -o "node-registry.dna"
+
     echo "📦 Packing elohim.happ..."
     hc app pack "$WORKDIR" -o "$WORKDIR/elohim.happ"
 
-    echo "✅ DNAs built (lamad + imagodei + infrastructure)"
+    echo "✅ DNAs built (lamad + imagodei + infrastructure + mishpat + node-registry)"
     echo ""
 fi
 
@@ -240,12 +252,14 @@ echo "┌───────────────────────�
 echo "│ Step 2: elohim-storage (Content DB + Blobs)                   │"
 echo "└──────────────────────────────────────────────────────────────┘"
 
-STORAGE_BIN="$HC_DIR/target/release/elohim-storage"
+# elohim-storage now lives at elohim/elohim-storage (peer-level), not under elohim/holochain.
+STORAGE_DIR="$HC_DIR/../elohim-storage"
+STORAGE_BIN="$STORAGE_DIR/target/release/elohim-storage"
 
 # Build if needed
 if [ ! -f "$STORAGE_BIN" ] || [ "$FORCE_BUILD" = true ]; then
     echo "   🔨 Building elohim-storage..."
-    cd "$HC_DIR/elohim-storage"
+    cd "$STORAGE_DIR"
     RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
     echo "   ✅ Build complete"
 fi
@@ -333,12 +347,14 @@ echo "┌───────────────────────�
 echo "│ Step 3: Doorway Gateway                                       │"
 echo "└──────────────────────────────────────────────────────────────┘"
 
-DOORWAY_BIN="$APP_DIR/../doorway/target/release/doorway"
+# doorway-service is the Rust crate; `doorway/` is the umbrella with subprojects.
+DOORWAY_DIR="$APP_DIR/../../doorway/doorway-service"
+DOORWAY_BIN="$DOORWAY_DIR/target/release/doorway"
 
 # Build if needed
 if [ ! -f "$DOORWAY_BIN" ] || [ "$FORCE_BUILD" = true ]; then
     echo "   🔨 Building doorway..."
-    cd "$APP_DIR/../doorway"
+    cd "$DOORWAY_DIR"
     RUSTFLAGS="" cargo build --release
     echo "   ✅ Build complete"
 fi

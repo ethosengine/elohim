@@ -1,0 +1,140 @@
+{
+  "handle": "hosted-steward-portal-handoff",
+  "title": "Doorway login routes elohim stewards through a peer-native OAuth portal; visible agency reflects their stewardship",
+  "vision_quotes": [
+    {
+      "text": "Doorway's relationship to identity is analogous to an OAuth relying party that presents the login portal but does not own it. Websites (doorways) present OAuth logins; identity providers (peer-native infrastructure) own them. ... Pre-graduation (hosted): the doorway serves as both relying party AND identity provider, because there is no peer-native identity yet. Post-graduation (peer-steward): the doorway is only the relying party. The login portal it presents is backed by the peer-native identity provider. Doorway never owns the peer-steward's login portal — it can only present it.",
+      "source": ".claude/memory/project_peer_native_account_canonical_surface.md:15-22"
+    },
+    {
+      "text": "the p2p-native OAuth portal is rendered either (a) directly from the human's own steward device running elohim-app, or (b) by their trusted peer network rendering it on their behalf (mesh-rendered IdP — meaningful for recovery/availability when the steward device is unavailable).",
+      "source": ".claude/memory/project_peer_native_account_canonical_surface.md:33"
+    },
+    {
+      "text": "M5 connects them via the account management surface in elohim-app (Surface 3 from project_imagodei_three_surfaces). ... Treat the hosted ↔ peer-native handoff as a first-class concern, not a side note. Do not foreclose the OAuth-pattern shape.",
+      "source": ".claude/memory/project_m5_reframe_auth_portal_convergence.md:14-43"
+    }
+  ],
+  "plan_deliverables": [
+    {
+      "id": "login-form-domain-scoped",
+      "text": "The doorway login form input accepts only the username portion (decorative @<gateway> suffix is enforced, not just a label). The user cannot type their full domain into the identifier field.",
+      "source": "user-stated-bug 2026-05-22; current threshold-login.component.ts:86-101 renders the suffix but accepts full email and hints 'Or use your full email address'",
+      "user_visible": true
+    },
+    {
+      "id": "steward-login-handoff-to-portal-host",
+      "text": "When a returning user logs in to doorway and the auth response identifies them as a steward with a reachable portalHostUrl, doorway hands the session off to that portal host (the peer-native OAuth portal rendered from a trusted peer running elohim-app/elohim-storage) rather than completing the session locally.",
+      "source": "project_m5_reframe_auth_portal_convergence.md + 2026-05-19-doorway-stewardship-chain-design.md §3.2-§3.3 (chain orphan + supersession); AuthResponse currently lacks portal_host_url field — ExchangeSessionResponse already has it (auth_routes.rs:88-103)",
+      "user_visible": true
+    },
+    {
+      "id": "context-label-hosted-steward-not-visitor",
+      "text": "After login, the visible context label distinguishes 'hosted steward' (a steward currently accessing through a hosted doorway because their peer-native infra is unreachable or absent) from 'hosted visitor' (an unsgraduated hosted human). The visible label MUST not call a confirmed steward a visitor.",
+      "source": "user-stated-bug 2026-05-22; current doorway-account.component.ts:97-106 renders a 'Accessing through {doorwayName}' banner only when isSteward && !hasLocalConductor — does not visibly assert role 'steward' anywhere; agency vocab in auth_routes.rs:142 lists 'doorway, node, device, hosted, visitor' but no 'steward' phase",
+      "user_visible": true
+    },
+    {
+      "id": "agency-progression-coherent-with-a2o",
+      "text": "Agency progression observed in the running UI is coherent with the canonical lifecycle expressed in the a2o features (auth-lifecycle, user-management, session-handoff, recovery-m5-doorway-handoff-to-steward) and with the M5 reframe: hosted → key_export → install_app → steward, with hosted-steward as the in-between state for a graduated steward visiting through doorway.",
+      "source": "doorway-account.component.ts:28-33 AGENCY_STEPS + genesis/a2o/features/auth/* + project_m5_reframe_auth_portal_convergence.md",
+      "user_visible": true
+    }
+  ],
+  "manifesto_anchors": [
+    {
+      "deliverable_id": "steward-login-handoff-to-portal-host",
+      "why": "If a graduated steward authenticates at doorway and doorway holds the identity authority (instead of yielding to the peer-native portal), the protocol's no-sovereignty / graduation principle is violated at the most visible surface. The user's identity authority is supposed to graduate away from doorway permanently. This is the M5 promise made visible."
+    },
+    {
+      "deliverable_id": "context-label-hosted-steward-not-visitor",
+      "why": "Calling a confirmed steward a 'visitor' inverts the protocol's stance on agency. The label is the first signal a user has about whether the system understands who they are. Drift here means the substrate believes one thing and the UI tells the human a different thing — exactly the gap /deliver exists to close."
+    },
+    {
+      "deliverable_id": "login-form-domain-scoped",
+      "why": "The doorway is offering hosting on its own gateway (alpha.elohim.host). Allowing arbitrary full domains in the identifier field invites users to mis-target, and confuses the federation surface (which is a separate 'Login with a different doorway' link). The form should express the doorway's scope, not pretend to be a generic identity provider."
+    }
+  ],
+  "scenarios_existing": [
+    "genesis/a2o/features/auth/auth-lifecycle.feature: 'Matthew logs in as admin' — asserts identifier=matthew.dowell@alpha.elohim.host but does NOT assert steward-status or portal-host handoff",
+    "genesis/a2o/features/auth/auth-lifecycle.feature: 'Register a new human on a doorway' — covers hosted-visitor case",
+    "genesis/a2o/features/auth/user-management.feature: feature description names 'hosted visitors with accounts' as the user-management subject (Matthew operating as the steward)",
+    "genesis/a2o/features/auth/session-handoff.feature: 'Full handoff from elohim-app to doorway-app' — covers the session-transfer-token shape but not the portal-host handoff direction",
+    "genesis/a2o/features/auth/recovery/recovery-m5-doorway-handoff-to-steward.feature: covers the /account button-based 'Manage from your steward' click; does NOT yet cover the LOGIN-time auto-handoff (the user's described feature)",
+    "genesis/a2o/features/auth/recovery/recovery-m5-portal-host-discovery.feature: POST /api/v1/account/portal-hosts wiring (substrate)"
+  ],
+  "scenarios_missing": [
+    {
+      "intent": "Threshold login identifier field rejects an identifier that already contains '@' (or strips the suffix); user can only type a username when the doorway provides the suffix.",
+      "proposed_location": "genesis/a2o/features/auth/threshold-login-domain-scoping.feature (new) — UI scenario; @browser-only + @elohim-visually-validated"
+    },
+    {
+      "intent": "When Matthew (steward with reachable portalHostUrl) logs in via threshold-login, doorway redirects him to the portal host for authentication (the peer-native OAuth portal renders the actual login decision), then resumes the doorway-side OAuth code dance back at the original client_id.",
+      "proposed_location": "genesis/a2o/features/auth/steward-login-portal-handoff.feature (new) — @recovery-m5 + @auth-portal-convergence"
+    },
+    {
+      "intent": "Visible context label after login distinguishes 'hosted steward' from 'hosted visitor' — Susan (hosted visitor) sees 'visitor' framing; Matthew (steward accessing via doorway because his node is offline) sees 'hosted steward' framing.",
+      "proposed_location": "genesis/a2o/features/auth/agency-context-labels.feature (new) — @auth + @agency-context"
+    },
+    {
+      "intent": "Agency progression panel in doorway-account is internally consistent with the auth lifecycle and M5 reframe — coverage scenarios for the four pipeline steps (hosted, key_export, install_app, steward) and the in-between 'hosted-steward' state when isSteward=true and hasLocalConductor=false.",
+      "proposed_location": "genesis/a2o/features/auth/agency-pipeline-coherence.feature (new) — @auth + @agency-pipeline"
+    }
+  ],
+  "screenshot_targets": [
+    {
+      "scenario": "Doorway login form is gateway-scoped",
+      "url": "https://doorway-alpha.elohim.host/threshold/login (or local proxy equivalent)",
+      "what_should_be_visible": "Identifier input is scoped to username only — typing '@something' is rejected or stripped. The decorative suffix '@alpha.elohim.host' is visible AND enforced (not just a hint). The 'Or use your full email address' hint is gone or reframed to point at the federated 'Login with a different doorway' link."
+    },
+    {
+      "scenario": "Steward login hands off to portal host",
+      "url": "https://doorway-alpha.elohim.host/threshold/login (Matthew identity)",
+      "what_should_be_visible": "After submitting credentials, the browser navigates to Matthew's reachable portalHostUrl (e.g. https://matthew.steward.example/...). Network panel shows a redirect with a session_token-like parameter. Doorway's OAuth code dance resumes at the registered client_id after the portal-host completes the decision."
+    },
+    {
+      "scenario": "Hosted-steward context label after login (Matthew)",
+      "url": "https://doorway-alpha.elohim.host/account (Matthew logged in, isSteward=true, hasLocalConductor=false)",
+      "what_should_be_visible": "Visible 'Hosted Steward' (or similar) badge/label near the account header. The 'Accessing through {doorwayName}' banner is present. The agency pipeline shows step 4 'Steward' as not-yet-completed (since the user is on hosted infrastructure) but step 1 'Hosted' as completed AND the role is correctly named."
+    },
+    {
+      "scenario": "Hosted-visitor context label after login (Susan)",
+      "url": "https://doorway-alpha.elohim.host/account (Susan logged in, isSteward=false)",
+      "what_should_be_visible": "Visible 'Hosted Visitor' or 'Visitor' framing. Agency pipeline shows step 1 'Hosted' as the current state. Graduation CTA visible."
+    }
+  ],
+  "scope": {
+    "in_scope": [
+      "doorway/doorway-app/src/app/components/login/threshold-login.component.{ts,css}",
+      "doorway/doorway-app/src/app/components/account/doorway-account.component.{ts,css}",
+      "doorway/doorway-app/src/app/services/doorway-admin.service.ts",
+      "doorway/doorway-app/src/app/models/doorway.model.ts",
+      "doorway/doorway-service/src/routes/auth_routes.rs (AuthResponse + handle_login portal-host probe)",
+      "doorway/doorway-service/src/auth/portal_host.rs",
+      "app/elohim-app/src/app/account/services/portal-host-discovery.service.ts (consumer side, if portal-host-side flow needs adjustment)",
+      "app/elohim-app/src/app/imagodei/components/login/login.component.ts (the peer-native side of the OAuth handshake)",
+      "genesis/a2o/features/auth/**/*.feature (new scenarios + edits to existing)",
+      "genesis/a2o/steps/ui/auth.steps.ts (new step defs if needed)",
+      "genesis/a2o/steps/ui/account-m5.steps.ts (steward handoff steps)"
+    ],
+    "consent_required_paths": [
+      "**/*.production.*",
+      ".github/workflows/**",
+      "elohim/holochain/dna/**/integrity/**",
+      "**/jwt_secret*",
+      "**/STEWARD_AGENT_KEY*"
+    ]
+  },
+  "search_trail": [
+    {"location": "genesis/docs/plans/*<handle>*", "hit": true, "result": "2026-05-19-doorway-stewardship-chain-design.md — three-tier authority chain (custody / steward-of-record / operator commitment) with JWT OperatorSnapshot. Substrate is amend-in-place landed; wiring is task #16."},
+    {"location": "genesis/docs/superpowers/specs/*", "hit": true, "result": "2026-04-21-bootstrap-steward-authority-frame-design.md — graduated authority, no integrity-zome gates on bootstrap pubkey, constitutional tier from install."},
+    {"location": "genesis/docs/content/elohim-protocol/**", "hit": true, "result": "protocol-specification.md + content-pipeline.md reference alpha.elohim.host gateway in the federation pattern."},
+    {"location": "genesis/a2o/features/auth/**", "hit": true, "result": "3 auth features (lifecycle, user-management, session-handoff) + 7 recovery-m5 features (including doorway-handoff-to-steward + portal-host-discovery)."},
+    {"location": ".claude/memory/**", "hit": true, "result": "5 directly relevant project memories: m5_reframe, peer_native_account, imagodei_three_surfaces, elohim_app_as_composable_view_federation, multi_doorway_human_registration."},
+    {"location": "code surface (doorway-app login/account)", "hit": true, "result": "threshold-login renders decorative domain suffix but accepts full email; doorway-account ignores portal_host on the LOGIN path (only consumes it via /auth/portal-host via openSteward())."},
+    {"location": "code surface (doorway-service auth_routes.rs)", "hit": true, "result": "ExchangeSessionResponse HAS portal_host_url field (line 102), AuthResponse does NOT (line 164-182). probe_first_portal_host() is called on /auth/exchange-session but not on /auth/login. Asymmetric wiring is the substrate gap."},
+    {"location": "code surface (elohim-app account services)", "hit": true, "result": "portal-host-discovery.service.ts + handoff.service.ts wired on the receiving side; account-view.ts has portalHosts: PortalHostView[]."},
+    {"location": "git log relevant", "hit": "partial", "result": "Recent commits f2bb6429c..866307639 are Sprint 1A imagodei settings palette + qahal phases — orthogonal. Earlier M5 substrate is in the chain landed 2026-05-19."},
+    {"location": "where 'hosted visitor' exact string lives", "hit": false, "result": "Literal 'hosted visitor' / 'hostedVisitor' / 'HostedVisitor' NOT found in source. user-management.feature description says 'I want to manage hosted visitors with accounts' but no UI string emits this. Likely user is paraphrasing the visible-after-login framing — needs operator clarification or live render to confirm exact location."}
+  ]
+}

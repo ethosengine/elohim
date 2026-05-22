@@ -32,9 +32,12 @@ import {
 import { type KeyLocation } from '../models/identity.model';
 
 import { AuthService } from './auth.service';
+import { HostingAccountService } from './hosting-account.service';
 
 const STAGE_NODE_STEWARD: AgencyStage = 'node-steward';
 const STAGE_APP_STEWARD: AgencyStage = 'app-steward';
+const STAGE_HOSTED_STEWARD: AgencyStage = 'hosted-steward';
+const STAGE_HOSTED: AgencyStage = 'hosted';
 const KEY_TYPE_SIGNING = 'signing-key';
 const KEY_LABEL_SIGNING = 'Signing Key';
 
@@ -44,16 +47,23 @@ const KEY_LABEL_SIGNING = 'Signing Key';
 export class AgencyService {
   private readonly holochainService = inject(HolochainClientService);
   private readonly authService = inject(AuthService);
+  private readonly hostingAccountService = inject(HostingAccountService);
 
   /**
    * Computed agency state based on current connections and session.
+   *
+   * Side-effect: triggers a hosting-account fetch on first read when the human
+   * is authenticated but `/auth/account` hasn't been loaded yet — this is what
+   * lets us discriminate `hosted-steward` from `hosted` without forcing every
+   * consumer to manually call `hostingAccountService.loadAccount()`.
    */
   readonly agencyState = computed<AgencyState>(() => {
     const holochainConnection = this.holochainService.connection();
     const holochainState = holochainConnection.state;
     const displayInfo = this.holochainService.getDisplayInfo();
 
-    // Determine current stage based on connection state
+    this.ensureHostingAccountFresh();
+
     const currentStage = this.determineStage(holochainState, displayInfo.hasStoredCredentials);
 
     // Get connection status
@@ -122,33 +132,59 @@ export class AgencyService {
     const displayInfo = this.holochainService.getDisplayInfo();
 
     if (holochainState === 'connected') {
-      // Detect if conductor is local or remote
       const isLocalConductor = this.isLocalConductor(displayInfo.appUrl);
 
       if (isLocalConductor) {
-        // Local conductor - either app-steward or node-steward
-        // For now, detect node-steward based on configuration
-        // In the future, check if hosting other humans via DHT query
         const isNodeSteward = this.detectNodeOperatorStatus();
         return isNodeSteward ? STAGE_NODE_STEWARD : STAGE_APP_STEWARD;
       }
 
-      // Remote conductor = Hosted User
-      return 'hosted';
+      return this.hostedOrHostedSteward();
     }
 
     if (holochainState === 'connecting' || holochainState === 'authenticating') {
-      // Still connecting, but we have intent to connect
-      return hasStoredCredentials ? 'hosted' : 'visitor';
+      return hasStoredCredentials ? this.hostedOrHostedSteward() : 'visitor';
     }
 
-    // Authenticated via JWT but Holochain not connected yet
     if (this.authService.isAuthenticated()) {
-      return 'hosted';
+      return this.hostedOrHostedSteward();
     }
 
-    // Not connected = Visitor
     return 'visitor';
+  }
+
+  /**
+   * Distinguishes a confirmed steward (whose peer-native portal is authoritative
+   * but is presently signed in through a doorway) from an unsgraduated hosted
+   * visitor. Reads the `isSteward` flag from the doorway-issued account view.
+   *
+   * Falls back to 'hosted' when the account hasn't loaded yet (signed-in but
+   * /auth/account not yet fetched); upgrades to 'hosted-steward' once the
+   * account confirms `isSteward: true`.
+   */
+  private hostedOrHostedSteward(): AgencyStage {
+    return this.hostingAccountService.account()?.isSteward === true
+      ? STAGE_HOSTED_STEWARD
+      : STAGE_HOSTED;
+  }
+
+  /**
+   * Opportunistically fetch the hosting account when authenticated and not yet
+   * loaded. Idempotent: subsequent reads after a successful load are no-ops.
+   */
+  private hostingAccountFetchInFlight = false;
+  private ensureHostingAccountFresh(): void {
+    if (this.hostingAccountFetchInFlight) return;
+    if (!this.authService.isAuthenticated()) return;
+    if (this.hostingAccountService.account() !== null) return;
+    if (this.hostingAccountService.isLoading()) return;
+
+    this.hostingAccountFetchInFlight = true;
+    void this.hostingAccountService
+      .loadAccount()
+      .finally(() => {
+        this.hostingAccountFetchInFlight = false;
+      });
   }
 
   /**
