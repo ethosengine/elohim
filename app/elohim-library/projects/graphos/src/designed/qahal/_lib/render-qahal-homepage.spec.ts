@@ -240,4 +240,22 @@ describe('renderQahalHomepage — context-column persistence', () => {
     // draft assumed). The composer correctly emits this attribute.
     expect(ctxCoSteward?.getAttribute('primary-observation')).toBe('The household is steady.');
   });
+
+  it('forwards derivePendingIds into context co-steward .pendingAcknowledgments', () => {
+    // Probes the derivePendingIds path through renderContextColumn (distinct from
+    // the stream-panel path tested above). Uses the same clean-fixture pattern so
+    // baked-in acknowledgmentPending flags don't mask the scene-level signal.
+    const { acknowledgmentPending: _drop0, ...e0 } = baseScene.streamEvents[0]!;
+    const { acknowledgmentPending: _drop1, ...e1 } = baseScene.streamEvents[1]!;
+    const scene = {
+      ...baseScene,
+      streamEvents: [e0, e1],
+      pendingAcknowledgments: [e0.id],
+    };
+    const host = renderToHost(scene, baseOpts);
+    const ctxCoSteward = host.querySelector(
+      'elohim-qahal-context-column [slot="co-steward"]'
+    ) as HTMLElement & { pendingAcknowledgments?: string[] };
+    expect(ctxCoSteward?.pendingAcknowledgments).toEqual([e0.id]);
+  });
 });
