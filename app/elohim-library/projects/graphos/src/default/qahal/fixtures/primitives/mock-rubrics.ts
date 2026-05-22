@@ -90,7 +90,8 @@ export interface MockRubric {
  * - engaged / contributor / steward: full
  * - child (James): hidden — Matthew + Jessica protect him from open-web exposure
  * - elder_under_guardianship (Gertrude): filtered_via_co_steward — filtered with care
- * - idd_member / legal_steward_protected: hidden
+ * - idd_member: filtered_via_co_steward — same dignity-floor treatment as elder
+ * - legal_steward_protected: hidden
  */
 export const DOWELL_HOUSEHOLD_RUBRIC: MockRubric = {
   qahalId: 'dowell-household',
