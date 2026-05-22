@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Pre-push hook: Runs project-specific checks before allowing push.
 # Bypass: HUSKY=0 git push  (or: git push --no-verify)
 #
@@ -6,6 +6,10 @@
 # so the husky shim (which normally handles this) is not in the call path.
 [ "${HUSKY-}" = "0" ] && { echo "pre-push: HUSKY=0 — skipping all gates"; exit 0; }
 
+# Treat pipe failures as the pipeline's exit code. -e is intentionally NOT
+# set because many existing gate paths use `command || handle_failure`
+# patterns; -u is unsafe given the optional toolchain vars (NVM_DIR etc.).
+set -o pipefail
 
 # Detects which projects changed and runs `just gate` in each.
 # Each project's justfile defines its own quality checks:
@@ -56,7 +60,7 @@ ZERO_SHA="0000000000000000000000000000000000000000"
 
 # ── Lockfile Consistency Check ────────────────────────────────────
 # Catch uncommitted lockfile changes that would break CI's --frozen-lockfile
-if git diff --name-only HEAD | grep -q 'pnpm-lock.yaml'; then
+if { git diff --name-only HEAD 2>/dev/null || true; } | grep -q 'pnpm-lock.yaml'; then
   echo "WARNING: pnpm-lock.yaml has uncommitted changes"
   echo "  CI uses --frozen-lockfile and will fail if lockfile is stale."
   echo "  Run: git add pnpm-lock.yaml && git commit --amend"
