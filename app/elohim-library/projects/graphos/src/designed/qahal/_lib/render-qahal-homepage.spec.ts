@@ -167,3 +167,77 @@ describe('renderQahalHomepage — power-user gating', () => {
     expect(host.querySelector('elohim-qahal-power-user-expandable')).toBeTruthy();
   });
 });
+
+describe('renderQahalHomepage — panel routing', () => {
+  const PANEL_TAG: Record<string, string> = {
+    stream: 'elohim-qahal-stream-panel',
+    'member-ring': 'elohim-qahal-member-ring-panel',
+    rules: 'elohim-qahal-rules-panel',
+    'co-steward': 'elohim-qahal-co-steward-panel',
+    'social-compute': 'elohim-qahal-social-compute-panel',
+    'standing-inspector': 'elohim-qahal-standing-inspector-panel',
+    'shefa-resources': 'elohim-qahal-shefa-resources-panel',
+    attestations: 'elohim-qahal-attestations-panel',
+    'graph-discovery': 'elohim-qahal-graph-discovery-panel',
+  };
+
+  it.each(Object.entries(PANEL_TAG))(
+    'mounts %s in the main-viewer when activePanel=%s',
+    (panelName, expectedTag) => {
+      const host = renderToHost(baseScene, { ...baseOpts, activePanel: panelName as never });
+      const mainViewer = host.querySelector('elohim-qahal-main-viewer');
+      expect(mainViewer?.querySelector(expectedTag)).toBeTruthy();
+      expect(mainViewer?.getAttribute('active-panel-name')).toBe(panelName);
+    }
+  );
+
+  it('defaults to stream panel when activePanel is not set', () => {
+    const host = renderToHost(baseScene, baseOpts);
+    const mainViewer = host.querySelector('elohim-qahal-main-viewer');
+    expect(mainViewer?.querySelector('elohim-qahal-stream-panel')).toBeTruthy();
+    expect(mainViewer?.getAttribute('active-panel-name')).toBe('stream');
+  });
+
+  it('forwards pendingAcknowledgments into stream events', () => {
+    // Build a clean two-event stream where neither event has acknowledgmentPending
+    // baked in (i.e. it is `undefined`), so the only source of the flag is
+    // scene.pendingAcknowledgments. The composer falls back via `??`, so an
+    // explicit per-event `false` would mask the scene-level signal we're testing.
+    // (DOWELL_TUESDAY_MORNING_STREAM bakes acknowledgmentPending: true on
+    // several events for storybook richness.)
+    const { acknowledgmentPending: _drop0, ...e0 } = baseScene.streamEvents[0]!;
+    const { acknowledgmentPending: _drop1, ...e1 } = baseScene.streamEvents[1]!;
+    const cleanEvents = [e0, e1];
+    const scene = {
+      ...baseScene,
+      streamEvents: cleanEvents,
+      pendingAcknowledgments: [cleanEvents[0]!.id],
+    };
+    const host = renderToHost(scene, baseOpts);
+    const streamPanel = host.querySelector('elohim-qahal-stream-panel') as HTMLElement & {
+      events?: Array<{ id: string; acknowledgmentPending?: boolean }>;
+    };
+    expect(streamPanel?.events?.[0]?.acknowledgmentPending).toBe(true);
+    expect(streamPanel?.events?.[1]?.acknowledgmentPending).toBeFalsy();
+  });
+});
+
+describe('renderQahalHomepage — context-column persistence', () => {
+  it('always renders co-steward + rules + discovery slots regardless of activePanel', () => {
+    for (const panel of ['stream', 'member-ring', 'rules', 'social-compute'] as const) {
+      const host = renderToHost(baseScene, { ...baseOpts, activePanel: panel });
+      const ctxCol = host.querySelector('elohim-qahal-context-column');
+      expect(ctxCol?.querySelector('[slot="co-steward"]')).toBeTruthy();
+      expect(ctxCol?.querySelector('[slot="rules"]')).toBeTruthy();
+      expect(ctxCol?.querySelector('[slot="discovery"]')).toBeTruthy();
+    }
+  });
+
+  it('renders context co-steward with scene.coStewardObservation', () => {
+    const host = renderToHost(baseScene, baseOpts);
+    const ctxCoSteward = host.querySelector('elohim-qahal-context-column [slot="co-steward"]');
+    // The actual element attribute name is 'primary-observation' (NOT 'observation' as the plan
+    // draft assumed). The composer correctly emits this attribute.
+    expect(ctxCoSteward?.getAttribute('primary-observation')).toBe('The household is steady.');
+  });
+});
