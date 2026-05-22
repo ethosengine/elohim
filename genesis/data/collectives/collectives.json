@@ -494,7 +494,15 @@
       "name": "Susan's Household",
       "governanceLayer": "family",
       "reach": "trusted",
-      "description": "Compute shard — Susan's household",
+      "description": "Compute shard — Susan's household (Seattle metro; Susan + husband Caleb + 3 young children; Pacific NW leg of the tri-region reciprocal backup chain)",
+      "domain": "household"
+    },
+    {
+      "id": "household-daniel",
+      "name": "Daniel's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Daniel's household (Tulsa, OK metro; Jessica's brother; Plains-region leg of the multi-regional reciprocal backup chain)",
       "domain": "household"
     },
     {

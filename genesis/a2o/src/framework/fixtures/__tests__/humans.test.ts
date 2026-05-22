@@ -15,11 +15,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
-import { _resetDeploymentsCacheForTests, isHumanDeployed } from '../humans.js';
+import {
+  _resetDeploymentsCacheForTests,
+  autoSkippedHumans,
+  isAnyNodePoolAvailable,
+  isHumanDeployed,
+  isShemAvailable,
+} from '../humans.js';
 
 interface FixtureHuman {
   name: string;
   suspended?: boolean;
+  nodeTypes?: ('remote' | 'edge' | 'performance' | 'operations')[];
 }
 
 function writeFixture(dir: string, humans: FixtureHuman[]): string {
@@ -38,6 +45,7 @@ void describe('isHumanDeployed', () => {
 
   afterEach(() => {
     delete process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE;
+    delete process.env.ELOHIM_SHEM_STATUS;
     _resetDeploymentsCacheForTests();
     rmSync(workDir, { recursive: true, force: true });
   });
@@ -92,5 +100,91 @@ void describe('isHumanDeployed', () => {
     assert.equal(isHumanDeployed('Pete'), false);
     assert.equal(isHumanDeployed('pete'), false);
     assert.equal(isHumanDeployed('PeTe'), false);
+  });
+});
+
+void describe('shem availability gating', () => {
+  let workDir: string;
+
+  beforeEach(() => {
+    workDir = mkdtempSync(join(tmpdir(), 'elohim-deployments-shem-'));
+    _resetDeploymentsCacheForTests();
+  });
+
+  afterEach(() => {
+    delete process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE;
+    delete process.env.ELOHIM_SHEM_STATUS;
+    _resetDeploymentsCacheForTests();
+    rmSync(workDir, { recursive: true, force: true });
+  });
+
+  void it('isShemAvailable() defaults to true when env unset (fail-open)', () => {
+    assert.equal(isShemAvailable(), true);
+  });
+
+  void it('isShemAvailable() returns false when ELOHIM_SHEM_STATUS=unavailable', () => {
+    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    assert.equal(isShemAvailable(), false);
+  });
+
+  void it('isShemAvailable() treats unknown values as available (fail-open)', () => {
+    process.env.ELOHIM_SHEM_STATUS = 'garbage';
+    assert.equal(isShemAvailable(), true);
+  });
+
+  void it('isAnyNodePoolAvailable: dev-cluster pools always available', () => {
+    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    assert.equal(isAnyNodePoolAvailable(['performance']), true);
+    assert.equal(isAnyNodePoolAvailable(['edge']), true);
+    assert.equal(isAnyNodePoolAvailable(['operations']), true);
+  });
+
+  void it('isAnyNodePoolAvailable: remote-only fails when shem down', () => {
+    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    assert.equal(isAnyNodePoolAvailable(['remote']), false);
+  });
+
+  void it('isAnyNodePoolAvailable: remote-with-fallback passes when shem down', () => {
+    // ["remote", "performance"] still has the performance fallback;
+    // pool-level gating sees performance and returns true.
+    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    assert.equal(isAnyNodePoolAvailable(['remote', 'performance']), true);
+  });
+
+  void it('auto-skips a remote-only human when shem unavailable', () => {
+    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE = writeFixture(workDir, [
+      { name: 'matthew', nodeTypes: ['performance'] },
+      { name: 'shemonly', nodeTypes: ['remote'] },
+    ]);
+    assert.equal(isHumanDeployed('matthew'), true);
+    assert.equal(isHumanDeployed('shemonly'), false);
+    assert.deepEqual(autoSkippedHumans(), ['shemonly']);
+  });
+
+  void it('keeps remote-with-fallback humans deployed when shem unavailable', () => {
+    // Most of our shem-resident humans declare ["remote", "performance"],
+    // meaning "prefer shem but fall back to performance node". When shem
+    // is down, the scheduler lands them on performance — they are still
+    // deployable, just on the dev cluster. Pool-level gating respects that.
+    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE = writeFixture(workDir, [
+      { name: 'gertrude', nodeTypes: ['remote', 'performance'] },
+      { name: 'daniel', nodeTypes: ['remote', 'performance'] },
+    ]);
+    assert.equal(isHumanDeployed('gertrude'), true);
+    assert.equal(isHumanDeployed('daniel'), true);
+    assert.deepEqual(autoSkippedHumans(), []);
+  });
+
+  void it('still respects hard "suspended" flag even when shem available', () => {
+    process.env.ELOHIM_SHEM_STATUS = 'available';
+    process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE = writeFixture(workDir, [
+      { name: 'pete', suspended: true, nodeTypes: ['remote', 'performance'] },
+    ]);
+    assert.equal(isHumanDeployed('pete'), false);
+    // Hard-suspended is NOT counted as auto-skipped — that bucket is only
+    // for the soft per-run scale-down.
+    assert.deepEqual(autoSkippedHumans(), []);
   });
 });

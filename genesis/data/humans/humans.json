@@ -773,14 +773,14 @@
     },
     {
       "id": "human-susan-household",
-      "householdId": "household-matthew",
+      "householdId": "household-susan",
       "displayName": "Susan",
       "category": "core-family",
       "profileReach": "community",
-      "bio": "Matthew's sister. Household member exploring how families can steward digital resources together.",
+      "bio": "Matthew's sister. Lives in the greater Seattle metro with her husband Daniel and three young children (not yet on the protocol). Anchors the Pacific Northwest leg of the Dowell-Susan-Gertrude tri-household reciprocal backup network, giving the family multi-regional resilience against any single-region failure.",
       "location": {
-        "layer": "neighborhood",
-        "name": "Tech Valley"
+        "layer": "city",
+        "name": "Seattle"
       },
       "communities": [
         "community-local-church",
@@ -791,6 +791,72 @@
         "education",
         "digital-stewardship",
         "community-building"
+      ]
+    },
+    {
+      "id": "human-caleb-spouse",
+      "householdId": "household-susan",
+      "displayName": "Caleb",
+      "agencyPhase": "device",
+      "category": "core-family",
+      "profileReach": "community",
+      "bio": "Susan's husband. Father to three young children (not yet on the protocol). Pacific Northwest household co-steward; second deployed peer in household-susan, anchoring the Seattle leg of the tri-region reciprocal backup network (San Antonio ↔ Seattle ↔ Tulsa).",
+      "location": {
+        "layer": "city",
+        "name": "Seattle"
+      },
+      "communities": [
+        "community-local-church"
+      ],
+      "affinities": [
+        "family-systems",
+        "digital-stewardship",
+        "community-building",
+        "outdoors"
+      ]
+    },
+    {
+      "id": "human-daniel-brother",
+      "householdId": "household-daniel",
+      "displayName": "Daniel",
+      "agencyPhase": "device",
+      "category": "core-family",
+      "profileReach": "community",
+      "bio": "Jessica's brother (Matthew's brother-in-law). Lives in the Tulsa, Oklahoma metro with his wife Emma. Anchors the Plains-region leg of the Dowell-Susan-Daniel-Gertrude multi-regional reciprocal backup network — geographically separated from both San Antonio (Dowell + Gertrude) and Seattle (Susan + Caleb), giving the chain three independent regions.",
+      "location": {
+        "layer": "city",
+        "name": "Tulsa"
+      },
+      "communities": [
+        "community-local-church"
+      ],
+      "affinities": [
+        "family-systems",
+        "digital-stewardship",
+        "community-building",
+        "civic-life"
+      ]
+    },
+    {
+      "id": "human-emma-spouse",
+      "householdId": "household-daniel",
+      "displayName": "Emma",
+      "agencyPhase": "device",
+      "category": "core-family",
+      "profileReach": "community",
+      "bio": "Daniel's wife. Second peer in household-daniel (Tulsa, OK metro); gives the Plains-region leg of the multi-regional reciprocal backup chain its own intra-household redundancy so a single-device failure does not collapse the entire region.",
+      "location": {
+        "layer": "city",
+        "name": "Tulsa"
+      },
+      "communities": [
+        "community-local-church"
+      ],
+      "affinities": [
+        "family-systems",
+        "digital-stewardship",
+        "community-building",
+        "arts"
       ]
     },
     {
@@ -916,6 +982,42 @@
     {
       "source": "human-matthew-manager",
       "target": "human-jessica-spouse",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-caleb-spouse",
+      "target": "human-susan-household",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-susan-household",
+      "target": "human-caleb-spouse",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-daniel-brother",
+      "target": "human-jessica-spouse",
+      "relationshipType": "sibling",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-jessica-spouse",
+      "target": "human-daniel-brother",
+      "relationshipType": "sibling",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-daniel-brother",
+      "target": "human-emma-spouse",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-emma-spouse",
+      "target": "human-daniel-brother",
       "relationshipType": "spouse",
       "intimacyLevel": "intimate"
     },

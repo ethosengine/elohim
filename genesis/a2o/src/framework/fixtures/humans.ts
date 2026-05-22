@@ -211,22 +211,45 @@ export function relationshipsFor(humanId: string): HumansJsonRelationship[] {
 // Deployment topology awareness (reads deployments.json)
 // ---------------------------------------------------------------------------
 //
+// IMPORTANT BOUNDARY: this module is genesis test-bench tooling. It knows
+// about k8s node pools ("remote" = shem, "edge"/"performance"/"operations" =
+// other nodes) because the test harness models peers as k8s pods on a real
+// cluster. Elohim protocol code MUST NOT know about k8s — peers in
+// production have no k8s pool concept. This file is the gating layer that
+// keeps the test bench separate from the substrate.
+//
 // Some fixture humans (matthew, jessica, terrance, adam, pete, frank) have
 // k8s pods declared in genesis/orchestrator/data/deployments.json. Others
-// (Susan, Tommy, Georgina, Maria, etc.) are doorway-seeded personas without
-// a k8s pod. When a node fails (e.g. shem 2026-05-04), affected humans get
-// "suspended": true in deployments.json. isHumanDeployed() lets a2o steps
-// auto-skip scenarios that depend on a suspended conductor — without any
-// feature-file edits.
+// (Tommy, Georgina, Maria, etc.) are doorway-seeded personas without a
+// k8s pod. When a node fails (e.g. shem 2026-05-04), affected humans get
+// "suspended": true in deployments.json — OR the operator declares shem
+// unavailable for this run via ELOHIM_SHEM_STATUS=unavailable. Both paths
+// make isHumanDeployed() return false for the affected humans, and a2o
+// step definitions auto-skip those scenarios.
+//
+// Scale-tier separation: shem is the heavy-lift k8s node where most of
+// the peer-modeling load lives. The dev clusters (edge/performance/
+// operations) are deliberately kept lean because dev work runs directly
+// on them. When shem is down, we prefer to scale DOWN the test fixture
+// set (skip remote-only humans) rather than fall back onto the dev
+// clusters and crowd them out. The pipeline marks the build UNSTABLE
+// rather than FAILED when this auto-scale-down happens.
+
+/** k8s node pools known to the test bench. "remote" = shem; others are
+ * dev-cluster pools (intel-nuc, ethosengine performance, etc.). */
+export type NodePool = 'remote' | 'edge' | 'performance' | 'operations';
 
 interface DeploymentRecord {
   name: string;
   suspended?: boolean;
+  nodeTypes?: NodePool[];
 }
 
 interface DeploymentsCache {
   /** lowercased name → suspended boolean. Empty when file is unreadable (fail-open). */
   byName: Map<string, boolean>;
+  /** lowercased name → nodeTypes array (in scheduler-preference order). */
+  nodeTypesByName: Map<string, NodePool[]>;
 }
 
 let _deploymentsCache: DeploymentsCache | null = null;
@@ -246,14 +269,80 @@ function loadDeployments(): DeploymentsCache {
     const raw = readFileSync(jsonPath, 'utf-8');
     const data = JSON.parse(raw) as { humans?: DeploymentRecord[] };
     const byName = new Map<string, boolean>();
+    const nodeTypesByName = new Map<string, NodePool[]>();
     for (const h of data.humans ?? []) {
-      byName.set(h.name.toLowerCase(), Boolean(h.suspended));
+      const key = h.name.toLowerCase();
+      byName.set(key, Boolean(h.suspended));
+      if (Array.isArray(h.nodeTypes) && h.nodeTypes.length > 0) {
+        nodeTypesByName.set(key, [...h.nodeTypes]);
+      }
     }
-    return { byName };
+    return { byName, nodeTypesByName };
   } catch {
     // Fail-open: tests should still run if deployments.json is unreadable.
-    return { byName: new Map() };
+    return { byName: new Map(), nodeTypesByName: new Map() };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Shem / node-pool availability (test bench only — never read by elohim code)
+// ---------------------------------------------------------------------------
+
+/** Operator declarations for the test bench:
+ *   - "available"   → shem is up; remote-resident humans are deployable
+ *   - "unavailable" → shem is down; remote-resident humans auto-skip
+ *   - "unknown"     → fail-open (default; treat as available)
+ *
+ * Pipelines should probe shem at start-of-run (e.g. via kubectl get node
+ * shem) and set this env var explicitly. Local dev can leave it unset.
+ */
+export type ShemStatus = 'available' | 'unavailable' | 'unknown';
+
+function readShemStatus(): ShemStatus {
+  const raw = (process.env.ELOHIM_SHEM_STATUS ?? '').toLowerCase().trim();
+  if (raw === 'available' || raw === 'unavailable' || raw === 'unknown') {
+    return raw;
+  }
+  return 'unknown';
+}
+
+/** Returns true if shem is considered reachable for this test run. Fail-open
+ * when status is "unknown" (the default) so tests still execute when the
+ * pipeline hasn't probed. */
+export function isShemAvailable(): boolean {
+  return readShemStatus() !== 'unavailable';
+}
+
+/** Returns true if at least one of `pools` is reachable on the test bench
+ * right now. Today only the `remote` pool is gated (via shem-status); the
+ * dev-cluster pools are assumed always available because dev is running on
+ * them. When new gated pools appear, add their probes here. */
+export function isAnyNodePoolAvailable(pools: NodePool[]): boolean {
+  for (const p of pools) {
+    if (p === 'remote') {
+      if (isShemAvailable()) return true;
+    } else {
+      // edge / performance / operations — dev clusters, always available.
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Counter of humans auto-skipped this run due to node-pool unavailability.
+ * Test runner can read this at end-of-run and mark the build UNSTABLE if > 0
+ * (i.e. some scenarios skipped because of test-bench scaling, not failures). */
+let _autoSkippedHumans: Set<string> = new Set();
+
+/** Snapshot of which humans were auto-skipped by node-pool gating. Returns a
+ * copy so callers can't mutate internal state. */
+export function autoSkippedHumans(): string[] {
+  return [..._autoSkippedHumans].sort();
+}
+
+/** Reset auto-skip tracking. Test runners call this at start-of-run. */
+export function resetAutoSkippedHumans(): void {
+  _autoSkippedHumans = new Set();
 }
 
 function ensureDeploymentsLoaded(): DeploymentsCache {
@@ -265,21 +354,41 @@ function ensureDeploymentsLoaded(): DeploymentsCache {
  * Returns true if the named human is currently deployable for live testing:
  *   - matthew/jessica/terrance → true (in deployments.json, not suspended)
  *   - adam/pete/frank (suspended) → false (conductor pod won't run)
+ *   - daniel/emma/susan/caleb/eve/gertrude/frank/pete/terrance/adam
+ *     (nodeTypes starts with "remote") → false when shem is unavailable
  *   - Susan/Tommy/Georgina/etc. → true (doorway-only personas, no k8s pod)
  *
- * Used by step definitions to return 'pending' for suspended humans, so
- * scenarios auto-skip when their conductors are unavailable. Toggling
- * "suspended": true in deployments.json gates every scenario for that
- * human across all feature files — no manual @wip tags required.
+ * Two gating paths:
+ *   1. Hard suspension via deployments.json "suspended": true (operator
+ *      decision; persists across runs).
+ *   2. Soft auto-skip via ELOHIM_SHEM_STATUS=unavailable (per-run probe;
+ *      no deployments.json edit needed). Pipeline probes shem at start
+ *      and sets the env; tests scale themselves to the available compute.
+ *
+ * Either path causes step definitions that name the affected human to
+ * return 'pending' from Cucumber, so the scenario auto-skips without any
+ * feature-file edit. Auto-skipped humans accumulate in autoSkippedHumans();
+ * the test runner can mark the build UNSTABLE (not FAILED) at end-of-run
+ * when that set is non-empty.
  */
 export function isHumanDeployed(displayName: string): boolean {
   const cache = ensureDeploymentsLoaded();
   // Empty registry = fail-open (file unreadable, missing, or no humans declared).
   if (cache.byName.size === 0) return true;
-  const suspended = cache.byName.get(displayName.toLowerCase());
+  const key = displayName.toLowerCase();
+  const suspended = cache.byName.get(key);
   // Not in registry = doorway-only persona; treat as deployed.
   if (suspended === undefined) return true;
-  return !suspended;
+  // Hard-suspended in deployments.json — definitive false.
+  if (suspended) return false;
+  // Soft auto-skip: human is not suspended in deployments.json, but their
+  // nodeTypes require a pool that's currently unavailable on the test bench.
+  const nodeTypes = cache.nodeTypesByName.get(key);
+  if (nodeTypes !== undefined && !isAnyNodePoolAvailable(nodeTypes)) {
+    _autoSkippedHumans.add(key);
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -289,4 +398,5 @@ export function isHumanDeployed(displayName: string): boolean {
  */
 export function _resetDeploymentsCacheForTests(): void {
   _deploymentsCache = null;
+  _autoSkippedHumans = new Set();
 }
