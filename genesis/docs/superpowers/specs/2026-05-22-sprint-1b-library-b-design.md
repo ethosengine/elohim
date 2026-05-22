@@ -193,9 +193,9 @@ import type {
   MockImagodeiProfile,
   CapabilityTier,
 } from '../../../default/qahal/fixtures/primitives/mock-imagodei-profiles';
-import type { MockReaEvent } from '../../../default/qahal/fixtures/primitives/mock-care-economy-events';
+import type { MockCareEconomyEvent } from '../../../default/qahal/fixtures/primitives/mock-care-economy-events';
 import type { MockRubric } from '../../../default/qahal/fixtures/primitives/mock-rubrics';
-import type { MockSocialComputeTopology } from '../../../default/qahal/fixtures/primitives/mock-social-compute-topology';
+import type { MockComputeTopology } from '../../../default/qahal/fixtures/primitives/mock-social-compute-topology';
 
 /**
  * A Scene is a coherent slice of the Qahal substrate at one moment —
@@ -211,8 +211,8 @@ export interface Scene {
 
   rubric: MockRubric;
   members: MockImagodeiProfile[];
-  streamEvents: MockReaEvent[];
-  computeTopology: MockSocialComputeTopology;
+  streamEvents: MockCareEconomyEvent[];
+  computeTopology: MockComputeTopology;
   coStewardObservation: string;
 
   curatedEprs: Array<{ id: string; title: string; provenance: 'curated-epr' }>;
