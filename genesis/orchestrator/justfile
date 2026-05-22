@@ -27,3 +27,8 @@ lint-fix:
 
 # Quality gate: validate Jenkinsfiles against Jenkins itself.
 gate: lint
+
+# Regenerate pipeline-list.json from orchestrator-strategy.mjs.
+# Run after editing PIPELINES.
+ci-pipeline-list:
+  @node scripts/generate-pipeline-list.mjs

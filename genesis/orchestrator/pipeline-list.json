@@ -1,0 +1,53 @@
+{
+  "generatedFrom": "orchestrator-strategy.mjs PIPELINES",
+  "pipelines": [
+    {
+      "name": "elohim-holochain",
+      "manualOnly": false,
+      "triggersGenesis": true,
+      "cascades": true
+    },
+    {
+      "name": "elohim-edge",
+      "manualOnly": false,
+      "triggersGenesis": true,
+      "cascades": true
+    },
+    {
+      "name": "elohim",
+      "manualOnly": false,
+      "triggersGenesis": true,
+      "cascades": true
+    },
+    {
+      "name": "elohim-genesis",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": true
+    },
+    {
+      "name": "elohim-steward",
+      "manualOnly": true,
+      "triggersGenesis": false,
+      "cascades": true
+    },
+    {
+      "name": "elohim-sophia",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": true
+    },
+    {
+      "name": "elohim-epr",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": false
+    },
+    {
+      "name": "elohim-storybook",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": false
+    }
+  ]
+}

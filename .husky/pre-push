@@ -182,6 +182,12 @@ if command -v node >/dev/null 2>&1; then
   fi
 fi
 
+# Pipeline-list freshness: if orchestrator-strategy.mjs changed, the
+# generated pipeline-list.json must be regenerated and committed.
+if echo "$CHANGED" | grep -q "^genesis/orchestrator/orchestrator-strategy.mjs$"; then
+  PROJECTS="$PROJECTS pipeline-list-fresh"
+fi
+
 # Fallback: grep-based project detection
 if [ "$USE_MANIFEST" = false ]; then
   # doorway-app must be checked BEFORE doorway (prefix overlap)
@@ -290,7 +296,7 @@ run_gate() {
   cd "$PROJECT_DIR" || return 1
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "cargo-coverage" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ] || [ "$PROJECT_NAME" = "elements-codegen" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "cargo-coverage" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ] || [ "$PROJECT_NAME" = "elements-codegen" ] || [ "$PROJECT_NAME" = "pipeline-list-fresh" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -368,6 +374,17 @@ run_gate() {
         pnpm run elements:codegen:verify 2>&1 && \
         pnpm --filter elohim-core test 2>&1
         rc=$?
+        ;;
+      pipeline-list-fresh)
+        echo "[$PROJECT_NAME] Verifying pipeline-list.json is fresh..."
+        node genesis/orchestrator/scripts/generate-pipeline-list.mjs >/dev/null
+        if ! git diff --quiet -- genesis/orchestrator/pipeline-list.json; then
+          echo "ERROR: pipeline-list.json is stale relative to orchestrator-strategy.mjs"
+          echo "  Run: just -d genesis/orchestrator ci-pipeline-list && git add genesis/orchestrator/pipeline-list.json"
+          rc=1
+        else
+          rc=0
+        fi
         ;;
     esac
   elif command -v just >/dev/null 2>&1 && [ -f justfile ]; then
@@ -664,8 +681,9 @@ for PROJECT in $PROJECTS; do
       cargo-coverage)   PROJECT_DIR="." ;;
       manifest-hygiene) PROJECT_DIR="." ;;
       sweettest-check) PROJECT_DIR="." ;;
-      elements-codegen) PROJECT_DIR="." ;;
-      *)                PROJECT_DIR="$PROJECT" ;;
+      elements-codegen)    PROJECT_DIR="." ;;
+      pipeline-list-fresh) PROJECT_DIR="." ;;
+      *)                   PROJECT_DIR="$PROJECT" ;;
     esac
   fi
 
