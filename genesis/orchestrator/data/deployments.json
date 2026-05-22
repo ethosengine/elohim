@@ -58,7 +58,13 @@
       "edgenodeCpuLimit": "1000m"
     },
     {
-      "$comment": "Introduced 2026-05-18 alongside shem-return reshuffle. James is matthew+jessica's son (human-james-son, guardians in genesis/data/humans/james-son.md). Promoted from content-only to deployed peer as the third household member (memory: 'Matthew/Jessica/James on household'). Chromebook floor — same archetype terrance ran before bumps + shem move.",
+      "$comment": "Introduced 2026-05-18 alongside shem-return reshuffle. James is matthew+jessica's son (human-james-son, guardians in genesis/data/humans/james-son.md). Promoted from content-only to deployed peer as the third household member (memory: 'Matthew/Jessica/James on household'). FIRST TEMPORARY BUMP (2026-05-22): chromebook floor (384Mi/768Mi + 150m/500m) OOM-killed during elohim-edge/dev #984–#985 deployment-verification — pod failed to reach 1/1 on rollout, NodeIdentity::load tripped on a saved-then-truncated identity.key (empty-file crashloop with misleading 'rsa not enabled') under conductor cold-start memory pressure. Bumped live via `kubectl set resources sts/elohim-james-alpha` to typical-steward (512Mi/1536Mi + 250m/1000m, matches pete/frank/emma); pod recovered without further restarts. Manifest now mirrors the live state so the next Jenkins re-apply doesn't roll back to the OOM floor. Archetype label preserved (device-chromebook-edu); same restoration shape as terrance — step toward $chromebookFloor once shem-stability + hosted-pool pressure subside, OR once the identity.key empty-file guard lands (elohim/elohim-storage/src/identity.rs:243, bytes.is_empty() check before Keypair::from_protobuf_encoding) so cold-starts can survive on the lean floor.",
+      "$chromebookFloor": {
+        "edgenodeMemoryRequest": "384Mi",
+        "edgenodeMemoryLimit": "768Mi",
+        "edgenodeCpuRequest": "150m",
+        "edgenodeCpuLimit": "500m"
+      },
       "name": "james",
       "role": "son",
       "humanLabel": "james-son",
@@ -66,12 +72,12 @@
       "pattern": "consolidated",
       "template": "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml",
       "deviceArchetype": "device-chromebook-edu",
-      "affinityComment": "James: stewarded minor — household peer (matthew+jessica guardians); edge + performance fallback. New deployment 2026-05-18.",
+      "affinityComment": "James: stewarded minor — household peer (matthew+jessica guardians); edge + performance fallback. New deployment 2026-05-18; bumped to typical-steward 2026-05-22 after OOM (see $comment).",
       "nodeTypes": ["edge", "performance"],
-      "edgenodeMemoryRequest": "384Mi",
-      "edgenodeMemoryLimit": "768Mi",
-      "edgenodeCpuRequest": "150m",
-      "edgenodeCpuLimit": "500m"
+      "edgenodeMemoryRequest": "512Mi",
+      "edgenodeMemoryLimit": "1536Mi",
+      "edgenodeCpuRequest": "250m",
+      "edgenodeCpuLimit": "1000m"
     },
     {
       "name": "pete",
