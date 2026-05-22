@@ -16,6 +16,8 @@
     "projects/elohim-service/src/resilience/**/*.spec.ts",
     "projects/elohim-service/src/resilience/**/*.ts",
     "projects/elohim-service/src/distribution/**/*.spec.ts",
-    "projects/elohim-service/src/distribution/**/*.ts"
+    "projects/elohim-service/src/distribution/**/*.ts",
+    "projects/graphos/src/**/*.spec.ts",
+    "projects/graphos/src/**/*.ts"
   ]
 }
