@@ -1,0 +1,145 @@
+{
+  "handle": "doorway-federation-alpha-pair",
+  "title": "Two doorway instances in the alpha namespace federate the shared conductor pool; one human can register at either doorway and content delivery works through both",
+  "vision_quotes": [
+    {
+      "text": "Humans register with multiple doorways — multi-registration = resiliency; flows doorway-agnostic.",
+      "source": ".claude/memory/project_multi_doorway_human_registration.md"
+    },
+    {
+      "text": "Doorway is single-target dispatch — substrate moves bytes; doorway projects+caches; peer-iteration = regression.",
+      "source": ".claude/memory/project_doorway_single_target_no_fanout.md"
+    },
+    {
+      "text": "P2P mesh is the hosting layer — peer-sharding IS hosting; doorway is optional web2 projection.",
+      "source": ".claude/memory/project_p2p_is_hosting.md"
+    },
+    {
+      "text": "Doorway as peer registration point — peers register with doorway, not Holo's marketplace.",
+      "source": ".claude/memory/project_doorway_peer_registration.md"
+    }
+  ],
+  "plan_deliverables": [
+    {
+      "id": "doorway-alpha-b-running",
+      "text": "A second doorway pod (elohim-doorway-alpha-b) runs in the elohim-alpha namespace, deployed from the dev branch via the alpha pipeline. It serves the apex hostname elohim.host (and signal.elohim.host) with its own DOORWAY_ID 'apex-elohim-host' and its own MongoDB projection database 'doorway-alpha-b'. Both /health and /version respond green.",
+      "source": "genesis/orchestrator/manifests/doorway/alpha-b.yaml (new this branch)",
+      "user_visible": true
+    },
+    {
+      "id": "federation-peer-discovery",
+      "text": "Doorway-A and doorway-B discover each other via FEDERATION_PEERS. Each one's /admin/federation/peers endpoint lists the other; the heartbeat task keeps the peer cache fresh; both doorways register themselves in the infrastructure zome as content publishers with overlapping capabilities (blob, html5_app).",
+      "source": "doorway/doorway-service/src/services/federation.rs (existing); FEDERATION_PEERS env in alpha.yaml + alpha-b.yaml (this branch)",
+      "user_visible": true
+    },
+    {
+      "id": "multi-doorway-account-registration",
+      "text": "A new human can register an account at doorway-A (alpha.elohim.host) and the same identity is reachable when logging in at doorway-B (elohim.host) — custodial keys + agency context flow via the shared alpha conductor pool, not via shared MongoDB. Distinct MongoDB DBs prove the substrate is the source of truth.",
+      "source": "Existing doorway custodial-key flow (auth_routes.rs); shared CONDUCTOR_URLS in alpha.yaml + alpha-b.yaml.",
+      "user_visible": true
+    },
+    {
+      "id": "content-delivery-via-either-doorway",
+      "text": "Content seeded into the alpha DHT (via the existing seeder against any human's conductor) is fetchable through both doorway-A and doorway-B at identical URL shapes (e.g. /blob/<hash>, /apps/<slug>, /lamad/concept/<id>). The two projection caches converge independently from the underlying DHT, demonstrating the doorway-as-projection vs. doorway-as-source story.",
+      "source": "Existing projection layer (doorway-service/src/projection); independent MONGODB_DB values in alpha.yaml + alpha-b.yaml.",
+      "user_visible": true
+    }
+  ],
+  "manifesto_anchors": [
+    {
+      "deliverable_id": "doorway-alpha-b-running",
+      "why": "Until a second doorway actually runs in production-shape topology, doorway-federation is a design diagram, not a substrate property. Federation must be observably true, not merely conceivable."
+    },
+    {
+      "deliverable_id": "multi-doorway-account-registration",
+      "why": "The 'doorway as OAuth relying party' frame is hollow if a user is locked to one doorway. Multi-doorway registration is the protocol's promise that no single doorway is gatekeeper — the human's identity lives on the substrate, not in any one gateway's MongoDB."
+    },
+    {
+      "deliverable_id": "content-delivery-via-either-doorway",
+      "why": "If a content URL only resolves at the doorway that ingested it, the protocol has accidentally re-created the same single-host coupling that web2 hosting imposes. Cross-doorway content delivery is the visible proof that the substrate, not any gateway, holds the content."
+    }
+  ],
+  "scenarios_existing": [],
+  "scenarios_missing": [
+    {
+      "intent": "Both doorways report each other as a federation peer at /admin/federation/peers within N seconds of pod-ready.",
+      "proposed_location": "genesis/a2o/features/federation/doorway-peer-discovery.feature (new) — @federation + @smoke"
+    },
+    {
+      "intent": "A human registers at doorway-A, then logs in at doorway-B; the second login produces a valid session for the same humanId (custodial key + agency context are substrate-derived, not MongoDB-derived).",
+      "proposed_location": "genesis/a2o/features/federation/multi-doorway-account-registration.feature (new) — @federation + @auth"
+    },
+    {
+      "intent": "Content seeded against matthew-alpha's conductor is reachable via both alpha.elohim.host/blob/<hash> AND elohim.host/blob/<hash> with byte-identical responses.",
+      "proposed_location": "genesis/a2o/features/federation/multi-doorway-content-delivery.feature (new) — @federation + @content"
+    }
+  ],
+  "screenshot_targets": [
+    {
+      "scenario": "Both doorways visible in /admin/federation/peers",
+      "url": "https://alpha.elohim.host/admin/federation/peers and https://elohim.host/admin/federation/peers (same view, mirrored)",
+      "what_should_be_visible": "alpha.elohim.host page shows a row for apex-elohim-host with last_heartbeat < 60s; the mirrored elohim.host page shows a row for alpha-elohim-host with last_heartbeat < 60s. Both rows show capabilities [blob, html5_app]."
+    },
+    {
+      "scenario": "Account registered at A is reachable at B",
+      "url": "Register at https://alpha.elohim.host/threshold/register (Susan), then visit https://elohim.host/threshold/login",
+      "what_should_be_visible": "Login form at elohim.host accepts Susan's identifier (susan@apex-elohim-host or whatever doorway-B's suffix is), the auth flow returns a valid session for Susan's humanId — same humanId observed at the alpha conductor pool."
+    },
+    {
+      "scenario": "Content delivery through either doorway",
+      "url": "https://alpha.elohim.host/apps/elohim-host-landing/index.html AND https://elohim.host/apps/elohim-host-landing/index.html",
+      "what_should_be_visible": "Identical landing page response from both hosts. Network panel shows distinct origin servers but identical content-hash header and body."
+    }
+  ],
+  "operator_cutover_steps": [
+    {
+      "step": 1,
+      "command": "kubectl delete ingress -n elohim-prod elohim-site-ingress",
+      "why": "Frees the elohim.host apex hostname claim held by the (paused) prod elohim-app ingress so cert-manager can reissue the cert in elohim-alpha for doorway-alpha-b. The manifest file has been renamed to elohim-prod-paused.elohim.host so the next prod apply would not re-claim apex, but the live ingress on the cluster still holds the claim until manually deleted."
+    },
+    {
+      "step": 2,
+      "command": "kubectl delete certificate -n elohim-prod elohim-site-tls-cert elohim-prod-paused-tls-cert 2>/dev/null || true",
+      "why": "Optional — releases cert-manager's apex cert lock from elohim-prod. cert-manager will reissue elohim-host-apex-tls in elohim-alpha on the next doorway-alpha-b ingress reconcile. Safe to skip if the cert was never issued."
+    },
+    {
+      "step": 3,
+      "command": "git push origin dev",
+      "why": "Triggers the orchestrator → elohim-edge pipeline, which now also deploys alpha-b.yaml as elohim-doorway-alpha-b. Watch the orchestrator build log for both doorway rollout-status calls succeeding."
+    },
+    {
+      "step": 4,
+      "command": "curl -sf https://elohim.host/health && curl -sf https://alpha.elohim.host/health",
+      "why": "Smoke-test that both doorways are reachable on their public hostnames. /health does not require auth."
+    },
+    {
+      "step": 5,
+      "command": "curl -sf https://elohim.host/admin/federation/peers -H 'Authorization: Bearer $API_KEY_ADMIN_B' | jq",
+      "why": "Confirms doorway-B sees doorway-A in its peer cache. Mirror with /alpha doorway's admin endpoint to confirm the reverse direction."
+    }
+  ],
+  "scope": {
+    "in_scope": [
+      "genesis/orchestrator/manifests/doorway/alpha-b.yaml (new)",
+      "genesis/orchestrator/manifests/doorway/alpha.yaml (FEDERATION_PEERS edit)",
+      "genesis/orchestrator/manifests/doorway/prod.yaml (paused note)",
+      "genesis/orchestrator/manifests/elohim-app/prod/ingress.yaml (apex rename + paused note)",
+      "elohim/holochain/Jenkinsfile (alpha-b deploy hook)",
+      "genesis/orchestrator/Jenkinsfile (VERSION_ENDPOINTS)",
+      "genesis/a2o/features/federation/*.feature (new scenarios)"
+    ],
+    "consent_required_paths": [
+      "**/*.production.*",
+      ".github/workflows/**",
+      "**/jwt_secret*",
+      "**/STEWARD_AGENT_KEY*"
+    ]
+  },
+  "search_trail": [
+    {"location": "genesis/orchestrator/manifests/doorway/", "hit": true, "result": "alpha.yaml, prod.yaml, staging.yaml, staging-read.yaml — staging-read precedent shows the two-doorways-one-conductor-pool pattern."},
+    {"location": "doorway/doorway-service/src/services/federation.rs", "hit": true, "result": "spawn_peer_discovery_task, register_doorway_in_dht, spawn_heartbeat_task — federation surface is already implemented; this work just gives it two doorways to exercise."},
+    {"location": "elohim/holochain/Jenkinsfile (deployDoorwayManifest)", "hit": true, "result": "Existing helper takes manifestOverride + deploymentName for replicas — same signature usable for alpha-b without refactor."},
+    {"location": "genesis/orchestrator/Jenkinsfile (VERSION_ENDPOINTS)", "hit": true, "result": "Health watcher map; added doorway-alpha-b entry, removed app-prod (its hostname is now bound elsewhere)."},
+    {"location": ".claude/memory project_doorway_*", "hit": true, "result": "5 directly relevant memories: doorway_peer_registration, doorway_single_target_no_fanout, doorway_manifest_driven_routes, doorway_registry_persistence_asymmetry, multi_doorway_human_registration."}
+  ]
+}

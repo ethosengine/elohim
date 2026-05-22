@@ -1,58 +1,72 @@
-# Doorway Alpha Deployment — Agency On-Ramp
+# Doorway Alpha-B Deployment — Federation Peer of doorway-alpha
 #
-# Five roles in one process:
-#   1. DNS/TLS gateway (stateless HTTP routing)
-#   2. Bootstrap/Signal (agent discovery + WebRTC relay)
-#   3. Projection cache (HTTP API for DHT content)
-#   4. Identity host (custodial agent keys for hosted users)
-#   5. Recovery registrar (relationship-based identity recovery)
+# Second doorway in the elohim-alpha namespace, deployed alongside the primary
+# doorway-alpha from the same dev-branch alpha pipeline. Exists to prove the
+# doorway-federation surface end-to-end (FEDERATION_PEERS discovery, DHT
+# self-registration, cross-doorway account registration, multi-doorway
+# content delivery) without standing up a second conductor pool.
 #
-# Never owns data — connects to P2P StatefulSet via ClusterIP service.
-# Scaling is via the conductor pool behind doorway, not doorway replicas.
-# See doorway/SCALING.md for the full model.
+# Topology:
+#   Browser → alpha.elohim.host  → elohim-doorway-alpha    ─┐
+#   Browser → elohim.host        → elohim-doorway-alpha-b  ─┴→ shared alpha
+#                                                              conductor pool
+#                                                              (matthew/jessica/…)
 #
-# Architecture:
-#   Browser -> Ingress -> Doorway (auth + routing) -> edgenode service (conductor/storage)
-#   Doorway-app (operator dashboard) served from same pod via localhost
+# Doorway-A's DOORWAY_ID is "alpha-elohim-host"; this one's is
+# "apex-elohim-host". They federate via the FEDERATION_PEERS env var
+# (each lists the other) and register themselves in the infrastructure
+# zome as content publishers with overlapping but distinct capabilities.
+#
+# MongoDB:
+#   doorway-A uses MONGODB_DB=doorway-alpha (existing projection state)
+#   doorway-B uses MONGODB_DB=doorway-alpha-b (independent projection state) —
+#   so projection cache divergence is observable, not hidden by shared state.
+#
+# Apex hostname (elohim.host) was previously bound to elohim-prod via the
+# main-branch pipeline. The prod pipeline is paused; see manifests/doorway/
+# prod.yaml and manifests/elohim-app/prod/ingress.yaml for the parking notes.
+# Operator must `kubectl delete ingress` the elohim-prod claims before the
+# first alpha-b deploy can succeed (cert-manager reissues elohim-host-tls-cert
+# in elohim-alpha on first ingress reconcile).
 #
 # Ports:
 #   - 8080: Doorway Gateway (public, authenticated)
 #   - 80:   Operator Dashboard (nginx, pod-internal)
 ---
-# Secret for Doorway Gateway API keys
+# Secret for Doorway-B Gateway API keys
 apiVersion: v1
 kind: Secret
 metadata:
-  name: elohim-doorway-alpha-secrets
+  name: elohim-doorway-alpha-b-secrets
   namespace: elohim-alpha
   labels:
-    app: elohim-doorway
+    app: elohim-doorway-b
     environment: alpha
     app.kubernetes.io/name: doorway
-    app.kubernetes.io/instance: doorway-alpha
+    app.kubernetes.io/instance: doorway-alpha-b
     app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: gateway
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
 type: Opaque
 stringData:
-  # IMPORTANT: Change these in production!
-  api-key-authenticated: "dev-elohim-auth-2024"
-  api-key-admin: "dev-elohim-admin-2024"
-  jwt-secret: "dev-jwt-secret-change-in-production-2024"
-  # Anthropic API key for elohim-agent-sdk sidecar (set via sealed-secret in production)
+  # Federation peer of doorway-alpha — distinct keys so cross-doorway auth
+  # exercises real JWT-validation rather than shared-secret fallthroughs.
+  api-key-authenticated: "dev-elohim-auth-b-2024"
+  api-key-admin: "dev-elohim-admin-b-2024"
+  jwt-secret: "dev-jwt-secret-b-change-in-production-2024"
   anthropic-api-key: "REPLACE_WITH_REAL_KEY"
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: elohim-doorway-alpha
+  name: elohim-doorway-alpha-b
   namespace: elohim-alpha
   labels:
-    app: elohim-doorway
+    app: elohim-doorway-b
     environment: alpha
     app.kubernetes.io/name: doorway
-    app.kubernetes.io/instance: doorway-alpha
+    app.kubernetes.io/instance: doorway-alpha-b
     app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: gateway
     app.kubernetes.io/part-of: elohim
@@ -61,15 +75,15 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: elohim-doorway
+      app: elohim-doorway-b
       environment: alpha
   template:
     metadata:
       labels:
-        app: elohim-doorway
+        app: elohim-doorway-b
         environment: alpha
         app.kubernetes.io/name: doorway
-        app.kubernetes.io/instance: doorway-alpha
+        app.kubernetes.io/instance: doorway-alpha-b
         app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
         app.kubernetes.io/component: gateway
         app.kubernetes.io/part-of: elohim
@@ -118,7 +132,9 @@ spec:
               value: "info,doorway=debug"
             - name: PROJECTION_WRITER
               value: "true"
-            # Alpha hosts Matthew (founder) + Jessica (household)
+            # Shared alpha conductor pool — matthew (founder) + jessica (household)
+            # are the same backends doorway-A uses, so federation proves the
+            # multi-projection surface without doubling backend cost.
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL
@@ -127,18 +143,16 @@ spec:
               value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090"
             - name: STORAGE_URLS
               value: "STORAGE_URLS_PLACEHOLDER"
-            # Auto-register doorway's storage as a publisher of html5-app
-            # content on boot. storage_registration.rs reads this env var
-            # and calls register_content_server on the infrastructure zome
-            # with wildcard content_hash="*" and capabilities
-            # [blob, html5_app] — making the alpha doorway discoverable as
-            # a publisher of the elohim-host-landing bundle. Value MUST be
-            # the string "true" (matches `v == "true" || v == "1"`).
+            # Auto-register doorway-B's storage as a publisher in the
+            # infrastructure zome (wildcard content_hash="*"; capabilities
+            # [blob, html5_app]). Combined with doorway-A's identical
+            # registration, the DHT will list two distinct doorway
+            # publishers for the alpha cluster — surface area for the
+            # multi-doorway-content-delivery validation.
             - name: ELOHIM_STORAGE_AUTO_REGISTER
               value: "true"
             - name: ROOT_APP_SLUG
               value: "lamad"
-            # Elohim Agent SDK sidecar (runs in same pod)
             - name: ELOHIM_AGENT_URL
               value: "http://localhost:8095"
             - name: THRESHOLD_URL
@@ -147,79 +161,69 @@ spec:
               value: "nats://nats.elohim-alpha:4222"
             - name: MONGODB_URI
               value: "mongodb://mongodb.elohim-alpha:27017"
+            # Distinct projection DB — divergence between doorway-A and
+            # doorway-B caches is observable rather than hidden by shared
+            # mongo. Federation reconciliation is the test surface.
             - name: MONGODB_DB
-              value: "doorway-alpha"
+              value: "doorway-alpha-b"
+            # Identifier doorway-A sees when this peer registers itself in
+            # the DHT + federation peer cache. Must differ from doorway-A's
+            # "alpha-elohim-host".
             - name: DOORWAY_ID
-              value: "alpha-elohim-host"
+              value: "apex-elohim-host"
             - name: DOORWAY_URL
-              value: "https://doorway-alpha.elohim.host"
+              value: "https://elohim.host"
             - name: BOOTSTRAP_URL
-              value: "https://doorway-alpha.elohim.host/bootstrap"
+              value: "https://elohim.host/bootstrap"
             - name: SIGNAL_URL
-              value: "wss://signal.doorway-alpha.elohim.host"
+              value: "wss://signal.elohim.host"
             - name: INSTALLED_APP_ID
               value: "elohim"
             - name: HAPP_BUNDLE_PATH
               value: "/opt/holochain/elohim.happ"
-            # Server-side rendering — points to the elohim-app server bundle
-            # baked into the doorway image at build time (see the Dockerfile's
-            # ssr-bundle stage). Set safely even if the bundle hasn't shipped
-            # yet: doorway's `init_renderer` (server/http.rs:239) silently
-            # returns None when the file fails to load, so the pod stays
-            # healthy and SSR routes fall through to the storage proxy.
-            #
-            # Spec § Smallest first slice (line 396-422) — line 411 graduates
-            # SSR to real content routes once the engine is wired.
+            # SSR bundle baked into the doorway image at build time.
+            # init_renderer silently None's on load failure so the pod
+            # stays healthy and SSR routes fall through to the storage
+            # proxy. Same behavior as doorway-A.
             - name: SSR_BUNDLE_PATH
               value: "/opt/elohim-render/main.server.mjs"
-            # Federation peer: doorway-alpha-b in the same elohim-alpha namespace,
-            # apex hostname (elohim.host). Both doorways back onto the shared alpha
-            # conductor pool — this surfaces multi-projection federation without
-            # standing up a second conductor pool. See alpha-b.yaml for the peer's
-            # full config. Staging + prod were dropped from this list when prod
-            # pipeline was paused; restore them only when those environments are
-            # live again.
+            # Federation: point at doorway-A. Discovery loop in
+            # services::federation::spawn_peer_discovery_task will GET
+            # this peer's /admin/capabilities, register both doorways in
+            # the DHT, and run a heartbeat keeping the peer cache fresh.
             - name: FEDERATION_PEERS
-              value: "https://elohim.host"
+              value: "https://doorway-alpha.elohim.host"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
-                  name: elohim-doorway-alpha-secrets
+                  name: elohim-doorway-alpha-b-secrets
                   key: api-key-authenticated
             - name: API_KEY_ADMIN
               valueFrom:
                 secretKeyRef:
-                  name: elohim-doorway-alpha-secrets
+                  name: elohim-doorway-alpha-b-secrets
                   key: api-key-admin
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: elohim-doorway-alpha-secrets
+                  name: elohim-doorway-alpha-b-secrets
                   key: jwt-secret
           resources:
             requests:
-              # SSR enabled: doorway loads a 51MB Angular server bundle into a
-              # V8 isolate at startup. V8 parsing reserves ~200MB working set
-              # during AST construction; steady-state holds ~150MB for the
-              # parsed bundle + module loader cache. 256Mi was a coin-toss
-              # OOM; build #953 squeaked through, #954 didn't.
+              # Same V8/Angular SSR working-set story as doorway-A —
+              # see alpha.yaml for the build #953/#954 cache-miss notes.
               memory: "256Mi"
               cpu: "100m"
             limits:
               memory: "1Gi"
               cpu: "1000m"
-          # V8 + Angular bundle parse takes 10–60s on cold start (varies by
-          # cluster CPU contention). Use a startupProbe with a long failure
-          # tolerance so liveness/readiness can stay aggressive once the pod
-          # is up. Without this, livenessProbe's 10s initial delay killed the
-          # pod before doorway's HTTP server bound :8080.
           startupProbe:
             httpGet:
               path: /health
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
-            failureThreshold: 24  # 24 × 5s = 120s total budget
+            failureThreshold: 24
           readinessProbe:
             httpGet:
               path: /health
@@ -230,8 +234,6 @@ spec:
               path: /health
               port: 8080
             periodSeconds: 30
-        # Doorway Operator Dashboard - Angular app for node operators
-        # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app
           image: harbor.ethosengine.com/ethosengine/doorway-app:DOORWAY_APP_TAG_PLACEHOLDER
           imagePullPolicy: Always
@@ -261,8 +263,6 @@ spec:
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 30
-        # Elohim Agent SDK - TypeScript sidecar for Claude-powered constitutional reasoning
-        # Calls Anthropic API with constitutional prompts, 10-call budget cap
         - name: elohim-agent-sdk
           image: harbor.ethosengine.com/ethosengine/elohim-agent-sdk:AGENT_SDK_TAG_PLACEHOLDER
           imagePullPolicy: Always
@@ -278,7 +278,7 @@ spec:
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: elohim-doorway-alpha-secrets
+                  name: elohim-doorway-alpha-b-secrets
                   key: anthropic-api-key
           resources:
             requests:
@@ -303,13 +303,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: elohim-doorway-alpha
+  name: elohim-doorway-alpha-b
   namespace: elohim-alpha
   labels:
-    app: elohim-doorway
+    app: elohim-doorway-b
     environment: alpha
     app.kubernetes.io/name: doorway
-    app.kubernetes.io/instance: doorway-alpha
+    app.kubernetes.io/instance: doorway-alpha-b
     app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: gateway
     app.kubernetes.io/part-of: elohim
@@ -317,51 +317,44 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    # Doorway Gateway (for Ingress → doorway)
     - name: gateway-ws
       port: 8080
       targetPort: 8080
       protocol: TCP
-    # Doorway Operator Dashboard
     - name: operator-ui
       port: 8081
       targetPort: 80
       protocol: TCP
   selector:
-    app: elohim-doorway
+    app: elohim-doorway-b
     environment: alpha
 ---
-# Public Ingress - routes all traffic through authenticated Doorway Gateway
-# Supports: /admin, /app/*, /bootstrap/*, /api/v1/*, /operator/*
-# Signal subdomain: signal.doorway-alpha.elohim.host (tx5/SBD protocol)
+# Public Ingress on apex hostname elohim.host (re-bound from prod, see
+# manifests/doorway/prod.yaml + manifests/elohim-app/prod/ingress.yaml
+# for the parking notes). Signal subdomain hosts the tx5/SBD WebRTC
+# relay.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: elohim-doorway-alpha
+  name: elohim-doorway-alpha-b
   namespace: elohim-alpha
   labels:
-    app: elohim-doorway
+    app: elohim-doorway-b
     environment: alpha
     app.kubernetes.io/name: doorway
-    app.kubernetes.io/instance: doorway-alpha
+    app.kubernetes.io/instance: doorway-alpha-b
     app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: gateway
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
   annotations:
-    # WebSocket support for /admin, /app/*, signal subdomain
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
-    nginx.ingress.kubernetes.io/websocket-services: "elohim-doorway-alpha"
-    # Default 1 MB rejects HTML5-app ZIPs and bulk content/relationship POSTs.
-    # 100m covers current 6.75 MB ZIP + 3424-item bulk content with headroom.
-    # Companion: 16k proxy-buffer-size handles large response headers from
-    # holochain admin/app responses (cell info, route registry dumps).
+    nginx.ingress.kubernetes.io/websocket-services: "elohim-doorway-alpha-b"
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
-    # Required for WebSocket upgrade headers
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "upgrade";
@@ -370,29 +363,27 @@ spec:
   ingressClassName: public
   tls:
     - hosts:
-        - doorway-alpha.elohim.host
-        - signal.doorway-alpha.elohim.host
-      secretName: doorway-alpha-tls
+        - elohim.host
+        - signal.elohim.host
+      secretName: elohim-host-apex-tls
   rules:
-    - host: doorway-alpha.elohim.host
+    - host: elohim.host
       http:
         paths:
-          # All traffic through doorway gateway
-          # Doorway handles routing: /threshold/* -> doorway-app, /hc/* -> conductor
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: elohim-doorway-alpha
+                name: elohim-doorway-alpha-b
                 port:
                   number: 8080
-    - host: signal.doorway-alpha.elohim.host
+    - host: signal.elohim.host
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: elohim-doorway-alpha
+                name: elohim-doorway-alpha-b
                 port:
                   number: 8080

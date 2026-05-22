@@ -132,14 +132,20 @@ import groovy.transform.Field
     ]
 ]
 
-// Environment-specific endpoints for version checking
+// Environment-specific endpoints for version checking.
+// `doorway-alpha-b` is the federation peer of doorway-alpha on apex hostname
+// elohim.host; both back the shared alpha conductor pool — see
+// genesis/orchestrator/manifests/doorway/alpha-b.yaml. Prod (doorway-prod /
+// app-prod) is paused 2026-05-22 pending dev-branch federation proof; the
+// app-prod entry was removed because its apex `elohim.host` is now bound to
+// doorway-alpha-b. Restore it when the prod pipeline reopens.
 @Field def VERSION_ENDPOINTS = [
     'doorway-alpha': 'https://doorway-alpha.elohim.host/version',
+    'doorway-alpha-b': 'https://elohim.host/version',
     'doorway-staging': 'https://doorway-staging.elohim.host/version',
     'doorway-prod': 'https://doorway.elohim.host/version',
     'app-alpha': 'https://alpha.elohim.host/version.json',
-    'app-staging': 'https://staging.elohim.host/version.json',
-    'app-prod': 'https://elohim.host/version.json'
+    'app-staging': 'https://staging.elohim.host/version.json'
 ]
 
 // =============================================================================

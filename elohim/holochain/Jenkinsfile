@@ -1615,6 +1615,19 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
 
                                 // Deploy doorway with computed URLs
                                 deployDoorwayManifest(targetEnv, ec.envFile, allHumans)
+
+                                // Alpha-only: deploy doorway-alpha-b as the federation peer
+                                // sharing the alpha conductor pool. Apex hostname elohim.host
+                                // (see manifests/doorway/alpha-b.yaml). Mirrors the staging-read
+                                // precedent below — same conductor pool, distinct deployment
+                                // name and service selector. FEDERATION_PEERS in alpha.yaml +
+                                // alpha-b.yaml each point at the other so peer-discovery,
+                                // DHT-registration, and heartbeat exercise a 2-doorway topology.
+                                if (targetEnv == 'alpha') {
+                                    deployDoorwayManifest('alpha', ec.envFile, allHumans,
+                                        'genesis/orchestrator/manifests/doorway/alpha-b.yaml',
+                                        'elohim-doorway-alpha-b')
+                                }
                             }
 
                             // Cleanup orphaned StatefulSets from previous topology

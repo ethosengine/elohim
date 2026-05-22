@@ -1,5 +1,24 @@
 # Doorway Production Deployment — Agency On-Ramp
 #
+# ============================================================================
+# PAUSED 2026-05-22 — focused on dev-branch doorway federation proof.
+# ============================================================================
+# The prod pipeline has not been pushed in some time and the prod environment
+# has been dormant. We are deliberately staying on the dev/alpha pipeline to
+# prove the doorway-federation surface (two doorways in elohim-alpha — see
+# manifests/doorway/alpha.yaml + alpha-b.yaml) before resuming multi-branch
+# merges to main.
+#
+# The apex hostname `doorway.elohim.host` will be left bound to this manifest
+# until federation lands; `elohim.host` (which used to be the elohim-app prod
+# frontend at this same apex) has been re-bound to elohim-alpha/doorway-alpha-b.
+#
+# Operator must `kubectl delete ingress -n elohim-prod elohim-doorway-prod`
+# on the live cluster once after the federation proof lands if you want to
+# free `doorway.elohim.host` too — currently that hostname is still claimed
+# by this prod doorway and was not displaced.
+# ============================================================================
+#
 # Five roles in one process:
 #   1. DNS/TLS gateway (stateless HTTP routing)
 #   2. Bootstrap/Signal (agent discovery + WebRTC relay)

@@ -1,3 +1,18 @@
+# PAUSED 2026-05-22 — apex hostname elohim.host has been re-bound to
+# elohim-alpha/elohim-doorway-alpha-b for the doorway-federation proof
+# (see genesis/orchestrator/manifests/doorway/alpha-b.yaml). The prod
+# pipeline has been dormant for a while and we are deliberately staying
+# focused on the dev pipeline + multi-doorway federation surface before
+# attempting multi-branch merges again.
+#
+# To re-enable: revert this rename + restore secretName below, delete
+# the apex claim from elohim-alpha/elohim-doorway-alpha-b ingress, then
+# trigger the prod pipeline.
+#
+# Operator must `kubectl delete ingress -n elohim-prod elohim-site-ingress`
+# on the live cluster once after this lands so cert-manager + ingress-nginx
+# release their apex/cert claims; the elohim-alpha alpha-b ingress then
+# picks them up on next reconcile.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -9,12 +24,13 @@ metadata:
     app.kubernetes.io/component: frontend
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
+    elohim/paused: "doorway-federation-2026-05-22"
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
 spec:
   ingressClassName: public
   rules:
-  - host: elohim.host
+  - host: elohim-prod-paused.elohim.host
     http:
       paths:
       - backend:
@@ -26,5 +42,5 @@ spec:
         pathType: Prefix
   tls:
   - hosts:
-    - elohim.host
-    secretName: elohim-site-tls-cert
+    - elohim-prod-paused.elohim.host
+    secretName: elohim-prod-paused-tls-cert
