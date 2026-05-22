@@ -115,7 +115,7 @@ export const DOWELL_TUESDAY_MORNING_STREAM: MockCareEconomyEvent[] = [
     authorId: 'sheila-hardin',
     timestamp: '2026-05-21T07:42:00Z',
     content:
-      "I made it last night and James ate two bowls before he got sick. Maybe this helps. [chicken-and-rice soup recipe — Gertrude's version]",
+      "Sheila sent over chicken-and-rice soup last night — Gertrude's recipe. James ate two bowls before he got sick. Maybe this helps.",
     rea: { kind: 'care', tokens: 8 },
     acknowledgmentPending: true,
   },
