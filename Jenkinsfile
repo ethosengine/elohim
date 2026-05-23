@@ -862,19 +862,18 @@ VEOF
                     script {
                         def storageUrl = env.STORAGE_URL ?: 'http://elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8090'
                         // Auth for PATCH /db/content/{id} (the new route).
-                        // Reuses the existing doorway-admin-bootstrap-key
-                        // credential — same admin auth substrate already in
-                        // use by genesis/Jenkinsfile seed stages. Fails the
-                        // build if absent; the content-row link is the
-                        // load-bearing piece and silent failures here brick
+                        // Uses storage-api-key-admin credential (provisioned
+                        // by k8s operator per plan 2026-05-23-spa-blob-deploy-drift).
+                        // Fails the build if absent; the content-row link is
+                        // load-bearing and silent failures here brick
                         // alpha's gateway shell.
                         def adminKey = ''
                         try {
-                            withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+                            withCredentials([string(credentialsId: 'storage-api-key-admin', variable: 'ADMIN_KEY')]) {
                                 adminKey = env.ADMIN_KEY
                             }
                         } catch (e) {
-                            error "ABORT: doorway-admin-bootstrap-key credential missing. Required for PATCH /db/content/{id}; without it the SPA blob uploads but no content row references it. Create the credential in Jenkins (operator) and re-run. See genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md."
+                            error "ABORT: storage-api-key-admin credential missing. Required for PATCH /db/content/{id}; without it the SPA blob uploads but no content row references it. Create the credential in Jenkins (operator) and re-run. See genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md."
                         }
                         stageSpaBlob(storageUrl, "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", adminKey)
                     }
