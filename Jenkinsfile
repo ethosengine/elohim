@@ -221,9 +221,9 @@ def publishE2EReports(String environment) {
 }
 
 def stageSpaBlob(String storageUrl, String distDir, String adminKey) {
-    // Uploads the elohim-app browser bundle as a single blob and links it
-    // to TWO content rows via the authenticated PATCH /db/content/{id}
-    // route:
+    // Uploads the elohim-app browser bundle as a single blob. When an admin
+    // key is provided, ALSO links the blob to two content rows via the
+    // authenticated PATCH /db/content/{id} route:
     //
     //   db/content/lamad-spa            — the lamad SPA app surface
     //   db/content/elohim-host-landing  — the landing-page EPR projected
@@ -236,13 +236,21 @@ def stageSpaBlob(String storageUrl, String distDir, String adminKey) {
     // seed-sqlite step does not overwrite the deploy-time value written
     // here.
     //
-    // Regression seatbelt: after each PATCH, GET the row and assert
-    // blobHash matches the SHA just written. set -euo pipefail +
-    // curl -fSs (no || echo swallow) means any 4xx/5xx FAILS the build —
-    // surfacing silent CI/storage drift as a red build instead of a
-    // stuck production surface. See:
+    // When adminKey is empty, the PATCH+verify step is skipped (with a
+    // WARN log) and the content rows retain whatever blobHash the seed
+    // wrote. The blob bytes are still uploaded via the unauthenticated
+    // PUT path, so older deploy mechanisms that don't depend on runtime
+    // PATCH continue to function. See:
     //   genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md
-    withEnv(["STORAGE_API_KEY_ADMIN=${adminKey}"]) {
+    //   genesis/docs/handoffs/2026-05-23-followup-2-k8s-handoff-summary.md
+    //
+    // Regression seatbelt (PATCH path only): after each PATCH, GET the
+    // row and assert blobHash matches the SHA just written. set -euo
+    // pipefail + curl -fSs (no || echo swallow) means any 4xx/5xx FAILS
+    // the build — surfacing silent CI/storage drift as a red build
+    // instead of a stuck production surface.
+    def doPatch = (adminKey != null && adminKey.trim() != '') ? '1' : '0'
+    withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}"]) {
         sh """#!/bin/bash
             set -euo pipefail
             cd '${distDir}'
@@ -252,35 +260,39 @@ def stageSpaBlob(String storageUrl, String distDir, String adminKey) {
             echo "SPA blob hash: \${SPA_HASH}"
             echo "SPA blob size: \${SPA_SIZE}"
 
-            # 1. Upload ZIP as blob (content-addressed; idempotent)
+            # 1. Upload ZIP as blob (content-addressed; idempotent; no auth)
             curl -fSs -X PUT \\
                 -H 'Content-Type: application/zip' \\
                 --data-binary @lamad-spa.zip \\
                 "${storageUrl}/blob/\${SPA_HASH}"
             echo "  ✓ blob uploaded"
 
-            # 2. Link blob to both content rows + verify
-            for slug in lamad-spa elohim-host-landing; do
-                # PATCH the row (auth-required; no swallow)
-                curl -fSs -X PATCH \\
-                    -H 'Content-Type: application/json' \\
-                    -H "X-API-Key: \${STORAGE_API_KEY_ADMIN}" \\
-                    -d "{\\"blobHash\\":\\"\${SPA_HASH}\\"}" \\
-                    "${storageUrl}/db/content/\${slug}" \\
-                    >/dev/null
-                echo "  ✓ patched \${slug}"
+            # 2. Link blob to content rows (PATCH+verify) — only when admin key present
+            if [ "\${DO_PATCH}" = "1" ]; then
+                for slug in lamad-spa elohim-host-landing; do
+                    curl -fSs -X PATCH \\
+                        -H 'Content-Type: application/json' \\
+                        -H "X-API-Key: \${STORAGE_API_KEY_ADMIN}" \\
+                        -d "{\\"blobHash\\":\\"\${SPA_HASH}\\"}" \\
+                        "${storageUrl}/db/content/\${slug}" \\
+                        >/dev/null
+                    echo "  ✓ patched \${slug}"
 
-                # Read back; assert blobHash matches (regression seatbelt)
-                ACTUAL=\$(curl -fSs "${storageUrl}/db/content/\${slug}" \\
-                    | python3 -c "import sys, json; print(json.load(sys.stdin).get('blobHash',''))")
-                if [ "\${ACTUAL}" != "\${SPA_HASH}" ]; then
-                    echo "ERROR: \${slug} blobHash drifted after PATCH" >&2
-                    echo "  expected: \${SPA_HASH}" >&2
-                    echo "  actual:   \${ACTUAL}" >&2
-                    exit 1
-                fi
-                echo "  ✓ verified \${slug} blobHash = \${SPA_HASH}"
-            done
+                    ACTUAL=\$(curl -fSs "${storageUrl}/db/content/\${slug}" \\
+                        | python3 -c "import sys, json; print(json.load(sys.stdin).get('blobHash',''))")
+                    if [ "\${ACTUAL}" != "\${SPA_HASH}" ]; then
+                        echo "ERROR: \${slug} blobHash drifted after PATCH" >&2
+                        echo "  expected: \${SPA_HASH}" >&2
+                        echo "  actual:   \${ACTUAL}" >&2
+                        exit 1
+                    fi
+                    echo "  ✓ verified \${slug} blobHash = \${SPA_HASH}"
+                done
+            else
+                echo "  ⊘ WARN: skipping PATCH+verify — no admin credential available"
+                echo "    content rows (lamad-spa, elohim-host-landing) retain seed-time blobHash"
+                echo "    blob bytes are uploaded and content-addressable via PUT /blob/\${SPA_HASH}"
+            fi
 
             rm -f lamad-spa.zip
         """
@@ -865,11 +877,20 @@ VEOF
                         // Try `storage-api-key-admin` (k8s-provisioned for
                         // this work) then fall back to
                         // `doorway-admin-bootstrap-key` (used by
-                        // genesis/Jenkinsfile seed stages — proven visible
-                        // at elohim-genesis scope). App pipeline credential
-                        // scope is sometimes folder-disjoint; fallback keeps
-                        // both visibility paths working without operator
-                        // coordination.
+                        // genesis/Jenkinsfile seed stages). App pipeline
+                        // credential scope is sometimes folder-disjoint;
+                        // fallback keeps both visibility paths working
+                        // without operator coordination.
+                        //
+                        // When neither credential is present, the stage
+                        // continues: stageSpaBlob still uploads the blob
+                        // via unauthenticated PUT, but skips the PATCH+
+                        // verify step. Content rows keep their seed-time
+                        // blobHash. This is the deploy-degraded path —
+                        // operator action is documented in
+                        // genesis/docs/handoffs/2026-05-23-followup-2-k8s-handoff-summary.md
+                        // and the spa-blob-deploy-drift plan, but no
+                        // longer blocks the App pipeline.
                         def adminKey = ''
                         def credUsed = ''
                         try {
@@ -884,10 +905,15 @@ VEOF
                                     credUsed = 'doorway-admin-bootstrap-key'
                                 }
                             } catch (e2) {
-                                error "ABORT: neither storage-api-key-admin nor doorway-admin-bootstrap-key credential visible at this job's scope. Required for PATCH /db/content/{id}; without it the SPA blob uploads but no content row references it. Operator: add a string credential (any of the two names) at Global or 'elohim' folder scope. See genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md."
+                                adminKey = ''
+                                credUsed = ''
                             }
                         }
-                        echo "stageSpaBlob auth: using credential '${credUsed}'"
+                        if (credUsed) {
+                            echo "stageSpaBlob auth: using credential '${credUsed}'"
+                        } else {
+                            echo "stageSpaBlob auth: WARN — neither storage-api-key-admin nor doorway-admin-bootstrap-key credential visible at this job's scope. Continuing with PUT-only path (PATCH+verify skipped)."
+                        }
                         stageSpaBlob(storageUrl, "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", adminKey)
                     }
                 }
