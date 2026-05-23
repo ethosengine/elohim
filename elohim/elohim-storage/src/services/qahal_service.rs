@@ -29,8 +29,8 @@ use crate::hc_client::HcClient;
 use elohim_views::{
     AttestCollabAgreementInputView, CollabAgreementStatus, CollabAgreementView,
     CollabCollectiveView, CollabMembershipRole, CollabMembershipView, CollabQahalView,
-    CreateCollabAgreementInputView, CreateCollabCollectiveInputView, ElohimTier,
-    MemberKind, ShareAllocation, WithdrawMembershipInputView,
+    CreateCollabAgreementInputView, CreateCollabCollectiveInputView, ElohimTier, MemberKind,
+    ShareAllocation, WithdrawMembershipInputView,
 };
 
 // =============================================================================
@@ -80,10 +80,14 @@ impl QahalService {
         let payload = rmp_serde::to_vec_named(&zome_input)
             .map_err(|e| StorageError::Internal(format!("encode CreateCollectiveInput: {e}")))?;
 
-        let result = self.hc.call_zome(self.zome, "create_collective", payload).await?;
+        let result = self
+            .hc
+            .call_zome(self.zome, "create_collective", payload)
+            .await?;
 
-        let action_bytes: Vec<u8> = rmp_serde::from_slice(&result)
-            .map_err(|e| StorageError::Internal(format!("decode ActionHash from create_collective: {e}")))?;
+        let action_bytes: Vec<u8> = rmp_serde::from_slice(&result).map_err(|e| {
+            StorageError::Internal(format!("decode ActionHash from create_collective: {e}"))
+        })?;
 
         let cid = bytes_to_collective_cid(&action_bytes);
 
@@ -117,7 +121,7 @@ impl QahalService {
         let governance_terms_json = input
             .governance_terms
             .as_ref()
-            .map(|gt| serde_json::to_string(gt))
+            .map(serde_json::to_string)
             .transpose()
             .map_err(|e| StorageError::Internal(format!("encode governance_terms: {e}")))?
             .unwrap_or_else(|| "{}".to_string());
@@ -133,16 +137,20 @@ impl QahalService {
             display_name_for_qahal: input.display_name_for_qahal.clone(),
             salt: input.salt.clone(),
         };
-        let payload = rmp_serde::to_vec_named(&zome_input)
-            .map_err(|e| StorageError::Internal(format!("encode CreateCollabAgreementInput: {e}")))?;
+        let payload = rmp_serde::to_vec_named(&zome_input).map_err(|e| {
+            StorageError::Internal(format!("encode CreateCollabAgreementInput: {e}"))
+        })?;
 
         let result = self
             .hc
             .call_zome(self.zome, "create_collab_agreement", payload)
             .await?;
 
-        let action_bytes: Vec<u8> = rmp_serde::from_slice(&result)
-            .map_err(|e| StorageError::Internal(format!("decode ActionHash from create_collab_agreement: {e}")))?;
+        let action_bytes: Vec<u8> = rmp_serde::from_slice(&result).map_err(|e| {
+            StorageError::Internal(format!(
+                "decode ActionHash from create_collab_agreement: {e}"
+            ))
+        })?;
 
         let cid = bytes_to_agreement_cid(&action_bytes);
 
@@ -185,8 +193,9 @@ impl QahalService {
             agreement_action_hash: agreement_action_bytes,
             attesting_collective_cid: input.attesting_collective_cid.clone(),
         };
-        let payload = rmp_serde::to_vec_named(&zome_input)
-            .map_err(|e| StorageError::Internal(format!("encode AttestCollabAgreementInput: {e}")))?;
+        let payload = rmp_serde::to_vec_named(&zome_input).map_err(|e| {
+            StorageError::Internal(format!("encode AttestCollabAgreementInput: {e}"))
+        })?;
 
         // Returns () — we ignore the response bytes
         self.hc
@@ -229,7 +238,8 @@ impl QahalService {
             .await?;
 
         // Fetch the updated Membership record
-        self.fetch_membership_by_action(membership_action_bytes).await
+        self.fetch_membership_by_action(membership_action_bytes)
+            .await
     }
 
     // =========================================================================
@@ -257,7 +267,9 @@ impl QahalService {
         let (collective_action_bytes, anchor_agreement_cid) = if cid.starts_with("agreement:") {
             // Derive the Qahal CID from the agreement
             let agreement_bytes = decode_agreement_cid(cid)?;
-            let qahal_cid = self.get_qahal_cid_for_agreement_bytes(agreement_bytes).await?;
+            let qahal_cid = self
+                .get_qahal_cid_for_agreement_bytes(agreement_bytes)
+                .await?;
             let collective_bytes = decode_collective_cid(&qahal_cid)?;
             (collective_bytes, cid.to_string())
         } else {
@@ -271,9 +283,7 @@ impl QahalService {
             .await?;
 
         // List all Memberships for this Qahal
-        let membership_records = self
-            .list_memberships_for_cid(&qahal_collective.cid)
-            .await?;
+        let membership_records = self.list_memberships_for_cid(&qahal_collective.cid).await?;
 
         // Partition memberships into Collective members and Person members
         let mut member_collectives: Vec<CollabCollectiveView> = Vec::new();
@@ -325,8 +335,11 @@ impl QahalService {
         &self,
         action_bytes: Vec<u8>,
     ) -> Result<CollabCollectiveView, StorageError> {
-        let payload = rmp_serde::to_vec(&action_bytes)
-            .map_err(|e| StorageError::Internal(format!("encode ActionHash for get_collective_by_action: {e}")))?;
+        let payload = rmp_serde::to_vec(&action_bytes).map_err(|e| {
+            StorageError::Internal(format!(
+                "encode ActionHash for get_collective_by_action: {e}"
+            ))
+        })?;
 
         let result = self
             .hc
@@ -334,8 +347,11 @@ impl QahalService {
             .await?;
 
         // Coordinator returns Option<Record>
-        let maybe_record: Option<ZomeRecord> = rmp_serde::from_slice(&result)
-            .map_err(|e| StorageError::Internal(format!("decode Option<Record> from get_collective_by_action: {e}")))?;
+        let maybe_record: Option<ZomeRecord> = rmp_serde::from_slice(&result).map_err(|e| {
+            StorageError::Internal(format!(
+                "decode Option<Record> from get_collective_by_action: {e}"
+            ))
+        })?;
 
         let record = maybe_record.ok_or_else(|| {
             StorageError::NotFound(format!(
@@ -353,8 +369,9 @@ impl QahalService {
     ) -> Result<CollabAgreementView, StorageError> {
         // No dedicated extern for getting an agreement by action hash —
         // compose existing externs: get status + qahal CID, then build view.
-        let status_payload = rmp_serde::to_vec(action_bytes)
-            .map_err(|e| StorageError::Internal(format!("encode ActionHash for get_collab_status: {e}")))?;
+        let status_payload = rmp_serde::to_vec(action_bytes).map_err(|e| {
+            StorageError::Internal(format!("encode ActionHash for get_collab_status: {e}"))
+        })?;
         let status_result = self
             .hc
             .call_zome(self.zome, "get_collab_status", status_payload)
@@ -370,8 +387,9 @@ impl QahalService {
 
         // Optionally resolve the Collab-Qahal CID if instantiated
         let collab_qahal_cid = if matches!(status, CollabAgreementStatus::Instantiated) {
-            let cid_payload = rmp_serde::to_vec(action_bytes)
-                .map_err(|e| StorageError::Internal(format!("encode ActionHash for get_collab_qahal_cid: {e}")))?;
+            let cid_payload = rmp_serde::to_vec(action_bytes).map_err(|e| {
+                StorageError::Internal(format!("encode ActionHash for get_collab_qahal_cid: {e}"))
+            })?;
             let cid_result = self
                 .hc
                 .call_zome(self.zome, "get_collab_qahal_cid_for_agreement", cid_payload)
@@ -387,8 +405,8 @@ impl QahalService {
         Ok(CollabAgreementView {
             cid,
             authored_by_agent_cid: "agent:unknown".into(), // not derivable without full Record decode
-            participants: vec![],                           // not derivable without full Record decode
-            scope: String::new(),                          // not derivable without full Record decode
+            participants: vec![], // not derivable without full Record decode
+            scope: String::new(), // not derivable without full Record decode
             share_allocation: default_share_allocation(),
             commons_pool_tribute: 0.0,
             governance_terms: None,
@@ -404,16 +422,20 @@ impl QahalService {
         &self,
         action_bytes: Vec<u8>,
     ) -> Result<CollabMembershipView, StorageError> {
-        let payload = rmp_serde::to_vec(&action_bytes)
-            .map_err(|e| StorageError::Internal(format!("encode ActionHash for get_membership_by_action: {e}")))?;
+        let payload = rmp_serde::to_vec(&action_bytes).map_err(|e| {
+            StorageError::Internal(format!(
+                "encode ActionHash for get_membership_by_action: {e}"
+            ))
+        })?;
 
         let result = self
             .hc
             .call_zome(self.zome, "get_membership_by_action", payload)
             .await?;
 
-        let record: ZomeRecord = rmp_serde::from_slice(&result)
-            .map_err(|e| StorageError::Internal(format!("decode Record from get_membership_by_action: {e}")))?;
+        let record: ZomeRecord = rmp_serde::from_slice(&result).map_err(|e| {
+            StorageError::Internal(format!("decode Record from get_membership_by_action: {e}"))
+        })?;
 
         self.record_to_membership_view(record, &action_bytes)
     }
@@ -422,16 +444,18 @@ impl QahalService {
         &self,
         collective_cid: &str,
     ) -> Result<Vec<CollabMembershipView>, StorageError> {
-        let payload = rmp_serde::to_vec(collective_cid)
-            .map_err(|e| StorageError::Internal(format!("encode collective_cid for list_memberships: {e}")))?;
+        let payload = rmp_serde::to_vec(collective_cid).map_err(|e| {
+            StorageError::Internal(format!("encode collective_cid for list_memberships: {e}"))
+        })?;
 
         let result = self
             .hc
             .call_zome(self.zome, "list_memberships_for_collective_cid", payload)
             .await?;
 
-        let records: Vec<ZomeRecord> = rmp_serde::from_slice(&result)
-            .map_err(|e| StorageError::Internal(format!("decode Vec<Record> from list_memberships: {e}")))?;
+        let records: Vec<ZomeRecord> = rmp_serde::from_slice(&result).map_err(|e| {
+            StorageError::Internal(format!("decode Vec<Record> from list_memberships: {e}"))
+        })?;
 
         records
             .into_iter()
@@ -444,8 +468,9 @@ impl QahalService {
         &self,
         agreement_bytes: Vec<u8>,
     ) -> Result<String, StorageError> {
-        let payload = rmp_serde::to_vec(&agreement_bytes)
-            .map_err(|e| StorageError::Internal(format!("encode ActionHash for get_collab_qahal_cid: {e}")))?;
+        let payload = rmp_serde::to_vec(&agreement_bytes).map_err(|e| {
+            StorageError::Internal(format!("encode ActionHash for get_collab_qahal_cid: {e}"))
+        })?;
 
         let result = self
             .hc
@@ -469,10 +494,8 @@ impl QahalService {
         record: ZomeRecord,
         action_bytes: &[u8],
     ) -> Result<CollabCollectiveView, StorageError> {
-        let entry: ZomeCollectiveEntry =
-            rmp_serde::from_slice(&record.entry_bytes).map_err(|e| {
-                StorageError::Internal(format!("decode Collective entry: {e}"))
-            })?;
+        let entry: ZomeCollectiveEntry = rmp_serde::from_slice(&record.entry_bytes)
+            .map_err(|e| StorageError::Internal(format!("decode Collective entry: {e}")))?;
 
         let cid = if action_bytes.is_empty() {
             // Derive CID from the record's action_hash field if available
@@ -501,10 +524,8 @@ impl QahalService {
         record: ZomeRecord,
         action_bytes: &[u8],
     ) -> Result<CollabMembershipView, StorageError> {
-        let entry: ZomeMembershipEntry =
-            rmp_serde::from_slice(&record.entry_bytes).map_err(|e| {
-                StorageError::Internal(format!("decode Membership entry: {e}"))
-            })?;
+        let entry: ZomeMembershipEntry = rmp_serde::from_slice(&record.entry_bytes)
+            .map_err(|e| StorageError::Internal(format!("decode Membership entry: {e}")))?;
 
         let cid = if action_bytes.is_empty() {
             record

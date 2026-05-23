@@ -1,16 +1,16 @@
 //! epr view types — migrated from elohim-storage/src/views.rs (VIEWS.T2).
 
-use serde::{Deserialize, Serialize};
-#[allow(unused_imports)]
-use serde_json::Value;
-use ts_rs::TS;
-use crate::shared::*;
 #[allow(unused_imports)]
 use crate::imagodei::*;
 #[allow(unused_imports)]
 use crate::infrastructure::*;
 #[allow(unused_imports)]
 use crate::lamad::*;
+use crate::shared::*;
+use serde::{Deserialize, Serialize};
+#[allow(unused_imports)]
+use serde_json::Value;
+use ts_rs::TS;
 
 /// Coupling legs for an EPR envelope. All legs are optional at the wire level;
 /// kind-specific requirements are enforced by the validator (EprService::ingest).
@@ -124,7 +124,6 @@ pub struct EprProvidersView {
     /// Peer identifiers — "local" for this node, or libp2p PeerId for remote peers.
     pub providers: Vec<String>,
 }
-
 
 /// A lightweight reference to a related EPR atom, used in the nav-context
 /// projection. Label and resilience tier are best-effort — populated when the

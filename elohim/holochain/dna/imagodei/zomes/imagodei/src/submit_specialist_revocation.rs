@@ -267,12 +267,12 @@ pub fn submit_specialist_revocation(
     emit_key_revocation_envelope(
         revocation_id.clone(),
         revocation_cid.clone(),
-        target_human_id,  // Stage 1: human_id; Stage 2: Human entry CID
+        target_human_id, // Stage 1: human_id; Stage 2: Human entry CID
         revoked_key_str,
         rfc3339_now.clone(), // compromise_at == effective_at in M4
         rfc3339_now,
-        None,  // triggering_revocation_id
-        None,  // supersedes_cid
+        None, // triggering_revocation_id
+        None, // supersedes_cid
     )?;
 
     Ok(SubmitSpecialistRevocationOutput {

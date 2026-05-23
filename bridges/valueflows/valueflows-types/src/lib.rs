@@ -25,7 +25,7 @@ pub struct TranslationPoint {
     /// from M3+ when real hREA writes happen).
     pub at_block_height: Option<u64>,
     pub direction: Direction,
-    pub vf_type: String, // "EconomicEvent", "Proposal", ...
+    pub vf_type: String,       // "EconomicEvent", "Proposal", ...
     pub elohim_source: String, // "hREA::EconomicEvent" | "elohim::EprAtom" | ...
     pub translation_kind: TranslationKind,
     pub semantic_cost: SemanticCost,
@@ -119,9 +119,7 @@ impl OntologicalCommitment {
     pub fn as_ledger_str(self) -> &'static str {
         match self {
             OntologicalCommitment::SovereigntyToStewardship => "SovereigntyToStewardship",
-            OntologicalCommitment::KeyAuthorityToSocialAuthority => {
-                "KeyAuthorityToSocialAuthority"
-            }
+            OntologicalCommitment::KeyAuthorityToSocialAuthority => "KeyAuthorityToSocialAuthority",
             OntologicalCommitment::FixedAudienceToReachClass => "FixedAudienceToReachClass",
             OntologicalCommitment::BilateralToRelational => "BilateralToRelational",
             OntologicalCommitment::IndividualWillToContribution => "IndividualWillToContribution",
@@ -177,8 +175,14 @@ mod tests {
     fn as_ledger_str_matches_serde_string_form() {
         assert_eq!(Direction::Read.as_ledger_str(), "Read");
         assert_eq!(Direction::Write.as_ledger_str(), "Write");
-        assert_eq!(TranslationKind::SemanticBridge.as_ledger_str(), "SemanticBridge");
-        assert_eq!(SemanticCost::JustifiedDistinct.as_ledger_str(), "JustifiedDistinct");
+        assert_eq!(
+            TranslationKind::SemanticBridge.as_ledger_str(),
+            "SemanticBridge"
+        );
+        assert_eq!(
+            SemanticCost::JustifiedDistinct.as_ledger_str(),
+            "JustifiedDistinct"
+        );
         assert_eq!(
             OntologicalCommitment::SovereigntyToStewardship.as_ledger_str(),
             "SovereigntyToStewardship"

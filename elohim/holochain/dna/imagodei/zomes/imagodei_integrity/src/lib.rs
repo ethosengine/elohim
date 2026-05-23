@@ -30,7 +30,7 @@ pub use portal_host::*;
 
 // Qahal — collective / membership / collab-agreement substrate (M1 multi-collective)
 pub mod qahal;
-pub use qahal::{Collective, Membership, MembershipRole, MemberKind, CollabAgreement};
+pub use qahal::{CollabAgreement, Collective, MemberKind, Membership, MembershipRole};
 
 // =============================================================================
 // Identity Constants
@@ -687,8 +687,8 @@ pub struct KeyStewardship {
     pub elevated_threshold: Option<u32>, // Higher M for sensitive ops
 
     // === KEY METADATA ===
-    pub key_generation_id: String,       // Which key generation this stewardship covers
-    pub shard_commitment_hash: String,   // Commitment to verify shards
+    pub key_generation_id: String, // Which key generation this stewardship covers
+    pub shard_commitment_hash: String, // Commitment to verify shards
 
     // === LIFECYCLE ===
     pub created_at: String,
@@ -1584,7 +1584,6 @@ fn validate_identity_anomaly(anomaly: &IdentityAnomaly) -> ExternResult<Validate
 
 // validate_identity_challenge removed C.2 — IdentityChallenge is no longer an entry type.
 // validate_challenge_support removed C.2 — ChallengeSupport is no longer an entry type.
-
 
 // =============================================================================
 // Renewal Protocol Validation Functions

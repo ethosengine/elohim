@@ -920,10 +920,10 @@ fn fetch_recovery_request_human_id(recovery_request_cid: &str) -> ExternResult<S
     }
     let metadata: serde_json::Value = serde_json::from_str(&content_output.content.metadata_json)
         .map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "submit_intimate_witness Gate 1: bad metadata_json: {e}"
-            )))
-        })?;
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_intimate_witness Gate 1: bad metadata_json: {e}"
+        )))
+    })?;
     let human_id = metadata
         .get("human_id")
         .and_then(|v| v.as_str())
@@ -1019,9 +1019,7 @@ fn call_elohim_query_effective_identity_freeze_for_human(
 // natural shape. The Task 3 helper `fetch_recovery_request_human_id` is
 // single-field-specific and not reusable here.
 // ---------------------------------------------------------------------------
-fn call_elohim_get_content_by_id(
-    cid: &str,
-) -> ExternResult<Option<ConsolidatedContentOutput>> {
+fn call_elohim_get_content_by_id(cid: &str) -> ExternResult<Option<ConsolidatedContentOutput>> {
     let response = call(
         CallTargetCell::OtherRole("elohim".into()),
         ZomeName::from("content_store"),
@@ -2347,10 +2345,7 @@ pub fn canonical_envelope_bytes(envelope: &KeyRevocationEnvelope) -> Vec<u8> {
             agent_cid: &envelope.metadata.agent_cid,
             compromise_at: &envelope.metadata.compromise_at,
             effective_at: &envelope.metadata.effective_at,
-            triggering_revocation_id: envelope
-                .metadata
-                .triggering_revocation_id
-                .as_deref(),
+            triggering_revocation_id: envelope.metadata.triggering_revocation_id.as_deref(),
             supersedes_cid: envelope.metadata.supersedes_cid.as_deref(),
         },
     };
@@ -2572,7 +2567,6 @@ fn compute_required_witness_count(active_emergency_contacts: u32) -> u32 {
     let ceil_half_plus_one = m.div_ceil(2) + 1; // ceil(m/2) + 1 for u32
     std::cmp::max(2, ceil_half_plus_one)
 }
-
 
 /// Intimate-recovery witness validity horizon. Matches protocol spec §5.
 const WITNESS_EXPIRY_DAYS: u64 = 90;
@@ -2847,12 +2841,12 @@ pub fn create_self_revocation(
     emit_key_revocation_envelope(
         revocation_id.clone(),
         revocation_cid.clone(),
-        human_id,        // Stage 1: human_id; Stage 2: Human entry CID
+        human_id, // Stage 1: human_id; Stage 2: Human entry CID
         revoked_key_str,
         timestamp.clone(), // compromise_at == effective_at in M4
         timestamp,
-        None,            // triggering_revocation_id
-        None,            // supersedes_cid
+        None, // triggering_revocation_id
+        None, // supersedes_cid
     )?;
 
     Ok(KeyRevocationOutput {
@@ -3029,24 +3023,25 @@ pub fn submit_revocation_vote(
     // `governance-action:key-revocation` Content entry on the elohim DNA,
     // fetched by CID via the cross-DNA bridge. The vote itself is also written
     // cross-DNA as an `attestation:revocation-vote` Content (Task 14).
-    let content_output = call_elohim_get_content_by_id(&input.revocation_cid)?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "submit_revocation_vote: revocation CID {} not found on elohim DNA",
-            input.revocation_cid
-        )))
-    })?;
+    let content_output =
+        call_elohim_get_content_by_id(&input.revocation_cid)?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_revocation_vote: revocation CID {} not found on elohim DNA",
+                input.revocation_cid
+            )))
+        })?;
     if content_output.content.content_type != "governance-action:key-revocation" {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "submit_revocation_vote: expected governance-action:key-revocation, got {}",
             content_output.content.content_type
         ))));
     }
-    let metadata: serde_json::Value =
-        serde_json::from_str(&content_output.content.metadata_json).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "submit_revocation_vote: bad metadata_json: {e}"
-            )))
-        })?;
+    let metadata: serde_json::Value = serde_json::from_str(&content_output.content.metadata_json)
+        .map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_revocation_vote: bad metadata_json: {e}"
+        )))
+    })?;
     let revocation_id = metadata
         .get("id")
         .and_then(|v| v.as_str())
@@ -3281,9 +3276,9 @@ pub fn submit_revocation_vote(
             effective_cid,
             revocation_human_id.clone(), // Stage 1: human_id; Stage 2: Human entry CID
             revocation_revoked_key.clone(),
-            rfc3339_now.clone(),         // compromise_at == effective_at in M4
+            rfc3339_now.clone(), // compromise_at == effective_at in M4
             rfc3339_now,
-            Some(vote_id.clone()),       // triggering_revocation_id
+            Some(vote_id.clone()),              // triggering_revocation_id
             Some(input.revocation_cid.clone()), // supersedes_cid: prior pending entry
         )?;
     } else {
@@ -3371,10 +3366,10 @@ fn collect_active_freezes_for_human(human_id: &str) -> ExternResult<Vec<Identity
 
     let metadata: serde_json::Value = serde_json::from_str(&content_output.content.metadata_json)
         .map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "collect_active_freezes_for_human: bad metadata_json: {e}"
-            )))
-        })?;
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "collect_active_freezes_for_human: bad metadata_json: {e}"
+        )))
+    })?;
 
     let is_active = metadata
         .get("is_active")
@@ -3820,8 +3815,7 @@ pub fn submit_intimate_witness(
     // entry on elohim, no longer a `RecoveryRequest` entry on imagodei. Decode
     // is structured (ContentOutput), not a raw Entry::App — so the Task 2
     // `content_decode` helper is not needed in this code path.
-    let human_id =
-        fetch_recovery_request_human_id(&input.recovery_request_cid)?;
+    let human_id = fetch_recovery_request_human_id(&input.recovery_request_cid)?;
 
     // Gate 2: authorizer must be on an active emergency-enabled HumanRelationship.
     let authorizer_pubkey = agent_info()?.agent_initial_pubkey;
@@ -3837,10 +3831,8 @@ pub fn submit_intimate_witness(
     // Dedupe is now keyed on the recovery-request CID via a StringAnchor —
     // the ActionHash that previously anchored the link no longer exists on
     // imagodei's DHT after the cross-DNA migration of create_recovery_request.
-    let request_anchor =
-        StringAnchor::new("recovery_request_cid", &input.recovery_request_cid);
-    let request_anchor_hash =
-        hash_entry(&EntryTypes::StringAnchor(request_anchor.clone()))?;
+    let request_anchor = StringAnchor::new("recovery_request_cid", &input.recovery_request_cid);
+    let request_anchor_hash = hash_entry(&EntryTypes::StringAnchor(request_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(request_anchor))?;
     if has_existing_witness_for_request(&request_anchor_hash, &authorizer_human_id)? {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -4232,7 +4224,9 @@ pub fn create_renewal_attestation(
 /// were removed. Stage F will replace this stub with a bridge call to
 /// elohim's `get_governance_action_with_children`.
 #[hdk_extern]
-pub fn get_renewal_attestation_by_id(_id: String) -> ExternResult<Option<RenewalAttestationOutput>> {
+pub fn get_renewal_attestation_by_id(
+    _id: String,
+) -> ExternResult<Option<RenewalAttestationOutput>> {
     // TODO(Stage F): bridge to elohim get_governance_action_with_children keyed by id
     Ok(None)
 }

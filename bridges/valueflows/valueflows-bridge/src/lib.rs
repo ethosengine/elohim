@@ -128,14 +128,14 @@ mod tests {
 
     #[test]
     fn error_response_carries_expected_status_and_content_type() {
-        let resp = error_response(
-            StatusCode::BAD_REQUEST,
-            "invalid_graphql_request",
-            "boom",
-        );
+        let resp = error_response(StatusCode::BAD_REQUEST, "invalid_graphql_request", "boom");
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
-            resp.headers().get("content-type").unwrap().to_str().unwrap(),
+            resp.headers()
+                .get("content-type")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "application/json"
         );
     }

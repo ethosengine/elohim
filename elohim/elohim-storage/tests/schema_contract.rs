@@ -21,8 +21,8 @@ use elohim_storage::p2p::DrainStatusInfo;
 use elohim_storage::P2PStatusInfo;
 use elohim_views::{
     CollabAgreementStatus, CollabAgreementView, CollabCollectiveView, CollabMembershipRole,
-    CollabMembershipView, CollabQahalView, DeclaredShare, ElohimTier, GovernanceTerms,
-    MemberKind, ShareAllocation, ShareAllocationForm,
+    CollabMembershipView, CollabQahalView, DeclaredShare, ElohimTier, GovernanceTerms, MemberKind,
+    ShareAllocation, ShareAllocationForm,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -3165,15 +3165,23 @@ fn collab_agreement_view_round_trips() {
         share_allocation: ShareAllocation {
             form: ShareAllocationForm::Declared,
             shares: Some(vec![
-                DeclaredShare { collective_cid: "collective:a".into(), share: 0.5 },
-                DeclaredShare { collective_cid: "collective:b".into(), share: 0.45 },
+                DeclaredShare {
+                    collective_cid: "collective:a".into(),
+                    share: 0.5,
+                },
+                DeclaredShare {
+                    collective_cid: "collective:b".into(),
+                    share: 0.45,
+                },
             ]),
             affinity_window_blocks: None,
             rebalance_cadence_blocks: None,
             commons_pool_tribute: 0.05,
         },
         commons_pool_tribute: 0.05,
-        governance_terms: Some(GovernanceTerms { exit_terms: "clean".into() }),
+        governance_terms: Some(GovernanceTerms {
+            exit_terms: "clean".into(),
+        }),
         initial_tier: ElohimTier::T0,
         created_at_block_height: 44444,
         status: CollabAgreementStatus::PendingAttestations,

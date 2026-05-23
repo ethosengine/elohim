@@ -5,7 +5,7 @@
 
 use hdk::prelude::*;
 use imagodei_integrity::qahal::{
-    CollabAgreement, Collective, Membership, MembershipRole, MemberKind,
+    CollabAgreement, Collective, MemberKind, Membership, MembershipRole,
 };
 use imagodei_integrity::{EntryTypes, LinkTypes, StringAnchor};
 
@@ -125,9 +125,7 @@ pub fn get_collective_by_action(action_hash: ActionHash) -> ExternResult<Option<
 /// partition) are silently omitted — callers should retry if the count is
 /// unexpected.
 #[hdk_extern]
-pub fn list_memberships_for_collective(
-    collective_hash: ActionHash,
-) -> ExternResult<Vec<Record>> {
+pub fn list_memberships_for_collective(collective_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let query = LinkQuery::try_new(collective_hash, LinkTypes::HasMembership)?;
     let links = get_links(query, GetStrategy::default())?;
     let mut out = Vec::new();
@@ -204,7 +202,10 @@ pub fn attest_collab_agreement(input: AttestCollabAgreementInput) -> ExternResul
         .ok_or_else(|| wasm_error!("CollabAgreement decode failure"))?;
 
     // 3. Verify the attesting Collective is a declared participant.
-    if !agreement.participants.contains(&input.attesting_collective_cid) {
+    if !agreement
+        .participants
+        .contains(&input.attesting_collective_cid)
+    {
         return Err(wasm_error!(
             "attesting Collective '{}' is not a participant",
             input.attesting_collective_cid
@@ -237,12 +238,18 @@ pub fn attest_collab_agreement(input: AttestCollabAgreementInput) -> ExternResul
             if l.tag.0.as_slice() == b"INSTANTIATED" {
                 None
             } else {
-                std::str::from_utf8(l.tag.0.as_slice()).ok().map(|s| s.to_string())
+                std::str::from_utf8(l.tag.0.as_slice())
+                    .ok()
+                    .map(|s| s.to_string())
             }
         })
         .collect();
 
-    if agreement.participants.iter().all(|p| attested_cids.contains(p)) {
+    if agreement
+        .participants
+        .iter()
+        .all(|p| attested_cids.contains(p))
+    {
         // All participants attested — instantiate the Collab-Qahal atomically.
         instantiate_collab_qahal(&input.agreement_action_hash, &agreement)?;
     }
@@ -332,9 +339,7 @@ fn instantiate_collab_qahal(
 pub fn get_collab_status(agreement_hash: ActionHash) -> ExternResult<String> {
     let q = LinkQuery::try_new(agreement_hash, LinkTypes::AgreementOnCollab)?;
     let links = get_links(q, GetStrategy::default())?;
-    let instantiated = links
-        .iter()
-        .any(|l| l.tag.0.as_slice() == b"INSTANTIATED");
+    let instantiated = links.iter().any(|l| l.tag.0.as_slice() == b"INSTANTIATED");
     if instantiated {
         Ok("Instantiated".into())
     } else {
@@ -484,7 +489,10 @@ pub fn withdraw_membership_clean(input: WithdrawMembershipInput) -> ExternResult
         withdrawn_at_block_height: Some(block_height),
         ..m
     };
-    update_entry(input.membership_action_hash, &EntryTypes::Membership(updated))?;
+    update_entry(
+        input.membership_action_hash,
+        &EntryTypes::Membership(updated),
+    )?;
     Ok(())
 }
 
@@ -521,9 +529,9 @@ pub fn get_membership_by_action(action_hash: ActionHash) -> ExternResult<Record>
                 Ok(record_details.record)
             }
         }
-        Details::Entry(_) => {
-            Err(wasm_error!("Expected Record details, got Entry-level details"))
-        }
+        Details::Entry(_) => Err(wasm_error!(
+            "Expected Record details, got Entry-level details"
+        )),
     }
 }
 
@@ -553,7 +561,9 @@ fn validate_share_allocation_json(json: &str, claimed_tribute: f64) -> ExternRes
     let tribute = parsed
         .get("commons_pool_tribute")
         .and_then(|v| v.as_f64())
-        .ok_or_else(|| wasm_error!("share_allocation.commons_pool_tribute missing or not a number"))?;
+        .ok_or_else(|| {
+            wasm_error!("share_allocation.commons_pool_tribute missing or not a number")
+        })?;
 
     if (tribute - claimed_tribute).abs() > 1e-9 {
         return Err(wasm_error!(
