@@ -488,14 +488,43 @@ pub fn withdraw_membership_clean(input: WithdrawMembershipInput) -> ExternResult
     Ok(())
 }
 
-/// Read a Membership record by its ActionHash.
+/// Read the **latest** Membership record reachable from a creation ActionHash.
+///
+/// After `withdraw_membership_clean` runs an `update_entry`, the original
+/// action still resolves via `get(originalHash)` to the pre-update entry
+/// (HDK semantics: each action hash refers to a specific commit, and
+/// `get` is action-addressed). To observe the updated state from the
+/// original creation hash, we must traverse `RecordDetails.updates` and
+/// resolve the latest Update action.
 ///
 /// Used post-`withdraw_membership_clean` to assert that
-/// `withdrawn_at_block_height` is now `Some(_)`.
+/// `withdrawn_at_block_height` is now `Some(_)` — see sweettest
+/// `qahal_collab_t0_test::withdraw_membership_clean_exit` (regression
+/// repro: DNA #1268 panic at qahal_collab_t0_test.rs:470).
 #[hdk_extern]
 pub fn get_membership_by_action(action_hash: ActionHash) -> ExternResult<Record> {
-    get(action_hash, GetOptions::default())?
-        .ok_or_else(|| wasm_error!("Membership not found"))
+    let details = get_details(action_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!("Membership not found"))?;
+    match details {
+        Details::Record(record_details) => {
+            // Updates are ordered by the source-chain action sequence; the
+            // last entry is the most recent update reachable from this
+            // original action. M1 Membership flows produce at most one
+            // Update (clean withdrawal), so single-step follow is correct.
+            // If multi-step updates become possible (e.g. reactivation),
+            // this should iterate to the leaf of the update chain.
+            if let Some(latest_update) = record_details.updates.last() {
+                let updated_hash = latest_update.action_address().clone();
+                get(updated_hash, GetOptions::default())?
+                    .ok_or_else(|| wasm_error!("Membership Update record missing"))
+            } else {
+                Ok(record_details.record)
+            }
+        }
+        Details::Entry(_) => {
+            Err(wasm_error!("Expected Record details, got Entry-level details"))
+        }
+    }
 }
 
 /// Pre-validate the share-allocation JSON before committing a CollabAgreement.

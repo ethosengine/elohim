@@ -11,6 +11,11 @@ metadata:
     app.kubernetes.io/managed-by: jenkins
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
+    # 1 MB nginx default rejects the 9.6 MB SPA blob PUT from stageSpaBlob
+    # (App pipeline Upload SPA Blob stage — HTTP 413 in elohim app #1458).
+    # 100m mirrors the elohim-doorway-alpha ingress (doorway/alpha.yaml ~L361).
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
     nginx.ingress.kubernetes.io/configuration-snippet: |
       # ELOHIM_HOST_LANDING_ROOT_REWRITE — set by raw-viewport-landing-dogfood branch.
       # Map bare "/" to the elohim-host-landing html5-app bundle entry; everything
