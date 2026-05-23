@@ -95,6 +95,9 @@ pub mod token_mint_service;
 pub mod vulnerability;
 pub mod weather;
 
+// Multi-collective collaboration EPR — M1 Phase C service layer
+pub mod qahal_service;
+
 // Attestation Consolidation Sprint — projection signal handler + tally projector
 pub mod attestation_projector;
 pub mod tally_projector;
