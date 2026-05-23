@@ -2,9 +2,9 @@
 /* Generated from protocol schema: inputs/create-collab-agreement-input.schema.json -- DO NOT EDIT */
 
 /**
- * Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json.form field in imagodei DNA (DNA-notarized). Category C — wire-shape vocabulary. Form of share-routing function. Per spec §6.1. M1 only supports Declared.
+ * Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json.form field in imagodei DNA (DNA-notarized). Category C — wire-shape vocabulary. Form of share-routing function. Per spec §6.1. M1 only supports declared.
  */
-export type ShareAllocationForm = 'Declared' | 'AffinityDerived';
+export type ShareAllocationForm = 'declared' | 'affinityDerived';
 
 /**
  * Source of truth: Cat-A CollabAgreement DHT entry in imagodei DNA (DNA-notarized at commit via integrity validator + coordinator JSON structural checks). Category C — HTTP wire-shape input projecting onto the create_collab_agreement coordinator flow. Body for POST /api/v1/collab/agreement.

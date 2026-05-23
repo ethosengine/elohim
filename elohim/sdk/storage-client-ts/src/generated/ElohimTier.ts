@@ -4,4 +4,4 @@
  * Coordination scale tier for a Collab-Qahal (T0–T3 per spec §3.1).
  * Schema: epr:schema:enum:elohim-tier
  */
-export type ElohimTier = "t0" | "t1" | "t2" | "t3";
+export type ElohimTier = "T0" | "T1" | "T2" | "T3";

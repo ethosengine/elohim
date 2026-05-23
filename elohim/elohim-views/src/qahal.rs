@@ -791,7 +791,6 @@ pub struct GovernanceActionTallyView {
 /// Schema: epr:schema:enum:member-kind
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
 pub enum MemberKind {
     Person,
     Collective,
@@ -802,7 +801,6 @@ pub enum MemberKind {
 /// Schema: epr:schema:enum:elohim-tier
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
 pub enum ElohimTier {
     T0,
     T1,
@@ -881,7 +879,6 @@ pub struct CollabCollectiveView {
 /// Schema: inline in epr:schema:view:membership (role enum)
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
 pub enum CollabMembershipRole {
     Steward,
     Contributor,
@@ -910,7 +907,6 @@ pub struct CollabMembershipView {
 /// Schema: inline enum in epr:schema:view:collab-agreement
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-#[serde(rename_all = "camelCase")]
 pub enum CollabAgreementStatus {
     PendingAttestations,
     Instantiated,

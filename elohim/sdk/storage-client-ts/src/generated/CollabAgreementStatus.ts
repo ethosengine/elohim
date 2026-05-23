@@ -4,4 +4,4 @@
  * Counter-attestation status for a CollabAgreement.
  * Schema: inline enum in epr:schema:view:collab-agreement
  */
-export type CollabAgreementStatus = "pendingAttestations" | "instantiated";
+export type CollabAgreementStatus = "PendingAttestations" | "Instantiated";

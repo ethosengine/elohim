@@ -4,4 +4,4 @@
  * Polymorphic membership subject type (Person | Collective | ElohimAgent).
  * Schema: epr:schema:enum:member-kind
  */
-export type MemberKind = "person" | "collective" | "elohimAgent";
+export type MemberKind = "Person" | "Collective" | "ElohimAgent";

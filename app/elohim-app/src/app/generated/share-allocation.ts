@@ -2,9 +2,9 @@
 /* Generated from protocol schema: objects/share-allocation.schema.json -- DO NOT EDIT */
 
 /**
- * Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json.form field in imagodei DNA (DNA-notarized). Category C — wire-shape vocabulary. Form of share-routing function. Per spec §6.1. M1 only supports Declared.
+ * Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json.form field in imagodei DNA (DNA-notarized). Category C — wire-shape vocabulary. Form of share-routing function. Per spec §6.1. M1 only supports declared.
  */
-export type ShareAllocationForm = 'Declared' | 'AffinityDerived';
+export type ShareAllocationForm = 'declared' | 'affinityDerived';
 
 /**
  * Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json field in imagodei DNA (DNA-notarized as canonical CBOR within the entry). Category C — wire-shape projection. Share-routing function declared on a CollabAgreement. Form A = Declared shares; Form B = AffinityDerived (M2).

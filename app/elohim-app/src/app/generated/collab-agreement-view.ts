@@ -2,9 +2,9 @@
 /* Generated from protocol schema: views/collab-agreement-view.schema.json -- DO NOT EDIT */
 
 /**
- * Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json.form field in imagodei DNA (DNA-notarized). Category C — wire-shape vocabulary. Form of share-routing function. Per spec §6.1. M1 only supports Declared.
+ * Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json.form field in imagodei DNA (DNA-notarized). Category C — wire-shape vocabulary. Form of share-routing function. Per spec §6.1. M1 only supports declared.
  */
-export type ShareAllocationForm = 'Declared' | 'AffinityDerived';
+export type ShareAllocationForm = 'declared' | 'affinityDerived';
 /**
  * Source of truth: Cat-A CollabAgreement DHT entry's initial_tier field in imagodei DNA, plus the deferred friction-gradient evaluator's derived tier output (DNA-notarized at creation; derived thereafter). Category C — wire-shape vocabulary. Coordination scale tier for a Collab-Qahal. Per spec §3.1. M1 only reaches T0; T1+ requires deferred specs.
  */

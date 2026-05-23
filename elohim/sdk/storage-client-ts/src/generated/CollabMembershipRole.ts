@@ -4,4 +4,4 @@
  * Membership role within a Collective or Collab-Qahal.
  * Schema: inline in epr:schema:view:membership (role enum)
  */
-export type CollabMembershipRole = "steward" | "contributor" | "observer";
+export type CollabMembershipRole = "Steward" | "Contributor" | "Observer";
