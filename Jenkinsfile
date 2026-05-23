@@ -220,7 +220,7 @@ def publishE2EReports(String environment) {
     }
 }
 
-def stageSpaBlob(String storageUrl, String distDir, String adminKey) {
+def stageSpaBlob(String doorwayEprUrl, String distDir, String adminKey) {
     // Uploads the elohim-app browser bundle as a single blob. When an admin
     // key is provided, ALSO links the blob to two content rows via the
     // authenticated PATCH /db/content/{id} route:
@@ -264,7 +264,7 @@ def stageSpaBlob(String storageUrl, String distDir, String adminKey) {
             curl -fSs -X PUT \\
                 -H 'Content-Type: application/zip' \\
                 --data-binary @lamad-spa.zip \\
-                "${storageUrl}/blob/\${SPA_HASH}"
+                "${doorwayEprUrl}/blob/\${SPA_HASH}"
             echo "  ✓ blob uploaded"
 
             # 2. Link blob to content rows (PATCH+verify) — only when admin key present
@@ -274,11 +274,11 @@ def stageSpaBlob(String storageUrl, String distDir, String adminKey) {
                         -H 'Content-Type: application/json' \\
                         -H "X-API-Key: \${STORAGE_API_KEY_ADMIN}" \\
                         -d "{\\"blobHash\\":\\"\${SPA_HASH}\\"}" \\
-                        "${storageUrl}/db/content/\${slug}" \\
+                        "${doorwayEprUrl}/db/content/\${slug}" \\
                         >/dev/null
                     echo "  ✓ patched \${slug}"
 
-                    ACTUAL=\$(curl -fSs "${storageUrl}/db/content/\${slug}" \\
+                    ACTUAL=\$(curl -fSs "${doorwayEprUrl}/db/content/\${slug}" \\
                         | python3 -c "import sys, json; print(json.load(sys.stdin).get('blobHash',''))")
                     if [ "\${ACTUAL}" != "\${SPA_HASH}" ]; then
                         echo "ERROR: \${slug} blobHash drifted after PATCH" >&2
@@ -872,12 +872,23 @@ VEOF
             steps {
                 container('builder') {
                     script {
-                        // Default to the PUBLIC doorway URL for the target environment.
-                        // The doorway proxies /blob/{hash} (PUT) and /db/content/{id}
-                        // (PATCH) cleanly through to storage — this matches how the
-                        // pipeline behaves in production (Jenkins has no k8s access
-                        // to pod FQDNs there) and works regardless of which namespace
-                        // the build pod runs in.
+                        // Resolve the doorway-EPR URL for the target environment.
+                        //
+                        // A doorway-EPR URL is a DNS-facilitated address routed and
+                        // projected by a doorway to a specific EPR's hosting contract
+                        // (here: the elohim-host-landing EPR + lamad-spa). It is NOT
+                        // "the doorway URL" — that name belongs to the doorway-service
+                        // surface itself (doorway auth, federation, uptime, bootstrap).
+                        // A single doorway projects/hosts many EPRs; each has its own
+                        // DNS-facilitated URL via the doorway's stewardship contract.
+                        //
+                        // We hit the doorway-EPR URL (not the storage tier directly)
+                        // because storage is peer-native and not reachable from outside
+                        // the cluster. The doorway proxies /blob/{hash} (PUT) and
+                        // /db/content/{id} (PATCH) through to storage. This matches
+                        // how the pipeline behaves in production (Jenkins has no k8s
+                        // access to pod FQDNs there) and works regardless of which
+                        // namespace the build pod runs in.
                         //
                         // The previous default (http://elohim-matthew-alpha-0.elohim-
                         // matthew-alpha-headless:8090) was a headless-service pod
@@ -888,18 +899,19 @@ VEOF
                         //
                         // Env mapping mirrors the Environment Architecture comment
                         // at the top of this file. STORAGE_URL env still overrides
-                        // for ad-hoc or in-cluster targeting.
+                        // for ad-hoc or in-cluster targeting — kept named that way
+                        // for backward compatibility with existing deploy scripts.
                         def branch = env.BRANCH_NAME ?: 'dev'
-                        def defaultStorageUrl
+                        def defaultDoorwayEprUrl
                         if (branch == 'main') {
-                            defaultStorageUrl = 'https://elohim.host'
+                            defaultDoorwayEprUrl = 'https://elohim.host'
                         } else if (branch == 'staging' || branch.startsWith('staging-')) {
-                            defaultStorageUrl = 'https://staging.elohim.host'
+                            defaultDoorwayEprUrl = 'https://staging.elohim.host'
                         } else {
-                            defaultStorageUrl = 'https://alpha.elohim.host'
+                            defaultDoorwayEprUrl = 'https://alpha.elohim.host'
                         }
-                        def storageUrl = env.STORAGE_URL ?: defaultStorageUrl
-                        echo "stageSpaBlob storageUrl: ${storageUrl}"
+                        def doorwayEprUrl = env.STORAGE_URL ?: defaultDoorwayEprUrl
+                        echo "stageSpaBlob doorwayEprUrl: ${doorwayEprUrl}"
                         // Auth for PATCH /db/content/{id} (the new route).
                         // Try `storage-api-key-admin` (k8s-provisioned for
                         // this work) then fall back to
@@ -941,7 +953,7 @@ VEOF
                         } else {
                             echo "stageSpaBlob auth: WARN — neither storage-api-key-admin nor doorway-admin-bootstrap-key credential visible at this job's scope. Continuing with PUT-only path (PATCH+verify skipped)."
                         }
-                        stageSpaBlob(storageUrl, "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", adminKey)
+                        stageSpaBlob(doorwayEprUrl, "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", adminKey)
                     }
                 }
             }
