@@ -19,6 +19,11 @@
 use elohim_storage::p2p::replication::ReplicationStatus;
 use elohim_storage::p2p::DrainStatusInfo;
 use elohim_storage::P2PStatusInfo;
+use elohim_views::{
+    CollabAgreementStatus, CollabAgreementView, CollabCollectiveView, CollabMembershipRole,
+    CollabMembershipView, CollabQahalView, DeclaredShare, ElohimTier, GovernanceTerms,
+    MemberKind, ShareAllocation, ShareAllocationForm,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -37,7 +42,7 @@ fn load_ref_map() -> HashMap<String, Value> {
     let base = schema_dir();
     let mut refs = HashMap::new();
 
-    for subdir in &["enums", "views", "manifests"] {
+    for subdir in &["enums", "views", "manifests", "objects"] {
         let dir = base.join(subdir);
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
@@ -3093,4 +3098,106 @@ fn hub_summary_no_optional_fields_matches_schema() {
         json.get("displayLabel").is_none(),
         "displayLabel must be absent when None"
     );
+}
+
+// ── Multi-collective collab views (Task 9) ───────────────────────────────────
+
+#[test]
+fn collective_view_round_trips_through_schema() {
+    let v = CollabCollectiveView {
+        cid: "collective:abc123".into(),
+        founder_agent_cid: "agent:xyz".into(),
+        charter: "Test charter".into(),
+        display_name: "Test Collective".into(),
+        created_at_block_height: 12345,
+        anchor_agreement_cid: None,
+        elohim_tier: ElohimTier::T0,
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/collective-view.schema.json", &json);
+    let round: CollabCollectiveView = serde_json::from_value(json).unwrap();
+    assert_eq!(v, round);
+}
+
+#[test]
+fn collab_qahal_view_round_trips() {
+    let v = CollabQahalView {
+        cid: "collective:qahal-1".into(),
+        anchor_agreement_cid: "agreement:abc".into(),
+        display_name: "Test Collab".into(),
+        created_at_block_height: 22222,
+        elohim_tier: ElohimTier::T0,
+        member_collectives: vec![],
+        member_persons: vec!["agent:p1".into()],
+        commons_pool_balance: None,
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/collab-qahal-view.schema.json", &json);
+    let round: CollabQahalView = serde_json::from_value(json).unwrap();
+    assert_eq!(v, round);
+}
+
+#[test]
+fn membership_view_round_trips() {
+    let v = CollabMembershipView {
+        cid: "membership:m1".into(),
+        member_cid: "collective:a".into(),
+        member_kind: MemberKind::Collective,
+        collective_cid: "collective:qahal-1".into(),
+        role: CollabMembershipRole::Steward,
+        sponsor_cid: Some("agreement:abc".into()),
+        joined_at_block_height: 33333,
+        withdrawn_at_block_height: None,
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/membership-view.schema.json", &json);
+    let round: CollabMembershipView = serde_json::from_value(json).unwrap();
+    assert_eq!(v, round);
+}
+
+#[test]
+fn collab_agreement_view_round_trips() {
+    let v = CollabAgreementView {
+        cid: "agreement:abc".into(),
+        authored_by_agent_cid: "agent:author".into(),
+        participants: vec!["collective:a".into(), "collective:b".into()],
+        scope: "test scope".into(),
+        share_allocation: ShareAllocation {
+            form: ShareAllocationForm::Declared,
+            shares: Some(vec![
+                DeclaredShare { collective_cid: "collective:a".into(), share: 0.5 },
+                DeclaredShare { collective_cid: "collective:b".into(), share: 0.45 },
+            ]),
+            affinity_window_blocks: None,
+            rebalance_cadence_blocks: None,
+            commons_pool_tribute: 0.05,
+        },
+        commons_pool_tribute: 0.05,
+        governance_terms: Some(GovernanceTerms { exit_terms: "clean".into() }),
+        initial_tier: ElohimTier::T0,
+        created_at_block_height: 44444,
+        status: CollabAgreementStatus::PendingAttestations,
+        attested_by: vec![],
+        collab_qahal_cid: None,
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/collab-agreement-view.schema.json", &json);
+    let round: CollabAgreementView = serde_json::from_value(json).unwrap();
+    assert_eq!(v, round);
+}
+
+#[test]
+#[should_panic(expected = "Schema validation failed")]
+fn share_allocation_refuses_zero_tribute_via_schema() {
+    // JSON Schema must refuse zero tribute via exclusiveMinimum on commonsPoolTribute.
+    // validate_against_schema panics on validation failure — that panic is the assertion.
+    let bad = serde_json::json!({
+        "form": "declared",
+        "shares": [
+            {"collectiveCid": "collective:a", "share": 0.5},
+            {"collectiveCid": "collective:b", "share": 0.5}
+        ],
+        "commonsPoolTribute": 0.0
+    });
+    validate_against_schema("objects/share-allocation.schema.json", &bad);
 }
