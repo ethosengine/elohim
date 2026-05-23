@@ -49,17 +49,12 @@ use std::fs;
 use std::path::PathBuf;
 
 use elohim_views::{
-    AttestCollabAgreementInputView, CollabAgreementStatus, CollabAgreementView,
-    CollabCollectiveView, CollabMembershipRole, CollabMembershipView, CreateCollabAgreementInputView,
-    CreateCollabCollectiveInputView, DeclaredShare, ElohimTier, GovernanceTerms, MemberKind,
-    ShareAllocation, ShareAllocationForm, WithdrawMembershipInputView,
+    AttestCollabAgreementInputView, CreateCollabAgreementInputView,
+    CreateCollabCollectiveInputView, ElohimTier, ShareAllocationForm, WithdrawMembershipInputView,
 };
 use serde_json::{json, Value};
 
-use elohim_storage::{
-    hc_client_registry::HcClientRegistry,
-    http::build_manifest,
-};
+use elohim_storage::{hc_client_registry::HcClientRegistry, http::build_manifest};
 
 // =============================================================================
 // Schema test helpers (self-contained; mirrors schema_contract.rs helpers
@@ -302,10 +297,7 @@ fn collab_dispatcher_post_agreement_cid_attest_routes_to_attest() {
 
 #[test]
 fn collab_dispatcher_get_cid_routes_to_fetch_collab() {
-    assert_eq!(
-        collab_dispatch("GET", "/uhCkkAAA"),
-        "fetch_collab_qahal"
-    );
+    assert_eq!(collab_dispatch("GET", "/uhCkkAAA"), "fetch_collab_qahal");
 }
 
 #[test]
@@ -337,10 +329,7 @@ fn collab_dispatcher_delete_cid_returns_not_found() {
 #[test]
 fn collab_dispatcher_agreement_sub_path_without_attest_returns_not_found() {
     // GET /api/v1/collab/agreement/{cid} — not a registered route
-    assert_eq!(
-        collab_dispatch("GET", "/agreement/uhCkkAAA"),
-        "not_found"
-    );
+    assert_eq!(collab_dispatch("GET", "/agreement/uhCkkAAA"), "not_found");
 }
 
 // =============================================================================
@@ -355,7 +344,7 @@ fn collective_cid_prefix_is_collective_colon() {
         "Collective CIDs must start with 'collective:'"
     );
     assert!(
-        cid.strip_prefix("collective:").unwrap().len() > 0,
+        !cid.strip_prefix("collective:").unwrap().is_empty(),
         "collective CID suffix (base64url of ActionHash) must be non-empty"
     );
 }
@@ -368,7 +357,7 @@ fn agreement_cid_prefix_is_agreement_colon() {
         "Agreement CIDs must start with 'agreement:'"
     );
     assert!(
-        cid.strip_prefix("agreement:").unwrap().len() > 0,
+        !cid.strip_prefix("agreement:").unwrap().is_empty(),
         "agreement CID suffix must be non-empty"
     );
 }
@@ -379,7 +368,10 @@ fn valid_collective_cid_contains_no_slash() {
     let valid = "collective:dGVzdAo";
     let invalid = "collective:part1/part2";
     assert!(!valid.contains('/'), "valid CID must not contain slash");
-    assert!(invalid.contains('/'), "fixture confirms slash detection works");
+    assert!(
+        invalid.contains('/'),
+        "fixture confirms slash detection works"
+    );
 }
 
 // =============================================================================
@@ -449,10 +441,16 @@ fn create_collective_body_is_camel_case_with_three_required_fields() {
         "salt": "e3b0c44298fc"
     });
     assert!(body.get("charter").is_some(), "charter is required");
-    assert!(body.get("displayName").is_some(), "displayName is camelCase required field");
+    assert!(
+        body.get("displayName").is_some(),
+        "displayName is camelCase required field"
+    );
     assert!(body.get("salt").is_some(), "salt is required");
     // Verify snake_case is NOT the wire format
-    assert!(body.get("display_name").is_none(), "snake_case must not be used in wire format");
+    assert!(
+        body.get("display_name").is_none(),
+        "snake_case must not be used in wire format"
+    );
 }
 
 #[test]
@@ -469,15 +467,33 @@ fn create_collab_agreement_body_uses_camel_case_keys() {
         "salt": "deadbeef"
     });
 
-    assert!(body.get("displayNameForQahal").is_some(), "must use displayNameForQahal");
-    assert!(body.get("display_name_for_qahal").is_none(), "snake_case must not be used");
+    assert!(
+        body.get("displayNameForQahal").is_some(),
+        "must use displayNameForQahal"
+    );
+    assert!(
+        body.get("display_name_for_qahal").is_none(),
+        "snake_case must not be used"
+    );
     assert!(body.get("initialTier").is_some(), "must use initialTier");
-    assert!(body.get("initial_tier").is_none(), "snake_case must not be used");
-    assert!(body.get("shareAllocation").is_some(), "must use shareAllocation");
+    assert!(
+        body.get("initial_tier").is_none(),
+        "snake_case must not be used"
+    );
+    assert!(
+        body.get("shareAllocation").is_some(),
+        "must use shareAllocation"
+    );
 
     let sa = body.get("shareAllocation").unwrap();
-    assert!(sa.get("commonsPoolTribute").is_some(), "shareAllocation.commonsPoolTribute required");
-    assert!(sa.get("commons_pool_tribute").is_none(), "snake_case must not be in shareAllocation");
+    assert!(
+        sa.get("commonsPoolTribute").is_some(),
+        "shareAllocation.commonsPoolTribute required"
+    );
+    assert!(
+        sa.get("commons_pool_tribute").is_none(),
+        "snake_case must not be in shareAllocation"
+    );
     assert!(sa.get("form").is_some(), "shareAllocation.form required");
 }
 
@@ -497,7 +513,10 @@ fn attest_collab_agreement_body_requires_two_camel_case_fields() {
         "attestingCollectiveCid": "collective:BBBB"
     });
     assert!(body.get("agreementCid").is_some(), "agreementCid required");
-    assert!(body.get("attestingCollectiveCid").is_some(), "attestingCollectiveCid required");
+    assert!(
+        body.get("attestingCollectiveCid").is_some(),
+        "attestingCollectiveCid required"
+    );
     assert!(body.get("agreement_cid").is_none(), "snake_case not used");
 }
 
@@ -507,8 +526,14 @@ fn withdraw_membership_body_requires_two_camel_case_fields() {
         "membershipCid": "collective:MMMM",
         "collabQahalCid": "collective:QQQQ"
     });
-    assert!(body.get("membershipCid").is_some(), "membershipCid required");
-    assert!(body.get("collabQahalCid").is_some(), "collabQahalCid required");
+    assert!(
+        body.get("membershipCid").is_some(),
+        "membershipCid required"
+    );
+    assert!(
+        body.get("collabQahalCid").is_some(),
+        "collabQahalCid required"
+    );
     assert!(body.get("membership_cid").is_none(), "snake_case not used");
 }
 
@@ -547,8 +572,13 @@ fn zero_commons_pool_tribute_is_accepted_at_wire_level() {
             "commonsPoolTribute": 0.0
         }
     });
-    let tribute = body["shareAllocation"]["commonsPoolTribute"].as_f64().unwrap();
-    assert_eq!(tribute, 0.0_f64, "zero tribute is representable at the wire level");
+    let tribute = body["shareAllocation"]["commonsPoolTribute"]
+        .as_f64()
+        .unwrap();
+    assert_eq!(
+        tribute, 0.0_f64,
+        "zero tribute is representable at the wire level"
+    );
     // NOTE: if a future version adds HTTP-layer validation for tribute > 0,
     // update this test to expect a 400 response instead.
 }
@@ -629,9 +659,7 @@ fn post_attest_collab_agreement_requires_auth_in_manifest() {
         .map(|r| (r.path.clone(), r.auth_required))
         .collect::<std::collections::HashMap<_, _>>();
     assert_eq!(
-        flags
-            .get("/api/v1/collab/agreement/{cid}/attest")
-            .copied(),
+        flags.get("/api/v1/collab/agreement/{cid}/attest").copied(),
         Some(true),
         "POST /api/v1/collab/agreement/{{cid}}/attest must require auth"
     );
@@ -930,10 +958,7 @@ fn create_collab_agreement_refuses_zero_tribute() {
     let mut body = valid_create_collab_agreement_body();
     body["shareAllocation"]["commonsPoolTribute"] = json!(0.0);
     assert!(
-        schema_rejects(
-            "inputs/create-collab-agreement-input.schema.json",
-            &body
-        ),
+        schema_rejects("inputs/create-collab-agreement-input.schema.json", &body),
         "zero commonsPoolTribute must be rejected by the schema (exclusiveMinimum: 0)"
     );
 }
@@ -945,10 +970,7 @@ fn create_collab_agreement_refuses_t1_initial_tier() {
     let mut body = valid_create_collab_agreement_body();
     body["initialTier"] = json!("T1");
     assert!(
-        schema_rejects(
-            "inputs/create-collab-agreement-input.schema.json",
-            &body
-        ),
+        schema_rejects("inputs/create-collab-agreement-input.schema.json", &body),
         "initialTier T1 must be rejected by the schema (const: T0)"
     );
 }
@@ -959,10 +981,7 @@ fn create_collab_agreement_refuses_fewer_than_two_participants() {
     let mut body = valid_create_collab_agreement_body();
     body["participants"] = json!(["collective:AAA"]);
     assert!(
-        schema_rejects(
-            "inputs/create-collab-agreement-input.schema.json",
-            &body
-        ),
+        schema_rejects("inputs/create-collab-agreement-input.schema.json", &body),
         "fewer than 2 participants must be rejected by the schema (minItems: 2)"
     );
 }

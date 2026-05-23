@@ -18,20 +18,20 @@
 //! See `genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md` for the
 //! migration history.
 
-pub mod shared;
-pub mod lamad;
-pub mod shefa;
-pub mod qahal;
+pub mod epr;
 pub mod imagodei;
 pub mod infrastructure;
-pub mod epr;
 pub mod inputs;
+pub mod lamad;
+pub mod qahal;
+pub mod shared;
+pub mod shefa;
 
 // Re-export all domain types at the crate root for convenience
-pub use shared::*;
-pub use lamad::*;
-pub use shefa::*;
-pub use qahal::*;
+pub use epr::*;
 pub use imagodei::*;
 pub use infrastructure::*;
-pub use epr::*;
+pub use lamad::*;
+pub use qahal::*;
+pub use shared::*;
+pub use shefa::*;

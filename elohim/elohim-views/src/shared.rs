@@ -206,7 +206,6 @@ pub struct ViewFederationResponse {
     pub slice: ViewSlice,
 }
 
-
 impl ViewFederationRequest {
     /// Canonical bytes for signing/dedup keys. MessagePack named-fields encoding
     /// — same shape as the wire codec uses, so request bytes used by the codec

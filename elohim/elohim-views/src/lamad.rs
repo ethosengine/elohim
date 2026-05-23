@@ -1,14 +1,14 @@
 //! lamad view types — migrated from elohim-storage/src/views.rs (VIEWS.T2).
 
+#[allow(unused_imports)]
+use crate::infrastructure::*;
+use crate::shared::*;
+#[allow(unused_imports)]
+use crate::shefa::*;
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
 use ts_rs::TS;
-use crate::shared::*;
-#[allow(unused_imports)]
-use crate::infrastructure::*;
-#[allow(unused_imports)]
-use crate::shefa::*;
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -326,4 +326,3 @@ pub struct AttestationView {
     /// Optional description from the Content entry.
     pub description: Option<String>,
 }
-

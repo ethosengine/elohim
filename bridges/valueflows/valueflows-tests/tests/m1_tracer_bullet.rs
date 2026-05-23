@@ -34,8 +34,7 @@ async fn economic_event_query_returns_fixture_and_logs_observation() {
     assert_eq!(ee["provider"], "agent-fixture-provider");
     assert_eq!(ee["receiver"], "agent-fixture-receiver");
     assert_eq!(
-        ee["note"],
-        "M1 tracer-bullet fixture; M3 will return real hREA data",
+        ee["note"], "M1 tracer-bullet fixture; M3 will return real hREA data",
         "note matches fixture",
     );
 
@@ -47,12 +46,11 @@ async fn economic_event_query_returns_fixture_and_logs_observation() {
         .c;
     assert_eq!(count, 1, "exactly one observation written");
 
-    let kind: String = diesel::sql_query(
-        "SELECT translation_kind AS c FROM translation_observations LIMIT 1",
-    )
-    .get_result::<StringRow>(&mut conn)
-    .expect("kind query")
-    .c;
+    let kind: String =
+        diesel::sql_query("SELECT translation_kind AS c FROM translation_observations LIMIT 1")
+            .get_result::<StringRow>(&mut conn)
+            .expect("kind query")
+            .c;
     assert_eq!(
         kind,
         TranslationKind::IdentityShape.as_ledger_str(),

@@ -283,6 +283,7 @@ async fn handle_withdraw_membership(
 /// Note: We return `Ok(QahalService { … })` on each call rather than holding
 /// a cached `Arc<QahalService>` in `Services`.  The `HcClient` it wraps is
 /// already behind an `Arc`, so no extra allocation cost is incurred in practice.
+#[allow(clippy::result_large_err)]
 fn require_qahal_service(
     hc_registry: Option<&Arc<HcClientRegistry>>,
 ) -> Result<QahalService, Response<Full<Bytes>>> {

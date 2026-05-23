@@ -25,7 +25,11 @@ async fn vf_graphql_returns_fixture_economic_event_via_handler_for_test() {
 
     assert_eq!(resp.status(), 200);
     assert_eq!(
-        resp.headers().get("Content-Type").unwrap().to_str().unwrap(),
+        resp.headers()
+            .get("Content-Type")
+            .unwrap()
+            .to_str()
+            .unwrap(),
         "application/json"
     );
 

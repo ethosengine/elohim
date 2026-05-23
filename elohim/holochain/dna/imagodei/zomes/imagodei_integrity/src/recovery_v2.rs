@@ -281,8 +281,8 @@ pub fn check_cryptographic_quorum_rules(
         Ok(k) => k,
         Err(e) => {
             return ValidateCallbackResult::Invalid(format!(
-                "CryptographicQuorum shard_commitment_hash is not a valid Ed25519 verifying key: {e}",
-            ))
+            "CryptographicQuorum shard_commitment_hash is not a valid Ed25519 verifying key: {e}",
+        ))
         }
     };
 

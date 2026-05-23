@@ -126,8 +126,7 @@ mod tests {
         let sb: SerializedBytes =
             SerializedBytes::from(holochain_serialized_bytes::UnsafeBytes::from(bytes));
         let entry = Entry::App(AppEntryBytes::try_from(sb).expect("app entry bytes"));
-        let decoded =
-            decode_content_entry(entry).expect("decode tolerates missing metadata_json");
+        let decoded = decode_content_entry(entry).expect("decode tolerates missing metadata_json");
         assert_eq!(decoded.id, "test-id");
         assert_eq!(decoded.content_type, "concept");
         assert_eq!(decoded.author_id, Some("test-author".to_string()));

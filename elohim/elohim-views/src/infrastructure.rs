@@ -1,20 +1,20 @@
 //! infrastructure view types — migrated from elohim-storage/src/views.rs (VIEWS.T2).
 
-use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
-use serde_json::Value;
-use ts_rs::TS;
-use crate::shared::*;
+use crate::epr::*;
 #[allow(unused_imports)]
 use crate::imagodei::*;
 #[allow(unused_imports)]
 use crate::lamad::*;
 #[allow(unused_imports)]
-use crate::shefa::*;
-#[allow(unused_imports)]
 use crate::qahal::*;
+use crate::shared::*;
 #[allow(unused_imports)]
-use crate::epr::*;
+use crate::shefa::*;
+use serde::{Deserialize, Serialize};
+#[allow(unused_imports)]
+use serde_json::Value;
+use ts_rs::TS;
 
 /// Extension capability map — keyed by capability name, value is a structured entry.
 /// Used by `ElohimCapabilityProfile` for Tier-2 extensibility.
@@ -2102,4 +2102,3 @@ pub struct ObservationDiversitySummaryView {
     pub first_observed_at: i64,
     pub last_observed_at: i64,
 }
-

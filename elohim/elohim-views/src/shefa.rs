@@ -1,16 +1,16 @@
 //! shefa view types — migrated from elohim-storage/src/views.rs (VIEWS.T2).
 
-use serde::{Deserialize, Serialize};
-#[allow(unused_imports)]
-use serde_json::Value;
-use ts_rs::TS;
-use crate::shared::*;
 #[allow(unused_imports)]
 use crate::imagodei::*;
 #[allow(unused_imports)]
 use crate::infrastructure::*;
 #[allow(unused_imports)]
 use crate::lamad::*;
+use crate::shared::*;
+use serde::{Deserialize, Serialize};
+#[allow(unused_imports)]
+use serde_json::Value;
+use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -1115,4 +1115,3 @@ pub struct DashboardSteward {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hop_hint: Option<u32>,
 }
-
