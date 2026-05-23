@@ -1402,9 +1402,15 @@ spec:
         // Gate #6 iroh parity soak: nightly at midnight UTC.
         // The stage itself guards with `when { anyOf { triggeredBy 'TimerTrigger'; changeset ... } }`
         // so on push-triggered runs the nightly stage only fires when transport code changed.
-        // The cron trigger here fires the full orchestrator at midnight regardless of changes,
-        // which then runs the iroh parity stage unconditionally (TimerTrigger path).
-        cron('0 0 * * *')
+        // The cron trigger here fires the full orchestrator daily regardless of
+        // changes, which then runs the iroh parity stage unconditionally
+        // (TimerTrigger path). Schedule chosen to dodge late-evening push windows:
+        // 9am UTC = 5am EDT / 2am PDT (both Americas night) / 10am CET (start of
+        // EU workday, after morning standups). The original 0 0 UTC collided with
+        // late-evening EDT/PDT pushes — concretely on 2026-05-23 00:00 the cron
+        // abortPrevious'd webhook-triggered #1003 mid-genesis (downstream #1019
+        // → ABORTED → orchestrator → NOT_BUILT). AP-TIMER-WEBHOOK-COLLISION.
+        cron('0 9 * * *')
     }
 
     options {
