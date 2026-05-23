@@ -221,6 +221,18 @@ def publishE2EReports(String environment) {
 }
 
 def stageSpaBlob(String storageUrl, String distDir) {
+    // Uploads the elohim-app browser bundle as a single blob and links it
+    // to TWO content nodes:
+    //
+    //   db/content/lamad-spa            — the lamad SPA app surface
+    //   db/content/elohim-host-landing  — the landing-page EPR projected by
+    //                                     doorway-A (alpha.elohim.host) +
+    //                                     doorway-B (elohim.host) as their
+    //                                     ROOT_APP_SLUG
+    //
+    // One blob, two content rows, two projection surfaces. The JSON source
+    // for both content nodes intentionally omits blobHash; the seed-sqlite
+    // step does not overwrite the deploy-time value written here.
     sh """
         cd '${distDir}'
         zip -r lamad-spa.zip .
@@ -235,12 +247,14 @@ def stageSpaBlob(String storageUrl, String distDir) {
             "${storageUrl}/blob/\${SPA_HASH}" \
             || echo 'WARNING: Blob upload failed (storage may not be reachable)'
 
-        # Update content node with new blobHash
-        curl -f -X PUT \
-            -H 'Content-Type: application/json' \
-            -d '{"blobHash":"'\${SPA_HASH}'"}' \
-            "${storageUrl}/db/content/lamad-spa" \
-            || echo 'WARNING: Content node update failed'
+        # Link blob to both content nodes that project this bundle.
+        for slug in lamad-spa elohim-host-landing; do
+            curl -f -X PUT \
+                -H 'Content-Type: application/json' \
+                -d '{"blobHash":"'\${SPA_HASH}'"}' \
+                "${storageUrl}/db/content/\${slug}" \
+                || echo "WARNING: Content node update failed for \${slug}"
+        done
 
         rm -f lamad-spa.zip
     """
