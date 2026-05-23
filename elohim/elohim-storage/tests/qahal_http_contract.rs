@@ -3,11 +3,10 @@
 //! ## Scope
 //!
 //! Scope-honest contract tests: what elohim-storage can verify without a live
-//! Holochain conductor, without Task 11's handler module, and without the
-//! Task 7/8 view types.  The full happy-path + auth enforcement tests are
+//! Holochain conductor.  The full happy-path + auth enforcement tests are
 //! CI-scope (sweettest conductor, doorway integration).
 //!
-//! ## Test surfaces (all currently passing)
+//! ## Test surfaces
 //!
 //! 1. **§1 HcClientRegistry struct contract** — verifies the `imagodei` slot
 //!    exists and accepts `None`.  Compiles and passes today.
@@ -25,26 +24,144 @@
 //! 5. **§5 JSON wire shape** — verifies the camelCase key names and structural
 //!    requirements for each M1 request body using raw `serde_json::Value`.
 //!
-//! ## Tests that activate with Task 11
+//! 6. **§6 Manifest route registration** — verifies that `build_manifest()`
+//!    registers all 6 M1 qahal routes with the correct auth flags.
 //!
-//! The `§6_manifest_*` tests and `§7_503_*` handler tests are marked `#[ignore]`
-//! with an explicit "activate after Task 11" message.  They will turn green
-//! without code changes once Task 11 adds `pub mod qahal` to `api/mod.rs` and
-//! the 6 M1 routes to `build_manifest()`.
+//! 7. **§7 503 service-unavailable path** — the handlers require a live hyper
+//!    transport to construct `Request<Incoming>`.  These tests remain `#[ignore]`
+//!    until a shared HTTP test-server harness is available (Task 35 in the
+//!    storage test plan).  The handler API is wired and public as of Task 11.
 //!
-//! ## Tests that activate with Tasks 7/8
+//! 8. **§8 Input-type serde contract** — verifies `elohim_views` M1 input types
+//!    roundtrip correctly through `serde_json`.
 //!
-//! `§8_serde_*` tests are marked `#[ignore]` pending the view types landing in
-//! `elohim-views/src/qahal.rs` (Tasks 7/8).
+//! 9. **§9 Schema-level business-rule refusals** — JSON Schema validates that
+//!    zero-tribute and T1-initial inputs are rejected at the schema layer.
+//!
+//! 10. **§10 Conductor-scope happy-path stubs** — tests that require a live
+//!     Holochain conductor; kept as `#[ignore]` until sweettest infrastructure
+//!     can drive them (M1 CI-scope).
 //!
 //! See genesis/docs/plans/2026-05-23-multi-collective-collaboration-epr-plan.md §12.
 
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+
+use elohim_views::{
+    AttestCollabAgreementInputView, CollabAgreementStatus, CollabAgreementView,
+    CollabCollectiveView, CollabMembershipRole, CollabMembershipView, CreateCollabAgreementInputView,
+    CreateCollabCollectiveInputView, DeclaredShare, ElohimTier, GovernanceTerms, MemberKind,
+    ShareAllocation, ShareAllocationForm, WithdrawMembershipInputView,
+};
 use serde_json::{json, Value};
 
 use elohim_storage::{
     hc_client_registry::HcClientRegistry,
     http::build_manifest,
 };
+
+// =============================================================================
+// Schema test helpers (self-contained; mirrors schema_contract.rs helpers
+// but also loads `inputs/` and `objects/` subdirs for M1 input schemas)
+// =============================================================================
+
+fn schema_dir() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir.join("../sdk/schemas/v1")
+}
+
+fn load_full_ref_map() -> HashMap<String, Value> {
+    let base = schema_dir();
+    let mut refs = HashMap::new();
+    for subdir in &["enums", "views", "inputs", "objects"] {
+        let dir = base.join(subdir);
+        if let Ok(entries) = fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        if let Ok(schema) = serde_json::from_str::<Value>(&content) {
+                            let filename = path.file_name().unwrap().to_str().unwrap().to_string();
+                            refs.insert(filename.clone(), schema.clone());
+                            refs.insert(format!("./{}", filename), schema.clone());
+                            refs.insert(format!("../{}/{}", subdir, filename), schema.clone());
+                            refs.insert(format!("{}/{}", subdir, filename), schema.clone());
+                            if let Some(Value::String(id)) = schema.get("$id") {
+                                refs.insert(id.clone(), schema);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    refs
+}
+
+fn inline_refs(schema: &Value, refs: &HashMap<String, Value>) -> Value {
+    match schema {
+        Value::Object(map) => {
+            if let Some(Value::String(ref_path)) = map.get("$ref") {
+                if !ref_path.starts_with('#') {
+                    let (file_part, fragment) = match ref_path.split_once('#') {
+                        Some((file, frag)) => (file, Some(frag)),
+                        None => (ref_path.as_str(), None),
+                    };
+                    if let Some(referenced) = refs.get(file_part) {
+                        let mut inlined = referenced.clone();
+                        if let Value::Object(ref mut obj) = inlined {
+                            obj.remove("$id");
+                            obj.remove("$schema");
+                        }
+                        if let Some(frag) = fragment {
+                            let pointer = if frag.starts_with('/') {
+                                frag.to_string()
+                            } else {
+                                format!("/{frag}")
+                            };
+                            if let Some(sub) = inlined.pointer(&pointer) {
+                                return inline_refs(&sub.clone(), refs);
+                            }
+                        }
+                        return inline_refs(&inlined, refs);
+                    }
+                }
+            }
+            let mut result = serde_json::Map::new();
+            for (key, value) in map {
+                result.insert(key.clone(), inline_refs(value, refs));
+            }
+            Value::Object(result)
+        }
+        Value::Array(arr) => Value::Array(arr.iter().map(|v| inline_refs(v, refs)).collect()),
+        other => other.clone(),
+    }
+}
+
+fn load_schema(relative: &str) -> Value {
+    let path = schema_dir().join(relative);
+    let content = fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("Failed to read schema {}: {}", path.display(), e));
+    let raw: Value = serde_json::from_str(&content)
+        .unwrap_or_else(|e| panic!("Failed to parse schema {}: {}", path.display(), e));
+    let refs = load_full_ref_map();
+    inline_refs(&raw, &refs)
+}
+
+/// Returns `true` if the given instance is INVALID against the schema.
+fn schema_rejects(schema_path: &str, instance: &Value) -> bool {
+    let schema = load_schema(schema_path);
+    let validator = jsonschema::validator_for(&schema)
+        .unwrap_or_else(|e| panic!("Failed to compile schema {}: {}", schema_path, e));
+    let errors: Vec<_> = validator.iter_errors(instance).collect();
+    !errors.is_empty()
+}
+
+/// Returns `true` if the given instance is VALID against the schema.
+fn schema_accepts(schema_path: &str, instance: &Value) -> bool {
+    !schema_rejects(schema_path, instance)
+}
 
 // =============================================================================
 // §1 — HcClientRegistry struct contract
@@ -437,14 +554,13 @@ fn zero_commons_pool_tribute_is_accepted_at_wire_level() {
 }
 
 // =============================================================================
-// §6 — Manifest route registration (activates with Task 11)
+// §6 — Manifest route registration
 //
-// These tests are marked #[ignore] because `build_manifest()` does not yet
-// include the M1 qahal routes. Remove `#[ignore]` after Task 11 adds them.
+// Tasks 7/8/11 have landed.  All 6 M1 qahal routes are registered in
+// `build_manifest()` with the correct auth flags.
 // =============================================================================
 
 #[test]
-#[ignore = "activate after Task 11 adds M1 routes to build_manifest()"]
 fn manifest_registers_exactly_six_m1_qahal_routes() {
     let manifest = build_manifest();
     let qahal_routes: Vec<&str> = manifest
@@ -464,40 +580,48 @@ fn manifest_registers_exactly_six_m1_qahal_routes() {
 }
 
 #[test]
-#[ignore = "activate after Task 11 adds M1 routes to build_manifest()"]
 fn post_collective_requires_auth_in_manifest() {
     let flags = build_manifest()
         .routes
         .iter()
         .map(|r| (r.path.clone(), r.auth_required))
         .collect::<std::collections::HashMap<_, _>>();
-    assert_eq!(flags.get("/api/v1/collective").copied(), Some(true));
+    assert_eq!(
+        flags.get("/api/v1/collective").copied(),
+        Some(true),
+        "POST /api/v1/collective must require auth (creates a DNA-notarized Collective)"
+    );
 }
 
 #[test]
-#[ignore = "activate after Task 11 adds M1 routes to build_manifest()"]
 fn get_collective_by_cid_is_public_in_manifest() {
     let flags = build_manifest()
         .routes
         .iter()
         .map(|r| (r.path.clone(), r.auth_required))
         .collect::<std::collections::HashMap<_, _>>();
-    assert_eq!(flags.get("/api/v1/collective/{cid}").copied(), Some(false));
+    assert_eq!(
+        flags.get("/api/v1/collective/{cid}").copied(),
+        Some(false),
+        "GET /api/v1/collective/{{cid}} is a public read — no auth required"
+    );
 }
 
 #[test]
-#[ignore = "activate after Task 11 adds M1 routes to build_manifest()"]
 fn post_collab_agreement_requires_auth_in_manifest() {
     let flags = build_manifest()
         .routes
         .iter()
         .map(|r| (r.path.clone(), r.auth_required))
         .collect::<std::collections::HashMap<_, _>>();
-    assert_eq!(flags.get("/api/v1/collab/agreement").copied(), Some(true));
+    assert_eq!(
+        flags.get("/api/v1/collab/agreement").copied(),
+        Some(true),
+        "POST /api/v1/collab/agreement must require auth"
+    );
 }
 
 #[test]
-#[ignore = "activate after Task 11 adds M1 routes to build_manifest()"]
 fn post_attest_collab_agreement_requires_auth_in_manifest() {
     let flags = build_manifest()
         .routes
@@ -508,23 +632,26 @@ fn post_attest_collab_agreement_requires_auth_in_manifest() {
         flags
             .get("/api/v1/collab/agreement/{cid}/attest")
             .copied(),
-        Some(true)
+        Some(true),
+        "POST /api/v1/collab/agreement/{{cid}}/attest must require auth"
     );
 }
 
 #[test]
-#[ignore = "activate after Task 11 adds M1 routes to build_manifest()"]
 fn get_collab_qahal_is_public_in_manifest() {
     let flags = build_manifest()
         .routes
         .iter()
         .map(|r| (r.path.clone(), r.auth_required))
         .collect::<std::collections::HashMap<_, _>>();
-    assert_eq!(flags.get("/api/v1/collab/{cid}").copied(), Some(false));
+    assert_eq!(
+        flags.get("/api/v1/collab/{cid}").copied(),
+        Some(false),
+        "GET /api/v1/collab/{{cid}} is a public read — no auth required"
+    );
 }
 
 #[test]
-#[ignore = "activate after Task 11 adds M1 routes to build_manifest()"]
 fn post_withdraw_membership_requires_auth_in_manifest() {
     let flags = build_manifest()
         .routes
@@ -533,135 +660,350 @@ fn post_withdraw_membership_requires_auth_in_manifest() {
         .collect::<std::collections::HashMap<_, _>>();
     assert_eq!(
         flags.get("/api/v1/collab/{cid}/withdraw").copied(),
-        Some(true)
+        Some(true),
+        "POST /api/v1/collab/{{cid}}/withdraw must require auth"
+    );
+}
+
+// §6 alias: the plan explicitly names `create_collective_requires_auth` — this
+// is the same invariant as `post_collective_requires_auth_in_manifest` above.
+// Confirmed covered.  No duplicate test needed.
+
+// =============================================================================
+// §7 — 503 service-unavailable path
+//
+// The `api::qahal` module is now public (Task 11) and the handler signatures
+// are stable.  These tests remain `#[ignore]` only because constructing a
+// live `hyper::Request<Incoming>` without an actual TCP transport requires the
+// shared HTTP test-server harness that is scheduled for Task 35.
+// The handler API contract (503 + IMAGODEI_BRIDGE_OFFLINE code when registry is
+// absent) is documented in the handler comments and is tested end-to-end by
+// the doorway integration gate in CI.
+// =============================================================================
+
+#[test]
+#[ignore = "needs HTTP test-server harness (Task 35) — handler API is wired and public since Task 11"]
+fn create_collective_returns_503_when_registry_absent() {
+    // When activated: spin up storage in test mode with no HcClientRegistry,
+    // issue POST /api/v1/collective → expect 503 IMAGODEI_BRIDGE_OFFLINE.
+    //
+    // The production path is:
+    //   handle_api_request → qahal::handle_collective → require_qahal_service(None)
+    //   → response_503_imagodei_bridge_offline()
+    //
+    // See api/qahal.rs `require_qahal_service` for the 503 response contract.
+    unimplemented!("activate when Task 35 HTTP harness is available")
+}
+
+#[test]
+#[ignore = "needs HTTP test-server harness (Task 35) — handler API is wired and public since Task 11"]
+fn create_collab_agreement_returns_503_when_registry_absent() {
+    unimplemented!("activate when Task 35 HTTP harness is available")
+}
+
+#[test]
+#[ignore = "needs HTTP test-server harness (Task 35) — handler API is wired and public since Task 11"]
+fn attest_collab_agreement_returns_503_when_registry_absent() {
+    unimplemented!("activate when Task 35 HTTP harness is available")
+}
+
+#[test]
+#[ignore = "needs HTTP test-server harness (Task 35) — handler API is wired and public since Task 11"]
+fn get_collab_qahal_returns_503_when_registry_absent() {
+    unimplemented!("activate when Task 35 HTTP harness is available")
+}
+
+#[test]
+#[ignore = "needs HTTP test-server harness (Task 35) — handler API is wired and public since Task 11"]
+fn withdraw_membership_returns_503_when_registry_absent() {
+    unimplemented!("activate when Task 35 HTTP harness is available")
+}
+
+#[test]
+#[ignore = "needs HTTP test-server harness (Task 35) — handler API is wired and public since Task 11"]
+fn service_unavailable_response_carries_imagodei_bridge_offline_code() {
+    // body["code"] must equal "IMAGODEI_BRIDGE_OFFLINE"
+    unimplemented!("activate when Task 35 HTTP harness is available")
+}
+
+#[test]
+#[ignore = "needs HTTP test-server harness (Task 35) — handler API is wired and public since Task 11"]
+fn create_collective_returns_503_when_imagodei_slot_absent() {
+    // let registry = Arc::new(HcClientRegistry { infrastructure: None, imagodei: None });
+    // handle_collective(req, POST, "", Some(&registry)) → 503
+    unimplemented!("activate when Task 35 HTTP harness is available")
+}
+
+#[test]
+#[ignore = "needs HTTP test-server harness (Task 35) — handler API is wired and public since Task 11"]
+fn create_collab_agreement_returns_503_when_imagodei_slot_absent() {
+    unimplemented!("activate when Task 35 HTTP harness is available")
+}
+
+// =============================================================================
+// §8 — Input-type serde contract
+//
+// Tasks 7/8 have landed — all view types are real.  These tests were previously
+// `#[ignore]` pending `elohim_views::qahal` types; they are now active.
+// =============================================================================
+
+#[test]
+fn create_collective_input_deserializes_from_valid_json() {
+    let v: CreateCollabCollectiveInputView = serde_json::from_value(json!({
+        "charter": "We steward the commons.",
+        "displayName": "Dawn Runners",
+        "salt": "e3b0c44298fc1234567890abcdef0123"
+    }))
+    .expect("valid CreateCollabCollectiveInputView must deserialize");
+    assert_eq!(v.display_name, "Dawn Runners");
+    assert_eq!(v.charter, "We steward the commons.");
+    assert_eq!(v.salt, "e3b0c44298fc1234567890abcdef0123");
+}
+
+#[test]
+fn create_collective_input_rejects_missing_display_name() {
+    // `displayName` is required — omitting it must produce a serde error.
+    let result: Result<CreateCollabCollectiveInputView, _> = serde_json::from_value(json!({
+        "charter": "We steward the commons.",
+        "salt": "e3b0c44298fc1234567890abcdef0123"
+    }));
+    assert!(
+        result.is_err(),
+        "missing displayName must be a deserialization error"
+    );
+}
+
+#[test]
+fn create_collab_agreement_input_deserializes_from_valid_json() {
+    let v: CreateCollabAgreementInputView = serde_json::from_value(json!({
+        "participants": ["collective:AAA", "collective:BBB"],
+        "scope": "cross-pillar experiment",
+        "shareAllocation": {
+            "form": "declared",
+            "commonsPoolTribute": 0.05
+        },
+        "initialTier": "T0",
+        "displayNameForQahal": "Alpha Collab",
+        "salt": "abcdef1234567890abcdef1234567890"
+    }))
+    .expect("valid CreateCollabAgreementInputView must deserialize");
+    assert_eq!(v.participants, vec!["collective:AAA", "collective:BBB"]);
+    assert_eq!(v.display_name_for_qahal, "Alpha Collab");
+    assert_eq!(v.initial_tier, ElohimTier::T0);
+    assert_eq!(v.share_allocation.commons_pool_tribute, 0.05);
+}
+
+#[test]
+fn create_collab_agreement_input_rejects_missing_participants() {
+    let result: Result<CreateCollabAgreementInputView, _> = serde_json::from_value(json!({
+        "scope": "test",
+        "shareAllocation": { "form": "Declared", "commonsPoolTribute": 0.05 },
+        "initialTier": "T0",
+        "displayNameForQahal": "X",
+        "salt": "abcdef1234567890abcdef1234567890"
+    }));
+    assert!(
+        result.is_err(),
+        "missing participants must be a deserialization error"
+    );
+}
+
+#[test]
+fn create_collab_agreement_input_accepts_zero_tribute_at_serde_level() {
+    // Zero tribute is representable as f64 — business-rule enforcement lives in
+    // the DNA coordinator (not at the serde boundary).
+    let result: Result<CreateCollabAgreementInputView, _> = serde_json::from_value(json!({
+        "participants": ["collective:AAA", "collective:BBB"],
+        "scope": "test",
+        "shareAllocation": { "form": "declared", "commonsPoolTribute": 0.0 },
+        "initialTier": "T0",
+        "displayNameForQahal": "X",
+        "salt": "abcdef1234567890abcdef1234567890"
+    }));
+    assert!(
+        result.is_ok(),
+        "zero tribute must be accepted at the serde boundary; DNA coordinator enforces >0"
+    );
+}
+
+#[test]
+fn attest_collab_agreement_input_deserializes_from_valid_json() {
+    let v: AttestCollabAgreementInputView = serde_json::from_value(json!({
+        "agreementCid": "agreement:uhCkkAAA",
+        "attestingCollectiveCid": "collective:uhCkkBBB"
+    }))
+    .expect("valid AttestCollabAgreementInputView must deserialize");
+    assert_eq!(v.agreement_cid, "agreement:uhCkkAAA");
+    assert_eq!(v.attesting_collective_cid, "collective:uhCkkBBB");
+}
+
+#[test]
+fn withdraw_membership_input_deserializes_from_valid_json() {
+    let v: WithdrawMembershipInputView = serde_json::from_value(json!({
+        "membershipCid": "collective:MMMM",
+        "collabQahalCid": "collective:QQQQ"
+    }))
+    .expect("valid WithdrawMembershipInputView must deserialize");
+    assert_eq!(v.membership_cid, "collective:MMMM");
+    assert_eq!(v.collab_qahal_cid, "collective:QQQQ");
+}
+
+#[test]
+fn elohim_tier_enum_all_variants_parse() {
+    let t0: ElohimTier = serde_json::from_value(json!("T0")).expect("T0 must parse");
+    let t1: ElohimTier = serde_json::from_value(json!("T1")).expect("T1 must parse");
+    let t2: ElohimTier = serde_json::from_value(json!("T2")).expect("T2 must parse");
+    let t3: ElohimTier = serde_json::from_value(json!("T3")).expect("T3 must parse");
+    assert_eq!(t0, ElohimTier::T0);
+    assert_eq!(t1, ElohimTier::T1);
+    assert_eq!(t2, ElohimTier::T2);
+    assert_eq!(t3, ElohimTier::T3);
+}
+
+#[test]
+fn share_allocation_form_enum_roundtrips() {
+    // serde(rename_all = "camelCase") on an enum converts PascalCase variants
+    // to camelCase strings: Declared → "declared", AffinityDerived → "affinityDerived".
+    let declared: ShareAllocationForm =
+        serde_json::from_value(json!("declared")).expect("'declared' must parse to Declared");
+    let affinity: ShareAllocationForm =
+        serde_json::from_value(json!("affinityDerived")).expect("'affinityDerived' must parse");
+
+    assert_eq!(declared, ShareAllocationForm::Declared);
+    assert_eq!(affinity, ShareAllocationForm::AffinityDerived);
+
+    // Roundtrip serialize — confirms the wire form is lowercase-camel
+    assert_eq!(
+        serde_json::to_value(&declared).unwrap(),
+        json!("declared"),
+        "Declared variant must serialize to 'declared' (camelCase of single-word PascalCase)"
+    );
+    assert_eq!(
+        serde_json::to_value(&affinity).unwrap(),
+        json!("affinityDerived"),
+        "AffinityDerived must serialize back to 'affinityDerived'"
     );
 }
 
 // =============================================================================
-// §7 — 503 service-unavailable path (activates with Task 11)
+// §9 — Schema-level business-rule refusals
 //
-// Marked #[ignore] until api::qahal is declared public.
-// The implementation contracts below describe the expected behaviour.
-// =============================================================================
-
-#[test]
-#[ignore = "activate after Task 11: api::qahal module not yet public"]
-fn create_collective_returns_503_when_registry_absent() {
-    // use elohim_storage::api::qahal::handle_collective;
-    // let req = make_incoming_request(Method::POST);
-    // let resp = run(handle_collective(req, Method::POST, "", None)).unwrap();
-    // assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
-    unimplemented!("activate after Task 11")
-}
-
-#[test]
-#[ignore = "activate after Task 11: api::qahal module not yet public"]
-fn create_collab_agreement_returns_503_when_registry_absent() {
-    unimplemented!("activate after Task 11")
-}
-
-#[test]
-#[ignore = "activate after Task 11: api::qahal module not yet public"]
-fn attest_collab_agreement_returns_503_when_registry_absent() {
-    unimplemented!("activate after Task 11")
-}
-
-#[test]
-#[ignore = "activate after Task 11: api::qahal module not yet public"]
-fn get_collab_qahal_returns_503_when_registry_absent() {
-    unimplemented!("activate after Task 11")
-}
-
-#[test]
-#[ignore = "activate after Task 11: api::qahal module not yet public"]
-fn withdraw_membership_returns_503_when_registry_absent() {
-    unimplemented!("activate after Task 11")
-}
-
-#[test]
-#[ignore = "activate after Task 11: api::qahal module not yet public"]
-fn service_unavailable_response_carries_imagodei_bridge_offline_code() {
-    // body["code"] must equal "IMAGODEI_BRIDGE_OFFLINE"
-    unimplemented!("activate after Task 11")
-}
-
-#[test]
-#[ignore = "activate after Task 11: api::qahal module not yet public"]
-fn create_collective_returns_503_when_imagodei_slot_absent() {
-    // let registry = Arc::new(HcClientRegistry { infrastructure: None, imagodei: None });
-    // handle_collective(req, POST, "", Some(&registry)) → 503
-    unimplemented!("activate after Task 11")
-}
-
-#[test]
-#[ignore = "activate after Task 11: api::qahal module not yet public"]
-fn create_collab_agreement_returns_503_when_imagodei_slot_absent() {
-    unimplemented!("activate after Task 11")
-}
-
-// =============================================================================
-// §8 — Input-type serde contract (activates with Tasks 7/8)
+// JSON Schema enforces the spec constraints that the DNA coordinator will
+// also enforce.  These tests catch schema drift before production code runs.
 //
-// Marked #[ignore] until the view types land in elohim-views.
+// Note: the salt regex in the input schema requires exactly 32 lowercase hex
+// chars (`^[0-9a-f]{32}$`).  All §9 fixtures use a conforming salt.
+// =============================================================================
+
+/// A minimal valid CreateCollabAgreementInput body (used as a baseline before
+/// mutation in each refusal test).
+fn valid_create_collab_agreement_body() -> Value {
+    json!({
+        "participants": ["collective:AAA", "collective:BBB"],
+        "scope": "valid scope",
+        "shareAllocation": {
+            "form": "declared",
+            "commonsPoolTribute": 0.05
+        },
+        "initialTier": "T0",
+        "displayNameForQahal": "Test Collab",
+        "salt": "abcdef1234567890abcdef1234567890"
+    })
+}
+
+#[test]
+fn create_collab_agreement_valid_baseline_passes_schema() {
+    // Confirm the baseline is accepted before testing mutations.
+    assert!(
+        schema_accepts(
+            "inputs/create-collab-agreement-input.schema.json",
+            &valid_create_collab_agreement_body()
+        ),
+        "baseline create-collab-agreement input must pass schema validation"
+    );
+}
+
+#[test]
+fn create_collab_agreement_refuses_zero_tribute() {
+    // spec §6.3: commonsPoolTribute must be > 0.
+    // The share-allocation schema uses `"exclusiveMinimum": 0` on commonsPoolTribute.
+    let mut body = valid_create_collab_agreement_body();
+    body["shareAllocation"]["commonsPoolTribute"] = json!(0.0);
+    assert!(
+        schema_rejects(
+            "inputs/create-collab-agreement-input.schema.json",
+            &body
+        ),
+        "zero commonsPoolTribute must be rejected by the schema (exclusiveMinimum: 0)"
+    );
+}
+
+#[test]
+fn create_collab_agreement_refuses_t1_initial_tier() {
+    // spec §3.1: new ColabAgreements always start at T0.
+    // The input schema uses `"const": "T0"` on initialTier.
+    let mut body = valid_create_collab_agreement_body();
+    body["initialTier"] = json!("T1");
+    assert!(
+        schema_rejects(
+            "inputs/create-collab-agreement-input.schema.json",
+            &body
+        ),
+        "initialTier T1 must be rejected by the schema (const: T0)"
+    );
+}
+
+#[test]
+fn create_collab_agreement_refuses_fewer_than_two_participants() {
+    // The participants array has `"minItems": 2`.
+    let mut body = valid_create_collab_agreement_body();
+    body["participants"] = json!(["collective:AAA"]);
+    assert!(
+        schema_rejects(
+            "inputs/create-collab-agreement-input.schema.json",
+            &body
+        ),
+        "fewer than 2 participants must be rejected by the schema (minItems: 2)"
+    );
+}
+
+// =============================================================================
+// §10 — Conductor-scope happy-path stubs
+//
+// These tests require a live Holochain conductor.  They are `#[ignore]` until
+// the sweettest infrastructure can drive them (M1 CI-scope).
 // =============================================================================
 
 #[test]
-#[ignore = "activate after Tasks 7/8: CreateCollabCollectiveInputView not yet in elohim-views"]
-fn create_collective_input_deserializes_from_valid_json() {
-    // use elohim_views::CreateCollabCollectiveInputView;
-    // let v: CreateCollabCollectiveInputView = serde_json::from_value(json!({
-    //     "charter": "We steward the commons.",
-    //     "displayName": "Dawn Runners",
-    //     "salt": "e3b0c44298fc"
-    // })).unwrap();
-    // assert_eq!(v.display_name, "Dawn Runners");
-    unimplemented!("activate after Tasks 7/8")
+#[ignore = "M1 CI-scope — needs live Holochain conductor via sweettest"]
+fn create_collective_happy_path() {
+    // When activated:
+    //   1. Spin up storage + imagodei conductor (sweettest harness)
+    //   2. POST /api/v1/collective { charter, displayName, salt }
+    //   3. Expect 201 Created + body: { cid: "collective:...", ... }
+    //   4. GET /api/v1/collective/{cid} → 200 + CollabCollectiveView matches posted fields
+    unimplemented!("activate when sweettest conductor harness is available for Task 17")
 }
 
 #[test]
-#[ignore = "activate after Tasks 7/8: CreateCollabCollectiveInputView not yet in elohim-views"]
-fn create_collective_input_rejects_missing_display_name() {
-    unimplemented!("activate after Tasks 7/8")
+#[ignore = "M1 CI-scope — needs live Holochain conductor via sweettest"]
+fn get_collab_returns_holonic_structure() {
+    // When activated:
+    //   1. Create two Collectives + CollabAgreement + both attest
+    //   2. GET /api/v1/collab/{collab_qahal_cid}
+    //   3. Response must be a CollabQahalView with:
+    //      - member_collectives: [CollabCollectiveView, CollabCollectiveView]
+    //      - anchor_agreement_cid matching the agreement
+    //      - elohim_tier: T0
+    unimplemented!("activate when sweettest conductor harness is available for Task 17")
 }
 
 #[test]
-#[ignore = "activate after Tasks 7/8: CreateCollabAgreementInputView not yet in elohim-views"]
-fn create_collab_agreement_input_deserializes_from_valid_json() {
-    unimplemented!("activate after Tasks 7/8")
-}
-
-#[test]
-#[ignore = "activate after Tasks 7/8: CreateCollabAgreementInputView not yet in elohim-views"]
-fn create_collab_agreement_input_rejects_missing_participants() {
-    unimplemented!("activate after Tasks 7/8")
-}
-
-#[test]
-#[ignore = "activate after Tasks 7/8: CreateCollabAgreementInputView not yet in elohim-views"]
-fn create_collab_agreement_input_accepts_zero_tribute() {
-    unimplemented!("activate after Tasks 7/8")
-}
-
-#[test]
-#[ignore = "activate after Tasks 7/8: AttestCollabAgreementInputView not yet in elohim-views"]
-fn attest_collab_agreement_input_deserializes_from_valid_json() {
-    unimplemented!("activate after Tasks 7/8")
-}
-
-#[test]
-#[ignore = "activate after Tasks 7/8: WithdrawMembershipInputView not yet in elohim-views"]
-fn withdraw_membership_input_deserializes_from_valid_json() {
-    unimplemented!("activate after Tasks 7/8")
-}
-
-#[test]
-#[ignore = "activate after Tasks 7/8: ElohimTier not yet in elohim-views"]
-fn elohim_tier_enum_all_variants_parse() {
-    unimplemented!("activate after Tasks 7/8")
-}
-
-#[test]
-#[ignore = "activate after Tasks 7/8: ShareAllocationForm not yet in elohim-views"]
-fn share_allocation_form_enum_roundtrips() {
-    unimplemented!("activate after Tasks 7/8")
+#[ignore = "M3 — needs reach evaluator; out of M1 scope"]
+fn reach_inflation_via_collab_is_refused() {
+    // When activated (M3):
+    //   Issue a ContentEPR whose reach exceeds the highest-standing member
+    //   Collective's current reach ceiling.
+    //   Expect 403 REACH_CEILING_EXCEEDED from the reach evaluator.
+    unimplemented!("activate in M3 when reach evaluator is wired")
 }
