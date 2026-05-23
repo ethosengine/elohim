@@ -1,0 +1,14 @@
+{
+  "$id": "epr:schema:input:create-collective",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CreateCollectiveInput",
+  "description": "Source of truth: Cat-A Collective DHT entry in imagodei DNA (DNA-notarized at commit via integrity validator). Category C — HTTP wire-shape input projecting onto the create_collective coordinator flow. Body for POST /api/v1/collective.",
+  "type": "object",
+  "required": ["charter", "displayName", "salt"],
+  "additionalProperties": false,
+  "properties": {
+    "charter": { "type": "string", "minLength": 1, "maxLength": 16384 },
+    "displayName": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "salt": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
+  }
+}

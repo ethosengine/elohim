@@ -1,0 +1,8 @@
+{
+  "$id": "epr:schema:enum:share-allocation-form",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ShareAllocationForm",
+  "description": "Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json.form field in imagodei DNA (DNA-notarized). Category C — wire-shape vocabulary. Form of share-routing function. Per spec §6.1. M1 only supports Declared.",
+  "type": "string",
+  "enum": ["Declared", "AffinityDerived"]
+}

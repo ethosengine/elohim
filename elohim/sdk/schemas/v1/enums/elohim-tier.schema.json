@@ -1,0 +1,8 @@
+{
+  "$id": "epr:schema:enum:elohim-tier",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ElohimTier",
+  "description": "Source of truth: Cat-A CollabAgreement DHT entry's initial_tier field in imagodei DNA, plus the deferred friction-gradient evaluator's derived tier output (DNA-notarized at creation; derived thereafter). Category C — wire-shape vocabulary. Coordination scale tier for a Collab-Qahal. Per spec §3.1. M1 only reaches T0; T1+ requires deferred specs.",
+  "type": "string",
+  "enum": ["T0", "T1", "T2", "T3"]
+}

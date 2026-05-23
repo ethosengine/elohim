@@ -1,0 +1,22 @@
+{
+  "$id": "epr:schema:input:create-collab-agreement",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CreateCollabAgreementInput",
+  "description": "Source of truth: Cat-A CollabAgreement DHT entry in imagodei DNA (DNA-notarized at commit via integrity validator + coordinator JSON structural checks). Category C — HTTP wire-shape input projecting onto the create_collab_agreement coordinator flow. Body for POST /api/v1/collab/agreement.",
+  "type": "object",
+  "required": ["participants", "scope", "shareAllocation", "initialTier", "displayNameForQahal", "salt"],
+  "additionalProperties": false,
+  "properties": {
+    "participants": { "type": "array", "minItems": 2, "items": { "type": "string", "pattern": "^collective:" } },
+    "scope": { "type": "string", "minLength": 1, "maxLength": 16384 },
+    "shareAllocation": { "$ref": "../objects/share-allocation.schema.json" },
+    "governanceTerms": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "exitTerms": { "type": "string", "enum": ["clean", "repair"] } }
+    },
+    "initialTier": { "type": "string", "const": "T0" },
+    "displayNameForQahal": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "salt": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
+  }
+}

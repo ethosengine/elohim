@@ -1,0 +1,13 @@
+{
+  "$id": "epr:schema:input:attest-collab-agreement",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AttestCollabAgreementInput",
+  "description": "Source of truth: Cat-A2 AgreementOnCollab link in imagodei DNA (DNA-notarized link with attesting collective CID in the tag bytes). Category C — HTTP wire-shape input projecting onto the attest_collab_agreement coordinator flow. Body for POST /api/v1/collab/agreement/{cid}/attest.",
+  "type": "object",
+  "required": ["agreementCid", "attestingCollectiveCid"],
+  "additionalProperties": false,
+  "properties": {
+    "agreementCid": { "type": "string", "pattern": "^agreement:" },
+    "attestingCollectiveCid": { "type": "string", "pattern": "^collective:" }
+  }
+}

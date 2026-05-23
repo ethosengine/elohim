@@ -1,0 +1,27 @@
+{
+  "$id": "epr:schema:view:collab-agreement",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CollabAgreementView",
+  "description": "Source of truth: Cat-A CollabAgreement DHT entry in imagodei DNA (DNA-notarized) plus derived counter-attestation status computed from Cat-A2 AgreementOnCollab links (DNA-notarized link metadata). Category C — HTTP wire-shape projection; reconstructible at any time from DHT state. Includes counter-attestation status + the Collab-Qahal CID once instantiated.",
+  "type": "object",
+  "required": ["cid", "authoredByAgentCid", "participants", "scope", "shareAllocation", "commonsPoolTribute", "initialTier", "createdAtBlockHeight", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "cid": { "type": "string", "pattern": "^agreement:" },
+    "authoredByAgentCid": { "type": "string" },
+    "participants": { "type": "array", "items": { "type": "string", "pattern": "^collective:" } },
+    "scope": { "type": "string" },
+    "shareAllocation": { "$ref": "../objects/share-allocation.schema.json" },
+    "commonsPoolTribute": { "type": "number" },
+    "governanceTerms": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "exitTerms": { "type": "string", "enum": ["clean", "repair"] } }
+    },
+    "initialTier": { "$ref": "../enums/elohim-tier.schema.json" },
+    "createdAtBlockHeight": { "type": "integer" },
+    "status": { "type": "string", "enum": ["PendingAttestations", "Instantiated"] },
+    "attestedBy": { "type": "array", "items": { "type": "string", "pattern": "^collective:" } },
+    "collabQahalCid": { "type": ["string", "null"], "pattern": "^collective:" }
+  }
+}

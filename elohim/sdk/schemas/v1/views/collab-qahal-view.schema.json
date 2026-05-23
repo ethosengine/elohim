@@ -1,0 +1,19 @@
+{
+  "$id": "epr:schema:view:collab-qahal",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CollabQahalView",
+  "description": "Source of truth: Cat-A Collective DHT entry in imagodei DNA (the Collab-Qahal is itself a recursive Collective; anchor_agreement_cid distinguishes it) plus traversal over Cat-A Membership entries via Cat-A2 HasMembership links (all DNA-notarized). Category C — HTTP wire-shape projection; reconstructible at any time. Wire shape returned by GET /api/v1/collab/:cid.",
+  "type": "object",
+  "required": ["cid", "anchorAgreementCid", "displayName", "createdAtBlockHeight", "elohimTier", "memberCollectives", "memberPersons"],
+  "additionalProperties": false,
+  "properties": {
+    "cid": { "type": "string", "pattern": "^collective:" },
+    "anchorAgreementCid": { "type": "string", "pattern": "^agreement:" },
+    "displayName": { "type": "string" },
+    "createdAtBlockHeight": { "type": "integer" },
+    "elohimTier": { "$ref": "../enums/elohim-tier.schema.json" },
+    "memberCollectives": { "type": "array", "items": { "$ref": "./collective-view.schema.json" } },
+    "memberPersons": { "type": "array", "items": { "type": "string" } },
+    "commonsPoolBalance": { "type": "number" }
+  }
+}

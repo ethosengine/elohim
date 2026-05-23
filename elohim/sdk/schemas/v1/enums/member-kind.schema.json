@@ -1,0 +1,8 @@
+{
+  "$id": "epr:schema:enum:member-kind",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MemberKind",
+  "description": "Source of truth: Cat-A Membership DHT entry's member_kind field in imagodei DNA (DNA-notarized). Category C — wire-shape projection of that enum field. Polymorphic membership subject type for Collective/Qahal members. Per spec §2.1.",
+  "type": "string",
+  "enum": ["Person", "Collective", "ElohimAgent"]
+}

@@ -1,0 +1,13 @@
+{
+  "$id": "epr:schema:input:withdraw-membership",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WithdrawMembershipInput",
+  "description": "Source of truth: Cat-A Membership DHT entry in imagodei DNA (DNA-notarized update setting withdrawn_at_block_height). Category C — HTTP wire-shape input projecting onto the withdraw_membership_clean coordinator flow. Body for POST /api/v1/collab/{cid}/withdraw.",
+  "type": "object",
+  "required": ["membershipCid", "collabQahalCid"],
+  "additionalProperties": false,
+  "properties": {
+    "membershipCid": { "type": "string", "pattern": "^membership:" },
+    "collabQahalCid": { "type": "string", "pattern": "^collective:" }
+  }
+}

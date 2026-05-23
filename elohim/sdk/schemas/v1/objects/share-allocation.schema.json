@@ -1,0 +1,28 @@
+{
+  "$id": "epr:schema:object:share-allocation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ShareAllocation",
+  "description": "Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json field in imagodei DNA (DNA-notarized as canonical CBOR within the entry). Category C — wire-shape projection. Share-routing function declared on a CollabAgreement. Form A = Declared shares; Form B = AffinityDerived (M2).",
+  "type": "object",
+  "required": ["form", "commonsPoolTribute"],
+  "additionalProperties": false,
+  "properties": {
+    "form": { "$ref": "../enums/share-allocation-form.schema.json" },
+    "shares": {
+      "type": "array",
+      "description": "Required when form == Declared. Each share is fractional (0,1); sum + commonsPoolTribute must equal 1.0.",
+      "items": {
+        "type": "object",
+        "required": ["collectiveCid", "share"],
+        "additionalProperties": false,
+        "properties": {
+          "collectiveCid": { "type": "string" },
+          "share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "affinityWindowBlocks": { "type": "integer", "description": "Required when form == AffinityDerived (M2)." },
+    "rebalanceCadenceBlocks": { "type": "integer", "description": "Required when form == AffinityDerived (M2)." },
+    "commonsPoolTribute": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Substrate-validated > 0. Zero tribute is refused per spec §6.3." }
+  }
+}

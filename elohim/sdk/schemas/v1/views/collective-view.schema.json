@@ -1,0 +1,18 @@
+{
+  "$id": "epr:schema:view:collective",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CollectiveView",
+  "description": "Source of truth: Cat-A Collective DHT entry in imagodei DNA (DNA-notarized). Category C — HTTP wire-shape projection; reconstructible at any time from DHT state. Wire shape for GET /api/v1/collective/:cid.",
+  "type": "object",
+  "required": ["cid", "founderAgentCid", "charter", "displayName", "createdAtBlockHeight", "elohimTier"],
+  "additionalProperties": false,
+  "properties": {
+    "cid": { "type": "string", "pattern": "^collective:" },
+    "founderAgentCid": { "type": "string" },
+    "charter": { "type": "string" },
+    "displayName": { "type": "string" },
+    "createdAtBlockHeight": { "type": "integer" },
+    "anchorAgreementCid": { "type": ["string", "null"], "pattern": "^agreement:" },
+    "elohimTier": { "$ref": "../enums/elohim-tier.schema.json" }
+  }
+}

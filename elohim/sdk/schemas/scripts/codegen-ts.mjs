@@ -116,6 +116,16 @@ const INTERFACE_FILES = [
   { src: 'views/topology-overview-view.ts', dest: 'topology-overview-view.ts' },
   // EPR nav-context projection -- Category C read-only, no new DHT types
   { src: 'views/epr-nav-context-view.ts', dest: 'epr-nav-context-view.ts' },
+  // M1 multi-collective collaboration substrate — Category C wire projections of Phase A DHT entries
+  { src: 'objects/share-allocation.ts', dest: 'share-allocation.ts' },
+  { src: 'inputs/create-collective-input.ts', dest: 'create-collective-input.ts' },
+  { src: 'inputs/create-collab-agreement-input.ts', dest: 'create-collab-agreement-input.ts' },
+  { src: 'inputs/attest-collab-agreement-input.ts', dest: 'attest-collab-agreement-input.ts' },
+  { src: 'inputs/withdraw-membership-input.ts', dest: 'withdraw-membership-input.ts' },
+  { src: 'views/collective-view.ts', dest: 'collective-view.ts' },
+  { src: 'views/membership-view.ts', dest: 'membership-view.ts' },
+  { src: 'views/collab-agreement-view.ts', dest: 'collab-agreement-view.ts' },
+  { src: 'views/collab-qahal-view.ts', dest: 'collab-qahal-view.ts' },
 ];
 
 /**
@@ -139,6 +149,26 @@ async function loadRefMap(baseDir) {
     refMap.set(`enums/${file}`, schema);
     // From attestation/subtypes/: ../../enums/<file>
     refMap.set(`../../enums/${file}`, schema);
+  }
+
+  // Load object schemas for cross-dir $ref (e.g., collab-agreement-view → share-allocation)
+  const objectDir = join(baseDir, 'objects');
+  let objectFiles;
+  try {
+    objectFiles = (await readdir(objectDir)).filter((f) => f.endsWith('.schema.json'));
+  } catch {
+    objectFiles = [];
+  }
+  for (const file of objectFiles) {
+    const schema = JSON.parse(await readFile(join(objectDir, file), 'utf8'));
+    // From inputs/ or views/: ../objects/<file>
+    refMap.set(`../objects/${file}`, schema);
+    // Same-dir ref with explicit "./" prefix
+    refMap.set(`./${file}`, schema);
+    // Canonical $id
+    if (schema.$id) {
+      refMap.set(schema.$id, schema);
+    }
   }
 
   // Load view schemas for cross-view $ref (e.g., p2p-status-view → drain-status-view)
@@ -388,7 +418,7 @@ async function main() {
     const refMap = await loadRefMap(SCHEMA_DIR);
 
     const allGenerated = [];
-    for (const subdir of ['enums', 'inputs', 'views', 'p2p', 'manifests', 'attestation', 'attestation/subtypes']) {
+    for (const subdir of ['enums', 'objects', 'inputs', 'views', 'p2p', 'manifests', 'attestation', 'attestation/subtypes']) {
       const results = await generateFromDir(subdir, refMap);
       allGenerated.push(...results);
     }

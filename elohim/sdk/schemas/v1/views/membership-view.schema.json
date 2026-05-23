@@ -1,0 +1,19 @@
+{
+  "$id": "epr:schema:view:membership",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MembershipView",
+  "description": "Source of truth: Cat-A Membership DHT entry in imagodei DNA (DNA-notarized). Category C — HTTP wire-shape projection; reconstructible at any time from DHT state. Wire shape for Membership entries with memberKind discriminating polymorphic subject.",
+  "type": "object",
+  "required": ["cid", "memberCid", "memberKind", "collectiveCid", "role", "joinedAtBlockHeight"],
+  "additionalProperties": false,
+  "properties": {
+    "cid": { "type": "string", "pattern": "^membership:" },
+    "memberCid": { "type": "string" },
+    "memberKind": { "$ref": "../enums/member-kind.schema.json" },
+    "collectiveCid": { "type": "string", "pattern": "^collective:" },
+    "role": { "type": "string", "enum": ["Steward", "Contributor", "Observer"] },
+    "sponsorCid": { "type": ["string", "null"] },
+    "joinedAtBlockHeight": { "type": "integer" },
+    "withdrawnAtBlockHeight": { "type": ["integer", "null"] }
+  }
+}
