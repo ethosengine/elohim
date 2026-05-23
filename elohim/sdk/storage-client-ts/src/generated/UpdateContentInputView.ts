@@ -19,4 +19,12 @@ metadata: JsonValue | null,
 /**
  * If provided, replaces all existing tags.
  */
-tags: Array<string> | null, reach: string | null, };
+tags: Array<string> | null, reach: string | null, 
+/**
+ * Content-addressed SHA256 of the bundle/asset this row projects.
+ * Set at deploy-time by Jenkinsfile:stageSpaBlob — see
+ * genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md.
+ * Deliberately optional: PATCH callers MAY set this without touching
+ * any other field.
+ */
+blobHash: string | null, };

@@ -160,6 +160,13 @@ pub struct UpdateContentInputView {
     pub tags: Option<Vec<String>>,
     #[serde(default)]
     pub reach: Option<String>,
+    /// Content-addressed SHA256 of the bundle/asset this row projects.
+    /// Set at deploy-time by Jenkinsfile:stageSpaBlob — see
+    /// genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md.
+    /// Deliberately optional: PATCH callers MAY set this without touching
+    /// any other field.
+    #[serde(default)]
+    pub blob_hash: Option<String>,
 }
 
 /// Input for creating/updating content mastery - camelCase API boundary type

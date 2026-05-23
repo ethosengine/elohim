@@ -530,6 +530,29 @@ mod schema_version_tests {
         assert!(view.metadata.is_none());
     }
 
+    /// PATCH /db/content/{id} must accept a body that sets blobHash without
+    /// touching any other field. This is the deploy-time stageSpaBlob path
+    /// (see genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md).
+    #[test]
+    fn test_update_content_input_view_blob_hash_only_patch() {
+        let json = r#"{"blobHash": "sha256-deadbeef"}"#;
+        let view: UpdateContentInputView = serde_json::from_str(json).unwrap();
+        assert_eq!(view.blob_hash.as_deref(), Some("sha256-deadbeef"));
+        assert!(view.title.is_none());
+        assert!(view.description.is_none());
+        assert!(view.metadata.is_none());
+    }
+
+    /// blobHash absent from the body → field is None and other partial-update
+    /// semantics still hold.
+    #[test]
+    fn test_update_content_input_view_blob_hash_absent_when_not_provided() {
+        let json = r#"{"title": "renamed"}"#;
+        let view: UpdateContentInputView = serde_json::from_str(json).unwrap();
+        assert_eq!(view.title.as_deref(), Some("renamed"));
+        assert!(view.blob_hash.is_none());
+    }
+
     #[test]
     fn collective_input_round_trips() {
         let json = r#"{"id":"c1","name":"Test Collective","governanceLayer":"community","reach":"commons","createdBy":"agent1"}"#;
