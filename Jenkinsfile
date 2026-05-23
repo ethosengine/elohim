@@ -872,7 +872,34 @@ VEOF
             steps {
                 container('builder') {
                     script {
-                        def storageUrl = env.STORAGE_URL ?: 'http://elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8090'
+                        // Default to the PUBLIC doorway URL for the target environment.
+                        // The doorway proxies /blob/{hash} (PUT) and /db/content/{id}
+                        // (PATCH) cleanly through to storage — this matches how the
+                        // pipeline behaves in production (Jenkins has no k8s access
+                        // to pod FQDNs there) and works regardless of which namespace
+                        // the build pod runs in.
+                        //
+                        // The previous default (http://elohim-matthew-alpha-0.elohim-
+                        // matthew-alpha-headless:8090) was a headless-service pod
+                        // FQDN that only resolved from inside the elohim-alpha
+                        // namespace; build pods in the jenkins namespace got curl
+                        // exit 6 (Couldn't resolve host). See App #1457 for the
+                        // diagnosis.
+                        //
+                        // Env mapping mirrors the Environment Architecture comment
+                        // at the top of this file. STORAGE_URL env still overrides
+                        // for ad-hoc or in-cluster targeting.
+                        def branch = env.BRANCH_NAME ?: 'dev'
+                        def defaultStorageUrl
+                        if (branch == 'main') {
+                            defaultStorageUrl = 'https://elohim.host'
+                        } else if (branch == 'staging' || branch.startsWith('staging-')) {
+                            defaultStorageUrl = 'https://staging.elohim.host'
+                        } else {
+                            defaultStorageUrl = 'https://alpha.elohim.host'
+                        }
+                        def storageUrl = env.STORAGE_URL ?: defaultStorageUrl
+                        echo "stageSpaBlob storageUrl: ${storageUrl}"
                         // Auth for PATCH /db/content/{id} (the new route).
                         // Try `storage-api-key-admin` (k8s-provisioned for
                         // this work) then fall back to
