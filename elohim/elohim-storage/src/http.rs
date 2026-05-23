@@ -9284,6 +9284,18 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         .route(
+            // Partial-update route. Handler dispatch lives in
+            // handle_db_content_by_id (http.rs ~line 3810, Method::PATCH branch);
+            // this entry is the auth/metadata registration. Without it, PATCH
+            // requests fall through to method_not_allowed (405) — the silent
+            // failure mode that broke deploy-time stageSpaBlob. See
+            // genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md.
+            Route::patch("/db/content/{id}")
+                .handler("update_content")
+                .auth_required()
+                .build(),
+        )
+        .route(
             Route::delete("/db/content/{id}")
                 .handler("delete_content")
                 .auth_required()

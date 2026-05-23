@@ -62,6 +62,10 @@ pub struct UpdateContentInput {
     /// If provided, replaces all existing tags (delete all + insert new).
     pub tags: Option<Vec<String>>,
     pub reach: Option<String>,
+    /// Content-addressed SHA256 (e.g. "sha256-…") of the bundle this row
+    /// projects. Written by Jenkinsfile:stageSpaBlob at deploy time. None
+    /// means "no change" — preserves existing blob_hash on the row.
+    pub blob_hash: Option<String>,
 }
 
 fn default_content_type() -> String {
@@ -488,6 +492,10 @@ pub fn update_content(
         .metadata_json
         .as_deref()
         .or(existing.content.metadata_json.as_deref());
+    let new_blob_hash = input
+        .blob_hash
+        .as_deref()
+        .or(existing.content.blob_hash.as_deref());
 
     let now = current_timestamp();
 
@@ -504,6 +512,7 @@ pub fn update_content(
             content::content_format.eq(new_content_format),
             content::metadata_json.eq(new_metadata_json),
             content::reach.eq(new_reach),
+            content::blob_hash.eq(new_blob_hash),
             content::updated_at.eq(&now),
         ))
         .execute(conn)
@@ -1320,7 +1329,51 @@ mod tests {
             metadata_json: None,
             tags: None,
             reach: None,
+            blob_hash: None,
         };
         assert_eq!(input.id, "test-id");
+    }
+
+    /// PATCH semantics: setting only blob_hash leaves other fields untouched.
+    /// This is the deploy-time stageSpaBlob path — see
+    /// genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md.
+    #[test]
+    fn test_update_content_blob_hash_only_preserves_other_fields() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        // Seed a row with a known title + blob_hash="".
+        let create = CreateContentInput {
+            id: "patch-bh-test".to_string(),
+            title: "Original Title".to_string(),
+            description: Some("Original Description".to_string()),
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: Some("".to_string()),
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "public".to_string(),
+            created_by: None,
+            content_body: None,
+            tags: vec![],
+        };
+        bulk_create_content(&mut conn, &ctx, vec![create]).unwrap();
+
+        // PATCH only blob_hash.
+        let update = UpdateContentInput {
+            id: "patch-bh-test".to_string(),
+            blob_hash: Some("sha256-deadbeef".to_string()),
+            ..Default::default()
+        };
+        let result = update_content(&mut conn, &ctx, update).unwrap();
+
+        assert_eq!(result.content.blob_hash.as_deref(), Some("sha256-deadbeef"));
+        // Other fields unchanged.
+        assert_eq!(result.content.title, "Original Title");
+        assert_eq!(
+            result.content.description.as_deref(),
+            Some("Original Description")
+        );
     }
 }

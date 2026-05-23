@@ -195,6 +195,7 @@ impl ContentService {
             metadata_json: merged_metadata_json,
             tags: view.tags,
             reach: view.reach,
+            blob_hash: view.blob_hash,
         };
 
         let result = content_diesel::update_content(&mut conn, &self.ctx, input)?;
