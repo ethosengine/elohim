@@ -10,6 +10,7 @@ import {
   BlobManifest,
   ListOptions,
 } from './types';
+import { QahalApi } from './api/qahal';
 
 /**
  * HTTP client for elohim-storage sync API
@@ -39,11 +40,15 @@ import {
 export class StorageClient {
   private config: Required<Omit<StorageConfig, 'apiKey'>> & Pick<StorageConfig, 'apiKey'>;
 
+  /** Collective + Collab agreement SDK methods */
+  readonly qahal: QahalApi;
+
   constructor(config: StorageConfig) {
     this.config = {
       timeout: 30000,
       ...config,
     };
+    this.qahal = new QahalApi(this);
   }
 
   /**
@@ -311,6 +316,26 @@ export class StorageClient {
       'GET',
       `/manifest/${encodeURIComponent(hashOrCid)}`
     );
+  }
+
+  // ==================== Internal Convenience Helpers ====================
+
+  /**
+   * POST JSON body and expect a JSON response.
+   * Used by sub-API classes (e.g. QahalApi).
+   * @internal
+   */
+  postJson<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>('POST', path, body);
+  }
+
+  /**
+   * GET and expect a JSON response.
+   * Used by sub-API classes (e.g. QahalApi).
+   * @internal
+   */
+  getJson<T>(path: string): Promise<T> {
+    return this.request<T>('GET', path);
   }
 
   // ==================== Utility Methods ====================
