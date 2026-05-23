@@ -80,8 +80,12 @@ for HOST in $MANIFEST_HOSTS; do
         done
         $IS_OUR_INGRESS && continue
 
-        # Check if the existing ingress routes our hostname
-        if echo "$EXISTING_HOSTS" | grep -qF "$HOST"; then
+        # Check if the existing ingress routes our hostname.
+        # Split the comma-separated host list and EXACT-match per host —
+        # `grep -qFx` requires the whole line to match. Substring grep is
+        # incorrect here because `elohim.host` is a substring of
+        # `alpha.elohim.host` and would yield false positives.
+        if echo "$EXISTING_HOSTS" | tr ',' '\n' | grep -qFx "$HOST"; then
             echo ""
             echo "  CONFLICT: hostname '${HOST}' is claimed by manifest ingress"
             echo "            but already routed by existing ingress '${EXISTING_NAME}'"

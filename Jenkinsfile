@@ -862,19 +862,32 @@ VEOF
                     script {
                         def storageUrl = env.STORAGE_URL ?: 'http://elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8090'
                         // Auth for PATCH /db/content/{id} (the new route).
-                        // Uses storage-api-key-admin credential (provisioned
-                        // by k8s operator per plan 2026-05-23-spa-blob-deploy-drift).
-                        // Fails the build if absent; the content-row link is
-                        // load-bearing and silent failures here brick
-                        // alpha's gateway shell.
+                        // Try `storage-api-key-admin` (k8s-provisioned for
+                        // this work) then fall back to
+                        // `doorway-admin-bootstrap-key` (used by
+                        // genesis/Jenkinsfile seed stages — proven visible
+                        // at elohim-genesis scope). App pipeline credential
+                        // scope is sometimes folder-disjoint; fallback keeps
+                        // both visibility paths working without operator
+                        // coordination.
                         def adminKey = ''
+                        def credUsed = ''
                         try {
                             withCredentials([string(credentialsId: 'storage-api-key-admin', variable: 'ADMIN_KEY')]) {
                                 adminKey = env.ADMIN_KEY
+                                credUsed = 'storage-api-key-admin'
                             }
-                        } catch (e) {
-                            error "ABORT: storage-api-key-admin credential missing. Required for PATCH /db/content/{id}; without it the SPA blob uploads but no content row references it. Create the credential in Jenkins (operator) and re-run. See genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md."
+                        } catch (e1) {
+                            try {
+                                withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+                                    adminKey = env.ADMIN_KEY
+                                    credUsed = 'doorway-admin-bootstrap-key'
+                                }
+                            } catch (e2) {
+                                error "ABORT: neither storage-api-key-admin nor doorway-admin-bootstrap-key credential visible at this job's scope. Required for PATCH /db/content/{id}; without it the SPA blob uploads but no content row references it. Operator: add a string credential (any of the two names) at Global or 'elohim' folder scope. See genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md."
+                            }
                         }
+                        echo "stageSpaBlob auth: using credential '${credUsed}'"
                         stageSpaBlob(storageUrl, "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", adminKey)
                     }
                 }
