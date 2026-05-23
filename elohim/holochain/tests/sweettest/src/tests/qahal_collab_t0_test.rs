@@ -42,6 +42,24 @@ struct CreateCollectiveInput {
     salt: String,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct CreateCollabAgreementInput {
+    participants: Vec<String>,
+    scope: String,
+    share_allocation_json: String,
+    commons_pool_tribute: f64,
+    governance_terms_json: String,
+    initial_tier: String,
+    display_name_for_qahal: String,
+    salt: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct AttestCollabAgreementInput {
+    agreement_action_hash: ActionHash,
+    attesting_collective_cid: String,
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -98,6 +116,231 @@ async fn create_collective_atomic_founder_membership() -> Result<()> {
         1,
         "create_collective must atomically create exactly one founder Steward Membership; got {}",
         memberships.len()
+    );
+
+    Ok(())
+}
+
+/// Verify the full collab-agreement attestation lifecycle:
+///   1. `create_collab_agreement` creates the agreement in PendingAttestations state.
+///   2. Attesting Coll A leaves state PendingAttestations (B not yet attested).
+///   3. Attesting Coll B transitions state to Instantiated.
+///   4. `get_collab_qahal_cid_for_agreement` returns a "collective:"-prefixed CID.
+///   5. `list_memberships_for_collective_cid` on the Collab-Qahal returns 2 Memberships.
+///
+/// Single agent is steward of both collectives (created atomically by `create_collective`),
+/// so the `require_caller_is_steward_of` gate passes for both attestation calls.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires packed DNA artifact — wire into Jenkins pack-then-test stage"]
+async fn create_collab_agreement_requires_pending_attestations() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("imagodei-collab-app", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    // Create Collective A.
+    let coll_a_hash: ActionHash = conductor
+        .call(
+            &cell.zome(ZOME),
+            "create_collective",
+            CreateCollectiveInput {
+                charter: "We steward the riparian corridor together.".into(),
+                display_name: "Collective A".into(),
+                salt: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1".into(),
+            },
+        )
+        .await;
+    let coll_a_cid = format!("collective:{}", coll_a_hash);
+
+    // Create Collective B.
+    let coll_b_hash: ActionHash = conductor
+        .call(
+            &cell.zome(ZOME),
+            "create_collective",
+            CreateCollectiveInput {
+                charter: "We steward the lower watershed.".into(),
+                display_name: "Collective B".into(),
+                salt: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2".into(),
+            },
+        )
+        .await;
+    let coll_b_cid = format!("collective:{}", coll_b_hash);
+
+    // Build share-allocation JSON with actual CIDs.
+    let share_allocation_json = format!(
+        r#"{{"form":"declared","shares":[{{"collective_cid":"{}","share":0.5}},{{"collective_cid":"{}","share":0.45}}],"commons_pool_tribute":0.05}}"#,
+        coll_a_cid, coll_b_cid
+    );
+
+    // Create the CollabAgreement.
+    let agreement_hash: ActionHash = conductor
+        .call(
+            &cell.zome(ZOME),
+            "create_collab_agreement",
+            CreateCollabAgreementInput {
+                participants: vec![coll_a_cid.clone(), coll_b_cid.clone()],
+                scope: "Joint stewardship of riparian restoration".into(),
+                share_allocation_json,
+                commons_pool_tribute: 0.05,
+                governance_terms_json: r#"{"exit_terms":"clean"}"#.into(),
+                initial_tier: "T0".into(),
+                display_name_for_qahal: "Riparian Stewards Collab".into(),
+                salt: "ccccccccccccccccccccccccccccccc1".into(),
+            },
+        )
+        .await;
+
+    // After creation, status must be PendingAttestations.
+    let status: String = conductor
+        .call(&cell.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .await;
+    assert_eq!(
+        status, "PendingAttestations",
+        "expected PendingAttestations after create_collab_agreement, got: {status}"
+    );
+
+    // Attest on behalf of Collective A — still pending (B not attested yet).
+    let (): () = conductor
+        .call(
+            &cell.zome(ZOME),
+            "attest_collab_agreement",
+            AttestCollabAgreementInput {
+                agreement_action_hash: agreement_hash.clone(),
+                attesting_collective_cid: coll_a_cid.clone(),
+            },
+        )
+        .await;
+
+    let status: String = conductor
+        .call(&cell.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .await;
+    assert_eq!(
+        status, "PendingAttestations",
+        "expected PendingAttestations after only A attested, got: {status}"
+    );
+
+    // Attest on behalf of Collective B — all participants attested → Instantiated.
+    let (): () = conductor
+        .call(
+            &cell.zome(ZOME),
+            "attest_collab_agreement",
+            AttestCollabAgreementInput {
+                agreement_action_hash: agreement_hash.clone(),
+                attesting_collective_cid: coll_b_cid.clone(),
+            },
+        )
+        .await;
+
+    let status: String = conductor
+        .call(&cell.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .await;
+    assert_eq!(
+        status, "Instantiated",
+        "expected Instantiated after all participants attested, got: {status}"
+    );
+
+    // Collab-Qahal CID must start with "collective:".
+    let qahal_cid: String = conductor
+        .call(
+            &cell.zome(ZOME),
+            "get_collab_qahal_cid_for_agreement",
+            agreement_hash.clone(),
+        )
+        .await;
+    assert!(
+        qahal_cid.starts_with("collective:"),
+        "expected Collab-Qahal CID to start with 'collective:', got: {qahal_cid}"
+    );
+
+    // Collab-Qahal must have exactly 2 Memberships (one per participating Collective).
+    let memberships: Vec<holochain_types::prelude::Record> = conductor
+        .call(
+            &cell.zome(ZOME),
+            "list_memberships_for_collective_cid",
+            qahal_cid,
+        )
+        .await;
+    assert_eq!(
+        memberships.len(),
+        2,
+        "Collab-Qahal must have exactly 2 Memberships after instantiation; got {}",
+        memberships.len()
+    );
+
+    Ok(())
+}
+
+/// Verify that `create_collab_agreement` refuses a zero `commons_pool_tribute`.
+///
+/// The `validate_share_allocation_json` coordinator gate checks `tribute > 0`
+/// before committing the entry. Passing `commons_pool_tribute: 0.0` must produce
+/// an error; the call must not succeed.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires packed DNA artifact — wire into Jenkins pack-then-test stage"]
+async fn create_collab_agreement_refuses_zero_tribute() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("imagodei-collab-zero-tribute", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    // Create two Collectives so the participants vec is valid.
+    let coll_a_hash: ActionHash = conductor
+        .call(
+            &cell.zome(ZOME),
+            "create_collective",
+            CreateCollectiveInput {
+                charter: "Collective A for zero-tribute test.".into(),
+                display_name: "Zero-tribute A".into(),
+                salt: "dddddddddddddddddddddddddddddddd".into(),
+            },
+        )
+        .await;
+    let coll_a_cid = format!("collective:{}", coll_a_hash);
+
+    let coll_b_hash: ActionHash = conductor
+        .call(
+            &cell.zome(ZOME),
+            "create_collective",
+            CreateCollectiveInput {
+                charter: "Collective B for zero-tribute test.".into(),
+                display_name: "Zero-tribute B".into(),
+                salt: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into(),
+            },
+        )
+        .await;
+    let coll_b_cid = format!("collective:{}", coll_b_hash);
+
+    // JSON with 0.0 tribute and shares summing to 1.0.
+    let share_allocation_json = format!(
+        r#"{{"form":"declared","shares":[{{"collective_cid":"{}","share":0.5}},{{"collective_cid":"{}","share":0.5}}],"commons_pool_tribute":0.0}}"#,
+        coll_a_cid, coll_b_cid
+    );
+
+    // Attempt to create with zero tribute — must be refused.
+    let result: std::result::Result<ActionHash, _> = conductor
+        .call_fallible(
+            &cell.zome(ZOME),
+            "create_collab_agreement",
+            CreateCollabAgreementInput {
+                participants: vec![coll_a_cid, coll_b_cid],
+                scope: "Zero-tribute test scope".into(),
+                share_allocation_json,
+                commons_pool_tribute: 0.0,
+                governance_terms_json: r#"{"exit_terms":"clean"}"#.into(),
+                initial_tier: "T0".into(),
+                display_name_for_qahal: "Zero Tribute Collab".into(),
+                salt: "ffffffffffffffffffffffffffffffff".into(),
+            },
+        )
+        .await;
+
+    assert!(
+        result.is_err(),
+        "expected create_collab_agreement to refuse zero commons_pool_tribute, but call succeeded"
     );
 
     Ok(())
