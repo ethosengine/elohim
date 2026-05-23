@@ -220,44 +220,71 @@ def publishE2EReports(String environment) {
     }
 }
 
-def stageSpaBlob(String storageUrl, String distDir) {
+def stageSpaBlob(String storageUrl, String distDir, String adminKey) {
     // Uploads the elohim-app browser bundle as a single blob and links it
-    // to TWO content nodes:
+    // to TWO content rows via the authenticated PATCH /db/content/{id}
+    // route:
     //
     //   db/content/lamad-spa            — the lamad SPA app surface
-    //   db/content/elohim-host-landing  — the landing-page EPR projected by
-    //                                     doorway-A (alpha.elohim.host) +
-    //                                     doorway-B (elohim.host) as their
-    //                                     ROOT_APP_SLUG
+    //   db/content/elohim-host-landing  — the landing-page EPR projected
+    //                                     by doorway-A (alpha.elohim.host)
+    //                                     + doorway-B (elohim.host) as
+    //                                     their ROOT_APP_SLUG
     //
-    // One blob, two content rows, two projection surfaces. The JSON source
-    // for both content nodes intentionally omits blobHash; the seed-sqlite
-    // step does not overwrite the deploy-time value written here.
-    sh """
-        cd '${distDir}'
-        zip -r lamad-spa.zip .
-        SPA_HASH=\$(sha256sum lamad-spa.zip | awk '{print \$1}')
-        echo "SPA blob hash: \${SPA_HASH}"
-        echo "SPA blob size: \$(du -h lamad-spa.zip | cut -f1)"
+    // One blob, two content rows, two projection surfaces. The JSON
+    // source for both content nodes intentionally omits blobHash; the
+    // seed-sqlite step does not overwrite the deploy-time value written
+    // here.
+    //
+    // Regression seatbelt: after each PATCH, GET the row and assert
+    // blobHash matches the SHA just written. set -euo pipefail +
+    // curl -fSs (no || echo swallow) means any 4xx/5xx FAILS the build —
+    // surfacing silent CI/storage drift as a red build instead of a
+    // stuck production surface. See:
+    //   genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md
+    withEnv(["STORAGE_API_KEY_ADMIN=${adminKey}"]) {
+        sh """#!/bin/bash
+            set -euo pipefail
+            cd '${distDir}'
+            zip -r lamad-spa.zip .
+            SPA_HASH="sha256-\$(sha256sum lamad-spa.zip | awk '{print \$1}')"
+            SPA_SIZE="\$(du -h lamad-spa.zip | cut -f1)"
+            echo "SPA blob hash: \${SPA_HASH}"
+            echo "SPA blob size: \${SPA_SIZE}"
 
-        # Upload ZIP as blob to storage
-        curl -f -X PUT \
-            -H 'Content-Type: application/zip' \
-            --data-binary @lamad-spa.zip \
-            "${storageUrl}/blob/\${SPA_HASH}" \
-            || echo 'WARNING: Blob upload failed (storage may not be reachable)'
+            # 1. Upload ZIP as blob (content-addressed; idempotent)
+            curl -fSs -X PUT \\
+                -H 'Content-Type: application/zip' \\
+                --data-binary @lamad-spa.zip \\
+                "${storageUrl}/blob/\${SPA_HASH}"
+            echo "  ✓ blob uploaded"
 
-        # Link blob to both content nodes that project this bundle.
-        for slug in lamad-spa elohim-host-landing; do
-            curl -f -X PUT \
-                -H 'Content-Type: application/json' \
-                -d '{"blobHash":"'\${SPA_HASH}'"}' \
-                "${storageUrl}/db/content/\${slug}" \
-                || echo "WARNING: Content node update failed for \${slug}"
-        done
+            # 2. Link blob to both content rows + verify
+            for slug in lamad-spa elohim-host-landing; do
+                # PATCH the row (auth-required; no swallow)
+                curl -fSs -X PATCH \\
+                    -H 'Content-Type: application/json' \\
+                    -H "X-API-Key: \${STORAGE_API_KEY_ADMIN}" \\
+                    -d "{\\"blobHash\\":\\"\${SPA_HASH}\\"}" \\
+                    "${storageUrl}/db/content/\${slug}" \\
+                    >/dev/null
+                echo "  ✓ patched \${slug}"
 
-        rm -f lamad-spa.zip
-    """
+                # Read back; assert blobHash matches (regression seatbelt)
+                ACTUAL=\$(curl -fSs "${storageUrl}/db/content/\${slug}" \\
+                    | python3 -c "import sys, json; print(json.load(sys.stdin).get('blobHash',''))")
+                if [ "\${ACTUAL}" != "\${SPA_HASH}" ]; then
+                    echo "ERROR: \${slug} blobHash drifted after PATCH" >&2
+                    echo "  expected: \${SPA_HASH}" >&2
+                    echo "  actual:   \${ACTUAL}" >&2
+                    exit 1
+                fi
+                echo "  ✓ verified \${slug} blobHash = \${SPA_HASH}"
+            done
+
+            rm -f lamad-spa.zip
+        """
+    }
 }
 
 // ============================================================================
@@ -834,7 +861,22 @@ VEOF
                 container('builder') {
                     script {
                         def storageUrl = env.STORAGE_URL ?: 'http://elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8090'
-                        stageSpaBlob(storageUrl, "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser")
+                        // Auth for PATCH /db/content/{id} (the new route).
+                        // Reuses the existing doorway-admin-bootstrap-key
+                        // credential — same admin auth substrate already in
+                        // use by genesis/Jenkinsfile seed stages. Fails the
+                        // build if absent; the content-row link is the
+                        // load-bearing piece and silent failures here brick
+                        // alpha's gateway shell.
+                        def adminKey = ''
+                        try {
+                            withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+                                adminKey = env.ADMIN_KEY
+                            }
+                        } catch (e) {
+                            error "ABORT: doorway-admin-bootstrap-key credential missing. Required for PATCH /db/content/{id}; without it the SPA blob uploads but no content row references it. Create the credential in Jenkins (operator) and re-run. See genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md."
+                        }
+                        stageSpaBlob(storageUrl, "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", adminKey)
                     }
                 }
             }
