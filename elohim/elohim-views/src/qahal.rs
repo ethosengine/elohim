@@ -781,3 +781,228 @@ pub struct GovernanceActionTallyView {
     pub rebuilt_at: String,
 }
 
+// ---------------------------------------------------------------------------
+// Multi-collective collaboration types — M1 EPR implementation
+// Source of truth: JSON schemas in elohim/sdk/schemas/v1/
+// ts-rs generates TypeScript via `cargo test export_bindings`
+// ---------------------------------------------------------------------------
+
+/// Polymorphic membership subject type (Person | Collective | ElohimAgent).
+/// Schema: epr:schema:enum:member-kind
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub enum MemberKind {
+    Person,
+    Collective,
+    ElohimAgent,
+}
+
+/// Coordination scale tier for a Collab-Qahal (T0–T3 per spec §3.1).
+/// Schema: epr:schema:enum:elohim-tier
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub enum ElohimTier {
+    T0,
+    T1,
+    T2,
+    T3,
+}
+
+/// Form of share-routing function (Declared | AffinityDerived).
+/// Schema: epr:schema:enum:share-allocation-form
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub enum ShareAllocationForm {
+    Declared,
+    AffinityDerived,
+}
+
+/// One declared-share entry within a ShareAllocation.
+/// Schema: epr:schema:object:share-allocation (inline items)
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DeclaredShare {
+    pub collective_cid: String,
+    pub share: f64,
+}
+
+/// Share-routing function declared on a CollabAgreement.
+/// Schema: epr:schema:object:share-allocation
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ShareAllocation {
+    pub form: ShareAllocationForm,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shares: Option<Vec<DeclaredShare>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub affinity_window_blocks: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rebalance_cadence_blocks: Option<u64>,
+    pub commons_pool_tribute: f64,
+}
+
+/// Governance exit-terms clause embedded in CollabAgreementView.
+/// Schema: inline in epr:schema:view:collab-agreement
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct GovernanceTerms {
+    /// "clean" | "repair"
+    pub exit_terms: String,
+}
+
+/// P2P-native Collective entity — CID-addressed, DNA-notarized (Cat-A).
+/// Schema: epr:schema:view:collective
+/// Wire shape for GET /api/v1/collective/:cid
+///
+/// NOTE: `shefa::CollectiveView` is an older pre-P2P-native projection.
+/// This type is re-exported from the crate root as `qahal::CollabCollectiveView`
+/// to avoid symbol collision with shefa's `CollectiveView`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct CollabCollectiveView {
+    pub cid: String,
+    pub founder_agent_cid: String,
+    pub charter: String,
+    pub display_name: String,
+    pub created_at_block_height: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor_agreement_cid: Option<String>,
+    pub elohim_tier: ElohimTier,
+}
+
+/// Membership role within a Collective or Collab-Qahal.
+/// Schema: inline in epr:schema:view:membership (role enum)
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub enum CollabMembershipRole {
+    Steward,
+    Contributor,
+    Observer,
+}
+
+/// P2P-native Membership entity — CID-addressed, DNA-notarized (Cat-A).
+/// Schema: epr:schema:view:membership
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct CollabMembershipView {
+    pub cid: String,
+    pub member_cid: String,
+    pub member_kind: MemberKind,
+    pub collective_cid: String,
+    pub role: CollabMembershipRole,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sponsor_cid: Option<String>,
+    pub joined_at_block_height: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withdrawn_at_block_height: Option<u64>,
+}
+
+/// Counter-attestation status for a CollabAgreement.
+/// Schema: inline enum in epr:schema:view:collab-agreement
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub enum CollabAgreementStatus {
+    PendingAttestations,
+    Instantiated,
+}
+
+/// Multi-collective collaboration agreement — DNA-notarized (Cat-A).
+/// Schema: epr:schema:view:collab-agreement
+/// Wire shape for GET /api/v1/collab/agreement/:cid
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct CollabAgreementView {
+    pub cid: String,
+    pub authored_by_agent_cid: String,
+    pub participants: Vec<String>,
+    pub scope: String,
+    pub share_allocation: ShareAllocation,
+    pub commons_pool_tribute: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governance_terms: Option<GovernanceTerms>,
+    pub initial_tier: ElohimTier,
+    pub created_at_block_height: u64,
+    pub status: CollabAgreementStatus,
+    #[serde(default)]
+    pub attested_by: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collab_qahal_cid: Option<String>,
+}
+
+/// Instantiated Collab-Qahal — a recursive Collective, DNA-notarized (Cat-A).
+/// Schema: epr:schema:view:collab-qahal
+/// Wire shape for GET /api/v1/collab/:cid
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct CollabQahalView {
+    pub cid: String,
+    pub anchor_agreement_cid: String,
+    pub display_name: String,
+    pub created_at_block_height: u64,
+    pub elohim_tier: ElohimTier,
+    pub member_collectives: Vec<CollabCollectiveView>,
+    pub member_persons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commons_pool_balance: Option<f64>,
+}
+
+// --- Input types (HTTP request bodies) ---
+
+/// Body for POST /api/v1/collective
+/// Schema: epr:schema:input:create-collective
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCollabCollectiveInputView {
+    pub charter: String,
+    pub display_name: String,
+    pub salt: String,
+}
+
+/// Body for POST /api/v1/collab/agreement
+/// Schema: epr:schema:input:create-collab-agreement
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCollabAgreementInputView {
+    pub participants: Vec<String>,
+    pub scope: String,
+    pub share_allocation: ShareAllocation,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governance_terms: Option<GovernanceTerms>,
+    pub initial_tier: ElohimTier,
+    pub display_name_for_qahal: String,
+    pub salt: String,
+}
+
+/// Body for POST /api/v1/collab/agreement/{cid}/attest
+/// Schema: epr:schema:input:attest-collab-agreement
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct AttestCollabAgreementInputView {
+    pub agreement_cid: String,
+    pub attesting_collective_cid: String,
+}
+
+/// Body for POST /api/v1/collab/{cid}/withdraw
+/// Schema: epr:schema:input:withdraw-membership
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawMembershipInputView {
+    pub membership_cid: String,
+    pub collab_qahal_cid: String,
+}
