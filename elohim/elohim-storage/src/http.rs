@@ -9928,6 +9928,47 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/collective + /api/v1/collab — Multi-collective collaboration EPR M1
+        // See genesis/docs/superpowers/specs/2026-05-23-multi-collective-collaboration-epr-design.md
+        // Writes require auth (imagodei conductor bridge); reads are public.
+        // =====================================================================
+        .route(
+            Route::post("/api/v1/collective")
+                .handler("create_collective")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/collective/{cid}")
+                .handler("get_collective")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/collab/agreement")
+                .handler("create_collab_agreement")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/collab/agreement/{cid}/attest")
+                .handler("attest_collab_agreement")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/collab/{cid}")
+                .handler("get_collab_qahal")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/collab/{cid}/withdraw")
+                .handler("withdraw_membership")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/vf-graphql — Wave 3 M1 valueflows bridge endpoint.
         // Stub-stage: serves fixture EconomicEvent via the bridge's GraphQL schema.
         // M2+ adds identity bridge, M3+ adds real hREA projection.
@@ -10093,6 +10134,31 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/vf-graphql"),
             "missing /api/v1/vf-graphql (Wave 3 M1)"
+        );
+        // Multi-collective collaboration EPR M1 — qahal routes (Task 11)
+        assert!(
+            paths.contains(&"/api/v1/collective"),
+            "missing /api/v1/collective (M1 Task 11)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/collective/{cid}"),
+            "missing /api/v1/collective/{{cid}} (M1 Task 11)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/collab/agreement"),
+            "missing /api/v1/collab/agreement (M1 Task 11)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/collab/agreement/{cid}/attest"),
+            "missing /api/v1/collab/agreement/{{cid}}/attest (M1 Task 11)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/collab/{cid}"),
+            "missing /api/v1/collab/{{cid}} (M1 Task 11)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/collab/{cid}/withdraw"),
+            "missing /api/v1/collab/{{cid}}/withdraw (M1 Task 11)"
         );
         // SSR-eligible lamad routes (Task 12) — verify paths and render field
         let lamad_routes: std::collections::HashMap<&str, _> = manifest

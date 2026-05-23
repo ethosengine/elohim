@@ -44,6 +44,7 @@ pub mod placement_gaps;
 pub mod places;
 pub mod presence;
 pub mod projector_status;
+pub mod qahal;
 pub mod rea_commitments;
 pub mod reciprocity;
 pub mod recognition;
@@ -167,6 +168,17 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("commitments") {
         let resource_path = sub_path.strip_prefix("commitments").unwrap_or("");
         rea_commitments::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("collective") {
+        // Multi-collective collaboration EPR M1 — first-order Collective CRUD.
+        // Must precede any future "collection*" prefix to avoid shadowing.
+        let resource_path = sub_path.strip_prefix("collective").unwrap_or("");
+        qahal::handle_collective(req, method, resource_path, hc_registry.as_ref()).await
+    } else if sub_path.starts_with("collab") {
+        // Multi-collective collaboration EPR M1 — CollabAgreement + CollabQahal.
+        // "collab" must come after "collective" (no overlap) but before any
+        // future "collaboration*" prefix.
+        let resource_path = sub_path.strip_prefix("collab").unwrap_or("");
+        qahal::handle_collab(req, method, resource_path, hc_registry.as_ref()).await
     } else if sub_path.starts_with("attestations") {
         let resource_path = sub_path.strip_prefix("attestations").unwrap_or("");
         attestations::handle(req, method, resource_path, &pool, &app_ctx).await
