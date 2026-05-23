@@ -1283,6 +1283,43 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Seed Operator Bindings') {
+            // Registers Matthew as primary operator of both alpha-cluster
+            // doorways via REA operate-doorway commitments. Same human, two
+            // doorway IDs (alpha-elohim-host + apex-elohim-host) — the
+            // doorways differ in surface URL but share an operator.
+            //
+            // Per genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
+            // and elohim/sdk/schemas/v1/objects/operator-classification.schema.json.
+            // Schema v1 (omits custody/steward refs); v2 requires the full
+            // attestation chain — graduate when bootstrap attestations land.
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/seeder') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "SEED OPERATOR BINDINGS (M5 matthew → alpha-elohim-host + apex-elohim-host)"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Doorway: ${doorwayHost}"
+                                    echo ""
+                                    DOORWAY_URL="${doorwayHost}" \\
+                                      npx tsx src/seed-operator-bindings.ts
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Trigger M1 Cross-Pod Fetch') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
