@@ -432,6 +432,72 @@ fn decode_collective_cid_to_action(cid: &str) -> ExternResult<ActionHash> {
         .map_err(|_| wasm_error!("invalid ActionHash in collective CID: {}", cid))
 }
 
+// =============================================================================
+// Task 6: withdraw_membership_clean — clean-exit per spec §6.4
+// =============================================================================
+
+/// Withdraw a Membership via the clean-exit path (spec §6.4).
+///
+/// Sets `withdrawn_at_block_height` to the current block height. Future REA
+/// flow allocation calculations at blocks >= withdrawn do not accrue to this
+/// member (share-routing in Tasks 13/14 honours this boundary).
+///
+/// Authority rules:
+/// - `Person` membership: caller must equal `member_cid`.
+/// - `Collective` membership: caller must be a current Steward of the
+///   withdrawing Collective.
+/// - `ElohimAgent` membership: not supported in M1 (returns an error).
+#[hdk_extern]
+pub fn withdraw_membership_clean(input: WithdrawMembershipInput) -> ExternResult<()> {
+    let existing = get(input.membership_action_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!("Membership not found"))?;
+    let m: Membership = existing
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!("{}", e))?
+        .ok_or_else(|| wasm_error!("Membership decode failure"))?;
+
+    // Authority check: caller must be the member (Person) or a current Steward
+    // of the withdrawing Collective (Collective-typed memberships).
+    let caller_cid = encode_agent_cid(&agent_info()?.agent_initial_pubkey);
+    match m.member_kind {
+        MemberKind::Person => {
+            if m.member_cid != caller_cid {
+                return Err(wasm_error!(
+                    "only the member may withdraw their own Person Membership"
+                ));
+            }
+        }
+        MemberKind::Collective => {
+            require_caller_is_steward_of(&caller_cid, &m.member_cid)?;
+        }
+        MemberKind::ElohimAgent => {
+            // ElohimAgent membership withdrawal is governed differently; deferred.
+            return Err(wasm_error!(
+                "ElohimAgent Membership withdrawal not supported in M1"
+            ));
+        }
+    }
+
+    let block_height = current_block_height()?;
+    let updated = Membership {
+        withdrawn_at_block_height: Some(block_height),
+        ..m
+    };
+    update_entry(input.membership_action_hash, &EntryTypes::Membership(updated))?;
+    Ok(())
+}
+
+/// Read a Membership record by its ActionHash.
+///
+/// Used post-`withdraw_membership_clean` to assert that
+/// `withdrawn_at_block_height` is now `Some(_)`.
+#[hdk_extern]
+pub fn get_membership_by_action(action_hash: ActionHash) -> ExternResult<Record> {
+    get(action_hash, GetOptions::default())?
+        .ok_or_else(|| wasm_error!("Membership not found"))
+}
+
 /// Pre-validate the share-allocation JSON before committing a CollabAgreement.
 ///
 /// Checks:

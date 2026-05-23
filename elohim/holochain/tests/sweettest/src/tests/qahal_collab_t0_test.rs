@@ -19,6 +19,7 @@ use elohim_sweettest::common::{
     fixtures::network_seed,
 };
 use holo_hash::ActionHash;
+use holochain_serialized_bytes::prelude::*;
 
 // ============================================================================
 // Constants
@@ -58,6 +59,28 @@ struct CreateCollabAgreementInput {
 struct AttestCollabAgreementInput {
     agreement_action_hash: ActionHash,
     attesting_collective_cid: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct WithdrawMembershipInput {
+    membership_action_hash: ActionHash,
+    collab_qahal_cid: String,
+}
+
+/// Mirror of `imagodei_integrity::qahal::Membership`.
+///
+/// Used to decode the entry from a `Record` returned by `get_membership_by_action`.
+/// Field names and types MUST match the integrity struct exactly so that the
+/// MessagePack-encoded entry round-trips correctly.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, SerializedBytes)]
+struct MembershipMirror {
+    member_cid: String,
+    member_kind: String,
+    collective_cid: String,
+    role: String,
+    sponsor_cid: Option<String>,
+    joined_at_block_height: u64,
+    withdrawn_at_block_height: Option<u64>,
 }
 
 // ============================================================================
@@ -267,6 +290,186 @@ async fn create_collab_agreement_requires_pending_attestations() -> Result<()> {
         2,
         "Collab-Qahal must have exactly 2 Memberships after instantiation; got {}",
         memberships.len()
+    );
+
+    Ok(())
+}
+
+/// Verify the clean-exit withdrawal path (spec §6.4):
+///   1. Build a 2-collective Collab-Qahal (inline setup — no shared helper).
+///   2. Identify the Collective-A Membership in the Collab-Qahal.
+///   3. Call `withdraw_membership_clean` as Collective A's Steward.
+///   4. Read back the Membership via `get_membership_by_action`.
+///   5. Assert `withdrawn_at_block_height.is_some()`.
+///
+/// Single agent is Steward of Collective A (and B), so the coordinator authority
+/// gate passes for both the Collab-Qahal setup and the withdrawal call.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires packed DNA artifact — wire into Jenkins pack-then-test stage"]
+async fn withdraw_membership_clean_exit() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("imagodei-withdraw-app", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    // --- Build 2-collective Collab-Qahal (inline, mirrors Task 5 test setup) ---
+
+    // Create Collective A.
+    let coll_a_hash: ActionHash = conductor
+        .call(
+            &cell.zome(ZOME),
+            "create_collective",
+            CreateCollectiveInput {
+                charter: "We steward the riparian corridor together.".into(),
+                display_name: "Collective A".into(),
+                salt: "11111111111111111111111111111111".into(),
+            },
+        )
+        .await;
+    let coll_a_cid = format!("collective:{}", coll_a_hash);
+
+    // Create Collective B.
+    let coll_b_hash: ActionHash = conductor
+        .call(
+            &cell.zome(ZOME),
+            "create_collective",
+            CreateCollectiveInput {
+                charter: "We steward the lower watershed.".into(),
+                display_name: "Collective B".into(),
+                salt: "22222222222222222222222222222222".into(),
+            },
+        )
+        .await;
+    let coll_b_cid = format!("collective:{}", coll_b_hash);
+
+    // Build share-allocation JSON with actual CIDs.
+    let share_allocation_json = format!(
+        r#"{{"form":"declared","shares":[{{"collective_cid":"{}","share":0.5}},{{"collective_cid":"{}","share":0.45}}],"commons_pool_tribute":0.05}}"#,
+        coll_a_cid, coll_b_cid
+    );
+
+    // Create the CollabAgreement.
+    let agreement_hash: ActionHash = conductor
+        .call(
+            &cell.zome(ZOME),
+            "create_collab_agreement",
+            CreateCollabAgreementInput {
+                participants: vec![coll_a_cid.clone(), coll_b_cid.clone()],
+                scope: "Joint stewardship of riparian restoration".into(),
+                share_allocation_json,
+                commons_pool_tribute: 0.05,
+                governance_terms_json: r#"{"exit_terms":"clean"}"#.into(),
+                initial_tier: "T0".into(),
+                display_name_for_qahal: "Riparian Stewards Collab".into(),
+                salt: "33333333333333333333333333333333".into(),
+            },
+        )
+        .await;
+
+    // Attest from Collective A.
+    let (): () = conductor
+        .call(
+            &cell.zome(ZOME),
+            "attest_collab_agreement",
+            AttestCollabAgreementInput {
+                agreement_action_hash: agreement_hash.clone(),
+                attesting_collective_cid: coll_a_cid.clone(),
+            },
+        )
+        .await;
+
+    // Attest from Collective B — triggers instantiation.
+    let (): () = conductor
+        .call(
+            &cell.zome(ZOME),
+            "attest_collab_agreement",
+            AttestCollabAgreementInput {
+                agreement_action_hash: agreement_hash.clone(),
+                attesting_collective_cid: coll_b_cid.clone(),
+            },
+        )
+        .await;
+
+    // Confirm Collab-Qahal is instantiated.
+    let qahal_cid: String = conductor
+        .call(
+            &cell.zome(ZOME),
+            "get_collab_qahal_cid_for_agreement",
+            agreement_hash.clone(),
+        )
+        .await;
+    assert!(
+        qahal_cid.starts_with("collective:"),
+        "Collab-Qahal CID must start with 'collective:', got: {qahal_cid}"
+    );
+
+    // --- Find the Collective-A Membership in the Collab-Qahal ---
+
+    let memberships: Vec<holochain_types::prelude::Record> = conductor
+        .call(
+            &cell.zome(ZOME),
+            "list_memberships_for_collective_cid",
+            qahal_cid.clone(),
+        )
+        .await;
+    assert_eq!(
+        memberships.len(),
+        2,
+        "Collab-Qahal must have 2 Memberships; got {}",
+        memberships.len()
+    );
+
+    // Decode each Membership to find the one for Collective A.
+    let coll_a_membership_hash = memberships
+        .iter()
+        .find_map(|record| {
+            let m = record
+                .entry()
+                .to_app_option::<MembershipMirror>()
+                .ok()
+                .flatten()?;
+            if m.member_cid == coll_a_cid {
+                Some(record.action_hashed().hash.clone())
+            } else {
+                None
+            }
+        })
+        .expect("Collective-A Membership must be present in Collab-Qahal");
+
+    // --- Withdraw Collective A's Membership (clean-exit) ---
+
+    let (): () = conductor
+        .call(
+            &cell.zome(ZOME),
+            "withdraw_membership_clean",
+            WithdrawMembershipInput {
+                membership_action_hash: coll_a_membership_hash.clone(),
+                collab_qahal_cid: qahal_cid.clone(),
+            },
+        )
+        .await;
+
+    // --- Assert withdrawn_at_block_height is now Some(_) ---
+
+    let updated_record: holochain_types::prelude::Record = conductor
+        .call(
+            &cell.zome(ZOME),
+            "get_membership_by_action",
+            coll_a_membership_hash,
+        )
+        .await;
+
+    let updated_membership = updated_record
+        .entry()
+        .to_app_option::<MembershipMirror>()
+        .expect("entry decode must not error")
+        .expect("Membership entry must be present");
+
+    assert!(
+        updated_membership.withdrawn_at_block_height.is_some(),
+        "withdrawn_at_block_height must be Some(_) after clean withdrawal; got None"
     );
 
     Ok(())
