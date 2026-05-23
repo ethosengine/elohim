@@ -19,10 +19,11 @@
     "html5-app"
   ],
   "relatedNodeIds": [],
-  "blobHash": "PLACEHOLDER_REPLACED_BY_SEED_SCRIPT",
   "metadata": {
     "category": "protocol-surface",
     "author": "Matthew Dowell",
+    "blobPopulatedAt": "deploy-time",
+    "blobPopulatedBy": "Jenkinsfile:stageSpaBlob (root pipeline). The elohim-app browser bundle is zipped + uploaded as a blob; the hash is written into db/content/elohim-host-landing.blobHash and db/content/lamad-spa.blobHash. Intentionally absent from this source JSON so seed-sqlite does not clobber the deploy-time value on re-seed.",
     "embedStrategy": "iframe",
     "requiredCapabilities": ["javascript"],
     "securityPolicy": {
