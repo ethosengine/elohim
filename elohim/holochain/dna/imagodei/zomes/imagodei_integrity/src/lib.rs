@@ -28,6 +28,10 @@ pub use agent_peer_binding::*;
 pub mod portal_host;
 pub use portal_host::*;
 
+// Qahal — collective / membership / collab-agreement substrate (M1 multi-collective)
+pub mod qahal;
+pub use qahal::{Collective, Membership, MembershipRole, MemberKind, CollabAgreement};
+
 // =============================================================================
 // Identity Constants
 // =============================================================================
@@ -936,6 +940,10 @@ pub enum EntryTypes {
     AgentPeerBinding(AgentPeerBinding),
     // Recovery Protocol Phase 2 M5 — auth portal URL registry (Human → PortalHost)
     PortalHost(PortalHost),
+    // Qahal substrate — M1 multi-collective collaboration
+    Collective(Collective),
+    Membership(Membership),
+    CollabAgreement(CollabAgreement),
 }
 
 // =============================================================================
@@ -1069,6 +1077,15 @@ pub enum LinkTypes {
 
     // Recovery Protocol Phase 2 M5 — PortalHost links
     PortalHosts, // Human ActionHash -> PortalHost (all portal hosts for this human)
+
+    // Qahal substrate links — M1 multi-collective collaboration
+    MemberOf,               // Person/Collective/ElohimAgent CID -> Collective
+    HasMember,              // Collective -> Member CID (any kind)
+    HasMembership,          // Collective -> Membership entry (full metadata)
+    StewardOf,              // Person/Collective CID -> Collective (role-filtered)
+    CharterAnchor,          // Anchor("collective:<cid>") -> Collective
+    AgreementOnCollab,      // CollabAgreement -> Collective (the instantiated Collab-Qahal)
+    MembershipForAgreement, // CollabAgreement -> Membership entries
 }
 
 // =============================================================================
@@ -1125,6 +1142,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::PortalHost(portal_host) => {
                     validate_create_portal_host(&action, &portal_host)
                 }
+                // Qahal substrate validation — M1 multi-collective
+                EntryTypes::Collective(c) => qahal::validate_collective_pure(&c),
+                EntryTypes::Membership(m) => qahal::validate_membership_pure(&m),
+                EntryTypes::CollabAgreement(a) => qahal::validate_collab_agreement_pure(&a),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {

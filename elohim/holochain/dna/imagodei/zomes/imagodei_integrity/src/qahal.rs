@@ -20,7 +20,7 @@ pub enum MembershipRole {
 }
 
 #[hdk_entry_helper]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Collective {
     pub founder_agent_cid: String,
     pub charter: String,
@@ -33,7 +33,7 @@ pub struct Collective {
 }
 
 #[hdk_entry_helper]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Membership {
     pub member_cid: String,
     pub member_kind: MemberKind,
@@ -48,7 +48,7 @@ pub struct Membership {
 }
 
 #[hdk_entry_helper]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub struct CollabAgreement {
     pub authored_by_agent_cid: String,
     pub participants: Vec<String>, // Collective CIDs
