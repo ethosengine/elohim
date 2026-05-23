@@ -55,6 +55,10 @@ pub use bootstrap_steward::{
     DnaProperties,
 };
 
+// Qahal coordinator — atomic multi-step orchestration for Collective + Collab flows
+// (M1 multi-collective collaboration, Tasks 4–6 implement the coordinator functions).
+pub mod qahal_coordinator;
+
 // =============================================================================
 // Input/Output Types
 // =============================================================================
