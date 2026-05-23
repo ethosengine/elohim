@@ -151,8 +151,12 @@ spec:
             # multi-doorway-content-delivery validation.
             - name: ELOHIM_STORAGE_AUTO_REGISTER
               value: "true"
+            # Root app served at "/" — the landing-page EPR shared with
+            # doorway-alpha. Same elohim-host-landing ContentNode resolved
+            # via the same shared storage pool; differing only in surface
+            # URL (elohim.host vs alpha.elohim.host) + operator binding.
             - name: ROOT_APP_SLUG
-              value: "lamad"
+              value: "elohim-host-landing"
             - name: ELOHIM_AGENT_URL
               value: "http://localhost:8095"
             - name: THRESHOLD_URL
@@ -187,12 +191,17 @@ spec:
             # proxy. Same behavior as doorway-A.
             - name: SSR_BUNDLE_PATH
               value: "/opt/elohim-render/main.server.mjs"
-            # Federation: point at doorway-A. Discovery loop in
-            # services::federation::spawn_peer_discovery_task will GET
-            # this peer's /admin/capabilities, register both doorways in
-            # the DHT, and run a heartbeat keeping the peer cache fresh.
+            # Federation: point at doorway-A on its user-facing surface
+            # (alpha.elohim.host), symmetric with alpha.yaml's pointer at
+            # elohim.host. doorway-alpha.elohim.host is still a valid alias
+            # for the same backend service, but using the user-facing host
+            # keeps the federation pair legible: alpha.elohim.host ↔
+            # elohim.host. Discovery loop in
+            # services::federation::spawn_peer_discovery_task will GET this
+            # peer's /admin/capabilities, register both doorways in the DHT,
+            # and run a heartbeat keeping the peer cache fresh.
             - name: FEDERATION_PEERS
-              value: "https://doorway-alpha.elohim.host"
+              value: "https://alpha.elohim.host"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
