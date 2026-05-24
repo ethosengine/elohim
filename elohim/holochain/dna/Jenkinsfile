@@ -134,6 +134,9 @@ def runSweettestShard(int n, int total, String shardPodYaml) {
                         set -uo pipefail
                         export HOME=\${HOME:-/root}
                         mkdir -p "\$HOME"
+                        # nextest --extract-to requires the dir to exist;
+                        # canonicalize() ENOENTs on missing destination.
+                        mkdir -p extracted-${n}
                         export SHARD_LOG=sweettest-shard-${n}.log
                         : > "\$SHARD_LOG"
                         nix develop --impure --accept-flake-config "\$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c '
