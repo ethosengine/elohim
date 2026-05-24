@@ -717,7 +717,167 @@ For the mint-monarch archetype: grandma's coffee-shop transaction begins as a `s
 
 ## A.5 Commitment
 
-> *Stubbed — full draft pending. Hyperscale analog: Spring-Batch scheduled job (planned-future-Event) AND the custody primitive for cold-archive (`Commitment(action="custody-quilt", tier_floor=shelved)`). Critical sub-sections: dual-role nature (planning AND custody); the `custody-blob`/`custody-quilt`/`custody-shelved` ladder; how Commitments fulfill into Events; the cancellation flow.*
+### 1. What it is
+
+A Commitment is the substrate's **promise primitive** — a notarized pledge of future economic activity. Implemented as the `Commitment` entry type in the elohim DNA's `content_store_integrity` zome (`content_store_integrity:1342`). It holds the action verb (`action: String`), the parties (`provider`, `receiver`), the resource being promised (`resource_classified_as_json`, `resource_quantity_value`), and the timing (`has_point_in_time`, `has_beginning`, `has_end`, `due`). State advances through six canonical values defined in `COMMITMENT_STATES`: `proposed → accepted → in-progress → fulfilled → cancelled → breached`. It is linked into the fulfillment graph via `EventFulfillsCommitment` DHT links (EconomicEvent action_hash → Commitment action_hash) and scoped into bilateral agreements via `clause_of: Option<String>` (Agreement.id).
+
+Commitments are **dual-role**: simultaneously a **planning primitive** (a scheduled future Event that hasn't fired yet) and a **custody primitive** (the structural author of cold-archive stewardship — specifically `action: "custody-quilt"` with `tier_floor` embedded in `resource_classified_as_json`). The same entry type carries both roles, distinguished entirely by the `action` verb. This duality is architecturally load-bearing: planning Commitments and custody Commitments share the same validation path, gossip path, and SQL projection table. The design consequence is intentional — a stewardship promise and a patronage promise are structurally equivalent.
+
+### 2. Hyperscale analog
+
+**Think Spring-Batch scheduled job record fused with an AWS Reserved Instance lease — both on a shared DHT notary.** Like a Spring-Batch job definition, a planning Commitment (`action: "subscribe"`, `action: "provide-compute"`) describes future work, a timing window, and records the execution result (the fulfilling Event). Like a Reserved Instance lease, a custody Commitment (`action: "custody-quilt"`) locks a steward to a storage tier-floor for a specific CID over a time window, with breach-penalty attestation semantics. Neither analogy is sufficient alone — the fusion is what makes Commitments load-bearing across both the economics plane (Patreon recurring patronage, household budgets) and the infrastructure plane (quilt cold-archive stewardship). This is Stripe Subscription records + AWS Reserved Instance contracts collapsed into one DHT-notarized primitive.
+
+### 3. Data flow
+
+```
+Author (human, shefa-elohim, or TierController) signs Commitment entry
+        │
+        ▼
+Holochain coordinator zome validates:
+  action verb ∈ REA_ACTIONS
+  + state ∈ COMMITMENT_STATES
+  + required fields populated for this action role
+        │
+        ▼
+DHT validator quorum gossip-validates (O(log N) neighborhood)
+  → notarized: Commitment hash is unforgeable, party-bound
+        │
+        ▼
+Post-commit signal → ReconcileController → SQL projection
+  (rea_commitments table indexed by provider/receiver/action/state/due)
+        │
+        ├── Planning path: shefa-elohim timer task polls
+        │   WHERE state='accepted' AND due <= now()
+        │   → fires fulfilling EconomicEvent
+        │   → creates EventFulfillsCommitment DHT link
+        │   → updates Commitment state to 'fulfilled' or 'in-progress' (recurring)
+        │
+        └── Custody path: TierController reads
+            WHERE action='custody-quilt' AND state='accepted'
+            → enforces tier_floor from resource_classified_as_json
+            → on breach: BreachScanner authors tier-breach Attestation
+            → BreachScanner feeds quilt_tier_state projection
+            → application queries (dashboard, AccountingAggregator, shefa standing)
+```
+
+### 4. Physical storage
+
+| Layer | What lives there | Shape |
+|---|---|---|
+| **Source of truth** | Author's source-chain + DHT shard replicas | Holochain DHT |
+| **Operational copy** | SQL: `rea_commitments` table | SQLite rows indexed by `provider`, `receiver`, `action`, `state`, `due` |
+| **Fulfillment graph** | `EventFulfillsCommitment` DHT links | Link entries: EconomicEvent action_hash → Commitment action_hash |
+| **Custody payload** | `resource_classified_as_json` field | JSON: `{cid, tier_floor, shelf_destination, diversity_role}` (tiered-quilt spec §4) |
+| **Web2 projection** | Optional doorway SSR read for patron-visible recurring state | Redis-shape row keyed by `commitment_id` |
+| **Breach history** | `tier-breach` Attestation entries (`category="storage-stewardship"`) | DHT notarized; reference Commitment hash |
+
+### 5. Gossip / sync layer
+
+- **DHT payload**: 1–3 KB per entry (metadata-dominated; `resource_classified_as_json` carries ~200–500 B for custody payloads). Gossiped once at authoring; state transitions author new link entries on `CommitmentByState` anchors — Holochain immutable source-chain discipline prevents in-place mutation.
+- **libp2p sync plane**: `rea_commitments` SQL table syncs as delta projections via cursor-tracked sync. A peer coming online after a state change pulls the delta rather than full DHT traversal. Fulfilling `EconomicEvent` rows arrive as separate delta rows against `economic_events`.
+- **iroh-blob plane**: not applicable to Commitment metadata. Custody Commitments reference CIDs that live in iroh-blob, but the Commitment entry is pure metadata — no bytes attached.
+- **Rate ceiling**: a household with 50 active patronage subscriptions + a TierController governing 500 quilts emits ~550 Commitment entries total. Well within the ~3000-entry-per-peer DHT budget. At Patreon-scale across the full network, entries distribute across the patron graph — no single peer holds all 1M.
+
+### 6. Provenance — maintained vs intentionally degraded
+
+**Maintained cryptographically forever:**
+- Signature chain (author-signed at write; DHT validator quorum at gossip time)
+- Content-address (Commitment CID)
+- `EventFulfillsCommitment` link traversal to all fulfilling Events — the complete payment and fulfillment history is permanent
+- Breach attestations: `tier-breach` Attestations reference the Commitment hash; a steward who breached a custody Commitment carries that record permanently in the attestation graph
+- Agreement clause membership: `clause_of` field binds the Commitment to its bilateral Agreement; both survive independently
+
+**Intentionally degraded (access cost, not truth):**
+- **Cancelled Commitments**: state transitions to `cancelled`; excluded from active SQL views by default but queryable forever as audit history
+- **Fulfilled recurring Commitments**: once a subscription Commitment fulfills and a new one is authored for the next cycle, the prior transitions to `fulfilled` and moves to history view — same DHT permanence, lower query priority
+- **Cold-archive custody Commitments for dissolved content**: when content reaches `closed` lifecycle state, its custody Commitment transitions to `fulfilled` or `cancelled`; the CID reference becomes a quilt archive pointer, recoverable via K-of-N
+
+The substrate's commitment is to **truth-verifiability, not free-access-forever.** A breach from three years ago is not rewritten — it remains in the attestation record. The CID is forever; the cost of retrieval scales with lifecycle stage.
+
+### 7. Agentic intelligence at scale
+
+Where elohim cognition is load-bearing:
+
+- **Shefa-elohim (scheduler)**: fires planned fulfillment Events on time, retries gracefully, detects stuck cursors (bridge observation graduation halted — e.g., Stripe is down), escalates to patron or creator with actionable context. Without this, every recurring patronage payment requires human confirmation — unworkable at Patreon-shape scale.
+- **TierController + BreachScanner (custody elohim)**: reads the custody Commitment floor from `rea_commitments`, compares to observed tier via holdings-attestation probes, authors `tier-breach` Attestation when a steward falls below their floor. No human can monitor 500-quilt commitments per household across a 100M-household network.
+- **Stewardship-elohim (authoring)**: determines when a content artifact crosses the cold-archive threshold (reach-decline + age + storage-budget pressure), authors the `custody-quilt` Commitment on behalf of the household, selects appropriate stewards via affinity and prior-fulfillment records. The household never sees this unless the elohim surfaces an ambient notification.
+- **Care-class isolation invariant**: custody Commitments (`action: "custody-quilt"`) are compute-class; patronage Commitments (`action: "subscribe"`) are care-class. Shefa-elohim discriminates via `signal_kind` and `resource_classified_as` whitelists. A custody breach signal must never debit patronage standing, and patronage fulfillment attribution must never gate compute placement decisions. This is a substrate-invariant wired through `signal_kind` discrimination — not an ad-hoc field convention.
+
+**This is the value-prop unlock**: the promise economy (recurring patronage, long-term stewardship) is tractable only because elohim agents fire, monitor, and repair Commitments at machine-speed. Human-only operational overhead consumes the value before it reaches the intended recipient.
+
+### 8. Scale: household → hub → global
+
+- **Local DHT (household elohim-node)**: active Commitments per household — ~50 patronage subscriptions + ~10–20 budget Commitments + ~100–500 custody-quilt Commitments if the household is a quilt steward. At ~2 KB each: ~1–2 MB SQL projection. Comfortably within the ~3000 DHT entry budget per peer. Patronage Commitments authored by patrons live in the *patron's* DHT neighborhood — the creator's node queries them via reach scope rather than replicating all entries.
+- **Hub (collective elohim-node)**: aggregates fulfillment views via federated SQL — "what is our collective's total committed patronage this month?" — without replicating individual member Commitments. The hub holds collective-level Commitments: a joint stewardship agreement for a shared quilt (family photo archive spanning cities), a shared capacity lease for a collective compute node.
+- **Global**: Commitment entries at network scale are bounded by the agent-reach graph. A Commitment is visible only to its parties and their elohim agents — not all 8B participants. Custody Commitments for commons-reach content may propagate via `CommitmentByReceiver` anchor links scoped to the content's reach boundary, so any potential steward can verify the floor before accepting.
+
+### 9. Limit-awareness / capture prevention
+
+- **DHT validator quorum** prevents a single peer from falsifying a Commitment — forging a stewardship pledge they didn't author or backdating a fulfillment
+- **`clause_of` Agreement scoping**: bilateral Agreements are co-authored and co-signed; a Commitment exceeding its Agreement's authorization fails integrity validation; neither party can unilaterally overcommit
+- **Custody-floor enforcement is peer-local, not hub-controlled**: the `TierController` reads each peer's own Commitments and enforces them locally — honest under partition, honest under hub-failure; no central orchestrator can dictate what floor every peer must hold
+- **Breach → Attestation → shefa standing**: a steward who breaches custody Commitments accumulates `tier-breach` Attestations; future placement decisions factor these in via standing-curve pressure — friction-gradient limitarianism applied to storage; a chronic non-deliverer becomes expensive to use as a steward, not globally banned
+- **Subscription concentration**: a creator with 1M patrons has 1M `subscribe` Commitments spread across the patron graph; the creator's node receives the projection via reach-scoped sync — it does not hold all 1M DHT entries
+
+### 10. Network resilience
+
+- **DHT shard-N redundancy**: each Commitment entry replicates to ~10 neighborhood peers; survives single-node failures
+- **Partition recovery**: cursor-tracked libp2p sync heals `rea_commitments` projection gaps on reconnect; a patron offline when a state change occurred gets the delta on next sync
+- **Custody breach under partition**: the BreachScanner uses an observation-gap first pass (holdings-attestation gap must exceed the manifest-declared breach window, archetype-tuned: longer for mobile household nodes, shorter for wired steward nodes) before issuing a breach Attestation — temporary partition is not breach
+- **Fulfillment under offline conditions**: the shefa-elohim scheduler is peer-local — recurring Events accumulate on the source chain and gossip when connectivity restores; the protocol does not depend on doorway availability to honor Commitments
+- **Cold-archive K-of-N recoverability**: a custody Commitment with `tier_floor=shelved` maps to the quilt's K-of-N erasure-coding guarantee (4-of-7 minimum recovery); if 3 of 7 stewards breach, the 4 survivors reconstruct; breach Attestations from failed stewards inform future diversified placement
+
+### 11. Dashboard worked example (preview)
+
+**Patreon archetype — patron and creator dashboard**
+
+The patron's "recurring giving" tile reads from local SQL — zero network at render:
+
+```sql
+SELECT
+  c.id                         AS commitment_id,
+  c.receiver                   AS creator_agent,
+  c.resource_quantity_value    AS monthly_amount,
+  c.resource_quantity_unit     AS unit,
+  c.due                        AS next_due,
+  c.state                      AS commitment_state,
+  COUNT(ee.id)                 AS payments_made
+FROM rea_commitments c
+LEFT JOIN economic_events ee
+  ON ee.id IN (
+    SELECT event_id FROM commitment_fulfillment
+    WHERE commitment_id = c.id
+  )
+WHERE c.provider = :patron_agent_id
+  AND c.action   = 'subscribe'
+  AND c.state NOT IN ('cancelled', 'breached')
+GROUP BY c.id
+ORDER BY c.due ASC;
+```
+
+`SUM(monthly_amount)` = total monthly outflow from the patron. Creator view inverts: `receiver = :creator_agent_id` gives the MRR chart Patreon used to own.
+
+**Cold-archive stewardship dashboard** — per-quilt custody status for a steward node operator:
+
+```sql
+SELECT
+  json_extract(rc.resource_classified_as_json, '$.cid')        AS quilt_cid,
+  json_extract(rc.resource_classified_as_json, '$.tier_floor') AS committed_floor,
+  rc.resource_quantity_value                                    AS committed_bytes,
+  qts.observed_tier,
+  CASE WHEN qts.observed_tier < committed_floor
+       THEN 'AT RISK' ELSE 'OK' END                            AS status
+FROM rea_commitments rc
+LEFT JOIN quilt_tier_state qts
+  ON qts.cid = json_extract(rc.resource_classified_as_json, '$.cid')
+WHERE rc.action   = 'custody-quilt'
+  AND rc.provider = :this_agent_id
+  AND rc.state    = 'accepted';
+```
+
+Both queries read entirely from local SQL projection — zero network at render time. Full patron lifecycle walk-through (subscription → payment → tier-change → cancel) lives in [`applications/patreon-application-design.md`](./applications/patreon-application-design.md). Capacity-declaration Commitments (`action: "provide-compute"`, `action: "request-compute"`) are the supply side of [`applications/aws-compute-application-design.md`](./applications/aws-compute-application-design.md).
+
+---
 
 ## A.6 Attestation (`Content` + `content_type: "attestation:*"`)
 
