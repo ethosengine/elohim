@@ -21,6 +21,7 @@
 
 use std::sync::Arc;
 
+use holochain_types::prelude::ActionHash;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
@@ -780,65 +781,55 @@ struct ZomeCollabAgreementEntry {
 
 /// Encode a 39-byte ActionHash into a `collective:<display>` CID string.
 ///
-/// Holochain's ActionHash Display implementation uses `holo_hash`'s standard
-/// base32-padded encoding (the "uhCkk..." prefix). For elohim-storage — which
-/// does not import `holo_hash` directly — we use base64url of the raw bytes as
-/// a stable, round-trippable representation. The coordinator uses the same
-/// encoding in its `action_hash_to_cid` helper.
-///
-/// NOTE: The coordinator's `action_hash_to_cid` uses `format!("collective:{}", hash)`
-/// where `hash` is an HDK `ActionHash` whose `Display` is the HoloHash base32
-/// string (e.g. "uhCkk..."). elohim-storage stores the raw bytes returned by the
-/// conductor; we re-encode them as base64url to produce a stable CID.
-/// Both forms are valid CIDs for DHT-internal references; the key invariant is
-/// that `decode_collective_cid` can round-trip what `bytes_to_collective_cid` produced.
+/// Uses `ActionHash`'s `Display` implementation (HoloHash standard base32-padded
+/// encoding, "uhCkk..." prefix) — identical to the coordinator's
+/// `format!("collective:{}", hash)`. Both sides of the storage/zome boundary
+/// now produce byte-equal CIDs for the same DHT entry.
 fn bytes_to_collective_cid(bytes: &[u8]) -> String {
-    format!("collective:{}", base64url_encode(bytes))
+    format!("collective:{}", action_hash_from_bytes(bytes))
 }
 
 /// Encode a 39-byte ActionHash into an `agreement:<display>` CID string.
 fn bytes_to_agreement_cid(bytes: &[u8]) -> String {
-    format!("agreement:{}", base64url_encode(bytes))
+    format!("agreement:{}", action_hash_from_bytes(bytes))
 }
 
-/// Decode a `collective:<b64url>` CID string back to raw ActionHash bytes.
+/// Decode a `collective:<HoloHash-display>` CID string back to raw ActionHash bytes.
 fn decode_collective_cid(cid: &str) -> Result<Vec<u8>, StorageError> {
     let raw = cid.strip_prefix("collective:").ok_or_else(|| {
         StorageError::InvalidInput(format!(
             "collective CID must start with 'collective:'; got: {cid}"
         ))
     })?;
-    base64url_decode(raw)
+    ActionHash::try_from(raw)
+        .map(|h| h.get_raw_39().to_vec())
         .map_err(|e| StorageError::InvalidInput(format!("invalid collective CID '{cid}': {e}")))
 }
 
-/// Decode an `agreement:<b64url>` CID string back to raw ActionHash bytes.
+/// Decode an `agreement:<HoloHash-display>` CID string back to raw ActionHash bytes.
 fn decode_agreement_cid(cid: &str) -> Result<Vec<u8>, StorageError> {
     let raw = cid.strip_prefix("agreement:").ok_or_else(|| {
         StorageError::InvalidInput(format!(
             "agreement CID must start with 'agreement:'; got: {cid}"
         ))
     })?;
-    base64url_decode(raw)
+    ActionHash::try_from(raw)
+        .map(|h| h.get_raw_39().to_vec())
         .map_err(|e| StorageError::InvalidInput(format!("invalid agreement CID '{cid}': {e}")))
 }
 
-/// Convenience alias — same encoding as `decode_agreement_cid` but used
+/// Convenience alias — same decoding as `decode_agreement_cid` but used
 /// in contexts where the caller already validated the prefix.
 fn agreement_action_bytes_from_cid(cid: &str) -> Result<Vec<u8>, StorageError> {
     decode_agreement_cid(cid)
 }
 
-fn base64url_encode(bytes: &[u8]) -> String {
-    use base64::Engine as _;
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
-}
-
-fn base64url_decode(s: &str) -> Result<Vec<u8>, String> {
-    use base64::Engine as _;
-    base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(s)
-        .map_err(|e| e.to_string())
+/// Construct an `ActionHash` from raw conductor bytes (39-byte HoloHash format).
+///
+/// Panics on malformed bytes — callers must only pass bytes originating from the
+/// Holochain conductor, which always emits valid 39-byte ActionHash values.
+fn action_hash_from_bytes(bytes: &[u8]) -> ActionHash {
+    ActionHash::from_raw_39(bytes.to_vec())
 }
 
 // =============================================================================
