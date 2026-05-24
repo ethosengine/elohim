@@ -195,7 +195,7 @@ pnpm run hc:start
 pnpm start
 ```
 
-<!-- ci-marker(2026-05-24): App pipeline rebuild after stageSpaBlob URL + 413 fixes.
+<!-- ci-marker(2026-05-24, retrigger after nexus PVC recovery): App pipeline rebuild after stageSpaBlob URL + 413 fixes.
      The orchestrator's graph-walker change-patterns for the App pipeline don't
      yet include genesis/orchestrator/manifests/elohim-app/** — so ingress changes
      under that path don't trigger an App build. This file touch forces the App
