@@ -170,10 +170,13 @@ spec:
     }
 
     options {
-        // Cold sweettest compile (no cargo cache hit) takes ~30min on its own;
-        // WASM stages + DNA pack + tests together push past the old 60min ceiling.
-        // Once the cargo PVC is warm, total wall time drops back under an hour.
-        timeout(time: 150, unit: 'MINUTES')
+        // Overall pipeline budget. The dominant cost is the sweettest stage;
+        // cold-PVC first build observed at ~97min (build #1270 aborted at the
+        // tighter 90min stage cap). 240min gives headroom for cold-first
+        // builds + the surrounding WASM + DNA pack + manifest hygiene stages.
+        // Once W3 per-DNA filter is active on a single-DNA push, total drops
+        // dramatically and we can revisit the budget.
+        timeout(time: 240, unit: 'MINUTES')
         // abortPrevious: true — when a new orchestrator dispatch arrives while a
         // previous build of this pipeline is in-flight, abort the old one. Without
         // this, the previous orchestrator's downstream queues up behind the in-flight
@@ -535,7 +538,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 // serialized (--test-threads=1), so the full suite can take 30+ min
                 // on top. Stage timeout sized for cold-cache worst case; warm runs
                 // will finish in ~10–15min.
-                timeout(time: 90, unit: 'MINUTES')
+                timeout(time: 150, unit: 'MINUTES')
             }
             steps {
                 container('builder') {
