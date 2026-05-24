@@ -1654,6 +1654,12 @@ spec:
                         }
 
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')
+                        // Bridge changedFiles across CPS stage boundaries (def-scoped
+                        // locals don't survive into the next stage's script{} block).
+                        // Execute Builds reads CHANGED_PATHS_PASSTHROUGH and passes
+                        // it as the 4th arg to triggerPipeline so downstream pipelines
+                        // see CHANGED_PATHS for per-path / per-DNA selectivity.
+                        env.CHANGED_PATHS_PASSTHROUGH = changedFiles.join('\n')
 
                         // Build + write the predicted-build-graph artifact.
                         def predictedLevels = groupByDependencyLevel(graphPipelines)
@@ -1770,6 +1776,9 @@ spec:
                 container('builder') {
                     script {
                         def pipelines = (env.PIPELINES_TO_RUN ?: '').split(',').findAll { it }
+                        // Recover changedFiles from env-bridge (see Determine Build Plan).
+                        // def-scoped locals don't cross CPS stage boundaries.
+                        def changedFiles = (env.CHANGED_PATHS_PASSTHROUGH ?: '').split('\n').findAll { it }
                         def results = [:]
                         def pipelineBaselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
 
