@@ -130,7 +130,7 @@ def runSweettestShard(int n, int total, String shardPodYaml) {
             container('builder') {
                 unstash 'sweettest-shard-input'
                 dir('elohim/holochain/tests/sweettest') {
-                    sh """
+                    sh """#!/usr/bin/env bash
                         set -uo pipefail
                         export HOME=\${HOME:-/root}
                         mkdir -p "\$HOME"
