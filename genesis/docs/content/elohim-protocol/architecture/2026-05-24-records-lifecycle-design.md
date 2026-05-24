@@ -848,7 +848,168 @@ Zero DHT reads at query time. Attestations stay agent-private until the family o
 
 ## A.7 FeedbackSignal
 
-> *Stubbed — full draft pending. Hyperscale analog: webhook / event-notification gated by reach. Critical sub-sections: the documented edge case (the ONE social-move surface that earns DHT-tier cost, because reach-coupling requires authoring-time notarization); `signal_kind` extensibility; how FeedbackSignals contribute to reach earning/decay; manifest-declared validators.*
+> *[A.7 written below — stub removed]*
+
+### 1. What it is
+
+A FeedbackSignal is the substrate's **social nervous system** — a notarized record of one agent's social act toward a piece of content or another signal. Implemented as a `FeedbackSignal` entry type in the `content_store_integrity` zome, it carries: the `target_cid` of the EPR being acted on, a `signal_kind` discriminator (whitelisted from `SIGNAL_KINDS`), an optional `vouch_kind` sub-discriminator, an optional `evidence_cid` for corrections, a `standing_impact` classification, and a `signer_pubkey` (raw ed25519 bytes, canonically verified by the coordinator before `create_entry`). The entry is **immutable after creation** — `validate_update_entry` rejects all updates; retraction is its own new signal. What makes FeedbackSignal architecturally exceptional among the eight primitives is its **documented edge case status**: it is the only social-move surface that earns DHT-tier cost. Every other social vocabulary extension (likes, endorsements, comments, reactions) would cost nothing if they lived off-DHT — but they cannot, because standing-curve mechanics and reach-coupling require authoring-time notarization to be unforgeable. This does not violate the "no new DHT entry types" principle: `FeedbackSignal` is an existing entry type; `signal_kind` extensibility means new social moves land as whitelist additions, never as new entry types.
+
+### 2. Hyperscale analog
+
+**Think Stripe webhook events filtered by the receiver's credit score, with a public audit log that both the sender and the network can cite as evidence.** Like a Stripe webhook, a FeedbackSignal fires when an agent acts. Like a filtered webhook, the signal only propagates to peers within the signer's reach scope — delivery is gated by earned standing, not by subscription. Unlike any webhook system: the signal is content-addressed, DHT-notarized (signer identity is unforgeable), and accumulates into a standing-curve that affects the signer's future reach capacity. A skeptical systems architect would recognize the shape as: **event log with built-in trust-compute gradient**, where each record contributes to its author's permission surface for future records.
+
+### 3. Data flow
+
+```
+Agent authors social act (endorse, comment, report, correction, vouch, forget-request)
+          │
+          ▼
+Coordinator zome (T8): verifies ed25519 signature over canonical bytes
+          │  cross-entity rules deferred from HDI (project_hdi_no_get_links_in_validators):
+          │    retraction signer == original author (must_get_action on target)
+          │    correction evidence_cid → existing Correction EPR (DHT lookup)
+          │    vouch: no-self-vouch (must_get_valid_record on target signal)
+          ▼
+create_entry(EntryTypes::FeedbackSignal) → source chain + DHT gossip
+          │
+          ▼
+Gossip neighborhood validates via integrity zome floors:
+  Floor 1: signal_kind ∈ SIGNAL_KINDS whitelist
+  Floor 2: standing_impact ∈ STANDING_IMPACTS whitelist
+  Floor 3: squelch ⇒ standing_impact == advisory
+  Floor 4: correction ⇒ evidence_cid is Some
+  Floor 5: vouch ⇒ vouch_kind ∈ VOUCH_KINDS; non-vouch ⇒ vouch_kind is None
+          │
+          ▼
+Post-commit signal → ElohimContentDispatcher → FeedbackSignalProjector
+          │           (routes by entry type per ReconcileController discipline)
+          ▼
+Diesel upsert in `feedback_signals` table with `dht_anchor_hash`
+          │
+          ▼ (parallel)
+T1 libp2p EPR-atom plane:  EprFanOutCtx fan-out to predecessor + reach-neighborhood peers
+iroh gossip plane:         broadcast to BLAKE3(reach-scope) topic
+          │
+          ▼
+Standing-curve service re-derives signer's standing score from aggregate signals
+          │
+          ▼
+Application queries (feed ranking, reach gating, moderation dashboard)
+```
+
+The T1 wire path (`/elohim/epr-atom/2.0.0`, MessagePack via `FeedbackSignal` in `p2p/feedback_signal.rs`) carries signals between peers in real time before DHT notarization completes. T1 is fast and operational; DHT is the unforgeable record. They are complementary, not redundant.
+
+### 4. Physical storage
+
+| Layer | What lives there | Shape |
+|---|---|---|
+| **Source of truth** | Author's source-chain entry + DHT shard replicas | Holochain DHT (`content_store_integrity` FeedbackSignal entry type) |
+| **Operational copy** | SQL projection on peers with reach to the target EPR | SQLite `feedback_signals` table with `dht_anchor_hash` |
+| **Real-time transport** | Live signal propagation before DHT confirms | libp2p `/elohim/epr-atom/2.0.0` + iroh gossip plane (MessagePack `FeedbackSignal` from `p2p/feedback_signal.rs`) |
+| **Standing aggregate** | Derived standing score per signer | SQLite view re-derived from signal aggregates; never stored independently of signals |
+| **Large evidence** | Correction EPR body (claims + citations) | iroh-blob (referenced by `evidence_cid`; the FeedbackSignal entry itself is ~200–400 bytes) |
+
+### 5. Gossip / sync layer
+
+- **DHT**: full FeedbackSignal payload (~200–400 bytes: five primitive fields + 32-byte signer_pubkey); gossip latency 200–2000 ms; per-peer DHT budget shared with EPRs, Events, Attestations (~3000 entries total before degradation)
+- **libp2p EPR-atom plane**: fan-out via `EprFanOutCtx` (predecessor peer routing + reach-neighborhood flood); T22 fan-out path activates when `fan_out_ctx` is wired in `AppState`; enables real-time signal delivery before DHT settles
+- **iroh gossip plane**: broadcast to BLAKE3 topic mapped from target EPR's reach scope; peers in the same reach-cluster receive the signal without polling
+- **Evidence pull**: Correction EPR bodies are never gossiped — pull-fetched via iroh-blob on demand when a peer evaluates epistemic weight
+
+Rates: a Meta-shaped application at 500 interactions/user/day generates ~100 KB/day DHT writes per active user (~500 signals × 200 bytes). At the ~3000-entry DHT budget, a single user's footprint pressures limits after ~six months of heavy use. The standing-curve addresses this by making high-standing peers carry proportional cost and by enabling signal-stream subordination to aggregates.
+
+### 6. Provenance — maintained vs intentionally degraded
+
+**Maintained cryptographically forever:**
+- Ed25519 signature over canonical bytes (`targetCid || signalKind || evidenceCid? || standingImpact || signedBy`) — signer cannot deny authorship
+- `signer_pubkey` raw bytes on DHT — unforgeable agent identity
+- `target_cid` content-addresses the specific EPR version the signal evaluated — permanently couples signal to subject
+- DHT validator quorum attestation at write time — neighborhood confirmed the signal met floor rules
+- `dht_anchor_hash` in SQL projection links every operational query to the notarized truth
+
+**Intentionally degraded (access cost, not truth):**
+- **Squelch signals are locally private**: Floor 3 (`squelch ⇒ standing_impact == advisory`) is enforced at the DHT layer; squelch entries are authored under agent scope, never propagating to the target's reach neighborhood — truth preserved, effect is local
+- **Cold-archive path for signal-dense content**: high-volume signal streams (a post with 50k endorsements) can be subordinated to a Signal-Aggregate Commitment after standing-curve crystallization; individual signals become shelved under the aggregate, recoverable via K-of-N quilt pull
+- **Standing score is derived, not stored**: if underlying signals are archived, re-derivation requires a quilt pull — retrieval cost scales with history depth, truth intact
+
+The substrate's commitment is to truth-verifiability, not free-access-forever. The signer's identity and target CID are forever; the standing-score's real-time accessibility scales with lifecycle stage.
+
+### 7. Agentic intelligence at scale
+
+Where elohim cognition is load-bearing:
+
+- **Standing-curve stewardship** (`standing-stewardship-elohim`): continuously re-derives standing scores from signal aggregates, detects Sybil-shaped vouch clusters and standing-farm patterns, proposes adjustments to mishpat governance. Humans cannot monitor 8B signal streams for coordinated manipulation.
+- **Correction routing** (`epistemic-elohim`): when a `correction` signal arrives with `evidence_cid` pointing to a Correction EPR, evaluates the evidence chain (observation_refs, citation quality, vouching signers) and advises the mishpat pipeline on whether the correction merits `debit-firm` escalation.
+- **Reach-mutation recommendations**: after standing-curve re-derivation, proposes `grant-reach` or `revoke-reach` Events on affected content EPRs (Gap 10 in Part D), closing the loop between social feedback and content visibility.
+- **Forget-request routing** (`rights-stewardship-elohim`): receives `signal_kind: "forget-request"` (declared in the `elohim` pillar manifest under `signalKinds`), evaluates against the subject's standing and mishpat constitutional constraints, and authors or withholds the `attestation:forget-decision` EPR.
+
+What humans alone cannot do at care-economy scale: evaluate 500 signals/user/day across hundreds of millions of users for manipulation patterns, evidence quality, and appropriate reach-mutation recommendations. **This is the value-prop unlock**: a social network where standing is earned and manipulation is expensive — not because a platform enforces it centrally, but because the substrate's social nervous system is elohim-mediated at scale.
+
+### 8. Scale: household → hub → global
+
+- **Local DHT (household elohim-node)**: signal footprint = signals authored + signals on content in reach scope. At 500 signals/day, a household node holds ~180k signals/year in SQL — manageable. DHT budget pressure emerges after ~six months of heavy use; standing-curve cost distribution and aggregate subordination are the release valves.
+- **Hub (collective elohim-node)**: holds signals for content in the collective's reach scope. A 200-member qahal with active discussion (~50 signals/member/day) generates ~10k signals/day; the hub's SQL projection is the aggregation surface for collective-level standing curves and community moderation dashboards. Hub does NOT replicate every member's personal signals — only signals in collective reach scope.
+- **Global**: only signals whose `target_cid` is a commons-attested EPR federate to the global DHT neighborhood. Personal post endorsements stay in the poster's reach cluster; commons-level corrections federate globally. This scope-gating prevents billions of likes from overwhelming the global DHT.
+
+The scaling discipline: `signal_kind` extensibility means new social vocabulary never spawns new DHT entry types. New `react-emoji`, `tag-person`, `bookmark` kinds all land as SIGNAL_KINDS whitelist additions + manifest declarations. The DNA entry count is precious; the social vocabulary is open.
+
+### 9. Limit-awareness / capture prevention
+
+- **Whitelist-gated vocabulary**: `SIGNAL_KINDS` and `STANDING_IMPACTS` constants in `content_store_integrity/src/feedback_signal.rs` are the floor; a new kind requires protocol-schema amendment + whitelist update + manifest declaration — three independent gates against arbitrary vocabulary proliferation
+- **Squelch is advisory-only**: Floor 3 prevents squelch from being weaponized as a standing-debit instrument; squelch is steward discretion, not a weapon
+- **Correction requires evidence**: Floor 4 prevents bare-assertion corrections from reaching DHT; coordinated false-correction attacks must produce entire chains of fake Correction EPRs, each facing validator quorum
+- **No-self-vouch** (coordinator-level; deferred from HDI because `must_get_valid_record` requires HDK): prevents standing-farm-by-self-endorsement
+- **Standing-curve friction-gradient**: agents who author many `debit-firm` quarantines face standing depletion if signals are subsequently retracted or vouched-against, making coordinated quarantine attacks self-limiting — friction-gradient limitarianism embedded in signal economics
+- **Care-class / compute-class isolation**: `standing_impact` values are strictly care-class primitives — they affect content standing and reach, never compute-tier breach signals; the `signal_kind` whitelist is the enforcement surface for this invariant (`project_compute_commitments_bounded`)
+
+### 10. Network resilience
+
+- **DHT shard redundancy**: every FeedbackSignal entry is replicated to ~10 neighborhood peers; cannot be silently deleted by any single peer
+- **T1 wire redundancy**: `EprFanOutCtx` fan-out (predecessor peer + reach-topic gossip) ensures signals authored during a DHT write delay still reach operational projections on neighboring peers before DHT confirms
+- **Partition recovery**: cursor-tracked libp2p sync on the EPR-atom plane ensures signals authored during a partition re-propagate on reconnect; `dht_anchor_hash` lets the SQL projection detect and fill gaps
+- **Cold-archive path for signal-dense streams**: high-signal EPRs can have historical signal streams subordinated under Signal-Aggregate Commitments (custody-quilt, tier_floor=shelved); individual signals are K-of-N recoverable from quilt
+- **Doorway projection**: web2 consumers receive accumulated standing scores and signal-density counts as read-optimized SQL views; individual signals are not replicated to doorway — only their aggregate effect on the standing curve
+
+### 11. Dashboard worked example (preview)
+
+In the Meta / Facebook substrate-native application (`applications/meta-facebook-application-design.md`), the FeedbackSignal is the primary social-move primitive across six surfaces simultaneously:
+
+| Social act | FeedbackSignal shape |
+|---|---|
+| Like / endorse on a post | `signal_kind: "endorse"`, `standing_impact: "advisory"` |
+| Comment on a post | `signal_kind: "comment"`, `standing_impact: "advisory"` — comment body is a child Post EPR; the FeedbackSignal links them |
+| Reaction (😂, 🔥, ❤️) | `signal_kind: "react"`, reaction-type in metadata, `standing_impact: "advisory"` |
+| Report a post | `signal_kind: "report"`, `standing_impact: "debit-soft"` — escalates to qahal governance |
+| Moderation quarantine | `signal_kind: "quarantine"`, `standing_impact: "debit-firm"` — requires mishpat/qahal authorization |
+| Vouch for a correction | `signal_kind: "vouch"`, `vouch_kind: "accept-correction"` — standing recovery for the corrected author |
+
+The feed-ranking query for a user's home feed:
+
+```sql
+-- Ranked post feed: posts in reach scope, ordered by earned standing + signal density
+SELECT
+    e.id,
+    e.title,
+    e.created_at,
+    COUNT(DISTINCT fs.id)            AS signal_density,
+    SUM(CASE WHEN fs.standing_impact = 'debit-firm' THEN -3
+             WHEN fs.standing_impact = 'debit-soft' THEN -1
+             ELSE 1 END)             AS net_standing_weight,
+    ss.standing_score                AS author_standing
+FROM content e
+JOIN standing_scores ss ON ss.agent_pubkey = e.author_pubkey
+LEFT JOIN feedback_signals fs ON fs.target_cid = e.cid
+    AND fs.signal_kind IN ('endorse', 'react', 'vouch')
+WHERE e.content_type = 'post'
+  AND e.reach_scope IN ('community', 'commons')
+  AND e.app_id = ?
+GROUP BY e.id
+ORDER BY (author_standing * 0.4 + net_standing_weight * 0.4 + signal_density * 0.2) DESC,
+         e.created_at DESC
+LIMIT 100;
+```
+
+Ranking is by standing, not predicted engagement — the substrate's feed is anti-extractive by construction. Full composition walk in `applications/meta-facebook-application-design.md`. The Patreon archetype (`applications/patreon-application-design.md`) uses FeedbackSignals for patron-creator social acts within tier-gated communities; the R&O archetype (`applications/requests-offers-application-design.md`) uses FeedbackSignal `correction` and `vouch` signals to power the offer-quality reputation curve that makes cooperative commerce self-policing.
 
 ## A.8 Links (graph edges)
 
