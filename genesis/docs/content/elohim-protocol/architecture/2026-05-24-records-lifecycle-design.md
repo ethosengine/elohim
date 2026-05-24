@@ -852,7 +852,140 @@ Zero DHT reads at query time. Attestations stay agent-private until the family o
 
 ## A.8 Links (graph edges)
 
-> *Stubbed — full draft pending. Hyperscale analog: GraphQL edges; cheap, unbudgeted. Critical sub-sections: the elohim DNA LinkTypes enum and current usage; the NEW link types added by this spec (`EprToEvent`, `EprToResource` per Gap 1); the existing patterns (`AttestationToSubject`, `Coupling`, `Membership`, `Delegation`); how links carry the graph that EPRs project as nodes.*
+### 1. What it is
+
+A Link is a directed edge in the DHT graph — a Holochain `create_link` call that records a typed pointer from a source hash to a target entry hash, with an optional tag payload. Links are **not entries**: they carry no independent identity, they consume no EntryTypes budget, and their validator quorum is faster than entry creation because validators only check the edge relationship, not a payload schema. The `content_store_integrity` zome today holds **225 link type variants** in its `LinkTypes` enum (a `u8` discriminant — hard ceiling 256). Because links are cheap per instance, they are the connective tissue that makes EPRs, Events, Resources, Attestations, FeedbackSignals, and Commitments into a queryable graph rather than a collection of isolated notary records. Every DHT entry in the substrate becomes a node; every `create_link` call is a traversable edge. This spec adds two new link types via Part D.1 — `EprToEvent` and `EprToResource` — whose full specification lives there; this section explains the Links primitive holistically.
+
+### 2. Hyperscale analog
+
+**Think GraphQL edges with DHT notarization and a u8-typed discriminant.** In GraphQL, a field resolver traverses a typed edge: `Account → [Transaction]` is resolved by following a typed connection from one node to related nodes. DHT links carry the same shape — a typed edge from source hash to target hash, traversable by anyone with access to either endpoint. Unlike a GraphQL resolver (which hits a single master database), each DHT link is gossiped to a neighborhood of peers: the link is the proof that the connection exists, not just a query result. Unlike a foreign key (which assumes a master database), a DHT link survives peer churn because it is replicated across DHT neighbors. Unlike a relational join (which scans a table), DHT traversal follows content-addressed hashes — identity travels with bytes, not a server-vended row ID. The "cheap, unbudgeted" framing is precise: links cost one gossip write and consume zero EntryTypes budget. At 225 link types defined and a hard ceiling of 256, the **type budget** is not free in the long run, but each individual link **instance** is still far cheaper to author than an entry instance.
+
+### 3. Data flow
+
+```
+Author calls create_link(source_hash, target_hash, LinkType, tag)
+        │
+        ▼
+DHT validator quorum: link-type validation (O(log N) neighborhood)
+    - Is source_hash a valid anchor for this LinkType?
+    - Is the author permitted to create this edge?
+    - Is the tag payload well-formed?
+        │
+        ▼
+Link replicates to neighborhood peers (smaller payload than entries)
+        │
+        ▼
+post_commit signal → ReconcileController projects edge into SQL adjacency table
+        │
+        ▼
+SQL adjacency row written (e.g., epr_event_edges, attestation_subject_edges)
+        │
+        ▼
+Application queries traverse graph at zero network cost
+    e.g., SELECT events.* FROM economic_events e
+          JOIN epr_event_edges ee ON ee.event_id = e.id
+          WHERE ee.epr_id = $account_epr_id
+          ORDER BY e.has_point_in_time DESC;
+```
+
+After projection, traversal is pure SQL — **zero DHT calls at query time** for data within the local peer's reach scope.
+
+### 4. Physical storage
+
+| Layer | What lives there | Shape |
+|---|---|---|
+| **Source of truth** | Author's source-chain link record + DHT link neighborhood replicas | Holochain DHT `create_link` action |
+| **Operational copy** | SQL adjacency tables projected from post-commit signals | SQLite `*_edges` tables (e.g., `epr_event_edges`, `epr_resource_edges`, `attestation_subject_edges`) |
+| **Web2 projection** | Doorway SQL-over-HTTP query for unconnected clients | Same adjacency tables mirrored in doorway SQL projection |
+| **Tag payloads** | Small tag bytes in the DHT link record itself | ≤ 256 bytes typical; large evidence lives in iroh-blob, referenced by CID in the tag |
+
+The SQL adjacency projection is what enables graph queries at near-zero latency after initial sync. A fresh peer pulls DHT links via the libp2p sync plane and projects them into adjacency tables; from that point, graph traversal is local SQL with no network round-trips for reach-scope data.
+
+### 5. Gossip / sync layer
+
+- **DHT**: link payload ≈ 32 bytes source hash + 32 bytes target hash + 1 byte link type discriminant + optional tag (0–256 bytes typical). Gossip latency 200–2000 ms. **Faster validation than entries** — validators inspect the relationship semantics, not a field-by-field payload schema.
+- **libp2p sync plane**: link projections delta-sync to SQL adjacency tables via the same cursor model as entry projections — link-create signals project as edge-upserts; link-delete signals project as edge-removes. Sync rate matches the entry plane (Phase 11 SyncManagerBackend).
+- **iroh-blob**: links themselves never transit iroh-blob. A link tag may carry the CID of a blob (e.g., `AttestationToSubject` tag carrying `evidence_cid`), but blob bytes move independently over the iroh plane.
+- **Practical traversal cost post-projection**: any graph query against the local SQL is O(1) indexed lookup — the gossip cost was paid once at link-creation time.
+
+### 6. Provenance — maintained vs intentionally degraded
+
+**Maintained cryptographically forever:**
+- Author signature on the `create_link` action (unforgeable who created this edge and when)
+- Source and target hashes (both endpoints are CID-pinned at link-creation time; the relationship is content-addressed)
+- DHT validator quorum attestation (neighborhood peers witnessed edge creation)
+- Link type discriminant (structural semantics — `AttestationToSubject` vs `EventFulfillsCommitment` — are part of the notarized record)
+- Tag payload, if present (signed with the link; carries relationship-specific metadata)
+
+**Intentionally degraded (access cost, not truth):**
+- **When source EPR is subordinated**: links from the EPR don't independently gossip; traversal costs one extra hop through the parent's reach scope
+- **When source EPR is shelved**: the DHT link persists, but K-of-N quilt pull applies if the target entry is also cold-archived
+- **When source EPR is closed**: existing links remain queryable; validation rejects new link creation targeting the closed EPR
+- **Right-to-be-forgotten**: mishpat-governed link deletion removes an edge from new traversals; a redaction-applied marker preserves the structural provenance of the former relationship per the authorship-floor constitutional commitment
+
+The substrate's commitment is to **truth-verifiability, not free traversal forever.** A notarized edge cannot be falsified; the cost of traversing it scales with the lifecycle stage of its endpoints.
+
+### 7. Agentic intelligence at scale
+
+Where elohim cognition is load-bearing:
+
+- **Link authoring at care-economy frequency**: inventory-elohim, vehicle-elohim, care-stewardship-elohim author `EprToResource` and `EprToEvent` links that bind narrated events to their parent EPRs. Humans author at event-horizon scale (major purchases, life events); elohim authors the continuous connective tissue between them, building the traversable record of lived household experience.
+- **Link-type triage at the 256-cap**: when a new application pattern proposes a new link type, the governance-elohim (or rust-architect) evaluates: is this a genuinely structural DHT relationship or a query-time filter that belongs in SQL? The LINK_ARCHITECTURE.md triage rule — "if it exists only for queries, use projection" — becomes elohim-assisted at fleet scale. The governance-elohim can surface which link types have no validators depending on them and are projection-candidates for deprecation, reclaiming budget for new structural edges.
+- **Social graph traversal (Meta archetype)**: `RelationshipBySource`, `RelationshipByTarget`, and `RelationshipPendingConsent` links are created by the social-elohim when consent is mutual. Friends-of-friends traversal federates through reach-attested projections — each peer's local SQL holds their immediate graph; second-degree traversal is a federated query to neighboring nodes, not full-graph replication.
+- **Attestation chain traversal**: `AttestationToSubject` and `GovernanceActionChild` links are elohim-traversed to construct evidence chains for standing computation. Standing-elohim walks these edges to derive reach scores without human navigation at scale.
+
+**This is the value-prop unlock**: links are the edges that let elohim agents navigate substrate-native graphs at care-economy frequency, binding every household narration into a traversable record of lived experience.
+
+### 8. Scale: household → hub → global
+
+- **Local DHT (household elohim-node)**: a typical household has ~1k EPRs. With Gap 1 closed, each EPR accumulates ~10 Events and ~5 Resources over its lifetime — roughly 15k `EprToEvent`/`EprToResource` edge projections. Add ~5k `AttestationToSubject` and social-graph edges. Total household link projection: ~20k SQL adjacency rows ≈ 1–2 MB on disk. This is the in-reach-scope graph.
+- **Hub (collective elohim-node)**: holds collective-level EPR edges (shared assets, joint commitments) plus `AttestationToSubject` and `FeedbackSignal` links for member contributions. Does not replicate member household link graphs unless members elect commons-reach. Hub link set: ~50k rows for a medium collective (200 members × ~250 reach-elected links each).
+- **Global**: DHT replicates each link to ~10 peers. At 8B households × 20k links each, the aggregate DHT link volume is enormous — but each peer holds only its **reach-scope slice**, not the whole graph. Commons-reach links (public content, commons-attested resources) are the only links gossipped beyond reach scope. The link graph is naturally partitioned by reach scope; no single peer sees the whole graph.
+
+### 9. Limit-awareness / capture prevention
+
+- **u8 discriminant ceiling (256 types, 225 currently used)**: the 31 remaining link type slots are precious. Every new link type proposal must pass LINK_ARCHITECTURE.md triage: genuinely structural relationship vs. projection-candidate. The anti-pattern is "add a link type for each new query pattern" — that path exhausts the budget against a hard wall. The LINK_ARCHITECTURE.md explicitly lists ~50 `*By{Attribute}` variants as deprecation candidates; retiring those reclaims headroom for structural edges like `EprToEvent` and `EprToResource`.
+- **Validator quorum gates edge creation**: a link from source A to target B requires the creating agent to have structural standing to create that relationship. `AttestationToSubject` validators check issuer identity. `EventFulfillsCommitment` validators check event/commitment correlation. This prevents link-flood attacks where a malicious peer creates millions of spurious edges to overwhelm a link neighborhood.
+- **Reach-scoped traversal prevents graph harvesting**: query-time traversal is gated by local SQL reach scope. An attacker cannot request "give me all edges from all EPRs" — they see only the reach-scoped projection their standing permits.
+- **Link deletion is governance-mediated for structural relationships**: mishpat consent flows gate edge removal for accountability chains (REA fulfillment, attestation subjects). Ephemeral edges can be revoked by their author.
+- **No self-vouchable social edges**: the no-self-vouch invariant from FeedbackSignal extends structurally — `RelationshipWithCustody` links require mutual consent; agents cannot create structural custody-edges to themselves.
+
+### 10. Network resilience
+
+- **DHT shard-N redundancy**: each link replicates to ~10 neighborhood peers; recoverable from any one honest peer.
+- **Partition recovery**: links authored during a partition sit on the author's source chain; they gossip to the DHT and project into SQL adjacency tables once connectivity resumes. The libp2p sync plane's cursor model handles link-create backfill across the partition gap.
+- **Cold-archive survival**: links survive even when their target entries are shelved to the quilt. The link is the navigation handle that enables surface re-elevation; without the DHT link, re-elevation would require a full DHT scan by hash rather than a link-traversal lookup.
+- **Doorway projection for unconnected clients**: doorway mirrors the SQL adjacency tables. Browser clients traverse graph results via REST without running a Holochain conductor; link provenance (author + quorum) is surfaced in responses for clients that need to verify.
+
+### 11. Dashboard worked example
+
+**Monarch/Mint personal-finance dashboard — account→event→resource traversal:**
+
+The household opens their finance dashboard. The shefa pillar renders current balances, recent transactions, and category spending. Each view is a graph traversal over link-projected adjacency tables:
+
+```sql
+-- Account EPR → its Events (requires EprToEvent link type per Gap 1 / Part D.1)
+SELECT e.id, e.action, e.resource_quantity_value, e.has_point_in_time
+FROM economic_events e
+JOIN epr_event_edges ee ON ee.event_id = e.id
+WHERE ee.epr_id = $account_epr_id
+  AND e.has_point_in_time >= date('now', '-30 days')
+ORDER BY e.has_point_in_time DESC;
+
+-- Account EPR → its current Resources (balances and holdings)
+SELECT r.id, r.name, r.accounting_quantity_value, r.accounting_quantity_unit
+FROM economic_resources r
+JOIN epr_resource_edges er ON er.resource_id = r.id
+WHERE er.epr_id = $account_epr_id;
+```
+
+Both queries are pure SQL after sync — zero DHT calls at render time. The `epr_event_edges` and `epr_resource_edges` adjacency tables are projected from `EprToEvent` and `EprToResource` link-create signals via the ReconcileController. Full composition in `applications/mint-monarch-application-design.md`.
+
+**Meta/Facebook social-graph traversal**: `RelationshipBySource` and `RelationshipByTarget` links enable friend-graph queries powering the feed. Each user's local SQL holds their immediate connection graph; second-degree traversal federates via reach-attested peer projections. Full pattern in `applications/meta-facebook-application-design.md`.
+
+**Google Drive folder→document traversal**: `parent_epr_cid` on a document EPR is a declarative field encoding parentage; the `EprToResource` link (or analogous folder-content edge) is what projects into a SQL adjacency table and enables efficient `SELECT * WHERE parent_epr_cid = $folder_id` queries at render time. Drive-shape folder trees emerge from EPR link hierarchies. Full pattern in `applications/google-drive-application-design.md`.
+
+The architectural distinction is this: **`parent_epr_cid` is a content-addressed field that declares a relationship; the `EprToEvent`/`EprToResource` links are the gossiped edges that project that relationship into traversable SQL adjacency tables.** Both are necessary; neither alone is sufficient. Fields encode; links enable traversal.
 
 ---
 
