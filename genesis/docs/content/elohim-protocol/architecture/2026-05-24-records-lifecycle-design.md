@@ -446,7 +446,149 @@ Both queries run against the local Diesel SQL projection — zero network calls 
 
 ## A.4 Observation
 
-> *Stubbed — full draft pending. This section is **largely a citation** of 2026-05-11-observation-event-layer-design.md. Hyperscale analog: Splunk / structured-log stream with retention classes. Critical sub-sections to integrate from the cited spec: the ephemeral nature (libp2p + iroh-blob, never DHT); the diversity-tagging model; the graduation paths (Path 1: Attestation; Path 2: summary Event); the retention-class table (operational 7d, contextual 30d, archival 90d, wisdom indefinite); the "witness, not surveillance" constitutional posture.*
+> **Canonical spec**: `genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md`. This section is a digested citation — the 11 sub-sections are answered concisely, pointing to the canonical for depth. Amend the canonical and update this citation; do not re-derive the design here.
+
+### 1. What it is
+
+Per the canonical Observation spec (§3), an Observation is ephemeral peer-witnessed evidence on the Track 2 substrate data plane — never a DHT entry. A single `Observation` struct (`observer_cid`, `log_cid`, `log_offset`, `observation_kind`, `subject_cid`, `payload_json`, inline diversity tags, `signature`) carries all raw evidence: doorway heartbeats, card-swipes, content-views, mastery-check results, blob-served ticks. It lives in an observer-controlled iroh-blob append-only log; cursor announcements gossip via libp2p gossipsub; subscribed receivers pull segments via ALPN. Individual Observations are designed to dissolve — their life-span ends when their retention class expires or their evidence has been cited in a graduated artifact on the DHT. The records lifecycle uses Observations as the feed that graduation evaluators crystallize into Events and Attestations, making care-economy authorship tractable at human scale.
+
+### 2. Hyperscale analog
+
+Think Splunk's structured log stream plus Kafka's topic-subscription model, with S3-shaped content-addressed append-only log storage behind it — but ephemeral by design and graduated by policy rather than retained forever. Like Splunk, Observations have `observation_kind` namespaces, retention classes, and aggregation queries. Like Kafka, each `kind_namespace` is a topic; peers subscribe by role. Unlike either: there is no central log server — each observer owns their iroh-blob log; gossip is cursor-only (~200 bytes); bytes mobilize via pull-fetch. The surveillance capitalism anti-pattern is structural: the log cannot be read by anyone not subscribed to the gossip topic, and reach gates both subscription and graduation. See canonical spec §5 for the complete wire protocol and §7.2 for the retention-class table.
+
+### 3. Data flow
+
+```
+Observer (human, elohim, or bridge-stewardship-elohim) signs and appends row
+    to local iroh-blob log (BLAKE3-chunked; root advances to new log_cid)
+        │
+        ▼
+Cursor announcement gossiped (~200 bytes) via libp2p gossipsub
+    topic: elohim/observations/<kind_namespace>
+        │
+        ▼ (peers subscribed to the topic per role policy)
+Subscribed peer pull-fetches new log segment via iroh-blob / libp2p ALPN
+    verifies BLAKE3 integrity + per-row observer signature
+    projects rows to local `observations` table
+        │
+        ▼
+Graduation evaluator (per-pillar tokio task) polls `observation_diversity_summary`
+        │
+        ├── Path 1: diversity threshold met →
+        │       issues Attestation (Content + content_type: "attestation:<subtype>") on DHT
+        │       populates metadata.evidence_json.observation_refs with iroh:// tuples
+        │
+        └── Path 2: summarize policy →
+                issues summary EconomicEvent on DHT
+                (one entry replaces O(1000) raw observations; observation_refs attached)
+
+Application queries read graduated Events / Attestations.
+Audit-replay re-fetches iroh-blob segments via observation_refs.
+```
+
+See canonical spec §5 (three substrate moves per observation) and §8 (graduation paths) for per-step detail.
+
+### 4. Physical storage
+
+| Layer | What lives there | Shape |
+|---|---|---|
+| **Source of truth** | Observer's iroh-blob append-only log; `log_cid` is the BLAKE3 Merkle root; advances per append | iroh-blob store (local to observer node) |
+| **Operational copy** | SQL `observations` table on subscribed peers | PK: `(observer_cid, log_cid, log_offset)`; indexes on `(subject_cid, observation_kind, observed_at)` and `(observer_cid, seq)`; see canonical spec §4.4 |
+| **Cursor index** | `observation_cursors` table per `(observer_cid, viewer_peer_id)` | SQL — `last_projected_offset`, `last_seen_at`; drives partition recovery |
+| **Diversity summary** | `observation_diversity_summary` materialized view | SQL — `COUNT(DISTINCT observer_household_cid)` etc. per `(subject_cid, observation_kind)`; see canonical spec §6.2 |
+| **Web2 projection** | Doorway SSR serves diversity summaries for civic legibility (Track 4) | Redis-shape query cache; reach-bounded by subject EPR's scope |
+| **Graduated artifacts** | Events and Attestations that cite observations | DHT (notarized) — separate primitives (A.2 and A.6); Observation primitive has no DHT footprint of its own |
+
+`FeedbackSignal` is the documented edge case that lands on DHT for reach-coupling; raw Observations never do. See canonical spec §3 (the architectural cut table) and records-lifecycle §2 (the primitives table).
+
+### 5. Gossip / sync layer
+
+Per canonical spec §5.1 and §5.2: three moves per Observation — (1) append to local iroh-log, (2) gossip cursor ~200 bytes, (3) pull-fetch segment on demand. The cursor announcement carries `observer_cid`, `kind`, `log_cid`, `latest_offset`, optional `subject_cid`, and a time window. Receivers pull only when they care; bytes do not fan out to all subscribers.
+
+- **Cursor gossip**: ~200 bytes per tick; high-frequency-tolerable under gossipsub flow control
+- **Segment fetch**: delta only — `(last_projected_offset .. latest_offset)`; BLAKE3-verified; O(KB) per sync cycle per observer per subscriber
+- **Backpressure**: receivers self-prioritize by retention class — `wisdom` keeps flowing; pure `operational` degrades first (canonical spec §5.6)
+- **DHT write pressure**: zero — Observations do not consume the ~3000 entry/peer DHT budget; only graduated artifacts do
+
+### 6. Provenance — maintained vs intentionally degraded
+
+**Maintained cryptographically forever:**
+- Per-row observer signature (every row signed; auditor can re-verify at any time via iroh-blob fetch)
+- BLAKE3-chunked iroh-log integrity (`log_cid` is the Merkle root; chunks independently verifiable)
+- `iroh://<observer_cid>@<log_cid>#<offset>` reference tuples cited in Attestation `evidence_json.observation_refs` — the durable audit-replay anchor
+- Inline diversity dimensions recorded at write (`observer_household_cid`, `observer_collective_cid`, `observer_region`, `observer_archetype`, `observer_compute_class`)
+
+**Intentionally degraded (access cost, not truth):**
+- `operational` class: iroh-log pruned after graduation window closes; 7-day SQL hot; 90-day SQL summarized; raw payload gone
+- `contextual` class: 30-day SQL hot; log retained; SQL trimmed at consolidation event
+- `attestation-feeding` rows: retained until the citing Attestation is itself superseded or redacted
+- Right-to-be-forgotten: iroh-log publishes a redacted root (root-rewrite via mishpat governance); downstream Attestations carry `redaction-applied` in `metadata.revocation`; the decision is itself a public `attestation:forget-decision` (canonical spec §9.4)
+
+The substrate's commitment is truth-verifiability, not free-access-forever. The `iroh://` audit reference is forever; cost of re-verification scales with retention class.
+
+### 7. Agentic intelligence at scale
+
+Per canonical spec §8 (graduation paths) and the observer-protocol's "ephemeral witness in service of flourishing":
+
+The graduation evaluator (per-pillar tokio task inside elohim-storage) is elohim cognition that is genuinely load-bearing — humans cannot synthesize 1000:1 evidence ratios. The `infrastructure:blob-served` graduation example (canonical spec §8.2) replaces 1,247 raw Observations with one summary EconomicEvent. For personal finance, `shefa:card-swipe` observations graduate to transfer Events 1:1 (high-signal evidence); for community infrastructure, `infrastructure:doorway-heartbeat` observations graduate to `attestation:doorway-health` only when 3+ households across 2+ regions concur.
+
+**Stewardship-elohim** authors bridge Observations (Plaid card-swipe, Stripe commerce) under its signature so households get automated evidence without raw data leaving the node. **Care-stewardship-elohim** authors `shefa:caregiving-hour` observations from household rhythms — graduation evaluators crystallize these into REA Events that make care work legible to the household's economic picture. Without this elohim layer, the care economy remains invisible to the substrate; with it, **the protocol can scale love and care.**
+
+### 8. Scale: household → hub → global
+
+Per canonical spec §5.3 (subscription matrix) and §7.2 (retention classes):
+
+- **Local DHT (household elohim-node)**: holds SQL projections of subscribed `observation_kind` namespaces relevant to its custodial role. Typical footprint: ~50k rows × ~500 bytes ≈ ~25 MB hot SQL, pruned to ~5 MB after 7-day `operational` window. Zero DHT entries — the Observation primitive does not consume the ~3000 entry/peer budget.
+- **Hub (collective elohim-node)**: subscribes to `infrastructure` + pillar namespaces across its membership. Holds diversity summaries across member households; does NOT replicate raw member Observations — per `project_node_metrics_vs_hub_aggregation_boundary`, per-node metrics stay per-node; hub aggregates. Runs the cross-household graduation evaluators (doorway-health attestations requiring 3+ households) that cannot be satisfied from a single household's observations.
+- **Global**: Observations never reach the global DHT. Only graduated artifacts (Attestations, summary Events) federate at commons-attested reach — with `iroh://` audit-replay paths attached, not raw payloads. An Ophanim peer (high-diversity volunteer witness hub per observer-protocol Part II) subscribes to all `kind_namespace` topics to raise diversity threshold satisfaction; it does not centralize data.
+
+### 9. Limit-awareness / capture prevention
+
+Per canonical spec §9.1 (what observers cannot do) and the `observer-protocol.md` constitutional safeguards:
+
+- **No privileged read path**: observation consumers are equal peers; subscriptions governed by `peer_transport_manifest` role policy; no single actor has a special endpoint for all observations
+- **Physical privacy switches** (observer-protocol Part I): the substrate has no path to compel observation — an observer not running emits no cursors; absence is detectable but content is not inferrable
+- **Reach as earned at kind level**: `observation_kind` reach is manifest-declared; manifest amendments go through governance (DHT-notarized); no operator can unilaterally elevate an `agent-private` kind to `commons`
+- **Diversity thresholds prevent monoculture capture**: graduation requires distinct households, collectives, and regions; a single actor controlling many agent keys cannot satisfy the household-diversity threshold (canonical spec §6.1 anti-Sybil weighting)
+- **Forget as governed, not silent**: right-to-be-forgotten flows through mishpat governance; the decision is itself a public Attestation explaining what was done and why (canonical spec §9.4)
+
+### 10. Network resilience
+
+Per canonical spec §5.5 (cursor tracking) and §5.7 (partition handling):
+
+- **Partition recovery**: on reconnect, a peer reads its `observation_cursors`, polls gossip for current announcements, computes the delta, and pulls iroh-segments — no special recovery protocol; the cursor model handles it deterministically
+- **Observer-log redundancy**: the iroh-blob log is content-addressed; any peer that fetched a segment before pruning retains a verifiable copy; graduation evaluators hold `attestation-feeding` rows until the citing Attestation is issued
+- **Doorway projection**: Track 4 doorway serves `observation_diversity_summary` views for civic legibility per the Public Observer epic — the unconnected (browser, no P2P peer) reads aggregated summaries without access to raw observations
+- **Gossip backpressure**: under sustained load, gossipsub flow control limits cursor frequency; the iroh-log is the buffer; receivers can lag and catch up without causality breaks
+- **DHT independence**: the Observation plane is fully decoupled from DHT health — a DHT partition halts only the graduation of new Attestations and summary Events, not ongoing observation collection
+
+### 11. Dashboard worked example
+
+In `applications/meta-facebook-application-design.md`, posts receive engagement — views, reactions, comments. Before becoming social moves (`FeedbackSignal`), these are `imagodei:content-viewed` Observations. The feed-ranking query uses the diversity summary rather than raw engagement counts:
+
+```sql
+-- Feed ranking: reach-breadth over engagement-optimization
+SELECT
+    e.id                          AS post_epr_cid,
+    e.content                     AS post_preview,
+    ods.distinct_households       AS social_reach_breadth,
+    ods.distinct_collectives      AS collective_breadth,
+    COUNT(fs.id)                  AS feedback_signal_count
+FROM eprs e
+LEFT JOIN observation_diversity_summary ods
+    ON ods.subject_cid = e.id
+    AND ods.observation_kind = 'imagodei:content-viewed'
+LEFT JOIN feedback_signals fs
+    ON fs.target_cid = e.id
+WHERE e.content_type = 'post'
+  AND e.reach IN ('community', 'commons')
+ORDER BY ods.distinct_households DESC, feedback_signal_count DESC
+LIMIT 50;
+```
+
+`distinct_households` is organic reach-breadth — how many distinct households found this worth engaging with, not predicted-attention. Raw view counts are `operational`-class and prune after 7 days; what persists is the diversity summary and `FeedbackSignal` DHT entries that earned reach-coupling. Per `meta-facebook-application-design.md`, the feed ranks by standing + recency + signal-density, not by predicted-attention — this is how the substrate delivers Facebook-shape without engagement-optimization extraction.
+
+For the mint-monarch archetype: grandma's coffee-shop transaction begins as a `shefa:card-swipe` Observation on the libp2p plane, graduates to a `transfer` Event on the DHT within the graduation window, and renders in the Monarch dashboard as a SQL row — zero DHT footprint for the raw observation, one ~2 KB DHT entry for the graduated Event, and an `iroh://` audit trail anchoring both. See `applications/mint-monarch-application-design.md` §"How one transaction flows" for the step-by-step.
 
 ## A.5 Commitment
 
