@@ -15,6 +15,13 @@
  *   - steward (fetches hApp for desktop builds)
  *
  * Direct webhook triggers are ignored - use orchestrator or manual trigger.
+ *
+ * Sweettest stage W3+W5 active (2026-05-24): the cargo nextest invocation
+ * inside `script {}` is replaced by `cargo nextest archive` + 4-way
+ * distributed test shards via podTemplate-allocated runners. See helpers
+ * `SWEETTEST_SHARD_COUNT` + `runSweettestShard()` above `pipeline {}`.
+ * Per-DNA filter from CHANGED_PATHS (orchestrator passthrough, W2)
+ * harvested by `tests/sweettest/scripts/build-nextest-filter.sh`.
  */
 
 // ============================================================================
