@@ -1351,14 +1351,166 @@ A skeptical systems architect should land in `applications/` and find each arche
 
 > *Stubbed — full draft pending. Each gap gets its own subsection with: motivation, design (entry types, link types, fields, coordinator functions, validation rules), manifest declarations, migration story, and test surface. Each subsection names the **specific code surfaces it touches** so the spec→code graph is walkable from any gap.*
 
-### D.1 Subordination architecture (Gaps 1+2: `EprToEvent` / `EprToResource` link types + `parent_epr_cid` field)
+### D.1 Subordination Architecture (Gaps 1+2: `EprToEvent` / `EprToResource` link types + `parent_epr_cid` field) — Wave B
+
+**Motivation.** Subordinate Events and Resources need a parent EPR so their custody and gossip cost shed under the parent's reach scope. Today, every EconomicEvent and EconomicResource lives at the top level — they're not structurally bound to the EPR whose state they represent. Without subordination:
+
+- A Monarch dashboard rendering "events under this account" requires querying all Events whose `provider` or `receiver` matches the account agent — slow + ambiguous (events touch many agents)
+- A household-inventory's couches don't know they belong to the household — every Resource is structurally peer with every other Resource at the same reach scope
+- Cold-archive of a parent EPR can't sweep its children efficiently — no link to traverse
+- Field-encoded relationships (`provider`, `receiver`) are queryable but not gossiped as edges — projection-lag means a fresh peer sees the field but not the structural binding
+
+The substrate's first-class graph pattern (per `project_first_class_graph_pattern`) treats EPRs as nodes and Couplings/Memberships/Delegations as edges. Subordination needs to be one of those edge types.
+
+**Design — field + link + adjacency table as a triple.** Phase 1 A.8 surfaced that any single one of these is incomplete:
+
+- Field alone: declarative but unqueryable without projection; projection-lag = silent missed subordinates during fresh-peer cold reads
+- Link alone: traversable but doesn't survive entry-content rehydration without the SQL projection
+- Adjacency table alone: queryable but disconnected from DHT truth — drift risk if the projection isn't synchronized
+
+So all three ship together as the subordination primitive:
+
+**Field on entry struct.**
+```rust
+// elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs
+pub struct EconomicEvent {
+    // ... existing fields ...
+    pub parent_epr_cid: Option<String>,  // NEW — Option for backward-compatibility
+}
+
+pub struct EconomicResource {
+    // ... existing fields ...
+    pub parent_epr_cid: Option<String>,  // NEW — same shape
+}
+```
+
+`Option<String>` permits existing parentless entries to continue functioning; new subordinate Events/Resources set the field at creation.
+
+**Link types on DHT.**
+```rust
+pub enum LinkTypes {
+    // ... existing variants ...
+    EprToEvent,         // NEW — parent EPR → child Event
+    EprToResource,      // RENAMED IN PLACE from ContentToResource (zero callers confirmed)
+}
+```
+
+The `EprToResource` rename in place resolves the overlap Phase 1 A.8 flagged between the proposed `EprToResource` and the existing `ContentToResource` — same semantic, cleaner name. Caller spot-check confirmed zero call sites of `LinkTypes::ContentToResource` outside the enum declaration; no migration cost.
+
+**SQL adjacency tables (Diesel migration).**
+```sql
+-- elohim/elohim-storage/migrations/<date>-epr-adjacency-tables/up.sql
+CREATE TABLE epr_event_edges (
+    parent_epr_cid TEXT NOT NULL,
+    child_event_cid TEXT NOT NULL,
+    edge_created_at TEXT NOT NULL,
+    PRIMARY KEY (parent_epr_cid, child_event_cid)
+);
+CREATE INDEX idx_epr_event_edges_parent ON epr_event_edges(parent_epr_cid, edge_created_at);
+
+CREATE TABLE epr_resource_edges (
+    parent_epr_cid TEXT NOT NULL,
+    child_resource_cid TEXT NOT NULL,
+    edge_created_at TEXT NOT NULL,
+    PRIMARY KEY (parent_epr_cid, child_resource_cid)
+);
+CREATE INDEX idx_epr_resource_edges_parent ON epr_resource_edges(parent_epr_cid, edge_created_at);
+```
+
+The ReconcileController projects `EprToEvent` / `EprToResource` link-create signals into these adjacency rows. This is the **canonical projection target for one-shot parent-child lookups** (per operator decision B-2 bifurcation): Diesel adjacency tables for shallow queries; CozoDB `graph_views/` module for multi-hop graph walks.
+
+**Canonical projection target rules (per B-2 bifurcation):**
+
+| Query shape | Projection target | Rationale |
+|---|---|---|
+| List children of one parent (1-hop) | Diesel `epr_*_edges` table | Single-index lookup; SQLite-fast |
+| Multi-hop traversal (friend-of-friend; ancestor chain) | CozoDB `graph_views/` | Graph-native query; richer composition |
+| Aggregation across children (sum balances) | Diesel adjacency + JOIN against `economic_*` tables | Standard SQL pattern |
+| Pattern detection (find cycles, dense subgraphs) | CozoDB | Graph-native is the right tool |
+
+D.1 declares the rule in spec; D.6 (elohim-authoring pattern) wires the projector accordingly; the application archetypes (Wave 2) use whichever target matches their query shape.
+
+**Coordinator functions.**
+```rust
+// elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+
+create_event_under_epr(parent_epr_cid: Cid, event_data: EconomicEvent)
+  // 1. Validate parent EPR exists and is not in `closed` lifecycle_state (D.7 interlock)
+  // 2. Validate authoring agent has Membership in parent's custody scope
+  // 3. Create EconomicEvent entry with parent_epr_cid set
+  // 4. Create EprToEvent link from parent → event
+  // 5. ReconcileController projects into epr_event_edges
+
+create_resource_under_epr(parent_epr_cid: Cid, resource_data: EconomicResource)
+  // Same shape; EprToResource link; epr_resource_edges projection
+```
+
+**Validation rules (integrity zome).**
+
+- `EprToEvent` / `EprToResource` link creation rejected when parent EPR has `lifecycle_state = "closed"` (D.7 interlock — closed EPRs cannot accept new subordinates)
+- Link creation rejected when authoring agent has no Membership in parent's custody scope (configurable per pillar manifest — some pillars allow public child creation under a public-collective parent; defaults to "custody-required")
+- Field `parent_epr_cid` validated as a valid Cid format at write time
+- `EprToResource` (renamed from `ContentToResource`) inherits any prior validation rules from the renamed variant
+
+**Manifest declaration.** Each pillar manifest declares which `content_type` parent EPRs accept which subordinate Event/Resource shapes:
+
+```jsonc
+// elohim/sdk/domains/shefa/manifest.json
+{
+  "subordination_rules": [
+    {
+      "parent_content_type": "household",
+      "accepts_event_actions": ["transfer", "checkpoint", "close-account"],
+      "accepts_resource_classifications": ["currency-USD", "currency-community"]
+    },
+    {
+      "parent_content_type": "household-inventory",
+      "accepts_event_actions": ["receive", "transfer", "transform", "dispose"],
+      "accepts_resource_classifications": ["furniture", "vehicle", "tool", "digital-media", "stewarded-physical"]
+    }
+  ]
+}
+```
+
+D.10's vocabulary governance gate validates that referenced content_types, action verbs, and resource_classifications are all declared elsewhere in the manifest.
+
+**Query patterns** (representative — shapes the application archetypes use):
+
+```sql
+-- One-shot: list events under an account (Monarch dashboard)
+SELECT e.* FROM economic_events e
+JOIN epr_event_edges ed ON ed.child_event_cid = e.cid
+WHERE ed.parent_epr_cid = :account_cid
+ORDER BY e.observed_at DESC LIMIT 50;
+
+-- One-shot: list resources under household-inventory (Monarch "my stuff")
+SELECT r.* FROM economic_resources r
+JOIN epr_resource_edges ed ON ed.child_resource_cid = r.cid
+WHERE ed.parent_epr_cid = :inventory_cid;
+```
+
+```cozo
+// Multi-hop: traverse the household-inventory hierarchy for cold archive sweep
+?[parent, descendant] :=
+    *epr_resource_edges[root, descendant], root = $household_cid;
+*epr_resource_edges[descendant, deeper] => ?[descendant, deeper]
+```
+
+**Migration.** Pre-launch hard cutover; no shim. Existing parentless Events and Resources keep `parent_epr_cid: None` and continue functioning. New Events and Resources can set the field at creation. ReconcileController backfills `epr_*_edges` tables from existing entries on first run (one-time scan).
 
 **Touches:**
-- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — add to `LinkTypes` enum (`EprToEvent`, `EprToResource`); add `parent_epr_cid: Option<String>` field to `EconomicEvent` and `EconomicResource` structs
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — add to `LinkTypes` enum (`EprToEvent`); rename `ContentToResource` → `EprToResource` (zero callers); add `parent_epr_cid: Option<String>` field to `EconomicEvent` + `EconomicResource` structs
 - `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — new coordinator functions `create_event_under_epr`, `create_resource_under_epr`
-- `elohim/elohim-storage/src/views.rs` — extend Event and Resource view types with `parent_epr_cid`
-- `elohim/sdk/schemas/v1/views/economic-event-view.schema.json`, `economic-resource-view.schema.json` — add field
-- `elohim/sdk/domains/*/manifest.json` — declare which content_types accept subordinate Events/Resources
+- `elohim/elohim-storage/migrations/<date>-epr-adjacency-tables/up.sql` — **new Diesel migration** creating `epr_event_edges` + `epr_resource_edges` tables with indices on parent_epr_cid
+- `elohim/elohim-storage/src/services/reconcile_controller.rs` — project `EprToEvent` / `EprToResource` link-create signals into adjacency tables
+- `elohim/elohim-storage/src/graph_views/{shefa,lamad,...}.rs` — CozoDB graph-view builders for multi-hop traversals (per B-2 bifurcation)
+- `elohim/elohim-storage/src/views.rs` — extend `EconomicEventView` + `EconomicResourceView` with `parent_epr_cid: Option<String>` field
+- `elohim/sdk/schemas/v1/views/economic-event-view.schema.json` — add `parent_epr_cid` field
+- `elohim/sdk/schemas/v1/views/economic-resource-view.schema.json` — add `parent_epr_cid` field (this schema authored in D.13)
+- `elohim/sdk/domains/*/manifest.json` — `subordination_rules` section per pillar (validated by D.10's gate)
+- `elohim/holochain/dna/LINK_ARCHITECTURE.md` — note the `ContentToResource → EprToResource` rename in the link-type history
+
+---
 
 ### D.2 Surface (re-elevation) operation (Gap 3)
 
@@ -1374,13 +1526,103 @@ A skeptical systems architect should land in `applications/` and find each arche
 - `elohim/sdk/domains/elohim/manifest.json` — canonical `custody-quilt` action verb with `tier_floor` parameter
 - Retire parallel vocabularies in `2026-05-10-memory-lifecycle-design.md` and `2026-05-11-tiered-quilt-stewardship-design.md` (those specs get amendment notes pointing here)
 
-### D.4 EconomicResource consolidation (Gap 5)
+### D.4 EconomicResource Consolidation (Gap 5) — Wave B
+
+**Motivation.** The substrate currently has two distinct DHT entry types representing "resource with state": `EconomicResource` (REA canonical) and `StewardedResource` (added later for stewardship-specific tracking). Their fields overlap. REA discipline says one canonical type with classification-based variants — not parallel types. Phase 1 A.3 surfaced that consolidation is structurally clean *if* the migration sequence is right; doing it wrong has clear downstream consequences (capacity-planning, household-resilience, and node-stewardship dashboards all depend on `StewardedResource` fields).
+
+**Design — one canonical type with classification + field additions.** `StewardedResource` retires; its semantic surface folds into `EconomicResource` via two moves: (a) the `resource_classified_as` discrimination carries stewardship variants; (b) two fields that have no clean classification-mapping become first-class on `EconomicResource`.
+
+**Classification mapping (B-3 + B-4 reference field landings below).**
+
+| StewardedResource semantic | Lands as | Notes |
+|---|---|---|
+| Generic stewarded asset | `resource_classified_as: "stewarded-physical"` | Furniture, vehicles, tools |
+| Stewarded digital asset | `resource_classified_as: "stewarded-digital"` | Documents, photos, media |
+| Stewarded compute capacity | `resource_classified_as: "stewarded-compute"` | AWS-shape provider capacity declaration |
+| Stewarded space | `resource_classified_as: "stewarded-space"` | Storage, square footage |
+| Stewarded labor capacity | `resource_classified_as: "stewarded-care-hour"` | Caregiving time available |
+
+**Field additions on `EconomicResource` (B-3 + B-4 resolved per operator lean).**
+
+```rust
+// elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs
+pub struct EconomicResource {
+    // ... existing fields ...
+    pub parent_epr_cid: Option<String>,       // from D.1
+    pub governed_by: Option<String>,          // NEW — references collective governance handle (B-3)
+    pub data_quality: Option<DataQuality>,    // NEW — provenance signal for derived dashboards (B-4)
+}
+
+pub enum DataQuality {
+    Measured,   // sensor / instrumented source
+    Estimated,  // elohim-inferred from observations
+    Manual,     // human-entered
+    Mixed,      // mixed-provenance accumulated state
+}
+```
+
+**`governed_by` (B-3 resolution).** `Option<String>` referencing a Collective EPR's CID that holds governance authority over this Resource. When set, allocation Events on this Resource require Membership-attested authorship from within the governed collective. When unset, household-scope custody applies (default). The field preserves the `StewardedResource.governed_by` semantic for shared resources (energy pools, commons compute credits, joint household assets) without spawning a new substrate primitive.
+
+**`data_quality` (B-4 resolution).** `Option<DataQuality>` provenance signal for the current state. Set by the elohim-agent authoring the Resource based on observation_refs of the contributing Events (bridge-authored Events with `observation_refs` → `Measured`; manually entered → `Manual`; elohim-inferred without source observation → `Estimated`; accumulated state across mixed-provenance event history → `Mixed`). Monarch's data-confidence view reads this field directly to gray-out estimated values, badge bridge-authored balances, etc.
+
+**Field migration map (StewardedResource → EconomicResource).**
+
+| StewardedResource field | Lands at | Notes |
+|---|---|---|
+| `steward_id` | `primary_accountable` (existing) | semantic match |
+| `governed_by` | `governed_by` (NEW field B-3) | first-class preservation |
+| `data_quality` | `data_quality` (NEW field B-4) | first-class preservation |
+| `total_capacity_value` | **derived view** over event history | not stored — derived |
+| `total_allocated_value` | **derived view** over allocation Events | not stored — derived |
+| `total_used_value` | **derived view** over consumption Events | not stored — derived |
+| `available_value` | **derived view** (capacity − allocated − used) | not stored — derived |
+| `allocations_json` | **derived view** joining `epr_event_edges` against allocation Events | not stored — replaced by D.1 subordination + adjacency |
+| `recent_usage_json` | **derived view** over recent consumption Events with timestamp filter | not stored — derived |
+| `trends_json` | **derived view** with rolling window aggregation | not stored — derived |
+| `acquisition_event_id` | **derived view** — first receive/produce Event in history | not stored — derived |
+| `last_valuation_event_id` | **derived view** — most recent valuation/reclassification Event | not stored — derived |
+
+**Hard-cutover prerequisite — derived views must work before retirement.** Phase 1 A.3 flagged that Gap 5 is a migration landmine if the entry type is retired before the derived views replacing the computed fields are wired. The sequencing:
+
+1. Author derived-view services (`elohim/elohim-storage/src/services/resource_state_service.rs` planned) that produce the same surface the dashboards expected from `StewardedResource`
+2. Green-test the derived views against fixture data
+3. Migrate existing StewardedResource entries to EconomicResource (one-time Diesel migration with classification set per existing usage)
+4. Retire the `StewardedResource` entry type from the integrity zome enum
+5. Run `pnpm test` to verify capacity-planning + household-resilience + node-stewardship dashboards still pass
+
+Steps 1-2 are blocking prerequisites; step 4 cannot land before they're green.
+
+**Manifest declaration.** Pillar manifests declare which `resource_classified_as` values their pillar uses; D.10's vocabulary governance gate validates these against the EconomicResource classifications enum.
+
+```jsonc
+// elohim/sdk/domains/shefa/manifest.json
+{
+  "vocabulary_declarations": {
+    "resource_classifications": [
+      {"classification": "currency-USD", "stewardship_variant": false},
+      {"classification": "currency-community", "stewardship_variant": false},
+      {"classification": "stewarded-physical", "stewardship_variant": true},
+      {"classification": "stewarded-digital", "stewardship_variant": true},
+      {"classification": "stewarded-compute", "stewardship_variant": true}
+    ]
+  }
+}
+```
+
+**Budget win.** -1 variant from elohim DNA `EntryTypes` enum (StewardedResource retired). The reclaimed slot is available for future structural-type additions, partially offsetting D.1's two new link types and any future entry-type pressure.
+
+**Migration strategy.** Pre-launch hard cutover; no backwards-compat shim. All `StewardedResource` callers (capacity-planning service, household-resilience service, node-stewardship dashboard surfaces, content store coordinator) migrate to `EconomicResource` with appropriate classification + the new fields. Single Diesel migration drops the `stewarded_resources` projection table. One TS codegen pass refreshes types via `@elohim/storage-client`.
 
 **Touches:**
-- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — retire `StewardedResource` entry type; collapse its fields into `EconomicResource` via `resource_classified_as` discrimination
-- Migration scripts under `genesis/migrations/` — pre-launch hard cutover; no backwards-compat shim
-- Update all callers of `StewardedResource` to use `EconomicResource` with appropriate classification
-- Budget win: -1 variant in EntryTypes enum
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — retire `StewardedResource` entry type; add `governed_by` + `data_quality` fields to `EconomicResource`; add `DataQuality` enum
+- `elohim/elohim-storage/src/services/resource_state_service.rs` — **new service** providing derived views (capacity / allocated / used / available / allocations / recent_usage / trends) — **blocking prerequisite for entry-type retirement**
+- `elohim/elohim-storage/src/views.rs` — extend `EconomicResourceView` with `governed_by`, `data_quality`, `parent_epr_cid`; retire `StewardedResourceView`
+- `elohim/sdk/schemas/v1/views/economic-resource-view.schema.json` — add new fields (authored in D.13)
+- `elohim/elohim-storage/migrations/<date>-retire-stewarded-resource/up.sql` — drop `stewarded_resources` projection table; backfill `economic_resources` from prior `stewarded_resources` rows with classification set per row's usage pattern
+- `elohim/sdk/domains/{shefa,lamad,imagodei,qahal}/manifest.json` — declare stewardship-variant `resource_classifications`; validated by D.10's gate
+- All callers of `StewardedResource` (capacity-planning, household-resilience, node-stewardship dashboard, content_store coordinator) — migrate to `EconomicResource` with classification
+
+---
 
 ### D.5 Observation Spec Implementation Prerequisite (Gap 6) — Wave A prerequisite
 
@@ -1561,6 +1803,187 @@ The gate reads these declarations to validate surface consistency. The manifest 
 - `elohim/holochain/dna/LINK_ARCHITECTURE.md` — close deprecation checklist; update the 256-cap accounting
 - `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — coordinator functions that previously created `*By*` links: re-route to SQL projection upserts via ReconcileController
 - `elohim/elohim-storage/src/services/reconcile_controller.rs` — handle the SQL-projection upserts for queries that previously used `*By*` link traversal
+
+---
+
+### D.12 Checkpoint / Snapshot / Aggregate-Subordination Primitive (Gap 13) — Wave B
+
+**Motivation.** Phase 1 returns identified a single shared shape across multiple primitives: event-sourced state grows unboundedly on the read side. Specifically:
+
+- **A.3 Resource**: 10 years × 50 transactions/day per account = 182k events per Resource. `SUM(quantity_delta)` becomes non-trivial; balance materialization at dashboard render time gets slow.
+- **A.7 FeedbackSignal**: social-velocity DHT-budget exhaustion is structurally unrelieved. 500 signals/user/day × 200 bytes hits the ~3000-entry neighborhood budget within months. Signal-Aggregate Commitment was named as the release valve but not wired.
+- **A.6 Attestation**: graduation rate-ceiling missing; policy bugs can over-issue Attestations by orders of magnitude.
+- **A.2 Event**: graduation evaluator throughput at hub scale ceiling.
+
+These are read-side cost-growth problems on long-lived high-volume primitives. The substrate's event-sourcing discipline is correct (no balance-as-stored-field; no signal-as-pre-aggregated-counter) — but it needs an explicit release valve, or every long-lived Resource and high-velocity signal stream becomes mechanically expensive over time. This gap formalizes the release valve as **two new Commitment action verbs** that ride on existing primitives.
+
+**Design — checkpoint Commitment (read-side balance snapshot).**
+
+```rust
+Commitment {
+    action: "checkpoint",
+    subject_cid: <resource_cid>,
+    period_start: <unix_timestamp>,
+    period_end: <unix_timestamp>,
+    metadata_json: serde_json::json!({
+        "balance_snapshot": { "quantity": ..., "unit": ..., "by_classification": {...} },
+        "event_count_covered": <count>,
+        "merkle_root_of_covered_events": <hash>,
+    }).to_string(),
+    state: "fulfilled",  // checkpoints land in fulfilled state directly
+    // ... standard Commitment fields ...
+}
+```
+
+A `checkpoint` Commitment authoritatively summarizes the balance state of a Resource at `period_end`. Read-path optimization: when a derived view queries balance, it finds the most recent `checkpoint` Commitment, takes the snapshot as the starting state, and only sums Events from `checkpoint.period_end` forward. The 10-year-deep Resource becomes a 1-quarter-deep read against an authoritative snapshot — orders of magnitude faster.
+
+**Design — aggregate-subordinate Commitment (signal-stream subordination).**
+
+```rust
+Commitment {
+    action: "aggregate-subordinate",
+    subject_cid: <target_cid_being_aggregated_under>,
+    period_start: <unix_timestamp>,
+    period_end: <unix_timestamp>,
+    resource_classified_as_json: serde_json::json!([
+        "aggregation:feedback-signal",
+        { "signal_kind": "endorse", "shelf_destination": "peer-cellar://..." }
+    ]).to_string(),
+    metadata_json: serde_json::json!({
+        "signal_count_aggregated": <count>,
+        "aggregate_metrics": { "total_endorse_count": ..., "distinct_authors": ..., "standing_impact_sum": ... },
+        "merkle_root_of_aggregated_signals": <hash>,
+    }).to_string(),
+    state: "accepted",
+    // ... standard Commitment fields ...
+}
+```
+
+The Commitment serves dual roles:
+1. **As Commitment**: it's an authoritative summary of the aggregated window (for reads — standing computation can use the aggregate metrics instead of re-deriving from individual signals)
+2. **As custody-quilt authority**: it permits the underlying individual FeedbackSignal entries to subordinate per the canonical submerge pattern (Gap 4 / D.3). The signals move to cold archive; the Commitment retains the aggregate.
+
+This is per A.7's surfaced finding: signal-dense content needs a DHT-budget release valve. The Commitment IS that release valve.
+
+**B-5 resolution: aggregate-subordinate trigger threshold.** Manifest-declared per `signal_kind` with time-based fallback. Per-signal-kind policies live in pillar manifests:
+
+```jsonc
+// elohim/sdk/domains/imagodei/manifest.json
+{
+  "vocabulary_declarations": {
+    "signal_kinds": [
+      {
+        "kind": "endorse",
+        "aggregate_subordinate_policy": {
+          "trigger_age_days": 30,           // signals older than 30d eligible
+          "trigger_min_count": 100,         // OR 100+ signals on same target
+          "trigger_after_window_closed": true  // OR standing-curve has crystallized
+        }
+      },
+      {
+        "kind": "comment",
+        "aggregate_subordinate_policy": {
+          "trigger_age_days": 90,           // comments stay hot longer
+          "trigger_min_count": 1000
+        }
+      },
+      {
+        "kind": "report",
+        "aggregate_subordinate_policy": null  // reports never subordinate (governance evidence stays hot)
+      }
+    ]
+  }
+}
+```
+
+Time-based fallback (90 days) applies when manifest doesn't override. `null` policy means "never subordinate" (for governance-critical signal_kinds like `report` that must remain queryable indefinitely).
+
+**B-6 resolution: balance checkpoint trigger.** Manifest-declared per `resource_classified_as` with row-count floor as universal fallback:
+
+```jsonc
+// elohim/sdk/domains/shefa/manifest.json
+{
+  "vocabulary_declarations": {
+    "resource_classifications": [
+      {
+        "classification": "currency-USD",
+        "checkpoint_policy": {
+          "trigger_cadence_days": 90,    // quarterly checkpoint
+          "trigger_event_count": 10000   // OR every 10k events
+        }
+      },
+      {
+        "classification": "stewarded-physical",
+        "checkpoint_policy": null  // furniture rarely needs checkpoints
+      }
+    ]
+  },
+  "checkpoint_floor": {
+    "event_count": 50000  // any Resource crossing 50k events triggers checkpoint regardless
+  }
+}
+```
+
+`null` policy = no scheduled checkpoint (low-activity Resources). Floor ensures runaway Resources can't dodge checkpointing entirely.
+
+**Coordinator functions.**
+```rust
+create_checkpoint_commitment(subject_cid: Cid)
+  // 1. Determine period_start (most recent prior checkpoint's period_end, or Resource creation)
+  // 2. Iterate events in [period_start, now) — compute balance snapshot
+  // 3. Build merkle root of covered event hashes
+  // 4. Author Commitment(action="checkpoint", metadata=snapshot)
+  // 5. Mark as fulfilled immediately
+
+create_aggregate_subordinate_commitment(target_cid: Cid, signal_kind: String, window: TimeRange)
+  // 1. Query FeedbackSignals on target_cid in window
+  // 2. Compute aggregate metrics + merkle root
+  // 3. Author Commitment(action="aggregate-subordinate", metadata=metrics)
+  // 4. ReconcileController fans out to:
+  //    - memory-lifecycle submerge for the aggregated signals
+  //    - tiered-quilt quilt-demoted (custody-quilt, tier_floor=shelved)
+  //    - update standing-curve to use aggregate metrics for queries on this window
+```
+
+**Validation rules.**
+
+- `checkpoint` Commitment authored by Resource's current custodian OR an authorized elohim-agent with stewardship-commitment Attestation
+- `aggregate-subordinate` Commitment authored by an elohim-agent with subscription to the relevant signal_kind namespace; manifest-declared trigger threshold must be met
+- Both Commitments carry a `merkle_root` of the data they summarize; downstream queries can audit-verify by re-fetching the underlying entries and recomputing
+
+**Read-path optimization (the actual speed win).**
+
+```sql
+-- Without checkpoint: full event-history scan
+SELECT SUM(quantity_delta) FROM economic_events
+WHERE provider = :account_cid OR receiver = :account_cid;  -- 182k rows
+
+-- With checkpoint: snapshot + delta
+WITH latest_checkpoint AS (
+  SELECT (metadata_json::jsonb->'balance_snapshot'->>'quantity')::numeric AS snap_balance,
+         (metadata_json::jsonb->>'period_end')::int AS period_end
+  FROM commitments
+  WHERE action = 'checkpoint' AND subject_cid = :account_cid
+  ORDER BY period_end DESC LIMIT 1
+)
+SELECT
+  COALESCE(lc.snap_balance, 0) + COALESCE(SUM(e.quantity_delta), 0) AS balance
+FROM latest_checkpoint lc
+LEFT JOIN economic_events e ON
+  (e.provider = :account_cid OR e.receiver = :account_cid)
+  AND e.observed_at > COALESCE(lc.period_end, 0);
+```
+
+The 10-year-deep query collapses to (snapshot + recent-quarter deltas) — usually <500 rows.
+
+**Manifest declaration validated by D.10's gate.** All `resource_classified_as` checkpoint policies and `signal_kind` aggregate_subordinate policies are declared in pillar manifests; the vocabulary governance gate ensures the classifications and signal_kinds referenced actually exist in their respective whitelists.
+
+**Touches:**
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — add `"checkpoint"` and `"aggregate-subordinate"` to `REA_ACTIONS` whitelist (per D.10 vocabulary governance)
+- `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — new coordinator functions `create_checkpoint_commitment`, `create_aggregate_subordinate_commitment`
+- `elohim/elohim-storage/src/services/checkpoint_service.rs` — **new service** computing balance snapshots; consumed by `resource_state_service.rs` (D.4) for read-path optimization
+- `elohim/elohim-storage/src/services/signal_aggregate_service.rs` — **new service** computing signal aggregates; coordinates with submerge fan-out via ReconcileController (D.3)
+- `elohim/sdk/domains/*/manifest.json` — `checkpoint_policy` per resource_classification; `aggregate_subordinate_policy` per signal_kind; `checkpoint_floor` (universal fallback)
 
 ---
 
