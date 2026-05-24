@@ -11,6 +11,7 @@ use http_body_util::{BodyExt, Full};
 use hyper::{body::Incoming, Method, Request, Response, StatusCode};
 
 pub mod schema;
+pub mod translate;
 
 pub use schema::{BridgeContext, DbPool};
 

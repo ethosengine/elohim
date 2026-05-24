@@ -46,6 +46,10 @@ pub struct EconomicEventView {
     pub created_at: String,
     /// Place ID where this event occurred (spatial grounding)
     pub at_location: Option<String>,
+    /// CID of the Collab-Qahal scope under which this event was authored.
+    /// Set on the primary event; Settlement events carry the Collab CID in
+    /// their metadata extensions block instead.
+    pub scope_collab_cid: Option<String>,
 }
 
 /// Measure — quantity + unit pair (ValueFlows)
@@ -230,6 +234,15 @@ pub struct CreateEconomicEventInputView {
     /// Place ID where this event occurred (spatial grounding)
     #[serde(default)]
     pub at_location: Option<String>,
+    /// CID of the Collab-Qahal scope under which this event is authored.
+    /// When present, the HTTP handler routes the event value through the Collab's
+    /// ShareAllocation and persists Settlement events before returning.
+    #[serde(default)]
+    pub scope_collab_cid: Option<String>,
+    /// Block height at which the event was authored (used for share-routing
+    /// when scope_collab_cid is set; 0 for events outside a Collab scope).
+    #[serde(default)]
+    pub at_block_height: u64,
 }
 
 /// Input for creating a stewardship allocation - camelCase API boundary type

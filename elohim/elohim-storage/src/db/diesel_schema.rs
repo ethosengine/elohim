@@ -189,6 +189,7 @@ diesel::table! {
         created_at -> Text,
         at_location -> Nullable<Text>,
         verified_at -> Nullable<Text>,
+        scope_collab_cid -> Nullable<Text>,
     }
 }
 

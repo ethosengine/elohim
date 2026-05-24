@@ -98,6 +98,9 @@ pub mod weather;
 // Multi-collective collaboration EPR — M1 Phase C service layer
 pub mod qahal_service;
 
+// Multi-collective collaboration EPR — M1 Phase D share-routing evaluator (pure function)
+pub mod share_routing;
+
 // Attestation Consolidation Sprint — projection signal handler + tally projector
 pub mod attestation_projector;
 pub mod tally_projector;

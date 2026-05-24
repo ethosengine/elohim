@@ -365,6 +365,12 @@ pub struct EconomicEvent {
     /// atomically with the corresponding `epr_atoms.verified_at` clear. Satisfies
     /// invariants I4 (revocation propagation) and I5 (verified-state consistency).
     pub verified_at: Option<String>,
+    /// CID of the Collab-Qahal scope under which this event was authored.
+    ///
+    /// When set, downstream queries can correlate this event (and any Settlement
+    /// events it spawned) with their source Collab.  Settlement events carry the
+    /// Collab CID in their `metadata_json` extensions block.
+    pub scope_collab_cid: Option<String>,
 }
 
 /// New economic event for INSERT
@@ -398,6 +404,7 @@ pub struct NewEconomicEvent<'a> {
     pub dht_anchor_hash: Option<&'a str>,
     pub at_location: Option<&'a str>,
     pub verified_at: Option<&'a str>,
+    pub scope_collab_cid: Option<&'a str>,
 }
 
 // ============================================================================

@@ -778,6 +778,7 @@ impl ResourceService {
                     note: req.note.clone(),
                     metadata_json: None,
                     at_location: None,
+                    scope_collab_cid: None,
                 },
             )?;
             event.id.clone()

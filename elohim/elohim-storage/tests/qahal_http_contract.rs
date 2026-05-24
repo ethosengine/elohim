@@ -1026,3 +1026,227 @@ fn reach_inflation_via_collab_is_refused() {
     //   Expect 403 REACH_CEILING_EXCEEDED from the reach evaluator.
     unimplemented!("activate in M3 when reach evaluator is wired")
 }
+
+// =============================================================================
+// §11 — Share-routing EconomicEvent integration (M1 Task 14)
+//
+// These tests exercise `route_economic_event_under_collab` — the pure function
+// that maps a CollabAgreementView + event value → Vec<CreateEconomicEventInput>
+// (one Settlement per RoutedAmount).  They pass today without a conductor.
+//
+// The live HTTP path (POST /api/v1/economic-event with scopeCollabCid) is
+// wired in `api/economic_events.rs::handle_create` and persists routed
+// Settlements via `EconomicEventService::bulk_create_events`. End-to-end
+// verification needs a live Holochain conductor (CI-scope) — see the
+// `#[ignore]` test in §10 of this file.
+// =============================================================================
+
+#[test]
+fn route_economic_event_under_collab_distributes_t0_two_collective_setup() {
+    // Validates the wiring intent of Task 14 without a live conductor or HTTP server.
+    // Mirrors the T0 scenario: Coll A 47.5%, Coll B 47.5%, commons-pool tribute 5%.
+    use elohim_storage::services::economic_event_service::route_economic_event_under_collab;
+    use elohim_views::{
+        CollabAgreementStatus, CollabAgreementView, DeclaredShare, ElohimTier, ShareAllocation,
+        ShareAllocationForm,
+    };
+    use std::collections::HashSet;
+
+    let agreement = CollabAgreementView {
+        cid: "agreement:m1-task14-test".into(),
+        authored_by_agent_cid: "agent:founder".into(),
+        participants: vec!["collective:a".into(), "collective:b".into()],
+        scope: "m1-task14".into(),
+        share_allocation: ShareAllocation {
+            form: ShareAllocationForm::Declared,
+            shares: Some(vec![
+                DeclaredShare {
+                    collective_cid: "collective:a".into(),
+                    share: 0.475,
+                },
+                DeclaredShare {
+                    collective_cid: "collective:b".into(),
+                    share: 0.475,
+                },
+            ]),
+            affinity_window_blocks: None,
+            rebalance_cadence_blocks: None,
+            commons_pool_tribute: 0.05,
+        },
+        commons_pool_tribute: 0.05,
+        governance_terms: None,
+        initial_tier: ElohimTier::T0,
+        created_at_block_height: 0,
+        status: CollabAgreementStatus::Instantiated,
+        attested_by: vec!["collective:a".into(), "collective:b".into()],
+        collab_qahal_cid: Some("collective:qahal-task14".into()),
+    };
+
+    let active: HashSet<String> = vec!["collective:a".into(), "collective:b".into()]
+        .into_iter()
+        .collect();
+
+    let inputs = route_economic_event_under_collab(
+        &agreement,
+        1000.0,
+        0, // at_block_height (M1: always 0)
+        &active,
+        "event-src-task14",
+    )
+    .expect("routing a valid T0 setup must succeed");
+
+    // Three settlement events: A, B, commons-pool
+    assert_eq!(
+        inputs.len(),
+        3,
+        "T0 two-collective setup must emit 3 settlement events"
+    );
+
+    let by_receiver: std::collections::HashMap<_, _> = inputs
+        .iter()
+        .map(|i| {
+            (
+                i.receiver.clone(),
+                i.resource_quantity_value.unwrap_or(0.0) as f64,
+            )
+        })
+        .collect();
+
+    let a = *by_receiver
+        .get("collective:a")
+        .expect("collective:a settlement missing");
+    let b = *by_receiver
+        .get("collective:b")
+        .expect("collective:b settlement missing");
+    let commons = *by_receiver
+        .get("commons-pool")
+        .expect("commons-pool tribute missing");
+
+    assert!(
+        (a - 475.0).abs() < 0.1,
+        "collective:a: expected ~475, got {a}"
+    );
+    assert!(
+        (b - 475.0).abs() < 0.1,
+        "collective:b: expected ~475, got {b}"
+    );
+    assert!(
+        (commons - 50.0).abs() < 0.1,
+        "commons-pool: expected ~50, got {commons}"
+    );
+
+    let total = a + b + commons;
+    assert!(
+        (total - 1000.0).abs() < 0.1,
+        "settlement amounts must sum to event value (~1000), got {total}"
+    );
+}
+
+#[test]
+fn route_economic_event_under_collab_withdrawn_member_flows_entirely_to_commons() {
+    // Regression guard for spec §6.4: withdrawn member's share flows entirely
+    // to commons-pool with no re-normalization.
+    use elohim_storage::services::economic_event_service::route_economic_event_under_collab;
+    use elohim_views::{
+        CollabAgreementStatus, CollabAgreementView, DeclaredShare, ElohimTier, ShareAllocation,
+        ShareAllocationForm,
+    };
+    use std::collections::HashSet;
+
+    let agreement = CollabAgreementView {
+        cid: "agreement:withdrawal-test".into(),
+        authored_by_agent_cid: "agent:founder".into(),
+        participants: vec!["collective:a".into(), "collective:b".into()],
+        scope: "withdrawal".into(),
+        share_allocation: ShareAllocation {
+            form: ShareAllocationForm::Declared,
+            shares: Some(vec![
+                DeclaredShare {
+                    collective_cid: "collective:a".into(),
+                    share: 0.475,
+                },
+                DeclaredShare {
+                    collective_cid: "collective:b".into(),
+                    share: 0.475,
+                },
+            ]),
+            affinity_window_blocks: None,
+            rebalance_cadence_blocks: None,
+            commons_pool_tribute: 0.05,
+        },
+        commons_pool_tribute: 0.05,
+        governance_terms: None,
+        initial_tier: ElohimTier::T0,
+        created_at_block_height: 0,
+        status: CollabAgreementStatus::Instantiated,
+        attested_by: vec!["collective:a".into(), "collective:b".into()],
+        collab_qahal_cid: Some("collective:qahal-wd".into()),
+    };
+
+    // collective:a has withdrawn; only B is active
+    let active: HashSet<String> = vec!["collective:b".into()].into_iter().collect();
+
+    let inputs = route_economic_event_under_collab(
+        &agreement,
+        1000.0,
+        500, // at_block_height after withdrawal
+        &active,
+        "event-src-withdrawal",
+    )
+    .expect("routing with one withdrawn member must succeed");
+
+    let by_receiver: std::collections::HashMap<_, _> = inputs
+        .iter()
+        .map(|i| {
+            (
+                i.receiver.clone(),
+                i.resource_quantity_value.unwrap_or(0.0) as f64,
+            )
+        })
+        .collect();
+
+    assert!(
+        !by_receiver.contains_key("collective:a"),
+        "withdrawn collective:a must not receive a settlement event"
+    );
+
+    let b = *by_receiver.get("collective:b").unwrap_or(&0.0);
+    let commons = *by_receiver.get("commons-pool").unwrap_or(&0.0);
+
+    // B gets its own 47.5%; commons absorbs A's 47.5% + base tribute 5%
+    assert!(
+        (b - 475.0).abs() < 0.1,
+        "active collective:b: expected ~475, got {b}"
+    );
+    assert!(
+        (commons - 525.0).abs() < 0.1,
+        "commons-pool absorbs A's share + tribute: expected ~525, got {commons}"
+    );
+}
+
+#[test]
+#[ignore = "M1 CI-scope — needs live Holochain conductor via sweettest; full Agreement decode now active"]
+fn economic_event_under_collab_routes_through_share_allocation() {
+    // When this test runs in CI (M2):
+    //   1. Build a 2-collective T0 Collab-Qahal (Coll A 0.475, Coll B 0.475, tribute 0.05)
+    //   2. POST /api/v1/economic-events with body:
+    //      { "action":"transfer", "provider":"agent:x", "receiver":"collective:qahal",
+    //        "resourceQuantityValue":1000, "resourceQuantityUnit":"credit",
+    //        "scopeCollabCid":"collective:<qahal-cid>", "atBlockHeight":0 }
+    //   3. Assert response.primary.id is set and response.settlements.created == 3
+    //   4. List economic events filtered by provider == "collective:<qahal-cid>"
+    //   5. Assert: A and B each received ~475, commons-pool ~50, sum ~1000
+    //
+    // DB migration (scope_collab_cid column): LANDED in M1 Task 14 deepening.
+    //   migrations/2026-05-24-000000_economic_events_add_scope_collab_cid/
+    //
+    // Handler routing (async fetch_collab_qahal + bulk_create_events): LANDED in M1 Task 14.
+    //   api/economic_events.rs handle_create + QahalService::fetch_collab_agreement
+    //
+    // Full Agreement entry decode (share_allocation.shares): LANDED in M1 final.
+    //   ZomeCollabAgreementEntry + rmp_serde decode in fetch_agreement_by_action_bytes.
+    //   Unit test: qahal_service::tests::zome_collab_agreement_entry_round_trips_through_decode
+    //
+    // Remaining blocker: live Holochain conductor (Che environment constraint — not a code gap).
+    todo!("activate in M2 with live sweettest conductor")
+}

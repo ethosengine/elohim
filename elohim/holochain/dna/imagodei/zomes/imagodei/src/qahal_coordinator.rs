@@ -178,7 +178,7 @@ pub fn create_collab_agreement(input: CreateCollabAgreementInput) -> ExternResul
 /// The caller must be a current Steward of `attesting_collective_cid` (checked
 /// via `HasMembership` link traversal — OK in coordinator, not integrity zome).
 ///
-/// Each attestation is recorded as an `AgreementOnCollab` link from the agreement
+/// Each attestation is recorded as an `AttestationOnAgreement` link from the agreement
 /// ActionHash to the attesting Collective's ActionHash, tagged with the Collective
 /// CID bytes for cheap iteration.
 ///
@@ -212,14 +212,14 @@ pub fn attest_collab_agreement(input: AttestCollabAgreementInput) -> ExternResul
         ));
     }
 
-    // 4. Record the attestation as a tagged AgreementOnCollab link.
+    // 4. Record the attestation as a tagged AttestationOnAgreement link.
     //    Tag = Collective CID bytes (UTF-8) for cheap set-membership checks below.
     let attesting_collective_hash =
         decode_collective_cid_to_action(&input.attesting_collective_cid)?;
     create_link(
         input.agreement_action_hash.clone(),
         attesting_collective_hash,
-        LinkTypes::AgreementOnCollab,
+        LinkTypes::AttestationOnAgreement,
         LinkTag::new(input.attesting_collective_cid.as_bytes()),
     )?;
 
@@ -227,21 +227,16 @@ pub fn attest_collab_agreement(input: AttestCollabAgreementInput) -> ExternResul
     let attestation_links = {
         let q = LinkQuery::try_new(
             input.agreement_action_hash.clone(),
-            LinkTypes::AgreementOnCollab,
+            LinkTypes::AttestationOnAgreement,
         )?;
         get_links(q, GetStrategy::default())?
     };
     let attested_cids: std::collections::HashSet<String> = attestation_links
         .iter()
         .filter_map(|l| {
-            // Skip the "INSTANTIATED" sentinel tag.
-            if l.tag.0.as_slice() == b"INSTANTIATED" {
-                None
-            } else {
-                std::str::from_utf8(l.tag.0.as_slice())
-                    .ok()
-                    .map(|s| s.to_string())
-            }
+            std::str::from_utf8(l.tag.0.as_slice())
+                .ok()
+                .map(|s| s.to_string())
         })
         .collect();
 
@@ -260,9 +255,8 @@ pub fn attest_collab_agreement(input: AttestCollabAgreementInput) -> ExternResul
 ///
 /// Creates the recursive Collective entry + one Collective-typed Steward
 /// Membership for each participant, then links them bidirectionally.
-/// The "INSTANTIATED" sentinel tag on an AgreementOnCollab link from the
-/// agreement hash serves as the fast-path "is it done?" marker for
-/// `get_collab_status`.
+/// A `CollabInstantiated` link from the agreement hash serves as the
+/// fast-path "is it done?" marker for `get_collab_status`.
 fn instantiate_collab_qahal(
     agreement_hash: &ActionHash,
     agreement: &CollabAgreement,
@@ -286,12 +280,12 @@ fn instantiate_collab_qahal(
     let qahal_hash = create_entry(&EntryTypes::Collective(collab_qahal))?;
     let qahal_cid = action_hash_to_cid(&qahal_hash);
 
-    // Sentinel link: agreement -> instantiated Qahal, tag = "INSTANTIATED".
+    // Instantiation link: agreement -> instantiated Qahal, unit tag.
     create_link(
         agreement_hash.clone(),
         qahal_hash.clone(),
-        LinkTypes::AgreementOnCollab,
-        LinkTag::new(b"INSTANTIATED"),
+        LinkTypes::CollabInstantiated,
+        (),
     )?;
 
     // Create a Collective-typed Steward Membership for each participating Collective.
@@ -333,17 +327,16 @@ fn instantiate_collab_qahal(
 /// Return "Instantiated" if all participants have attested and the Collab-Qahal
 /// exists, or "PendingAttestations" otherwise.
 ///
-/// The "INSTANTIATED" sentinel `AgreementOnCollab` link tag is the canonical
-/// marker — set atomically by `instantiate_collab_qahal`.
+/// Queries `CollabInstantiated` links — set atomically by `instantiate_collab_qahal`.
+/// No tag inspection needed: presence of the link is the signal.
 #[hdk_extern]
 pub fn get_collab_status(agreement_hash: ActionHash) -> ExternResult<String> {
-    let q = LinkQuery::try_new(agreement_hash, LinkTypes::AgreementOnCollab)?;
+    let q = LinkQuery::try_new(agreement_hash, LinkTypes::CollabInstantiated)?;
     let links = get_links(q, GetStrategy::default())?;
-    let instantiated = links.iter().any(|l| l.tag.0.as_slice() == b"INSTANTIATED");
-    if instantiated {
-        Ok("Instantiated".into())
-    } else {
+    if links.is_empty() {
         Ok("PendingAttestations".into())
+    } else {
+        Ok("Instantiated".into())
     }
 }
 
@@ -351,17 +344,16 @@ pub fn get_collab_status(agreement_hash: ActionHash) -> ExternResult<String> {
 /// CollabAgreement.  Errors if not yet instantiated.
 #[hdk_extern]
 pub fn get_collab_qahal_cid_for_agreement(agreement_hash: ActionHash) -> ExternResult<String> {
-    let q = LinkQuery::try_new(agreement_hash, LinkTypes::AgreementOnCollab)?;
+    let q = LinkQuery::try_new(agreement_hash, LinkTypes::CollabInstantiated)?;
     let links = get_links(q, GetStrategy::default())?;
-    let sentinel = links
-        .iter()
-        .find(|l| l.tag.0.as_slice() == b"INSTANTIATED")
+    let instantiation = links
+        .first()
         .ok_or_else(|| wasm_error!("Collab not yet instantiated"))?;
-    let qahal_hash = sentinel
+    let qahal_hash = instantiation
         .target
         .clone()
         .into_action_hash()
-        .ok_or_else(|| wasm_error!("sentinel link target is not an ActionHash"))?;
+        .ok_or_else(|| wasm_error!("CollabInstantiated link target is not an ActionHash"))?;
     Ok(action_hash_to_cid(&qahal_hash))
 }
 

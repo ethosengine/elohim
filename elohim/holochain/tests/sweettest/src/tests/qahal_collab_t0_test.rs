@@ -476,6 +476,210 @@ async fn withdraw_membership_clean_exit() -> Result<()> {
     Ok(())
 }
 
+// =============================================================================
+// Task 17: Multi-conductor end-to-end T0 Collab flow
+// =============================================================================
+//
+// Scenario: two independent founders (each on their own conductor) create one
+// Collective each, then cross-attest a CollabAgreement. After all attestations
+// are committed and DHT consistency is reached, both conductors must report the
+// Collab-Qahal as Instantiated.
+//
+// Cross-conductor pattern (per feedback_sweettest_cross_agent_consistency):
+//   - `two_agent_conductors()` spawns two isolated SweetConductors.
+//   - `SweetConductor::exchange_peer_info([&ca, &cb]).await` inside a timeout
+//     loop seeds the local peer tables so the conductors can find each other.
+//   - `await_consistency(60, [&cell_a, &cell_b]).await` waits for the DHT to
+//     converge before read-after-write cross-conductor assertions.
+//
+// NOTE: This test is ignored until the DNA artifact is packed by Jenkins;
+//   the `#[ignore]` tag matches every other test that needs the .dna bundle.
+
+use elohim_sweettest::common::conductors::two_agent_conductors;
+use holochain::sweettest::{await_consistency, SweetConductor};
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires packed DNA artifact — wire into Jenkins pack-then-test stage"]
+async fn two_conductor_t0_collab_end_to_end() -> Result<()> {
+    use elohim_sweettest::common::fixtures::network_seed;
+
+    // -------------------------------------------------------------------------
+    // Set up two conductors, each with their own agent and the same DNA bundle.
+    // Both conductors use the same network_seed so they join the same DHT.
+    // The progenitor/bootstrap-steward is set to the respective agent pubkey so
+    // that each agent can steward their own Collective.
+    // -------------------------------------------------------------------------
+    let [(mut ca, a1), (mut cb, a2)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+
+    // Each conductor installs the DNA with its own founder as progenitor.
+    let dna_a = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let dna_b = load_dna(DNA, &seed, Some(a2.clone())).await?;
+
+    let app_a = ca
+        .setup_app_for_agent("imagodei-mc-a", a1.clone(), &[dna_a])
+        .await?;
+    let app_b = cb
+        .setup_app_for_agent("imagodei-mc-b", a2.clone(), &[dna_b])
+        .await?;
+    let cell_a = app_a.cells().first().expect("cell A installed").clone();
+    let cell_b = app_b.cells().first().expect("cell B installed").clone();
+
+    // -------------------------------------------------------------------------
+    // Conductor A's founder creates Collective A.
+    // -------------------------------------------------------------------------
+    let coll_a_hash: ActionHash = ca
+        .call(
+            &cell_a.zome(ZOME),
+            "create_collective",
+            CreateCollectiveInput {
+                charter: "We steward the upper watershed together.".into(),
+                display_name: "Coll A".into(),
+                // 32-hex salt as required by integrity validator
+                salt: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1".into(),
+            },
+        )
+        .await;
+    let coll_a_cid = format!("collective:{}", coll_a_hash);
+
+    // -------------------------------------------------------------------------
+    // Conductor B's founder creates Collective B.
+    // -------------------------------------------------------------------------
+    let coll_b_hash: ActionHash = cb
+        .call(
+            &cell_b.zome(ZOME),
+            "create_collective",
+            CreateCollectiveInput {
+                charter: "We steward the lower watershed together.".into(),
+                display_name: "Coll B".into(),
+                salt: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2".into(),
+            },
+        )
+        .await;
+    let coll_b_cid = format!("collective:{}", coll_b_hash);
+
+    // -------------------------------------------------------------------------
+    // Exchange peer info and await DHT consistency before cross-conductor reads.
+    // Pattern mirrors feedback_signal.rs and epr_phase_2b_batch_a_e2e.rs.
+    // -------------------------------------------------------------------------
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&ca, &cb]).await {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange (Coll A + Coll B)"))?;
+
+    await_consistency(60, [&cell_a, &cell_b])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after collective creation: {e}"))?;
+
+    // -------------------------------------------------------------------------
+    // Conductor A authors the CollabAgreement naming both Collectives.
+    // -------------------------------------------------------------------------
+    let share_allocation_json = format!(
+        r#"{{"form":"declared","shares":[{{"collective_cid":"{}","share":0.475}},{{"collective_cid":"{}","share":0.475}}],"commons_pool_tribute":0.05}}"#,
+        coll_a_cid, coll_b_cid
+    );
+
+    let agreement_hash: ActionHash = ca
+        .call(
+            &cell_a.zome(ZOME),
+            "create_collab_agreement",
+            CreateCollabAgreementInput {
+                participants: vec![coll_a_cid.clone(), coll_b_cid.clone()],
+                scope: "Joint riparian stewardship".into(),
+                share_allocation_json,
+                commons_pool_tribute: 0.05,
+                governance_terms_json: r#"{"exit_terms":"clean"}"#.into(),
+                initial_tier: "T0".into(),
+                display_name_for_qahal: "Riparian Stewards".into(),
+                salt: "ccccccccccccccccccccccccccccccc1".into(),
+            },
+        )
+        .await;
+
+    // Wait for the agreement to propagate to conductor B before attestations.
+    await_consistency(60, [&cell_a, &cell_b])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after agreement creation: {e}"))?;
+
+    // Status on conductor A must be PendingAttestations immediately after creation.
+    let status_before: String = ca
+        .call(&cell_a.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .await;
+    assert_eq!(
+        status_before, "PendingAttestations",
+        "expected PendingAttestations before any attestation, got: {status_before}"
+    );
+
+    // -------------------------------------------------------------------------
+    // Conductor A's founder attests on behalf of Collective A.
+    // -------------------------------------------------------------------------
+    let (): () = ca
+        .call(
+            &cell_a.zome(ZOME),
+            "attest_collab_agreement",
+            AttestCollabAgreementInput {
+                agreement_action_hash: agreement_hash.clone(),
+                attesting_collective_cid: coll_a_cid.clone(),
+            },
+        )
+        .await;
+
+    // -------------------------------------------------------------------------
+    // Conductor B's founder attests on behalf of Collective B.
+    // -------------------------------------------------------------------------
+    let (): () = cb
+        .call(
+            &cell_b.zome(ZOME),
+            "attest_collab_agreement",
+            AttestCollabAgreementInput {
+                agreement_action_hash: agreement_hash.clone(),
+                attesting_collective_cid: coll_b_cid.clone(),
+            },
+        )
+        .await;
+
+    // Both attestations are now committed; await full DHT convergence.
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&ca, &cb]).await {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange (post-attestation)"))?;
+
+    await_consistency(60, [&cell_a, &cell_b])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after attestations: {e}"))?;
+
+    // -------------------------------------------------------------------------
+    // Both conductors must now see the Collab-Qahal as Instantiated.
+    // -------------------------------------------------------------------------
+    let status_a: String = ca
+        .call(&cell_a.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .await;
+    assert_eq!(
+        status_a, "Instantiated",
+        "conductor A must see Instantiated after all attestations, got: {status_a}"
+    );
+
+    let status_b: String = cb
+        .call(&cell_b.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .await;
+    assert_eq!(
+        status_b, "Instantiated",
+        "conductor B must see Instantiated after all attestations, got: {status_b}"
+    );
+
+    Ok(())
+}
+
+// =============================================================================
+// (End Task 17)
+// =============================================================================
+
 /// Verify that `create_collab_agreement` refuses a zero `commons_pool_tribute`.
 ///
 /// The `validate_share_allocation_json` coordinator gate checks `tribute > 0`

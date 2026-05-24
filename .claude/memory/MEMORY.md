@@ -22,6 +22,7 @@
 - [Seed whoever is ready](project_seed_whoever_is_ready.md) — per-peer seeding; partial-cluster = steady state; no all-or-nothing.
 - [CI build storage — openebs-jiva + jenkins-ns PVCs](project_ci_storage_topology.md) — openebs-jiva-csi-default; nix-cache/cargo-cache/sweettest-target-cache in `jenkins` ns (see _holochain_build_pvcs_in_jenkins_ns).
 - [Verify cluster state before runbooks](feedback_verify_cluster_state_before_runbook.md) — manifests ≠ reality; quote kubectl get; exec|apply -f - pattern.
+- [No kubectl from dev env](feedback_no_kubectl_from_dev_env.md) — operator owns cluster ops (read+write); agent stays code-level — "clean up X" means fix repo manifests, next pipeline reconciles; tension with cluster-verify entry resolved in operator's favor.
 - [Check helm chart status before runbooks](feedback_check_helm_chart_status_before_runbooks.md) — Bitnami blocking/deprecating; prefer upstream official charts.
 - [Pause sprint when substrate change in flight](feedback_pause_sprint_when_substrate_in_flight.md) — image rebuild/restart in motion → minimum-revert mode only.
 - [Understand orchestrator substrate first](feedback_understand_orchestrator_substrate_before_changes.md) — read strategy.mjs + Jenkinsfile + drift test before changes.

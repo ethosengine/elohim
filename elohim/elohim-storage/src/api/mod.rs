@@ -124,7 +124,7 @@ pub async fn handle_api_request(
         stewardship::handle(req, method, resource_path, &pool, &app_ctx, services).await
     } else if sub_path.starts_with("economic-events") {
         let resource_path = sub_path.strip_prefix("economic-events").unwrap_or("");
-        economic_events::handle(req, method, resource_path, &pool, &app_ctx).await
+        economic_events::handle(req, method, resource_path, &pool, &app_ctx, hc_registry.as_ref()).await
     } else if sub_path.starts_with("epr") {
         let resource_path = sub_path.strip_prefix("epr").unwrap_or("");
         epr::handle(

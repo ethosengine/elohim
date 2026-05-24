@@ -212,6 +212,7 @@ pub fn reconcile_pass(
                 dht_anchor_hash: None,
                 at_location: None,
                 verified_at: None,
+                scope_collab_cid: None,
             };
             diesel::insert_into(economic_events::table)
                 .values(&new_event)
