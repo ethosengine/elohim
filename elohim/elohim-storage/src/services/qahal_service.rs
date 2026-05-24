@@ -253,6 +253,25 @@ impl QahalService {
         self.fetch_collective_by_action(action_bytes).await
     }
 
+    /// Fetch a CollabAgreement by its CID (e.g. "agreement:uhCkk...").
+    ///
+    /// Composes existing conductor externs (`get_collab_status` +
+    /// `get_collab_qahal_cid_for_agreement`) to build a `CollabAgreementView`.
+    ///
+    /// Note: the share_allocation decoded here uses the default fallback shape
+    /// because the raw Agreement entry bytes are not yet decoded by
+    /// `fetch_agreement_by_action_bytes` in M1.  The caller must supply the
+    /// `share_allocation` from the Collab creation flow if full routing is
+    /// required.  M2 will decode the full entry.
+    pub async fn fetch_collab_agreement(
+        &self,
+        cid: &str,
+    ) -> Result<CollabAgreementView, StorageError> {
+        debug!(cid = %cid, "QahalService::fetch_collab_agreement");
+        let action_bytes = decode_agreement_cid(cid)?;
+        self.fetch_agreement_by_action_bytes(&action_bytes).await
+    }
+
     /// Fetch the Collab-Qahal instantiated from a CollabAgreement CID.
     ///
     /// Calls `get_collab_qahal_cid_for_agreement` to find the Collab-Qahal's

@@ -460,6 +460,7 @@ pub fn settle(
             )),
             metadata_json: None,
             at_location: None,
+            scope_collab_cid: None,
         };
 
         record_event(conn, ctx, input)?;

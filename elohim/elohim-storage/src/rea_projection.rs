@@ -228,6 +228,7 @@ pub fn handle_rea_signal(
                 note: event.note,
                 metadata_json: event.metadata_json,
                 at_location: event.at_location,
+                scope_collab_cid: None,
             };
             economic_events::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
         }

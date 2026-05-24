@@ -98,6 +98,7 @@ impl From<EconomicEvent> for EconomicEventView {
             dht_anchor_hash: e.dht_anchor_hash,
             created_at: e.created_at,
             at_location: e.at_location,
+            scope_collab_cid: e.scope_collab_cid,
         }
     }
 }

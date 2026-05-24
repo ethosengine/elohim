@@ -63,6 +63,11 @@ pub struct CreateEconomicEventInput {
     /// Place ID where this event occurred (spatial grounding for carrying capacity)
     #[serde(default)]
     pub at_location: Option<String>,
+    /// CID of the Collab-Qahal scope under which this event was authored.
+    /// When set, the HTTP handler routes the event value through share-allocation
+    /// and emits Settlement events before persisting the primary.
+    #[serde(default)]
+    pub scope_collab_cid: Option<String>,
 }
 
 /// Query parameters for listing economic events - camelCase for URL params
@@ -331,6 +336,7 @@ pub fn record_event(
         dht_anchor_hash: None,
         at_location: input.at_location.as_deref(),
         verified_at: None,
+        scope_collab_cid: input.scope_collab_cid.as_deref(),
     };
 
     diesel::insert_into(economic_events::table)
@@ -377,6 +383,7 @@ pub fn record_content_view(
             note: None,
             metadata_json: None,
             at_location: None,
+            scope_collab_cid: None,
         },
     )
 }
@@ -422,6 +429,7 @@ pub fn record_mastery_advancement(
             note: Some(format!("Advanced from {} to {}", from_level, to_level)),
             metadata_json: Some(metadata.to_string()),
             at_location: None,
+            scope_collab_cid: None,
         },
     )
 }
@@ -461,6 +469,7 @@ pub fn record_citation(
             note: None,
             metadata_json: None,
             at_location: None,
+            scope_collab_cid: None,
         },
     )
 }
@@ -500,6 +509,7 @@ pub fn record_path_completion(
             note: None,
             metadata_json: None,
             at_location: None,
+            scope_collab_cid: None,
         },
     )
 }
@@ -540,6 +550,7 @@ pub fn record_affinity_transfer(
             note: None,
             metadata_json: None,
             at_location: None,
+            scope_collab_cid: None,
         },
     )
 }
@@ -656,6 +667,7 @@ pub fn upsert_with_anchor(
             dht_anchor_hash,
             at_location: input.at_location.as_deref(),
             verified_at: None,
+            scope_collab_cid: input.scope_collab_cid.as_deref(),
         };
 
         diesel::insert_into(economic_events::table)

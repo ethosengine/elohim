@@ -4,6 +4,17 @@
 //!
 //! Delegates to `EconomicEventService` for business logic, which calls
 //! `db::economic_events` for Diesel queries.
+//!
+//! ## Collab share-routing (M1 Task 14 deepening)
+//!
+//! When `POST /api/v1/economic-events` carries a `scopeCollabCid` field,
+//! `handle_create` performs async Collab+Agreement resolution at the handler
+//! boundary (which is already async, per Hyper), then calls the pure
+//! `route_economic_event_under_collab` evaluator and bulk-persists Settlement
+//! events.  `EconomicEventService` itself remains sync throughout.
+
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -14,7 +25,11 @@ use crate::db::economic_events::{CreateEconomicEventInput, EconomicEventQuery};
 use crate::db::models::rea_actions;
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
-use crate::services::economic_event_service::StagedTransaction;
+use crate::hc_client_registry::HcClientRegistry;
+use crate::services::economic_event_service::{
+    route_economic_event_under_collab, StagedTransaction,
+};
+use crate::services::qahal_service::QahalService;
 use crate::services::response::{self, from_create_result, from_option, from_result};
 use crate::services::EconomicEventService;
 use crate::views::{CreateEconomicEventInputView, EconomicEventView};
@@ -45,6 +60,7 @@ pub async fn handle(
     resource_path: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    hc_registry: Option<&Arc<HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Normalize path: strip leading slash, split into segments
     let path = resource_path.trim_start_matches('/');
@@ -54,7 +70,7 @@ pub async fn handle(
         (&Method::GET, "") => handle_list(req, pool, ctx).await,
 
         // POST /api/v1/economic-events
-        (&Method::POST, "") => handle_create(req, pool, ctx).await,
+        (&Method::POST, "") => handle_create(req, pool, ctx, hc_registry).await,
 
         // POST /api/v1/economic-events/bulk
         (&Method::POST, "bulk") => handle_bulk_create(req, pool, ctx).await,
@@ -124,15 +140,141 @@ async fn handle_create(
     req: Request<Incoming>,
     pool: &DbPool,
     ctx: &AppContext,
+    hc_registry: Option<&Arc<HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
     // Currently null for direct storage writes. Backfill needed for pre-coherence data.
     let input_view: CreateEconomicEventInputView = parse_body(req).await?;
+
+    // If the event was authored under a Collab scope, route through share-allocation
+    // BEFORE persisting.  The primary event records scope_collab_cid so downstream
+    // queries can correlate Settlement events with their source Collab.
+    if let Some(ref collab_cid) = input_view.scope_collab_cid.clone() {
+        // Build QahalService from the registry — returns 503 if conductor offline.
+        let svc = match build_qahal_service(hc_registry) {
+            Ok(s) => s,
+            Err(resp) => return Ok(resp),
+        };
+
+        // Fetch the Collab-Qahal to get the active member set.
+        let collab = svc.fetch_collab_qahal(collab_cid).await.map_err(|e| {
+            StorageError::Internal(format!(
+                "fetch_collab_qahal failed for {collab_cid}: {e}"
+            ))
+        })?;
+
+        // Resolve the anchor Agreement CID from the Collab-Qahal view.
+        let agreement_cid = &collab.anchor_agreement_cid;
+        if agreement_cid.is_empty() {
+            return Err(StorageError::InvalidInput(format!(
+                "Collab-Qahal {collab_cid} has no anchor_agreement_cid — cannot route"
+            )));
+        }
+
+        // Fetch the CollabAgreement to get share_allocation.
+        // Note (M1 limitation): fetch_agreement_by_action_bytes does not decode the
+        // full Agreement entry (share_allocation comes back as the default fallback).
+        // Until M2 adds full entry decode, we surface this gap with a clear error
+        // rather than silently routing with wrong allocations.
+        let agreement = svc.fetch_collab_agreement(agreement_cid).await.map_err(|e| {
+            StorageError::Internal(format!(
+                "fetch_collab_agreement failed for {agreement_cid}: {e}"
+            ))
+        })?;
+
+        if agreement.share_allocation.shares.is_none() {
+            return Err(StorageError::InvalidInput(
+                "Agreement share_allocation.shares is empty — \
+                 full Agreement entry decode is not yet available in M1; \
+                 supply share_allocation explicitly or wait for M2 full-decode"
+                    .into(),
+            ));
+        }
+
+        // Active member set = non-withdrawn Collective CIDs from the Collab-Qahal.
+        let active_set: HashSet<String> = collab
+            .member_collectives
+            .iter()
+            .map(|c| c.cid.clone())
+            .collect();
+
+        let at_block_height = input_view.at_block_height;
+
+        // Build the primary CreateEconomicEventInput (scope_collab_cid is threaded through).
+        let primary_input: CreateEconomicEventInput = input_view.into();
+
+        // Persist the primary event first — its ID is the source_event_id for Settlements.
+        let mut conn = get_conn(pool)?;
+        let primary = EconomicEventService::create_event(&mut conn, ctx, primary_input)
+            .map_err(|e| StorageError::Internal(format!("primary event insert failed: {e}")))?;
+
+        // Generate Settlement inputs via the pure evaluator.
+        let settlement_inputs = route_economic_event_under_collab(
+            &agreement,
+            primary.resource_quantity_value.unwrap_or(0.0) as f64,
+            at_block_height,
+            &active_set,
+            &primary.id,
+        )?;
+
+        // Bulk-persist Settlement events.
+        let settlement_result =
+            EconomicEventService::bulk_create_events(&mut conn, ctx, settlement_inputs)?;
+
+        let resp_body = serde_json::json!({
+            "primary": primary,
+            "settlements": {
+                "created": settlement_result.created,
+                "errors": settlement_result.errors,
+            }
+        });
+        return Ok(response::json_response(
+            hyper::StatusCode::CREATED,
+            &resp_body,
+        ));
+    }
+
+    // Non-Collab path: single event, original behavior.
     let input: CreateEconomicEventInput = input_view.into();
     let mut conn = get_conn(pool)?;
     Ok(from_create_result(EconomicEventService::create_event(
         &mut conn, ctx, input,
     )))
+}
+
+// ---------------------------------------------------------------------------
+// QahalService helper
+// ---------------------------------------------------------------------------
+
+/// Build a `QahalService` from the `HcClientRegistry`, returning a 503 response
+/// if the registry or imagodei slot is absent.  Mirrors the pattern in
+/// `api/qahal.rs::require_qahal_service` but returns a `StorageError`-safe
+/// response rather than panicking.
+#[allow(clippy::result_large_err)]
+fn build_qahal_service(
+    hc_registry: Option<&Arc<HcClientRegistry>>,
+) -> Result<QahalService, Response<Full<Bytes>>> {
+    let registry = match hc_registry {
+        Some(r) => r,
+        None => return Err(response_503_qahal_offline()),
+    };
+    let hc = match registry.imagodei.clone() {
+        Some(h) => h,
+        None => return Err(response_503_qahal_offline()),
+    };
+    Ok(QahalService::new(hc))
+}
+
+/// 503 body emitted when Collab share-routing is requested but the imagodei
+/// conductor bridge is offline.
+fn response_503_qahal_offline() -> Response<Full<Bytes>> {
+    let body = serde_json::json!({
+        "error": "imagodei bridge offline",
+        "code": "IMAGODEI_BRIDGE_OFFLINE",
+        "message": "scopeCollabCid was set but the imagodei conductor bridge is not \
+                    connected. EconomicEvent Collab routing requires the imagodei DNA.",
+    });
+    response::json_response(hyper::StatusCode::SERVICE_UNAVAILABLE, &body)
 }
 
 async fn handle_bulk_create(

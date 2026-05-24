@@ -1224,20 +1224,27 @@ fn route_economic_event_under_collab_withdrawn_member_flows_entirely_to_commons(
 }
 
 #[test]
-#[ignore = "M1 CI-scope — needs live Holochain conductor via sweettest + DB migration for scope_collab_cid"]
+#[ignore = "M1 CI-scope — needs live Holochain conductor via sweettest (DB migration landed in M1 Task 14)"]
 fn economic_event_under_collab_routes_through_share_allocation() {
     // When this test runs in CI (M2):
     //   1. Build a 2-collective T0 Collab-Qahal (Coll A 0.475, Coll B 0.475, tribute 0.05)
-    //   2. POST an EconomicEvent with scope_collab_cid set to the Collab's CID
-    //      and value=1000 under the Collab's scope
-    //   3. List the resulting Settlement EconomicEvents
-    //   4. Assert: A and B each got ~475, commons-pool got ~50, sum is ~1000
+    //   2. POST /api/v1/economic-events with body:
+    //      { "action":"transfer", "provider":"agent:x", "receiver":"collective:qahal",
+    //        "resourceQuantityValue":1000, "resourceQuantityUnit":"credit",
+    //        "scopeCollabCid":"collective:<qahal-cid>", "atBlockHeight":0 }
+    //   3. Assert response.primary.id is set and response.settlements.created == 3
+    //   4. List economic events filtered by provider == "collective:<qahal-cid>"
+    //   5. Assert: A and B each received ~475, commons-pool ~50, sum ~1000
     //
-    // Prerequisite DB migration:
-    //   ALTER TABLE economic_events ADD COLUMN scope_collab_cid TEXT;
+    // DB migration (scope_collab_cid column): LANDED in M1 Task 14 deepening.
+    //   migrations/2026-05-24-000000_economic_events_add_scope_collab_cid/
     //
-    // Prerequisite service change:
-    //   EconomicEventService must accept Arc<QahalService> so it can call
-    //   fetch_collab_qahal(&collab_cid) + decode anchor_agreement_cid.
-    todo!("requires conductor + scope_collab_cid DB migration + QahalService borrow in EconomicEventService — wire in M2 Jenkins sweettest")
+    // Handler routing (async fetch_collab_qahal + bulk_create_events): LANDED in M1 Task 14.
+    //   api/economic_events.rs handle_create + QahalService::fetch_collab_agreement
+    //
+    // Remaining blocker: full Agreement entry decode (share_allocation.shares)
+    //   in fetch_agreement_by_action_bytes — currently returns default fallback.
+    //   Until M2 adds full entry decode, the conductor test will hit the
+    //   "Agreement share_allocation.shares is empty" guard in handle_create.
+    todo!("activate in M2 when fetch_agreement_by_action_bytes decodes full Agreement entry")
 }
