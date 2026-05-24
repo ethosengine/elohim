@@ -7,21 +7,23 @@
 //!
 //! Controller (api/economic_events.rs) → **Service (this file)** → Model (db/economic_events.rs)
 //!
-//! ## Share-routing integration (M1 Task 14)
+//! ## Share-routing integration (M1 final)
 //!
 //! When an EconomicEvent is authored under a Collab-Qahal scope, the emission
-//! path should route the event's value through the Agreement's `ShareAllocation`
-//! and emit one Settlement EconomicEvent per `RoutedAmount`.
+//! path routes the event's value through the Agreement's `ShareAllocation`
+//! and emits one Settlement EconomicEvent per `RoutedAmount`.
 //!
-//! **Current status (M1):** The DB model (`EconomicEvent`) does not yet carry a
-//! `scope_collab_cid` field, and `EconomicEventService` is sync/SQLite-bound with
-//! no `QahalService` dependency. The pure evaluator (`evaluate_share_routing_active_only`)
-//! is ready in `services::share_routing`. The wiring intent is captured in
-//! `route_economic_event_under_collab` below; the full live path is deferred to M2
-//! when the DB migration adds `scope_collab_cid` and the service gains an async
-//! `QahalService` borrow.
+//! **Status (M1 final):**
+//! - DB column `scope_collab_cid`: LANDED in M1 Task 14 deepening
+//!   (`migrations/2026-05-24-000000_economic_events_add_scope_collab_cid/`).
+//! - Handler-level routing (`api/economic_events.rs` async fetch + bulk-emit): LANDED M1 Task 14.
+//! - Full Agreement entry decode (`fetch_agreement_by_action_bytes` decodes
+//!   `ZomeCollabAgreementEntry` via rmp_serde, parses `share_allocation_json`): LANDED M1 final.
+//! - Remaining deferral: the CI-scope live conductor sweettest
+//!   (`qahal_http_contract::economic_event_under_collab_routes_through_share_allocation`)
+//!   stays `#[ignore]` — Che environment constraint, not a code gap.
 //!
-//! ### Wiring sketch (M2 activation)
+//! ### Historical wiring sketch (now active in api/economic_events.rs)
 //!
 //! ```rust,ignore
 //! // Inside the emission entry point, after recording the primary event:

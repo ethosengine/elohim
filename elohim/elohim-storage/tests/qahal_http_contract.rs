@@ -1224,7 +1224,7 @@ fn route_economic_event_under_collab_withdrawn_member_flows_entirely_to_commons(
 }
 
 #[test]
-#[ignore = "M1 CI-scope — needs live Holochain conductor via sweettest (DB migration landed in M1 Task 14)"]
+#[ignore = "M1 CI-scope — needs live Holochain conductor via sweettest; full Agreement decode now active"]
 fn economic_event_under_collab_routes_through_share_allocation() {
     // When this test runs in CI (M2):
     //   1. Build a 2-collective T0 Collab-Qahal (Coll A 0.475, Coll B 0.475, tribute 0.05)
@@ -1242,9 +1242,10 @@ fn economic_event_under_collab_routes_through_share_allocation() {
     // Handler routing (async fetch_collab_qahal + bulk_create_events): LANDED in M1 Task 14.
     //   api/economic_events.rs handle_create + QahalService::fetch_collab_agreement
     //
-    // Remaining blocker: full Agreement entry decode (share_allocation.shares)
-    //   in fetch_agreement_by_action_bytes — currently returns default fallback.
-    //   Until M2 adds full entry decode, the conductor test will hit the
-    //   "Agreement share_allocation.shares is empty" guard in handle_create.
-    todo!("activate in M2 when fetch_agreement_by_action_bytes decodes full Agreement entry")
+    // Full Agreement entry decode (share_allocation.shares): LANDED in M1 final.
+    //   ZomeCollabAgreementEntry + rmp_serde decode in fetch_agreement_by_action_bytes.
+    //   Unit test: qahal_service::tests::zome_collab_agreement_entry_round_trips_through_decode
+    //
+    // Remaining blocker: live Holochain conductor (Che environment constraint — not a code gap).
+    todo!("activate in M2 with live sweettest conductor")
 }

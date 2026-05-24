@@ -29,8 +29,8 @@ use crate::hc_client::HcClient;
 use elohim_views::{
     AttestCollabAgreementInputView, CollabAgreementStatus, CollabAgreementView,
     CollabCollectiveView, CollabMembershipRole, CollabMembershipView, CollabQahalView,
-    CreateCollabAgreementInputView, CreateCollabCollectiveInputView, ElohimTier, MemberKind,
-    ShareAllocation, WithdrawMembershipInputView,
+    CreateCollabAgreementInputView, CreateCollabCollectiveInputView, ElohimTier, GovernanceTerms,
+    MemberKind, ShareAllocation, WithdrawMembershipInputView,
 };
 
 // =============================================================================
@@ -255,14 +255,14 @@ impl QahalService {
 
     /// Fetch a CollabAgreement by its CID (e.g. "agreement:uhCkk...").
     ///
-    /// Composes existing conductor externs (`get_collab_status` +
-    /// `get_collab_qahal_cid_for_agreement`) to build a `CollabAgreementView`.
+    /// Fetches the full Agreement Record from the conductor via
+    /// `get_collective_by_action` (generic `get()` in the coordinator) and
+    /// decodes the entry body as `ZomeCollabAgreementEntry`. Composes
+    /// `get_collab_status` + `get_collab_qahal_cid_for_agreement` for the
+    /// status and Qahal-CID fields.
     ///
-    /// Note: the share_allocation decoded here uses the default fallback shape
-    /// because the raw Agreement entry bytes are not yet decoded by
-    /// `fetch_agreement_by_action_bytes` in M1.  The caller must supply the
-    /// `share_allocation` from the Collab creation flow if full routing is
-    /// required.  M2 will decode the full entry.
+    /// Returns a `CollabAgreementView` with fully-decoded `share_allocation`,
+    /// `participants`, `scope`, and `governance_terms` fields.
     pub async fn fetch_collab_agreement(
         &self,
         cid: &str,
@@ -386,8 +386,71 @@ impl QahalService {
         &self,
         action_bytes: &[u8],
     ) -> Result<CollabAgreementView, StorageError> {
-        // No dedicated extern for getting an agreement by action hash —
-        // compose existing externs: get status + qahal CID, then build view.
+        // --- Step 1: Fetch the full Agreement Record ---
+        //
+        // The coordinator's `get_collective_by_action` extern calls
+        // `get(action_hash, GetOptions::default())` — it is a generic HDK
+        // `get()` and returns whatever Record lives at the ActionHash.  We
+        // call it here with an agreement ActionHash; the returned entry_bytes
+        // contain a CollabAgreement (not a Collective), which we decode below
+        // as `ZomeCollabAgreementEntry`.
+        let record_payload = rmp_serde::to_vec(action_bytes).map_err(|e| {
+            StorageError::Internal(format!(
+                "encode ActionHash for get_collective_by_action (agreement): {e}"
+            ))
+        })?;
+        let record_result = self
+            .hc
+            .call_zome(self.zome, "get_collective_by_action", record_payload)
+            .await?;
+
+        let maybe_record: Option<ZomeRecord> =
+            rmp_serde::from_slice(&record_result).map_err(|e| {
+                StorageError::Internal(format!(
+                    "decode Option<Record> from get_collective_by_action (agreement): {e}"
+                ))
+            })?;
+
+        let record = maybe_record.ok_or_else(|| {
+            StorageError::NotFound(format!(
+                "CollabAgreement not found for action {}",
+                hex::encode(action_bytes)
+            ))
+        })?;
+
+        // --- Step 2: Decode entry bytes as ZomeCollabAgreementEntry ---
+        let entry: ZomeCollabAgreementEntry =
+            rmp_serde::from_slice(&record.entry_bytes).map_err(|e| {
+                StorageError::Internal(format!("decode CollabAgreement entry: {e}"))
+            })?;
+
+        // --- Step 3: Parse share_allocation_json → ShareAllocation ---
+        let share_allocation: ShareAllocation =
+            serde_json::from_str(&entry.share_allocation_json).map_err(|e| {
+                StorageError::Internal(format!(
+                    "parse share_allocation_json for agreement {}: {e}",
+                    bytes_to_agreement_cid(action_bytes)
+                ))
+            })?;
+
+        // --- Step 4: Parse governance_terms_json → GovernanceTerms ---
+        let governance_terms: Option<GovernanceTerms> =
+            if entry.governance_terms_json.trim().is_empty()
+                || entry.governance_terms_json.trim() == "{}"
+            {
+                None
+            } else {
+                serde_json::from_str(&entry.governance_terms_json)
+                    .map(Some)
+                    .map_err(|e| {
+                        StorageError::Internal(format!(
+                            "parse governance_terms_json for agreement {}: {e}",
+                            bytes_to_agreement_cid(action_bytes)
+                        ))
+                    })?
+            };
+
+        // --- Step 5: Fetch status (get_collab_status extern) ---
         let status_payload = rmp_serde::to_vec(action_bytes).map_err(|e| {
             StorageError::Internal(format!("encode ActionHash for get_collab_status: {e}"))
         })?;
@@ -404,7 +467,7 @@ impl QahalService {
             CollabAgreementStatus::PendingAttestations
         };
 
-        // Optionally resolve the Collab-Qahal CID if instantiated
+        // --- Step 6: Optionally resolve the Collab-Qahal CID if instantiated ---
         let collab_qahal_cid = if matches!(status, CollabAgreementStatus::Instantiated) {
             let cid_payload = rmp_serde::to_vec(action_bytes).map_err(|e| {
                 StorageError::Internal(format!("encode ActionHash for get_collab_qahal_cid: {e}"))
@@ -421,16 +484,26 @@ impl QahalService {
 
         let cid = bytes_to_agreement_cid(action_bytes);
 
+        // --- Step 7: Parse initial_tier ---
+        let initial_tier = match entry.initial_tier.as_str() {
+            "T0" => ElohimTier::T0,
+            other => {
+                return Err(StorageError::Internal(format!(
+                    "unrecognised initial_tier '{other}' in CollabAgreement entry — M1 only supports T0"
+                )))
+            }
+        };
+
         Ok(CollabAgreementView {
             cid,
-            authored_by_agent_cid: "agent:unknown".into(), // not derivable without full Record decode
-            participants: vec![], // not derivable without full Record decode
-            scope: String::new(), // not derivable without full Record decode
-            share_allocation: default_share_allocation(),
-            commons_pool_tribute: 0.0,
-            governance_terms: None,
-            initial_tier: ElohimTier::T0,
-            created_at_block_height: 0,
+            authored_by_agent_cid: entry.authored_by_agent_cid,
+            participants: entry.participants,
+            scope: entry.scope,
+            share_allocation,
+            commons_pool_tribute: entry.commons_pool_tribute,
+            governance_terms,
+            initial_tier,
+            created_at_block_height: entry.created_at_block_height,
             status,
             attested_by: vec![],
             collab_qahal_cid,
@@ -672,6 +745,35 @@ struct ZomeMembershipEntry {
     pub withdrawn_at_block_height: Option<u64>,
 }
 
+/// Mirror of `imagodei_integrity::qahal::CollabAgreement` for deserialization.
+///
+/// Field order and names must match the integrity entry struct exactly, since
+/// rmp_serde uses the named-map encoding and matches fields by key.  The HDK
+/// `#[hdk_entry_helper]` macro delegates to serde with default field names.
+///
+/// `Serialize` is derived to allow round-trip tests via `rmp_serde::to_vec_named`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ZomeCollabAgreementEntry {
+    pub authored_by_agent_cid: String,
+    pub participants: Vec<String>,
+    pub scope: String,
+    /// JSON-stringified `ShareAllocation` (camelCase keys).
+    pub share_allocation_json: String,
+    pub commons_pool_tribute: f64,
+    /// JSON-stringified `GovernanceTerms` (camelCase keys). May be `"{}"` when absent.
+    pub governance_terms_json: String,
+    /// Populated once the Collab-Qahal is instantiated; `None` before full attestation.
+    #[serde(default)]
+    pub anchor_collective_cid: Option<String>,
+    /// "T0" only in M1.
+    pub initial_tier: String,
+    pub created_at_block_height: u64,
+    /// Carried for completeness of the wire type; not projected.
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub salt: String,
+}
+
 // =============================================================================
 // CID codec helpers
 // =============================================================================
@@ -739,14 +841,139 @@ fn base64url_decode(s: &str) -> Result<Vec<u8>, String> {
         .map_err(|e| e.to_string())
 }
 
-/// Fallback share allocation for when the full agreement entry cannot be decoded.
-fn default_share_allocation() -> ShareAllocation {
-    use elohim_views::ShareAllocationForm;
-    ShareAllocation {
-        form: ShareAllocationForm::Declared,
-        shares: None,
-        affinity_window_blocks: None,
-        rebalance_cadence_blocks: None,
-        commons_pool_tribute: 0.0,
+// =============================================================================
+// Unit tests — decode path only (no conductor required)
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that a `ZomeCollabAgreementEntry` round-trips through msgpack
+    /// serialization (the encoding the conductor uses) and that the JSON sub-fields
+    /// (`share_allocation_json`, `governance_terms_json`) parse into the correct
+    /// view-layer types — exercising the full decode path in
+    /// `fetch_agreement_by_action_bytes` without a live Holochain conductor.
+    #[test]
+    fn zome_collab_agreement_entry_round_trips_through_decode() {
+        // Build a realistic entry matching what the conductor would emit.
+        let share_allocation_json = serde_json::json!({
+            "form": "declared",
+            "shares": [
+                { "collectiveCid": "collective:coll-a", "share": 0.475 },
+                { "collectiveCid": "collective:coll-b", "share": 0.475 }
+            ],
+            "commonsPoolTribute": 0.05
+        })
+        .to_string();
+
+        let governance_terms_json = serde_json::json!({
+            "exitTerms": "clean"
+        })
+        .to_string();
+
+        let entry = ZomeCollabAgreementEntry {
+            authored_by_agent_cid: "agent:test-author".into(),
+            participants: vec![
+                "collective:coll-a".into(),
+                "collective:coll-b".into(),
+            ],
+            scope: "test-project".into(),
+            share_allocation_json: share_allocation_json.clone(),
+            commons_pool_tribute: 0.05,
+            governance_terms_json: governance_terms_json.clone(),
+            anchor_collective_cid: None,
+            initial_tier: "T0".into(),
+            created_at_block_height: 42,
+            salt: "0000000000000000000000000000000a".into(),
+        };
+
+        // --- Serialize as the conductor would (named msgpack) ---
+        let bytes = rmp_serde::to_vec_named(&entry)
+            .expect("rmp_serde::to_vec_named should not fail for ZomeCollabAgreementEntry");
+
+        // --- Deserialize back, mirroring fetch_agreement_by_action_bytes step 2 ---
+        let decoded: ZomeCollabAgreementEntry = rmp_serde::from_slice(&bytes)
+            .expect("rmp_serde::from_slice should decode ZomeCollabAgreementEntry");
+
+        assert_eq!(decoded.authored_by_agent_cid, "agent:test-author");
+        assert_eq!(decoded.participants.len(), 2);
+        assert_eq!(decoded.scope, "test-project");
+        assert_eq!(decoded.initial_tier, "T0");
+        assert_eq!(decoded.created_at_block_height, 42);
+        assert!((decoded.commons_pool_tribute - 0.05).abs() < 1e-9);
+
+        // --- Parse share_allocation_json, mirroring step 3 ---
+        let share_allocation: ShareAllocation =
+            serde_json::from_str(&decoded.share_allocation_json)
+                .expect("share_allocation_json should parse into ShareAllocation");
+
+        assert!(
+            share_allocation.shares.is_some(),
+            "ShareAllocation.shares must be Some(_) after full decode"
+        );
+        let shares = share_allocation.shares.as_ref().unwrap();
+        assert_eq!(shares.len(), 2, "expected 2 declared shares");
+
+        let coll_a = shares
+            .iter()
+            .find(|s| s.collective_cid == "collective:coll-a")
+            .expect("collective:coll-a share entry must be present");
+        assert!((coll_a.share - 0.475).abs() < 1e-9, "coll-a share ~ 0.475");
+
+        let coll_b = shares
+            .iter()
+            .find(|s| s.collective_cid == "collective:coll-b")
+            .expect("collective:coll-b share entry must be present");
+        assert!((coll_b.share - 0.475).abs() < 1e-9, "coll-b share ~ 0.475");
+
+        assert!(
+            (share_allocation.commons_pool_tribute - 0.05).abs() < 1e-9,
+            "commons_pool_tribute ~ 0.05"
+        );
+
+        // --- Parse governance_terms_json, mirroring step 4 ---
+        let governance_terms: Option<GovernanceTerms> =
+            if decoded.governance_terms_json.trim().is_empty()
+                || decoded.governance_terms_json.trim() == "{}"
+            {
+                None
+            } else {
+                serde_json::from_str(&decoded.governance_terms_json)
+                    .map(Some)
+                    .expect("governance_terms_json should parse into GovernanceTerms")
+            };
+
+        assert!(governance_terms.is_some(), "governance_terms must be Some");
+        assert_eq!(
+            governance_terms.unwrap().exit_terms,
+            "clean",
+            "exit_terms must be 'clean'"
+        );
+
+        // --- Parse initial_tier, mirroring step 7 ---
+        assert_eq!(decoded.initial_tier, "T0");
+    }
+
+    /// Verify that an empty / `"{}"` governance_terms_json maps to None,
+    /// consistent with the defensive check in fetch_agreement_by_action_bytes.
+    #[test]
+    fn empty_governance_terms_json_decodes_to_none() {
+        for empty_val in &["{}", "  {}  ", ""] {
+            let governance_terms: Option<GovernanceTerms> =
+                if empty_val.trim().is_empty() || empty_val.trim() == "{}" {
+                    None
+                } else {
+                    serde_json::from_str::<GovernanceTerms>(empty_val)
+                        .map(Some)
+                        .unwrap_or(None)
+                };
+            assert!(
+                governance_terms.is_none(),
+                "governance_terms for '{}' should be None",
+                empty_val
+            );
+        }
     }
 }
+

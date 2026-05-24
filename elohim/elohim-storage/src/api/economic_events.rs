@@ -172,21 +172,24 @@ async fn handle_create(
         }
 
         // Fetch the CollabAgreement to get share_allocation.
-        // Note (M1 limitation): fetch_agreement_by_action_bytes does not decode the
-        // full Agreement entry (share_allocation comes back as the default fallback).
-        // Until M2 adds full entry decode, we surface this gap with a clear error
-        // rather than silently routing with wrong allocations.
+        // Full Agreement entry decode is active (M1 final): fetch_agreement_by_action_bytes
+        // now decodes the CollabAgreement entry body from the conductor Record and parses
+        // share_allocation_json into a real ShareAllocation.
         let agreement = svc.fetch_collab_agreement(agreement_cid).await.map_err(|e| {
             StorageError::Internal(format!(
                 "fetch_collab_agreement failed for {agreement_cid}: {e}"
             ))
         })?;
 
+        // Defensive trust-boundary check: a properly-formed CollabAgreement always
+        // carries declared shares (validated by the coordinator pre-commit gate).
+        // This guard surfaces data-integrity violations rather than silently routing
+        // with zero shares.
         if agreement.share_allocation.shares.is_none() {
             return Err(StorageError::InvalidInput(
-                "Agreement share_allocation.shares is empty — \
-                 full Agreement entry decode is not yet available in M1; \
-                 supply share_allocation explicitly or wait for M2 full-decode"
+                "agreement share_allocation.shares missing on Agreement entry — \
+                 this should never happen with a properly-formed CollabAgreement; \
+                 check coordinator pre-commit validation or DHT data integrity"
                     .into(),
             ));
         }
