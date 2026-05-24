@@ -25,8 +25,19 @@ lint-style:
 lint-fix:
     pnpm exec npm-groovy-lint --path '../..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --fix
 
-# Quality gate: validate Jenkinsfiles against Jenkins itself.
-gate: lint
+# Static Jenkinsfile lints that catch runtime-only failure classes
+# (env-bridge anti-pattern → orchestrator/dev #1024 MissingPropertyException).
+# Fast — no Jenkins required. SCOPED to jenkinsfile-cps-scope.test.mjs only
+# because the broader orchestrator-strategy.test.mjs has a pre-existing drift
+# failure (tsconfig.storybook.json glob coverage) that's out of scope here.
+# Expand to `*.test.mjs` when that gets fixed.
+test-jenkinsfile-lints:
+    node --test jenkinsfile-cps-scope.test.mjs
+
+# Quality gate: validate Jenkinsfiles against Jenkins itself + run the
+# Jenkinsfile static lints. Pre-push hook calls `just gate` on any
+# orchestrator change.
+gate: lint test-jenkinsfile-lints
 
 # Regenerate pipeline-list.json from orchestrator-strategy.mjs.
 # Run after editing PIPELINES.
