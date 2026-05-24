@@ -1,6 +1,6 @@
 //! Phase 11 acceptance gate #5 — recovery e2e cross-stack.
 //!
-//! Spec: genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md line 514.
+//! Spec: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md line 514.
 //! Plan: genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md.
 //!
 //! Asserts: a recovery invitation published from one peer reaches each

@@ -11,7 +11,7 @@ harness used during cutover.
 ## Architecture decision: cutover posture
 
 **Phase 11 backend wiring is gated by the architecture spec at**
-[`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`](../../../../genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md).
+[`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`](../../../../genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md).
 
 The spec lands the cutover posture as **partial replacement, dual-stack
 permanent for most planes**, with a per-plane verdict table and a

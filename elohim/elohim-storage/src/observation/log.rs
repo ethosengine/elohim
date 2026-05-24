@@ -6,7 +6,7 @@
 //! durability (Task 4.5); this in-memory primitive is the foundation that
 //! lets Stage 4 components be unit-tested without iroh.
 //!
-//! See genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md §5.1.
+//! See genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md §5.1.
 
 use crate::observation::wire::Observation;
 use thiserror::Error;

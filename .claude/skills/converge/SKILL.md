@@ -249,4 +249,4 @@ conservative; the operator can always tell you to be more aggressive next cycle.
 
 - `.claude/skills/memory-kit/SKILL.md` — produces the reports converge consumes
 - `genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md` — the design rationale and end-state vision
-- `genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md` — the lifecycle primitives this skill operates within
+- `genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md` — the lifecycle primitives this skill operates within

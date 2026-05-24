@@ -252,3 +252,17 @@ Where the medium itself encodes love.
 *The old web profits from tragedy. The new web prevents it.*
 
 *Your family's digital sovereignty awaits at elohim.host/freedom*
+
+---
+
+## Technical Realization
+
+The protocol-layer work that delivers the platform alternatives this epic promises:
+
+- [`Records Lifecycle`](../architecture/2026-05-24-records-lifecycle-design.md) *(canonical)* — **the records lifecycle behind the platform replacements.** Part B.2 walks YouTube-shape digital media; Part B.3 walks Google-Drive / Photos-shape file store + collaboration; Part B.4 walks WordPress-shape composed SPAs. Each shows how the same eight primitives compose every platform shape without special-casing — and why peer nodes don't melt under massive blob traffic, search workloads, or composability demands.
+- [`DNA Signal as EPR Envelope`](../../../superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md) — the FeedbackSignal surface (subscribes, likes, comments) gated by reach.
+- [`Doorway Access Tier Patterns`](../../../superpowers/specs/2026-05-23-doorway-access-tier-patterns.md) — the web2 projection surface that serves browsers without Holochain peers (so your grandmother can read the new web from a stock Android).
+
+For the full canonical-specs index, see [`canonical-specs/INDEX.md`](../architecture/INDEX.md).
+
+*Speech is free but reach is earned — and the architecture that earns it is the records lifecycle. The medium encodes love because the substrate's gradient cost-sheds spam while elevating contribution.*

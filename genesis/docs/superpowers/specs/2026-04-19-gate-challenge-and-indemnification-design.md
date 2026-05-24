@@ -280,7 +280,7 @@ These principles emerge from the design above and should govern Phase 11+ implem
 - `ElohimSubstance` entry type (imagodei DNA, Phase 0 Category A): imagodei coordinator; the `SubstanceAttestation` indemnification action attaches to this
 - Rakia attestation pattern (`rakia/docs/plans/build-attestation-integration.md`): the `GateDecisionChallenge` shape rhymes with rakia's brit/attestation challenge surface — same principle of adding immutable accountability context to existing immutable records
 - Elohim-strength vocabulary (Task 9/10): `appeals-sustained` is the reputation-positive dimension; high upheld-challenge rate is the reputation-negative signal for dispatch preference
-- Experience story EPR design: `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` — consumer of the discernment gate; the first gate whose decisions will be challengeable under this spec
+- Experience story EPR design: `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md` — consumer of the discernment gate; the first gate whose decisions will be challengeable under this spec
 
 ---
 

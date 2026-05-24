@@ -32,7 +32,7 @@ The frame, after Pawel Huryn's article ("How I Finally Sorted My Claude Code Mem
 - `/converge` — synthesis layer (vision×readiness scoring + next-actions menu). Reads memory-kit reports; produces the session-start handoff.
 - Dev-dashboard scripts at `.claude/scripts/dev-dashboard/` — `plan-status.py` and `sprint-distill.py`. Useful, not memory-hygiene.
 
-**Spec reference**: `genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md` — the comet-shaped memory model and lifecycle primitives. Also see `genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md` for the three-perspective frame (history/roadmap/development) this kit sits inside.
+**Spec reference**: `genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md` — the comet-shaped memory model and lifecycle primitives. Also see `genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md` for the three-perspective frame (history/roadmap/development) this kit sits inside.
 
 **When to invoke**: weekly hygiene pass, before kicking off a major `/shift`, when "memory says X exists but X is gone" surfaces in agent output, or whenever the corpus feels noisy.
 
@@ -259,7 +259,7 @@ This kit's primary periodic role. Librarian-solo (no four-agent ceremony, no ope
 ## Related
 
 - `.claude/skills/converge/SKILL.md` — synthesis layer; consumes memory-kit reports
-- `genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md` — lifecycle primitives (the design language)
+- `genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md` — lifecycle primitives (the design language)
 - `genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md` — the three-perspective frame this kit sits inside; future historian role
 - `genesis/docs/content/elohim-protocol/living_memory/epic.md` — narrative on what living memory means in the protocol
 - `.claude/hooks/pre-tool-memory.py` — the PreToolUse memory injector

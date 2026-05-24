@@ -12,7 +12,7 @@ from the digest. This tool is read-only: it surfaces the raw signal so it
 stops being scattered.
 
 Sibling tool of `/cleanup` in the `/memory-kit` toolkit.
-Spec reference: genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md
+Spec reference: genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
 The corpus axis named in the v1 inputs of `/dream` ("Sprint-result artifacts
 from `/shift` and `/deliver`") is the surface this tool digests.
 

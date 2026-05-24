@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust (elohim-storage, Holochain HDK/HDI), MessagePack/CBOR (rmp-serde) for wire, BLAKE3 (iroh-blobs) for chunking, libp2p gossipsub for cursor propagation, Diesel + SQLite for projection, TypeScript (ts-rs codegen + @elohim/storage-client), Angular 19 service (elohim-service).
 
-**Spec:** `genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md`
+**Spec:** `genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md`
 
 **Prerequisite:** Wave 0 Stage A (attestation consolidation) must be landed before Stage 5 of this plan (graduation Path 1 depends on `content_type: "attestation:*"` discriminator pattern).
 
@@ -142,7 +142,7 @@ Create `elohim/sdk/schemas/v1/manifest/observation-kind.schema.json`:
   "$id": "epr:schema:manifest:observation-kind",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ObservationKindDeclaration",
-  "description": "Per-pillar manifest declaration of an observation_kind. See genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md §7.",
+  "description": "Per-pillar manifest declaration of an observation_kind. See genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md §7.",
   "type": "object",
   "required": ["kind", "namespace", "schema", "retention_class", "reach"],
   "properties": {
@@ -938,7 +938,7 @@ git commit -m "feat(observation): declare libp2p protocol id and iroh ALPN"
 -- Observation/Event Layer — Stage 3 of the observation-event-layer-design spec.
 -- Source of truth: iroh-blob log (per-observer, content-addressed). Classification: C.
 -- The substrate primitive for peer-witnessed evidence on Track 2 (libp2p+iroh).
--- See genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md
+-- See genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md
 
 -- One row per observation. Reconstructable by replaying the observer's iroh-blob log.
 CREATE TABLE observations (
@@ -3048,7 +3048,7 @@ For `peer_blob_inventory/up.sql`, prepend (do not edit the schema):
 -- 'infrastructure:blob-hosted' observation kinds. The libp2p gossipsub topic
 -- 'elohim/inventory/blob' is the legacy name for what is now formally the
 -- observation cursor announcement stream for blob-served/blob-hosted.
--- See: genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md §10 Stage 8.
+-- See: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md §10 Stage 8.
 ```
 
 Same shape for `projection_events/up.sql` and the system_metrics migration.
@@ -3083,7 +3083,7 @@ If a local CLAUDE.md exists, add a section explaining which existing tables now 
 ```markdown
 ### Observation Layer Projections
 
-Per `genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md`, the following existing operational SQL tables are observation projections:
+Per `genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md`, the following existing operational SQL tables are observation projections:
 
 - `peer_blob_inventory` — `infrastructure:blob-served` and `infrastructure:blob-hosted`
 - `system_metrics` — `infrastructure:system-sample` (per-node only)

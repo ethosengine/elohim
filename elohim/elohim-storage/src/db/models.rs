@@ -3274,7 +3274,7 @@ pub struct ObservationDiversitySummaryRow {
 
 // Unified attestations projection (Category A — source of truth: Holochain DHT)
 // Projection of Content entries with content_type LIKE 'attestation:%'.
-// See genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §7.4.
+// See genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md §7.4.
 // ============================================================================
 
 /// Projection row for a unified attestation Content entry from elohim DNA.

@@ -339,7 +339,7 @@ pub async fn handle_api_request(
         // Wave 3 M1 — valueflows bridge endpoint.
         // Stub-stage: serves fixture EconomicEvent via the bridge's GraphQL schema.
         // M2+ adds identity bridge (qahal-authority), M3+ adds real hREA projection.
-        // See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+        // See genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md
         // M1: every BridgeError variant is an infrastructure failure (body
         // read, response serialize, response build) — Internal (500) is
         // correct. M2+ will introduce auth/binding/authority denial variants

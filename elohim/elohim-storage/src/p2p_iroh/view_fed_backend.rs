@@ -7,7 +7,7 @@
 //! which calls `build_response_slice` directly) so the two transports
 //! return wire-byte-identical responses for the same request.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the view-federation plane is dual-stack permanent. 256 KiB cap on
 //! responses applies on both transports.
 //!

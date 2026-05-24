@@ -1,6 +1,6 @@
 //! Qahal substrate entries: Collective, Membership (polymorphic), CollabAgreement.
 //!
-//! Per spec: genesis/docs/superpowers/specs/2026-05-23-multi-collective-collaboration-epr-design.md
+//! Per spec: genesis/docs/content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md
 //! Pure-data validation only — link traversal happens in the coordinator zome.
 
 use hdi::prelude::*;

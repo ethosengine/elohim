@@ -7,5 +7,5 @@
 > rakia replacing Jenkins, plans that touch the build/test/attestation surface live
 > in rakia so they travel with that submodule's evolution.
 >
-> **Spec:** `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md`
+> **Spec:** `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md`
 > (commit `09563f63`).

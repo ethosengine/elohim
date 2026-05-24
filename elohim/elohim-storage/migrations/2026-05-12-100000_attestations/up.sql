@@ -1,6 +1,6 @@
 -- Source of truth: Holochain DHT (projection of Content entries with content_type LIKE 'attestation:%')
 -- Category A — every row carries dht_anchor_hash NOT NULL.
--- Per spec genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §7.4.
+-- Per spec genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md §7.4.
 
 CREATE TABLE IF NOT EXISTS attestations (
     id TEXT PRIMARY KEY,

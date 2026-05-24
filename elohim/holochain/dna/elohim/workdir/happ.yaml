@@ -92,7 +92,7 @@ roles:
   # hREA DNA — Wave 3 substrate readiness.
   # Lynn Foster's canonical hREA (h-REA/hREA). Pinned to a specific upstream
   # release; bundle fetched out-of-band into ../hrea/workdir/hrea.dna.
-  # See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+  # See genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md
   #
   # version_pin: 0.0.0  <-- update when first real version is pinned
   #

@@ -12,7 +12,7 @@
 //! pin wire-byte parity). Together they cover wire framing AND production
 //! dispatch.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the EPR plane is dual-stack permanent. The Announce variant is the
 //! asymmetric outlier (libp2p put_record vs iroh pkarr-not-yet-wired);
 //! one of the tests pins the iroh-side "not yet wired" reason so a

@@ -58,6 +58,6 @@ DnaSignal::KeyRevocation {
 5. Parse `relayChain` (ignore content for now, forward-compat).
 6. Run all three verification steps before applying state transition.
 
-**Spec doc (load-bearing for handoff):** `genesis/docs/superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md` — M4 T18 owns drafting this; my consumer reads it as the contract.
+**Spec doc (load-bearing for handoff):** `genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md` — M4 T18 owns drafting this; my consumer reads it as the contract.
 
 **Why this is the right architecture (capture the generational frame):** The wire carries propagation provenance, not just substrate addresses. The notary's role narrows to coordination registrar (sequence/lineage/effectiveness timing). Wisdom-layer enforcement (author/relay/consume gating) distributes to every node via the elohim at each hop. The substrate floor without the notary is still policy-enforced because elohims at each node gate authoring + reach + consumption — to form a dark web you'd have to remove the elohim layer entirely, which means leaving the protocol. Capture-resistance lives in ubiquitous wisdom, not in a chokepoint. The EPR envelope is the protocol's native primitive for this; treating signals as EPR envelopes aligns the wire with the primitive rather than inventing a parallel "signal schema." Related: [[project-elohim-agent-sense-respond-architecture]], [[project-three-layer-truth-model]], [[project-trust-as-efficiency-signal]].

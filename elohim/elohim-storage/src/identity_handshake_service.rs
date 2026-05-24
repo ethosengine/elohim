@@ -7,7 +7,7 @@
 //! [`crate::p2p_iroh::IdentityHandshakeBackend`] can produce
 //! wire-byte-identical responses for the same request.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the identity-handshake plane is dual-stack permanent. Integrity is
 //! preserved by Track 1 DHT-notarized agent identity (kitsune2/tx5)
 //! and the signed wire frames the handshake exchanges — NOT by any

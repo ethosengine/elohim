@@ -120,7 +120,7 @@ pub struct Args {
     pub doorway_id: Option<String>,
 
     /// Enable the self-hostable pkarr resolver endpoint at /pkarr/{key}.
-    /// See genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+    /// See genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
     /// (cutover gate #10).
     #[arg(long, env = "DOORWAY_PKARR_RESOLVER_ENABLED", default_value_t = false)]
     pub pkarr_resolver_enabled: bool,

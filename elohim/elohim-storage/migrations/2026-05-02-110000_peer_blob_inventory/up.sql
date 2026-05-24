@@ -3,7 +3,7 @@
 -- 'infrastructure:blob-hosted' observation kinds. The libp2p gossipsub topic
 -- 'elohim/inventory/blob' is the legacy name for what is now formally the
 -- observation cursor announcement stream for blob-served/blob-hosted.
--- See: genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md §10 Stage 8.
+-- See: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md §10 Stage 8.
 --
 -- T12 — peer_blob_inventory: Reality projection of who currently hosts what blob.
 --

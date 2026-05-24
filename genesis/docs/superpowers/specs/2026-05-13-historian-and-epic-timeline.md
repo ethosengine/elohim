@@ -3,7 +3,7 @@ title: Historian, Epic-Graph Timeline, and the Three Temporal Perspectives
 date: 2026-05-13
 status: draft
 related:
-  - genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
   - genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md
   - .claude/skills/memory-kit/SKILL.md
   - .claude/skills/converge/SKILL.md

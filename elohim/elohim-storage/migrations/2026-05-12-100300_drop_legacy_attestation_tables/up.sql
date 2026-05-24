@@ -1,5 +1,5 @@
 -- Removes legacy per-entry-type projection tables superseded by 2026-05-12-100000_attestations
--- (source of truth: Holochain DHT); see genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §7.4 for the full table list
+-- (source of truth: Holochain DHT); see genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md §7.4 for the full table list
 
 DROP TABLE IF EXISTS imagodei_attestations;
 DROP TABLE IF EXISTS humanity_witnesses;

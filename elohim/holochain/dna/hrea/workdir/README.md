@@ -12,7 +12,7 @@ translates VF-GraphQL queries and mutations and projects them into hREA
 entries via per-Human cells provisioned during the VFBinding handshake.
 
 See:
-- `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
+- `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 - `https://github.com/h-REA/hREA/releases`
 
 ## Fetching the bundle

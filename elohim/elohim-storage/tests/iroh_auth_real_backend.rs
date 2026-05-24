@@ -2,7 +2,7 @@
 //! QUIC dispatched into real services (not the stubs used by
 //! `iroh_auth_parity`).
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! both planes are dual-stack permanent. Integrity is preserved by
 //! DHT-anchored signed wire frames (Track 1), not transport-level
 //! security; both transports preserve DHT-derived integrity equally.

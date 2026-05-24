@@ -5,7 +5,7 @@
 #
 # Per memory project_ci_storage_topology: openebs-jiva-csi-default is the
 # verified storage class for this cluster. Per spec
-# genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md,
+# genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md,
 # this enables the self-hostable pkarr relay endpoint at /pkarr/{key}.
 spec:
   template:

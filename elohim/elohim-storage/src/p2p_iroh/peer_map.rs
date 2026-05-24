@@ -20,7 +20,7 @@
 //! out-of-tree consumer (steward) and for the README's documented
 //! examples.
 //!
-//! Spec: genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+//! Spec: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
 //! lines 440-505.
 
 use diesel::prelude::*;

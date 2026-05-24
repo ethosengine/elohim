@@ -533,7 +533,7 @@ mkdir -p /projects/elohim/.worktrees/epr-codec-phase-1/elohim/elohim-storage/mig
 
 ```sql
 -- EPR storage layer — Phase 2a
--- See genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md §8
+-- See genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md §8
 
 -- Primary atom table
 CREATE TABLE epr_atoms (

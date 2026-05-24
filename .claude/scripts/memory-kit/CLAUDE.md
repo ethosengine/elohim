@@ -117,7 +117,7 @@ These are the architectural insights the subagents internalize:
 
 ## Specs
 
-- `genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md` — lifecycle primitives (`promote`, `compact`, `merge`, `submerge`/`surface`, `close-interval`, `memorialize`, `forget`, `quarantine`)
+- `genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md` — lifecycle primitives (`promote`, `compact`, `merge`, `submerge`/`surface`, `close-interval`, `memorialize`, `forget`, `quarantine`)
 - `genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md` — converge design rationale + end-state vision
 - `genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md` — historian role + epic-graph-as-timeline + MemPalace substrate proposal
 

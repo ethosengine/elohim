@@ -6,7 +6,7 @@
 //! read-side variants so the two transports return wire-byte-identical
 //! responses for the same request.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the EPR plane is dual-stack permanent: identical wire frames, identical
 //! authorization gates. The Announce variant is the asymmetric outlier —
 //! libp2p side writes to Kademlia (`put_record`); iroh side uses

@@ -11,7 +11,7 @@
 //! (content-addressed by CID). The `epr_atoms` table (Phase 2a) is its
 //! operational projection.
 //!
-//! Spec: `genesis/docs/superpowers/specs/2026-04-23-epr-phase-2c-libp2p-federation-design.md`
+//! Spec: `genesis/docs/content/elohim-protocol/architecture/2026-04-23-epr-phase-2c-libp2p-federation-design.md`
 
 use async_trait::async_trait;
 use futures::prelude::*;

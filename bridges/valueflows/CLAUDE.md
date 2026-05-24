@@ -31,7 +31,7 @@ The hREA / VF-GraphQL bridge for the Elohim Protocol. Consumed by
 
 ## Reference docs
 
-- Spec: `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
+- Spec: `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 - M1 plan: `genesis/docs/superpowers/plans/2026-05-20-wave3-m1-valueflows-substrate-readiness-plan.md`
 
 ## Build / test

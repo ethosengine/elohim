@@ -1,6 +1,6 @@
 /**
  * Recovery cross-stack step definitions — gate #5 of iroh Phase 11 cutover.
- * (genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md line 514).
+ * (genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md line 514).
  *
  * Framework: Cucumber-JS 11 + tsx (a2o convention).
  * Tag: @recovery-cross-stack — run with: pnpm exec cucumber-js --tags '@recovery-cross-stack'

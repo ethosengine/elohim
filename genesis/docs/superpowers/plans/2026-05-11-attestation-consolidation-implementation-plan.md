@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 2021 (Holochain HDI/HDK 0.6, elohim-storage, Diesel/SQLite), JSON Schema (Draft 2020-12), ts-rs codegen, Angular 19, libp2p 0.54 with request-response (for Shamir share transport in Stage G).
 
-**Source-of-truth spec:** `genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md`
+**Source-of-truth spec:** `genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md`
 
 **Wave 0 integration:** This plan SUPERSEDES Wave 0's Attestation dedupe direction. After this plan's Stages A–F land, the Wave 0 plan's Stage B (`lamad_event_type → elohim_event_type` rename) executes against the post-consolidation tree. Wave 0 plan must be updated to cite this plan before dispatch.
 
@@ -184,7 +184,7 @@ Create `elohim/sdk/schemas/v1/attestation/attestation-content.schema.json`:
   "$id": "https://elohim.protocol/schemas/v1/attestation/attestation-content.schema.json",
   "$comment": "Source of truth: Holochain DHT (notarized Content entry with content_type LIKE 'attestation:%'). Category A per p2p-design-gate.",
   "title": "AttestationContent",
-  "description": "Wire shape for an attestation realized as a Content entry on elohim DNA. Source of truth is the Holochain DHT — this schema describes the JSON-on-wire shape only. See genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §3.",
+  "description": "Wire shape for an attestation realized as a Content entry on elohim DNA. Source of truth is the Holochain DHT — this schema describes the JSON-on-wire shape only. See genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md §3.",
   "type": "object",
   "required": [
     "id",
@@ -986,7 +986,7 @@ Create `elohim/holochain/dna/elohim/zomes/content_store/src/attestation.rs`:
 //! Attestation coordinator — issuance, revocation, queries.
 //!
 //! Implements the consolidation defined in
-//! `genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md`.
+//! `genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md`.
 //!
 //! Attestation entries are `Content` entries with `content_type` matching
 //! `"attestation:<subtype>"` declared in some pillar manifest. This module
@@ -2076,7 +2076,7 @@ Create `attestation_validator.rs` implementing the 8 floors from spec §9. Floor
 
 ```rust
 //! Validator floors for attestation + governance-action Content entries.
-//! See genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §9.
+//! See genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md §9.
 
 use hdi::prelude::*;
 
@@ -2453,7 +2453,7 @@ Stage D lands the SQLite projections that index attestation Content entries for 
 
 ```sql
 -- Removes legacy per-entry-type projection tables superseded by 2026-05-12-100000_attestations
--- (source of truth: Holochain DHT); see genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §7.4 for the full table list
+-- (source of truth: Holochain DHT); see genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md §7.4 for the full table list
 
 DROP TABLE IF EXISTS imagodei_attestations;
 DROP TABLE IF EXISTS humanity_witnesses;
@@ -2520,7 +2520,7 @@ git commit -m "migration(attestation): drop 22 legacy per-type attestation proje
 ```sql
 -- Source of truth: Holochain DHT (projection of Content entries with content_type LIKE 'attestation:%')
 -- Category A — every row carries dht_anchor_hash NOT NULL.
--- Per spec genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §7.4.
+-- Per spec genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md §7.4.
 
 CREATE TABLE attestations (
     id TEXT PRIMARY KEY,

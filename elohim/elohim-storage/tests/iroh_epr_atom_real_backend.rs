@@ -10,7 +10,7 @@
 //! ALPN dispatch, adapter mapping, EprAtomService wiring — the
 //! assertion blows up.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the EPR-atom plane is dual-stack permanent. Caller identity defaults
 //! to Anonymous in iroh mode pending the cross-stack peer-map
 //! graduation, so these tests exercise the unauthenticated paths.

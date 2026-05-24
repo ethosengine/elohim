@@ -141,7 +141,7 @@
   - Evaluates rules in order against GateContext keys
   - Returns first-matching outcome, or null if no match
 - [ ] Author the seven-valence rules artifact:
-  - Serialize the rules from `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` §7.3 as a structured ContentNode with `contentType: gate-rules-declaration`
+  - Serialize the rules from `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md` §7.3 as a structured ContentNode with `contentType: gate-rules-declaration`
   - Include all seven valences, magnitudes, evidence types, and rule ordering
   - Preserve the rule 3 vs rule 2 overlap semantics explicitly
 - [ ] Author the discernment-gate-v1-mechanical GateProcessDeclaration:
@@ -380,7 +380,7 @@
 ## Superseded / Related Work
 
 - **Supersedes:** `rakia/docs/plans/2026-04-18-experience-story-discernment-gate.md` (the full TS-discernment plan; metadata schemas and manifest registration already landed and remain correct).
-- **Consumes:** `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` §5–§7 (rules content for discernment-gate-v1-mechanical).
+- **Consumes:** `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md` §5–§7 (rules content for discernment-gate-v1-mechanical).
 - **Compositional sibling:** `rakia/docs/plans/build-attestation-integration.md` (GateDecisionAttestation specializes from brit's attestation pattern).
 - **Future follow-ons:**
   - Challenge + Indemnification spec (defines the accountability loop that this plan hooks into)

@@ -1,5 +1,5 @@
 -- EPR storage layer — Phase 2a
--- See genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md §8
+-- See genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md §8
 --
 -- Note: SQLite backend. Timestamps stored as TEXT (ISO-8601). Binary data as BLOB.
 -- Source of truth: EPR atoms (self-notarized via content-derived CID + Ed25519).

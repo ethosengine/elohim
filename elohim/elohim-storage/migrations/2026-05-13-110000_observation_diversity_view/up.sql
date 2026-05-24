@@ -1,5 +1,5 @@
 -- Observation/Event Layer — Stage 3.2 diversity summary view.
--- See genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md §6.2
+-- See genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md §6.2
 --
 -- Source of truth: aggregation over the observations table. Classification: C.
 -- This is a SQL view (re-evaluated on each query). If query cost dominates,

@@ -1382,13 +1382,41 @@ A skeptical systems architect should land in `applications/` and find each arche
 - Update all callers of `StewardedResource` to use `EconomicResource` with appropriate classification
 - Budget win: -1 variant in EntryTypes enum
 
-### D.5 Observation spec implementation prerequisite (Gap 6)
+### D.5 Observation Spec Implementation Prerequisite (Gap 6) — Wave A prerequisite
+
+**Motivation.** This spec's records-lifecycle gradient depends on the Observation tier as its upstream. Observations are where high-frequency, low-stake evidence lives; graduation policies (Path 1 → Attestation; Path 2 → summary Event) are where Observations crystallize into substrate primitives that records-lifecycle then wires. **Until the Observation tier is implemented end-to-end, the records-lifecycle gradient has no source for its early stages.** Two specific dependencies make this a strict Wave A prerequisite, not a parallel concern:
+
+- **The graduation evaluator (canonical 2026-05-11 spec Stage 5) is the producer for every Event/Attestation that records-lifecycle treats as graduated.** D.6 (elohim-authoring pattern) and D.7 (dissolution semantics) both reference graduation provenance; D.1 (subordination links) needs Events to subordinate; D.4 (Resource consolidation) needs the graduated Events to derive Resource state.
+- **Stage 6 retirement of `DoorwayHeartbeat`, `DoorwayHeartbeatSummary`, `HealthAttestation` (infrastructure DNA)** removes the operational-DHT-entries that today muddy the EPR-vs-Observation boundary. Until those go, "what's an EPR vs what's an Observation" remains incoherent in the current substrate. Records-lifecycle Part A.1 (EPR walkthrough) is structurally hand-waved if these heartbeat entries still exist.
+
+**Design.** Records-lifecycle does not re-spec the Observation tier; the canonical work lives in `2026-05-11-observation-event-layer-design.md`. This subsection records the **prerequisite chain** that gates records-lifecycle implementation against observation-spec completion:
+
+**Observation spec stage sequencing (canonical):**
+
+1. **Stage 1**: Manifest declarations (per-pillar `observation_kinds` arrays)
+2. **Stage 2**: Wire format + ALPN (libp2p + iroh parity)
+3. **Stage 3**: Storage tables (`observations`, `observation_logs`, `observation_cursors`, `observation_diversity_summary` view, `audit_observations`)
+4. **Stage 4**: `ObservationManagerBackend` neutral service (cursor-tracked sync; manages subscription matrices per peer role)
+5. **Stage 5**: Per-pillar graduation evaluator (tokio task — see D.6 for architecture decision on sharding + rate-ceiling + failover)
+6. **Stage 6**: Infrastructure DNA retirement — `DoorwayHeartbeat`, `DoorwayHeartbeatSummary`, `HealthAttestation` removed; their consumers re-route to graduated `attestation:doorway-health` issued by the graduation evaluator
+7. **Stage 7**: HTTP API + storage-client surfaces (doorway routes for observation diversity queries)
+8. **Stage 8**: Existing-table reclassification (doc-only — `peer_blob_inventory`, `system_metrics`, `projection_events` retro-tag as observation projections)
+
+**Hard-cutover discipline** (per Phase 1 Meta-Pattern 5): Stage 5 graduation evaluator must work end-to-end with green tests **before** Stage 6 retirement commit. Otherwise heartbeat consumers (doorway-health dashboards, infrastructure-attestation issuers, hub-availability gossip) all go dark simultaneously. This is the same migration-landmine pattern that D.4 EconomicResource consolidation has to navigate; both must wire the derived-views-or-replacement-machinery before the retirement.
+
+**Records-lifecycle dependency on Stage 5 specifically.** D.6 (elohim-authoring pattern) operationalizes the graduation evaluator's domain-specialized agents (inventory-elohim narrates `shefa:card-swipe` observations into transfer Events; vision-elohim narrates `lamad:image-captured` observations into auto-tag Attestations; care-stewardship-elohim narrates `imagodei:care-act` observations into care-Events). Without Stage 5 working, D.6 has no graduation surface to specialize.
+
+**Records-lifecycle dependency on Stage 6 specifically.** D.10 (vocabulary governance) catches the broader drift; Stage 6 closes the specific case where the infrastructure DNA still treats operational evidence as DHT entries. Until then, the EPR-as-vessel framing has counterexamples in the substrate (heartbeats look like notarized records but behave like operational evidence).
+
+**Manifest declarations records-lifecycle adds via Stage 1:** the Wave B/C/D gaps add `observation_kinds` declarations across `shefa`, `lamad`, `imagodei`, `qahal` pillars for the application-archetype evidence streams. D.10's vocabulary governance gate validates these as they land.
 
 **Touches:**
-- `elohim/elohim-storage/src/services/observation_manager.rs` (planned per 2026-05-11 Stage 4) — `ObservationManagerBackend` neutral service
-- `elohim/holochain/dna/infrastructure/zomes/*/src/lib.rs` — retire `DoorwayHeartbeat`, `DoorwayHeartbeatSummary`, `HealthAttestation` (Stage 6 cleanup)
-- `elohim/sdk/domains/infrastructure/manifest.json` — declare observation_kinds for heartbeat / blob-served / system-sample
-- This gap is a **strict prerequisite** for this spec's substrate stages; see 2026-05-11 spec for full plan
+- This subsection is a citation of `2026-05-11-observation-event-layer-design.md`; that spec is the canonical implementation plan
+- `elohim/elohim-storage/src/services/observation_manager.rs` (planned per Stage 4) — `ObservationManagerBackend` neutral service
+- `elohim/elohim-storage/src/services/graduation_evaluator.rs` (planned per Stage 5) — per-pillar graduation tokio task (architecture decisions resolved in D.6)
+- `elohim/holochain/dna/infrastructure/zomes/*/src/lib.rs` — retire `DoorwayHeartbeat`, `DoorwayHeartbeatSummary`, `HealthAttestation` (Stage 6)
+- `elohim/sdk/domains/infrastructure/manifest.json` — declare observation_kinds for `infrastructure:doorway-heartbeat`, `infrastructure:blob-served`, `infrastructure:system-sample` (Stage 1)
+- `elohim/sdk/domains/{shefa,lamad,imagodei,qahal}/manifest.json` — declare per-pillar observation_kinds via Wave B/C/D additions (Stage 1)
 
 ### D.6 Elohim-authoring pattern — domain-specialized agents (Gap 7)
 
@@ -1419,6 +1447,150 @@ A skeptical systems architect should land in `applications/` and find each arche
 - `elohim/sdk/domains/elohim/manifest.json` — declare `grant-reach`, `revoke-reach`, `reclassify-reach` action verbs
 - `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — validate reach changes against current standing + elohim arbitration
 - `elohim/elohim-storage/src/views.rs` — reach-state derived view for any EPR/Resource (current effective reach + history)
+
+---
+
+### D.10 Schema-First IoC Governance (Gap 11) — Wave A prerequisite
+
+**Motivation.** Phase 1 architectural composition found that the substrate has at least six extensible vocabulary surfaces — action verbs (`REA_ACTIONS`), signal kinds (`SIGNAL_KINDS`), observation kinds, attestation kinds (`ATTESTATION_KINDS`), resource classifications (`RESOURCE_CLASSIFICATIONS`), content types — each declared across four authoritative locations: Rust whitelist constants, JSON view/wire schemas, pillar manifests, and codegen output. These locations have drifted independently. As a result, four active application archetypes today reference vocabulary that fails substrate validation:
+
+- **Patreon archetype** uses `action="subscribe"` — not in `REA_ACTIONS`
+- **Meta archetype** uses `signal_kind: "comment" | "endorse" | "react" | "report"` — none in `SIGNAL_KINDS`
+- **Photos archetype** uses `attestation:auto-tag` / `attestation:face-cluster` — not in `ATTESTATION_KINDS`
+- **Mint archetype** queries with `parent_epr_cid` filter — field doesn't exist yet (lands in D.1)
+
+Plus a codegen bug: a literal `"$ref"` string appears as a member of the generated `ATTESTATION_KINDS` array, meaning an attestation with `content_type: "$ref"` would currently pass Floor 1 integrity validation.
+
+These are **surface-drift bugs**, not authoring bugs. The schema-first IoC discipline (per `feedback_schema_first_ioc` memory) has not been applied uniformly. Without a structural fix, every sprint that adds vocabulary in one location without the others compounds the drift, producing silent 503/401 cascades downstream (per `feedback_schema_data_enum_drift_cascade`).
+
+**Design — unified extensibility-vocabulary CI gate.** A single CI script (`pnpm run schema:check-extensibility-vocabulary`) validates each governed vocabulary across all four authoritative surfaces:
+
+```
+For each extensible vocabulary V in {
+  REA_ACTIONS, SIGNAL_KINDS, OBSERVATION_KINDS,
+  ATTESTATION_KINDS, RESOURCE_CLASSIFICATIONS, CONTENT_TYPES
+}:
+  Surfaces:
+    R = Rust whitelist constant (e.g., elohim/.../feedback_signal.rs SIGNAL_KINDS)
+    S = JSON schema enum (e.g., schemas/v1/p2p/feedback-signal.schema.json $.signalKind.enum)
+    M = pillar manifests (e.g., elohim/sdk/domains/*/manifest.json $.vocabulary_declarations.signal_kinds[].kind)
+    C = codegen output (e.g., generated_signal_kinds.rs)
+
+  Assertions:
+    1. Every value in R appears in S            — ERR schema-out-of-date
+    2. Every value in S appears in at least one M — ERR manifest-out-of-date
+    3. Every value in M is reflected in C        — WARN codegen-needs-rerun
+    4. No literal codegen sentinels in R or C    — ERR codegen-bug
+    5. Vocabulary declared in M but absent from R — WARN (supports "ship declaration before code")
+```
+
+**Pillar manifest extension.** Each pillar manifest gains a `vocabulary_declarations:` section:
+
+```jsonc
+{
+  "manifest_kind": "shefa",
+  "vocabulary_declarations": {
+    "action_verbs": [
+      {"verb": "transfer", "stake_class": "high"},
+      {"verb": "subscribe", "stake_class": "high"},
+      {"verb": "checkpoint", "stake_class": "operational"}
+    ],
+    "signal_kinds": [
+      {"kind": "comment", "signal_class": "care", "validator": "..."},
+      {"kind": "endorse", "signal_class": "care", "standing_impact": "credit-soft"}
+    ],
+    "observation_kinds": [...],
+    "attestation_kinds": [...],
+    "resource_classifications": [...],
+    "content_types": [...]
+  }
+}
+```
+
+The gate reads these declarations to validate surface consistency. The manifest is the **source of truth** for vocabulary; Rust whitelists + JSON schemas + codegen are projections of it.
+
+**Failure modes the gate catches** (Phase 1 inventory):
+- `ATTESTATION_KINDS` missing `mastery`, `content-quality`, `custodian-commitment`, `auto-tag`, `face-cluster`, `computation`
+- `SIGNAL_KINDS` missing `comment`, `endorse`, `react`, `report`
+- `REA_ACTIONS` missing `subscribe`, `checkpoint`, `aggregate-subordinate`, `surface`, `cash-out`, `grant-reach`, `revoke-reach`, `reclassify-reach`, `mint`
+- `RESOURCE_CLASSIFICATIONS` missing `backup-state`, `commons-credit`, `mastery`, `stewarded-physical`, `stewarded-digital`, `stewarded-compute`
+- `proofClass` enum mismatch between `attestation-view.schema.json` and `attestation_validator.rs`
+- `forget-request` in `SIGNAL_KINDS` whitelist but missing from `p2p/feedback-signal.schema.json` enum
+- `"$ref"` literal in generated `ATTESTATION_KINDS`
+
+**Migration discipline.** The gate is the prerequisite for closing all the vocabulary drift identified in Phase 1. Before any downstream gap (D.1, D.4, D.6, D.7, D.8, D.18, D.20) lands its substrate-side declarations, this gate must be wired so the additions don't drift again.
+
+**Pre-launch hard cutover.** No backwards-compat shim. The first run of the gate against the current substrate produces an error report; subsequent tasks (the per-vocabulary remediation specified in their respective subsections) close each surface item.
+
+**Touches:**
+- `elohim/sdk/schemas/scripts/check-extensibility-vocabulary.mjs` — new CI gate script
+- `package.json` (root) + per-pillar — new `schema:check-extensibility-vocabulary` npm script
+- `.husky/pre-push` — invoke the gate when relevant files changed (manifests, whitelist constants, schemas, codegen outputs)
+- `elohim/sdk/domains/*/manifest.json` — add `vocabulary_declarations:` section per pillar
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_attestation_kinds.rs` — fix `$ref` sentinel bug
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/feedback_signal.rs` — `SIGNAL_KINDS` const remediation per downstream gaps
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — `REA_ACTIONS`, `RESOURCE_CLASSIFICATIONS`, content-type constants remediation
+- `elohim/sdk/schemas/v1/views/attestation-view.schema.json` — `proofClass` enum reconciliation
+- `elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json` — `signalKind` enum reconciliation
+
+---
+
+### D.11 Substrate-Floor Validator Backfill (Gap 12) — Wave A prerequisite
+
+**Motivation.** Phase 1 found that several substrate-floor invariants are aspirational documentation, not enforced code. The validator layer is the substrate's contract with its participants — when a documented invariant has no code enforcement, operators rely on human discipline to maintain it. That discipline is brittle: any agent that didn't read the documentation can violate the invariant, and the substrate accepts the violation silently. Three specific gaps surfaced in Phase 1, each separately documented but together representing a class of debt:
+
+- **Attestation validator floors F2 / F4 / F6 are ACCEPT-all stubs** (marked TODO Task C.3 in `attestation_validator.rs`). Today, any agent with DHT write access can issue `attestation:mastery` for any subject in any concept domain without holding `attestation:steward` in that domain. Floor F4 (issuer eligibility for `attestation:content-quality`) and Floor F6 (subject domain match) have the same shape.
+- **Attestation validator Floor 5 temporal completeness** is incomplete (TODO Task C.2 — the op's Action timestamp isn't threaded into the validator). A vote submitted after `closes_at` can currently pass integrity validation if the parent governance-action parses correctly. The "deterministic deadline enforcement" the canonical spec claims is not yet fully wired.
+- **Manifest schema validator has no retention-class governance.** A manifest author can declare `lamad:sensor-biometric` with `retention_class: wisdom` and the protocol accepts it — directly violating `observer-protocol.md` Part VIII ("store video beyond 3-second processing window: forbidden"). The constitutional posture is enforced by human discipline, not by code.
+- **LINK_ARCHITECTURE.md deprecation checklist is incomplete.** ~50 `*By{Attribute}` query-index link types violate the DHT-as-notary principle (per `project_three_layer_truth_model`) but haven't been retired. Every sprint that adds a new structural link burns the 256-cap further while these unretired query-index links continue consuming slots.
+
+**Design — three coordinated backfills shipping together.** These are independent code changes but share a sprint because they together move the substrate-floor enforcement story from aspirational to actual. Shipping any one in isolation would leave the substrate looking partially invariant-protected, which is worse than transparently un-protected.
+
+**Backfill 1 — Attestation validator floors closure.** Close Floors F2 (steward authorization for `attestation:mastery`), F4 (issuer eligibility for `attestation:content-quality`), and F6 (subject domain match) per the attestation-consolidation canonical spec §4.2. Close Floor 5 temporal completeness (Task C.2) — thread the op's Action timestamp through the validator for strict `closes_at` enforcement. Each floor reads its policy from the relevant pillar manifest's `attestation_kinds` declarations (per D.10 vocabulary governance), so manifests can amend authorization rules without code changes.
+
+**Backfill 2 — Retention-class manifest validator extension.** Extend the manifest schema validation pipeline (`pnpm run schema:validate`) to reject `retention_class: wisdom | archival | attestation-feeding` on `observation_kind` schemas whose `subject_kind ∈ { environment, sensor }`. This is the substrate-floor enforcement of the witness-not-surveillance constitutional commitment. Validation runs at manifest write time + at every codegen run + at pre-push.
+
+**Backfill 3 — LINK_ARCHITECTURE deprecation sweep.** Formally retire the `*By{Attribute}` query-index link types from the `LinkTypes` enum. Migration: every retired `*By*` link gets its query workload moved to SQL projection (the operational layer that should have been carrying it from the start). LINK_ARCHITECTURE.md updates the deprecation checklist to show closure. Slots reclaimed are returned to the 256-cap budget; future structural link additions (D.1's `EprToEvent` + `EprToResource`) can land without immediately crowding the cap.
+
+**Sequencing.** Backfill 1 depends on D.10 (vocabulary governance landed first, so manifest authorization rules can be read by the floor logic). Backfills 2 and 3 are independent. All three land in Wave A so downstream gaps (D.1, D.6, D.7) ship against a substrate-floor that actually enforces what it documents.
+
+**Touches:**
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/attestation_validator.rs` — Floor F2, F4, F6 close (Task C.3); Floor 5 temporal completeness (Task C.2)
+- `elohim/sdk/schemas/scripts/validate-manifest.mjs` (or similar) — extend manifest schema validator with retention-class governance for sensor/environment observations
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — `LinkTypes` enum retire `*By{Attribute}` variants
+- `elohim/holochain/dna/LINK_ARCHITECTURE.md` — close deprecation checklist; update the 256-cap accounting
+- `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — coordinator functions that previously created `*By*` links: re-route to SQL projection upserts via ReconcileController
+- `elohim/elohim-storage/src/services/reconcile_controller.rs` — handle the SQL-projection upserts for queries that previously used `*By*` link traversal
+
+---
+
+### D.13 Missing View Schemas + Enum Reconciliation (Gap 14) — Wave A prerequisite
+
+**Motivation.** Phase 1 architectural composition found three concrete schema-layer gaps that produce silent cascade failures (per `feedback_schema_data_enum_drift_cascade`):
+
+- **`economic-resource-view.schema.json` does not exist.** The Resource is one of the eight foundational primitives (Part A.3) and a load-bearing primitive across every application archetype, yet the JSON schema declaring its HTTP wire shape was never authored. Without it, the doorway projection shape is undefined, the schema-contract test (`schema_contract.rs`) cannot detect drift, and the TS codegen has no source for the `EconomicResourceView` type. Any sprint that adds a Resource HTTP route is building on undeclared ground.
+- **`proofClass` enum drift in `attestation-view.schema.json`.** The view schema declares `proofClass: "witness | self-attest | audit-signature | computational"`. The validator (`attestation_validator.rs` Floor 8) and the canonical computation-attestation spec (`2026-05-01-computation-attestation-graduated-rigor-design.md`) use a different set: `witness | audit | proof | confirmation`. Any client validating the wire shape against the schema fails on attestations using validator-canonical class names. This is the exact 503/401 cascade shape the memory anchor warns about.
+- **`forget-request` in `SIGNAL_KINDS` whitelist but not in `p2p/feedback-signal.schema.json` enum.** The Rust whitelist accepts it (Floor 1 passes); the p2p wire-layer JSON schema rejects it. A signal that validates on DHT fails on the libp2p wire layer.
+
+These are not architecture decisions; they are schema-authoring debts. D.10 (vocabulary governance) catches future drift; D.13 closes the existing drift.
+
+**Design — three coordinated schema authorings.**
+
+**Authoring 1 — `economic-resource-view.schema.json`.** Author the missing schema per the 10 conventions at `elohim/sdk/schemas/v1/views/CONVENTIONS.md`. Required fields derived from the `EconomicResource` Rust struct + the planned additions from D.1 (`parent_epr_cid: Option<Cid>`), D.4 (`resource_classified_as: Vec<String>` after StewardedResource consolidation; addenda for `governed_by` and `data_quality` per operator decisions), and D.7 (`lifecycle_state: enum { active, subordinate, shelved, closed }`). Add the corresponding entry to `INTERFACE_FILES` in `elohim/sdk/schemas/scripts/codegen-ts.mjs` so the TS codegen picks it up. Add a contract test in `elohim/elohim-storage/tests/schema_contract.rs` to catch future drift.
+
+**Authoring 2 — `proofClass` enum reconciliation.** Canonical values are `witness | audit | proof | confirmation` (per `2026-05-01-computation-attestation-graduated-rigor-design.md` and the validator). Update `attestation-view.schema.json` to match. Update any consumer of the prior enum values (search for `self-attest` and `audit-signature` and `computational` across the repo) to use the canonical names. D.10's CI gate prevents this from drifting again.
+
+**Authoring 3 — `feedback-signal.schema.json` enum sync.** Add `forget-request` to the `signalKind` enum so it matches `SIGNAL_KINDS`. This is the minimal closure; the broader signal-kind expansion (`comment`, `endorse`, `react`, `report` for the Meta archetype) lands per D.18 (signal_class field) and the application-archetype Wave 2 dispatches that follow.
+
+**Migration discipline.** Authored schemas ship with their contract tests in the same commit. The contract tests are the substrate-floor invariant: `cargo test schema_contract` must pass before any sprint that touches a view ships. D.10's CI gate is the structural backstop; the contract tests are the immediate proof.
+
+**Touches:**
+- `elohim/sdk/schemas/v1/views/economic-resource-view.schema.json` — **new file**; required shape per CONVENTIONS.md
+- `elohim/sdk/schemas/scripts/codegen-ts.mjs` — extend `INTERFACE_FILES` to generate `EconomicResourceView` TypeScript type
+- `elohim/sdk/schemas/v1/views/attestation-view.schema.json` — `proofClass` enum reconciliation to canonical 4-value set
+- `elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json` — `signalKind` enum: add `forget-request`
+- `elohim/elohim-storage/tests/schema_contract.rs` — add `EconomicResourceView` contract test; verify `proofClass` enum match between validator and view; verify `signalKind` enum match between whitelist and wire schema
+- `elohim/elohim-storage/src/views.rs` — extend or confirm `EconomicResourceView` Rust struct matches the new JSON schema (one or the other is the source of truth; the contract test fails the build if they diverge)
 
 ---
 

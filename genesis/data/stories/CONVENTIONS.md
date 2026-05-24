@@ -1,6 +1,6 @@
 # Stories — Conventions
 
-Canonical human stories that compose with the protocol's data layer (humans, devices, roles, features) and serve as **Tier 1 narrative anchors** in the experience-story EPR design (see `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md`). Stories are first-class protocol content — when seeded, each story file becomes a `ContentNode` with `contentType: experience-story`, addressable via EPR alias and linked into the lamad graph.
+Canonical human stories that compose with the protocol's data layer (humans, devices, roles, features) and serve as **Tier 1 narrative anchors** in the experience-story EPR design (see `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md`). Stories are first-class protocol content — when seeded, each story file becomes a `ContentNode` with `contentType: experience-story`, addressable via EPR alias and linked into the lamad graph.
 
 The **storyteller** agent (`.claude/agents/storyteller.md`) owns this directory. Other agents read; only the storyteller and the operator write.
 
@@ -218,7 +218,7 @@ Stories should not slip into canonical without operator review. The graduation a
 - `.claude/memory/project_wisdom_resolves_into_epics.md` — story-compaction as memory's destination
 - `.claude/memory/feedback_a2o_narrative_is_opus_work.md` — narrative authoring is Opus work
 - `.claude/memory/feedback_no_hebrew_pillar_names_in_narrative.md` — translation discipline
-- `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` — the design spec this catalog implements (Tier 1 only)
+- `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md` — the design spec this catalog implements (Tier 1 only)
 - `genesis/data/humans/` — subject source of truth
 - `genesis/data/devices/` — device source of truth (referenced in narrative)
 - `genesis/docs/content/elohim-protocol/` — epic anchors

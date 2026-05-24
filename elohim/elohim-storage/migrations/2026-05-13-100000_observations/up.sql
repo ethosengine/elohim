@@ -1,5 +1,5 @@
 -- Observation/Event Layer — Stage 3 of the observation-event-layer-design spec.
--- See genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md
+-- See genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md
 --
 -- All tables here are Category C (operational projections). The authoritative
 -- form of every observation is the observer's per-observer iroh-blob log on

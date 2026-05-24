@@ -10,7 +10,7 @@
 
 **Tech Stack:** Rust 2021 (elohim DNA + imagodei DNA + infrastructure DNA + mishpat DNA + elohim-storage), Diesel migrations, JSON Schema codegen, TypeScript codegen, Angular 19 consumers, libp2p 0.54 (for Stage A Shamir transport).
 
-**Source-of-truth spec:** `genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md` (§1 "Wave 0 substrate cleanup") — **except for the Attestation dedupe, which is now governed by** `genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md`.
+**Source-of-truth spec:** `genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md` (§1 "Wave 0 substrate cleanup") — **except for the Attestation dedupe, which is now governed by** `genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md`.
 
 **Delivery master:** `genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md` (§2 Wave 0)
 
@@ -24,7 +24,7 @@ A 2026-05-11 brainstorm pass revealed the duplicate `Attestation` is only the vi
 
 This consolidation is now governed by:
 
-- **Spec:** `genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md` (12 sections; "validated recognition of capabilities" framing; Shape A — parent governance-action Content + child attestation Content + derived tally projection)
+- **Spec:** `genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md` (12 sections; "validated recognition of capabilities" framing; Shape A — parent governance-action Content + child attestation Content + derived tally projection)
 - **Plan:** `genesis/docs/superpowers/plans/2026-05-11-attestation-consolidation-implementation-plan.md` (7 stages A–G with bite-sized tasks for Stages A–D and task headers + acceptance criteria for Stages E–G)
 
 ### What this means for Wave 0
@@ -257,7 +257,7 @@ Attestation lives in imagodei DNA; the existing cross-DNA bridge
 issue_attestation_via_imagodei is the issuance path.
 
 Tiered-quilt wave-0 substrate cleanup; spec at
-genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md.
+genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md.
 EOF
 )"
 ```
@@ -763,7 +763,7 @@ field is renamed everywhere it appears:
 Pre-push hook drift check added in .husky/pre-push to prevent reintroduction.
 
 Tiered-quilt Wave 0 substrate cleanup; spec at
-genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md.
+genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -813,7 +813,7 @@ forward-fix lands.
 
 ## Cross-references
 
-- Spec: `genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md`
+- Spec: `genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md`
 - Delivery master: `genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md`
 - Diesel migration timestamp-collision memory: `feedback_diesel_migration_timestamp_collision`
 - Multi-agent PVC pacing memory: `feedback_multi_agent_pvc_pacing`

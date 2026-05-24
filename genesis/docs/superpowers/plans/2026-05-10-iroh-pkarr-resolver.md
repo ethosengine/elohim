@@ -2,7 +2,7 @@
 title: iroh Cutover Gate #10 — Self-Hostable pkarr Resolver in Production
 status: design-only
 created: 2026-05-10
-parent: genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+parent: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
 related:
   - genesis/docs/superpowers/plans/2026-05-08-iroh-phase11-prep.md
   - elohim/elohim-storage/src/p2p_iroh/endpoint.rs
@@ -235,7 +235,7 @@ This classification is what the audit hook needs to see; it is repeated in the s
   //! without any custom client code.
   //!
   //! This module is the substrate-side mitigation for cutover gate #10
-  //! per `genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`,
+  //! per `genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`,
   //! Step 2 of the n0-centralization-seam mitigation plan.
   //!
   //! # NOT a route registry proxy
@@ -579,7 +579,7 @@ This classification is what the audit hook needs to see; it is repeated in the s
 - [ ] **Step 4.2:** Add CLI/env args to `doorway/doorway-service/src/config.rs`'s `Args` struct (place adjacent to the existing `doorway_id` block around line 119):
   ```rust
   /// Enable the self-hostable pkarr resolver endpoint at /pkarr/{key}.
-  /// See genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+  /// See genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
   /// (cutover gate #10).
   #[arg(long, env = "DOORWAY_PKARR_RESOLVER_ENABLED", default_value_t = false)]
   pub pkarr_resolver_enabled: bool,
@@ -795,7 +795,7 @@ This classification is what the audit hook needs to see; it is repeated in the s
       /// pair registered on the Endpoint via add_discovery, wrapped by
       /// iroh's ConcurrentDiscovery for parallel querying.
       ///
-      /// See genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+      /// See genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
       /// (cutover gate #10) for the operator-self-hostable rationale.
       pub discovery_resolvers: Vec<DiscoveryResolverConfig>,
   }
@@ -1127,7 +1127,7 @@ This classification is what the audit hook needs to see; it is repeated in the s
   **Target:** any cluster running a doorway deployment.
   **Namespace:** wherever doorway is deployed (run `kubectl get deployment -A -l app=doorway` to find).
   **Risk:** Low. Adds a new HTTP route at `/pkarr/...` and opens the doorway pod to act as a pkarr relay. No existing routes change. The resolver is OFF by default and is opt-in via env var.
-  **Cutover gate:** #10 — "pkarr resolver running on doorway.elohim.host for one week with zero unavailability beyond the doorway itself's uptime" (genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md, line 421).
+  **Cutover gate:** #10 — "pkarr resolver running on doorway.elohim.host for one week with zero unavailability beyond the doorway itself's uptime" (genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md, line 421).
 
   ## What this enables
 

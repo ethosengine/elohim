@@ -3,7 +3,7 @@
   "$id": "https://elohim.protocol/schemas/v1/attestation/attestation-content.schema.json",
   "$comment": "Source of truth: Holochain DHT (notarized Content entry with content_type LIKE 'attestation:%'). Category A per p2p-design-gate.",
   "title": "AttestationContent",
-  "description": "Wire shape for an attestation realized as a Content entry on elohim DNA. Source of truth is the Holochain DHT — this schema describes the JSON-on-wire shape only. See genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §3.",
+  "description": "Wire shape for an attestation realized as a Content entry on elohim DNA. Source of truth is the Holochain DHT — this schema describes the JSON-on-wire shape only. See genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md §3.",
   "type": "object",
   "additionalProperties": false,
   "required": [

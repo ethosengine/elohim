@@ -183,7 +183,7 @@ rand = "0.8"
 # elohim-epr
 
 Canonical codec for the Elohim EPR (EntityPortalReference) atom defined in
-`genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`.
+`genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`.
 
 Shipping wire primitives: canonical CBOR (dag-cbor / RFC 8949 §4.2.1),
 CIDv1 (codec=0x71 dag-cbor, multihash=sha2-256), Ed25519 signatures.
@@ -196,7 +196,7 @@ Not a storage, resolver, or validator service — that's Phase 2+.
 ```rust
 //! elohim-epr — canonical codec for the Elohim EPR atom.
 //!
-//! See `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`.
+//! See `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`.
 
 pub mod cbor;
 pub mod cid;
@@ -2923,7 +2923,7 @@ Replace `elohim/epr/src/lib.rs`:
 ```rust
 //! elohim-epr — canonical codec for the Elohim EPR atom.
 //!
-//! See `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`.
+//! See `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`.
 //!
 //! # Example
 //!
@@ -3001,7 +3001,7 @@ Replace `elohim/epr/README.md`:
 # elohim-epr
 
 Canonical codec for the Elohim EPR (EntityPortalReference) atom defined in
-`genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`.
+`genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`.
 
 ## What this crate provides
 

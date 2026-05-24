@@ -3,7 +3,7 @@
 **Target:** any cluster running a doorway deployment.
 **Namespace:** wherever doorway is deployed (run `kubectl get deployment -A -l app=doorway` to find).
 **Risk:** Low. Adds a new HTTP route at `/pkarr/...` and opens the doorway pod to act as a pkarr relay. No existing routes change. The resolver is OFF by default and is opt-in via env var.
-**Cutover gate:** #10 — "pkarr resolver running on doorway.elohim.host for one week with zero unavailability beyond the doorway itself's uptime" (genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md, line 421).
+**Cutover gate:** #10 — "pkarr resolver running on doorway.elohim.host for one week with zero unavailability beyond the doorway itself's uptime" (genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md, line 421).
 
 ## What this enables
 

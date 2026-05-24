@@ -5,7 +5,7 @@
 //! can route shard fetch / probe / push / inventory through the same
 //! code path.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the shard plane is dual-stack permanent. Reed-Solomon coding stays
 //! in pure Rust; framing is per-transport. This service holds the
 //! transport-neutral state (the blob store + the optional content DB

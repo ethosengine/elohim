@@ -75,7 +75,7 @@ pub struct IrohConfig {
     /// pair registered on the Endpoint via `add_discovery`, wrapped by
     /// iroh's `ConcurrentDiscovery` for parallel querying.
     ///
-    /// See genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+    /// See genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
     /// (cutover gate #10) for the operator-self-hostable rationale.
     pub discovery_resolvers: Vec<DiscoveryResolverConfig>,
 }

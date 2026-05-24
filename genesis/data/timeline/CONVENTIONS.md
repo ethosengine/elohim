@@ -200,5 +200,5 @@ This catalog is starting empty. The shape above is a working hypothesis; expect 
 - `.claude/agents/historian.md` — chronicle owner
 - `.claude/agents/cartographer.md` — roadmap + backlog owner
 - `.claude/agents/storyteller.md` — produces signal that flows into backlog
-- `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` — Tier 1 narrative anchor design (sibling pattern for chronicle-entry if we go that route)
+- `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md` — Tier 1 narrative anchor design (sibling pattern for chronicle-entry if we go that route)
 - `genesis/plans/` — implementation specs (downstream of backlog)

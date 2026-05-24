@@ -10,7 +10,7 @@ shared terms — interpretable evidence the operator can review.
 
 This tool is the candidate-detection layer for the `merge` lifecycle
 primitive specified in:
-  genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md
+  genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
 
 Scope is read-only by design. The merge itself is a future tool.
 
@@ -255,7 +255,7 @@ def render_report(
         "**Read-only report.** This surfaces likely-duplicate clusters of "
         "memory entries — the candidate-detection layer for the `merge` "
         "primitive ("
-        "`genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md`)."
+        "`genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md`)."
     )
     out.append("")
     out.append(f"- Memory entries scanned: **{total_docs}**")

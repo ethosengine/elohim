@@ -8,7 +8,7 @@ Feature: Recovery completes across mixed iroh/libp2p share-holder transports
   profile each share-holder supports — the share-holder is reached via
   whichever wire it speaks.
 
-  Spec:  genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md line 514
+  Spec:  genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md line 514
   Plan:  genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md
   Rust:  elohim/elohim-storage/tests/iroh_recovery_cross_stack.rs
 

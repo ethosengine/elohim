@@ -4,7 +4,7 @@
 //! request-response handler and the iroh-side `EprBackend` can route
 //! reach-authorization-gated reads through the same code path.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the EPR plane is dual-stack permanent: identical wire frames,
 //! identical authorization gates, transport-specific announce.
 //!

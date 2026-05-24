@@ -20,7 +20,7 @@ All architectural decisions you flagged at pause time have been resolved:
 | T12 — `main.rs` wires subscriber → dispatcher | landed | `2195bd284` |
 | **T18 — DnaSignal::KeyRevocation EPR envelope** | **landed** | `7f8972b9c`, `a4a9c60a3`, `26e7e186e`, `423adbb1b` |
 
-The architectural reframe is captured in `/projects/elohim/genesis/docs/superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md`. Read that first — it's the load-bearing context for everything below.
+The architectural reframe is captured in `/projects/elohim/genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md`. Read that first — it's the load-bearing context for everything below.
 
 ## What changed from your pause-note expectations
 
@@ -118,7 +118,7 @@ verifying_key.verify_strict(&canonical, &signature)?;
 
 ## Files to read first
 
-1. `genesis/docs/superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md` — architectural decision + canonical bytes spec
+1. `genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md` — architectural decision + canonical bytes spec
 2. `elohim/sdk/schemas/v1/dna-signals/key-revocation.schema.json` — envelope schema
 3. `elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs` `canonical_envelope_bytes` — producer side reference
 4. `elohim/elohim-storage/src/signals.rs` `handle_imagodei_dna_signal` — consumer side reference (already verifies signatures; you can model on it)
