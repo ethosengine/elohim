@@ -454,7 +454,130 @@ Both queries run against the local Diesel SQL projection — zero network calls 
 
 ## A.6 Attestation (`Content` + `content_type: "attestation:*"`)
 
-> *Stubbed — full draft pending. Hyperscale analog: PKI certificate with auditable `evidence_refs` back to Observations. Critical sub-sections: the four `proof_evidence.class` tiers (witness / audit / proof / confirmation per 2026-05-01-computation-attestation spec); the evidence-chain integrity model (`observation_refs` pointing to iroh-blob log positions); the issuer-vs-subject distinction; revocation via root-rewrite.*
+> *Canonical spec: [2026-05-11-attestation-consolidation-design.md](./2026-05-11-attestation-consolidation-design.md) — read end-to-end for the full consolidation rationale, the 18+ entry-type migration, M-of-N governance-action decomposition, Shamir-off-DHT decoupling, and the 7-stage migration plan. This section integrates Attestation into the records-lifecycle vocabulary and surfaces the tensions specific to this spec's concerns.*
+
+### 1. What it is
+
+An Attestation is a **validated claim derived from one or more Observations** — notarized on the DHT as a `Content` entry with `content_type: "attestation:<subtype>"`. No new DHT entry type is introduced; the carrier reuses `Content`'s full field set (`id`, `author_id`, `reach`, `metadata_json`, `related_node_ids`) plus a typed `AttestationToSubject` link from the attestation to the entity it attests about. The **issuer** is `author_id` (signed by the Holochain action); the **subject** is the link target. Subtypes are declared in pillar manifests and generated into `ATTESTATION_KINDS` in `content_store_integrity/src/generated_attestation_kinds.rs` at codegen time — the integrity zome's Floor 1 check rejects unknown subtypes unconditionally. Attestations are the protocol's notary layer for human capability, content quality, device health, governance decisions, and computation results. They answer "how does the substrate know this claim is true?" with a signed, gossip-validated, evidence-linked entry that costs DHT budget proportional to trust requirement.
+
+### 2. Hyperscale analog
+
+**Think X.509 PKI certificate + an auditable evidence chain back to structured log positions — but without a certificate authority.** Like a PKI cert, an Attestation carries: issuer identity, subject identity, claim content, validity window, and signature. Unlike PKI, there is no CA; the DHT validator quorum replaces the CA's root-of-trust. The issuer's standing (derived from prior Attestations + FeedbackSignal history) plays the role that CA reputation plays in traditional PKI. Unlike a cert, every Attestation optionally carries `evidence_json.observation_refs` — iroh-blob CIDs pointing to the raw evidence behind the claim. A skeptical auditor can pull those bytes and verify the claim without trusting the issuer. The four `proof_evidence.class` tiers from `2026-05-01-computation-attestation-graduated-rigor-design.md` map to familiar validation depths: domain-validated (witness), organization-validated (audit), extended-validation (proof), hardware-attestation (confirmation).
+
+### 3. Data flow
+
+```
+Graduation evaluator / elohim-agent / human issuer
+        │
+        ▼
+coordinator: issue_attestation(input)
+  ├─ create Content entry  (content_type: "attestation:<subtype>")
+  └─ create AttestationToSubject link  (same action)
+        │
+        ▼
+integrity validator  (attestation_validator.rs discriminator-chain)
+  F1: subtype ∈ ATTESTATION_KINDS               [IMPLEMENTED]
+  F5: expires_at RFC3339; parent gov-action exists [IMPLEMENTED]
+  F7: supersedes_cid → same-kind, same-issuer   [IMPLEMENTED]
+  F8: proof_evidence.class declared + material  [IMPLEMENTED]
+  FG3: recovery-approval ≠ Shamir share bytes   [IMPLEMENTED]
+  F2/F4/F6: manifest-aware issuer / eligibility [TODO(C.3)]
+        │
+        ▼
+DHT gossip  →  neighborhood validation quorum
+        │
+        ▼
+post-commit signal  →  ElohimContentSignal dispatcher
+        │  →  AttestationProjector
+        ▼
+Diesel upsert into `attestations` table  (dht_anchor_hash NOT NULL)
+        │
+        ▼
+application queries: GET /api/v1/attestations?subject={cid}&kind={subtype}
+```
+
+### 4. Physical storage
+
+| Layer | What lives there | Shape |
+|---|---|---|
+| **Source of truth** | Author source-chain + DHT neighborhood replicas | Holochain DHT (elohim DNA `content_store_integrity`) |
+| **Operational copy** | Unified projection rebuilt from signal stream | SQLite `attestations` table (per 2026-05-11 spec §7.4; `dht_anchor_hash` NOT NULL) |
+| **Tally projection** | M-of-N governance-action state | SQLite `governance_action_tally` table (Category C — rebuildable any time) |
+| **Evidence bytes** | Raw observation logs cited by `observation_refs` | iroh-blob (pull-fetched by CID; never gossiped) |
+| **Web2 projection** | Optional doorway SSR cache | Redis-shape; filtered by `attestation_kind` + expiry + `supersedes_cid` chain |
+
+### 5. Gossip / sync layer
+
+- **DHT**: full `Content` entry payload — typically 1–3 KB for attestation metadata + proof material; `AttestationToSubject` link tag (subject_kind); gossip latency 200–2000 ms. Revocations gossip as new Content entries (append-only) — the projection's `supersedes_cid` join surfaces current status.
+- **libp2p sync plane**: `attestations` projection rows delta-sync via cursor; M-of-N vote children arrive as individual entries, tally converges within one sync cycle of quorum; expiry filtering is projection-layer, not DHT-layer.
+- **iroh-blob**: raw observation evidence — the log positions cited in `evidence_json.observation_refs`; pull-fetched only when an auditor needs the backing evidence; sizes range from < 1 KB (single-observation summary) to many MB (audit-class Merkle-rooted computation inputs); never gossiped; cold-archivable via quilt K-of-N.
+
+### 6. Provenance — maintained vs intentionally degraded
+
+**Maintained cryptographically forever:**
+- Issuer signature (Holochain action header; unforgeable; carried in the Content entry)
+- Content-address CID (content-derived; the attestation identity is its bytes)
+- DHT validator quorum acceptance (other peers validated at write time; recorded in action headers)
+- `AttestationToSubject` link (subject identity verifiable by any peer with reach)
+- `proof_evidence.class` and all required proof material (`merkle_root`, `proof_blob`, `confirmer_signature` per class — stored on-entry, not reconstructed)
+- Revocation chain: the `supersedes_cid` trail is append-only and forever traversable
+
+**Intentionally degraded (access cost, not truth):**
+- **Cold observation evidence**: iroh-blob log positions in `observation_refs` may move to quilt (K-of-N recovery); the CIDs remain forever; retrieval cost scales with cold-archive tier
+- **Expired attestations**: filtered from "current capability" queries in the projection layer; remain on DHT, queryable by CID forever
+- **Revoked attestations**: projection-filtered by `supersedes_cid` chain; the original remains on DHT (right-to-be-forgotten is a mishpat root-rewrite at the EPR layer, not at individual Attestation entries)
+- **Vote children on failed proposals**: lose projection visibility once tally closes; persist on DHT forever as auditable record of the governance deliberation
+
+The substrate's commitment is **truth-verifiability, not free-access-forever.** A revoked attestation is verifiably revoked; a cold-archived observation is verifiably retrievable at cost. The CID is forever.
+
+### 7. Agentic intelligence at scale
+
+Attestations are where elohim cognition is most load-bearing across four specializations:
+
+- **Graduation evaluator** (`elohim-storage/src/services/graduation_evaluator.rs`): per-pillar tokio task watching Observation accumulation; fires `issue_attestation` when a policy threshold is met — e.g., 5 health check observations with p95 latency < 500 ms in 24 hours → `attestation:device-health` at class=witness. Humans cannot monitor 100M device streams.
+- **elohim-vision-agent**: for Google-Photos-shape applications, issues `attestation:auto-tag` and `attestation:face-cluster` referencing photo EPRs by CID. Without the vision-agent, no one tags 100k household photos; face clusters link multiple EPRs via `subject_face_cid` in `evidence_json`.
+- **stewardship-elohim**: signs Observations authored by legacy bridges (Plaid, Stripe, KYC providers); the graduation evaluator decides when accumulated observations warrant a credential attestation — `attestation:identity-credential` after successful KYC bridge verification.
+- **computation-elohim**: for AWS-compute-shape workloads, issues `attestation:computation` at the appropriate `proof_evidence.class` per the compute-attestation gradient — interpreting four signals: stakes, spread, consensus-deficit (FeedbackSignal::Correction firing rate), and provability ceiling. See `2026-05-01-computation-attestation-graduated-rigor-design.md` for the full treatment.
+
+What humans alone can't do at care-economy scale: issue, track, and revoke thousands of graduated capability claims per household member per year across mastery, health, governance, and computation domains. **Elohim agents carry the continuous certification load — this is the value-prop unlock.**
+
+### 8. Scale: household → hub → global
+
+- **Local DHT (household elohim-node)**: ~50 Attestations in the Monarch/Mint archetype (price feeds, KYC credentials, health certifications) × ~3 KB = ~150 KB SQL projection. For a Photos household: thousands of auto-tag Attestations × 1 KB = a few MB SQL. Both fit comfortably in the household footprint.
+- **Hub (collective elohim-node)**: hub holds governance-action parent entries (proposals, challenges, elections) and the `governance_action_tally` projections for its governance scope. Hub does NOT replicate individual household Attestations unless they elect community/commons reach. Vote children and stewardship-grants are community-reach and gossip to hub peers.
+- **Global**: `attestation:humanness` and `attestation:identity-credential` are the highest-reach Attestations — ~1–3 per human × 8B humans = ~8–24B global entries. These earn their DHT budget: humanness-attestation is the substrate's primary Sybil defense. All other subtypes are scoped narrower (community / household / agent-private).
+
+### 9. Limit-awareness / capture prevention
+
+- **Manifest-gated subtypes (Floor 1, implemented)**: only subtypes in `ATTESTATION_KINDS` (generated from pillar manifests) can be written. A new claim vocabulary requires a manifest PR — not just a write attempt. Unknown subtypes fail-closed at the integrity layer.
+- **Issuer-authorization floors (F2/F4/F6 — TODO C.3)**: when wired, these gates ensure `attestation:mastery` can only be issued by an agent who themselves holds `attestation:steward` in that concept domain — preventing a single-issuer monopoly on capability recognition.
+- **Shamir-off-DHT (Floor G3, implemented)**: `attestation:recovery-approval` entries are rejected by the integrity zome if they contain `share_data`, `share_index`, or `share_blob` anywhere in their metadata. The architectural boundary is substrate-enforced, not advisory.
+- **Revocation is issuer-scoped (Floor 7, implemented)**: only the original issuer can revoke an attestation (same `author_id` verified via `must_get`); third-party revocation requires a mishpat governance-action.
+- **Friction-gradient**: high-volume Attestation issuers face rising DHT write friction proportional to standing; commons-reach Attestations face elohim-council arbitration before federating.
+
+### 10. Network resilience
+
+- **DHT shard-N**: each Attestation Content entry replicates to ~10 neighborhood peers; the entry survives any single-peer failure
+- **Partition recovery**: cursor-tracked libp2p sync delivers M-of-N vote children across partition heal; tally converges on next sync cycle; `governance_action_tally` is Category C and fully rebuildable from the signal stream
+- **Cold-archive of evidence**: iroh-blob positions in `observation_refs` survive quilt K-of-N erasure; a future audit can reconstruct the backing evidence even if original peers have long since left the network
+- **Revocation propagation**: new revocation Content gossips the same as any Attestation; projection `supersedes_cid` join surfaces current status immediately; doorway serves the filtered view to unconnected clients
+- **Governance deadline resilience**: `closes_at` is structurally validated (Floor 5); late votes after `closes_at` fail at the integrity layer — deterministic deadline enforcement is preferred over eventual-consistency ambiguity for binding acts
+
+### 11. Dashboard worked example
+
+Three application archetypes where Attestations are load-bearing:
+
+**Monarch/Mint** (`applications/mint-monarch-application-design.md`): The personal-finance dashboard holds ~50 Attestations in local SQL — primarily `attestation:price-feed` entries (daily-cadence, reach=commons, issued by oracle-elohim) that enable net-worth calculation for investment accounts, and `attestation:identity-credential` entries that KYC-gate bridge access (Plaid, Stripe). Price-feed Attestations earn their DHT budget: without them, investment balances are stale. KYC-credential Attestations are agent-private; they exist locally but never federate.
+
+**Google Photos** (`applications/google-photos-application-design.md`): Vision-agent issues `attestation:auto-tag` and `attestation:face-cluster` per photo EPR. The local SQL query for "all photos of Maya" is:
+```sql
+SELECT a.subject_cid FROM attestations a
+WHERE a.attestation_kind = 'attestation:face-cluster'
+  AND json_extract(a.evidence_json, '$.face_label') = 'Maya'
+```
+Zero DHT reads at query time. Attestations stay agent-private until the family opts shared albums in; face clusters never federate without explicit reach grant.
+
+**AWS Compute** (`applications/aws-compute-application-design.md`): `attestation:computation` `proof_evidence.class` is manifest-declared per workload type — witness for trusted high-standing providers, audit when FeedbackSignal::Correction rates rise, proof for high-stakes results. A provider's standing accumulates from fulfilled Commitments + computation Attestations not subsequently Corrected. The computation-elohim interprets the four-signal gradient at each issuance; the tally projection surfaces provider reputation without a centralized rating authority.
 
 ## A.7 FeedbackSignal
 
