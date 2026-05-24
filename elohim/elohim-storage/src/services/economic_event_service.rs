@@ -542,7 +542,8 @@ pub fn route_economic_event_under_collab(
     let mut inputs = Vec::with_capacity(routed.len());
 
     for amount in &routed {
-        let settlement_id = generate_settlement_id(source_event_id, &amount.collective_cid, at_block_height);
+        let settlement_id =
+            generate_settlement_id(source_event_id, &amount.collective_cid, at_block_height);
 
         // Extensions block: annotates which Agreement drove this settlement and
         // what the commons-pool tribute was.  Stored as metadata_json in the DB.
@@ -554,8 +555,9 @@ pub fn route_economic_event_under_collab(
                 "scopeCollabCid": agreement.collab_qahal_cid,
             }
         });
-        let metadata_json = serde_json::to_string(&extensions)
-            .map_err(|e| StorageError::Internal(format!("settlement extensions serialization: {e}")))?;
+        let metadata_json = serde_json::to_string(&extensions).map_err(|e| {
+            StorageError::Internal(format!("settlement extensions serialization: {e}"))
+        })?;
 
         inputs.push(CreateEconomicEventInput {
             id: Some(settlement_id),
@@ -598,7 +600,11 @@ pub fn route_economic_event_under_collab(
 }
 
 /// Generate a deterministic Settlement event ID from the source event, beneficiary, and block height.
-fn generate_settlement_id(source_event_id: &str, collective_cid: &str, at_block_height: u64) -> String {
+fn generate_settlement_id(
+    source_event_id: &str,
+    collective_cid: &str,
+    at_block_height: u64,
+) -> String {
     let mut hasher = Sha256::new();
     hasher.update(source_event_id.as_bytes());
     hasher.update(collective_cid.as_bytes());
@@ -648,17 +654,23 @@ mod integration_tests {
         let agreement = make_agreement(
             0.05,
             vec![
-                DeclaredShare { collective_cid: "collective:a".into(), share: 0.475 },
-                DeclaredShare { collective_cid: "collective:b".into(), share: 0.475 },
+                DeclaredShare {
+                    collective_cid: "collective:a".into(),
+                    share: 0.475,
+                },
+                DeclaredShare {
+                    collective_cid: "collective:b".into(),
+                    share: 0.475,
+                },
             ],
         );
-        let active: HashSet<String> =
-            vec!["collective:a".into(), "collective:b".into()].into_iter().collect();
+        let active: HashSet<String> = vec!["collective:a".into(), "collective:b".into()]
+            .into_iter()
+            .collect();
 
-        let inputs = route_economic_event_under_collab(
-            &agreement, 1000.0, 100, &active, "event-source-1",
-        )
-        .expect("routing must succeed for valid T0 setup");
+        let inputs =
+            route_economic_event_under_collab(&agreement, 1000.0, 100, &active, "event-source-1")
+                .expect("routing must succeed for valid T0 setup");
 
         // Three settlement events: A, B, commons-pool
         assert_eq!(inputs.len(), 3, "expected 3 settlement events");
@@ -668,13 +680,28 @@ mod integration_tests {
             .map(|i| (i.receiver.clone(), i.resource_quantity_value.unwrap_or(0.0)))
             .collect();
 
-        let a = *by_receiver.get("collective:a").expect("collective:a must receive a settlement") as f64;
-        let b = *by_receiver.get("collective:b").expect("collective:b must receive a settlement") as f64;
-        let commons = *by_receiver.get("commons-pool").expect("commons-pool tribute must be emitted") as f64;
+        let a = *by_receiver
+            .get("collective:a")
+            .expect("collective:a must receive a settlement") as f64;
+        let b = *by_receiver
+            .get("collective:b")
+            .expect("collective:b must receive a settlement") as f64;
+        let commons = *by_receiver
+            .get("commons-pool")
+            .expect("commons-pool tribute must be emitted") as f64;
 
-        assert!((a - 475.0).abs() < 0.1, "collective:a should get ~475, got {a}");
-        assert!((b - 475.0).abs() < 0.1, "collective:b should get ~475, got {b}");
-        assert!((commons - 50.0).abs() < 0.1, "commons-pool should get ~50, got {commons}");
+        assert!(
+            (a - 475.0).abs() < 0.1,
+            "collective:a should get ~475, got {a}"
+        );
+        assert!(
+            (b - 475.0).abs() < 0.1,
+            "collective:b should get ~475, got {b}"
+        );
+        assert!(
+            (commons - 50.0).abs() < 0.1,
+            "commons-pool should get ~50, got {commons}"
+        );
         assert!((a + b + commons - 1000.0).abs() < 0.1, "sum must be ~1000");
     }
 
@@ -683,17 +710,22 @@ mod integration_tests {
         let agreement = make_agreement(
             0.05,
             vec![
-                DeclaredShare { collective_cid: "collective:a".into(), share: 0.475 },
-                DeclaredShare { collective_cid: "collective:b".into(), share: 0.475 },
+                DeclaredShare {
+                    collective_cid: "collective:a".into(),
+                    share: 0.475,
+                },
+                DeclaredShare {
+                    collective_cid: "collective:b".into(),
+                    share: 0.475,
+                },
             ],
         );
         // collective:a has withdrawn; only B is in the active set
         let active: HashSet<String> = vec!["collective:b".into()].into_iter().collect();
 
-        let inputs = route_economic_event_under_collab(
-            &agreement, 1000.0, 200, &active, "event-source-2",
-        )
-        .expect("routing must succeed even with one withdrawn member");
+        let inputs =
+            route_economic_event_under_collab(&agreement, 1000.0, 200, &active, "event-source-2")
+                .expect("routing must succeed even with one withdrawn member");
 
         let by_receiver: HashMap<_, _> = inputs
             .iter()
@@ -721,25 +753,33 @@ mod integration_tests {
         let agreement = make_agreement(
             0.05,
             vec![
-                DeclaredShare { collective_cid: "collective:a".into(), share: 0.475 },
-                DeclaredShare { collective_cid: "collective:b".into(), share: 0.475 },
+                DeclaredShare {
+                    collective_cid: "collective:a".into(),
+                    share: 0.475,
+                },
+                DeclaredShare {
+                    collective_cid: "collective:b".into(),
+                    share: 0.475,
+                },
             ],
         );
-        let active: HashSet<String> =
-            vec!["collective:a".into(), "collective:b".into()].into_iter().collect();
+        let active: HashSet<String> = vec!["collective:a".into(), "collective:b".into()]
+            .into_iter()
+            .collect();
 
-        let inputs1 = route_economic_event_under_collab(
-            &agreement, 1000.0, 100, &active, "event-source-3",
-        )
-        .unwrap();
-        let inputs2 = route_economic_event_under_collab(
-            &agreement, 1000.0, 100, &active, "event-source-3",
-        )
-        .unwrap();
+        let inputs1 =
+            route_economic_event_under_collab(&agreement, 1000.0, 100, &active, "event-source-3")
+                .unwrap();
+        let inputs2 =
+            route_economic_event_under_collab(&agreement, 1000.0, 100, &active, "event-source-3")
+                .unwrap();
 
         let ids1: Vec<_> = inputs1.iter().map(|i| i.id.clone()).collect();
         let ids2: Vec<_> = inputs2.iter().map(|i| i.id.clone()).collect();
-        assert_eq!(ids1, ids2, "settlement IDs must be deterministic for same inputs");
+        assert_eq!(
+            ids1, ids2,
+            "settlement IDs must be deterministic for same inputs"
+        );
     }
 
     #[test]
@@ -747,17 +787,23 @@ mod integration_tests {
         let agreement = make_agreement(
             0.05,
             vec![
-                DeclaredShare { collective_cid: "collective:a".into(), share: 0.475 },
-                DeclaredShare { collective_cid: "collective:b".into(), share: 0.475 },
+                DeclaredShare {
+                    collective_cid: "collective:a".into(),
+                    share: 0.475,
+                },
+                DeclaredShare {
+                    collective_cid: "collective:b".into(),
+                    share: 0.475,
+                },
             ],
         );
-        let active: HashSet<String> =
-            vec!["collective:a".into(), "collective:b".into()].into_iter().collect();
+        let active: HashSet<String> = vec!["collective:a".into(), "collective:b".into()]
+            .into_iter()
+            .collect();
 
-        let inputs = route_economic_event_under_collab(
-            &agreement, 1000.0, 100, &active, "event-source-4",
-        )
-        .unwrap();
+        let inputs =
+            route_economic_event_under_collab(&agreement, 1000.0, 100, &active, "event-source-4")
+                .unwrap();
 
         for input in &inputs {
             let meta: serde_json::Value =

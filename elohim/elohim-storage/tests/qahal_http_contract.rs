@@ -1044,11 +1044,11 @@ fn reach_inflation_via_collab_is_refused() {
 fn route_economic_event_under_collab_distributes_t0_two_collective_setup() {
     // Validates the wiring intent of Task 14 without a live conductor or HTTP server.
     // Mirrors the T0 scenario: Coll A 47.5%, Coll B 47.5%, commons-pool tribute 5%.
-    use elohim_views::{
-        CollabAgreementStatus, CollabAgreementView, DeclaredShare, ElohimTier,
-        ShareAllocation, ShareAllocationForm,
-    };
     use elohim_storage::services::economic_event_service::route_economic_event_under_collab;
+    use elohim_views::{
+        CollabAgreementStatus, CollabAgreementView, DeclaredShare, ElohimTier, ShareAllocation,
+        ShareAllocationForm,
+    };
     use std::collections::HashSet;
 
     let agreement = CollabAgreementView {
@@ -1059,8 +1059,14 @@ fn route_economic_event_under_collab_distributes_t0_two_collective_setup() {
         share_allocation: ShareAllocation {
             form: ShareAllocationForm::Declared,
             shares: Some(vec![
-                DeclaredShare { collective_cid: "collective:a".into(), share: 0.475 },
-                DeclaredShare { collective_cid: "collective:b".into(), share: 0.475 },
+                DeclaredShare {
+                    collective_cid: "collective:a".into(),
+                    share: 0.475,
+                },
+                DeclaredShare {
+                    collective_cid: "collective:b".into(),
+                    share: 0.475,
+                },
             ]),
             affinity_window_blocks: None,
             rebalance_cadence_blocks: None,
@@ -1075,8 +1081,9 @@ fn route_economic_event_under_collab_distributes_t0_two_collective_setup() {
         collab_qahal_cid: Some("collective:qahal-task14".into()),
     };
 
-    let active: HashSet<String> =
-        vec!["collective:a".into(), "collective:b".into()].into_iter().collect();
+    let active: HashSet<String> = vec!["collective:a".into(), "collective:b".into()]
+        .into_iter()
+        .collect();
 
     let inputs = route_economic_event_under_collab(
         &agreement,
@@ -1088,34 +1095,61 @@ fn route_economic_event_under_collab_distributes_t0_two_collective_setup() {
     .expect("routing a valid T0 setup must succeed");
 
     // Three settlement events: A, B, commons-pool
-    assert_eq!(inputs.len(), 3, "T0 two-collective setup must emit 3 settlement events");
+    assert_eq!(
+        inputs.len(),
+        3,
+        "T0 two-collective setup must emit 3 settlement events"
+    );
 
     let by_receiver: std::collections::HashMap<_, _> = inputs
         .iter()
-        .map(|i| (i.receiver.clone(), i.resource_quantity_value.unwrap_or(0.0) as f64))
+        .map(|i| {
+            (
+                i.receiver.clone(),
+                i.resource_quantity_value.unwrap_or(0.0) as f64,
+            )
+        })
         .collect();
 
-    let a = *by_receiver.get("collective:a").expect("collective:a settlement missing");
-    let b = *by_receiver.get("collective:b").expect("collective:b settlement missing");
-    let commons = *by_receiver.get("commons-pool").expect("commons-pool tribute missing");
+    let a = *by_receiver
+        .get("collective:a")
+        .expect("collective:a settlement missing");
+    let b = *by_receiver
+        .get("collective:b")
+        .expect("collective:b settlement missing");
+    let commons = *by_receiver
+        .get("commons-pool")
+        .expect("commons-pool tribute missing");
 
-    assert!((a - 475.0).abs() < 0.1, "collective:a: expected ~475, got {a}");
-    assert!((b - 475.0).abs() < 0.1, "collective:b: expected ~475, got {b}");
-    assert!((commons - 50.0).abs() < 0.1, "commons-pool: expected ~50, got {commons}");
+    assert!(
+        (a - 475.0).abs() < 0.1,
+        "collective:a: expected ~475, got {a}"
+    );
+    assert!(
+        (b - 475.0).abs() < 0.1,
+        "collective:b: expected ~475, got {b}"
+    );
+    assert!(
+        (commons - 50.0).abs() < 0.1,
+        "commons-pool: expected ~50, got {commons}"
+    );
 
     let total = a + b + commons;
-    assert!((total - 1000.0).abs() < 0.1, "settlement amounts must sum to event value (~1000), got {total}");
+    assert!(
+        (total - 1000.0).abs() < 0.1,
+        "settlement amounts must sum to event value (~1000), got {total}"
+    );
 }
 
 #[test]
 fn route_economic_event_under_collab_withdrawn_member_flows_entirely_to_commons() {
     // Regression guard for spec §6.4: withdrawn member's share flows entirely
     // to commons-pool with no re-normalization.
-    use elohim_views::{
-        CollabAgreementStatus, CollabAgreementView, DeclaredShare, ElohimTier,
-        ShareAllocation, ShareAllocationForm,
-    };
     use elohim_storage::services::economic_event_service::route_economic_event_under_collab;
+    use elohim_views::{
+        CollabAgreementStatus, CollabAgreementView, DeclaredShare, ElohimTier, ShareAllocation,
+        ShareAllocationForm,
+    };
     use std::collections::HashSet;
 
     let agreement = CollabAgreementView {
@@ -1126,8 +1160,14 @@ fn route_economic_event_under_collab_withdrawn_member_flows_entirely_to_commons(
         share_allocation: ShareAllocation {
             form: ShareAllocationForm::Declared,
             shares: Some(vec![
-                DeclaredShare { collective_cid: "collective:a".into(), share: 0.475 },
-                DeclaredShare { collective_cid: "collective:b".into(), share: 0.475 },
+                DeclaredShare {
+                    collective_cid: "collective:a".into(),
+                    share: 0.475,
+                },
+                DeclaredShare {
+                    collective_cid: "collective:b".into(),
+                    share: 0.475,
+                },
             ]),
             affinity_window_blocks: None,
             rebalance_cadence_blocks: None,
@@ -1156,7 +1196,12 @@ fn route_economic_event_under_collab_withdrawn_member_flows_entirely_to_commons(
 
     let by_receiver: std::collections::HashMap<_, _> = inputs
         .iter()
-        .map(|i| (i.receiver.clone(), i.resource_quantity_value.unwrap_or(0.0) as f64))
+        .map(|i| {
+            (
+                i.receiver.clone(),
+                i.resource_quantity_value.unwrap_or(0.0) as f64,
+            )
+        })
         .collect();
 
     assert!(
@@ -1168,7 +1213,10 @@ fn route_economic_event_under_collab_withdrawn_member_flows_entirely_to_commons(
     let commons = *by_receiver.get("commons-pool").unwrap_or(&0.0);
 
     // B gets its own 47.5%; commons absorbs A's 47.5% + base tribute 5%
-    assert!((b - 475.0).abs() < 0.1, "active collective:b: expected ~475, got {b}");
+    assert!(
+        (b - 475.0).abs() < 0.1,
+        "active collective:b: expected ~475, got {b}"
+    );
     assert!(
         (commons - 525.0).abs() < 0.1,
         "commons-pool absorbs A's share + tribute: expected ~525, got {commons}"
