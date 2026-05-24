@@ -11,3 +11,6 @@
 [submodule "elohim/rakia"]
 	path = elohim/rakia
 	url = https://github.com/ethosengine/rakia.git
+[submodule "che-devworkspaces"]
+	path = che-devworkspaces
+	url = https://github.com/ethosengine/che-devworkspaces.git

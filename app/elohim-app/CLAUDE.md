@@ -194,3 +194,12 @@ pnpm run hc:start
 # Angular dev server only (if doorway already running)
 pnpm start
 ```
+
+<!-- ci-marker(2026-05-24): App pipeline rebuild after stageSpaBlob URL + 413 fixes.
+     The orchestrator's graph-walker change-patterns for the App pipeline don't
+     yet include genesis/orchestrator/manifests/elohim-app/** — so ingress changes
+     under that path don't trigger an App build. This file touch forces the App
+     pipeline to fire so stageSpaBlob can write fresh blob hashes into the
+     elohim-host-landing + lamad-spa content rows. Once a follow-up shift adds
+     manifests/elohim-app/** to the App pipeline's changePatterns, this marker
+     becomes obsolete and can be removed. -->
