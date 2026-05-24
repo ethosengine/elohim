@@ -862,6 +862,53 @@ VEOF
             }
         }
 
+        stage('Apply Ingress (pre-upload)') {
+            // Apply the per-env ingress manifest BEFORE Upload SPA Blob.
+            //
+            // The ingress carries `nginx.ingress.kubernetes.io/proxy-body-size`,
+            // which nginx-ingress's default (1 MB) violates for the ~10 MB SPA
+            // blob PUT that stageSpaBlob does. Without this stage, the App
+            // pipeline can't bootstrap: stageSpaBlob runs at line ~865 and
+            // hits 413; the Deploy to Alpha stage that would normally apply
+            // the ingress doesn't run until line ~1126, after stageSpaBlob.
+            //
+            // Symptom this stage fixes: App #1460 (and prior) 413 on PUT.
+            // Bootstrap chicken-and-egg first written into the ingress
+            // manifest comment by 984f6b0e7; this stage closes the loop.
+            //
+            // kubectl apply is idempotent — the later Deploy to Alpha stage
+            // still applies the full sibling-manifest set (configmap, service,
+            // ingress) via deployAppToEnvironment. Applying the ingress twice
+            // is a no-op.
+            //
+            // Scope: alpha (dev/feat/claude branches), staging, prod.
+            // Each env has its own genesis/orchestrator/manifests/elohim-app/<env>/ingress.yaml.
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { shouldRunStep('build-angular') }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def branch = env.BRANCH_NAME ?: 'dev'
+                        def env_target
+                        if (branch == 'main') {
+                            env_target = 'prod'
+                        } else if (branch == 'staging' || branch.startsWith('staging-')) {
+                            env_target = 'staging'
+                        } else {
+                            env_target = 'alpha'
+                        }
+                        def ingressPath = "genesis/orchestrator/manifests/elohim-app/${env_target}/ingress.yaml"
+                        echo "Applying ${env_target} ingress (pre-upload) from ${ingressPath}"
+                        sh "kubectl apply -f ${ingressPath}"
+                    }
+                }
+            }
+        }
+
         stage('Upload SPA Blob') {
             when {
                 allOf {
