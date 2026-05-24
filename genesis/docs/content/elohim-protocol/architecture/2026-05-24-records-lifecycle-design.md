@@ -442,7 +442,132 @@ Both queries run against the local Diesel SQL projection — zero network calls 
 
 ## A.3 Resource (`EconomicResource` + classification)
 
-> *Stubbed — full draft pending. Hyperscale analog: S3 object whose state is mass-balance-derived from event history (event-sourcing with REA as the reduce function). Critical sub-sections: balance-as-derived-view (not stored); `resource_classified_as` for stewardship variants (subsumes StewardedResource per Gap 5); CID continuity across surface re-elevation; subordination via `parent_epr_cid`; dissolution to closed state.*
+### 1. What it is
+
+A Resource is a **thing with economic value that flows through the network** — a photo in a family archive, a token of recognition earned by a contributor, a kilowatt-hour of stored energy, a quilt of bytes committed to a peer pantry, a content node that learners consume. Implemented as an `EconomicResource` DHT entry with a `classified_as_json` discriminator carrying one or more URI-class labels (e.g., `"content"`, `"compute"`, `"care-token"`, `"backup-state"`). Resources do not store their own balance or current state; those are **derived views** over the Event history that has acted upon them. After the Gap 5 consolidation, `StewardedResource` — a parallel entry type that stored computed capacity, allocation, and usage fields directly — is retired; all stewardship-variant semantics move into `EconomicResource` with appropriate `resource_classified_as` discrimination. A Resource's identity is content-addressed (CID), which means its identity survives subordination under a `parent_epr_cid`, cold-archive into the quilt, and `surface` re-elevation without any identity mutation.
+
+### 2. Hyperscale analog
+
+**Think S3 object + event-sourced aggregate, where current state is the reduce function over its Event history.** Like S3, a Resource has a stable content-addressed identity (the CID plays the role of the S3 key + ETag) and can reference bytes of any size via iroh-blob. Unlike S3, the resource's "current balance" (how much is available? who has custody?) is never stored as a field — it is materialized by the storage projection by replaying all `EconomicEvent` entries whose `resource_inventoried_as` references this resource's id. Concretely: `accounting_quantity_value` on the DHT entry is the value at write time; the *current* quantity is a derived SQL view: `SELECT SUM(quantity_delta) FROM economic_events WHERE resource_inventoried_as = ?`. A skeptical accountant knows this shape as double-entry bookkeeping without a running ledger; a skeptical storage engineer knows it as event-sourcing without snapshots. The hyperscale win: no balance update race, no reconciliation step, no separate table to keep in sync — the ledger *is* the state.
+
+### 3. Data flow
+
+```
+Authoring agent (human or elohim) writes EconomicResource entry
+        │
+        ▼
+Coordinator zome (content_store) → integrity validators:
+  - classified_as values against RESOURCE_CLASSIFICATIONS whitelist
+  - primary_accountable / custodian are valid agent IDs
+  - if parent_epr_cid set: parent EPR exists; author has custody rights
+        │
+        ▼
+DHT validator quorum gossip-validates + replicates to neighborhood
+        │
+        ▼
+Post-commit signal → ReconcileController → SQL projection
+  (economic_resources table; classified_as column indexed)
+        │
+        ▼
+Events accumulate against the resource (via resource_inventoried_as)
+        │
+        ▼
+Balance derived view:
+  SELECT SUM(quantity_delta) FROM economic_events
+  WHERE resource_inventoried_as = <resource_id>
+        │
+        ▼
+Application queries: dashboard, shefa views, doorway projection
+```
+
+### 4. Physical storage
+
+| Layer | What lives there | Shape |
+|---|---|---|
+| **Source of truth** | Author's source-chain entry + DHT shard replicas | Holochain DHT; `EconomicResource` entry in `content_store_integrity` |
+| **Operational copy** | SQL projection on every peer with reach | `economic_resources` table; `classified_as` column indexed; `lifecycle_state` column (`active` / `subordinate` / `shelved` / `closed`) |
+| **Balance derived view** | Materialized by query over `economic_events` | SQL view `resource_balance_view`; no stored balance field |
+| **Web2 projection** | Optional doorway-service cache | Redis-shape cache keyed by resource CID; serves unconnected web clients |
+| **Large attachments** | Bytes referenced by `tracking_identifier` CID | iroh-blob; pull-fetched on demand; never gossiped |
+
+### 5. Gossip / sync layer
+
+- **DHT**: `EconomicResource` entry payload, typically 2–5 KB (metadata + `classified_as_json` + optional `tracking_identifier` CID reference + timestamps). Gossip latency 200–2000 ms. The DHT carries the *declaration* of the resource, not the bytes and not the balance.
+- **libp2p sync plane**: SQL projection rows sync via cursor-tracked delta-sync. Balance views re-derive on the receiving peer once their `economic_events` table is current. A peer that is one sync cycle behind may show a stale balance — this is expected; the substrate commitment is convergence, not immediate consistency.
+- **iroh-blob plane**: For content resources (photos, documents, quilts), actual bytes are pull-fetched on demand using the CID from `tracking_identifier` or `content_node_id`. Bytes never gossip; only the DHT entry (the manifest) gossips.
+- **Inventory gossip (libp2p)**: `peer_blob_inventory` projections gossip via the `elohim/inventory/blob` topic, carrying which peers hold which resource CIDs at which tier. This is the operational discovery plane for resource availability — `project_inventory_exchange_not_byte_replication` applies — not for resource truth.
+
+### 6. Provenance — maintained vs intentionally degraded
+
+**Maintained cryptographically forever:**
+- Author signature on the DHT entry (who declared this resource, when)
+- The resource's CID (content-addressed; immutable identity)
+- The chain of `EconomicEvent` entries that have acted upon this resource (each carries `resource_inventoried_as` back to this id; the chain is append-only and gossip-validated)
+- The `primary_accountable` agent at each historical point (agent key is non-repudiable)
+
+**Intentionally degraded (access cost, not truth):**
+- **At subordination** (`parent_epr_cid` set): the resource does not independently gossip its balance view; queryable only via traversal from the parent EPR's reach scope — one extra network hop vs. direct query
+- **At cold-archive** (`lifecycle_state: shelved`, Commitment with `action: "custody-quilt"` and `tier_floor: "shelved"`): payload erasure-coded across quilt peers via Reed-Solomon; CID still verifiable, but drawing the bytes requires K-of-N pull from quilt peers (multi-second latency)
+- **At dissolution** (`lifecycle_state: closed`): future Events targeting this resource are rejected by integrity validators; existing Event history remains queryable forever; the resource cannot receive new value flows, but its accounting chain is cryptographically permanent
+- **Right-to-be-forgotten**: mishpat governance may trigger root-rewrite on the `EconomicResource` entry, stripping PII content fields while preserving the structural accounting chain; downstream Event references retain `redaction-applied` markers
+
+The substrate's commitment: **the CID is forever; the cost of retrieving the bytes scales with lifecycle stage.** A dissolved photo resource's CID proves the photo existed; drawing the actual image requires quilt reconstruction. This cost-shedding is what makes 8B-scale inventory possible.
+
+### 7. Agentic intelligence at scale
+
+Where elohim cognition is load-bearing:
+
+- **Inventory narration** — the `inventory-elohim` agent continuously evaluates whether resources are still actively flowing or should subordinate/shelve. A household's ~10k physical objects (furniture, appliances, tools, vehicles) each have a Resource; no human can actively maintain 10k entries × 100M households. Inventory-elohim does.
+- **Balance materialization at care-economy frequency** — recognition tokens, care-tokens, and time-tokens accumulate via Events at a rate humans cannot manually reconcile. The `care-stewardship-elohim` materializes the running balance and narrates context: "14 care-hours contributed this week, 23% above your household average."
+- **Classification enforcement** — when a bridge (e.g., `bridges/plaid/`) imports legacy financial data as `EconomicEvent` rows, the `stewardship-elohim` classifies resulting `EconomicResource` entries via `resource_classified_as` (e.g., `["currency", "financial-asset"]`), ensuring the substrate sees the household's full economic picture without manual tagging.
+- **Dissolution narration** — when a resource becomes inactive (no Events for N days, below threshold balance), the domain-elohim authors `Event(action="dispose")` to transition `lifecycle_state` to `closed`, notifies linked EPRs, and authors the custody Commitment routing the quilt to cold-archive. Humans can confirm or override.
+
+What humans alone can't do at care-economy scale: continuously maintain resource state for millions of low-value household items and care-economy tokens. Elohim agents narrate the mundane. **This is the value-prop unlock — an economy that can see the nurse's 3 AM compassion as a Resource with an accounting history.**
+
+### 8. Scale: household → hub → global
+
+- **Local DHT (household elohim-node)**: a typical household holds ~1k–10k Resources across all classifications (physical inventory, recognition tokens, financial assets, compute credits, content). At 3 KB per Resource DHT entry, that is 3–30 MB of DHT writes. The balance views derive from `economic_events`; with ~100k events/year per household, balance queries run in milliseconds on local SQLite.
+- **Hub (collective elohim-node)**: the hub does not replicate individual household Resources unless they elect commons reach. Hub-level Resources are collective-level entities: shared assets, pool contributions, collective compute credits. Hub balance queries aggregate by joining `economic_events` projected from federated household nodes — the hub computes collective balances without storing member Resources.
+- **Global**: only Resources with `reach: commons` (commons-attested) propagate to the DHT's global scope — protocol-level resources such as learning-points standards, recognition-score schemas, compute-credit specifications. Personal inventory, financial assets, and care tokens never reach global scope.
+
+### 9. Limit-awareness / capture prevention
+
+- DHT validator quorum prevents any single peer from falsifying resource creation or custodian assignment
+- `resource_classified_as` discrimination gates which classifications can be authored under which agent types — compute-class resources cannot be re-labelled as care-class resources by fiat; they ride separate `signal_kind` streams (see `project_compute_commitments_bounded`)
+- Care-class and compute-class Resource balances are maintained in isolated accounting streams: compute breach signals cannot contaminate care attribution, and care debits cannot gate compute placement — this is a substrate-invariant wired through `signal_kind` and `resource_classified_as` whitelists, not a convention
+- `primary_accountable` is a stewardship record, not an ownership claim; accumulating disproportionate resource stewardship triggers rising friction via standing-curve flattening (friction-gradient limitarianism)
+- Dissolution is an integrity-layer constraint — a closed Resource cannot receive new value flows without a mishpat governance `action: "revive"` requiring quorum consent; the integrity zome validates this at write time
+
+### 10. Network resilience
+
+- DHT shard-N redundancy: each `EconomicResource` entry replicated to ~10 neighborhood peers; single-peer loss does not affect resource accessibility
+- Partition recovery: cursor-tracked libp2p sync ensures Event history (and therefore balance correctness) converges after a partition heals; a peer offline for 30 days re-derives the correct balance after catching up its `economic_events` projection
+- Cold-archive recoverability: quilts holding resource bytes use Reed-Solomon erasure coding; any K-of-N peers can reconstruct the full payload — even `shelved` resources are recoverable if K honest quilt peers are reachable
+- Doorway projection: for web2 / browser clients without a Holochain peer, doorway serves the `economic-resource-view.schema.json` wire shape from its Redis-shape cache; balance fields are omitted or served as cached snapshots with a declared staleness bound
+- CID continuity: a Resource that moves through `active` → `subordinate` → `shelved` → `surfaced` retains its CID at every stage; re-elevation via `surface_resource(resource_cid, new_parent_epr_cid)` authors a new Event and updates `lifecycle_state` via ReconcileController but does not create a new DHT entry — the existing entry's CID is the permanent identity
+
+### 11. Dashboard worked example (preview)
+
+In the Google Photos substrate-native media library (`applications/google-photos-application-design.md`), every photo has a companion Resource with `resource_classified_as: ["backup-state"]` tracking how many copies exist across the peer mesh and cold archive. The vision-elohim dashboard renders a per-album backup health row:
+
+```sql
+-- Per-album backup health: photo count and bytes at each lifecycle tier
+SELECT
+    e.parent_epr_cid        AS album_cid,
+    r.lifecycle_state,
+    COUNT(*)                AS photo_count,
+    SUM(ev.resource_quantity_value) AS total_bytes
+FROM economic_resources r
+JOIN epr_atoms e ON e.resource_id = r.id
+LEFT JOIN economic_events ev ON ev.resource_inventoried_as = r.id
+    AND ev.action = 'custody-quilt'
+WHERE r.classified_as LIKE '%backup-state%'
+GROUP BY e.parent_epr_cid, r.lifecycle_state;
+```
+
+For each shared album, the dashboard shows how many photos are `active` (locally warm), `shelved` (cold-archive quilt), or `closed` (disposed). The Resource's CID is the stable key that survives photo re-uploads and re-archiving cycles without identity collision. The byte-count balance derives from quilt Commitment Event history — no stored field, always current.
+
+Full walk in `applications/google-photos-application-design.md`.
 
 ## A.4 Observation
 
