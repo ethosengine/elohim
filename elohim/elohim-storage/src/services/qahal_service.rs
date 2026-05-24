@@ -420,14 +420,12 @@ impl QahalService {
         })?;
 
         // --- Step 2: Decode entry bytes as ZomeCollabAgreementEntry ---
-        let entry: ZomeCollabAgreementEntry =
-            rmp_serde::from_slice(&record.entry_bytes).map_err(|e| {
-                StorageError::Internal(format!("decode CollabAgreement entry: {e}"))
-            })?;
+        let entry: ZomeCollabAgreementEntry = rmp_serde::from_slice(&record.entry_bytes)
+            .map_err(|e| StorageError::Internal(format!("decode CollabAgreement entry: {e}")))?;
 
         // --- Step 3: Parse share_allocation_json → ShareAllocation ---
-        let share_allocation: ShareAllocation =
-            serde_json::from_str(&entry.share_allocation_json).map_err(|e| {
+        let share_allocation: ShareAllocation = serde_json::from_str(&entry.share_allocation_json)
+            .map_err(|e| {
                 StorageError::Internal(format!(
                     "parse share_allocation_json for agreement {}: {e}",
                     bytes_to_agreement_cid(action_bytes)
@@ -865,10 +863,7 @@ mod tests {
 
         let entry = ZomeCollabAgreementEntry {
             authored_by_agent_cid: "agent:test-author".into(),
-            participants: vec![
-                "collective:coll-a".into(),
-                "collective:coll-b".into(),
-            ],
+            participants: vec!["collective:coll-a".into(), "collective:coll-b".into()],
             scope: "test-project".into(),
             share_allocation_json: share_allocation_json.clone(),
             commons_pool_tribute: 0.05,
@@ -967,4 +962,3 @@ mod tests {
         }
     }
 }
-

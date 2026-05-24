@@ -158,9 +158,7 @@ async fn handle_create(
 
         // Fetch the Collab-Qahal to get the active member set.
         let collab = svc.fetch_collab_qahal(collab_cid).await.map_err(|e| {
-            StorageError::Internal(format!(
-                "fetch_collab_qahal failed for {collab_cid}: {e}"
-            ))
+            StorageError::Internal(format!("fetch_collab_qahal failed for {collab_cid}: {e}"))
         })?;
 
         // Resolve the anchor Agreement CID from the Collab-Qahal view.
@@ -175,11 +173,14 @@ async fn handle_create(
         // Full Agreement entry decode is active (M1 final): fetch_agreement_by_action_bytes
         // now decodes the CollabAgreement entry body from the conductor Record and parses
         // share_allocation_json into a real ShareAllocation.
-        let agreement = svc.fetch_collab_agreement(agreement_cid).await.map_err(|e| {
-            StorageError::Internal(format!(
-                "fetch_collab_agreement failed for {agreement_cid}: {e}"
-            ))
-        })?;
+        let agreement = svc
+            .fetch_collab_agreement(agreement_cid)
+            .await
+            .map_err(|e| {
+                StorageError::Internal(format!(
+                    "fetch_collab_agreement failed for {agreement_cid}: {e}"
+                ))
+            })?;
 
         // Defensive trust-boundary check: a properly-formed CollabAgreement always
         // carries declared shares (validated by the coordinator pre-commit gate).

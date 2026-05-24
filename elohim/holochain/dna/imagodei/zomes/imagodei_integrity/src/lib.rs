@@ -1085,7 +1085,7 @@ pub enum LinkTypes {
     StewardOf,              // Person/Collective CID -> Collective (role-filtered)
     CharterAnchor,          // Anchor("collective:<cid>") -> Collective
     AttestationOnAgreement, // CollabAgreement -> attesting Collective (tag = collective CID bytes)
-    CollabInstantiated,     // CollabAgreement -> instantiated Collab-Qahal Collective (unit tag, single per agreement)
+    CollabInstantiated, // CollabAgreement -> instantiated Collab-Qahal Collective (unit tag, single per agreement)
     MembershipForAgreement, // CollabAgreement -> Membership entries
 }
 
