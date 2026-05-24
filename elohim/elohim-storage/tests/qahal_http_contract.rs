@@ -1034,10 +1034,11 @@ fn reach_inflation_via_collab_is_refused() {
 // that maps a CollabAgreementView + event value → Vec<CreateEconomicEventInput>
 // (one Settlement per RoutedAmount).  They pass today without a conductor.
 //
-// The live HTTP path (POST /api/v1/economic-event with scope_collab_cid) is
-// deferred to M2: it requires a DB migration adding `scope_collab_cid` to the
-// `economic_events` table and an async `QahalService` borrow in the service.
-// See `economic_event_service.rs` module-level doc for the M2 activation gate.
+// The live HTTP path (POST /api/v1/economic-event with scopeCollabCid) is
+// wired in `api/economic_events.rs::handle_create` and persists routed
+// Settlements via `EconomicEventService::bulk_create_events`. End-to-end
+// verification needs a live Holochain conductor (CI-scope) — see the
+// `#[ignore]` test in §10 of this file.
 // =============================================================================
 
 #[test]
