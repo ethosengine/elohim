@@ -1,0 +1,20 @@
+# Nextest config for sweettest workspace.
+#
+# Primary purpose: enable JUnit XML output per profile so Jenkins can
+# aggregate results across distributed test shards (W5 of the 2026-05-24
+# stage efficiency design).
+#
+# Path is relative to CARGO_TARGET_DIR/nextest/<profile>/, so for the
+# default profile JUnit lands at target/nextest/default/junit.xml.
+
+[profile.default]
+# Per-test slow-test threshold. Sweettest scenarios spin up real conductors;
+# anything past 5 minutes wall-clock is worth flagging.
+slow-timeout = { period = "5m", terminate-after = 3 }
+
+[profile.default.junit]
+path = "junit.xml"
+report-name = "sweettest"
+# Store the absolute time each test took for cross-shard balancing analysis.
+store-success-output = false
+store-failure-output = true

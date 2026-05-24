@@ -1,3 +1,4 @@
+//! @dna-scope: imagodei
 //! Sweettest — Recovery Protocol Phase 2 Milestone M3.
 //!
 //! These tests exercise coordinator-side correctness across multiple cells

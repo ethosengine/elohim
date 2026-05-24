@@ -1,3 +1,4 @@
+//! @dna-scope: lamad, imagodei
 //! Sweettest — EPR Phase 2B Batch A: Wire-Shape Contracts + Conductor-Bound Loop (Task A.12).
 //!
 //! ## What this file proves and does NOT prove

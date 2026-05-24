@@ -1,3 +1,4 @@
+//! @dna-scope: imagodei
 //! Sweettest — AgentPeerBinding (EPR Phase 2B, Task A.2).
 //!
 //! These tests exercise the AgentPeerBinding integrity entry type via the

@@ -1,3 +1,4 @@
+//! @dna-scope: imagodei
 //! Sweettest baseline — imagodei (identity).
 //!
 //! Baseline scenarios (§2.1.3):

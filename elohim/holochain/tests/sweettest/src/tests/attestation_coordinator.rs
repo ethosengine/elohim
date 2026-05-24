@@ -1,3 +1,4 @@
+//! @dna-scope: lamad
 //! Sweettest — attestation coordinator (Attestation Consolidation, Tasks B.3 / B.4 / B.5 / B.6).
 //!
 //! Verifies the end-to-end flow: `issue_attestation` creates a Content entry

@@ -1,3 +1,4 @@
+//! @dna-scope: imagodei
 //! Sweettest — Recovery Protocol Phase 2 Milestone M5: PortalHost CRUD.
 //!
 //! These tests exercise the `add_portal_host`, `get_my_portal_hosts`, and

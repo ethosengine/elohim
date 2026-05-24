@@ -714,7 +714,7 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
 /**
  * Trigger a pipeline and wait for result
  */
-def triggerPipeline(String name, String branch, boolean wait = true) {
+def triggerPipeline(String name, String branch, boolean wait = true, List changedFiles = []) {
     echo "▶️ Triggering ${name}/${branch}..."
 
     try {
@@ -733,6 +733,13 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
         // Two activation paths: operator param OR [deploy-only] commit tag.
         def deployOnlyDownstream = (params.DEPLOY_ONLY ?: false) || env.DEPLOY_ONLY_FROM_TAG == 'true'
         buildParams.add(booleanParam(name: 'DEPLOY_ONLY', value: deployOnlyDownstream))
+        // CHANGED_PATHS — newline-delimited list of changed source paths
+        // from this orchestrator run's changeset. Downstream pipelines that
+        // want per-path / per-DNA selectivity (e.g. elohim-holochain's
+        // sweettest stage harvester for nextest binary filter, W3 of the
+        // 2026-05-24 stage efficiency design) read this. Empty value →
+        // full-suite fallback (manual / [build:X] tag / force builds).
+        buildParams.add(stringParam(name: 'CHANGED_PATHS', value: changedFiles.join('\n')))
 
         def result = build(
             job: "${name}/${branch}",
@@ -1806,7 +1813,7 @@ spec:
                                 if (level.size() == 1) {
                                     def name = level[0]
                                     echo "🔨 Building: ${name}"
-                                    def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                    def result = triggerPipeline(name, env.BRANCH_NAME, true, changedFiles)
                                     results[name] = result
                                     recordPipelineResult(name, result, pipelineBaselines)
                                 } else {
@@ -1815,7 +1822,7 @@ spec:
                                         parallelBuilds[name] = {
                                             stage(name) {
                                                 echo "🔨 Building: ${name}"
-                                                def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                                def result = triggerPipeline(name, env.BRANCH_NAME, true, changedFiles)
                                                 results[name] = result
                                                 recordPipelineResult(name, result, pipelineBaselines)
                                             }
@@ -1848,7 +1855,7 @@ spec:
                                 echo '🌱 Running Genesis (seed + test)'
                                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-                                def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true)
+                                def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true, changedFiles)
 
                                 // Hydrate stageAnnotations from genesis's
                                 // conductor-readiness + seed-results artifacts.

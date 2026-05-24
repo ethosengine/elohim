@@ -1,3 +1,4 @@
+//! @dna-scope: imagodei
 //! Sweettest — Recovery Protocol Phase 2 Milestone M5: submit_specialist_revocation.
 //!
 //! These tests exercise the `submit_specialist_revocation` coordinator function

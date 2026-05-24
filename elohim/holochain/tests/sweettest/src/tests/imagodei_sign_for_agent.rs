@@ -1,3 +1,4 @@
+//! @dna-scope: imagodei
 //! Sweettest — `sign_for_agent` coordinator function (EPR Phase 2B, Task C.1).
 //!
 //! Exercises the imagodei coordinator function that elohim-storage calls

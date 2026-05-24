@@ -1,3 +1,4 @@
+//! @dna-scope: node_registry
 //! Sweettest baseline — node-registry (node admission).
 //!
 //! Baseline (§2.4): node admission flow — bootstrap-steward admits a second

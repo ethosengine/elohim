@@ -1,3 +1,4 @@
+//! @dna-scope: infrastructure
 //! Sweettest baseline — infrastructure (doorway federation).
 //!
 //! Infrastructure is federation-native (no bootstrap steward — see Wave 1

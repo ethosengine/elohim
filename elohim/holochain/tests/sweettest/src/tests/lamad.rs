@@ -1,3 +1,4 @@
+//! @dna-scope: lamad
 //! Sweettest baseline — lamad (content_store coordinator).
 //!
 //! Scenarios (§2.3):

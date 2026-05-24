@@ -1,3 +1,4 @@
+//! @dna-scope: mishpat
 //! Sweettest baseline — mishpat (governance).
 //!
 //! Baseline (§2.1.3): bootstrap-steward creates a governance entry; a second

@@ -1,3 +1,4 @@
+//! @dna-scope: imagodei
 //! Sweettest cross-DNA flows for T0 Collab end-to-end.
 //! Per plan: 2026-05-23-multi-collective-collaboration-epr-plan.md
 //!

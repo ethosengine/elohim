@@ -1,3 +1,4 @@
+//! @dna-scope: imagodei
 //! Sweettest — Recovery Protocol Phase 2 Milestone M4: Fast-Path Revocation.
 //!
 //! These tests exercise coordinator-side correctness for the M4 revocation fast-

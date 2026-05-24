@@ -56,6 +56,107 @@ def shouldRunStep(String stepName) {
     return steps.contains('all') || steps.contains(stepName)
 }
 
+// ============================================================================
+// W5 — Distributed sweettest test shards
+//
+// SWEETTEST_SHARD_COUNT: number of parallel test runner pods. Each consumes
+// the same compiled nextest archive (stashed by the compile stage) and runs
+// `cargo nextest run --partition hash:N/M`. Hash partitioning evens out
+// uneven test runtimes (kitsune2 conductor setup cost varies).
+//
+// SWEETTEST_SHARD_POD_YAML: minimal pod spec for shard runners. No PVCs
+// (compile state is in the stashed archive); same image as compile pod so
+// the nix dev shell + linked runtime libs (libsodium, libdatachannel, etc)
+// are available. Sized for 1 conductor at a time (--test-threads=1 still
+// in force inside each shard).
+// ============================================================================
+def SWEETTEST_SHARD_COUNT = 4
+def SWEETTEST_SHARD_POD_YAML = '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: ee-jenkins
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                  - operations
+                  - edge
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "build"
+      effect: "NoSchedule"
+  containers:
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      imagePullPolicy: Always
+      command: [cat]
+      tty: true
+      envFrom:
+        - secretRef:
+            name: sccache-credentials
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "1"
+          ephemeral-storage: "4Gi"
+        limits:
+          memory: "4Gi"
+          cpu: "2"
+          ephemeral-storage: "8Gi"
+'''
+
+// Run a single sweettest shard inside its own podTemplate-allocated pod.
+// Unstashes the compiled nextest archive + the W3 filter file, runs the
+// partition through `nix develop` so runtime libs link, archives the
+// per-shard log + JUnit XML for the post.always aggregator.
+def runSweettestShard(int n, int total, String shardPodYaml) {
+    podTemplate(label: "sweettest-shard-${n}-${total}", yaml: shardPodYaml) {
+        node("sweettest-shard-${n}-${total}") {
+            container('builder') {
+                unstash 'sweettest-shard-input'
+                dir('elohim/holochain/tests/sweettest') {
+                    sh """
+                        set -uo pipefail
+                        export HOME=\${HOME:-/root}
+                        mkdir -p "\$HOME"
+                        export SHARD_LOG=sweettest-shard-${n}.log
+                        : > "\$SHARD_LOG"
+                        nix develop --impure --accept-flake-config "\$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c '
+                            set -uo pipefail
+                            unset RUSTC_WRAPPER
+                            export RUSTFLAGS=""
+                            FILTER=\$(cat .nextest-filter)
+                            echo "[shard-${n}/${total}] filter: \$FILTER"
+                            cargo nextest run \\
+                                --archive-file sweettest-archive.tar.zst \\
+                                --extract-to extracted-${n} \\
+                                --no-fail-fast \\
+                                --test-threads=1 \\
+                                --partition hash:${n}/${total} \\
+                                -E "\$FILTER" \\
+                                2>&1 | tee "\$SHARD_LOG"
+                        '
+                        RC=\${PIPESTATUS[0]}
+                        # Copy nextest JUnit (cargo target dir is inside the extract dir)
+                        find extracted-${n} -name junit.xml -exec cp {} sweettest-shard-${n}-junit.xml \\; 2>/dev/null || true
+                        exit \$RC
+                    """
+                    archiveArtifacts(
+                        artifacts: "sweettest-shard-${n}.log,sweettest-shard-${n}-junit.xml",
+                        allowEmptyArchive: true
+                    )
+                }
+            }
+        }
+    }
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -166,6 +267,11 @@ spec:
             name: 'DEPLOY_ONLY',
             defaultValue: false,
             description: 'No-op for this pipeline. Accepted so the orchestrator can propagate the flag uniformly; orchestrator skips triggering DNA when DEPLOY_ONLY=true.'
+        )
+        string(
+            name: 'CHANGED_PATHS',
+            defaultValue: '',
+            description: 'Newline-delimited list of changed source paths from orchestrator. Empty value (manual / force / tag dispatch) means run full suite. Read by the sweettest stage harvester to compose a per-DNA nextest binary filter (W3 of the 2026-05-24 stage efficiency design).'
         )
     }
 
@@ -579,6 +685,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # \$ or \" escapes needed. Constraint: no literal
                                 # apostrophes in this block. Double-quoted variant
                                 # broke at #1222 and #1224 on quoting edge cases.
+
+                                # W3+W5: run the harvester ONCE in outer shell; write
+                                # filter to .nextest-filter so the stashed file flows
+                                # to every shard pod unchanged. No need to re-grep
+                                # markers 4x.
+                                NEXTEST_FILTER=$("$WORKSPACE/elohim/holochain/tests/sweettest/scripts/build-nextest-filter.sh")
+                                echo "[sweettest] nextest -E (for shards): $NEXTEST_FILTER"
+                                printf "%s" "$NEXTEST_FILTER" > .nextest-filter
+
                                 nix develop --impure --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c '
                                     set -uo pipefail
                                     # sccache daemon log capture — written by sccache
@@ -613,39 +728,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     # pack in #1212 (./target hard-coded). See volumeMounts.
                                     export CARGO_TARGET_DIR=/cargo-target
 
-                                    # Quarantined tests:
-                                    #   epr_2b_batch_a_full_loop — discards create_human output
-                                    #     into serde_json::Value, but create_human returns a
-                                    #     bare ActionHash (msgpack BIN, no Value variant). Test
-                                    #     body needs (let _human: ActionHash = ...) one-line
-                                    #     type-annotation fix on a discarded var. Tracked under
-                                    #     shift 2026-04-27T03-56-all-pipelines-green-or-unstable.
-                                    #
-                                    #   create_and_list_succeeds (attention_tending T9) —
-                                    #     create_attention_tending succeeds (no panic) but the
-                                    #     subsequent list_my_tending returns 0 records. Pattern
-                                    #     mirrors get_content_stats which works, so the failure is
-                                    #     non-obvious — possibly EntryDefIndex codegen for the
-                                    #     newly-added private entry, possibly a 0.6 query semantic
-                                    #     for private entries. Quarantined to unblock cascade;
-                                    #     tracked under shift 2026-05-03T18-19-orchestrator-805.
-                                    #
-                                    #   refresh_ttl_appends_timestamp (attention_tending T9) —
-                                    #     cascade of create_and_list_succeeds; iterates the empty
-                                    #     list_my_tending output. Will resolve when #1 resolves.
-                                    #
-                                    #   cross_agent_get_returns_none (attention_tending T9) —
-                                    #     test asserts get(action_hash) returns None for a peer
-                                    #     private entry, but Holochain 0.6 may return Some(Record)
-                                    #     with NotStored entry (action header is public; entry is
-                                    #     private). Test expectation likely needs revision to
-                                    #     check record.entry().is_present() instead of asserting
-                                    #     the Option<Record> outer is None. Needs HDK semantic
-                                    #     verification before fixing.
-                                    cargo nextest run --release --no-fail-fast \\
-                                        --run-ignored all \\
-                                        --test-threads=1 \\
-                                        -E "not (test(=epr_2b_batch_a_full_loop) | test(=create_and_list_succeeds) | test(=refresh_ttl_appends_timestamp) | test(=cross_agent_get_returns_none))" \\
+                                    # W5: build the test archive (compile + bundle ALL
+                                    # binaries). Shards apply the W3 -E filter at run
+                                    # time, so archive is cache-friendly (same content
+                                    # regardless of changeset).
+                                    cargo nextest archive --release \\
+                                        --archive-file "$(pwd)/sweettest-archive.tar.zst" \\
                                         2>&1 | tee "$LOG"
                                     CARGO_RC=${PIPESTATUS[0]}
                                     # Capture sccache hit/miss/write stats to the
@@ -685,6 +773,30 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo "(full log archived as dna-integration.log)"
                                 exit $RC
                             '''
+
+                            // W5: stash compiled archive + filter + flake files
+                            // (shards don't `checkout scm`; they need flake.nix
+                            // + flake.lock at the same workspace path the nix
+                            // develop --command argument expects).
+                            sh '''ls -lh sweettest-archive.tar.zst .nextest-filter'''
+                            stash(
+                                includes: 'elohim/holochain/tests/sweettest/sweettest-archive.tar.zst,elohim/holochain/tests/sweettest/.nextest-filter,elohim/holochain/dna/elohim/flake.nix,elohim/holochain/dna/elohim/flake.lock',
+                                name: 'sweettest-shard-input'
+                            )
+
+                            // W5: run shards in parallel — each in its own pod
+                            // (SWEETTEST_SHARD_POD_YAML, no PVC mounts). hash:k/N
+                            // partitioning evens out runtime per-shard. Failed shard
+                            // doesn't kill peers (failFast default off) → full test
+                            // signal across all shards.
+                            def shards = [:]
+                            for (int i = 1; i <= SWEETTEST_SHARD_COUNT; i++) {
+                                int n = i
+                                shards["sweettest-shard-${n}/${SWEETTEST_SHARD_COUNT}"] = {
+                                    runSweettestShard(n, SWEETTEST_SHARD_COUNT, SWEETTEST_SHARD_POD_YAML)
+                                }
+                            }
+                            parallel shards
                         }
                     }
                 }
@@ -692,8 +804,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             post {
                 always {
                     archiveArtifacts(
-                        artifacts: 'elohim/holochain/tests/sweettest/dna-integration.log,elohim/holochain/tests/sweettest/dna-integration-sccache-daemon.log,elohim/holochain/tests/sweettest/dna-integration-sccache-stats.txt',
+                        artifacts: 'elohim/holochain/tests/sweettest/dna-integration.log,elohim/holochain/tests/sweettest/dna-integration-sccache-daemon.log,elohim/holochain/tests/sweettest/dna-integration-sccache-stats.txt,elohim/holochain/tests/sweettest/.nextest-filter',
                         allowEmptyArchive: true
+                    )
+                    // Aggregate per-shard JUnit. allowEmptyResults: pre-merge builds
+                    // (no shards yet) or filter-empty shards won't fail this.
+                    junit(
+                        allowEmptyResults: true,
+                        testResults: 'elohim/holochain/tests/sweettest/sweettest-shard-*-junit.xml'
                     )
                     // Clean leaked temp conductor dirs (panicked tests can skip Drop).
                     sh 'find /tmp -maxdepth 2 -name "sweet_conductor_*" -mtime +0 -exec rm -rf {} + 2>/dev/null || true'

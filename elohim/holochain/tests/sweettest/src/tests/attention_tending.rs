@@ -1,3 +1,4 @@
+//! @dna-scope: imagodei
 //! Sweettest — AttentionTending coordinator (EPR Phase 3.5, T9).
 //!
 //! Exercises the coordinator functions for AttentionTending private entries.

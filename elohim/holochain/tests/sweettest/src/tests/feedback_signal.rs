@@ -1,3 +1,4 @@
+//! @dna-scope: lamad
 //! Sweettest — FeedbackSignal coordinator (EPR Phase 3.5, T8).
 //!
 //! Exercises the coordinator pre-commit gates and link topology for all 4

@@ -1,3 +1,4 @@
+//! @dna-scope: lamad
 //! Sweettest — stake-class gate for create_rea_economic_event (§8.3).
 //!
 //! Verifies that:

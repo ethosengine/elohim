@@ -1,3 +1,4 @@
+//! @dna-scope: lamad
 //! Sweettest — Manifest entry type (EPR Phase 3, Task 7-8).
 //!
 //! These tests exercise the Manifest integrity entry type via the
