@@ -260,12 +260,29 @@ def stageSpaBlob(String doorwayEprUrl, String distDir, String adminKey) {
             echo "SPA blob hash: \${SPA_HASH}"
             echo "SPA blob size: \${SPA_SIZE}"
 
-            # 1. Upload ZIP as blob (content-addressed; idempotent; no auth)
+            # 1. Upload ZIP as blob via doorway's seed-blob route.
+            #
+            # Why /admin/seed/blob and not /blob/{hash}: doorway's
+            # forward_blob_to_storage (storage_proxy.rs) is a read-through
+            # cache that hardcodes client.get() — PUT requests get silently
+            # downgraded to GET, storage returns 404 on the not-yet-uploaded
+            # hash, the build fails with curl exit 22.
+            #
+            # /admin/seed/blob is the seeder's write-through path: doorway
+            # validates the X-Blob-Hash header, caches locally, then
+            # server-side forwards PUT /blob/{hash} to elohim-storage. The
+            # route is documented at doorway-service/src/routes/seed.rs.
+            #
+            # The earlier direct PUT /blob/{hash} only worked when
+            # doorwayEprUrl pointed at elohim-storage's intra-cluster
+            # address (which accepts PUT natively). Switching to the public
+            # doorway hostname (commit e4d2ab1de) was the regression vector.
             curl -fSs -X PUT \\
                 -H 'Content-Type: application/zip' \\
+                -H "X-Blob-Hash: \${SPA_HASH}" \\
                 --data-binary @lamad-spa.zip \\
-                "${doorwayEprUrl}/blob/\${SPA_HASH}"
-            echo "  ✓ blob uploaded"
+                "${doorwayEprUrl}/admin/seed/blob"
+            echo "  ✓ blob uploaded (via /admin/seed/blob)"
 
             # 2. Link blob to content rows (PATCH+verify) — only when admin key present
             if [ "\${DO_PATCH}" = "1" ]; then
