@@ -125,20 +125,22 @@ spec:
       volumeMounts:
         - name: cargo-cache
           mountPath: /root/.cargo
+        - name: sweettest-target-cache
+          mountPath: /cargo-target
         # NOTE: nix-store PVC mount intentionally absent. Mounting an empty
         # PVC at /nix/store on first run wipes out the ci-builder-nix image's
         # bundled nix binary. Tracked as followup; sccache via Garage S3 is
         # the planned replacement for cargo build caching once sccache lands
         # in ci-builder-nix:latest (in flight separately).
-        # NOTE: sweettest-target-cache /cargo-target mount also temporarily
-        # absent. Pairing CARGO_TARGET_DIR=/cargo-target with this mount
-        # broke the DNA pack stage in build #1212: post-build steps (hc dna
-        # pack, hApp manifest resolution) look for content_store.wasm at the
-        # default ./target path, which CARGO_TARGET_DIR overrides. Failure:
-        # "Failed to canonicalize resource path: content_store.wasm: No
-        # such file or directory". Reverting to default ./target until we
-        # can either rewire the post-build paths to honor CARGO_TARGET_DIR,
-        # or move to sccache-based caching once that infra lands.
+        # NOTE: sweettest-target-cache is restored 2026-05-24. Build #1212
+        # broke when CARGO_TARGET_DIR=/cargo-target was set pod-wide via
+        # the `environment {}` block — `hc dna pack` later in the pipeline
+        # hard-coded ./target for content_store.wasm lookup and 404'd.
+        # CORRECT pattern: set CARGO_TARGET_DIR INSIDE the sweettest
+        # `bash -c '...'` block ONLY (see sweettest stage below). DNA-pack
+        # stages run in separate `sh` blocks that never see this env, so
+        # they continue using ./target. DO NOT lift CARGO_TARGET_DIR back
+        # to the pod or stage environment{} — it will break pack again.
 '''
         }
     }
@@ -146,11 +148,11 @@ spec:
     environment {
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
-        // CARGO_TARGET_DIR temporarily unset — see volumeMounts NOTE above.
-        // Default ./target restores the path post-build steps (hc dna pack,
-        // hApp manifest resolution) expect. Caching for the sweettest cold
-        // compile will return via sccache once ci-builder-nix:latest carries
-        // the sccache binary (in-flight infra change).
+        // CARGO_TARGET_DIR is INTENTIONALLY NOT SET at stage/pod scope.
+        // It is scoped to the sweettest `bash -c '...'` block only, so the
+        // sweettest-target-cache PVC backs warm incremental compile for
+        // sweettest WITHOUT redirecting `hc dna pack`'s ./target lookup.
+        // See volumeMounts NOTE above and the sweettest stage's inner export.
     }
 
     parameters {
@@ -604,6 +606,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     # search for __getrandom_v03_custom which does not exist off-WASM.
                                     # See CLAUDE.md §RUSTFLAGS Override Required.
                                     export RUSTFLAGS=""
+                                    # Scoped to this bash -c only; pod-wide broke hc dna
+                                    # pack in #1212 (./target hard-coded). See volumeMounts.
+                                    export CARGO_TARGET_DIR=/cargo-target
 
                                     # Quarantined tests:
                                     #   epr_2b_batch_a_full_loop — discards create_human output
