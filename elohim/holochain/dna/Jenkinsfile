@@ -148,6 +148,7 @@ def runSweettestShard(int n, int total, String shardPodYaml) {
                             cargo nextest run \\
                                 --archive-file sweettest-archive.tar.zst \\
                                 --extract-to extracted-${n} \\
+                                --workspace-remap . \\
                                 --no-fail-fast \\
                                 --test-threads=1 \\
                                 --partition hash:${n}/${total} \\
@@ -800,11 +801,17 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         // Confirm archive landed where stash expects.
                         sh '''ls -lh elohim/holochain/tests/sweettest/sweettest-archive.tar.zst elohim/holochain/tests/sweettest/.nextest-filter'''
 
-                        // Stash compiled archive + filter + flake files (shards
-                        // don't `checkout scm`; they need flake.nix + flake.lock
-                        // at the same workspace path nix develop expects).
+                        // Stash compiled archive + filter + workspace source +
+                        // flake files. nextest's archive contains test binaries
+                        // + metadata only — it needs the original Cargo.toml +
+                        // src/ on the runtime machine so `--workspace-remap`
+                        // can map binaries→tests. Include all of sweettest/
+                        // (small without target/) so the shard has full workspace.
+                        // flake.nix + flake.lock are at dna/elohim/ — needed by
+                        // `nix develop` on the shard pod.
                         stash(
-                            includes: 'elohim/holochain/tests/sweettest/sweettest-archive.tar.zst,elohim/holochain/tests/sweettest/.nextest-filter,elohim/holochain/dna/elohim/flake.nix,elohim/holochain/dna/elohim/flake.lock',
+                            includes: 'elohim/holochain/tests/sweettest/**,elohim/holochain/dna/elohim/flake.nix,elohim/holochain/dna/elohim/flake.lock',
+                            excludes: 'elohim/holochain/tests/sweettest/target/**,elohim/holochain/tests/sweettest/extracted-*/**',
                             name: 'sweettest-shard-input'
                         )
 
