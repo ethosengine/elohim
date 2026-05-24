@@ -780,31 +780,42 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo "(full log archived as dna-integration.log)"
                                 exit $RC
                             '''
-
-                            // W5: stash compiled archive + filter + flake files
-                            // (shards don't `checkout scm`; they need flake.nix
-                            // + flake.lock at the same workspace path the nix
-                            // develop --command argument expects).
-                            sh '''ls -lh sweettest-archive.tar.zst .nextest-filter'''
-                            stash(
-                                includes: 'elohim/holochain/tests/sweettest/sweettest-archive.tar.zst,elohim/holochain/tests/sweettest/.nextest-filter,elohim/holochain/dna/elohim/flake.nix,elohim/holochain/dna/elohim/flake.lock',
-                                name: 'sweettest-shard-input'
-                            )
-
-                            // W5: run shards in parallel — each in its own pod
-                            // (SWEETTEST_SHARD_POD_YAML, no PVC mounts). hash:k/N
-                            // partitioning evens out runtime per-shard. Failed shard
-                            // doesn't kill peers (failFast default off) → full test
-                            // signal across all shards.
-                            def shards = [:]
-                            for (int i = 1; i <= SWEETTEST_SHARD_COUNT; i++) {
-                                int n = i
-                                shards["sweettest-shard-${n}/${SWEETTEST_SHARD_COUNT}"] = {
-                                    runSweettestShard(n, SWEETTEST_SHARD_COUNT, SWEETTEST_SHARD_POD_YAML)
-                                }
-                            }
-                            parallel shards
                         }
+                    }
+
+                    // W5 stash + parallel — OUTSIDE the dir('elohim/.../sweettest')
+                    // block. stash() inside dir() resolved workspace-relative
+                    // `includes:` against the dir's cwd → produced "No files
+                    // included in stash" failure on #1272 even though the
+                    // archive was confirmed present. Workspace-root context
+                    // here is what stash expects, and the shard helper's
+                    // unstash → dir(sweettest) → sh sequence then finds the
+                    // files at the right relative paths inside each shard pod.
+                    script {
+                        // Confirm archive landed where stash expects.
+                        sh '''ls -lh elohim/holochain/tests/sweettest/sweettest-archive.tar.zst elohim/holochain/tests/sweettest/.nextest-filter'''
+
+                        // Stash compiled archive + filter + flake files (shards
+                        // don't `checkout scm`; they need flake.nix + flake.lock
+                        // at the same workspace path nix develop expects).
+                        stash(
+                            includes: 'elohim/holochain/tests/sweettest/sweettest-archive.tar.zst,elohim/holochain/tests/sweettest/.nextest-filter,elohim/holochain/dna/elohim/flake.nix,elohim/holochain/dna/elohim/flake.lock',
+                            name: 'sweettest-shard-input'
+                        )
+
+                        // Run shards in parallel — each in its own pod
+                        // (SWEETTEST_SHARD_POD_YAML, no PVC mounts). hash:k/N
+                        // partitioning evens out runtime per-shard. Failed shard
+                        // doesn't kill peers (failFast default off) → full test
+                        // signal across all shards.
+                        def shards = [:]
+                        for (int i = 1; i <= SWEETTEST_SHARD_COUNT; i++) {
+                            int n = i
+                            shards["sweettest-shard-${n}/${SWEETTEST_SHARD_COUNT}"] = {
+                                runSweettestShard(n, SWEETTEST_SHARD_COUNT, SWEETTEST_SHARD_POD_YAML)
+                            }
+                        }
+                        parallel shards
                     }
                 }
             }
