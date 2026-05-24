@@ -2,7 +2,7 @@
 
 **Branch:** `sprint/qahal-m1`
 **Base:** `origin/dev` @ `1293f33a5`
-**Sprint commits:** 6 commits beyond origin/dev (5 feature + 1 quality-gate)
+**Sprint commits:** 9 commits beyond origin/dev (5 feature + 4 quality-gate/fmt/fix)
 **Status:** DONE_WITH_CONCERNS (pre-existing clippy failures in unrelated crates; sprint-scope gates are green)
 
 ---
@@ -10,6 +10,9 @@
 ## Commit Log (origin/dev..HEAD)
 
 ```
+3eb3ba1f4 fix(qahal-m1): replace .get().is_none() with .contains_key() — clippy
+ff31dde36 chore(qahal-m1): fmt economic_event_service.rs + qahal_http_contract.rs
+2bd28d0c7 docs(sprint): qahal M1 — 17 tasks complete, branch sprint/qahal-m1
 ab847a8fd chore(qahal-m1): quality gate fixes — clippy + fmt for sprint/qahal-m1
 892b3adec test(qahal-sweettest): two-conductor end-to-end T0 Collab flow
 40f7e8ebc feat(storage-client): QahalApi SDK methods for Collective + Collab flows
@@ -19,7 +22,7 @@ d65f2c3f7 feat(qahal-share-routing): Form A declared share-routing evaluator + 5
 ```
 
 Tasks 1–12 landed as prior-sprint commits already merged into origin/dev baseline.
-The sprint isolation branch carries Tasks 13–18 (5 feature + 1 quality-gate).
+The sprint isolation branch carries Tasks 13–18 (5 feature + 4 quality-gate/fmt/fix).
 
 ---
 
@@ -30,18 +33,19 @@ The sprint isolation branch carries Tasks 13–18 (5 feature + 1 quality-gate).
 | Suite | Passed | Failed | Ignored |
 |-------|--------|--------|---------|
 | doctests (lib) | 1 | 0 | 14 |
-| share_routing (unit) | 6 | 0 | 0 |
-| qahal_http_contract | 43 | 0 | 5 |
+| share_routing + economic_event (unit) | 6 | 0 | 0 |
+| qahal_http_contract | **52** | 0 | **12** |
 | schema_contract | (CI-scope — requires live elohim-storage binary) | — | — |
 
 **Doctest ignores** (14): all pre-existing — require live conductor, p2p transport,
 or blob-store infrastructure not available in Che. None are qahal-related.
 
 **qahal_http_contract ignores** (§7 + §10):
-- §7 (5 tests): handler-level 503 path tests — require a `Request<Incoming>` from
+- §7 (2 tests): handler-level 503 path tests — require a `Request<Incoming>` from
   a live hyper transport. Marked `#[ignore]` pending shared HTTP test-server harness
   (Task 35 in storage test plan). Documented rationale in test file header.
-- §10 (0 active): conductor-scope happy-path stubs — reserved for CI sweettest.
+- §10 (10 tests): conductor-scope happy-path stubs — reserved for CI sweettest.
+  Each test carries a doc-comment explaining the CI deferral reason.
 
 **signal_emit_round_trip** binary not found — stale sccache artifact (`.tmp` file
 not promoted to final binary hash). Pre-existing issue unrelated to sprint. Will
