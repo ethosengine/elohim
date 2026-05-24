@@ -84,6 +84,13 @@ async fn forward_db_request(
         Method::PUT => client.put(&full_url),
         Method::DELETE => client.delete(&full_url),
         Method::HEAD => client.head(&full_url),
+        // PATCH was missing before — storage registers PATCH /db/content/{id}
+        // (see elohim-storage/src/http.rs Route::patch + Method::PATCH handler),
+        // but this hard-coded /db/* short-circuit returned 405 before the
+        // route registry could see it. Surfaced by stageSpaBlob in app#1463:
+        // blob upload succeeded via /admin/seed/blob, then PATCH content-row
+        // returned 405 here.
+        Method::PATCH => client.patch(&full_url),
         _ => {
             return Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
@@ -107,8 +114,8 @@ async fn forward_db_request(
         }
     }
 
-    // Forward body for POST/PUT
-    if matches!(method, Method::POST | Method::PUT) {
+    // Forward body for POST/PUT/PATCH
+    if matches!(method, Method::POST | Method::PUT | Method::PATCH) {
         match req.collect().await {
             Ok(collected) => {
                 let body_bytes = collected.to_bytes();
