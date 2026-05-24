@@ -737,7 +737,7 @@ mod integration_tests {
         let commons = *by_receiver.get("commons-pool").unwrap_or(&0.0) as f64;
 
         assert!(
-            by_receiver.get("collective:a").is_none(),
+            !by_receiver.contains_key("collective:a"),
             "withdrawn collective:a must not receive settlement"
         );
         assert!((b - 475.0).abs() < 0.1, "active collective:b gets ~475");

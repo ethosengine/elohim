@@ -90,7 +90,7 @@ fn withdrawn_member_does_not_accrue() {
     let routed = evaluate_share_routing_active_only(&allocation, 1000.0, 0, &active_set).unwrap();
     let lookup: std::collections::HashMap<_, _> =
         routed.iter().map(|r| (r.collective_cid.clone(), r.amount)).collect();
-    assert!(lookup.get("collective:a").is_none(), "A withdrew; no accrual");
+    assert!(!lookup.contains_key("collective:a"), "A withdrew; no accrual");
     // B's relative share + commons-pool re-normalized over the remaining 0.45 + 0.05 fraction.
     // For M1 we DO NOT re-normalize after withdrawal — the unspent share flows entirely
     // to the commons pool of the Collab. This makes the substrate behavior predictable
