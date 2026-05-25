@@ -6,14 +6,35 @@
  * - Assessment completion summary (inline after quiz failure)
  * - Path overview (persistent panel near locked gates)
  *
- * Each recommendation renders as an <app-epr-link display="card"> wrapped with
- * a context label explaining WHY this content is recommended.
+ * Each recommendation renders as an <elohim-epr-link display="card"> wrapped with
+ * a context label explaining WHY this content is recommended. The Lit element
+ * owns resolution + popover behavior internally; this component wires the
+ * EprResolverService as the resolver property and translates the Lit
+ * 'navigate' CustomEvent into Angular Router navigation.
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, ChangeDetectionStrategy, Input, Output, EventEmitter } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  CUSTOM_ELEMENTS_SCHEMA,
+  ElementRef,
+  Input,
+  Output,
+  EventEmitter,
+  AfterViewInit,
+  OnDestroy,
+  inject,
+} from '@angular/core';
+import { Router } from '@angular/router';
 
-import { EprLinkComponent } from '@app/elohim/components/epr-link/epr-link.component';
+import { firstValueFrom } from 'rxjs';
+
+import 'elohim-core/register';
+
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+
+import type { ElohimEprLink } from 'elohim-core';
 
 import type {
   ContentRecommendation,
@@ -23,7 +44,8 @@ import type {
 @Component({
   selector: 'app-recommendation-list',
   standalone: true,
-  imports: [CommonModule, EprLinkComponent],
+  imports: [CommonModule],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (recommendations.length > 0) {
@@ -36,7 +58,10 @@ import type {
             <span class="recommendation-context" [attr.data-testid]="'recommendation-context-' + i">
               {{ getContextLabel(rec) }}
             </span>
-            <app-epr-link [epr]="'epr:' + rec.contentId" display="card"></app-epr-link>
+            <elohim-epr-link
+              [attr.epr]="'epr:' + rec.contentId"
+              display="card"
+            ></elohim-epr-link>
             <button
               class="recommendation-dismiss"
               data-testid="recommendation-dismiss"
@@ -94,10 +119,23 @@ import type {
     `,
   ],
 })
-export class RecommendationListComponent {
+export class RecommendationListComponent implements AfterViewInit, OnDestroy {
   @Input() recommendations: ContentRecommendation[] = [];
   @Input() heading = 'Strengthen Your Foundations';
   @Output() dismiss = new EventEmitter<string>();
+
+  private readonly eprResolver = inject(EprResolverService);
+  private readonly router = inject(Router);
+  private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  private readonly navigateListener = (e: Event): void => {
+    const epr = (e as CustomEvent<{ epr: string }>).detail.epr;
+    this.eprResolver.resolve(epr).subscribe(resolved => {
+      if (resolved?.route) {
+        void this.router.navigate(resolved.route);
+      }
+    });
+  };
 
   private readonly contextLabels: Record<RecommendationReason, string> = {
     prerequisite_gap: 'Foundation for concepts you need',
@@ -109,5 +147,36 @@ export class RecommendationListComponent {
 
   getContextLabel(rec: ContentRecommendation): string {
     return this.contextLabels[rec.reason] ?? '';
+  }
+
+  ngAfterViewInit(): void {
+    // Wire the EprResolverService as the Lit element's resolver property on
+    // each rendered <elohim-epr-link>. Property assignment must happen after
+    // the element upgrades (i.e. after view init / @for-loop materializes).
+    this.wireResolvers();
+
+    // Translate the Lit 'navigate' event into Angular Router navigation.
+    // Listener is delegated on the host so it catches events from any
+    // <elohim-epr-link> rendered by the @for loop.
+    this.elRef.nativeElement.addEventListener('navigate', this.navigateListener);
+  }
+
+  ngOnDestroy(): void {
+    this.elRef.nativeElement.removeEventListener('navigate', this.navigateListener);
+  }
+
+  private wireResolvers(): void {
+    const litEls = this.elRef.nativeElement.querySelectorAll<ElohimEprLink>('elohim-epr-link');
+    for (const litEl of litEls) {
+      litEl.resolver = async (eprRef: string) => {
+        const resolved = await firstValueFrom(this.eprResolver.resolve(eprRef));
+        if (!resolved) return null;
+        return {
+          title: resolved.content.title,
+          description: resolved.content.description || undefined,
+          reach: resolved.content.reach,
+        };
+      };
+    }
   }
 }

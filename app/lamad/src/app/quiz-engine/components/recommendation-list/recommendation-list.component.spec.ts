@@ -109,7 +109,7 @@ describe('RecommendationListComponent', () => {
     component.recommendations = mockRecs;
     fixture.detectChanges();
 
-    const links = fixture.nativeElement.querySelectorAll('app-epr-link');
+    const links = fixture.nativeElement.querySelectorAll('elohim-epr-link');
     expect(links.length).toBe(2);
   });
 
