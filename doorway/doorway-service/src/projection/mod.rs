@@ -38,6 +38,7 @@ pub mod app_auth;
 pub mod collections;
 pub mod document;
 pub mod engine;
+pub mod epr_router;
 pub mod store;
 pub mod subscriber;
 pub mod warm;
@@ -46,6 +47,7 @@ pub mod warm_stream;
 // Re-export main types
 pub use document::{ProjectedDocument, ProjectionQuery};
 pub use engine::{spawn_engine_task, EngineConfig, ProjectionEngine, ProjectionSignal};
+pub use epr_router::EprRouter;
 pub use store::{ProjectionConfig, ProjectionStore};
 pub use subscriber::{
     spawn_subscriber, ContentServerRegistration, SignalSubscriber, SubscriberConfig,
