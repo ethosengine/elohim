@@ -38,6 +38,7 @@ pub mod app_auth;
 pub mod collections;
 pub mod document;
 pub mod engine;
+pub mod storage_events_subscriber;
 pub mod store;
 pub mod subscriber;
 pub mod warm;

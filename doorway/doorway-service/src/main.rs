@@ -741,6 +741,25 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Pattern Z.B.2 bridge: subscribe to storage's /api/v1/events SSE so doorway
+    // accepts content updates from substrate as they happen. Pairs with
+    // warm_stream above: warm_stream is the cold-start snapshot, this is
+    // the live tail. Doorway is a projection of substrate truth — without
+    // this subscriber, deploy-time PATCHes on /db/content/{slug} are silent
+    // to the projection caches and serve stale bundles until next restart.
+    // See genesis/docs/superpowers/specs/2026-05-23-doorway-access-tier-patterns.md
+    // (Pattern Z).
+    if let Some(ref storage_url) = args.storage_url {
+        let _events_handle = doorway::projection::storage_events_subscriber::spawn_subscriber_task(
+            storage_url.clone(),
+            state.app_file_cache.clone(),
+        );
+        info!(
+            storage_url = %storage_url,
+            "Storage events subscriber spawned (Pattern Z.B.2)"
+        );
+    }
+
     // Start Orchestrator background tasks (if enabled)
     // The state is already created and wired to AppState above
     let _orchestrator = if let Some(ref orch_state) = orchestrator_state {

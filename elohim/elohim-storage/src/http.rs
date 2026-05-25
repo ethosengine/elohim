@@ -3817,11 +3817,23 @@ impl HttpServer {
                 let view: UpdateContentInputView = serde_json::from_slice(&body_bytes)
                     .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
 
+                let update_result = services.content.update(content_id, view);
+
+                // Pattern Z.B.1 bridge: refresh the in-memory slug_index so the
+                // /apps/{slug}/{file} fast-path sees the new blob_hash. Without
+                // this, ContentService::update writes to SQLite but the fast-path
+                // cache returns the stale (pre-PATCH) blob_hash on the next
+                // request — silently serving the OLD bundle while DB says NEW.
+                // Sibling bridge: Z.B.2 in doorway-service (storage_events
+                // subscriber) handles the cross-service projection cache.
+                // See genesis/docs/superpowers/specs/
+                // 2026-05-23-doorway-access-tier-patterns.md (Pattern Z).
+                if update_result.is_ok() {
+                    self.load_slug_index().await;
+                }
+
                 Ok(response::from_result(
-                    services
-                        .content
-                        .update(content_id, view)
-                        .map(ContentWithTagsView::from),
+                    update_result.map(ContentWithTagsView::from),
                 ))
             }
             Method::DELETE => {
