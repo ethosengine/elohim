@@ -207,7 +207,20 @@ def calculateTriagePriority(int f, int u) { f > 0 && u > 0 ? 'CRITICAL' : f > 0 
  *
  * Called at multiple checkpoints ('plan' → 'execute' → 'post') so that a single
  * interrupted stage cannot wipe the baseline permanently. Each checkpoint is a
- * valid resume point on its own because __global__ is refreshed every call.
+ * valid resume point on its own.
+ *
+ * Two correctness rules (bug #2 of 2026-05-24 sweettest sprint):
+ *  1. Preserve per-pipeline baselines from env.PIPELINE_BASELINES (set in
+ *     Execute Builds as recordPipelineResult advances them on success).
+ *     Without this, every checkpoint wiped the per-pipeline tracking and
+ *     forced re-dispatch of all pipelines on every push.
+ *  2. Only advance __global__ when the orchestrator's overall state warrants
+ *     it. At 'plan' and 'execute' checkpoints (build still in flight),
+ *     advance optimistically. At 'post' checkpoint, gate the advance on
+ *     currentBuild.result NOT being FAILURE/ABORTED — those mean downstream
+ *     never finished its work, so __global__ shouldn't claim "all of HEAD
+ *     was successfully built" (which would cause the next orchestrator to
+ *     skip the rebuilds the failure actually requires).
  *
  * Pure pipeline steps only (readJSON/writeJSON/archiveArtifacts) — safe to call
  * from inside a container() block or from bare post.always.
@@ -217,17 +230,42 @@ def calculateTriagePriority(int f, int u) { f > 0 && u > 0 ? 'CRITICAL' : f > 0 
  * found (first run)" stuck state that re-triggered every pipeline on every push.
  */
 def archivePipelineBaselines(String checkpoint) {
+    // Rule 1: start from prior per-pipeline baselines (preserved across calls).
     def baselines = [:]
-    if (env.GIT_COMMIT_FULL) {
+    if (env.PIPELINE_BASELINES) {
+        try {
+            def prior = readJSON(text: env.PIPELINE_BASELINES)
+            if (prior instanceof Map) baselines = prior
+        } catch (Exception e) {
+            echo "[baseline:${checkpoint}] WARNING: env.PIPELINE_BASELINES unparseable (${e.message}); starting fresh"
+        }
+    }
+
+    // Rule 2: gate __global__ advance on build state at post-checkpoint.
+    boolean shouldAdvanceGlobal = true
+    if (checkpoint == 'post') {
+        // currentBuild.result is null while in-flight, set to FAILURE/UNSTABLE/etc
+        // by stage failures or explicit unstable()/error() calls. Stage successes
+        // before post.always leave it null = treated as SUCCESS by Jenkins.
+        def cbResult = currentBuild.result ?: 'SUCCESS'
+        if (cbResult in ['FAILURE', 'ABORTED', 'NOT_BUILT']) {
+            shouldAdvanceGlobal = false
+            def prior = baselines['__global__']
+            echo "[baseline:${checkpoint}] currentBuild.result=${cbResult} — NOT advancing __global__ (preserving prior ${prior?.toString()?.take(8) ?: '(null)'})"
+        }
+    }
+    if (shouldAdvanceGlobal && env.GIT_COMMIT_FULL) {
         baselines['__global__'] = env.GIT_COMMIT_FULL
     }
+
     env.PIPELINE_BASELINES = writeJSON(returnText: true, json: baselines)
     writeJSON file: 'pipeline-baselines.json', json: baselines, pretty: 2
     if (!fileExists('pipeline-baselines.json')) {
         error "pipeline-baselines.json missing after writeJSON (checkpoint=${checkpoint})"
     }
     archiveArtifacts artifacts: 'pipeline-baselines.json', fingerprint: true
-    echo "[baseline:${checkpoint}] archived — __global__=${baselines['__global__']?.toString()?.take(8) ?: '(null)'}"
+    def perPipelineCount = baselines.keySet().findAll { it != '__global__' }.size()
+    echo "[baseline:${checkpoint}] archived — __global__=${baselines['__global__']?.toString()?.take(8) ?: '(null)'}, per-pipeline=${perPipelineCount}"
 }
 
 /**
