@@ -55,6 +55,8 @@ fn event_type(event: &StorageEvent) -> &'static str {
         StorageEvent::KnowledgeMapCreated { .. } => "knowledge-map.created",
         StorageEvent::KnowledgeMapUpdated { .. } => "knowledge-map.updated",
         StorageEvent::KnowledgeMapDeleted { .. } => "knowledge-map.deleted",
+        StorageEvent::ProjectionRegistered { .. } => "projection.registered",
+        StorageEvent::ProjectionRevoked { .. } => "projection.revoked",
     }
 }
 
@@ -96,6 +98,12 @@ fn event_data(event: &StorageEvent) -> String {
         } => serde_json::json!({ "id": id, "mapType": map_type, "ownerId": owner_id }).to_string(),
         StorageEvent::KnowledgeMapUpdated { id } => serde_json::json!({ "id": id }).to_string(),
         StorageEvent::KnowledgeMapDeleted { id } => serde_json::json!({ "id": id }).to_string(),
+        StorageEvent::ProjectionRegistered { commitment_id } => {
+            serde_json::json!({ "commitmentId": commitment_id }).to_string()
+        }
+        StorageEvent::ProjectionRevoked { commitment_id } => {
+            serde_json::json!({ "commitmentId": commitment_id }).to_string()
+        }
     }
 }
 
@@ -231,6 +239,38 @@ mod tests {
             }),
             "knowledge-map.created"
         );
+    }
+
+    #[test]
+    fn projection_registered_event_formats_correctly() {
+        let evt = StorageEvent::ProjectionRegistered {
+            commitment_id: "test-cid".into(),
+        };
+        assert_eq!(event_type(&evt), "projection.registered");
+        let data = event_data(&evt);
+        assert!(
+            data.contains("\"commitmentId\":\"test-cid\""),
+            "data was: {data}"
+        );
+        let formatted = format_sse_event(&evt);
+        assert!(formatted.starts_with("event: projection.registered\n"));
+        assert!(formatted.ends_with("\n\n"));
+    }
+
+    #[test]
+    fn projection_revoked_event_formats_correctly() {
+        let evt = StorageEvent::ProjectionRevoked {
+            commitment_id: "test-cid".into(),
+        };
+        assert_eq!(event_type(&evt), "projection.revoked");
+        let data = event_data(&evt);
+        assert!(
+            data.contains("\"commitmentId\":\"test-cid\""),
+            "data was: {data}"
+        );
+        let formatted = format_sse_event(&evt);
+        assert!(formatted.starts_with("event: projection.revoked\n"));
+        assert!(formatted.ends_with("\n\n"));
     }
 
     #[test]

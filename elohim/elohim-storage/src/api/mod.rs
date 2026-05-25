@@ -175,7 +175,7 @@ pub async fn handle_api_request(
         custodians::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("commitments") {
         let resource_path = sub_path.strip_prefix("commitments").unwrap_or("");
-        rea_commitments::handle(req, method, resource_path, &pool, &app_ctx).await
+        rea_commitments::handle(req, method, resource_path, &pool, &app_ctx, services).await
     } else if sub_path.starts_with("collective") {
         // Multi-collective collaboration EPR M1 — first-order Collective CRUD.
         // Must precede any future "collection*" prefix to avoid shadowing.
