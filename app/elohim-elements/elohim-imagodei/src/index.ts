@@ -45,3 +45,6 @@ export type { OAuthProviderRef } from './elohim-imagodei-login-card.js';
 
 export { ElohimImagodeiConsentCard } from './elohim-imagodei-consent-card.js';
 export type { ClaimRef, RequestingClient } from './elohim-imagodei-consent-card.js';
+
+export { ElohimImagodeiOauthCallback } from './elohim-imagodei-oauth-callback.js';
+export type { ExchangeOutcome, ExchangeCodeFn } from './elohim-imagodei-oauth-callback.js';

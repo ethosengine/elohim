@@ -64,3 +64,9 @@ import { ElohimImagodeiConsentCard } from './elohim-imagodei-consent-card.js';
 if (!customElements.get('elohim-imagodei-consent-card')) {
   customElements.define('elohim-imagodei-consent-card', ElohimImagodeiConsentCard);
 }
+
+import { ElohimImagodeiOauthCallback } from './elohim-imagodei-oauth-callback.js';
+
+if (!customElements.get('elohim-imagodei-oauth-callback')) {
+  customElements.define('elohim-imagodei-oauth-callback', ElohimImagodeiOauthCallback);
+}
