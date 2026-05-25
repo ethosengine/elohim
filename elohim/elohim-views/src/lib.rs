@@ -23,6 +23,7 @@ pub mod imagodei;
 pub mod infrastructure;
 pub mod inputs;
 pub mod lamad;
+pub mod projection;
 pub mod qahal;
 pub mod shared;
 pub mod shefa;
