@@ -8,6 +8,7 @@ export default defineConfig({
       entry: {
         index: resolve(__dirname, 'src/index.ts'),
         register: resolve(__dirname, 'src/register.ts'),
+        'federated-identifier': resolve(__dirname, 'src/federated-identifier.ts'),
       },
       formats: ['es'],
       fileName: (_format, entry) => `${entry}.js`,

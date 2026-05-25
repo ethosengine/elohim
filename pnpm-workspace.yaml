@@ -1,6 +1,7 @@
 packages:
   - app/elohim-app
   - app/lamad
+  - app/imagodei-portal
   - doorway/doorway-app
   - app/elohim-library
   - app/elohim-library/projects/elohim-service

@@ -18,6 +18,8 @@
  *   - elohim-host-landing @ doorway:elohim-host        urlPath: "/"
  *   - lamad-spa            @ doorway:alpha-elohim-host  urlPath: "/lamad"
  *   - lamad-spa            @ doorway:elohim-host        urlPath: "/lamad"
+ *   - imagodei-portal      @ doorway:alpha-elohim-host  urlPath: "/auth/portal"
+ *   - imagodei-portal      @ doorway:elohim-host        urlPath: "/auth/portal"
  *
  * Usage:
  *   DOORWAY_URL=http://localhost:8888 npx tsx src/seed-projections.ts
@@ -159,7 +161,8 @@ export function buildProjectionCommitmentBody(spec: ProjectionSpec): CommitmentB
 // Default MVP projection set
 //
 // Matthew is the operator of both alpha-elohim-host and elohim-host.
-// Two EPRs are projected on each doorway: the landing page and the lamad SPA.
+// Three EPRs are projected on each doorway: the landing page, the lamad SPA,
+// and the imagodei-portal auth surface (spec §6.1).
 // =============================================================================
 
 export function defaultProjectionSeeds(): ProjectionSpec[] {
@@ -192,11 +195,21 @@ export function defaultProjectionSeeds(): ProjectionSpec[] {
     baseHref: '/lamad/',
   });
 
+  const imagodeiPortalAt = (doorwayId: string): ProjectionSpec => ({
+    ...base,
+    doorwayId,
+    eprId: 'imagodei-portal',
+    urlPath: '/auth/portal',
+    baseHref: '/auth/portal/',
+  });
+
   return [
     landingAt('alpha-elohim-host'),
     landingAt('elohim-host'),
     lamadAt('alpha-elohim-host'),
     lamadAt('elohim-host'),
+    imagodeiPortalAt('alpha-elohim-host'),
+    imagodeiPortalAt('elohim-host'),
   ];
 }
 

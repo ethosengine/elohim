@@ -1,500 +1,314 @@
 /**
- * AuthCallbackComponent Tests
+ * AuthCallbackComponent (Lit wrapper) — spec
  *
- * Tests for OAuth callback handler component.
+ * Tests cover the thin Angular bridge: URL param extraction, exchangeCode
+ * callback wiring, auth state update, navigation, and error logging.
+ *
+ * The Lit element is not rendered (JSDOM treats custom elements as
+ * HTMLElement stubs), so assertions target component state and service
+ * call expectations — same pattern as login.component.spec.ts.
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
-
-import { AuthCallbackComponent } from './auth-callback.component';
-import { SeoService } from '../../../services/seo.service';
-import { AuthService } from '../../services/auth.service';
-import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
+import { ActivatedRoute, provideRouter, Router } from '@angular/router';
+import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
-describe('AuthCallbackComponent', () => {
-  let component: AuthCallbackComponent;
+import { AuthCallbackComponent } from './auth-callback.component';
+import { AuthService } from '../../services/auth.service';
+import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeQueryParamMap(params: Record<string, string>) {
+  return {
+    get: (k: string) => params[k] ?? null,
+  };
+}
+
+function makeRoute(params: Record<string, string> = {}) {
+  return {
+    snapshot: { queryParamMap: makeQueryParamMap(params) },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Suite
+// ---------------------------------------------------------------------------
+
+describe('AuthCallbackComponent (Lit wrapper)', () => {
   let fixture: ComponentFixture<AuthCallbackComponent>;
-  let mockAuthService: any;
-  let mockOAuthProvider: any;
-  let mockSeoService: any;
-  let mockRouter: any;
-  let originalLocation: Location;
+  let component: AuthCallbackComponent;
+  let router: Router;
 
-  beforeEach(async () => {
-    // Save original location
-    originalLocation = window.location;
+  let mockOAuth: {
+    handleCallback: ReturnType<typeof vi.fn>;
+    clearCallbackParams: ReturnType<typeof vi.fn>;
+    consumeReturnUrl: ReturnType<typeof vi.fn>;
+    isFlowInProgress: ReturnType<typeof signal<boolean>>;
+  };
 
-    // Create mocks with correct methods
+  let mockAuthService: {
+    setAuthFromResult: ReturnType<typeof vi.fn>;
+  };
+
+  const successResult = {
+    success: true as const,
+    token: 'jwt-abc',
+    humanId: 'matthew',
+    agentPubKey: 'agent-pub-key',
+    identifier: 'matthew@alpha.elohim.host',
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+  };
+
+  async function setup(queryParams: Record<string, string> = { code: 'abc', state: 'xyz', provider: 'github' }) {
+    mockOAuth = {
+      handleCallback: vi.fn().mockResolvedValue(successResult),
+      clearCallbackParams: vi.fn(),
+      consumeReturnUrl: vi.fn().mockReturnValue(null),
+      isFlowInProgress: signal(false),
+    };
+
     mockAuthService = {
       setAuthFromResult: vi.fn(),
     };
 
-    mockOAuthProvider = {
-      getCallbackParams: vi.fn(),
-      handleCallback: vi.fn(),
-      clearCallbackParams: vi.fn(),
-      consumeReturnUrl: vi.fn(),
-    };
-    mockOAuthProvider.consumeReturnUrl.mockReturnValue(null);
-
-    mockSeoService = {
-      setTitle: vi.fn(),
-    };
-    mockRouter = {
-      navigate: vi.fn(),
-    };
-
-    // Configure default mock returns
-    mockOAuthProvider.getCallbackParams.mockReturnValue(null);
-
     await TestBed.configureTestingModule({
       imports: [AuthCallbackComponent],
       providers: [
+        provideRouter([]),
+        { provide: OAuthAuthProvider, useValue: mockOAuth },
         { provide: AuthService, useValue: mockAuthService },
-        { provide: OAuthAuthProvider, useValue: mockOAuthProvider },
-        { provide: SeoService, useValue: mockSeoService },
-        { provide: Router, useValue: mockRouter },
+        { provide: ActivatedRoute, useValue: makeRoute(queryParams) },
       ],
     }).compileComponents();
 
+    router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
     fixture = TestBed.createComponent(AuthCallbackComponent);
     component = fixture.componentInstance;
-  });
-
-  afterEach(() => {
-    // Restore location if it was modified
-    if (window.location !== originalLocation) {
-      Object.defineProperty(window, 'location', {
-        value: originalLocation,
-        writable: true,
-        configurable: true,
-      });
-    }
-  });
-
-  /**
-   * Helper to set window.location using history API
-   */
-  function setWindowUrl(url: string): void {
-    const urlObj = new URL(url);
-    window.history.pushState({}, '', urlObj.pathname + urlObj.search);
+    fixture.detectChanges();
   }
 
-  // ==========================================================================
-  // Component Creation
-  // ==========================================================================
-
-  it('should create', () => {
-    // Don't call detectChanges yet - we need to prevent ngOnInit from running
-    expect(component).toBeTruthy();
+  afterEach(() => {
+    vi.restoreAllMocks();
+    TestBed.resetTestingModule();
   });
 
   // ==========================================================================
-  // Signals
+  // URL param extraction
   // ==========================================================================
 
-  it('should have status signal', () => {
-    expect(component.status).toBeDefined();
+  it('extracts code from query params', async () => {
+    await setup();
+    expect(component.code()).toBe('abc');
   });
 
-  it('should have errorMessage signal', () => {
-    expect(component.errorMessage).toBeDefined();
+  it('extracts state from query params', async () => {
+    await setup();
+    expect(component.state()).toBe('xyz');
   });
 
-  // ==========================================================================
-  // Public Methods
-  // ==========================================================================
-
-  it('should have retry method', () => {
-    expect(component.retry).toBeDefined();
-    expect(typeof component.retry).toBe('function');
+  it('extracts provider label from query params', async () => {
+    await setup();
+    expect(component.providerLabel()).toBe('github');
   });
 
-  it('should have goHome method', () => {
-    expect(component.goHome).toBeDefined();
-    expect(typeof component.goHome).toBe('function');
+  it('sets code to empty string when absent from URL', async () => {
+    await setup({ state: 'xyz' });
+    expect(component.code()).toBe('');
   });
 
-  // ==========================================================================
-  // Go Home
-  // ==========================================================================
-
-  it('should navigate to home when goHome is called', () => {
-    component.goHome();
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
+  it('sets provider label to empty string when absent from URL', async () => {
+    await setup({ code: 'abc', state: 'xyz' });
+    expect(component.providerLabel()).toBe('');
   });
 
   // ==========================================================================
-  // Initial State
+  // Custom element rendered in template
   // ==========================================================================
 
-  it('should start with processing status', () => {
-    expect(component.status()).toBe('processing');
+  it('renders the oauth-callback custom element', async () => {
+    await setup();
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback');
+    expect(el).toBeTruthy();
   });
 
-  it('should have no error message initially', () => {
-    expect(component.errorMessage()).toBe('');
+  it('sets code attribute on the element', async () => {
+    await setup();
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback');
+    expect(el.getAttribute('code')).toBe('abc');
+  });
+
+  it('sets state attribute on the element', async () => {
+    await setup();
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback');
+    expect(el.getAttribute('state')).toBe('xyz');
+  });
+
+  it('sets provider-label attribute on the element', async () => {
+    await setup();
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback');
+    expect(el.getAttribute('provider-label')).toBe('github');
   });
 
   // ==========================================================================
-  // Retry Navigation
+  // exchangeCode callback wiring — success path
   // ==========================================================================
 
-  it('should navigate to login page when retry is called', () => {
-    component.retry();
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/login']);
+  it('wires exchangeCode to OAuthAuthProvider.handleCallback', async () => {
+    await setup();
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
+      HTMLElement & Record<string, unknown>;
+    const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
+
+    await exchangeCode('abc', 'xyz');
+
+    expect(mockOAuth.handleCallback).toHaveBeenCalledWith('abc', 'xyz');
+  });
+
+  it('calls AuthService.setAuthFromResult on successful exchange', async () => {
+    await setup();
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
+      HTMLElement & Record<string, unknown>;
+    const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
+
+    await exchangeCode('abc', 'xyz');
+
+    expect(mockAuthService.setAuthFromResult).toHaveBeenCalledWith(successResult);
+  });
+
+  it('clears URL params after a successful exchange', async () => {
+    await setup();
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
+      HTMLElement & Record<string, unknown>;
+    const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
+
+    await exchangeCode('abc', 'xyz');
+
+    expect(mockOAuth.clearCallbackParams).toHaveBeenCalled();
+  });
+
+  it('resolves with { session: result } on success', async () => {
+    await setup();
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
+      HTMLElement & Record<string, unknown>;
+    const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<{ session: unknown }>;
+
+    const outcome = await exchangeCode('abc', 'xyz');
+
+    expect(outcome).toEqual({ session: successResult });
   });
 
   // ==========================================================================
-  // OAuth Callback Handling - Success Flow
+  // exchangeCode callback wiring — failure path
   // ==========================================================================
 
-  describe('OAuth Callback - Success Flow', () => {
-    beforeEach(() => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-auth-code-123',
-        state: 'test-state-456',
-      });
+  it('throws when OAuthAuthProvider.handleCallback returns success:false', async () => {
+    await setup();
+    mockOAuth.handleCallback.mockResolvedValue({ success: false, error: 'invalid_grant', code: 'INVALID_CREDENTIALS' });
 
-      mockOAuthProvider.handleCallback.mockReturnValue(
-        Promise.resolve({
-          success: true,
-          token: 'test-jwt-token',
-          humanId: 'human-123',
-          agentPubKey: 'agent-pub-key-123',
-          identifier: 'user@example.com',
-          expiresAt: Date.now() + 3600000,
-        })
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
+      HTMLElement & Record<string, unknown>;
+    const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
+
+    await expect(exchangeCode('abc', 'xyz')).rejects.toThrow('invalid_grant');
+  });
+
+  it('clears URL params even on a failed exchange', async () => {
+    await setup();
+    mockOAuth.handleCallback.mockResolvedValue({ success: false, error: 'expired', code: 'TOKEN_EXPIRED' });
+
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
+      HTMLElement & Record<string, unknown>;
+    const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
+
+    await exchangeCode('abc', 'xyz').catch(() => {});
+
+    expect(mockOAuth.clearCallbackParams).toHaveBeenCalled();
+  });
+
+  it('does NOT call setAuthFromResult on a failed exchange', async () => {
+    await setup();
+    mockOAuth.handleCallback.mockResolvedValue({ success: false, error: 'denied', code: 'INVALID_CREDENTIALS' });
+
+    const el = fixture.nativeElement.querySelector('elohim-imagodei-oauth-callback') as
+      HTMLElement & Record<string, unknown>;
+    const exchangeCode = el['exchangeCode'] as (c: string, s: string) => Promise<unknown>;
+
+    await exchangeCode('abc', 'xyz').catch(() => {});
+
+    expect(mockAuthService.setAuthFromResult).not.toHaveBeenCalled();
+  });
+
+  // ==========================================================================
+  // onSuccess — navigation
+  // ==========================================================================
+
+  it('navigates to /lamad by default on success', async () => {
+    await setup();
+    mockOAuth.consumeReturnUrl.mockReturnValue(null);
+
+    component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
+
+    expect(router.navigate).toHaveBeenCalledWith(['/lamad']);
+  });
+
+  it('navigates to stored returnUrl when present', async () => {
+    await setup();
+    mockOAuth.consumeReturnUrl.mockReturnValue('/community/governance');
+
+    component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
+
+    expect(router.navigate).toHaveBeenCalledWith(['/community/governance']);
+  });
+
+  it('consumes the return URL (calls consumeReturnUrl) on success', async () => {
+    await setup();
+
+    component.onSuccess(new CustomEvent('success', { detail: { session: {} } }));
+
+    expect(mockOAuth.consumeReturnUrl).toHaveBeenCalled();
+  });
+
+  // ==========================================================================
+  // onError — logging, no crash
+  // ==========================================================================
+
+  it('logs error details on OAuth callback failure', async () => {
+    await setup();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    component.onError(
+      new CustomEvent('error', { detail: { reason: 'invalid_grant', recoverable: true } }),
+    );
+
+    expect(consoleSpy).toHaveBeenCalledWith('OAuth callback error:', 'invalid_grant');
+    consoleSpy.mockRestore();
+  });
+
+  it('does not throw when onError is called', async () => {
+    await setup();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(() => {
+      component.onError(
+        new CustomEvent('error', { detail: { reason: 'network_error', recoverable: true } }),
       );
-
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it('should process callback on initialization', async () => {
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(mockOAuthProvider.getCallbackParams).toHaveBeenCalled();
-    });
-
-    it('should exchange code for token', async () => {
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(mockOAuthProvider.handleCallback).toHaveBeenCalledWith(
-        'test-auth-code-123',
-        'test-state-456'
-      );
-    });
-
-    it('should update auth service on success', async () => {
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(mockAuthService.setAuthFromResult).toHaveBeenCalled();
-    });
-
-    it('should set status to success', async () => {
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(component.status()).toBe('success');
-    });
-
-    it('should clear callback params after processing', async () => {
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(mockOAuthProvider.clearCallbackParams).toHaveBeenCalled();
-    });
-
-    it('should redirect to lamad by default after delay', async () => {
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      vi.advanceTimersByTime(1500);
-
-      expect(mockOAuthProvider.consumeReturnUrl).toHaveBeenCalled();
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad']);
-    });
-
-    it('should redirect to stored returnUrl after delay', async () => {
-      mockOAuthProvider.consumeReturnUrl.mockReturnValue('/community/governance');
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      vi.advanceTimersByTime(1500);
-
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/community/governance']);
-    });
+    }).not.toThrow();
   });
 
-  // ==========================================================================
-  // OAuth Callback Handling - Error Flows
-  // ==========================================================================
+  it('does not navigate on error', async () => {
+    await setup();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
 
-  describe('OAuth Callback - Error Flows', () => {
-    it('should handle no callback params', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue(null);
-      setWindowUrl('http://localhost/auth/callback');
+    component.onError(
+      new CustomEvent('error', { detail: { reason: 'access_denied', recoverable: false } }),
+    );
 
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(component.status()).toBe('error');
-      expect(component.errorMessage()).toContain('Invalid callback');
-    });
-
-    it('should handle OAuth error in URL', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue(null);
-      setWindowUrl('http://localhost/auth/callback?error=access_denied');
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(component.status()).toBe('error');
-    });
-
-    it('should handle token exchange failure', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-code',
-        state: 'test-state',
-      });
-
-      mockOAuthProvider.handleCallback.mockReturnValue(
-        Promise.resolve({
-          success: false,
-          error: 'Token exchange failed',
-        })
-      );
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(component.status()).toBe('error');
-      expect(component.errorMessage()).toBe('Token exchange failed');
-    });
-
-    it('should handle exception during callback', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-code',
-        state: 'test-state',
-      });
-
-      mockOAuthProvider.handleCallback.mockReturnValue(Promise.reject(new Error('Network error')));
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(component.status()).toBe('error');
-      expect(component.errorMessage()).toBe('Network error');
-    });
-
-    it('should handle non-Error exception', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-code',
-        state: 'test-state',
-      });
-
-      mockOAuthProvider.handleCallback.mockReturnValue(Promise.reject('String error'));
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(component.status()).toBe('error');
-      expect(component.errorMessage()).toBe('An unexpected error occurred');
-    });
-  });
-
-  // ==========================================================================
-  // OAuth Error Messages
-  // ==========================================================================
-
-  describe('OAuth Error Messages', () => {
-    beforeEach(() => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue(null);
-    });
-
-    const errorCases = [
-      { error: 'access_denied', expectedMessage: 'You denied access to your account.' },
-      { error: 'invalid_request', expectedMessage: 'The authorization request was invalid.' },
-      {
-        error: 'unauthorized_client',
-        expectedMessage: 'This application is not authorized.',
-      },
-      {
-        error: 'unsupported_response_type',
-        expectedMessage: 'The authorization server does not support this response type.',
-      },
-      { error: 'invalid_scope', expectedMessage: 'The requested permissions are invalid.' },
-      {
-        error: 'server_error',
-        expectedMessage: 'The authorization server encountered an error.',
-      },
-      {
-        error: 'temporarily_unavailable',
-        expectedMessage: 'The authorization server is temporarily unavailable.',
-      },
-      { error: 'unknown_error', expectedMessage: 'Authorization failed: unknown_error' },
-    ];
-
-    errorCases.forEach(({ error, expectedMessage }) => {
-      it(`should display correct message for ${error}`, async () => {
-        setWindowUrl(`http://localhost/auth/callback?error=${error}`);
-
-        fixture.detectChanges();
-        await fixture.whenStable();
-
-        expect(component.status()).toBe('error');
-        expect(component.errorMessage()).toBe(expectedMessage);
-      });
-    });
-
-    it('should use error_description when provided', async () => {
-      setWindowUrl(
-        'http://localhost/auth/callback?error=access_denied&error_description=Custom+error+message'
-      );
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(component.errorMessage()).toBe('Custom error message');
-    });
-  });
-
-  // ==========================================================================
-  // Template State Rendering
-  // ==========================================================================
-
-  describe('Template State Rendering', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it('should show processing state initially', () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-code',
-        state: 'test-state',
-      });
-      mockOAuthProvider.handleCallback.mockReturnValue(new Promise(() => {})); // Never resolves
-
-      fixture.detectChanges();
-
-      const processingCard = fixture.nativeElement.querySelector('.callback-card.processing');
-      expect(processingCard).toBeTruthy();
-      expect(processingCard.textContent).toContain('Completing sign in');
-    });
-
-    it('should show success state after successful auth', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-code',
-        state: 'test-state',
-      });
-      mockOAuthProvider.handleCallback.mockReturnValue(
-        Promise.resolve({
-          success: true,
-          token: 'test-token',
-          humanId: 'human-123',
-          agentPubKey: 'agent-pub-key-123',
-          identifier: 'user@example.com',
-          expiresAt: Date.now() + 3600000,
-        })
-      );
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const successCard = fixture.nativeElement.querySelector('.callback-card.success');
-      expect(successCard).toBeTruthy();
-      expect(successCard.textContent).toContain('Welcome back');
-    });
-
-    it('should show error state on failure', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-code',
-        state: 'test-state',
-      });
-      mockOAuthProvider.handleCallback.mockReturnValue(
-        Promise.resolve({ success: false, error: 'Test error' })
-      );
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const errorCard = fixture.nativeElement.querySelector('.callback-card.error');
-      expect(errorCard).toBeTruthy();
-      expect(errorCard.textContent).toContain('Sign in failed');
-      expect(errorCard.textContent).toContain('Test error');
-    });
-
-    it('should show retry and home buttons on error', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-code',
-        state: 'test-state',
-      });
-      mockOAuthProvider.handleCallback.mockReturnValue(
-        Promise.resolve({ success: false, error: 'Test error' })
-      );
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const buttons = fixture.nativeElement.querySelectorAll('.actions button');
-      expect(buttons.length).toBe(2);
-      expect(buttons[0].textContent).toContain('Try Again');
-      expect(buttons[1].textContent).toContain('Go Home');
-    });
-
-    it('should trigger retry when retry button clicked', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-code',
-        state: 'test-state',
-      });
-      mockOAuthProvider.handleCallback.mockReturnValue(
-        Promise.resolve({ success: false, error: 'Test error' })
-      );
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const retryButton = fixture.nativeElement.querySelector('.btn-primary');
-      retryButton.click();
-
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/login']);
-    });
-
-    it('should trigger goHome when home button clicked', async () => {
-      mockOAuthProvider.getCallbackParams.mockReturnValue({
-        code: 'test-code',
-        state: 'test-state',
-      });
-      mockOAuthProvider.handleCallback.mockReturnValue(
-        Promise.resolve({ success: false, error: 'Test error' })
-      );
-
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const homeButton = fixture.nativeElement.querySelector('.btn-secondary');
-      homeButton.click();
-
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
-    });
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 });

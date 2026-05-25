@@ -1,0 +1,29 @@
+{
+  "id": "imagodei-portal",
+  "contentType": "application",
+  "title": "Elohim Imagodei Portal",
+  "name": "Imagodei Portal",
+  "description": "The peer OAuth portal — sign-in, consent, and account management. Renders identically whether served via doorway projection, doorway-routed peer conductor, or Tauri local conductor. Built from app/imagodei-portal/ with base href /auth/portal/.",
+  "content": {
+    "slug": "imagodei-portal",
+    "entryPoint": "index.html"
+  },
+  "contentFormat": "spa-bundle",
+  "tags": [
+    "application",
+    "spa",
+    "auth",
+    "portal",
+    "imagodei",
+    "oauth"
+  ],
+  "blobHash": "",
+  "reach": "commons",
+  "metadata": {
+    "category": "application",
+    "embedStrategy": "root",
+    "blobPopulatedBy": "Jenkinsfile:stageSpaBlob — the imagodei-portal bundle is built from app/imagodei-portal/ (Angular 19, no SSR, base href /auth/portal/) and uploaded as a separate blob. This content row's blobHash is patched at deploy time via PATCH /db/content/imagodei-portal."
+  },
+  "createdAt": "2026-05-25T00:00:00.000000",
+  "updatedAt": "2026-05-25T00:00:00.000000"
+}

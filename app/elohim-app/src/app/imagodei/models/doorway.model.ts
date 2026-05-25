@@ -238,6 +238,33 @@ export interface DoorwayHealthResponse {
 }
 
 // =============================================================================
+// Framework-agnostic federated-identifier helpers (re-exported)
+// =============================================================================
+
+// The canonical implementations live in elohim-imagodei so they can be shared
+// with the standalone imagodei-portal bundle (Task D2) without pulling in
+// Angular DI.  We import + re-export the discriminated-union helpers for
+// consumers that want the richer outcome shapes, and keep the original
+// null-returning wrappers below for backward compat with existing Angular call
+// sites.
+//
+// NOTE: we use a named `import` (not an `export { } from` re-export) so that
+// Vite's resolve.alias intercepts the specifier correctly in all module-runner
+// contexts including pool:forks test workers.
+import {
+  parseFederatedIdentifier as _parseFedId,
+  resolveGatewayToDoorwayUrl as _resolveGateway,
+  type FederatedIdentifier,
+  type DoorwayDescriptor,
+  type ParseOutcome,
+  type ResolveOutcome,
+} from 'elohim-imagodei/federated-identifier';
+
+export type { FederatedIdentifier, DoorwayDescriptor, ParseOutcome, ResolveOutcome };
+export const parseFederatedIdentifierOutcome: typeof _parseFedId = _parseFedId;
+export const resolveGatewayToDoorwayUrlOutcome: typeof _resolveGateway = _resolveGateway;
+
+// =============================================================================
 // Helpers
 // =============================================================================
 
@@ -291,46 +318,36 @@ export function getFeatureDisplay(feature: DoorwayFeature): { label: string; ico
 
 /**
  * Parse a federated identifier (user@gateway.host) into parts.
+ *
+ * Thin wrapper over the framework-agnostic helper in elohim-imagodei that
+ * preserves the original null-returning signature for existing Angular call
+ * sites.  New code should prefer `parseFederatedIdentifierOutcome` from this
+ * module (or import directly from 'elohim-imagodei') for the richer
+ * discriminated-union shape.
  */
 export function parseFederatedIdentifier(identifier: string): {
   username: string;
   gatewayDomain: string;
 } | null {
-  const trimmed = identifier.trim().replace(/^@/, '');
-  const atIndex = trimmed.lastIndexOf('@');
-  if (atIndex <= 0 || atIndex === trimmed.length - 1) return null;
-  return {
-    username: trimmed.substring(0, atIndex),
-    gatewayDomain: trimmed.substring(atIndex + 1),
-  };
+  const outcome = _parseFedId(identifier);
+  if (!outcome.ok) return null;
+  return { username: outcome.value.username, gatewayDomain: outcome.value.gatewayDomain };
 }
 
 /**
  * Resolve a gateway domain to a doorway URL.
  *
- * Strategy:
- * 1. Check BOOTSTRAP_DOORWAYS for matching URL
- * 2. Convention: domain -> https://doorway-{subdomain}.{rest}
- * 3. Fallback: try https://{domain} directly
+ * Thin wrapper over the framework-agnostic helper in elohim-imagodei that
+ * preserves the original string-returning signature for existing Angular call
+ * sites.  New code should prefer `resolveGatewayToDoorwayUrlOutcome` from
+ * this module for the discriminated-union shape.
  */
 export function resolveGatewayToDoorwayUrl(
   gatewayDomain: string,
-  knownDoorways: DoorwayInfo[] = BOOTSTRAP_DOORWAYS
+  knownDoorways: DoorwayInfo[] = BOOTSTRAP_DOORWAYS,
 ): string {
-  // 1. Check known doorways (match by URL containing the domain)
-  const known = knownDoorways.find(
-    d => d.url.includes(gatewayDomain) || d.url.includes(`doorway-${gatewayDomain.split('.')[0]}`)
-  );
-  if (known) return known.url;
-
-  // 2. Convention: alpha.elohim.host -> doorway-alpha.elohim.host
-  const parts = gatewayDomain.split('.');
-  if (parts.length >= 3 && !parts[0].startsWith('doorway-')) {
-    return `https://doorway-${gatewayDomain}`;
-  }
-
-  // 3. Fallback: use domain directly (it might BE the doorway)
-  return `https://${gatewayDomain}`;
+  const outcome = _resolveGateway(gatewayDomain, knownDoorways);
+  return outcome.ok ? outcome.doorway.url : `https://${gatewayDomain}`;
 }
 
 /**

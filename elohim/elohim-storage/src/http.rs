@@ -1046,6 +1046,17 @@ impl HttpServer {
                 }
             }
 
+            // Auth identity endpoint: same wire shape as doorway's /auth/me so
+            // the standalone peer OAuth portal bundle can consume either source
+            // without knowing which transport is in play (spec §3.2 Transport β).
+            (Method::GET, "/auth/me") => {
+                if let Some(ref pool) = self.db_pool {
+                    self.handle_auth_me(pool.clone()).await
+                } else {
+                    Ok(response::service_unavailable("Database not enabled"))
+                }
+            }
+
             // EPR Head API: DAG-CBOR encoded three-pillar metadata
             (Method::PUT, p) if p.starts_with("/epr-head/") => {
                 let id = p.strip_prefix("/epr-head/").unwrap_or("");
@@ -6312,6 +6323,103 @@ impl HttpServer {
         Ok(response::ok(&views))
     }
 
+    /// GET /auth/me — Project LocalSession into the portal MeResponse shape.
+    ///
+    /// Mirrors the wire shape of `doorway/auth_routes.rs::MeResponse` (Task A2)
+    /// so the standalone peer OAuth portal bundle can consume either source
+    /// identically (spec §3.2 Transport β).  Storage projections always return
+    /// `trustMode: "peer-conductor"` because the storage instance IS the
+    /// conductor authority; there is no doorway-host concept on this path.
+    ///
+    /// Returns 200 + MeResponse on an active session, 401 + `{"error":…}` when
+    /// no session exists (never returns a MeResponse body on the 401 path, to
+    /// match doorway's contract).
+    async fn handle_auth_me(
+        &self,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        #[derive(Debug, serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct AuthorityRef {
+            label: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            id: Option<String>,
+        }
+
+        /// Wire shape kept in sync with `doorway/auth_routes.rs::MeResponse`.
+        /// When storage projects /auth/me, `trust_mode` is always
+        /// `"peer-conductor"` and `doorway_id` / `doorway_url` are `None`.
+        #[derive(Debug, serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct StorageMeResponse {
+            human_id: String,
+            agent_pub_key: String,
+            identifier: String,
+            permission_level: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            doorway_id: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            doorway_url: Option<String>,
+            authenticated: bool,
+            /// Always `"peer-conductor"` for storage projections.
+            trust_mode: String,
+            authority: AuthorityRef,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            conductor_endpoint: Option<String>,
+        }
+
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+        let Some(session) = db::local_sessions::get_active_session(&mut conn)? else {
+            return Ok(Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"no active session"}"#)))
+                .unwrap());
+        };
+
+        // Derive a human-readable conductor label from what we know about this
+        // node.  Prefer the libp2p peer-id (set via with_self_peer_id); fall
+        // back to the bind address; finally a generic phrase understood by the
+        // trust-indicator chrome.
+        let conductor_endpoint = if self.self_peer_id != "unknown-peer" {
+            self.self_peer_id.clone()
+        } else {
+            let addr = self.bind_addr;
+            if addr.ip().is_loopback() {
+                "your conductor on this device".to_string()
+            } else {
+                addr.to_string()
+            }
+        };
+
+        let resp = StorageMeResponse {
+            human_id: session.human_id,
+            agent_pub_key: session.agent_pub_key,
+            identifier: session.identifier,
+            // LocalSession has no permission_level field; default to "standard"
+            // — the same default doorway uses when the JWT claim is absent.
+            permission_level: "standard".to_string(),
+            // doorway fields are None: we are the peer conductor, not a hosted
+            // doorway (doorway_url still carries the origin the session was
+            // created from, but on this endpoint we expose None to match the
+            // trust-mode contract).
+            doorway_id: None,
+            doorway_url: None,
+            authenticated: true,
+            trust_mode: "peer-conductor".to_string(),
+            authority: AuthorityRef {
+                label: conductor_endpoint.clone(),
+                id: Some(self.self_peer_id.clone()),
+            },
+            conductor_endpoint: Some(conductor_endpoint),
+        };
+
+        Ok(response::ok(&resp))
+    }
+
     /// POST /session/intent - Set session intent for drift detection
     ///
     /// Declares what the user plans to do this session. Creates a set-point
@@ -9193,6 +9301,21 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
+        // =====================================================================
+        // /auth/me — Peer OAuth portal trust-indicator endpoint (Task A4)
+        //
+        // Returns the same MeResponse shape as doorway's /auth/me so the
+        // standalone portal bundle can consume either source without knowing
+        // which transport is in play (spec §3.2 Transport β).
+        // cache_ttl(0): session state — never cached.
+        // auth not flagged here: handler returns 401 itself when no session.
+        // =====================================================================
+        .route(
+            Route::get("/auth/me")
+                .handler("auth_me")
+                .cache_ttl(0)
+                .build(),
+        )
         .route(
             Route::put("/api/v1/identity/me")
                 .handler("update_me")
@@ -10320,5 +10443,122 @@ mod blob_backend_wiring_tests {
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(v["blobs"]["iroh_served"].as_u64(), Some(7));
         assert_eq!(v["blobs"]["libp2p_served"].as_u64(), Some(13));
+    }
+}
+
+// =============================================================================
+// /auth/me tests — Task A4 (peer OAuth portal substrate audit §3)
+//
+// Pure unit tests — no DB or server required. Placed in their own cfg(test)
+// module so they compile under the default feature set (no p2p-iroh required).
+// =============================================================================
+#[cfg(test)]
+mod auth_me_tests {
+    use super::*;
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AuthorityRef {
+        label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+    }
+
+    /// Wire shape kept in sync with `doorway/auth_routes.rs::MeResponse`.
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct StorageMeResponse {
+        human_id: String,
+        agent_pub_key: String,
+        identifier: String,
+        permission_level: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        doorway_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        doorway_url: Option<String>,
+        authenticated: bool,
+        trust_mode: String,
+        authority: AuthorityRef,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        conductor_endpoint: Option<String>,
+    }
+
+    /// Verify the wire shape serialises with camelCase keys, trustMode is
+    /// "peer-conductor", conductorEndpoint is present, and doorwayId is absent.
+    #[test]
+    fn auth_me_storage_me_response_serializes_correctly() {
+        let resp = StorageMeResponse {
+            human_id: "matthew".into(),
+            agent_pub_key: "uhCAk_test".into(),
+            identifier: "matthew@local".into(),
+            permission_level: "standard".into(),
+            doorway_id: None,
+            doorway_url: None,
+            authenticated: true,
+            trust_mode: "peer-conductor".into(),
+            authority: AuthorityRef {
+                label: "your conductor on this device".into(),
+                id: Some("12D3KooWTest".into()),
+            },
+            conductor_endpoint: Some("your conductor on this device".into()),
+        };
+
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["trustMode"], "peer-conductor");
+        assert_eq!(json["authenticated"], true);
+        assert_eq!(json["authority"]["label"], "your conductor on this device");
+        assert_eq!(json["authority"]["id"], "12D3KooWTest");
+        assert_eq!(
+            json["conductorEndpoint"],
+            "your conductor on this device",
+            "conductorEndpoint must be present"
+        );
+        // doorwayId and doorwayUrl must be absent (skip_serializing_if = None)
+        assert!(
+            json.get("doorwayId").is_none(),
+            "doorwayId must be omitted when None"
+        );
+        assert!(
+            json.get("doorwayUrl").is_none(),
+            "doorwayUrl must be omitted when None"
+        );
+        // Verify camelCase keys
+        assert!(json.get("humanId").is_some(), "humanId must be camelCase");
+        assert!(
+            json.get("agentPubKey").is_some(),
+            "agentPubKey must be camelCase"
+        );
+        assert!(
+            json.get("permissionLevel").is_some(),
+            "permissionLevel must be camelCase"
+        );
+    }
+
+    /// Verify that build_manifest() includes the /auth/me route.
+    /// This guards against accidental removal from the manifest.
+    #[test]
+    fn build_manifest_includes_auth_me_route() {
+        let manifest = build_manifest();
+        let auth_me = manifest
+            .routes
+            .iter()
+            .find(|r| r.path == "/auth/me" && r.method == doorway_client::HttpMethod::Get);
+        assert!(
+            auth_me.is_some(),
+            "GET /auth/me is missing from build_manifest — portal bundle \
+             Transport β path would be broken (Task A4)"
+        );
+        // Must NOT be cached — session state
+        let route = auth_me.unwrap();
+        assert_eq!(
+            route.cache_ttl_secs, 0,
+            "/auth/me must have cache_ttl(0) — session data must never be cached"
+        );
+        // Must NOT require auth at the route level — handler returns 401 itself
+        assert!(
+            !route.auth_required,
+            "/auth/me must not set auth_required at route level; \
+             the handler returns 401 itself to match doorway's contract"
+        );
     }
 }

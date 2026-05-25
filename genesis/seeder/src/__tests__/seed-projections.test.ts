@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildProjectionCommitmentBody, type ProjectionSpec } from '../seed-projections.js';
+import {
+  buildProjectionCommitmentBody,
+  defaultProjectionSeeds,
+  type ProjectionSpec,
+} from '../seed-projections.js';
 
 describe('buildProjectionCommitmentBody', () => {
   const baseSpec: ProjectionSpec = {
@@ -43,5 +47,23 @@ describe('buildProjectionCommitmentBody', () => {
     expect(a.id).not.toBe(b.id);
     expect(a.id).not.toBe(c.id);
     expect(b.id).not.toBe(c.id);
+  });
+});
+
+describe('defaultProjectionSeeds', () => {
+  it('default seed set has 6 commitments total (landing × 2 + lamad × 2 + portal × 2)', () => {
+    expect(defaultProjectionSeeds().length).toBe(6);
+  });
+
+  it('default seed set includes /auth/portal projections on both doorways', () => {
+    const seeds = defaultProjectionSeeds();
+    const portalSeeds = seeds.filter((s) => s.eprId === 'imagodei-portal');
+    expect(portalSeeds.length).toBe(2);
+    expect(portalSeeds.every((s) => s.urlPath === '/auth/portal')).toBe(true);
+    expect(portalSeeds.every((s) => s.baseHref === '/auth/portal/')).toBe(true);
+    expect(portalSeeds.map((s) => s.doorwayId).sort()).toEqual([
+      'alpha-elohim-host',
+      'elohim-host',
+    ]);
   });
 });

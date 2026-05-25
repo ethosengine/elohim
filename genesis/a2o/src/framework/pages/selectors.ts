@@ -152,24 +152,25 @@ export const SHELL = {
   SIGNUP_BUTTON: 'nav-signup-button',
 } as const;
 
-// App login (elohim-app: login.component.html)
+// App login (elohim-app: login.component.html — Lit wrapper, E1)
+//
+// The Angular template is now a thin Lit wrapper. All interactive elements are
+// owned by the Lit primitives inside the custom elements. E2E steps locate the
+// custom elements by tag name, then interact with their internal shadow-DOM or
+// delegated slots. Use tag selectors (locate()) rather than testId() here.
+//
+// Step mapping:
+//   resolve step → <elohim-imagodei-portal-shell> contains <elohim-imagodei-federated-resolver>
+//   login step   → <elohim-imagodei-portal-shell> contains <elohim-imagodei-login-card>
 export const LOGIN = {
-  FEDERATED_ID: 'login-federated-id',
-  FEDERATED_SUBMIT: 'login-federated-submit',
-  IDENTIFIER: 'login-identifier',
-  PASSWORD: 'login-password',
-  PASSWORD_TOGGLE: 'login-password-toggle',
-  SUBMIT: 'login-submit',
-  ERROR: 'login-error',
-  UNLOCK_PASSWORD: 'login-unlock-password',
-  UNLOCK_PASSWORD_TOGGLE: 'login-unlock-password-toggle',
-  UNLOCK_SUBMIT: 'login-unlock-submit',
-  SWITCH_ACCOUNT: 'login-switch-account',
-  BACK_TO_FEDERATED: 'login-back-to-federated',
-  CREDENTIALS_BACK: 'login-credentials-back',
-  REMEMBER_ME: 'login-remember-me',
-  GO_TO_REGISTER: 'login-go-to-register',
-  BACK_HOME: 'login-back-home',
+  /** Host shell — always present; [attr.step] reflects current step */
+  PORTAL_SHELL: 'elohim-imagodei-portal-shell',
+  /** Federated resolver element (step=resolve) */
+  FEDERATED_RESOLVER: 'elohim-imagodei-federated-resolver',
+  /** Login card element (step=login) */
+  LOGIN_CARD: 'elohim-imagodei-login-card',
+  /** Error region slot — contains the Angular-rendered error + recovery link */
+  ERROR_REGION: '[slot="error-region"]',
 } as const;
 
 // Register (elohim-app: register.component.html)

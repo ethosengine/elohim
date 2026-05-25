@@ -213,6 +213,23 @@ pub struct HumanProfileResponse {
     pub updated_at: String,
 }
 
+/// Human-readable authority reference surfaced by the portal trust-indicator chrome.
+///
+/// For `doorway-host` mode: label is the doorway hostname (e.g. "alpha.elohim.host");
+/// id is the doorway_id slug.
+/// For `peer-conductor` mode (deferred to Task A4): label and id describe the
+/// peer's conductor location. Mode B activation comes from elohim-storage's /auth/me
+/// projection; this doorway endpoint always returns `doorway-host`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorityRef {
+    /// Human-readable label rendered by the trust-indicator chip.
+    pub label: String,
+    /// Optional stable identifier (doorway_id slug or conductor peer_id).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MeResponse {
@@ -226,6 +243,26 @@ pub struct MeResponse {
     /// Doorway URL for cross-doorway validation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doorway_url: Option<String>,
+    /// Whether the caller has a valid session. Always `true` on the 200 path;
+    /// the unauthenticated path returns 401 (no MeResponse body).
+    pub authenticated: bool,
+    /// Auth mode for the current session.
+    ///
+    /// - `"doorway-host"` — doorway runs the conductor (flywheel; eviction-capable;
+    ///   default for hosted accounts).
+    /// - `"peer-conductor"` — conductor lives on a peer-managed storage instance
+    ///   or Tauri-local device; doorway is at most transparent ingress.
+    ///
+    /// MVP: always `"doorway-host"`. Mode B detection is deferred to Task A4
+    /// (elohim-storage /auth/me projection) per spec §6.2.
+    pub trust_mode: String,
+    /// Human-readable authority reference surfaced by the portal trust-indicator.
+    /// Derived from the issuing doorway's URL + id for `doorway-host` mode.
+    pub authority: AuthorityRef,
+    /// Conductor's reachable URL or peer-id descriptor when `trust_mode` is
+    /// `"peer-conductor"`. Null in MVP (Mode B substrate deferred).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conductor_endpoint: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1753,6 +1790,22 @@ async fn handle_me(req: Request<hyper::body::Incoming>, state: Arc<AppState>) ->
     }
 
     let claims = result.claims.unwrap();
+
+    // Derive authority label from doorway_url hostname; fall back to doorway_id,
+    // then to a generic placeholder. This is the doorway-host mode label shown by
+    // the trust-indicator chip in the portal shell.
+    let authority_label = claims
+        .doorway_url
+        .as_deref()
+        .and_then(|url| {
+            // Strip scheme: "https://alpha.elohim.host" → "alpha.elohim.host"
+            url.strip_prefix("https://")
+                .or_else(|| url.strip_prefix("http://"))
+                .map(|h| h.trim_end_matches('/').to_string())
+        })
+        .or_else(|| claims.doorway_id.clone())
+        .unwrap_or_else(|| "elohim.host".to_string());
+
     json_response(
         StatusCode::OK,
         &MeResponse {
@@ -1760,8 +1813,15 @@ async fn handle_me(req: Request<hyper::body::Incoming>, state: Arc<AppState>) ->
             agent_pub_key: claims.agent_pub_key,
             identifier: claims.identifier,
             permission_level: claims.permission_level.to_string(),
-            doorway_id: claims.doorway_id,
+            doorway_id: claims.doorway_id.clone(),
             doorway_url: claims.doorway_url,
+            authenticated: true,
+            trust_mode: "doorway-host".to_string(),
+            authority: AuthorityRef {
+                label: authority_label,
+                id: claims.doorway_id,
+            },
+            conductor_endpoint: None,
         },
     )
 }
@@ -4175,5 +4235,136 @@ pub fn validate_ws_token(state: &AppState, token: &str) -> Option<Claims> {
         result.claims
     } else {
         None
+    }
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that MeResponse serialises with the new trust-mode fields in
+    /// camelCase, that `conductorEndpoint` is absent when None, and that the
+    /// existing fields are unaffected.
+    ///
+    /// This is a serialisation-contract test — it does not exercise the HTTP
+    /// handler (which requires a running conductor + MongoDB). Handler-level
+    /// integration tests live in the sweettest workspace.
+    #[test]
+    fn me_response_serializes_trust_mode_and_authority() {
+        let me = MeResponse {
+            human_id: "human-matthew".into(),
+            agent_pub_key: "uhCAk-test-key".into(),
+            identifier: "matthew@alpha.elohim.host".into(),
+            permission_level: "standard".into(),
+            doorway_id: Some("alpha-elohim-host".into()),
+            doorway_url: Some("https://alpha.elohim.host".into()),
+            authenticated: true,
+            trust_mode: "doorway-host".into(),
+            authority: AuthorityRef {
+                label: "alpha.elohim.host".into(),
+                id: Some("alpha-elohim-host".into()),
+            },
+            conductor_endpoint: None,
+        };
+
+        let json = serde_json::to_value(&me).unwrap();
+
+        // New trust-mode fields
+        assert_eq!(json["authenticated"], true);
+        assert_eq!(json["trustMode"], "doorway-host");
+        assert_eq!(json["authority"]["label"], "alpha.elohim.host");
+        assert_eq!(json["authority"]["id"], "alpha-elohim-host");
+        // conductorEndpoint must be absent (skip_serializing_if = "Option::is_none")
+        assert!(
+            json.get("conductorEndpoint").is_none(),
+            "conductorEndpoint should be omitted when None"
+        );
+
+        // Existing fields must remain intact and camelCase
+        assert_eq!(json["humanId"], "human-matthew");
+        assert_eq!(json["agentPubKey"], "uhCAk-test-key");
+        assert_eq!(json["identifier"], "matthew@alpha.elohim.host");
+        assert_eq!(json["permissionLevel"], "standard");
+        assert_eq!(json["doorwayId"], "alpha-elohim-host");
+        assert_eq!(json["doorwayUrl"], "https://alpha.elohim.host");
+    }
+
+    /// Verify that when doorway_id and doorway_url are absent, authority still
+    /// serialises with a non-empty label and no id key.
+    #[test]
+    fn me_response_authority_without_doorway_fields() {
+        let me = MeResponse {
+            human_id: "human-dev".into(),
+            agent_pub_key: "uhCAk-dev".into(),
+            identifier: "dev@local".into(),
+            permission_level: "admin".into(),
+            doorway_id: None,
+            doorway_url: None,
+            authenticated: true,
+            trust_mode: "doorway-host".into(),
+            authority: AuthorityRef {
+                label: "elohim.host".into(),
+                id: None,
+            },
+            conductor_endpoint: None,
+        };
+
+        let json = serde_json::to_value(&me).unwrap();
+
+        assert_eq!(json["authenticated"], true);
+        assert_eq!(json["trustMode"], "doorway-host");
+        assert_eq!(json["authority"]["label"], "elohim.host");
+        // id must be absent when None
+        assert!(
+            json["authority"].get("id").is_none(),
+            "authority.id should be omitted when None"
+        );
+        // doorwayId / doorwayUrl must be absent when None
+        assert!(json.get("doorwayId").is_none());
+        assert!(json.get("doorwayUrl").is_none());
+    }
+
+    /// Verify the authority label derivation helper logic used in handle_me:
+    /// doorway_url hostname extraction must strip scheme and trailing slash.
+    #[test]
+    fn authority_label_derived_from_doorway_url_hostname() {
+        // Simulate the derivation logic from handle_me
+        let derive_label = |doorway_url: Option<&str>, doorway_id: Option<&str>| -> String {
+            doorway_url
+                .and_then(|url| {
+                    url.strip_prefix("https://")
+                        .or_else(|| url.strip_prefix("http://"))
+                        .map(|h| h.trim_end_matches('/').to_string())
+                })
+                .or_else(|| doorway_id.map(str::to_string))
+                .unwrap_or_else(|| "elohim.host".to_string())
+        };
+
+        assert_eq!(
+            derive_label(Some("https://alpha.elohim.host"), Some("alpha-elohim-host")),
+            "alpha.elohim.host"
+        );
+        assert_eq!(
+            derive_label(
+                Some("https://alpha.elohim.host/"),
+                Some("alpha-elohim-host")
+            ),
+            "alpha.elohim.host"
+        );
+        assert_eq!(
+            derive_label(Some("http://localhost:8888"), None),
+            "localhost:8888"
+        );
+        // Falls back to doorway_id when url is absent
+        assert_eq!(
+            derive_label(None, Some("alpha-elohim-host")),
+            "alpha-elohim-host"
+        );
+        // Falls back to generic placeholder when both absent
+        assert_eq!(derive_label(None, None), "elohim.host");
     }
 }

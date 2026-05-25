@@ -1,294 +1,112 @@
 /**
- * OAuth Callback Component
+ * AuthCallbackComponent (Lit wrapper).
  *
- * Handles the OAuth redirect callback from doorway's /auth/authorize.
- * Exchanges the authorization code for a JWT token and completes login.
+ * Renders <elohim-imagodei-oauth-callback> with code + state extracted from
+ * the URL query params and the exchangeCode callback wired to OAuthAuthProvider.
  *
- * Flow:
- * 1. User is redirected here from doorway with ?code=xxx&state=yyy
- * 2. Component extracts code and state from URL
- * 3. OAuthAuthProvider exchanges code for token
- * 4. On success: AuthService updates state, redirect to home/lamad
- * 5. On error: Show error message with retry option
+ * All visual states (exchanging skeleton, done, error) are owned by the Lit
+ * element. This Angular bridge owns:
+ *   - Extracting code / state / provider from ActivatedRoute snapshot
+ *   - Delegating the actual code exchange to OAuthAuthProvider.handleCallback
+ *   - Calling AuthService.setAuthFromResult on success
+ *   - Navigating to the stored return URL (or /lamad) after success
+ *   - Logging errors surfaced by the element
+ *
+ * Per design spec §1.1, this is the cleanup that achieves "ZERO third portal"
+ * — the Lit element is the sole visual surface; the Angular component is a
+ * thin bridge.
  */
 
+import {
+  AfterViewInit,
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  ElementRef,
+  OnInit,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import 'elohim-imagodei/register';
 
-// @coverage: 100.0% (2026-02-24)
-
-import { SeoService } from '../../../services/seo.service';
 import { AuthService } from '../../services/auth.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
-
-type CallbackStatus = 'processing' | 'success' | 'error';
+import { type AuthResult } from '../../models/auth.model';
 
 @Component({
   selector: 'app-auth-callback',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
-    <div class="callback-container">
-      @switch (status()) {
-        @case ('processing') {
-          <div class="callback-card processing">
-            <div class="spinner"></div>
-            <h2>Completing sign in...</h2>
-            <p>Please wait while we verify your identity.</p>
-          </div>
-        }
-
-        @case ('success') {
-          <div class="callback-card success">
-            <div class="check-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20,6 9,17 4,12"></polyline>
-              </svg>
-            </div>
-            <h2>Welcome back!</h2>
-            <p>Redirecting...</p>
-          </div>
-        }
-
-        @case ('error') {
-          <div class="callback-card error">
-            <div class="error-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="15" y1="9" x2="9" y2="15"></line>
-                <line x1="9" y1="9" x2="15" y2="15"></line>
-              </svg>
-            </div>
-            <h2>Sign in failed</h2>
-            <p class="error-message">{{ errorMessage() }}</p>
-            <div class="actions">
-              <button class="btn-primary" (click)="retry()">Try Again</button>
-              <button class="btn-secondary" (click)="goHome()">Go Home</button>
-            </div>
-          </div>
-        }
-      }
-    </div>
+    <elohim-imagodei-oauth-callback
+      #cb
+      [attr.code]="code()"
+      [attr.state]="state()"
+      [attr.provider-label]="providerLabel()"
+      (success)="onSuccess($event)"
+      (error)="onError($event)"
+    >
+      <a slot="recovery-cta" routerLink="/identity/recovery">Recover account</a>
+    </elohim-imagodei-oauth-callback>
   `,
-  styles: [
-    `
-      .callback-container {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, #1a1a2e 0%, #0a0a15 100%);
-        padding: 1rem;
-      }
-
-      .callback-card {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 1rem;
-        padding: 3rem;
-        text-align: center;
-        max-width: 400px;
-        width: 100%;
-        backdrop-filter: blur(10px);
-      }
-
-      .callback-card h2 {
-        color: #fff;
-        margin: 1.5rem 0 0.5rem;
-        font-size: 1.5rem;
-        font-weight: 600;
-      }
-
-      .callback-card p {
-        color: rgba(255, 255, 255, 0.7);
-        margin: 0;
-        font-size: 0.95rem;
-      }
-
-      .spinner {
-        width: 48px;
-        height: 48px;
-        border: 3px solid rgba(255, 255, 255, 0.1);
-        border-top-color: #6366f1;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 0 auto;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      .check-icon,
-      .error-icon {
-        width: 64px;
-        height: 64px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto;
-      }
-
-      .check-icon {
-        background: rgba(34, 197, 94, 0.2);
-        color: #22c55e;
-      }
-
-      .check-icon svg {
-        width: 32px;
-        height: 32px;
-      }
-
-      .error-icon {
-        background: rgba(239, 68, 68, 0.2);
-        color: #ef4444;
-      }
-
-      .error-icon svg {
-        width: 32px;
-        height: 32px;
-      }
-
-      .error-message {
-        color: rgba(239, 68, 68, 0.9) !important;
-        margin-top: 0.5rem !important;
-      }
-
-      .actions {
-        display: flex;
-        gap: 1rem;
-        justify-content: center;
-        margin-top: 2rem;
-      }
-
-      .btn-primary,
-      .btn-secondary {
-        padding: 0.75rem 1.5rem;
-        border-radius: 0.5rem;
-        font-size: 0.95rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s;
-        border: none;
-      }
-
-      .btn-primary {
-        background: #6366f1;
-        color: white;
-      }
-
-      .btn-primary:hover {
-        background: #4f46e5;
-      }
-
-      .btn-secondary {
-        background: rgba(255, 255, 255, 0.1);
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-      }
-
-      .btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.15);
-      }
-    `,
-  ],
 })
-export class AuthCallbackComponent implements OnInit {
+export class AuthCallbackComponent implements OnInit, AfterViewInit {
+  private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly oauthProvider = inject(OAuthAuthProvider);
+  private readonly oauth = inject(OAuthAuthProvider);
   private readonly authService = inject(AuthService);
-  private readonly seoService = inject(SeoService);
 
-  readonly status = signal<CallbackStatus>('processing');
-  readonly errorMessage = signal<string>('');
+  readonly code = signal('');
+  readonly state = signal('');
+  readonly providerLabel = signal('');
+
+  @ViewChild('cb') cbRef?: ElementRef<HTMLElement>;
 
   ngOnInit(): void {
-    void this.handleCallback();
+    const qp = this.route.snapshot.queryParamMap;
+    this.code.set(qp.get('code') ?? '');
+    this.state.set(qp.get('state') ?? '');
+    this.providerLabel.set(qp.get('provider') ?? '');
   }
 
-  private async handleCallback(): Promise<void> {
-    // Get callback parameters from URL
-    const params = this.oauthProvider.getCallbackParams();
+  ngAfterViewInit(): void {
+    if (!this.cbRef) return;
 
-    if (!params) {
-      // Check for error in URL
-      const url = new URL(globalThis.location.href);
-      const error = url.searchParams.get('error');
-      const errorDesc = url.searchParams.get('error_description');
+    // Wire the Lit element's imperative exchangeCode callback. The element calls
+    // this with (code, state) and expects Promise<{ session: unknown }>.
+    (this.cbRef.nativeElement as unknown as Record<string, unknown>)['exchangeCode'] = async (
+      code: string,
+      state: string
+    ): Promise<{ session: AuthResult }> => {
+      const result = await this.oauth.handleCallback(code, state);
 
-      if (error) {
-        this.status.set('error');
-        this.errorMessage.set(errorDesc ?? this.getOAuthErrorMessage(error));
-        this.oauthProvider.clearCallbackParams();
-        return;
+      if (!result.success) {
+        // Clear URL params before surfacing the error through the element's
+        // error state (the element catches the rejection).
+        this.oauth.clearCallbackParams();
+        throw new Error(result.error);
       }
 
-      // No code or error - invalid callback
-      this.status.set('error');
-      this.errorMessage.set('Invalid callback. No authorization code received.');
-      return;
-    }
+      // Persist auth state before the success event fires so the rest of the
+      // app is already authenticated when we navigate.
+      this.authService.setAuthFromResult(result);
+      this.oauth.clearCallbackParams();
 
-    try {
-      // Exchange code for token
-      const result = await this.oauthProvider.handleCallback(params.code, params.state);
-
-      // Clear URL parameters
-      this.oauthProvider.clearCallbackParams();
-
-      if (result.success) {
-        // Update auth state
-        this.authService.setAuthFromResult(result);
-
-        this.status.set('success');
-        this.seoService.setTitle('Welcome');
-
-        // Redirect to intended destination (or /lamad as default) after brief delay for UX
-        const returnUrl = this.oauthProvider.consumeReturnUrl() ?? '/lamad';
-        setTimeout(() => {
-          void this.router.navigate([returnUrl]);
-        }, 1500);
-      } else {
-        this.status.set('error');
-        this.errorMessage.set(result.error);
-      }
-    } catch (err) {
-      this.status.set('error');
-      this.errorMessage.set(err instanceof Error ? err.message : 'An unexpected error occurred');
-    }
+      return { session: result };
+    };
   }
 
-  retry(): void {
-    // Navigate to login page to restart auth flow
-    void this.router.navigate(['/identity/login']);
+  onSuccess(_e: Event): void {
+    const returnUrl = this.oauth.consumeReturnUrl() ?? '/lamad';
+    void this.router.navigate([returnUrl]);
   }
 
-  goHome(): void {
-    void this.router.navigate(['/']);
-  }
-
-  private getOAuthErrorMessage(error: string): string {
-    switch (error) {
-      case 'access_denied':
-        return 'You denied access to your account.';
-      case 'invalid_request':
-        return 'The authorization request was invalid.';
-      case 'unauthorized_client':
-        return 'This application is not authorized.';
-      case 'unsupported_response_type':
-        return 'The authorization server does not support this response type.';
-      case 'invalid_scope':
-        return 'The requested permissions are invalid.';
-      case 'server_error':
-        return 'The authorization server encountered an error.';
-      case 'temporarily_unavailable':
-        return 'The authorization server is temporarily unavailable.';
-      default:
-        return `Authorization failed: ${error}`;
-    }
+  onError(e: Event): void {
+    const detail = (e as CustomEvent<{ reason: string; recoverable: boolean }>).detail;
+    // eslint-disable-next-line no-console
+    console.error('OAuth callback error:', detail.reason);
   }
 }
