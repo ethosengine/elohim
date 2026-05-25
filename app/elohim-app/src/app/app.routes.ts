@@ -10,10 +10,6 @@ export const routes: Routes = [
     data: { protocolContent: true, fallbackCid: 'elohim-host-landing' },
   },
   {
-    path: 'lamad',
-    loadChildren: async () => import('@app/lamad/lamad.routes').then(m => m.LAMAD_ROUTES),
-  },
-  {
     path: 'community',
     loadChildren: async () => import('./qahal/community.routes').then(m => m.COMMUNITY_ROUTES),
   },
