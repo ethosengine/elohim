@@ -2,6 +2,16 @@
 // Consumers import the element classes for type annotations:
 // `import type { ElohimImagodeiFoo } from 'elohim-imagodei';`
 
+// Framework-agnostic helpers — safe to import from Angular and standalone bundles.
+export {
+  parseFederatedIdentifier,
+  resolveGatewayToDoorwayUrl,
+  type FederatedIdentifier,
+  type DoorwayDescriptor,
+  type ParseOutcome,
+  type ResolveOutcome,
+} from './federated-identifier.js';
+
 export { ElohimImagodeiIntrospectionPanel } from './elohim-imagodei-introspection-panel.js';
 export type { AffordanceTrace, SubjectSetting } from './elohim-imagodei-introspection-panel.js';
 

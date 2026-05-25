@@ -25,6 +25,10 @@
       "import": "./dist/register.js",
       "types": "./dist/register.d.ts"
     },
+    "./federated-identifier": {
+      "import": "./dist/federated-identifier.js",
+      "types": "./dist/federated-identifier.d.ts"
+    },
     "./tokens.scss": "./tokens.scss"
   },
   "files": [
