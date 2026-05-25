@@ -349,6 +349,16 @@ pub fn commitment_count(
 /// pending schema-first codegen of the action vocabulary).
 pub const OPERATE_DOORWAY_ACTION: &str = "operate-doorway";
 
+/// REA action discriminator for pillar-EPR projection commitments. Single
+/// source of truth for this string in the storage crate; mirrors the
+/// OPERATE_DOORWAY_ACTION pattern — a new action value on the existing
+/// Commitment infrastructure, not a new entry type.
+///
+/// Notarizes which doorway projects which EPR at what URL path. The action
+/// string is content-addressed into commitment ids; changing it breaks
+/// idempotency of every existing seed.
+pub const PROJECT_EPR_ACTION: &str = "project-epr";
+
 /// Build the canonical in_scope_of value for an operate-doorway commitment.
 ///
 /// Stored encoding is a JSON-array string (ValueFlows in_scope_of convention),
@@ -442,5 +452,12 @@ mod operator_helper_tests {
         // Schema-first codegen of this vocabulary is a future refactor; until
         // then this test is the drift detector.
         assert_eq!(OPERATE_DOORWAY_ACTION, "operate-doorway");
+    }
+
+    #[test]
+    fn project_epr_action_constant_is_stable() {
+        // The action string is content-addressed into commitment ids;
+        // changing it breaks idempotency of every existing seed.
+        assert_eq!(PROJECT_EPR_ACTION, "project-epr");
     }
 }
