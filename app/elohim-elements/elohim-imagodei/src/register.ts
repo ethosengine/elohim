@@ -52,3 +52,9 @@ import { ElohimImagodeiFederatedResolver } from './elohim-imagodei-federated-res
 if (!customElements.get('elohim-imagodei-federated-resolver')) {
   customElements.define('elohim-imagodei-federated-resolver', ElohimImagodeiFederatedResolver);
 }
+
+import { ElohimImagodeiLoginCard } from './elohim-imagodei-login-card.js';
+
+if (!customElements.get('elohim-imagodei-login-card')) {
+  customElements.define('elohim-imagodei-login-card', ElohimImagodeiLoginCard);
+}

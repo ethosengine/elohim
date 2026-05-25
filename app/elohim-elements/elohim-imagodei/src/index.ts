@@ -39,3 +39,6 @@ export type {
   FederatedResolveOutcome,
   ResolveIdentifierFn,
 } from './elohim-imagodei-federated-resolver.js';
+
+export { ElohimImagodeiLoginCard } from './elohim-imagodei-login-card.js';
+export type { OAuthProviderRef } from './elohim-imagodei-login-card.js';
