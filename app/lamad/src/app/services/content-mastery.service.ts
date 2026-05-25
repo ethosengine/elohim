@@ -8,7 +8,7 @@ import { LEARNER_BACKEND } from '@app/elohim/interfaces';
 import { isAboveGate, compareMasteryLevels } from '@elohim/service/angular/models/agent.model';
 import { MasteryRecordContent, SourceChainEntry } from '@elohim/storage-client';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+import { LocalSourceChainService } from '@elohim/service';
 import { SessionHumanService } from '@elohim/identity';
 
 import {

@@ -10,7 +10,7 @@ import { hasMinimumIntimacy } from '@app/elohim/models/human-consent.model';
 import { PathNegotiationContent } from '@elohim/storage-client';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { HumanConsentService } from '@app/elohim/services/human-consent.service';
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+import { LocalSourceChainService } from '@elohim/service';
 
 import {
   PathNegotiation,

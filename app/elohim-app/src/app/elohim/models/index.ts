@@ -66,7 +66,8 @@ export * from './coordination-envelope.model';
 export * from './epr-head.model';
 
 // Infrastructure
-export * from './source-chain.model';
+// source-chain.model — migrated to @elohim/service (Slice 2.1b)
+export * from '@elohim/service/angular/models/source-chain.model';
 // json-ld.model, open-graph.model — migrated to @elohim/service (Slice 2.1)
 export * from '@elohim/service/angular/models/json-ld.model';
 export * from '@elohim/service/angular/models/open-graph.model';

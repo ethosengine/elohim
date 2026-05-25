@@ -17,7 +17,7 @@ import {
   canElevate,
 } from '@app/elohim/models/human-consent.model';
 import { HumanConsentContent } from '@elohim/storage-client';
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+import { LocalSourceChainService } from '@elohim/service';
 import { SessionHumanService } from '@elohim/identity';
 
 // Models

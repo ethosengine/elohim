@@ -23,7 +23,7 @@ import { Injectable, OnDestroy, inject } from '@angular/core';
 import { BehaviorSubject, Observable, Subscription, combineLatest } from 'rxjs';
 
 import { isAboveGate } from '@elohim/service/angular/models/agent.model';
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+import { LocalSourceChainService } from '@elohim/service';
 import { SessionHumanService } from '@elohim/identity';
 
 import {

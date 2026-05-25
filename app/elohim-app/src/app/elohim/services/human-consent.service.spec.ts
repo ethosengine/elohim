@@ -2,7 +2,7 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
 import { HumanConsentService } from './human-consent.service';
-import { LocalSourceChainService } from './local-source-chain.service';
+import { LocalSourceChainService } from '@elohim/service';
 import { SessionHumanService } from '@elohim/identity';
 import { HumanConsent } from '@app/elohim/models/human-consent.model';
 import { LearningPath } from '@app/lamad/models/learning-path.model';
@@ -50,7 +50,7 @@ describe('HumanConsentService', () => {
     });
 
     service = TestBed.inject(HumanConsentService);
-    sourceChainMock = TestBed.inject(LocalSourceChainService) as {
+    sourceChainMock = TestBed.inject(LocalSourceChainService) as unknown as {
       [K in keyof LocalSourceChainService]?: Mock;
     };
     sessionHumanMock = TestBed.inject(SessionHumanService) as {

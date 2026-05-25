@@ -7,7 +7,8 @@
 
 // Infrastructure
 export { DataLoaderService } from './data-loader.service';
-export { LocalSourceChainService } from './local-source-chain.service';
+// LocalSourceChainService — migrated to @elohim/service (Slice 2.1b)
+export { LocalSourceChainService } from '@elohim/service';
 export { HolochainClientService } from './holochain-client.service';
 // GovernanceApiService — migrated to @elohim/service (Slice 2.1)
 export { GovernanceApiService } from '@elohim/service';
