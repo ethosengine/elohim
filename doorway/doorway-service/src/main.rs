@@ -786,6 +786,40 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Pattern Z.B.2 bridge + B15 projection refresh: subscribe to storage's
+    // /api/v1/events SSE so doorway accepts content updates and projection
+    // registration/revocation as they happen.
+    //
+    //  content.{created,updated,deleted}  → evict AppFileCache slug entry
+    //  projection.{registered,revoked}    → re-fetch all projections and call
+    //                                       EprRouter::replace_all (B15)
+    //
+    // Pairs with warm_stream above: warm_stream is the cold-start snapshot,
+    // this subscriber is the live tail. Doorway is a projection of substrate
+    // truth — without this subscriber, PATCHes and commitment changes are
+    // silent to the projection caches until next restart.
+    //
+    // See: genesis/docs/superpowers/specs/2026-05-23-doorway-access-tier-patterns.md
+    if let Some(ref storage_url) = args.storage_url {
+        let node_id_str = state.args.node_id.to_string();
+        let doorway_id = state
+            .args
+            .doorway_id
+            .as_deref()
+            .unwrap_or(&node_id_str)
+            .to_string();
+        let _events_handle = doorway::projection::storage_events_subscriber::spawn_subscriber_task(
+            storage_url.clone(),
+            doorway_id,
+            state.app_file_cache.clone(),
+            Arc::clone(&state.epr_router),
+        );
+        info!(
+            storage_url = %storage_url,
+            "Storage events subscriber spawned (Pattern Z.B.2 + B15 projection refresh)"
+        );
+    }
+
     // Start Orchestrator background tasks (if enabled)
     // The state is already created and wired to AppState above
     let _orchestrator = if let Some(ref orch_state) = orchestrator_state {
