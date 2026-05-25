@@ -747,9 +747,27 @@ importers:
       '@angular/router':
         specifier: ^19.2.0
         version: 19.2.19(@angular/common@19.2.19(@angular/core@19.2.19(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.19(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.19(@angular/animations@19.2.19(@angular/common@19.2.19(@angular/core@19.2.19(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.19(rxjs@7.8.2)(zone.js@0.15.1)))(@angular/common@19.2.19(@angular/core@19.2.19(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.19(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      '@phosphor-icons/core':
+        specifier: '*'
+        version: 2.1.1
+      '@types/d3':
+        specifier: '*'
+        version: 7.4.3
+      d3:
+        specifier: '*'
+        version: 7.9.0
       elohim-core:
         specifier: workspace:*
         version: link:../elohim-elements/elohim-core
+      highlight.js:
+        specifier: '*'
+        version: 11.11.1
+      marked:
+        specifier: '*'
+        version: 17.0.3
+      marked-highlight:
+        specifier: '*'
+        version: 2.2.3(marked@17.0.3)
       rxjs:
         specifier: ~7.8.0
         version: 7.8.2
