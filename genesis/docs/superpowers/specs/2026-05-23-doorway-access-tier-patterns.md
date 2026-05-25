@@ -150,6 +150,64 @@ A peer-native steward — someone whose conductor cell normally runs on their ow
 
 ---
 
+## Pattern Z — Substrate-correct EPR Head republish (the foundation under A / B / Recovery)
+
+**Surfaced by:** the 2026-05-24 shakeout. App #1464 mechanically succeeded — blob uploaded via `PUT /admin/seed/blob`, content rows PATCHed, all verifies green — yet `alpha.elohim.host` still served stale content. The new blob hash was visible in the SQLite content row (`GET /db/content/elohim-host-landing` returned the fresh CID) but doorway's `/apps/{slug}/index.html` route resolved through `app_file_cache.slug_index` which reads from MongoDB. MongoDB had the stale hash. The PATCH had updated SQLite *only*. There was no propagation.
+
+The user named the diagnosis: *"a blob update should trigger a response from the EPR — it should recognize that something it's attesting to changed."* That is the substrate-correct framing.
+
+### The two anti-patterns this names
+
+**Anti-pattern Z.1 — `PATCH /db/content/{slug}` as a deploy primitive.**
+`elohim/elohim-storage/src/http.rs:3810` registers `PATCH /db/content/{id}` as an authenticated SQLite mutation. The handler calls `ContentService::update` which writes to the diesel content table and returns the new view. It does NOT republish the EPR Head, does NOT emit a projection signal, does NOT advertise via Kad, does NOT touch the graph projection. The SQLite row — which is supposed to be a *projection* of substrate truth — is being treated as the authority. Every downstream cache (doorway MongoDB, doorway in-memory slug index, doorway extraction cache) silently diverges from it.
+
+**Anti-pattern Z.2 — `/db/*` hard-coded short-circuit in doorway.**
+`doorway/doorway-service/src/server/http.rs:1635` matches `(_, p) if p.starts_with("/db/")` and dispatches through `routes/db.rs::handle_db_request` — a 175-line proxy file that hardcodes which HTTP methods to forward (initially missed PATCH; fix landed in commit `7dcefeacd` 2026-05-24 23:03 UTC). Per `doorway/CLAUDE.md`: *"We deleted 13 identical proxy files that violated this rule. They must never come back."* This is the 14th instance. The route registry (`route_registry.rs`) already knows how to dispatch any method storage's manifest declares — through `forward_to_storage`, which supports GET/POST/PUT/PATCH/DELETE/HEAD. The short-circuit is dead-code shape masquerading as live code.
+
+### The canonical primitive that already exists
+
+`PUT /api/v1/epr/{cid}` (`elohim/elohim-storage/src/api/epr.rs:484`, dispatched via `epr.rs:158`). What it does:
+
+1. **Validates content-addressed contract:** path CID must equal envelope CID.
+2. **Rehydrates the full EPR envelope** — kind, reach, coupling, claims, supersedes, Ed25519 signature.
+3. **Calls `FederatedEprStore::put`** — diesel persistence + Kad `StartProviding` (P2P advertisement that *this peer holds the bytes at this CID*).
+4. **Graph projection (feature-gated `graph-native`)** — projects the new EprHead into CozoDB, writes SUPERSEDES edges if this atom supersedes a predecessor (the substrate's "this *replaces* that" primitive).
+5. **Fan-out (Phase 3.5)** — FeedbackSignal propagation through the back-prop pathway.
+
+That is the substrate's correct "republish this content with a new attestation" primitive. It is content-addressed, signed, P2P-advertised, graph-projected, and signal-emitting. Everything PATCH was trying to fake.
+
+### The shape of the bridge (this sprint or next)
+
+Migrating `stageSpaBlob` to `PUT /api/v1/epr/{cid}` is the destination but it has prerequisites: a deploy signing key, JSON envelope construction, CID computation. Those need a sprint of their own (see [Plan stageSpaBlob migration to PUT /api/v1/epr/{cid}](task #14)).
+
+Until that migration lands, the minimum substrate-correct behavior is: **`ContentService::update` emits a projection signal on every PATCH**, so doorway's subscriber refreshes the MongoDB projection and the `slug_index` picks up the new hash automatically — eliminating the manual `/admin/cache/clear/{slug}` + `/admin/cache/warm` dance that 2026-05-24 shakeout had to perform by hand. This is **not** substrate-correct — it's a bridge that keeps the projection caches honest while the operational PATCH path still exists. It does not republish a new EprHead, does not gossip via Kad, does not write a SUPERSEDES edge. Future signal subscribers (P2P peers receiving the projection event) only know that *something changed*, not what the new attestation says. That's the cost of the bridge.
+
+### What ships in this round of the long-term fix
+
+| Step | Lands where | Status |
+|---|---|---|
+| Z.A — Document Pattern Z (this section) | this spec | done with this commit |
+| Z.B — Doorway subscribes to storage's `/api/v1/events` SSE | `doorway/doorway-service/src/projection/storage_events_subscriber.rs` (new) + `main.rs` wiring | in progress; storage side already complete (see discovery note) |
+| Z.C — Remove `/db/*` short-circuit; `routes/db.rs` deleted | `doorway/doorway-service/src/{server/http.rs, routes/db.rs, routes/mod.rs}` | done with this commit |
+| Z.D — Plan stageSpaBlob → `PUT /api/v1/epr/{cid}` | dedicated spec at `genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md` | deferred to next sprint; design only |
+| Z.E — Deprecate `PATCH /db/content/{slug}` | `elohim-storage/src/http.rs`, route registry | blocked by Z.D landing |
+
+**Discovery note on Z.B (added 2026-05-25 mid-thread):** Storage already emits `StorageEvent::ContentUpdated { id }` from `ContentService::update` (`elohim-storage/src/services/content_service.rs:203`) and exposes it as `event: content.updated` on `GET /api/v1/events` (`elohim-storage/src/sse.rs:49`). The real gap is doorway-side — no subscriber exists. `doorway/doorway-service/src/projection/subscriber.rs` listens to the **conductor's WebSocket** (DNA post_commit signals), NOT to storage's HTTP SSE event bus. `doorway/doorway-service/src/projection/warm_stream.rs` consumes `cache.*` events ONCE at startup from `/api/v1/cache/stream` but does NOT keep listening for live updates. Z.B as originally scoped ("emit a signal on PATCH") is already shipped; what's missing is a long-running doorway-side subscriber that translates `content.updated` → `app_file_cache.refresh_app(slug)` + projection store invalidation. This is a new file plus `main.rs` background-task wiring, ~150 LoC. Reframing in the table above.
+
+### Why the order matters
+
+Z.B + Z.C are the bridge that closes the visible delivery gap (alpha.elohim.host stops serving stale content after PATCH). Z.D is the migration that makes the bridge unnecessary. Z.E is the cleanup that lets us delete the bridge.
+
+Inverting this order would break shakeout delivery: if we ship Z.E first (delete PATCH /db/content), stageSpaBlob has nothing to call. If we ship Z.D before Z.B, we still need the signal-on-PATCH because other PATCH callers (the avodah API, UI inline edits) will exist for some time.
+
+### Out of scope (named here so they don't drift)
+
+- **The seed-script PLACEHOLDER pattern.** `sha256-PLACEHOLDER_REPLACED_BY_SEED_SCRIPT` literal sentinels in seed JSON are themselves an anti-pattern (storage-side state coupled to a sed-replace at boot). Pattern Z's bridge does not address this; the seed pipeline replaces the seed-time write entirely.
+- **EPR Head republish authority and identity.** Who signs the deploy-time republish — Jenkins, a coordinator zome, a steward agent? That is the central question Z.D must answer. Today's PATCH bypasses the question by claiming admin authority via an X-API-Key. The substrate-correct answer is "an Ed25519 keypair owned by a named agent" but *which* named agent (the operator? a deploy service account? the EPR's original author?) is what the spec needs to resolve.
+- **Two-doorway federation.** elohim.host (alpha-b federation peer) reading content from alpha.elohim.host depends on Pattern A (content-row P2P sync). Pattern Z does not solve federation — it makes the source-of-truth update propagate to ONE doorway's projection caches. Federation is sibling-but-orthogonal.
+
+---
+
 ## Cross-cutting concern — Reach-aware cache scoping
 
 **The leak risk:** Today the projection store in `doorway/doorway-service/src/projection/store.rs` keys cache entries by `{dna}:{type}:{id}`. A hosted steward (Tier 2) and an anon visitor (Tier 1) requesting the same content ID share a cache entry. If the steward's request lands first and populates the cache with their authenticated view (e.g., relationship-scoped metadata), the anon visitor's next request hits the cache and sees the authenticated view. This is a privacy bug.
