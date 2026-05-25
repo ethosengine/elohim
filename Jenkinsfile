@@ -254,6 +254,20 @@ def stageSpaBlob(String doorwayEprUrl, String distDir, String adminKey) {
         sh """#!/bin/bash
             set -euo pipefail
             cd '${distDir}'
+
+            # Angular 19 SSR mode emits index.csr.html (Client-Side Rendered
+            # fallback) instead of index.html — SSR is expected to generate
+            # the per-route index.html at runtime. For static SPA delivery
+            # through the protocol's /apps/{slug}/index.html route, we need
+            # a literal index.html in the ZIP (storage's /apps handler
+            # doesn't fall back to index.csr.html). Mirror the dockerfile's
+            # contract (one of the two must exist) and materialize
+            # index.html when only the CSR fallback is present.
+            if [ ! -f index.html ] && [ -f index.csr.html ]; then
+                cp index.csr.html index.html
+                echo "  materialized index.html from index.csr.html (Angular 19 SSR-mode dist)"
+            fi
+
             zip -r lamad-spa.zip .
             SPA_HASH="sha256-\$(sha256sum lamad-spa.zip | awk '{print \$1}')"
             SPA_SIZE="\$(du -h lamad-spa.zip | cut -f1)"
