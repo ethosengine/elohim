@@ -42,3 +42,6 @@ export type {
 
 export { ElohimImagodeiLoginCard } from './elohim-imagodei-login-card.js';
 export type { OAuthProviderRef } from './elohim-imagodei-login-card.js';
+
+export { ElohimImagodeiConsentCard } from './elohim-imagodei-consent-card.js';
+export type { ClaimRef, RequestingClient } from './elohim-imagodei-consent-card.js';

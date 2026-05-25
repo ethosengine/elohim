@@ -58,3 +58,9 @@ import { ElohimImagodeiLoginCard } from './elohim-imagodei-login-card.js';
 if (!customElements.get('elohim-imagodei-login-card')) {
   customElements.define('elohim-imagodei-login-card', ElohimImagodeiLoginCard);
 }
+
+import { ElohimImagodeiConsentCard } from './elohim-imagodei-consent-card.js';
+
+if (!customElements.get('elohim-imagodei-consent-card')) {
+  customElements.define('elohim-imagodei-consent-card', ElohimImagodeiConsentCard);
+}
