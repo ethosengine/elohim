@@ -1,4 +1,9 @@
 import { Routes } from '@angular/router';
 
-// D2 fills routes when the portal flow is wired (federated-resolver → login-card → consent flow).
-export const routes: Routes = [];
+// Both routes render AppComponent — the URL params and path drive which
+// portal mode (login vs consent) is displayed inside the portal-shell.
+// AppComponent.ngOnInit() inspects window.location.search to distinguish flows.
+export const routes: Routes = [
+  { path: '', children: [] },
+  { path: 'consent', children: [] },
+];
