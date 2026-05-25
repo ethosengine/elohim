@@ -22,7 +22,9 @@
  * `SWEETTEST_SHARD_COUNT` + `runSweettestShard()` above `pipeline {}`.
  * Per-DNA filter from CHANGED_PATHS (orchestrator passthrough, W2)
  * harvested by `tests/sweettest/scripts/build-nextest-filter.sh`.
- * Stash + parallel block sits at workspace-root context (W5 stash-fix)
+ * Stash + parallel block sits at workspace-root context (W5 stash-fix).
+ * #1279 measured 55m26s wall vs ~74min baseline; #1280 killed by 09 UTC
+ * cron-cascade before JUnit fix could be measured — see bug #5 followup.
  * so `includes:` workspace-relative globs resolve correctly.
  */
 
