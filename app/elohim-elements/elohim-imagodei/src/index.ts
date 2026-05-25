@@ -27,3 +27,6 @@ export { ElohimImagodeiStewardConfigureBanner } from './elohim-imagodei-steward-
 
 export { ElohimImagodeiTrustIndicator } from './elohim-imagodei-trust-indicator.js';
 export type { TrustMode } from './elohim-imagodei-trust-indicator.js';
+
+export { ElohimImagodeiAttestorRow } from './elohim-imagodei-attestor-row.js';
+export type { AttestorRef } from './elohim-imagodei-attestor-row.js';

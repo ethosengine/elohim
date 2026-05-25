@@ -2,12 +2,17 @@
 // Each element registers its tag here so consumers can `import 'elohim-imagodei/register'`
 // to make all custom elements available.
 
+import { ElohimImagodeiAttestorRow } from './elohim-imagodei-attestor-row.js';
 import { ElohimImagodeiIntrospectionPanel } from './elohim-imagodei-introspection-panel.js';
 import { ElohimImagodeiProtectedTierMarker } from './elohim-imagodei-protected-tier-marker.js';
 import { ElohimImagodeiSettingControl } from './elohim-imagodei-setting-control.js';
 import { ElohimImagodeiSettingsPalette } from './elohim-imagodei-settings-palette.js';
 import { ElohimImagodeiStewardConfigureBanner } from './elohim-imagodei-steward-configure-banner.js';
 import { ElohimImagodeiTrustIndicator } from './elohim-imagodei-trust-indicator.js';
+
+if (!customElements.get('elohim-imagodei-attestor-row')) {
+  customElements.define('elohim-imagodei-attestor-row', ElohimImagodeiAttestorRow);
+}
 
 if (!customElements.get('elohim-imagodei-introspection-panel')) {
   customElements.define('elohim-imagodei-introspection-panel', ElohimImagodeiIntrospectionPanel);
