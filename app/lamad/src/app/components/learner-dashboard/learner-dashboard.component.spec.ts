@@ -13,12 +13,13 @@ import { PathService } from '../../services/path.service';
 
 import { LearnerDashboardComponent } from './learner-dashboard.component';
 
-import type { AgentProgress } from '@app/elohim/models/agent.model';
+import type { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import type { ContentMastery } from '../../models/content-mastery.model';
 import type { MasteryLevel } from '../../models/content-mastery.model';
 import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile.model';
 import type { PathIndex } from '../../models/learning-path.model';
 import { vi } from 'vitest';
+import { EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
 
 describe('LearnerDashboardComponent', () => {
   let component: LearnerDashboardComponent;
@@ -143,6 +144,8 @@ describe('LearnerDashboardComponent', () => {
         { provide: ContentMasteryService, useValue: mockContentMastery },
         { provide: PathService, useValue: mockPathService },
         { provide: AgentService, useValue: mockAgentService },
+        { provide: EVENT_API, useValue: { createEconomicEvent: vi.fn().mockReturnValue(of(null)), getEconomicEvents: vi.fn().mockReturnValue(of([])) } },
+        { provide: AGENT_CONTEXT, useValue: { getCurrentAgentId: vi.fn().mockReturnValue('test-agent') } },
       ],
     }).compileComponents();
 

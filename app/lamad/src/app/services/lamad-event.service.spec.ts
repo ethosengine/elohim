@@ -3,7 +3,7 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { LamadEventService } from './lamad-event.service';
-import { EventService } from '@app/shefa/services/event.service';
+import { EventService } from '@elohim/rea-runtime';
 
 describe('LamadEventService', () => {
   let service: LamadEventService;

@@ -49,7 +49,7 @@ import {
   GraduatedFeedbackComponent,
 } from '@app/qahal/components/graduated-feedback/graduated-feedback.component';
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
-import { AttentionTrackerService } from '@app/shefa/services/attention-tracker.service';
+import { AttentionTrackerService } from '@elohim/rea-runtime';
 
 import {
   DistributionBadgeComponent,

@@ -21,6 +21,7 @@ import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
 import { HouseholdResilienceService } from '../../services/household-resilience.service';
 import { ResilienceService as LibResilienceService } from '@elohim/service/public-api';
 import { vi, Mock } from 'vitest';
+import { AttentionTrackerService, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
 
 describe('ContentViewerComponent', () => {
   let component: ContentViewerComponent;
@@ -186,6 +187,9 @@ describe('ContentViewerComponent', () => {
         { provide: HouseholdResilienceService, useValue: householdResilienceSpyObj },
         { provide: LibResilienceService, useValue: libResilienceSpyObj },
         { provide: SignalHarnessService, useValue: { onRendererComplete: vi.fn().mockResolvedValue(undefined) } },
+        { provide: AttentionTrackerService, useValue: { trackContentView: vi.fn(), trackContentLeave: vi.fn(), getSessionViewedIds: vi.fn().mockReturnValue(new Set()) } },
+        { provide: EVENT_API, useValue: { createEconomicEvent: vi.fn().mockReturnValue(of(null)), getEconomicEvents: vi.fn().mockReturnValue(of([])) } },
+        { provide: AGENT_CONTEXT, useValue: { getCurrentAgentId: vi.fn().mockReturnValue('test-agent-id') } },
         {
           provide: EprResolverService,
           useValue: {

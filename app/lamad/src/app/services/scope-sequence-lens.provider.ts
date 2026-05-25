@@ -17,7 +17,7 @@ import { getContentIcon } from '@app/lamad/utils/content-icons';
 
 import { PathService } from './path.service';
 
-import type { ExplorerBreadcrumb, ExplorerNode, LensProvider } from '@app/shefa/models';
+import type { ExplorerBreadcrumb, ExplorerNode, LensProvider } from '@elohim/rea-runtime';
 
 /** Default file icon */
 const DEFAULT_FILE_ICON = getContentIcon();

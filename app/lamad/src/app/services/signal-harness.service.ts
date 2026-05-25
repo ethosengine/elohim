@@ -10,7 +10,7 @@ import {
 } from '@app/shefa';
 
 import type { RendererCompletionEvent } from '../renderers/renderer-registry.service';
-import type { REAAction, LamadEventType } from '@app/elohim/models';
+import type { REAAction, LamadEventType } from '@elohim/rea-runtime';
 
 /**
  * Feature flag for the EPR write-through path (Task C.3).

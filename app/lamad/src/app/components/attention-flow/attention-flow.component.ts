@@ -4,7 +4,7 @@ import { RouterModule } from '@angular/router';
 
 import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
 import { AgentService } from '@app/elohim/services/agent.service';
-import { EventService } from '@app/shefa/services/event.service';
+import { EventService } from '@elohim/rea-runtime';
 
 /**
  * AttentionFlowComponent — Learner's personal attention history.

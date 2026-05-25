@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
-import { EventService } from '@app/shefa/services/event.service';
+import { EventService } from '@elohim/rea-runtime';
 
 /**
  * LamadEventService -- Lamad domain convenience methods over the protocol EventService.

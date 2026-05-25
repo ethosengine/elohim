@@ -4,7 +4,7 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { AttentionFlowComponent } from './attention-flow.component';
-import { EventService } from '@app/shefa/services/event.service';
+import { EventService } from '@elohim/rea-runtime';
 import { AgentService } from '@app/elohim/services/agent.service';
 
 describe('AttentionFlowComponent', () => {
