@@ -6,6 +6,14 @@ import { ElohimPageChrome } from './elohim-page-chrome.js';
 import { ElohimDefaultOmnibar } from './elohim-default-omnibar.js';
 import { ElohimContextMenu } from './elohim-context-menu.js';
 import { ElohimEprLink } from './elohim-epr-link.js';
+import { ElohimEprRelationshipsPanel } from './elohim-epr-relationships-panel.js';
+import { ElohimReactionBar } from './elohim-reaction-bar.js';
+import { ElohimGraduatedFeedback } from './elohim-graduated-feedback.js';
+import { ElohimFeedbackMechanismGateway } from './elohim-feedback-mechanism-gateway.js';
+import { ElohimGateFeedbackTrigger } from './elohim-gate-feedback-trigger.js';
+import { ElohimNavigator } from './elohim-navigator.js';
+import { ElohimContentAnalytics } from './elohim-content-analytics.js';
+import { ElohimEprPopover } from './elohim-epr-popover.js';
 
 // Registration lives here, not on the ElohimButton class via @customElement,
 // to keep ./index.ts truly side-effect-free. Importing from 'elohim-core'
@@ -52,4 +60,36 @@ if (!customElements.get('elohim-context-menu')) {
 
 if (!customElements.get('elohim-epr-link')) {
   customElements.define('elohim-epr-link', ElohimEprLink);
+}
+
+if (!customElements.get('elohim-epr-relationships-panel')) {
+  customElements.define('elohim-epr-relationships-panel', ElohimEprRelationshipsPanel);
+}
+
+if (!customElements.get('elohim-reaction-bar')) {
+  customElements.define('elohim-reaction-bar', ElohimReactionBar);
+}
+
+if (!customElements.get('elohim-graduated-feedback')) {
+  customElements.define('elohim-graduated-feedback', ElohimGraduatedFeedback);
+}
+
+if (!customElements.get('elohim-feedback-mechanism-gateway')) {
+  customElements.define('elohim-feedback-mechanism-gateway', ElohimFeedbackMechanismGateway);
+}
+
+if (!customElements.get('elohim-gate-feedback-trigger')) {
+  customElements.define('elohim-gate-feedback-trigger', ElohimGateFeedbackTrigger);
+}
+
+if (!customElements.get('elohim-navigator')) {
+  customElements.define('elohim-navigator', ElohimNavigator);
+}
+
+if (!customElements.get('elohim-content-analytics')) {
+  customElements.define('elohim-content-analytics', ElohimContentAnalytics);
+}
+
+if (!customElements.get('elohim-epr-popover')) {
+  customElements.define('elohim-epr-popover', ElohimEprPopover);
 }
