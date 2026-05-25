@@ -22,12 +22,29 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function findRepoRoot(): string {
-  try {
-    return execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
-  } catch {
-    // Fallback: __dirname is genesis/seeder/src/__tests__
-    return path.resolve(__dirname, '..', '..', '..', '..');
+  // Walk up from __dirname looking for pnpm-workspace.yaml. This is robust
+  // across normal vitest runs AND git hook contexts where GIT_DIR may be set
+  // to the main repo's .git (causing `git rev-parse --show-toplevel` to
+  // return the seeder directory instead of the qahal-m1 worktree root).
+  let cursor = __dirname;
+  for (let i = 0; i < 10; i++) {
+    if (fs.existsSync(path.join(cursor, 'pnpm-workspace.yaml'))) {
+      return cursor;
+    }
+    const parent = path.dirname(cursor);
+    if (parent === cursor) break;
+    cursor = parent;
   }
+  // Last-resort fallback: assume __dirname is genesis/seeder/src/__tests__.
+  try {
+    const fromGit = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
+    if (fs.existsSync(path.join(fromGit, 'pnpm-workspace.yaml'))) {
+      return fromGit;
+    }
+  } catch {
+    /* fall through */
+  }
+  return path.resolve(__dirname, '..', '..', '..', '..');
 }
 
 const REPO_ROOT = findRepoRoot();
