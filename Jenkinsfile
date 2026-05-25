@@ -220,21 +220,29 @@ def publishE2EReports(String environment) {
     }
 }
 
-def stageSpaBlob(String doorwayEprUrl, String distDir, String adminKey) {
-    // Uploads the elohim-app browser bundle as a single blob. When an admin
-    // key is provided, ALSO links the blob to two content rows via the
-    // authenticated PATCH /db/content/{id} route:
+def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey) {
+    // Uploads one OR MORE pillar-EPR browser bundles. Each bundle is a
+    // {distDir, slug} pair: the dist contents get zipped + uploaded as a
+    // content-addressed blob, then (when an admin key is present) PATCHed
+    // onto that bundle's content row via /db/content/{slug}.
     //
-    //   db/content/lamad-spa            — the lamad SPA app surface
-    //   db/content/elohim-host-landing  — the landing-page EPR projected
-    //                                     by doorway-A (alpha.elohim.host)
+    // Pillar-EPR decomposition (Task B21): each pillar projects its own
+    // bundle onto its own content row. The previous "one blob, two slugs"
+    // arrangement (elohim-app bundle on both elohim-host-landing AND
+    // lamad-spa) was a coincidence of single-app deployment; with the
+    // lamad SPA split out into app/lamad, each surface owns its bundle:
+    //
+    //   db/content/elohim-host-landing  — landing-page EPR projected by
+    //                                     doorway-A (alpha.elohim.host)
     //                                     + doorway-B (elohim.host) as
-    //                                     their ROOT_APP_SLUG
+    //                                     ROOT_APP_SLUG; served from
+    //                                     app/elohim-app dist
+    //   db/content/lamad-spa            — lamad pillar EPR served from
+    //                                     app/lamad dist at /lamad/...
     //
-    // One blob, two content rows, two projection surfaces. The JSON
-    // source for both content nodes intentionally omits blobHash; the
-    // seed-sqlite step does not overwrite the deploy-time value written
-    // here.
+    // The JSON source for these content nodes intentionally omits
+    // blobHash; the seed-sqlite step does not overwrite the deploy-time
+    // value written here.
     //
     // When adminKey is empty, the PATCH+verify step is skipped (with a
     // WARN log) and the content rows retain whatever blobHash the seed
@@ -249,53 +257,66 @@ def stageSpaBlob(String doorwayEprUrl, String distDir, String adminKey) {
     // pipefail + curl -fSs (no || echo swallow) means any 4xx/5xx FAILS
     // the build — surfacing silent CI/storage drift as a red build
     // instead of a stuck production surface.
+    //
+    // index.html: SSR-mode dists (elohim-app, Angular 19) emit
+    // index.csr.html only; materialize to index.html since storage's
+    // /apps lookup is literal-path. Pure SPAs (app/lamad) pass through.
     def doPatch = (adminKey != null && adminKey.trim() != '') ? '1' : '0'
-    withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}"]) {
-        sh """#!/bin/bash
-            set -euo pipefail
-            cd '${distDir}'
-            zip -r lamad-spa.zip .
-            SPA_HASH="sha256-\$(sha256sum lamad-spa.zip | awk '{print \$1}')"
-            SPA_SIZE="\$(du -h lamad-spa.zip | cut -f1)"
-            echo "SPA blob hash: \${SPA_HASH}"
-            echo "SPA blob size: \${SPA_SIZE}"
+    for (bundle in bundles) {
+        def distDir = bundle.distDir
+        def slug = bundle.slug
+        echo "stageSpaBlobs: distDir='${distDir}' slug='${slug}'"
+        withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}"]) {
+            sh """#!/bin/bash
+                set -euo pipefail
+                cd '${distDir}'
 
-            # 1. Upload ZIP as blob (content-addressed; idempotent; no auth)
-            curl -fSs -X PUT \\
-                -H 'Content-Type: application/zip' \\
-                --data-binary @lamad-spa.zip \\
-                "${doorwayEprUrl}/blob/\${SPA_HASH}"
-            echo "  ✓ blob uploaded"
+                if [ ! -f index.html ] && [ -f index.csr.html ]; then
+                    cp index.csr.html index.html
+                    echo "  materialized index.html from index.csr.html (Angular SSR-mode dist)"
+                fi
 
-            # 2. Link blob to content rows (PATCH+verify) — only when admin key present
-            if [ "\${DO_PATCH}" = "1" ]; then
-                for slug in lamad-spa elohim-host-landing; do
+                zip -r spa-bundle.zip .
+                SPA_HASH="sha256-\$(sha256sum spa-bundle.zip | awk '{print \$1}')"
+                SPA_SIZE="\$(du -h spa-bundle.zip | cut -f1)"
+                echo "[${slug}] blob hash: \${SPA_HASH}"
+                echo "[${slug}] blob size: \${SPA_SIZE}"
+
+                # 1. Upload ZIP as blob (content-addressed; idempotent; no auth)
+                curl -fSs -X PUT \\
+                    -H 'Content-Type: application/zip' \\
+                    --data-binary @spa-bundle.zip \\
+                    "${doorwayEprUrl}/blob/\${SPA_HASH}"
+                echo "  ✓ blob uploaded"
+
+                # 2. Link blob to ${slug} content row (PATCH+verify) — only when admin key present
+                if [ "\${DO_PATCH}" = "1" ]; then
                     curl -fSs -X PATCH \\
                         -H 'Content-Type: application/json' \\
                         -H "X-API-Key: \${STORAGE_API_KEY_ADMIN}" \\
                         -d "{\\"blobHash\\":\\"\${SPA_HASH}\\"}" \\
-                        "${doorwayEprUrl}/db/content/\${slug}" \\
+                        "${doorwayEprUrl}/db/content/${slug}" \\
                         >/dev/null
-                    echo "  ✓ patched \${slug}"
+                    echo "  ✓ patched ${slug}"
 
-                    ACTUAL=\$(curl -fSs "${doorwayEprUrl}/db/content/\${slug}" \\
+                    ACTUAL=\$(curl -fSs "${doorwayEprUrl}/db/content/${slug}" \\
                         | python3 -c "import sys, json; print(json.load(sys.stdin).get('blobHash',''))")
                     if [ "\${ACTUAL}" != "\${SPA_HASH}" ]; then
-                        echo "ERROR: \${slug} blobHash drifted after PATCH" >&2
+                        echo "ERROR: ${slug} blobHash drifted after PATCH" >&2
                         echo "  expected: \${SPA_HASH}" >&2
                         echo "  actual:   \${ACTUAL}" >&2
                         exit 1
                     fi
-                    echo "  ✓ verified \${slug} blobHash = \${SPA_HASH}"
-                done
-            else
-                echo "  ⊘ WARN: skipping PATCH+verify — no admin credential available"
-                echo "    content rows (lamad-spa, elohim-host-landing) retain seed-time blobHash"
-                echo "    blob bytes are uploaded and content-addressable via PUT /blob/\${SPA_HASH}"
-            fi
+                    echo "  ✓ verified ${slug} blobHash = \${SPA_HASH}"
+                else
+                    echo "  ⊘ WARN: skipping PATCH+verify for ${slug} — no admin credential available"
+                    echo "    content row retains seed-time blobHash"
+                    echo "    blob bytes uploaded and content-addressable via PUT /blob/\${SPA_HASH}"
+                fi
 
-            rm -f lamad-spa.zip
-        """
+                rm -f spa-bundle.zip
+            """
+        }
     }
 }
 
@@ -757,6 +778,29 @@ VEOF
             }
         }
 
+        stage('Build Lamad Bundle') {
+            // Pillar-EPR decomposition (Task B21): app/lamad is the lamad
+            // pillar SPA, served as its own EPR at /lamad/... by doorway.
+            // Runs AFTER Build App because lamad's tsconfig path aliases
+            // reference app/elohim-app codegen artifacts (B18). Pure SPA,
+            // no SSR — produces app/lamad/dist/lamad/browser/index.html
+            // directly (no index.csr.html materialization required).
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { shouldRunStep('build-angular') }
+                }
+            }
+            steps {
+                container('builder') {
+                    dir('app/lamad') {
+                        sh 'pnpm run build'
+                        sh 'ls -la dist/lamad/browser/ | head -20'
+                    }
+                }
+            }
+        }
+
         stage('Unit Test') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
@@ -867,10 +911,10 @@ VEOF
             //
             // The ingress carries `nginx.ingress.kubernetes.io/proxy-body-size`,
             // which nginx-ingress's default (1 MB) violates for the ~10 MB SPA
-            // blob PUT that stageSpaBlob does. Without this stage, the App
-            // pipeline can't bootstrap: stageSpaBlob runs at line ~865 and
+            // blob PUT that stageSpaBlobs does. Without this stage, the App
+            // pipeline can't bootstrap: stageSpaBlobs runs at line ~865 and
             // hits 413; the Deploy to Alpha stage that would normally apply
-            // the ingress doesn't run until line ~1126, after stageSpaBlob.
+            // the ingress doesn't run until line ~1126, after stageSpaBlobs.
             //
             // Symptom this stage fixes: App #1460 (and prior) 413 on PUT.
             // Bootstrap chicken-and-egg first written into the ingress
@@ -958,7 +1002,7 @@ VEOF
                             defaultDoorwayEprUrl = 'https://alpha.elohim.host'
                         }
                         def doorwayEprUrl = env.STORAGE_URL ?: defaultDoorwayEprUrl
-                        echo "stageSpaBlob doorwayEprUrl: ${doorwayEprUrl}"
+                        echo "stageSpaBlobs doorwayEprUrl: ${doorwayEprUrl}"
                         // Auth for PATCH /db/content/{id} (the new route).
                         // Try `storage-api-key-admin` (k8s-provisioned for
                         // this work) then fall back to
@@ -969,7 +1013,7 @@ VEOF
                         // without operator coordination.
                         //
                         // When neither credential is present, the stage
-                        // continues: stageSpaBlob still uploads the blob
+                        // continues: stageSpaBlobs still uploads the blobs
                         // via unauthenticated PUT, but skips the PATCH+
                         // verify step. Content rows keep their seed-time
                         // blobHash. This is the deploy-degraded path —
@@ -996,11 +1040,19 @@ VEOF
                             }
                         }
                         if (credUsed) {
-                            echo "stageSpaBlob auth: using credential '${credUsed}'"
+                            echo "stageSpaBlobs auth: using credential '${credUsed}'"
                         } else {
-                            echo "stageSpaBlob auth: WARN — neither storage-api-key-admin nor doorway-admin-bootstrap-key credential visible at this job's scope. Continuing with PUT-only path (PATCH+verify skipped)."
+                            echo "stageSpaBlobs auth: WARN — neither storage-api-key-admin nor doorway-admin-bootstrap-key credential visible at this job's scope. Continuing with PUT-only path (PATCH+verify skipped)."
                         }
-                        stageSpaBlob(doorwayEprUrl, "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", adminKey)
+                        // Two pillar-EPR bundles, two content rows (Task B21).
+                        // Order matters only insofar as elohim-app must build
+                        // before lamad (lamad's tsconfig aliases reference
+                        // elohim-app codegen) — that ordering is enforced by
+                        // the upstream Build stages, not this call.
+                        stageSpaBlobs(doorwayEprUrl, [
+                            [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
+                            [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
+                        ], adminKey)
                     }
                 }
             }
