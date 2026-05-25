@@ -35,6 +35,18 @@ Audit lines flagging "new storage schema" against `@elohim/*` package mentions i
 
 ---
 
+## Pre-sprint readiness checklist
+
+Before dispatching Wave 1, the operator verifies:
+
+- [ ] **Substrate baseline landed.** Z.D Phase 1 schemas (REA compute-commitment + delegates-compute) are on dev (commits `b2380b899`, `7f66391b6`, `bf2efd191`). The new SDK can absorb the REA primitive from day one — confirmed.
+- [ ] **Lamad standalone is currently healthy.** `pnpm --filter lamad build` and `pnpm --filter lamad test` both green. As of integration of `design/peer-oauth-portal` (commits `a224c3e79..e18c4cb48`), lamad shows: build clean (warnings only — sass deprecation + NG8107), 2775 tests across 98 files all green, 126 cross-pillar import lines (228 `@app/elohim`, 28 `@app/imagodei`, 11 `@app/shefa`, 9 `@app/qahal`).
+- [ ] **Pre-existing test debt audited.** The peer-OAuth-portal integration surfaced two test files that were obsolete after landed refactors (epr-link spec post-Lit-wrapper refactor `10516614e`; app.routes spec post-lamad-bundle-split `effc26e04`). Before each Wave 2 slice dispatches, the slice agent runs `grep -rln "ngOnChanges\|loadChildren.*lamad" app/<consumer-bundle>/src --include="*.spec.ts"` and similar audits for the symbols it's migrating — obsolete specs surface BEFORE they block the pre-push gate.
+- [ ] **Pnpm lockfile is clean.** `pnpm install --lockfile-only` produces no diff. (When a Wave 2 slice scaffolds a new Angular library, it MUST re-run lockfile reconciliation; the workspace add was caught during peer-OAuth-portal integration and is captured in Slice 2.7's runbook.)
+- [ ] **Doorway clippy is healthy.** `cargo clippy -- -D warnings` on `doorway/doorway-service` returns 0. A regression at `src/server/http.rs:1257` (commit `542ca8f0b`) blocked the elohim-edge Docker image build for build 1002; fixed in `8c66fa3ca` before this sprint can land any HTTP-route changes from Slice 2.6.
+
+---
+
 ## Context
 
 The pillar-EPR decomposition merge (dev commit `0b36155e9`) moved lamad into `app/lamad/` as its own SPA bundle. But B18b configured lamad's `tsconfig.json` with cross-pillar path aliases pointing AT `app/elohim-app/src/app/...`:
@@ -177,13 +189,13 @@ After Wave 1's manifest lands AND operator resolves library-structure questions,
 
 1. For each service in the L slice:
    - [ ] Identify the canonical implementation (usually the one in `app/elohim-app/src/app/elohim/services/`)
-   - [ ] Copy it to `app/elohim-library/projects/elohim-service/src/lib/`
+   - [ ] Copy it AND its `*.spec.ts` to `app/elohim-library/projects/elohim-service/src/lib/` (test-spec co-migration — surfaced as a gotcha during peer-OAuth-portal integration where two specs were orphaned by their components' refactors and only the pre-push gate caught them)
    - [ ] Adapt imports: any `@app/*` cross-references inside the service body need their own L migration recursively
    - [ ] Add re-export to `public-api.ts`
    - [ ] Find all consumers via grep: `grep -rln "@app/elohim/services/<name>" app/`
    - [ ] Rewrite imports in each consumer
    - [ ] Verify build: `pnpm --filter elohim-library typecheck && pnpm --filter lamad build && pnpm --filter elohim-app build`
-   - [ ] Delete original source location
+   - [ ] Delete original source location AND the original `*.spec.ts` (no duplicate spec; the library copy is authoritative)
    - [ ] Commit per service: `feat(elohim-service): migrate <Service> from elohim-app pillar (Slice 2.1)`
 
 2. After all L services migrate:
@@ -349,6 +361,13 @@ After Wave 1's manifest lands AND operator resolves library-structure questions,
    - Storybook config (if pillar has UI primitives)
    - A2o feature scenarios (URL routes change)
    - Capture the patterns from THIS lamad split as the foundational case study
+   - **Common gotchas captured from preceding integrations** (subsection):
+     - **Bundle package.json minimum scripts.** Every new bundle ships with `build`, `start`, AND `test` scripts. The peer-OAuth-portal `app/imagodei-portal/package.json` shipped without `test`, meaning husky and the worker scan could not discover its 9 standalone-resolver tests. Add the missing script to the runbook scaffold template.
+     - **Pnpm lockfile reconciliation.** When `pnpm-workspace.yaml` gains a new bundle entry, the lockfile must be regenerated. `pnpm install --lockfile-only` is the fast path (~45s on this monorepo). Caught during the design/peer-oauth-portal merge; required because both branches added different new workspace entries (app/lamad and app/imagodei-portal).
+     - **Build-artifact tracking inconsistency.** `app/elohim-elements/elohim-core/dist/custom-elements.json` is git-tracked but `app/elohim-elements/elohim-imagodei/dist/` is gitignored. The runbook MUST take a position: pick one policy, propagate it, and call out that builders depend on the artifact being present locally (the elohim-imagodei tests 404 on `custom-elements.json` until `pnpm --filter elohim-imagodei run build` runs first).
+     - **Test-spec orphaning on Lit-wrapper refactor.** When an Angular component is rewritten as a thin Lit wrapper (the elohim-imagodei pattern: `LoginComponent`, `AuthCallbackComponent`, `EprLinkComponent`), the old spec asserting `ngOnChanges`/`OnChanges`/internal-state behavior STAYS unless explicitly retired. The pre-push gate catches it; the integrator pays the cost. Convention: a refactor that removes a lifecycle hook MUST update or replace the spec in the same commit.
+     - **Route-count specs as canaries of bundle splits.** `app.routes.spec.ts` asserting `routes.length === 14` continued to assert the pre-split count after lamad moved out (effc26e04). Specs that count entities or list routes are canaries — they belong in the bundle-split checklist as files to audit.
+     - **Clippy regressions from upstream merges.** When pulling origin/dev forward, a clippy `useless_conversion` in `doorway/src/server/http.rs:1257` (introduced by 542ca8f0b, fixed in 8c66fa3ca) blocked the elohim-edge Docker build for build 1002. Husky pre-push catches it locally; the convention is to fix-before-push rather than push-and-watch-CI-burn.
 3. - [ ] Update `README.md` index in `genesis/docs/architecture/`
 4. - [ ] Commit Slice 2.7 milestone
 
