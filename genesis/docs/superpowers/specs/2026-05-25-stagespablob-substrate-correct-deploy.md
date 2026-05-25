@@ -348,13 +348,55 @@ Z.D ships when:
 
 ---
 
-## §7 — Open questions
+## §7 — Resolved design questions
 
-1. **Deploy-svc-agent key custody**: vault? KMS? OS secret store? Per-operator choice or protocol-prescribed? Lean: per-operator choice, protocol-prescribed minimum (the key MUST live in *some* witnessable secret store; storing it in a plaintext repo file is a substrate violation that producers a `bad-custody` FeedbackSignal).
-2. **CID algorithm choice**: blake3 (iroh-native) vs sha256 (current `/admin/seed/blob` upload key prefix). The substrate-correct answer is whatever `FederatedEprStore::put` already uses for `KadStartProviding` keys — confirm and document. Today the wire format is `sha256-{hex}` per `quilt-vocabulary` memory; the iroh stack might prefer blake3 multihash. Resolve before CI scripting.
-3. **Rate-limit enforcement**: where does the substrate check `rate_per_hour`? Storage validator querying the event log? Mishpat zome with a sliding-window check? Lean: storage validator (cheaper, doesn't pollute DHT with rate-state). Tracking on-chain only triggers when the rate-limit signal escalates.
-4. **First-publish (`supersedes: null`) authority**: today the first publish of a new EPR can be by anyone. Should Z.D require a `delegates-compute` Commitment even for first-publish? Lean: yes, but the bound `epr_scope` can be `*` for an operator's bootstrap commitment. Closes the door against any-agent-publishes-anything from day one.
-5. **Recovery from compromised deploy-svc-agent**: detection (by what signal?), revocation propagation latency, post-compromise audit of accepted events (do we accept all, none, or replay-validate?). Likely a Z.D-followup spec.
+The five questions that landed in design discussion were resolved against the canon at [stewardship-over-sovereignty](epr:stewardship-over-sovereignty) and [cradle-to-grave-capability-gradient](epr:cradle-to-grave-capability-gradient). Each answer is anchored in protocol principles rather than crypto-libertarian defaults.
+
+### §7.1 — Deploy-svc-agent key custody
+
+**Resolution:** The substrate is indifferent to where the key lives; what matters is the **steward-stewardee relationship that grants standing**. The key is the cryptographic enactment of the operator-steward's `delegates-compute` Commitment, not a sovereignty primitive.
+
+- **Substrate-minimum:** the key MUST live in a witnessable secret store (Vault, AWS/GCP KMS, OS keyring, Kubernetes Secret, paper backup in a safe — operator's choice). A plaintext repo file emits a `bad-custody` FeedbackSignal (declarable by any steward observer; the operator's elohim raises it on detection).
+- **Recovery:** if the key is lost, the steward revokes the Commitment and issues a new one to a freshly-provisioned deploy-svc-agent. No cryptographic recovery primitive required — the social-relational primitive (steward attestation) covers it. Aligns with `project_socially_derived_security`: crypto accelerates, never gates.
+- **Custodian-as-counsel:** the operator's elohim-agent watches for anomalous behavior from the deploy-svc-agent and can recommend or initiate revocation per `project_elohim_as_counsel`.
+
+### §7.2 — CID algorithm choice
+
+**Resolution:** Use the existing `compute_cid` helper at `elohim/epr/src/cid.rs:11-15` — **SHA2-256 multihash + dag-cbor codec (0x71)**. This is the canonical CID format the entire EPR substrate already uses (`FederatedEprStore`, `KadStartProviding` keys, graph projection). Blake3 is iroh's content-addressing layer; the EPR envelope uses dag-cbor canonical sha256 and the two layers cooperate without conflict.
+
+### §7.3 — Rate-limit enforcement
+
+**Resolution:** **Both, with different roles.**
+
+- **Storage validator (cheap, no DHT round-trip):** sliding-window query against the local `economic_events` SQLite table for events with this `bounded_by` Commitment in the last `rate_per_hour` window. Rejects with HTTP 429 if over limit. This is the hot-path enforcement.
+- **Mishpat zome (slow, DHT-resident):** witness emits a `rate-limit-exceeded` `FeedbackSignal` (DHT entry) per breach attempt. This is the audit truth — observable by all peers, persists across restarts, accrues against the deploy-svc-agent's reputation per `project_signal_kind_extensible_protocol_class`.
+
+Storage rejection is the operational behavior; the FeedbackSignal is the protocol-witnessed truth.
+
+### §7.4 — First-publish (`supersedes: null`) authority
+
+**Resolution:** **Always require a `bounded_by` reference, even for `supersedes: null`** — anonymous publishing has no place in this substrate. Aligns with the sovereignty inversion: no standing without relationship.
+
+- For an operator's first deploy of a new EPR, the operator's existing `delegates-compute` Commitment to the deploy-svc-agent must have `epr_scope: ["*"]` or include the new EPR's identity.
+- For a freshly-provisioned operator (first-ever deploy), bootstrap is done by the operator-steward themselves publishing the first `delegates-compute` Commitment — they hold standing as a human steward of the doorway resource. No protocol-level "anonymous publish" gate exists.
+- Reach-bound: bootstrap `delegates-compute` Commitments at `reach_ceiling: "commons"` are the safe default; any higher reach requires explicit operator-steward signature with elevated capacity.
+
+### §7.5 — Compromise recovery for deploy-svc-agent
+
+**Resolution:** Cradle-to-grave shape. The deploy-svc-agent is a **stewarded compute resource** under the operator-steward — analogous to a ward's agentic compute under a guardian. Recovery follows the 4-layer graduated authority pattern from [cradle-to-grave-capability-gradient](epr:cradle-to-grave-capability-gradient) §3:
+
+| Compromise scenario | Recovery primitive |
+| --- | --- |
+| Operator-steward retains capacity, detects compromise | **Operator self-revokes** the `delegates-compute` Commitment via Mishpat; provisions new deploy-svc-agent; new Commitment supersedes old. Storage validator rejects in-flight events from the revoked agent immediately. |
+| Operator-steward unreachable but alive | **Intimate-circle quorum** (operator's recovery quorum, per `KeyStewardship`) issues `RevokeCommitment` against the deploy-svc-agent's commitment via threshold signature. |
+| Operator-steward incapacitated/deceased | **Successor-steward** (named in the operator's pre-arranged succession Commitment) assumes authority and re-issues a fresh `delegates-compute` to a new deploy-svc-agent. Existing already-republished EPRs stay live (audit trail intact, innocent-until-proven). |
+| Operator-steward compromised AND deploy-svc-agent compromised | **Network witness / qahal governance act** — slowest path, but absolute lockout is impossible. Qahal stewards can authorize revocation of the operator's standing entirely, transferring doorway custody to a successor. |
+
+**Prior accepted events:** stay accepted. The audit trail (`bounded_by` chain) preserves the historical truth that "at time T, this agent had standing." Past good republishes are not retroactively invalidated.
+
+### §7 implementation reference
+
+Each resolution informs concrete work in the implementation plan at `/projects/.claude-config/plans/abundant-wandering-lemon.md` (Phase 1 tasks 1.5–1.18 + Phase 2). The plan's "Resolved Open Questions" section restates these answers task-by-task for engineers; this section is the canonical record in the spec itself.
 
 ---
 
