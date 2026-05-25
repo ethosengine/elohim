@@ -631,6 +631,277 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-content-analytics.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-content-analytics> — protocol-native attention metrics display primitive.\n\nShows view count, completion count, and completion rate for a content node.\nMetrics are protocol-native economic events — not external analytics.\n\nService dependencies (the EventService calls) are abstracted via the\n`loader` property. Callers inject a loader that wraps their service.\nThe element handles loading state and error state itself.\n\nMigrated from ContentAnalyticsComponent (app/elohim-app/elohim).",
+          "name": "ElohimContentAnalytics",
+          "cssProperties": [
+            {
+              "description": "Container padding",
+              "name": "--elohim-analytics-padding"
+            },
+            {
+              "description": "Container background",
+              "name": "--elohim-analytics-bg"
+            },
+            {
+              "description": "Container foreground text color",
+              "name": "--elohim-analytics-fg"
+            },
+            {
+              "description": "Title font size",
+              "name": "--elohim-analytics-title-size"
+            },
+            {
+              "description": "Metric value font size",
+              "name": "--elohim-analytics-value-size"
+            },
+            {
+              "description": "Metric value font weight",
+              "name": "--elohim-analytics-value-weight"
+            },
+            {
+              "description": "Metric label font size",
+              "name": "--elohim-analytics-label-size"
+            },
+            {
+              "description": "Metric label color",
+              "name": "--elohim-analytics-label-color"
+            },
+            {
+              "description": "Grid gap between metrics",
+              "name": "--elohim-analytics-grid-gap"
+            },
+            {
+              "description": "Note text size",
+              "name": "--elohim-analytics-note-size"
+            },
+            {
+              "description": "Note text color",
+              "name": "--elohim-analytics-note-color"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The outer container",
+              "name": "container"
+            },
+            {
+              "description": "The \"Attention Metrics\" title",
+              "name": "title"
+            },
+            {
+              "description": "The loading state",
+              "name": "loading"
+            },
+            {
+              "description": "The metrics grid",
+              "name": "grid"
+            },
+            {
+              "description": "Each metric card",
+              "name": "metric"
+            },
+            {
+              "description": "The metric value span",
+              "name": "metric-value"
+            },
+            {
+              "description": "The metric label span",
+              "name": "metric-label"
+            },
+            {
+              "description": "The explanatory note",
+              "name": "note"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "contentId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Content ID to load analytics for",
+              "attribute": "content-id"
+            },
+            {
+              "kind": "field",
+              "name": "loader",
+              "type": {
+                "text": "ContentAnalyticsLoader | null"
+              },
+              "default": "null",
+              "description": "Analytics data loader"
+            },
+            {
+              "kind": "field",
+              "name": "metrics",
+              "type": {
+                "text": "ContentAnalyticsMetrics | null"
+              },
+              "default": "null",
+              "description": "Pre-loaded metrics (skips fetch if set)"
+            },
+            {
+              "kind": "field",
+              "name": "isLoading",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "hasError",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "loadedMetrics",
+              "type": {
+                "text": "ContentAnalyticsMetrics | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "method",
+              "name": "loadAnalytics",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              }
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "analytics-loaded",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: ContentAnalyticsMetrics } when data loads"
+            },
+            {
+              "name": "analytics-error",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "when load fails"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "content-id",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Content ID to load analytics for",
+              "fieldName": "contentId"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-content-analytics",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "designed",
+              "loading": "designed",
+              "error": "designed",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimContentAnalytics",
+          "declaration": {
+            "name": "ElohimContentAnalytics",
+            "module": "src/elohim-content-analytics.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-context-menu.ts",
       "declarations": [
         {
@@ -1290,6 +1561,1812 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-epr-popover.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-epr-popover> — three-pillar metadata popover primitive.\n\nShows a positioned popover with EPR Head metadata. Displays pillar-specific\ncontext from the three protocol pillars:\n- Lamad: title, content type, format, tags, description\n- Shefa: steward count\n- Qahal: reach level, constitutional layer\n\nDesigned to be used programmatically (positioned over anchors) by the\nmarkdown-renderer follow-up (Wave 3 / Slice 2.6 continuation) to render\n`<a data-epr=...>` anchor metadata popovers.\n\nDoes NOT modify `<elohim-epr-link>` — this is a separate, distinct primitive.\n\nMigrated/added from EprPopoverComponent (app/elohim-app/elohim/components/epr-popover)\nas the Slice 2.6 canary addition.",
+          "name": "ElohimEprPopover",
+          "cssProperties": [
+            {
+              "description": "Popover width",
+              "name": "--elohim-epr-popover-width"
+            },
+            {
+              "description": "Popover background",
+              "name": "--elohim-epr-popover-bg"
+            },
+            {
+              "description": "Popover foreground text color",
+              "name": "--elohim-epr-popover-fg"
+            },
+            {
+              "description": "Popover border",
+              "name": "--elohim-epr-popover-border"
+            },
+            {
+              "description": "Popover border radius",
+              "name": "--elohim-epr-popover-radius"
+            },
+            {
+              "description": "Popover box shadow",
+              "name": "--elohim-epr-popover-shadow"
+            },
+            {
+              "description": "Content type badge background",
+              "name": "--elohim-epr-type-bg"
+            },
+            {
+              "description": "Content type badge foreground",
+              "name": "--elohim-epr-type-fg"
+            },
+            {
+              "description": "Tag chip background",
+              "name": "--elohim-epr-tag-bg"
+            },
+            {
+              "description": "Tag chip foreground",
+              "name": "--elohim-epr-tag-fg"
+            },
+            {
+              "description": "Reach badge background",
+              "name": "--elohim-epr-reach-bg"
+            },
+            {
+              "description": "Reach badge foreground",
+              "name": "--elohim-epr-reach-fg"
+            },
+            {
+              "description": "Layer badge background",
+              "name": "--elohim-epr-layer-bg"
+            },
+            {
+              "description": "Layer badge foreground",
+              "name": "--elohim-epr-layer-fg"
+            },
+            {
+              "description": "\"Open resource\" link color",
+              "name": "--elohim-epr-link-color"
+            },
+            {
+              "description": "Section divider color",
+              "name": "--elohim-epr-divider-color"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The popover container",
+              "name": "popover"
+            },
+            {
+              "description": "The type + format header row",
+              "name": "header"
+            },
+            {
+              "description": "The content type badge",
+              "name": "type-badge"
+            },
+            {
+              "description": "The content format label",
+              "name": "format"
+            },
+            {
+              "description": "The content title heading",
+              "name": "title"
+            },
+            {
+              "description": "The description paragraph",
+              "name": "description"
+            },
+            {
+              "description": "The tags container",
+              "name": "tags"
+            },
+            {
+              "description": "Each tag chip",
+              "name": "tag"
+            },
+            {
+              "description": "The shefa (stewards) section",
+              "name": "shefa-section"
+            },
+            {
+              "description": "The qahal (reach + layer) section",
+              "name": "qahal-section"
+            },
+            {
+              "description": "The reach badge",
+              "name": "reach-badge"
+            },
+            {
+              "description": "The layer badge",
+              "name": "layer-badge"
+            },
+            {
+              "description": "The \"Open resource\" link",
+              "name": "link"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "head",
+              "type": {
+                "text": "EprHead | null"
+              },
+              "default": "null",
+              "description": "EPR Head metadata to display"
+            },
+            {
+              "kind": "field",
+              "name": "position",
+              "type": {
+                "text": "{ top: number; left: number }"
+              },
+              "default": "{ top: 0, left: 0 }",
+              "description": "Position relative to the viewport (px)"
+            },
+            {
+              "kind": "field",
+              "name": "route",
+              "type": {
+                "text": "string | null"
+              },
+              "default": "null",
+              "description": "Route href for the \"Open resource\" link",
+              "attribute": "route"
+            },
+            {
+              "kind": "field",
+              "name": "visible",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the popover is visible",
+              "attribute": "visible",
+              "reflects": true
+            },
+            {
+              "kind": "method",
+              "name": "handleMouseEnter",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "handleMouseLeave",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "dispatchDismiss",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "handleLinkClick",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "epr-popover-enter",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "when mouse enters the popover"
+            },
+            {
+              "name": "epr-popover-dismiss",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "when mouse leaves or escape is pressed"
+            },
+            {
+              "name": "epr-popover-navigate",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { route: string } } when link is clicked"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "route",
+              "type": {
+                "text": "string | null"
+              },
+              "default": "null",
+              "description": "Route href for the \"Open resource\" link",
+              "fieldName": "route"
+            },
+            {
+              "name": "visible",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the popover is visible",
+              "fieldName": "visible"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-epr-popover",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "observed",
+            "states": {
+              "empty": "designed",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimEprPopover",
+          "declaration": {
+            "name": "ElohimEprPopover",
+            "module": "src/elohim-epr-popover.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-epr-relationships-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-epr-relationships-panel> — cross-pillar relationship visualization primitive.\n\nGroups an array of EPR relationships by type and renders them in a\nresponsive grid. Knows no brand; all visual properties are override-able\nvia CSS custom properties. Accepts service deps as properties — no Angular DI.\n\nMigrated from EprRelationshipsPanelComponent (app/elohim-app).",
+          "name": "ElohimEprRelationshipsPanel",
+          "cssProperties": [
+            {
+              "description": "Group heading color",
+              "name": "--elohim-epr-panel-heading-color"
+            },
+            {
+              "description": "Relationship card background",
+              "name": "--elohim-epr-panel-card-bg"
+            },
+            {
+              "description": "Relationship card border",
+              "name": "--elohim-epr-panel-card-border"
+            },
+            {
+              "description": "Relationship card foreground text color",
+              "name": "--elohim-epr-panel-card-fg"
+            },
+            {
+              "description": "Relationship card border radius",
+              "name": "--elohim-epr-panel-card-radius"
+            },
+            {
+              "description": "Gap between relationship cards",
+              "name": "--elohim-epr-panel-gap"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The outer section element",
+              "name": "panel"
+            },
+            {
+              "description": "Each relationship group container",
+              "name": "group"
+            },
+            {
+              "description": "The group heading element",
+              "name": "group-heading"
+            },
+            {
+              "description": "The card grid container",
+              "name": "group-grid"
+            },
+            {
+              "description": "Each individual relationship card",
+              "name": "card"
+            },
+            {
+              "description": "The type badge on each card",
+              "name": "card-type"
+            },
+            {
+              "description": "The target ID text on each card",
+              "name": "card-target"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "relationships",
+              "type": {
+                "text": "EprRelationship[]"
+              },
+              "default": "[]",
+              "description": "The EPR relationships to render"
+            },
+            {
+              "kind": "field",
+              "name": "navigator",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Optional callback to navigate to a target EPR"
+            },
+            {
+              "kind": "field",
+              "name": "groups",
+              "type": {
+                "text": "RelationshipGroup[]"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "renderGroup",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "group",
+                  "type": {
+                    "text": "RelationshipGroup"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "renderCard",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "item",
+                  "type": {
+                    "text": "EprRelationship"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "handleCardClick",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "target",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "epr-navigate",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { target: string } } when a relationship card is activated"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-epr-relationships-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "designed",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimEprRelationshipsPanel",
+          "declaration": {
+            "name": "ElohimEprRelationshipsPanel",
+            "module": "src/elohim-epr-relationships-panel.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-feedback-mechanism-gateway.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-feedback-mechanism-gateway> — governance feedback gateway shell.\n\nOrchestrating element that renders the appropriate feedback mechanism sub-slot\nbased on the resolved mechanism level (0 = context-menu-only, 1 = reactions,\n2 = graduated + reactions). Psephos ballot rendering (levels 3-7) is out of\nscope for this primitive — callers provide psephos content via slot.\n\nAll service dependencies are accepted via properties/callbacks. The element\ndoes not fetch governance data itself — callers pass in resolved state.\n\nMigrated from FeedbackMechanismGatewayComponent (app/elohim-app/qahal).",
+          "name": "ElohimFeedbackMechanismGateway",
+          "cssProperties": [
+            {
+              "description": "Loading text color",
+              "name": "--elohim-gateway-loading-color"
+            },
+            {
+              "description": "Loading state padding",
+              "name": "--elohim-gateway-loading-padding"
+            },
+            {
+              "description": "Accumulation badge border radius",
+              "name": "--elohim-gateway-badge-radius"
+            },
+            {
+              "description": "Sensemaking badge background",
+              "name": "--elohim-gateway-sensemaking-bg"
+            },
+            {
+              "description": "Sensemaking badge foreground",
+              "name": "--elohim-gateway-sensemaking-fg"
+            },
+            {
+              "description": "Controversy badge background",
+              "name": "--elohim-gateway-controversy-bg"
+            },
+            {
+              "description": "Controversy badge foreground",
+              "name": "--elohim-gateway-controversy-fg"
+            },
+            {
+              "description": "Settled badge background",
+              "name": "--elohim-gateway-settled-bg"
+            },
+            {
+              "description": "Settled badge foreground",
+              "name": "--elohim-gateway-settled-fg"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The loading state container",
+              "name": "loading"
+            },
+            {
+              "description": "The content container when loaded",
+              "name": "content"
+            },
+            {
+              "description": "Each accumulation badge",
+              "name": "badge"
+            },
+            {
+              "description": "The sensemaking badge",
+              "name": "sensemaking-badge"
+            },
+            {
+              "description": "The controversy badge",
+              "name": "controversy-badge"
+            },
+            {
+              "description": "The settled badge",
+              "name": "settled-badge"
+            }
+          ],
+          "slots": [
+            {
+              "description": "Slot for the reactions bar (level 1+)",
+              "name": "reactions"
+            },
+            {
+              "description": "Slot for graduated feedback (level 2)",
+              "name": "graduated-feedback"
+            },
+            {
+              "description": "Slot for Psephos ballot (render target: psephos)",
+              "name": "psephos"
+            },
+            {
+              "description": "Slot for feedback aggregate display",
+              "name": "aggregate"
+            },
+            {
+              "description": "Slot for context-menu-only (level 0)",
+              "name": "context-menu"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "entityType",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Entity type (e.g. 'content', 'proposal')",
+              "attribute": "entityType"
+            },
+            {
+              "kind": "field",
+              "name": "entityId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Entity ID",
+              "attribute": "entityId"
+            },
+            {
+              "kind": "field",
+              "name": "selection",
+              "type": {
+                "text": "MechanismSelection | null"
+              },
+              "default": "null",
+              "description": "Resolved mechanism selection"
+            },
+            {
+              "kind": "field",
+              "name": "accumulationStatus",
+              "type": {
+                "text": "AccumulationStatus | null"
+              },
+              "default": "null",
+              "description": "Signal accumulation status"
+            },
+            {
+              "kind": "field",
+              "name": "loading",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether governance data is loading",
+              "attribute": "loading"
+            },
+            {
+              "kind": "field",
+              "name": "onNavigateToSensemaking",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called when sensemaking link is clicked"
+            },
+            {
+              "kind": "field",
+              "name": "onChallengeAction",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called when challenge action is triggered (level 0)"
+            },
+            {
+              "kind": "field",
+              "name": "showChallengeForm",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "method",
+              "name": "renderAccumulationBadges",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "status",
+                  "type": {
+                    "text": "AccumulationStatus"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "handleSensemakingClick",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "sensemaking-navigate",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { entityType, entityId } } when sensemaking link clicked"
+            },
+            {
+              "description": "{ detail: { entityType, entityId } } when challenge is triggered",
+              "name": "challenge-action"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "entityType",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Entity type (e.g. 'content', 'proposal')",
+              "fieldName": "entityType"
+            },
+            {
+              "name": "entityId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Entity ID",
+              "fieldName": "entityId"
+            },
+            {
+              "name": "loading",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether governance data is loading",
+              "fieldName": "loading"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-feedback-mechanism-gateway",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "designed",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimFeedbackMechanismGateway",
+          "declaration": {
+            "name": "ElohimFeedbackMechanismGateway",
+            "module": "src/elohim-feedback-mechanism-gateway.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-gate-feedback-trigger.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-gate-feedback-trigger> — governance gate feedback trigger primitive.\n\nRenders a vertical-ellipsis trigger button that opens a dropdown menu of\nfeedback action types (Flag, Challenge, Feedback, Report). Selecting an\nitem opens a modal dialog with a text area for the feedback message.\n\nService dependencies are accepted as callbacks — no Angular DI. The element\ndispatches events; callers handle the API submissions.\n\nMigrated from GateFeedbackTriggerComponent + GateFeedbackModalComponent\n(app/elohim-app/elohim/components/gate-feedback/).",
+          "name": "ElohimGateFeedbackTrigger",
+          "cssProperties": [
+            {
+              "description": "Trigger button icon color",
+              "name": "--elohim-gate-trigger-btn-color"
+            },
+            {
+              "description": "Trigger button hover color",
+              "name": "--elohim-gate-trigger-btn-hover-color"
+            },
+            {
+              "description": "Dropdown menu background",
+              "name": "--elohim-gate-menu-bg"
+            },
+            {
+              "description": "Dropdown menu border",
+              "name": "--elohim-gate-menu-border"
+            },
+            {
+              "description": "Dropdown menu border radius",
+              "name": "--elohim-gate-menu-radius"
+            },
+            {
+              "description": "Dropdown menu box shadow",
+              "name": "--elohim-gate-menu-shadow"
+            },
+            {
+              "description": "Menu item hover background",
+              "name": "--elohim-gate-menu-item-hover-bg"
+            },
+            {
+              "description": "Modal panel background",
+              "name": "--elohim-gate-modal-bg"
+            },
+            {
+              "description": "Modal panel border radius",
+              "name": "--elohim-gate-modal-radius"
+            },
+            {
+              "description": "Modal panel box shadow",
+              "name": "--elohim-gate-modal-shadow"
+            },
+            {
+              "description": "Submit button background",
+              "name": "--elohim-gate-submit-bg"
+            },
+            {
+              "description": "Submit button foreground",
+              "name": "--elohim-gate-submit-fg"
+            },
+            {
+              "description": "Submit button radius",
+              "name": "--elohim-gate-submit-radius"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The vertical-ellipsis trigger button",
+              "name": "trigger-btn"
+            },
+            {
+              "description": "The dropdown menu container",
+              "name": "menu"
+            },
+            {
+              "description": "Each menu item button",
+              "name": "menu-item"
+            },
+            {
+              "description": "The modal backdrop overlay",
+              "name": "modal-overlay"
+            },
+            {
+              "description": "The modal dialog panel",
+              "name": "modal-panel"
+            },
+            {
+              "description": "The modal heading",
+              "name": "modal-title"
+            },
+            {
+              "description": "The feedback textarea",
+              "name": "modal-textarea"
+            },
+            {
+              "description": "The modal submit button",
+              "name": "submit-btn"
+            },
+            {
+              "description": "The modal close button",
+              "name": "close-btn"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "contentId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Content ID to attach the feedback to",
+              "attribute": "content-id"
+            },
+            {
+              "kind": "field",
+              "name": "menuItems",
+              "type": {
+                "text": "GateFeedbackMenuItem[]"
+              },
+              "default": "[ { type: 'flag', label: 'Flag' }, { type: 'challenge', label: 'Challenge' }, { type: 'feedback', label: 'Feedback' }, { type: 'report', label: 'Report Issue' }, ]",
+              "description": "Menu items to show"
+            },
+            {
+              "kind": "field",
+              "name": "onFeedbackSubmit",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called with the feedback text and type"
+            },
+            {
+              "kind": "field",
+              "name": "menuOpen",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "modalOpen",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "activeFeedbackType",
+              "type": {
+                "text": "GateFeedbackType"
+              },
+              "privacy": "private",
+              "default": "'feedback'"
+            },
+            {
+              "kind": "field",
+              "name": "feedbackText",
+              "type": {
+                "text": "string"
+              },
+              "privacy": "private",
+              "default": "''"
+            },
+            {
+              "kind": "field",
+              "name": "isSubmitting",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "method",
+              "name": "renderModal",
+              "privacy": "private"
+            },
+            {
+              "kind": "method",
+              "name": "toggleMenu",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "openModal",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "type",
+                  "type": {
+                    "text": "GateFeedbackType"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "closeModal",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "handleOverlayClick",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "e",
+                  "type": {
+                    "text": "MouseEvent"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "handleMenuKeydown",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "e",
+                  "type": {
+                    "text": "KeyboardEvent"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "submitFeedback",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "feedback-menu-open",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "when the menu opens"
+            },
+            {
+              "name": "feedback-type-selected",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { type: GateFeedbackType } }"
+            },
+            {
+              "name": "feedback-closed",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "when modal is closed"
+            },
+            {
+              "name": "feedback-submit",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { type, contentId, text } }"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "content-id",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Content ID to attach the feedback to",
+              "fieldName": "contentId"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-gate-feedback-trigger",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimGateFeedbackTrigger",
+          "declaration": {
+            "name": "ElohimGateFeedbackTrigger",
+            "module": "src/elohim-gate-feedback-trigger.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-graduated-feedback.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-graduated-feedback> — context-aware scaled feedback primitive.\n\nInspired by Loomio's Gradients of Agreement and Forby's ARCH voting.\nPositions are context-specific; intensity captures how strongly the\nrespondent feels (ARCH pattern); optional reasoning for deliberative\nengagement.\n\nService dependencies accepted as callbacks — no Angular DI.\n\nMigrated from GraduatedFeedbackComponent (app/elohim-app/qahal).",
+          "name": "ElohimGraduatedFeedback",
+          "cssProperties": [
+            {
+              "description": "Container padding",
+              "name": "--elohim-feedback-padding"
+            },
+            {
+              "description": "Label text color",
+              "name": "--elohim-feedback-label-color"
+            },
+            {
+              "description": "Section border",
+              "name": "--elohim-feedback-border"
+            },
+            {
+              "description": "Submit button background",
+              "name": "--elohim-feedback-submit-bg"
+            },
+            {
+              "description": "Submit button foreground",
+              "name": "--elohim-feedback-submit-fg"
+            },
+            {
+              "description": "Submit button border radius",
+              "name": "--elohim-feedback-submit-radius"
+            },
+            {
+              "description": "Distribution bar height",
+              "name": "--elohim-feedback-distribution-height"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The feedback container",
+              "name": "container"
+            },
+            {
+              "description": "The scale label heading",
+              "name": "label"
+            },
+            {
+              "description": "The positions radiogroup",
+              "name": "positions"
+            },
+            {
+              "description": "Each position button",
+              "name": "position-btn"
+            },
+            {
+              "description": "The intensity slider section",
+              "name": "intensity-section"
+            },
+            {
+              "description": "The reasoning textarea section",
+              "name": "reasoning-section"
+            },
+            {
+              "description": "The submit/reset button section",
+              "name": "submit-section"
+            },
+            {
+              "description": "The submit button",
+              "name": "submit-btn"
+            },
+            {
+              "description": "The reset button",
+              "name": "reset-btn"
+            },
+            {
+              "description": "The community aggregate section",
+              "name": "aggregate-section"
+            },
+            {
+              "description": "The distribution progress bar",
+              "name": "distribution-bar"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "entityType",
+              "type": {
+                "text": "string"
+              },
+              "default": "'content'",
+              "description": "Entity type (e.g. 'content', 'proposal')",
+              "attribute": "entityType"
+            },
+            {
+              "kind": "field",
+              "name": "entityId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Entity ID",
+              "attribute": "entityId"
+            },
+            {
+              "kind": "field",
+              "name": "context",
+              "type": {
+                "text": "FeedbackContext"
+              },
+              "default": "'usefulness'",
+              "description": "Feedback context determining the scale",
+              "attribute": "context"
+            },
+            {
+              "kind": "field",
+              "name": "requiresReasoning",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether reasoning is always required",
+              "attribute": "requiresReasoning"
+            },
+            {
+              "kind": "field",
+              "name": "showAggregates",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "true",
+              "description": "Show aggregate distribution",
+              "attribute": "showAggregates"
+            },
+            {
+              "kind": "field",
+              "name": "compact",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Compact mode",
+              "attribute": "compact",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "distribution",
+              "type": {
+                "text": "FeedbackDistribution | null"
+              },
+              "default": "null",
+              "description": "Aggregate distribution from parent"
+            },
+            {
+              "kind": "field",
+              "name": "totalResponses",
+              "type": {
+                "text": "number"
+              },
+              "default": "0",
+              "description": "Total response count for distribution bar",
+              "attribute": "totalResponses"
+            },
+            {
+              "kind": "field",
+              "name": "hasSubmitted",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the current user has already submitted",
+              "attribute": "hasSubmitted"
+            },
+            {
+              "kind": "field",
+              "name": "onSubmit",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called when user submits feedback"
+            },
+            {
+              "kind": "field",
+              "name": "selectedPosition",
+              "type": {
+                "text": "number | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "intensity",
+              "type": {
+                "text": "number"
+              },
+              "privacy": "private",
+              "default": "5"
+            },
+            {
+              "kind": "field",
+              "name": "reasoning",
+              "type": {
+                "text": "string"
+              },
+              "privacy": "private",
+              "default": "''"
+            },
+            {
+              "kind": "field",
+              "name": "isSubmitting",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "showReasoningField",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "currentScale",
+              "type": {
+                "text": "ScaleDefinition"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "selectedPositionData",
+              "type": {
+                "text": "ScalePosition | null"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "reasoningIsRequired",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "canSubmit",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "renderAggregates",
+              "privacy": "private"
+            },
+            {
+              "kind": "method",
+              "name": "selectPosition",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "position",
+                  "type": {
+                    "text": "ScalePosition"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "toggleReasoning",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "submit",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "reset",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "getIntensityLabel",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              }
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "feedback-submit",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: GraduatedFeedbackInput } when feedback is submitted"
+            },
+            {
+              "name": "feedback-reset",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "when form is reset"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "entityType",
+              "type": {
+                "text": "string"
+              },
+              "default": "'content'",
+              "description": "Entity type (e.g. 'content', 'proposal')",
+              "fieldName": "entityType"
+            },
+            {
+              "name": "entityId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Entity ID",
+              "fieldName": "entityId"
+            },
+            {
+              "name": "context",
+              "type": {
+                "text": "FeedbackContext"
+              },
+              "default": "'usefulness'",
+              "description": "Feedback context determining the scale",
+              "fieldName": "context"
+            },
+            {
+              "name": "requiresReasoning",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether reasoning is always required",
+              "fieldName": "requiresReasoning"
+            },
+            {
+              "name": "showAggregates",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "true",
+              "description": "Show aggregate distribution",
+              "fieldName": "showAggregates"
+            },
+            {
+              "name": "compact",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Compact mode",
+              "fieldName": "compact"
+            },
+            {
+              "name": "totalResponses",
+              "type": {
+                "text": "number"
+              },
+              "default": "0",
+              "description": "Total response count for distribution bar",
+              "fieldName": "totalResponses"
+            },
+            {
+              "name": "hasSubmitted",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the current user has already submitted",
+              "fieldName": "hasSubmitted"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-graduated-feedback",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimGraduatedFeedback",
+          "declaration": {
+            "name": "ElohimGraduatedFeedback",
+            "module": "src/elohim-graduated-feedback.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-mention-base.ts",
       "declarations": [
         {
@@ -1455,6 +3532,539 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-navigator.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-navigator> — unified cross-pillar navigation primitive.\n\nImplements the \"Google Account\" navigation pattern:\n- Identity layer (profile bubble) with profile tray\n- Context app switcher (pillar tray)\n- Optional search bar\n- Banner notices\n\nAll routing is done by emitting events or calling callbacks. The element\nholds no router state itself — callers handle navigation.\n\nMigrated from ElohimNavigatorComponent (app/elohim-app/elohim).",
+          "name": "ElohimNavigator",
+          "cssProperties": [
+            {
+              "description": "Navigator background",
+              "name": "--elohim-nav-bg"
+            },
+            {
+              "description": "Navigator foreground",
+              "name": "--elohim-nav-fg"
+            },
+            {
+              "description": "Navigator border",
+              "name": "--elohim-nav-border"
+            },
+            {
+              "description": "Profile bubble background",
+              "name": "--elohim-nav-bubble-bg"
+            },
+            {
+              "description": "Profile bubble foreground",
+              "name": "--elohim-nav-bubble-fg"
+            },
+            {
+              "description": "Dropdown tray background",
+              "name": "--elohim-nav-tray-bg"
+            },
+            {
+              "description": "Dropdown tray border",
+              "name": "--elohim-nav-tray-border"
+            },
+            {
+              "description": "Dropdown tray shadow",
+              "name": "--elohim-nav-tray-shadow"
+            },
+            {
+              "description": "Search input background",
+              "name": "--elohim-nav-search-bg"
+            },
+            {
+              "description": "Search input border",
+              "name": "--elohim-nav-search-border"
+            },
+            {
+              "description": "Search input border radius",
+              "name": "--elohim-nav-search-radius"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The root navigation bar",
+              "name": "nav"
+            },
+            {
+              "description": "The left identity section",
+              "name": "identity-section"
+            },
+            {
+              "description": "The center search section",
+              "name": "search-section"
+            },
+            {
+              "description": "The right actions section",
+              "name": "actions-section"
+            },
+            {
+              "description": "The profile bubble button",
+              "name": "profile-bubble"
+            },
+            {
+              "description": "The app-switcher button",
+              "name": "context-switcher-btn"
+            },
+            {
+              "description": "The profile dropdown tray",
+              "name": "profile-tray"
+            },
+            {
+              "description": "The context-switcher dropdown tray",
+              "name": "context-tray"
+            },
+            {
+              "description": "The search input element",
+              "name": "search-input"
+            },
+            {
+              "description": "Each banner notice",
+              "name": "banner"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "context",
+              "type": {
+                "text": "ElohimContextApp"
+              },
+              "default": "'lamad'",
+              "description": "Active context app",
+              "attribute": "context",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "showSearch",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "true",
+              "description": "Show the search bar",
+              "attribute": "showSearch"
+            },
+            {
+              "kind": "field",
+              "name": "isAuthenticated",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the user is authenticated",
+              "attribute": "isAuthenticated"
+            },
+            {
+              "kind": "field",
+              "name": "displayName",
+              "type": {
+                "text": "string"
+              },
+              "default": "'Traveler'",
+              "description": "Authenticated user display name",
+              "attribute": "displayName"
+            },
+            {
+              "kind": "field",
+              "name": "identifier",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Authenticated user identifier (email)",
+              "attribute": "identifier"
+            },
+            {
+              "kind": "field",
+              "name": "identityMode",
+              "type": {
+                "text": "string"
+              },
+              "default": "'anonymous'",
+              "description": "Identity mode ('hosted' | 'steward' | 'anonymous')",
+              "attribute": "identityMode"
+            },
+            {
+              "kind": "field",
+              "name": "session",
+              "type": {
+                "text": "ElohimNavigatorSession | null"
+              },
+              "default": "null",
+              "description": "Session human state"
+            },
+            {
+              "kind": "field",
+              "name": "contextApps",
+              "type": {
+                "text": "ElohimContextAppConfig[]"
+              },
+              "default": "[ { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true }, { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true }, { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true }, { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true }, { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true }, ]",
+              "description": "List of context apps to show"
+            },
+            {
+              "kind": "field",
+              "name": "banners",
+              "type": {
+                "text": "ElohimNavigatorBannerItem[]"
+              },
+              "default": "[]",
+              "description": "Active banner notices"
+            },
+            {
+              "kind": "field",
+              "name": "onNavigate",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called with { route } when navigation triggered"
+            },
+            {
+              "kind": "field",
+              "name": "onSearch",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called with { query } when search submitted"
+            },
+            {
+              "kind": "field",
+              "name": "onLogout",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called when logout requested"
+            },
+            {
+              "kind": "field",
+              "name": "onBannerDismiss",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called with { id } when a banner is dismissed"
+            },
+            {
+              "kind": "field",
+              "name": "showProfileTray",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "showContextSwitcher",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "searchQuery",
+              "type": {
+                "text": "string"
+              },
+              "privacy": "private",
+              "default": "''"
+            },
+            {
+              "kind": "method",
+              "name": "navigate",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "route",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "toggleProfileTray",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "toggleContextSwitcher",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "switchContext",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "app",
+                  "type": {
+                    "text": "ElohimContextAppConfig"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "handleSearch",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "handleLogout",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "dismissBanner",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "id",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "navigate",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { route: string } }"
+            },
+            {
+              "name": "profile-tray-toggle",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { open: boolean } }"
+            },
+            {
+              "name": "context-switcher-toggle",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { open: boolean } }"
+            },
+            {
+              "name": "search",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { query: string, context: string } }"
+            },
+            {
+              "name": "logout",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "when logout is requested"
+            },
+            {
+              "name": "banner-dismiss",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { id: string } }"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "context",
+              "type": {
+                "text": "ElohimContextApp"
+              },
+              "default": "'lamad'",
+              "description": "Active context app",
+              "fieldName": "context"
+            },
+            {
+              "name": "showSearch",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "true",
+              "description": "Show the search bar",
+              "fieldName": "showSearch"
+            },
+            {
+              "name": "isAuthenticated",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the user is authenticated",
+              "fieldName": "isAuthenticated"
+            },
+            {
+              "name": "displayName",
+              "type": {
+                "text": "string"
+              },
+              "default": "'Traveler'",
+              "description": "Authenticated user display name",
+              "fieldName": "displayName"
+            },
+            {
+              "name": "identifier",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Authenticated user identifier (email)",
+              "fieldName": "identifier"
+            },
+            {
+              "name": "identityMode",
+              "type": {
+                "text": "string"
+              },
+              "default": "'anonymous'",
+              "description": "Identity mode ('hosted' | 'steward' | 'anonymous')",
+              "fieldName": "identityMode"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-navigator",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimNavigator",
+          "declaration": {
+            "name": "ElohimNavigator",
+            "module": "src/elohim-navigator.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-page-chrome.ts",
       "declarations": [
         {
@@ -1565,6 +4175,504 @@
           "declaration": {
             "name": "ElohimPageChrome",
             "module": "src/elohim-page-chrome.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-reaction-bar.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-reaction-bar> — protocol-native emotional feedback primitive.\n\nNOT Facebook-style likes. These are contextual emotional responses that respect\ncontent's feedback constraints, distinguish supportive vs critical reactions,\nmediate potentially harmful reactions (constitutional teaching), and track\npatterns for social health monitoring.\n\nService dependencies are accepted as properties (callbacks), NOT via Angular DI.\nThe consuming wrapper injects the callbacks; the element dispatches events and\ncalls back through them.\n\nMigrated from ReactionBarComponent (app/elohim-app/qahal).",
+          "name": "ElohimReactionBar",
+          "cssProperties": [
+            {
+              "description": "Gap between reaction buttons",
+              "name": "--elohim-reaction-bar-gap"
+            },
+            {
+              "description": "Reaction button background",
+              "name": "--elohim-reaction-btn-bg"
+            },
+            {
+              "description": "Reaction button border",
+              "name": "--elohim-reaction-btn-border"
+            },
+            {
+              "description": "Reaction button foreground color",
+              "name": "--elohim-reaction-btn-fg"
+            },
+            {
+              "description": "Active (selected) button background",
+              "name": "--elohim-reaction-btn-active-bg"
+            },
+            {
+              "description": "Active button border color",
+              "name": "--elohim-reaction-btn-active-border"
+            },
+            {
+              "description": "Reaction button border radius",
+              "name": "--elohim-reaction-btn-radius"
+            },
+            {
+              "description": "Count text color",
+              "name": "--elohim-reaction-count-fg"
+            },
+            {
+              "description": "Mediation dialog background",
+              "name": "--elohim-reaction-mediation-bg"
+            },
+            {
+              "description": "Mediation dialog foreground text color",
+              "name": "--elohim-reaction-mediation-fg"
+            },
+            {
+              "description": "Mediation indicator / warning color",
+              "name": "--elohim-reaction-warning-color"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The reaction bar container",
+              "name": "bar"
+            },
+            {
+              "description": "Each reaction button",
+              "name": "button"
+            },
+            {
+              "description": "The reaction icon span",
+              "name": "icon"
+            },
+            {
+              "description": "The reaction label span",
+              "name": "label"
+            },
+            {
+              "description": "The reaction count span",
+              "name": "count"
+            },
+            {
+              "description": "The mediation dialog overlay",
+              "name": "mediation-overlay"
+            },
+            {
+              "description": "The mediation dialog panel",
+              "name": "mediation-dialog"
+            }
+          ],
+          "slots": [
+            {
+              "description": "No default slot; all content is generated from props",
+              "name": ""
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "entityType",
+              "type": {
+                "text": "string"
+              },
+              "default": "'content'",
+              "description": "Entity type for governance signals (e.g. 'content', 'proposal')",
+              "attribute": "entityType"
+            },
+            {
+              "kind": "field",
+              "name": "entityId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Entity ID",
+              "attribute": "entityId"
+            },
+            {
+              "kind": "field",
+              "name": "constraints",
+              "type": {
+                "text": "ReactionConstraints | null"
+              },
+              "default": "null",
+              "description": "Reaction constraints from content FeedbackProfile"
+            },
+            {
+              "kind": "field",
+              "name": "counts",
+              "type": {
+                "text": "ReactionCount[]"
+              },
+              "default": "[]",
+              "description": "Current reaction counts from the parent"
+            },
+            {
+              "kind": "field",
+              "name": "userReactions",
+              "type": {
+                "text": "EmotionalReactionType[]"
+              },
+              "default": "[]",
+              "description": "Set of reactions the current user has submitted"
+            },
+            {
+              "kind": "field",
+              "name": "compact",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Compact mode (icons only, no labels)",
+              "attribute": "compact",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "showCounts",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "true",
+              "description": "Show reaction counts",
+              "attribute": "showCounts"
+            },
+            {
+              "kind": "field",
+              "name": "onReactionSubmit",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called when user submits a reaction"
+            },
+            {
+              "kind": "field",
+              "name": "onMediationProceed",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Called when user proceeds through mediation"
+            },
+            {
+              "kind": "field",
+              "name": "showMediationDialog",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "mediationReaction",
+              "type": {
+                "text": "(EmotionalReactionType & string) | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "mediationConfig",
+              "type": {
+                "text": "MediatedReaction | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "permittedReactions",
+              "type": {
+                "text": "EmotionalReactionType[]"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "mediatedMap",
+              "type": {
+                "text": "Map<EmotionalReactionType, MediatedReaction>"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "getCount",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "number"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "type",
+                  "type": {
+                    "text": "EmotionalReactionType"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "isUserReaction",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "boolean"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "type",
+                  "type": {
+                    "text": "EmotionalReactionType"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "renderMediationDialog",
+              "privacy": "private"
+            },
+            {
+              "kind": "method",
+              "name": "handleReactionClick",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "type",
+                  "type": {
+                    "text": "EmotionalReactionType"
+                  }
+                },
+                {
+                  "name": "mediated",
+                  "type": {
+                    "text": "boolean"
+                  }
+                },
+                {
+                  "name": "mediationConfig",
+                  "type": {
+                    "text": "MediatedReaction | undefined"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "onMediationResponse",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "proceed",
+                  "type": {
+                    "text": "boolean"
+                  }
+                },
+                {
+                  "name": "alt",
+                  "optional": true,
+                  "type": {
+                    "text": "EmotionalReactionType"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "closeMediationDialog",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "submitReaction",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "type",
+                  "type": {
+                    "text": "EmotionalReactionType"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE",
+              "inheritedFrom": {
+                "name": "CapabilityAwareElement",
+                "module": "src/capability/mixin.ts"
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "reaction-remove",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { type: EmotionalReactionType, entityId: string } } when reaction toggled off"
+            },
+            {
+              "name": "mediation-proceed",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: MediationProceedEvent } when mediation dialog is resolved"
+            },
+            {
+              "name": "reaction-submit",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: ReactionSubmitEvent } when a reaction is selected"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "entityType",
+              "type": {
+                "text": "string"
+              },
+              "default": "'content'",
+              "description": "Entity type for governance signals (e.g. 'content', 'proposal')",
+              "fieldName": "entityType"
+            },
+            {
+              "name": "entityId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Entity ID",
+              "fieldName": "entityId"
+            },
+            {
+              "name": "compact",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Compact mode (icons only, no labels)",
+              "fieldName": "compact"
+            },
+            {
+              "name": "showCounts",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "true",
+              "description": "Show reaction counts",
+              "fieldName": "showCounts"
+            }
+          ],
+          "mixins": [
+            {
+              "name": "CapabilityAwareElement",
+              "module": "/src/capability/index.js"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-reaction-bar",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimReactionBar",
+          "declaration": {
+            "name": "ElohimReactionBar",
+            "module": "src/elohim-reaction-bar.ts"
           }
         }
       ]
@@ -1859,6 +4967,310 @@
         },
         {
           "kind": "js",
+          "name": "ElohimEprRelationshipsPanel",
+          "declaration": {
+            "name": "ElohimEprRelationshipsPanel",
+            "module": "./elohim-epr-relationships-panel.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprRelationship",
+          "declaration": {
+            "name": "EprRelationship",
+            "module": "./elohim-epr-relationships-panel.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimReactionBar",
+          "declaration": {
+            "name": "ElohimReactionBar",
+            "module": "./elohim-reaction-bar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EmotionalReactionType",
+          "declaration": {
+            "name": "EmotionalReactionType",
+            "module": "./elohim-reaction-bar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ReactionConstraints",
+          "declaration": {
+            "name": "ReactionConstraints",
+            "module": "./elohim-reaction-bar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "MediatedReaction",
+          "declaration": {
+            "name": "MediatedReaction",
+            "module": "./elohim-reaction-bar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ReactionCount",
+          "declaration": {
+            "name": "ReactionCount",
+            "module": "./elohim-reaction-bar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ReactionSubmitEvent",
+          "declaration": {
+            "name": "ReactionSubmitEvent",
+            "module": "./elohim-reaction-bar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "MediationProceedEvent",
+          "declaration": {
+            "name": "MediationProceedEvent",
+            "module": "./elohim-reaction-bar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimGraduatedFeedback",
+          "declaration": {
+            "name": "ElohimGraduatedFeedback",
+            "module": "./elohim-graduated-feedback.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "FeedbackContext",
+          "declaration": {
+            "name": "FeedbackContext",
+            "module": "./elohim-graduated-feedback.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ScalePosition",
+          "declaration": {
+            "name": "ScalePosition",
+            "module": "./elohim-graduated-feedback.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ScaleDefinition",
+          "declaration": {
+            "name": "ScaleDefinition",
+            "module": "./elohim-graduated-feedback.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "GraduatedFeedbackInput",
+          "declaration": {
+            "name": "GraduatedFeedbackInput",
+            "module": "./elohim-graduated-feedback.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "FeedbackDistribution",
+          "declaration": {
+            "name": "FeedbackDistribution",
+            "module": "./elohim-graduated-feedback.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimFeedbackMechanismGateway",
+          "declaration": {
+            "name": "ElohimFeedbackMechanismGateway",
+            "module": "./elohim-feedback-mechanism-gateway.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "FeedbackMechanismLevel",
+          "declaration": {
+            "name": "FeedbackMechanismLevel",
+            "module": "./elohim-feedback-mechanism-gateway.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "FeedbackRenderTarget",
+          "declaration": {
+            "name": "FeedbackRenderTarget",
+            "module": "./elohim-feedback-mechanism-gateway.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "MechanismSelection",
+          "declaration": {
+            "name": "MechanismSelection",
+            "module": "./elohim-feedback-mechanism-gateway.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "AccumulationStatus",
+          "declaration": {
+            "name": "AccumulationStatus",
+            "module": "./elohim-feedback-mechanism-gateway.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "GatewayLoadResult",
+          "declaration": {
+            "name": "GatewayLoadResult",
+            "module": "./elohim-feedback-mechanism-gateway.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimGateFeedbackTrigger",
+          "declaration": {
+            "name": "ElohimGateFeedbackTrigger",
+            "module": "./elohim-gate-feedback-trigger.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "GateFeedbackType",
+          "declaration": {
+            "name": "GateFeedbackType",
+            "module": "./elohim-gate-feedback-trigger.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "GateFeedbackMenuItem",
+          "declaration": {
+            "name": "GateFeedbackMenuItem",
+            "module": "./elohim-gate-feedback-trigger.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "GateFeedbackPostedEvent",
+          "declaration": {
+            "name": "GateFeedbackPostedEvent",
+            "module": "./elohim-gate-feedback-trigger.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimNavigator",
+          "declaration": {
+            "name": "ElohimNavigator",
+            "module": "./elohim-navigator.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimContextApp",
+          "declaration": {
+            "name": "ElohimContextApp",
+            "module": "./elohim-navigator.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimContextAppConfig",
+          "declaration": {
+            "name": "ElohimContextAppConfig",
+            "module": "./elohim-navigator.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimNavigatorSession",
+          "declaration": {
+            "name": "ElohimNavigatorSession",
+            "module": "./elohim-navigator.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimNavigatorBannerItem",
+          "declaration": {
+            "name": "ElohimNavigatorBannerItem",
+            "module": "./elohim-navigator.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimContentAnalytics",
+          "declaration": {
+            "name": "ElohimContentAnalytics",
+            "module": "./elohim-content-analytics.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ContentAnalyticsMetrics",
+          "declaration": {
+            "name": "ContentAnalyticsMetrics",
+            "module": "./elohim-content-analytics.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ContentAnalyticsLoader",
+          "declaration": {
+            "name": "ContentAnalyticsLoader",
+            "module": "./elohim-content-analytics.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimEprPopover",
+          "declaration": {
+            "name": "ElohimEprPopover",
+            "module": "./elohim-epr-popover.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprHead",
+          "declaration": {
+            "name": "EprHead",
+            "module": "./elohim-epr-popover.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprLamadContext",
+          "declaration": {
+            "name": "EprLamadContext",
+            "module": "./elohim-epr-popover.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprShefaContext",
+          "declaration": {
+            "name": "EprShefaContext",
+            "module": "./elohim-epr-popover.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprQahalContext",
+          "declaration": {
+            "name": "EprQahalContext",
+            "module": "./elohim-epr-popover.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "*",
           "declaration": {
             "name": "*",
@@ -2015,14 +5427,72 @@
             "name": "ElohimEprLink",
             "module": "/src/elohim-epr-link.js"
           }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-epr-relationships-panel",
+          "declaration": {
+            "name": "ElohimEprRelationshipsPanel",
+            "module": "/src/elohim-epr-relationships-panel.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-reaction-bar",
+          "declaration": {
+            "name": "ElohimReactionBar",
+            "module": "/src/elohim-reaction-bar.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-graduated-feedback",
+          "declaration": {
+            "name": "ElohimGraduatedFeedback",
+            "module": "/src/elohim-graduated-feedback.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-feedback-mechanism-gateway",
+          "declaration": {
+            "name": "ElohimFeedbackMechanismGateway",
+            "module": "/src/elohim-feedback-mechanism-gateway.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-gate-feedback-trigger",
+          "declaration": {
+            "name": "ElohimGateFeedbackTrigger",
+            "module": "/src/elohim-gate-feedback-trigger.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-navigator",
+          "declaration": {
+            "name": "ElohimNavigator",
+            "module": "/src/elohim-navigator.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-content-analytics",
+          "declaration": {
+            "name": "ElohimContentAnalytics",
+            "module": "/src/elohim-content-analytics.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-epr-popover",
+          "declaration": {
+            "name": "ElohimEprPopover",
+            "module": "/src/elohim-epr-popover.js"
+          }
         }
       ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/contracts/omnibar.contract.ts",
-      "declarations": [],
-      "exports": []
     },
     {
       "kind": "javascript-module",
@@ -2302,6 +5772,12 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/contracts/omnibar.contract.ts",
+      "declarations": [],
+      "exports": []
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/localize/runtime.ts",
       "declarations": [
         {
@@ -2377,6 +5853,203 @@
           "declaration": {
             "name": "smokeGreeting",
             "module": "src/localize/source-locale.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/session/session.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Session",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "isAuthenticated",
+              "type": {
+                "text": "boolean"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "refreshFromCookies",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to session changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "readCookie",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string | null"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "name",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "shallowEquals",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "boolean"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                },
+                {
+                  "name": "b",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Session",
+          "declaration": {
+            "name": "Session",
+            "module": "src/session/session.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
           }
         }
       ]
@@ -2669,203 +6342,6 @@
           "declaration": {
             "name": "measureLuminanceChanges",
             "module": "src/testing/ua-prefs.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Loader",
-          "members": [
-            {
-              "kind": "field",
-              "name": "verifyCid",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "resolve",
-              "return": {
-                "type": {
-                  "text": "Promise<LoaderResolution>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                },
-                {
-                  "name": "bytes",
-                  "type": {
-                    "text": "Uint8Array"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Loader",
-          "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/session/session.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Session",
-          "members": [
-            {
-              "kind": "field",
-              "name": "_currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "privacy": "private",
-              "default": "null"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "isAuthenticated",
-              "type": {
-                "text": "boolean"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "refreshFromCookies",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to session changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "readCookie",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "string | null"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "name",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "shallowEquals",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "boolean"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "a",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                },
-                {
-                  "name": "b",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Session",
-          "declaration": {
-            "name": "Session",
-            "module": "src/session/session.ts"
           }
         }
       ]
