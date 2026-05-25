@@ -1,7 +1,7 @@
 ---
 title: Records Lifecycle — Wiring the EPR / Event / Resource Substrate
 tier: architecture
-status: Draft (in-flight; Part A.1 + Part B.1 reviewed, remainder stubbed)
+status: Draft (Parts A + B + D content-complete; Part C deferred to dev-sprint measurement; Part E migration-plan stubbed; awaiting Wave 2 application-archetype full-drafts)
 created: 2026-05-24
 authors: Matthew Dowell + Opus 4.7
 pillar coupling: elohim (substrate primitive), shefa (the canonical application), lamad (Resource state for content), imagodei (custody anchors), mishpat (governance of demotion/dissolution/forget)
@@ -56,7 +56,7 @@ defers:
 
 ## Status
 
-**Draft, in-flight.** Part A.1 (EPR primitive walkthrough) and Part B.1 (Monarch/Mint personal-finance worked example) are reviewed and approved as the section templates. Remaining primitives (A.2–A.8), remaining applications (B.2–B.6), the composability stress-test (Part C), the substrate wiring (Part D), and the migration plan (Part E) are stubbed with section headers + brief notes. Each subsequent drafting pass extends from this scaffold.
+**Draft, content-complete on Parts A + B + D.** Part A primitives (A.1 EPR exemplar + A.2-A.8 walkthroughs landed via Phase 1 parallel-agent dispatch with structured concerns reports) are fully drafted. Part B application archetypes refactored to per-file `applications/` directory (Mint/Monarch full draft; Khan-Academy / Google Drive / Google Photos / Meta-Facebook / Patreon / Requests-and-Offers / AWS-Compute composition drafts pending Wave 2 full-draft dispatch — now safe to dispatch since Wave A vocabulary-drift gaps have closed). Part D substrate wiring (20 subsections D.1-D.20 across Waves A-E) is content-complete; this addresses the gaps identified in the Phase 2 findings synthesis (the original 10-gap list expanded to 21 substrate gaps; D.1 merges Gaps 1+2 so the spec carries 20 subsections). Part C composability stress-test is **deferred** to development-sprint measurement per operator direction — placeholders point to the 10 measurement scenarios the alpha-cluster dev work will populate. Part E migration plan is stubbed; follows from Part D's wave-ordering once implementation work begins.
 
 This spec is **the navigable junction between manifesto and code**. The anchor sections below let any reader walk the graph from vision (epics) → architecture (this spec) → implementation (code) and back, in either direction.
 
@@ -1341,15 +1341,39 @@ A skeptical systems architect should land in `applications/` and find each arche
 
 ---
 
-# Part C — Composability stress-test
+# Part C — Composability Stress-Test
 
-> *Stubbed — full draft pending. **Load-bearing centerpiece.** Walks through what happens when ONE household's elohim-node participates simultaneously in all eight active application archetypes (per Part B): Mint/Monarch personal finance + Khan-Academy learning + Google-Drive document collaboration + Google-Photos media library + Meta/Facebook social graph + Patreon creator monetization + Requests & Offers cooperative commerce + AWS-shape peer compute. Demonstrates per-peer working-set bounds (~150 GB operational with cold archive elsewhere), DHT entry visibility (~100k entries per peer scope), libp2p bandwidth (~100 MB/month aggregate), observation rate (~1k/day local-only). The "households subsume hyperscale datacenters" claim is proven here: every household is its own datacenter for its own working set; the substrate federates queries (not data) when collectives need cross-household views; cold archive is itself peer-distributed in the quilt. The substrate's own use of compute (AI inference, sweettest jobs, graduation evaluators) is the bootstrapping demand for the AWS-shape archetype's supplier side.*
+> *Deferred to development-sprint measurement per operator direction.* The composability stress-test ("what happens when ONE household's elohim-node participates simultaneously in all eight active application archetypes?") is a question whose answer falls out of real measurement, not authored fiction. The scenarios below are placeholders pointing to the dev-work surfaces that will populate Part C with measured numbers from the alpha cluster.
+
+**Stress-test scenarios that will populate Part C (measured during development sprints, not authored here):**
+
+1. **Per-peer working-set footprint at full-stack participation.** One household elohim-node running concurrently: Mint/Monarch personal finance + Khan-Academy learning trajectory + Google-Drive document collaboration + Google-Photos media library + Meta/Facebook social graph + Patreon creator monetization + Requests & Offers cooperative commerce + AWS-shape compute participation. Target measurement: SQL projection size, iroh-blob working set, cold-archive residue. Expected order of magnitude: ~150 GB operational with cold archive elsewhere.
+
+2. **DHT entry visibility per peer scope.** Number of entries the household-peer maintains visibility on under typical reach scoping. Expected: ~100k entries within reach (per the back-of-envelope §1.1 sketch). Measured against real network traffic on the alpha cluster.
+
+3. **Libp2p sync-plane bandwidth profile.** Monthly bandwidth per household across all active application participation. Expected: <200 MB/month aggregate. Measured against alpha-cluster real traffic.
+
+4. **Observation rate at care-economy frequency.** Local-only Observation rate (per the 2026-05-11 observation spec retention model) before graduation thresholds fire. Expected: ~1k/day local. Critical that 99% of observations never touch DHT.
+
+5. **Graduation-evaluator throughput at hub scale.** Per kind_namespace shard (per D.6 D-1a), measure events-per-second throughput. Validates the D.6 architecture decisions.
+
+6. **Standing-curve recompute latency at moderation-active hub.** With D.18 signal_class isolation + D.14 60s staleness SLA, measure recompute time under moderation-heavy load (many quarantine/vouch cycles).
+
+7. **Recurring Commitment fulfillment under thundering-herd.** D.17 stagger discipline validated against 1M-patron first-of-month simulation: verify the BLAKE3-distributed delay actually flattens the receive-side rate to ~278/sec.
+
+8. **Link adjacency query latency under 500+ subordinates.** Per A.8 concern: a household-inventory EPR with 500+ subordinate Resources, render-time query latency for the "my stuff" view. D.1 bifurcated projection (Diesel for one-shot) measured against expected sub-100ms render.
+
+9. **DHT entry budget under sustained social velocity.** D.12 aggregate-subordinate release-valve validated: at 500 signals/user/day across a peer's reach scope, verify DHT entry count stays bounded by the aggregate-subordination cadence.
+
+10. **8B-user back-of-envelope verification.** The §1.1 math (100M households × per-household profile = planet-scale storage with cold tier as the planet-scale layer) validated against measurement projections from alpha-cluster scaling tests.
+
+The development-sprint measurement plan that closes Part C is a follow-up artifact, tracked separately from this spec. When measurement data exists, Part C transitions from placeholders to authored content. *Households subsume hyperscale datacenters* is the claim; the alpha-cluster numbers are the proof.
 
 ---
 
-# Part D — Lifecycle wiring (the ten substrate gaps)
+# Part D — Lifecycle wiring (the twenty substrate gaps)
 
-> *Stubbed — full draft pending. Each gap gets its own subsection with: motivation, design (entry types, link types, fields, coordinator functions, validation rules), manifest declarations, migration story, and test surface. Each subsection names the **specific code surfaces it touches** so the spec→code graph is walkable from any gap.*
+> Each gap has its own subsection with motivation, design (entry types, link types, fields, coordinator functions, validation rules), manifest declarations, migration story, test surface, and **code anchors** specifying the exact files it touches. The spec→code graph is walkable from any gap. **Wave structure (per Phase 2 findings synthesis):** Wave A is the unblocker (D.10 schema-first IoC governance, D.11 substrate-floor validator backfill, D.13 missing view schemas, D.5 observation spec implementation prerequisite); Wave B is substrate primitives (D.1 subordination, D.4 EconomicResource consolidation, D.12 checkpoint primitive); Wave C is lifecycle operations (D.2 surface, D.3 submerge, D.7 dissolution, D.9 reach-mutation); Wave D is patterns + interop (D.6 elohim-authoring, D.8 bridge pattern, D.15 cross-DNA coordination, D.16 multi-oracle confirmation, D.17 Commitment stagger, D.18 signal_class isolation, D.19 EPR-mediated key recovery, D.20 Layered Commons); Wave E is validator + policy (D.14 standing-curve view).
 
 ### D.1 Subordination Architecture (Gaps 1+2: `EprToEvent` / `EprToResource` link types + `parent_epr_cid` field) — Wave B
 
