@@ -20,3 +20,10 @@ export type { LoaderTransport, LoaderResolution, LoaderOptions } from './loader/
 
 export { Session } from './session/session.js';
 export type { CurrentUserView } from './session/session.js';
+
+export type {
+  OmnibarContext,
+  EprRef,
+  CapabilitySnapshot,
+  ReachContext,
+} from './contracts/omnibar.contract.js';
