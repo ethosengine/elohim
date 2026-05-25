@@ -23,7 +23,7 @@ import { map, tap, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
 
-import { LEARNER_BACKEND } from '@app/elohim/interfaces';
+import { LEARNER_BACKEND } from '../interfaces/learner-backend.interface';
 
 import {
   parsePointsByTrigger,

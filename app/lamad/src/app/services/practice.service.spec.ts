@@ -1,7 +1,7 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 
-import { LEARNER_BACKEND } from '@app/elohim/interfaces';
+import { LEARNER_BACKEND } from '../interfaces/learner-backend.interface';
 
 import { PracticeService } from './practice.service';
 

@@ -11,8 +11,7 @@ import { PathContextService } from '../../services/path-context.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SeoService } from '../../shared/services/seo.service';
 import { PathStepView, LearningPath } from '../../models/learning-path.model';
-import { provideElohimClient } from '@app/elohim/providers/elohim-client.provider';
-import { GOVERNANCE, CONTENT_ATTESTATION } from '@app/elohim/interfaces';
+import { provideElohimClient, GOVERNANCE, CONTENT_ATTESTATION } from '@elohim/service';
 import { vi, Mock } from 'vitest';
 
 describe('PathNavigatorComponent', () => {

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { PointsService } from './points.service';
-import { LEARNER_BACKEND } from '@app/elohim/interfaces';
+import { LEARNER_BACKEND } from '../interfaces/learner-backend.interface';
 import { vi } from 'vitest';
 
 describe('PointsService', () => {

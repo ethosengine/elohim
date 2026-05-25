@@ -7,7 +7,7 @@ import { IndexedDBCacheService } from '@app/elohim/services/indexeddb-cache.serv
 import { ProjectionAPIService } from '@app/elohim/services/projection-api.service';
 import { ContentResolverService, SourceTier } from '@app/elohim/services/content-resolver.service';
 import { ContentBackendService } from '@app/elohim/services/content.service';
-import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
+import { ELOHIM_CLIENT } from '@elohim/service';
 import { LearningPath, PathIndex, ContentNode } from '../models';
 import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { of, throwError, BehaviorSubject } from 'rxjs';

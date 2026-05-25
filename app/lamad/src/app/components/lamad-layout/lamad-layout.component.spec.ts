@@ -2,8 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { LamadLayoutComponent } from './lamad-layout.component';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
-import { GOVERNANCE, CONTENT_ATTESTATION } from '@app/elohim/interfaces';
+import { ELOHIM_CLIENT, GOVERNANCE, CONTENT_ATTESTATION } from '@elohim/service';
 import { vi } from 'vitest';
 
 describe('LamadLayoutComponent', () => {

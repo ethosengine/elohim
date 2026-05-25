@@ -6,6 +6,8 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
 import { ELOHIM_ENV } from '@elohim/service';
 import { environment } from '../environments/environment';
+import { LEARNER_BACKEND } from './interfaces/learner-backend.interface';
+import { LearnerBackendApiService } from './services/learner-backend-api.service';
 
 /**
  * Lamad bundle application config.
@@ -37,5 +39,8 @@ export const appConfig: ApplicationConfig = {
         doorwayUrl: environment.client?.doorwayUrl,
       },
     },
+    // LEARNER_BACKEND — concrete provider for the lamad-local learner backend token
+    // (P-disposition: token + interface live in lamad/interfaces/; elohim-app's token retired)
+    { provide: LEARNER_BACKEND, useClass: LearnerBackendApiService },
   ],
 };
