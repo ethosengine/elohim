@@ -631,6 +631,125 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-default-omnibar.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-default-omnibar> — the fallback omnibar used when a bundle doesn't\nBYO its own toolbar. Minimal MVP shape: brand mark + auth indicator.\n\nThe session primitive doesn't poll cookies. On `visibilitychange` the\nelement calls session.refreshFromCookies() so cross-tab auth changes\nare picked up opportunistically on tab re-focus. Callers may also call\nsession.refreshFromCookies() directly after any auth-related event.",
+          "name": "ElohimDefaultOmnibar",
+          "cssProperties": [
+            {
+              "description": "Override background (default: blend of Canvas + currentColor)",
+              "name": "--elohim-omnibar-bg"
+            },
+            {
+              "description": "Override bottom border color",
+              "name": "--elohim-omnibar-border"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The brand mark span",
+              "name": "brand"
+            },
+            {
+              "description": "The user area (name or sign-in link)",
+              "name": "user"
+            },
+            {
+              "description": "The authenticated user's humanId (present only when signed in)",
+              "name": "user-name"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "_session",
+              "privacy": "private",
+              "default": "new Session()"
+            },
+            {
+              "kind": "field",
+              "name": "_user",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_unsub",
+              "type": {
+                "text": "() => void | undefined"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_visibilityHandler",
+              "privacy": "private"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-default-omnibar",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "designed"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimDefaultOmnibar",
+          "declaration": {
+            "name": "ElohimDefaultOmnibar",
+            "module": "src/elohim-default-omnibar.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-mention-base.ts",
       "declarations": [
         {
@@ -790,6 +909,122 @@
           "declaration": {
             "name": "ElohimMentionBase",
             "module": "src/elohim-mention-base.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-page-chrome.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-page-chrome> — the bundle's root wrapper. Provides a slotted\nomnibar contract: bundles that have their own toolbar place it in\nslot=\"omnibar\"; bundles that don't get <elohim-default-omnibar>\nautomatically.",
+          "name": "ElohimPageChrome",
+          "cssProperties": [
+            {
+              "description": "Override sticky z-index of the omnibar host (default: 10)",
+              "name": "--elohim-chrome-omnibar-z"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The sticky container wrapping the active omnibar",
+              "name": "omnibar-host"
+            },
+            {
+              "description": "The scrolling content area",
+              "name": "main"
+            }
+          ],
+          "slots": [
+            {
+              "description": "The omnibar surface; defaults to <elohim-default-omnibar>",
+              "name": "omnibar"
+            },
+            {
+              "description": "Default slot for page content",
+              "name": ""
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "hasSlottedOmnibar",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "method",
+              "name": "_onOmnibarSlotChange",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "e",
+                  "type": {
+                    "text": "Event"
+                  }
+                }
+              ]
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-page-chrome",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimPageChrome",
+          "declaration": {
+            "name": "ElohimPageChrome",
+            "module": "src/elohim-page-chrome.ts"
           }
         }
       ]
@@ -1020,6 +1255,22 @@
         },
         {
           "kind": "js",
+          "name": "ElohimPageChrome",
+          "declaration": {
+            "name": "ElohimPageChrome",
+            "module": "./elohim-page-chrome.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimDefaultOmnibar",
+          "declaration": {
+            "name": "ElohimDefaultOmnibar",
+            "module": "./elohim-default-omnibar.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "*",
           "declaration": {
             "name": "*",
@@ -1143,6 +1394,22 @@
           "declaration": {
             "name": "ElohimMentionBase",
             "module": "/src/elohim-mention-base.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-page-chrome",
+          "declaration": {
+            "name": "ElohimPageChrome",
+            "module": "/src/elohim-page-chrome.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-default-omnibar",
+          "declaration": {
+            "name": "ElohimDefaultOmnibar",
+            "module": "/src/elohim-default-omnibar.js"
           }
         }
       ]
@@ -1512,130 +1779,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/session/session.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Session",
-          "members": [
-            {
-              "kind": "field",
-              "name": "_currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "privacy": "private",
-              "default": "null"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "isAuthenticated",
-              "type": {
-                "text": "boolean"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "refreshFromCookies",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to session changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "readCookie",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "string | null"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "name",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "shallowEquals",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "boolean"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "a",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                },
-                {
-                  "name": "b",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Session",
-          "declaration": {
-            "name": "Session",
-            "module": "src/session/session.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/loader/loader.ts",
       "declarations": [
         {
@@ -1995,6 +2138,130 @@
           "declaration": {
             "name": "measureLuminanceChanges",
             "module": "src/testing/ua-prefs.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/session/session.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Session",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "isAuthenticated",
+              "type": {
+                "text": "boolean"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "refreshFromCookies",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to session changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "readCookie",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string | null"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "name",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "shallowEquals",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "boolean"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                },
+                {
+                  "name": "b",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Session",
+          "declaration": {
+            "name": "Session",
+            "module": "src/session/session.ts"
           }
         }
       ]

@@ -15,6 +15,8 @@ export type {
 
 export { ElohimSkeleton } from './elohim-skeleton.js';
 export { ElohimMentionBase } from './elohim-mention-base.js';
+export { ElohimPageChrome } from './elohim-page-chrome.js';
+export { ElohimDefaultOmnibar } from './elohim-default-omnibar.js';
 
 export * from './capability/index.js';
 

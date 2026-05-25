@@ -2,6 +2,8 @@ import { ElohimButton } from './elohim-button.js';
 import { ElohimComputeTile } from './elohim-compute-tile.js';
 import { ElohimSkeleton } from './elohim-skeleton.js';
 import { ElohimMentionBase } from './elohim-mention-base.js';
+import { ElohimPageChrome } from './elohim-page-chrome.js';
+import { ElohimDefaultOmnibar } from './elohim-default-omnibar.js';
 
 // Registration lives here, not on the ElohimButton class via @customElement,
 // to keep ./index.ts truly side-effect-free. Importing from 'elohim-core'
@@ -32,4 +34,12 @@ if (!customElements.get('elohim-skeleton')) {
 
 if (!customElements.get('elohim-mention-base')) {
   customElements.define('elohim-mention-base', ElohimMentionBase);
+}
+
+if (!customElements.get('elohim-page-chrome')) {
+  customElements.define('elohim-page-chrome', ElohimPageChrome);
+}
+
+if (!customElements.get('elohim-default-omnibar')) {
+  customElements.define('elohim-default-omnibar', ElohimDefaultOmnibar);
 }
