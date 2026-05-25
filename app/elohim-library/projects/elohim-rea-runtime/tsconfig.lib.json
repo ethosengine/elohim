@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../out-tsc/lib",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "inlineSources": true,
+    "types": [],
+    "paths": {
+      "@elohim/storage-client": ["../../../../node_modules/@elohim/storage-client/dist/index"],
+      "@elohim/storage-client/generated": ["../../../../node_modules/@elohim/storage-client/dist/generated/index"],
+      "@elohim/rea-runtime": ["./src/public-api.ts"],
+      "@elohim/rea-runtime/*": ["./src/*"]
+    }
+  },
+  "exclude": [
+    "**/*.spec.ts"
+  ]
+}

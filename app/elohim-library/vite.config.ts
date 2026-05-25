@@ -12,6 +12,7 @@ export default defineConfig({
     include: [
       'src/**/*.spec.ts',
       'projects/elohim-identity/src/**/*.spec.ts',
+      'projects/elohim-rea-runtime/src/**/*.spec.ts',
       'projects/elohim-service/src/resilience/**/*.spec.ts',
       'projects/elohim-service/src/distribution/**/*.spec.ts',
       'projects/graphos/src/**/*.spec.ts',

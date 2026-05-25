@@ -1,0 +1,23 @@
+{
+  "name": "@elohim/rea-runtime",
+  "version": "0.1.0",
+  "description": "Elohim REA runtime — Economic Event services, Commitment action types, signal-bearing primitives per rea-compute-commitment-primitive.md",
+  "sideEffects": false,
+  "peerDependencies": {
+    "@angular/common": "^19.2.0",
+    "@angular/core": "^19.2.0",
+    "rxjs": "^7.8.0"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "keywords": [
+    "elohim",
+    "rea",
+    "economic-events",
+    "valueflows",
+    "hrea"
+  ],
+  "author": "Elohim Protocol",
+  "license": "MIT"
+}
