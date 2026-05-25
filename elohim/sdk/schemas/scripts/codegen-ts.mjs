@@ -32,6 +32,11 @@ const GENERATED_OUTPUT_DIRS = [
   // tab components (e.g. topology-tab.component.ts) re-declare the type
   // shapes inline and drift from the canonical schema. See task #11.
   resolve(REPO_ROOT, 'doorway/doorway-app/src/app/generated'),
+  // Pillar-EPR decomposition (B19, 2026-05-25 merge): lamad split into its
+  // own SPA bundle. The lamad codegen writes content-node-types.ts to
+  // app/lamad/src/app/generated/ with `import '../../generated/content-view'`,
+  // which resolves to app/lamad/src/generated/ — distribute schema types there.
+  resolve(REPO_ROOT, 'app/lamad/src/generated'),
 ];
 
 const ENUM_OUTPUT_PATHS = GENERATED_OUTPUT_DIRS.map((d) => join(d, 'schema-enums.ts'));
