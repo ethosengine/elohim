@@ -50,3 +50,10 @@ export * from './generated';
 
 // GraphQL query documents + response types (viewer.hub, viewer.peers)
 export * from './graphql';
+
+// Protocol wire-format types (Slice 2.5 — migrated from elohim-app pillar)
+export * from './protocol-core.model';
+export * from './zome-wire-types';
+export * from './epr-head.model';
+export * from './source-chain.model';
+export type { IIntegrityAnchor } from './integrity-anchor.interface';
