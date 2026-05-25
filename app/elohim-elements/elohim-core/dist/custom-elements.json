@@ -631,6 +631,271 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-context-menu.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-context-menu> — Google Drive-style fold-down menu.\n\nMVP: flat list of items. Submenu support (View as..., Where this\nleads...) deferred to a fast-follow shift per design spec §7.4.\n\nAccessibility: arrow-key navigation, Enter to select, Escape to close,\nfocus trap while open, ARIA menu role, focus restoration on close.",
+          "name": "ElohimContextMenu",
+          "cssProperties": [
+            {
+              "description": "Override background",
+              "name": "--elohim-menu-bg"
+            },
+            {
+              "description": "Override border color",
+              "name": "--elohim-menu-border"
+            },
+            {
+              "description": "Override border-radius",
+              "name": "--elohim-menu-radius"
+            },
+            {
+              "description": "Override drop shadow",
+              "name": "--elohim-menu-shadow"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The <ul> element",
+              "name": "menu"
+            },
+            {
+              "description": "Each <li> menu item",
+              "name": "item"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "open",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the menu is visible",
+              "attribute": "open",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "items",
+              "type": {
+                "text": "ContextMenuItem[]"
+              },
+              "default": "[]",
+              "description": "The menu items",
+              "attribute": "items"
+            },
+            {
+              "kind": "field",
+              "name": "focusedIndex",
+              "type": {
+                "text": "number"
+              },
+              "privacy": "private",
+              "default": "-1"
+            },
+            {
+              "kind": "field",
+              "name": "menuItems",
+              "type": {
+                "text": "NodeListOf<HTMLElement>"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "previouslyFocused",
+              "type": {
+                "text": "HTMLElement | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "clickOutsideHandler",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "firstEnabledIndex",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "number"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "focusItem",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "i",
+                  "type": {
+                    "text": "number"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "field",
+              "name": "handleKeydown",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "moveFocus",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "delta",
+                  "type": {
+                    "text": "number"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "select",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "item",
+                  "type": {
+                    "text": "ContextMenuItem"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "handleClose",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "item-select",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { id: string } } when an item is selected"
+            },
+            {
+              "name": "close",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "When the menu closes (any reason)"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "open",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the menu is visible",
+              "fieldName": "open"
+            },
+            {
+              "name": "items",
+              "type": {
+                "text": "ContextMenuItem[]"
+              },
+              "default": "[]",
+              "description": "The menu items",
+              "fieldName": "items"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-context-menu",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimContextMenu",
+          "declaration": {
+            "name": "ElohimContextMenu",
+            "module": "src/elohim-context-menu.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-default-omnibar.ts",
       "declarations": [
         {
@@ -1271,6 +1536,22 @@
         },
         {
           "kind": "js",
+          "name": "ElohimContextMenu",
+          "declaration": {
+            "name": "ElohimContextMenu",
+            "module": "./elohim-context-menu.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ContextMenuItem",
+          "declaration": {
+            "name": "ContextMenuItem",
+            "module": "./elohim-context-menu.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "*",
           "declaration": {
             "name": "*",
@@ -1411,8 +1692,22 @@
             "name": "ElohimDefaultOmnibar",
             "module": "/src/elohim-default-omnibar.js"
           }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-context-menu",
+          "declaration": {
+            "name": "ElohimContextMenu",
+            "module": "/src/elohim-context-menu.js"
+          }
         }
       ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/contracts/omnibar.contract.ts",
+      "declarations": [],
+      "exports": []
     },
     {
       "kind": "javascript-module",
@@ -1692,12 +1987,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/contracts/omnibar.contract.ts",
-      "declarations": [],
-      "exports": []
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/localize/runtime.ts",
       "declarations": [
         {
@@ -1779,33 +2068,84 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
+      "path": "src/session/session.ts",
       "declarations": [
         {
           "kind": "class",
           "description": "",
-          "name": "Loader",
+          "name": "Session",
           "members": [
             {
               "kind": "field",
-              "name": "verifyCid",
+              "name": "_currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "isAuthenticated",
               "type": {
                 "text": "boolean"
               },
-              "privacy": "private",
               "readonly": true
             },
             {
               "kind": "method",
-              "name": "resolve",
+              "name": "refreshFromCookies",
               "return": {
                 "type": {
-                  "text": "Promise<LoaderResolution>"
+                  "text": "void"
+                }
+              },
+              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
                 }
               },
               "parameters": [
                 {
-                  "name": "cid",
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to session changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "readCookie",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string | null"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "name",
                   "type": {
                     "text": "string"
                   }
@@ -1814,24 +2154,24 @@
             },
             {
               "kind": "method",
-              "name": "verifyCidMatches",
+              "name": "shallowEquals",
               "privacy": "private",
               "return": {
                 "type": {
-                  "text": "Promise<void>"
+                  "text": "boolean"
                 }
               },
               "parameters": [
                 {
-                  "name": "cid",
+                  "name": "a",
                   "type": {
-                    "text": "string"
+                    "text": "CurrentUserView | null"
                   }
                 },
                 {
-                  "name": "bytes",
+                  "name": "b",
                   "type": {
-                    "text": "Uint8Array"
+                    "text": "CurrentUserView | null"
                   }
                 }
               ]
@@ -1842,10 +2182,10 @@
       "exports": [
         {
           "kind": "js",
-          "name": "Loader",
+          "name": "Session",
           "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
+            "name": "Session",
+            "module": "src/session/session.ts"
           }
         }
       ]
@@ -2144,84 +2484,33 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/session/session.ts",
+      "path": "src/loader/loader.ts",
       "declarations": [
         {
           "kind": "class",
           "description": "",
-          "name": "Session",
+          "name": "Loader",
           "members": [
             {
               "kind": "field",
-              "name": "_currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "privacy": "private",
-              "default": "null"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "isAuthenticated",
+              "name": "verifyCid",
               "type": {
                 "text": "boolean"
               },
+              "privacy": "private",
               "readonly": true
             },
             {
               "kind": "method",
-              "name": "refreshFromCookies",
+              "name": "resolve",
               "return": {
                 "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
+                  "text": "Promise<LoaderResolution>"
                 }
               },
               "parameters": [
                 {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to session changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "readCookie",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "string | null"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "name",
+                  "name": "cid",
                   "type": {
                     "text": "string"
                   }
@@ -2230,24 +2519,24 @@
             },
             {
               "kind": "method",
-              "name": "shallowEquals",
+              "name": "verifyCidMatches",
               "privacy": "private",
               "return": {
                 "type": {
-                  "text": "boolean"
+                  "text": "Promise<void>"
                 }
               },
               "parameters": [
                 {
-                  "name": "a",
+                  "name": "cid",
                   "type": {
-                    "text": "CurrentUserView | null"
+                    "text": "string"
                   }
                 },
                 {
-                  "name": "b",
+                  "name": "bytes",
                   "type": {
-                    "text": "CurrentUserView | null"
+                    "text": "Uint8Array"
                   }
                 }
               ]
@@ -2258,10 +2547,10 @@
       "exports": [
         {
           "kind": "js",
-          "name": "Session",
+          "name": "Loader",
           "declaration": {
-            "name": "Session",
-            "module": "src/session/session.ts"
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
           }
         }
       ]

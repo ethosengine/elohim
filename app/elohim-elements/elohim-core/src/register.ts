@@ -4,6 +4,7 @@ import { ElohimSkeleton } from './elohim-skeleton.js';
 import { ElohimMentionBase } from './elohim-mention-base.js';
 import { ElohimPageChrome } from './elohim-page-chrome.js';
 import { ElohimDefaultOmnibar } from './elohim-default-omnibar.js';
+import { ElohimContextMenu } from './elohim-context-menu.js';
 
 // Registration lives here, not on the ElohimButton class via @customElement,
 // to keep ./index.ts truly side-effect-free. Importing from 'elohim-core'
@@ -42,4 +43,8 @@ if (!customElements.get('elohim-page-chrome')) {
 
 if (!customElements.get('elohim-default-omnibar')) {
   customElements.define('elohim-default-omnibar', ElohimDefaultOmnibar);
+}
+
+if (!customElements.get('elohim-context-menu')) {
+  customElements.define('elohim-context-menu', ElohimContextMenu);
 }
