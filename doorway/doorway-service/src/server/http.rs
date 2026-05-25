@@ -1254,7 +1254,7 @@ async fn dispatch_to_projected_epr(
                         builder = builder.header("cache-control", cc);
                     }
                     builder
-                        .body(Full::new(Bytes::from(body_bytes)))
+                        .body(Full::new(body_bytes))
                         .expect("infallible EPR proxy response")
                 }
                 Err(e) => {
