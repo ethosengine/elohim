@@ -46,3 +46,9 @@ import { ElohimImagodeiPortalShell } from './elohim-imagodei-portal-shell.js';
 if (!customElements.get('elohim-imagodei-portal-shell')) {
   customElements.define('elohim-imagodei-portal-shell', ElohimImagodeiPortalShell);
 }
+
+import { ElohimImagodeiFederatedResolver } from './elohim-imagodei-federated-resolver.js';
+
+if (!customElements.get('elohim-imagodei-federated-resolver')) {
+  customElements.define('elohim-imagodei-federated-resolver', ElohimImagodeiFederatedResolver);
+}

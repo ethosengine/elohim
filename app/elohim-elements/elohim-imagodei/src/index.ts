@@ -33,3 +33,9 @@ export type { AttestorRef } from './elohim-imagodei-attestor-row.js';
 
 export { ElohimImagodeiPortalShell } from './elohim-imagodei-portal-shell.js';
 export type { PortalStep, AuthorityResolution } from './elohim-imagodei-portal-shell.js';
+
+export { ElohimImagodeiFederatedResolver } from './elohim-imagodei-federated-resolver.js';
+export type {
+  FederatedResolveOutcome,
+  ResolveIdentifierFn,
+} from './elohim-imagodei-federated-resolver.js';
