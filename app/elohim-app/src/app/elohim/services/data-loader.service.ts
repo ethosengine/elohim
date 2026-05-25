@@ -46,7 +46,7 @@ import { GOVERNANCE } from '../interfaces/governance.interface';
 import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
 
 import { ContentResolverService } from './content-resolver.service';
-import { ContentService } from './content.service';
+import { ContentBackendService } from './content.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
@@ -246,7 +246,7 @@ export class DataLoaderService {
   private readonly contentResolver = inject(ContentResolverService);
 
   /** Content Service for doorway-based content operations (new pattern) */
-  private readonly contentService = inject(ContentService);
+  private readonly contentService = inject(ContentBackendService);
 
   /** Structured logger */
   private readonly logger = inject(LoggerService).createChild('DataLoader');

@@ -6,7 +6,7 @@ import { CONTENT_ATTESTATION } from '@app/elohim/interfaces/content-attestation.
 import { IndexedDBCacheService } from '@app/elohim/services/indexeddb-cache.service';
 import { ProjectionAPIService } from '@app/elohim/services/projection-api.service';
 import { ContentResolverService, SourceTier } from '@app/elohim/services/content-resolver.service';
-import { ContentService } from '@app/elohim/services/content.service';
+import { ContentBackendService } from '@app/elohim/services/content.service';
 import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
 import { LearningPath, PathIndex, ContentNode } from '../models';
 import { AgentProgress } from '@app/elohim/models/agent.model';
@@ -173,7 +173,7 @@ describe('DataLoaderService', () => {
         { provide: IndexedDBCacheService, useValue: mockIndexedDBCache },
         { provide: ProjectionAPIService, useValue: mockProjectionApi },
         { provide: ContentResolverService, useValue: mockContentResolver },
-        { provide: ContentService, useValue: mockContentService },
+        { provide: ContentBackendService, useValue: mockContentService },
         { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
       ],
     });

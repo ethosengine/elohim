@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { of, throwError } from 'rxjs';
 
-import { ContentService } from '@app/elohim/services/content.service';
+import { ContentBackendService } from '@app/elohim/services/content.service';
 
 import type { ContentNode } from '@app/lamad/models/content-node.model';
 
@@ -111,7 +111,7 @@ describe('InstrumentLoaderService', () => {
     TestBed.configureTestingModule({
       providers: [
         InstrumentLoaderService,
-        { provide: ContentService, useValue: contentServiceSpy },
+        { provide: ContentBackendService, useValue: contentServiceSpy },
       ],
     });
 

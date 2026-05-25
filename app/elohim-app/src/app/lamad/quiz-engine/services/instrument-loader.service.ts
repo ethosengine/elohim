@@ -14,7 +14,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
 
-import { ContentService } from '@app/elohim/services/content.service';
+import { ContentBackendService } from '@app/elohim/services/content.service';
 
 import {
   registerFromDefinition,
@@ -30,7 +30,7 @@ import type { ContentNode } from '@app/lamad/models/content-node.model';
 
 @Injectable({ providedIn: 'root' })
 export class InstrumentLoaderService {
-  private readonly contentService = inject(ContentService);
+  private readonly contentService = inject(ContentBackendService);
 
   private readonly loadingSignal = signal(false);
   private readonly loadedSignal = signal(false);

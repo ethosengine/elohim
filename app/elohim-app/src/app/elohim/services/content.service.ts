@@ -290,7 +290,7 @@ interface RawPathExtensionData {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ContentService {
+export class ContentBackendService {
   private readonly client: ElohimClient = inject(ELOHIM_CLIENT);
   private readonly storageClient = inject(StorageClientService);
   private readonly blobFetcher: IBlobFetcher = inject(BLOB_FETCHER);

@@ -2,7 +2,7 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 
-import { ContentService, ContentFilters, PathFilters } from './content.service';
+import { ContentBackendService, ContentFilters, PathFilters } from './content.service';
 import { StorageClientService } from './storage-client.service';
 import { HeliaFetchService } from './helia-fetch.service';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
@@ -16,8 +16,8 @@ import { provideHttpClient } from '@angular/common/http';
  *
  * Tests content fetching, blob resolution, caching, and query operations.
  */
-describe('ContentService', () => {
-  let service: ContentService;
+describe('ContentBackendService', () => {
+  let service: ContentBackendService;
   let httpMock: HttpTestingController;
   let mockClient: any;
   let mockStorageClient: any;
@@ -82,14 +82,14 @@ describe('ContentService', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        ContentService,
+        ContentBackendService,
         { provide: ELOHIM_CLIENT, useValue: mockClient },
         { provide: StorageClientService, useValue: mockStorageClient },
         { provide: HeliaFetchService, useValue: mockHeliaFetch },
       ],
     });
 
-    service = TestBed.inject(ContentService);
+    service = TestBed.inject(ContentBackendService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 

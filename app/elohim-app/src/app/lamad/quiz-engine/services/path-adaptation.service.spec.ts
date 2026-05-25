@@ -6,7 +6,7 @@ import { PathAdaptationService } from './path-adaptation.service';
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';
 import { StreakTrackerService } from './streak-tracker.service';
-import { ContentService } from '@app/elohim/services/content.service';
+import { ContentBackendService } from '@app/elohim/services/content.service';
 import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
 import type { QuizResult, ContentScore } from '../models/quiz-session.model';
 import { vi } from 'vitest';
@@ -126,7 +126,7 @@ describe('PathAdaptationService (story-first)', () => {
         { provide: QuestionPoolService, useValue: poolSpy },
         { provide: StreakTrackerService, useValue: streakSpy },
         { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
-        { provide: ContentService, useValue: contentServiceSpy },
+        { provide: ContentBackendService, useValue: contentServiceSpy },
       ],
     });
     service = TestBed.inject(PathAdaptationService);

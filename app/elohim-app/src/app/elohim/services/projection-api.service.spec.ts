@@ -1,7 +1,7 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
-import { ContentService } from './content.service';
+import { ContentBackendService } from './content.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { StorageClientService } from './storage-client.service';
 import { ContentNode, ContentType } from '../../lamad/models/content-node.model';
@@ -107,7 +107,7 @@ describe('ProjectionAPIService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         ProjectionAPIService,
-        { provide: ContentService, useValue: mockContentService },
+        { provide: ContentBackendService, useValue: mockContentService },
         { provide: StorageClientService, useValue: mockStorageClient },
       ],
     });

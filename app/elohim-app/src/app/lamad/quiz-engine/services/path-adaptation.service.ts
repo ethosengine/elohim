@@ -4,7 +4,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { BehaviorSubject, Observable, map } from 'rxjs';
 
-import { ContentService } from '@app/elohim/services/content.service';
+import { ContentBackendService } from '@app/elohim/services/content.service';
 
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';
@@ -229,7 +229,7 @@ export class PathAdaptationService {
   private readonly cooldownService = inject(AttemptCooldownService);
   private readonly poolService = inject(QuestionPoolService);
   private readonly streakService = inject(StreakTrackerService);
-  private readonly contentService = inject(ContentService);
+  private readonly contentService = inject(ContentBackendService);
 
   /** Cached adaptation states by path:human key */
   private readonly states = new Map<string, PathAdaptationState>();
