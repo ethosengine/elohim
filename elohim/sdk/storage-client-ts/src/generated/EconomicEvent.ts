@@ -16,4 +16,12 @@ at_location: string | null,
  * atomically with the corresponding `epr_atoms.verified_at` clear. Satisfies
  * invariants I4 (revocation propagation) and I5 (verified-state consistency).
  */
-verified_at: string | null, };
+verified_at: string | null, 
+/**
+ * CID of the Collab-Qahal scope under which this event was authored.
+ *
+ * When set, downstream queries can correlate this event (and any Settlement
+ * events it spawned) with their source Collab.  Settlement events carry the
+ * Collab CID in their `metadata_json` extensions block.
+ */
+scope_collab_cid: string | null, };

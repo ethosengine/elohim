@@ -8,12 +8,14 @@ import type { StewardDirectEndpoint } from "./StewardDirectEndpoint";
  *
  * Represents a pillar EPR's projection at a specific doorway: the URL path it
  * serves from, the caching mode, gate hints for the access layer, and the
- * steward-direct endpoint fallback. Seeded via CustodianCommitment on the
- * elohim DNA.
+ * steward-direct endpoint fallback. Seeded via REA Commitment with
+ * `action="project-epr"` on the elohim DNA.
  *
- * Source of truth: Holochain DHT (CustodianCommitment entry type on elohim DNA
- * content_store zome). This table is a read-optimized projection.
- * Category A — notarized commitment; dht_anchor_hash links back to DHT.
+ * Source of truth: Holochain DHT (`Commitment` entry type on elohim DNA
+ * `content_store_integrity` zome, action discriminator `"project-epr"` — see
+ * `REA_ACTIONS` in the integrity zome). The `rea_commitments` SQLite table is
+ * a read-optimized projection. Category A — notarized commitment;
+ * `dht_anchor_hash` links back to DHT.
  */
 export type EprProjectionView = { 
 /**
