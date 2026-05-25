@@ -40,7 +40,7 @@ export type {
   PoolRecommendations,
   PoolSource,
   MasteryChallengeState,
-} from '@app/elohim/models/zome-wire-types';
+} from '@elohim/storage-client';
 
 export {
   PoolSources,
@@ -53,4 +53,4 @@ export {
   getActiveContentIds,
   getRefreshQueueIds,
   getDiscoveryCandidates,
-} from '@app/elohim/models/zome-wire-types';
+} from '@elohim/storage-client';

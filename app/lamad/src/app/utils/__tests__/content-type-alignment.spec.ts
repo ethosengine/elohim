@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { CONTENT_TYPES, CONTENT_FORMATS, CORE_CONTENT_TYPES } from '@app/generated/schema-enums';
+import { CONTENT_TYPES, CONTENT_FORMATS, CORE_CONTENT_TYPES } from '../../../generated/schema-enums';
 import { ALL_CONTENT_TYPES, ALL_CONTENT_FORMATS } from '@app/lamad/models/content-node.model';
 import { CONTENT_TYPE_FOLDERS } from '@app/shefa/services/resource-explorer.service';
 

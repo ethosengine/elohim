@@ -6,7 +6,7 @@ import { BehaviorSubject, Observable, Subject, catchError, map, from, of } from 
 
 import { LEARNER_BACKEND } from '@app/elohim/interfaces';
 import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
-import { MasteryRecordContent, SourceChainEntry } from '@app/elohim/models/source-chain.model';
+import { MasteryRecordContent, SourceChainEntry } from '@elohim/storage-client';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';

@@ -17,7 +17,7 @@ import { Injectable, signal, computed } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
-import { type ReachLevel, reachEncompasses } from '@app/elohim/models/protocol-core.model';
+import { type ReachLevel, reachEncompasses } from '@elohim/storage-client';
 import { type Attestation } from '@app/imagodei/models/attestations.model';
 import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 

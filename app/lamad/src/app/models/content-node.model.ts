@@ -28,17 +28,17 @@
  */
 
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
-import { type ReachLevel, type GeographicContext } from '@app/elohim/models/protocol-core.model';
+import { type ReachLevel, type GeographicContext } from '@elohim/storage-client';
 import {
   CONTENT_TYPES as WIRE_CONTENT_TYPES,
   CONTENT_FORMATS as WIRE_CONTENT_FORMATS,
   type ContentType as WireContentType,
   type ContentFormat as WireContentFormat,
-} from '@app/generated/schema-enums';
+} from '../../generated/schema-enums';
 
 import type { ContentBlob, ContentSteward } from './content-extensions.model';
 import type { LamadContentType } from '../generated/manifest-types';
-import type { DistributionSummary } from '@app/generated/distribution-summary';
+import type { DistributionSummary } from '../../generated/distribution-summary';
 
 // Re-export blob/stewardship types (moved to content-extensions.model.ts)
 export type {
@@ -59,7 +59,7 @@ export type { TypedContentNode } from '../generated/content-node-types';
 export { isConceptNode, isAssessmentNode, isPathNode } from '../generated/content-node-types';
 
 // Re-export GeographicContext for backward compatibility
-export type { GeographicContext } from '@app/elohim/models/protocol-core.model';
+export type { GeographicContext } from '@elohim/storage-client';
 
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
@@ -777,4 +777,4 @@ export interface CreateRelationshipInput {
   metadataJson?: string;
 }
 
-export { type DistributionSummary } from '@app/generated/distribution-summary';
+export { type DistributionSummary } from '../../generated/distribution-summary';

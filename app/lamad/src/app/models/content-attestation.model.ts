@@ -21,7 +21,7 @@
  * - Revocation: creates new entry with revoked status, doesn't delete
  */
 
-import { REACH_LEVEL_VALUES } from '@app/elohim/models/protocol-core.model';
+import { REACH_LEVEL_VALUES } from '@elohim/storage-client';
 
 // @coverage: 100.0% (2026-02-24)
 

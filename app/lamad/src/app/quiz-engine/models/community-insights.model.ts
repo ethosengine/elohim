@@ -6,7 +6,7 @@
  * small cohorts (< 30 responses).
  */
 
-import { type ReachLevel } from '@app/elohim/models/protocol-core.model';
+import { type ReachLevel } from '@elohim/storage-client';
 import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
 // ─────────────────────────────────────────────────────────────────────────────

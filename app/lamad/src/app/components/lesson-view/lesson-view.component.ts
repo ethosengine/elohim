@@ -38,7 +38,7 @@ import {
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 
-import type { EprHead, EprRelationship } from '@app/elohim/models/epr-head.model';
+import type { EprHead, EprRelationship } from '@elohim/storage-client';
 // TODO: Quiz engine requires Perseus/React dependencies - enable when ready
 // import { InlineQuizComponent, InlineQuizCompletionEvent } from '../../quiz-engine';
 

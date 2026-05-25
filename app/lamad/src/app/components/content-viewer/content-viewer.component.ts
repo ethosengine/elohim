@@ -80,9 +80,9 @@ import { StewardshipAllocationService } from '../../services/stewardship-allocat
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 
-import type { HouseholdResilienceView } from '@app/generated/household-resilience-view';
-import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
-import type { EprRelationship } from '@app/elohim/models/epr-head.model';
+import type { HouseholdResilienceView } from '../../../generated/household-resilience-view';
+import type { ResilienceSnapshotView } from '../../../generated/resilience-snapshot-view';
+import type { EprRelationship } from '@elohim/storage-client';
 import type { ContentStewardshipView } from '@elohim/storage-client/generated';
 
 @Component({

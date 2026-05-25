@@ -69,6 +69,7 @@ const INTERFACE_FILES = [
   { src: 'views/elohim-reputation-profile-view.ts', dest: 'elohim-reputation-profile-view.ts' },
   { src: 'views/node-shape-view.ts', dest: 'node-shape-view.ts' },
   { src: 'views/household-devices-view.ts', dest: 'household-devices-view.ts' },
+  { src: 'views/household-resilience-view.ts', dest: 'household-resilience-view.ts' },
   { src: 'views/network-posture-view.ts', dest: 'network-posture-view.ts' },
   { src: 'views/placement-gap-view.ts', dest: 'placement-gap-view.ts' },
   { src: 'views/resilience-snapshot-view.ts', dest: 'resilience-snapshot-view.ts' },

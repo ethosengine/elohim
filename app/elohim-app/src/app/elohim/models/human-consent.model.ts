@@ -30,7 +30,7 @@ import {
   IntimacyLevel,
   ConsentState,
   type ConsentStateChange as BaseConsentStateChange,
-} from '@app/elohim/models/protocol-core.model';
+} from '@elohim/storage-client';
 
 // @coverage: 66.7% (2026-02-24)
 
@@ -272,4 +272,4 @@ export {
   type IntimacyLevel,
   isConsentActive,
   type ConsentState,
-} from '@app/elohim/models/protocol-core.model';
+} from '@elohim/storage-client';

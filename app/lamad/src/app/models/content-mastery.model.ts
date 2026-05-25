@@ -15,7 +15,7 @@
  */
 
 import type { MasteryLevel } from '@app/elohim/models/agent.model';
-import type { ContentMasteryWire } from '@app/elohim/models/zome-wire-types';
+import type { ContentMasteryWire } from '@elohim/storage-client';
 
 // @coverage: 30.0% (2026-02-24)
 
@@ -333,7 +333,7 @@ export type {
   MasterySnapshot,
   PathMasteryOverview,
   MasteryStatsWire,
-} from '@app/elohim/models/zome-wire-types';
+} from '@elohim/storage-client';
 
 /** Input for querying mastery */
 export interface QueryMasteryInput {

@@ -6,7 +6,7 @@ import { map, switchMap, shareReplay, catchError } from 'rxjs/operators';
 
 import { Observable, forkJoin, of } from 'rxjs';
 
-import { type ReachLevel } from '@app/elohim/models/protocol-core.model';
+import { type ReachLevel } from '@elohim/storage-client';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
 import { ContentNode, ContentMetadata } from '../models/content-node.model';

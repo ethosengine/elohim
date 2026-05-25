@@ -19,7 +19,7 @@
  * - Are private by default (user controls visibility)
  */
 
-import { type ReachLevel } from '@app/elohim/models/protocol-core.model';
+import { type ReachLevel } from '@elohim/storage-client';
 import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
 import { getDisplayConfigByFramework } from '../instruments/instrument-registry';

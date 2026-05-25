@@ -21,7 +21,7 @@
  */
 
 import type { AgentRef } from '@app/elohim/models/coordination-envelope.model';
-import type { ReachLevel } from '@app/elohim/models/protocol-core.model';
+import type { ReachLevel } from '@elohim/storage-client';
 
 // =============================================================================
 // Core Profile

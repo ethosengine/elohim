@@ -42,9 +42,9 @@ export type {
   LamadContributorDashboardWire,
   EarnLamadPointsInput,
   EarnLamadPointsResult,
-} from '@app/elohim/models/zome-wire-types';
+} from '@elohim/storage-client';
 
-export { parsePointsByTrigger, parseImpactByContent } from '@app/elohim/models/zome-wire-types';
+export { parsePointsByTrigger, parseImpactByContent } from '@elohim/storage-client';
 
 // =============================================================================
 // Point Triggers

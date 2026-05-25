@@ -16,7 +16,7 @@ import {
   isConsentActive,
   canElevate,
 } from '@app/elohim/models/human-consent.model';
-import { HumanConsentContent } from '@app/elohim/models/source-chain.model';
+import { HumanConsentContent } from '@elohim/storage-client';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 

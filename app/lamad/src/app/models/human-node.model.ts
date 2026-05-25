@@ -44,7 +44,7 @@ import {
   type ConsentState,
   type GovernanceLayer,
   type GeographicContext,
-} from '@app/elohim/models/protocol-core.model';
+} from '@elohim/storage-client';
 
 // @coverage: 22.2% (2026-02-24)
 
@@ -457,4 +457,4 @@ export {
   type GeographicContext,
   type ConsentState,
   type GovernanceLayer,
-} from '@app/elohim/models/protocol-core.model';
+} from '@elohim/storage-client';
