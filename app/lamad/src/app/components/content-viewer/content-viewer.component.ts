@@ -57,7 +57,7 @@ import {
   ResilienceSnapshotComponent,
 } from '@elohim/service/public-api';
 
-import { SeoService } from '../../../services/seo.service';
+import { SeoService } from '../../shared/services/seo.service';
 import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
 import { ContentNode, ContentFlag } from '../../models/content-node.model';
@@ -80,8 +80,8 @@ import { StewardshipAllocationService } from '../../services/stewardship-allocat
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 
-import type { HouseholdResilienceView } from '../../../generated/household-resilience-view';
-import type { ResilienceSnapshotView } from '../../../generated/resilience-snapshot-view';
+import type { HouseholdResilienceView } from '@app/generated/household-resilience-view';
+import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
 import type { EprRelationship } from '@app/elohim/models/epr-head.model';
 import type { ContentStewardshipView } from '@elohim/storage-client/generated';
 

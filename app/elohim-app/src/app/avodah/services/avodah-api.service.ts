@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { UpdateContentPatch } from '../../elohim/interfaces';
 import { StorageApiService } from '../../elohim/services/storage-api.service';
-import { ContentNode, ContentRelationshipType } from '../../lamad/models/content-node.model';
+import { ContentNode, ContentRelationshipType } from '@app/lamad/models/content-node.model';
 import { WorkStoryStatus } from '../models/work-story.model';
 
 import type { ContentWithTagsView } from '@elohim/storage-client/generated';

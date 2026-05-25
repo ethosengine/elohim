@@ -18,7 +18,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 // @coverage: 100.0% (2026-02-24)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { ContentMasteryService } from '../../lamad/services/content-mastery.service';
+import { ContentMasteryService } from '@app/lamad/services/content-mastery.service';
 import {
   type MigrationState,
   type MigrationResult,

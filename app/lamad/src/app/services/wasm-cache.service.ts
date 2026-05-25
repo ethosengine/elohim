@@ -39,7 +39,7 @@ import {
   TsChunkCache,
 } from '@elohim/service/cache/reach-aware-cache';
 
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environments/environment';
 
 import type {
   IReachAwareCache,

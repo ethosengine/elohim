@@ -11,7 +11,7 @@ import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 import { GovernanceService } from '@app/elohim/services/governance.service';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
 import { PathContextService } from '../../services/path-context.service';
-import { SeoService } from '../../../services/seo.service';
+import { SeoService } from '../../shared/services/seo.service';
 import { RendererRegistryService } from '../../renderers/renderer-registry.service';
 import { ContentNode } from '../../models/content-node.model';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';

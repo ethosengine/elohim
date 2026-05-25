@@ -4,7 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
 
-import { SeoService } from '../../../services/seo.service';
+import { SeoService } from '../../shared/services/seo.service';
 
 /**
  * LamadNotFoundComponent - 404 Page for Lamad routes

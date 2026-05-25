@@ -9,7 +9,7 @@ import { AgentService } from '@app/elohim/services/agent.service';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 import { PathContextService } from '../../services/path-context.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
-import { SeoService } from '../../../services/seo.service';
+import { SeoService } from '../../shared/services/seo.service';
 import { PathStepView, LearningPath } from '../../models/learning-path.model';
 import { provideElohimClient } from '@app/elohim/providers/elohim-client.provider';
 import { GOVERNANCE, CONTENT_ATTESTATION } from '@app/elohim/interfaces';

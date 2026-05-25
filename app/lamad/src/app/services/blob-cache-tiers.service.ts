@@ -19,7 +19,7 @@ import { Injectable, Injector, inject } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
 
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environments/environment';
 import { ContentBlob } from '../models/content-node.model';
 
 import { WasmCacheService, ReachLevel } from './wasm-cache.service';

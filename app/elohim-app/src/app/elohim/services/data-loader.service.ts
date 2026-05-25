@@ -10,26 +10,26 @@ import { Observable, of, from, defer, forkJoin } from 'rxjs';
 
 // Models from lamad pillar (will stay there - content-specific)
 // Using relative imports for now; will update to @app/lamad after full migration
-import { ContentAttestation } from '../../lamad/models/content-attestation.model';
+import { ContentAttestation } from '@app/lamad/models/content-attestation.model';
 import {
   ContentNode,
   ContentGraph,
   ContentRelationship,
   ContentRelationshipType,
-} from '../../lamad/models/content-node.model';
+} from '@app/lamad/models/content-node.model';
 import {
   KnowledgeMapIndex,
   KnowledgeMap,
   KnowledgeMapIndexEntry,
   KnowledgeMapType,
   KnowledgeNode,
-} from '../../lamad/models/knowledge-map.model';
+} from '@app/lamad/models/knowledge-map.model';
 import {
   LearningPath,
   PathIndex,
   PathIndexEntry,
   parsePathView,
-} from '../../lamad/models/learning-path.model';
+} from '@app/lamad/models/learning-path.model';
 import {
   PathExtensionIndex,
   PathExtension,
@@ -40,7 +40,7 @@ import {
   PathStepExclusion,
   UpstreamProposal,
   ExtensionStats,
-} from '../../lamad/models/path-extension.model';
+} from '@app/lamad/models/path-extension.model';
 import { CONTENT_ATTESTATION } from '../interfaces/content-attestation.interface';
 import { GOVERNANCE } from '../interfaces/governance.interface';
 import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';

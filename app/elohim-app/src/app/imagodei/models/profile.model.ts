@@ -15,7 +15,7 @@
 import { MasteryLevel } from '../../elohim/models/agent.model';
 import { JsonLdMetadata } from '../../elohim/models/json-ld.model';
 import { OpenGraphMetadata } from '../../elohim/models/open-graph.model';
-import { ContentType } from '../../lamad/models/content-node.model';
+import { ContentType } from '@app/lamad/models/content-node.model';
 // Models from elohim pillar (canonical location for shared types)
 
 /**

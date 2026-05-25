@@ -24,7 +24,7 @@ import { Observable, from, of, throwError, firstValueFrom } from 'rxjs';
 
 import { BlobMetadataAnchor } from '@app/elohim/integrity';
 
-import { StorageClientService } from '../../elohim/services/storage-client.service';
+import { StorageClientService } from '@app/elohim/services/storage-client.service';
 import { ContentBlob } from '../models/content-node.model';
 
 import { BlobFallbackService, BlobFetchResult, UrlHealth } from './blob-fallback.service';

@@ -9,7 +9,7 @@ import {
   AccessCheckResult,
   AccessLevel,
   AccessAction,
-} from '../../lamad/models/content-access.model';
+} from '@app/lamad/models/content-access.model';
 import {
   SessionHuman,
   SessionStats,

@@ -11,7 +11,7 @@ export const routes: Routes = [
   },
   {
     path: 'lamad',
-    loadChildren: async () => import('./lamad/lamad.routes').then(m => m.LAMAD_ROUTES),
+    loadChildren: async () => import('@app/lamad/lamad.routes').then(m => m.LAMAD_ROUTES),
   },
   {
     path: 'community',
@@ -61,7 +61,7 @@ export const routes: Routes = [
   {
     path: 'resource/:resourceId',
     loadComponent: async () =>
-      import('./lamad/components/content-viewer/content-viewer.component').then(
+      import('@app/lamad/components/content-viewer/content-viewer.component').then(
         m => m.ContentViewerComponent
       ),
     data: { protocolContent: true },

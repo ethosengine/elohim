@@ -18,8 +18,8 @@ import { Injectable } from '@angular/core';
 
 // @coverage: 80.5% (2026-02-24)
 
-import { ContentNode } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+import { ContentNode } from '@app/lamad/models/content-node.model';
+import { LearningPath } from '@app/lamad/models/learning-path.model';
 
 // =============================================================================
 // Cache Entry Types

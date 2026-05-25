@@ -30,7 +30,7 @@ import { Injectable, inject, OnDestroy } from '@angular/core';
 
 import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
 
-import { ContentNode } from '../../lamad/models/content-node.model';
+import { ContentNode } from '@app/lamad/models/content-node.model';
 
 import { StorageClientService, type StorageContentNode } from './storage-client.service';
 import {

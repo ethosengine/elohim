@@ -18,15 +18,15 @@ import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
 import { Observable, from, of } from 'rxjs';
 
-import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
-import { LearningPath, PathStep, parsePathView } from '../../lamad/models/learning-path.model';
+import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/content-node.model';
+import { LearningPath, PathStep, parsePathView } from '@app/lamad/models/learning-path.model';
 import { BLOB_FETCHER, type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 
 import { StorageClientService } from './storage-client.service';
 
-import type { KnowledgeMap, KnowledgeMapType } from '../../lamad/models/knowledge-map.model';
-import type { PathExtension, UpstreamProposal } from '../../lamad/models/path-extension.model';
+import type { KnowledgeMap, KnowledgeMapType } from '@app/lamad/models/knowledge-map.model';
+import type { PathExtension, UpstreamProposal } from '@app/lamad/models/path-extension.model';
 import type { ContentQuery } from '@elohim/service/client';
 
 /**
@@ -95,7 +95,7 @@ export interface ContentGraph {
 // =============================================================================
 
 // Re-export canonical KnowledgeMap from lamad module
-export type { KnowledgeMap } from '../../lamad/models/knowledge-map.model';
+export type { KnowledgeMap } from '@app/lamad/models/knowledge-map.model';
 
 /**
  * Knowledge map query filters
@@ -114,13 +114,13 @@ export interface KnowledgeMapFilters {
 // =============================================================================
 
 // Re-export canonical types from lamad module
-export type { PathExtension } from '../../lamad/models/path-extension.model';
+export type { PathExtension } from '@app/lamad/models/path-extension.model';
 export type {
   PathStepInsertion,
   PathStepAnnotation,
   PathStepReorder,
   PathStepExclusion,
-} from '../../lamad/models/path-extension.model';
+} from '@app/lamad/models/path-extension.model';
 
 /**
  * Path extension query filters
@@ -164,7 +164,7 @@ interface RawContentData {
    * Distribution telemetry surfaced by the substrate on EPR head responses (T34/T49).
    * Optional — pre-distribution content lacks a blob_hash and therefore lacks a summary.
    */
-  distribution?: import('../../lamad/models/content-node.model').DistributionSummary;
+  distribution?: import('@app/lamad/models/content-node.model').DistributionSummary;
 }
 
 /** Raw path step from storage/API */

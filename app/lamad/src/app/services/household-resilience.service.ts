@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
 
-import type { HouseholdResilienceView } from '../../generated/household-resilience-view';
+import type { HouseholdResilienceView } from '@app/generated/household-resilience-view';
 
 @Injectable({ providedIn: 'root' })
 export class HouseholdResilienceService {

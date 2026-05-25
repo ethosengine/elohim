@@ -68,6 +68,8 @@ export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
   tool: '🛠️',
   path: '🛤️',
   placeholder: '⚠️',
+  // Element registry types (added with schema-enums update)
+  'element-registry': '🧩',
 };
 
 /**
@@ -104,6 +106,8 @@ export const CONTENT_FORMAT_ICONS: Record<ContentFormat, string> = {
   epub: '📚',
   'epr-composite': '🗺️',
   'spa-bundle': '🖥️',
+  // Element registry format (added with schema-enums update)
+  'element-registry-manifest': '🧩',
 };
 
 /**

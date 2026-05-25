@@ -11,7 +11,7 @@ import { Subject, forkJoin } from 'rxjs';
 import { AgentProgress, MasteryLevel, MasteryTier } from '@app/elohim/models/agent.model';
 import { AgentService } from '@app/elohim/services/agent.service';
 
-import { SeoService } from '../../../services/seo.service';
+import { SeoService } from '../../shared/services/seo.service';
 import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
 import { RecommendationListComponent } from '../../quiz-engine/components/recommendation-list/recommendation-list.component';
 import {

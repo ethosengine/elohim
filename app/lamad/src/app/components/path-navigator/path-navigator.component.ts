@@ -19,7 +19,7 @@ import { Subject } from 'rxjs';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 
-import { SeoService } from '../../../services/seo.service';
+import { SeoService } from '../../shared/services/seo.service';
 import { MasteryLevel } from '../../models/content-mastery.model';
 import { PathContext } from '../../models/exploration-context.model';
 import {

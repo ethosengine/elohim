@@ -26,7 +26,7 @@ import { map, catchError } from 'rxjs/operators';
 
 import { Observable, from, of, firstValueFrom } from 'rxjs';
 
-import { DoorwayClientService } from '../../elohim/services/doorway-client.service';
+import { DoorwayClientService } from '@app/elohim/services/doorway-client.service';
 
 /**
  * Result of blob verification
