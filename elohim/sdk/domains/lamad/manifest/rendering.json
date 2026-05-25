@@ -36,5 +36,13 @@
       "epr-composite"
     ],
     "platform": "angular"
+  },
+  "elohim-element-registry": {
+    "component": "ElohimElementRegistryComponent",
+    "formats": [
+      "element-registry-manifest"
+    ],
+    "platform": "angular",
+    "notes": "Renders the element-registry-manifest content format — a small manifest declaring which custom Lit elements a pillar EPR exposes for cross-pillar embedding. See pillar-EPR decomposition spec §3 (element-registry-manifest as content type) and B9/B10 Library A/B stories that exercise this renderer."
   }
 }

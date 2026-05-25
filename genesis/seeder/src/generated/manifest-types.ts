@@ -86,6 +86,7 @@ export const LAMAD_RENDERER_MAP: Record<string, string> = {
   'html5-app': 'IframeRendererComponent',
   'video-embed': 'IframeRendererComponent',
   'epr-composite': 'PathViewerComponent',
+  'element-registry-manifest': 'ElohimElementRegistryComponent',
 };
 
 export interface DiversityThreshold {

@@ -1,9 +1,7 @@
 // AUTO-GENERATED from lamad manifest + companion schemas.
 // DO NOT EDIT — regenerate with: pnpm run lamad:codegen
 
-// B18b: Relative path updated for new location (was '../../generated/content-view' when under elohim-app).
-// TODO(B18c-followup): Update the lamad:codegen script to emit '@app/generated/content-view' instead.
-import type { ContentView } from '@app/generated/content-view';
+import type { ContentView } from '../../generated/content-view';
 import type { ConceptMetadata, AssessmentMetadata, ExperienceStoryMetadata, ExperienceMomentMetadata, PathMetadata, GateProcessDeclarationMetadata, UniversalBandDeclarationMetadata, GateRulesDeclarationMetadata, AggregationSpecMetadata, EscalationTargetSpecMetadata } from './metadata-types';
 
 export type TypedContentNode =

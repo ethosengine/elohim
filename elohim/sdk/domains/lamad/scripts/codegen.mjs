@@ -6,7 +6,7 @@
  *   - Lamad manifest (elohim/sdk/domains/lamad/manifest.json)
  *   - Lamad companion schemas (elohim/sdk/domains/lamad/schemas/*.schema.json)
  *
- * Produces (to BOTH app/elohim-app/src/app/lamad/generated/ AND genesis/seeder/src/generated/):
+ * Produces (to BOTH app/lamad/src/app/generated/ AND genesis/seeder/src/generated/):
  *   - metadata-types.ts — PathMetadata, ConceptMetadata, AssessmentMetadata interfaces
  *   - body-types.ts — EprCompositeBody, Section, Item interfaces
  *   - content-node-types.ts — discriminated TypedContentNode union + generic type guards
@@ -64,8 +64,11 @@ async function resolveRefs(value, baseDir) {
 const MANIFEST_PATH = resolve(LAMAD_DIR, 'manifest.json');
 
 // Output locations (identical copies, except content-node-types.ts imports)
+// Note: lamad was split out of elohim-app into its own SPA bundle as part
+// of the pillar-EPR decomposition (B19 of the 2026-05-25 merge). The codegen
+// target moved from app/elohim-app/src/app/lamad/ to app/lamad/src/app/.
 const OUTPUT_DIRS = [
-  resolve(REPO_ROOT, 'app/elohim-app/src/app/lamad/generated'),
+  resolve(REPO_ROOT, 'app/lamad/src/app/generated'),
   resolve(REPO_ROOT, 'genesis/seeder/src/generated'),
 ];
 

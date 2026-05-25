@@ -45,6 +45,7 @@ pub const ALL_CONTENT_FORMATS: &[&str] = &[
     "json",
     "sophia",
     "sophia-quiz-json",
+    "element-registry-manifest",
 ];
 
 /// Core contenttype — Three-leg coupled: knowledge + value + governance. DNA-notarized, immutable once signed.
@@ -105,6 +106,7 @@ pub const ALL_CONTENT_TYPES: &[&str] = &[
     "gate-rules-declaration",
     "aggregation-spec",
     "escalation-target-spec",
+    "element-registry",
 ];
 
 /// Core devicearchetype — DNA-notarized device archetypes for AgentPeerBinding entries in imagodei integrity zome (Task A.2). 'node' = dedicated elohim-node instances (household blades, server processes). 'desktop' = Tauri-wrapped desktop clients. 'mobile' = mobile devices. 'steward' = collective infrastructure steward processes. All four values are required at genesis; no extensible tier defined.
