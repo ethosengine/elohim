@@ -191,7 +191,7 @@ DNAs in `elohim/holochain/dna/` notarize the protocol's structural commitments a
 
 ### Two pillars worth introducing here
 
-**Lamad** is path-centric, not course-centric. Knowledge is structured as **territory** (immutable ContentNodes — videos, docs, simulations), **journeys** (curated paths that add narrative meaning and sequence), and **travelers** (learners whose progress and attestations shape the experience). Learning is something you do through relationships and contributions, not something a platform certifies. See [`app/elohim-app/src/app/lamad/README.md`](./app/elohim-app/src/app/lamad/README.md).
+**Lamad** is path-centric, not course-centric. Knowledge is structured as **territory** (immutable ContentNodes — videos, docs, simulations), **journeys** (curated paths that add narrative meaning and sequence), and **travelers** (learners whose progress and attestations shape the experience). Learning is something you do through relationships and contributions, not something a platform certifies. The lamad SPA bundle lives at [`app/lamad/`](./app/lamad/) — split out of the elohim-app monolith via the pillar-EPR decomposition.
 
 **Avodah** treats work as *service*, not commodity. Work items are EPRs — so a piece of work carries its knowledge context, its value claim, and its governance state inseparably. Attestation gates (typically a lamad learning path) can be required before someone bids on or accepts work, enabling open collaboration qualified by demonstrated mastery rather than credentials.
 

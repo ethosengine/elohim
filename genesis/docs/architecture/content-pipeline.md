@@ -267,6 +267,6 @@ User sees content
 | Connection strategy | `app/elohim-library/.../doorway-connection-strategy.ts` | 226-252 |
 | Content service | `app/elohim-app/src/app/elohim/services/content.service.ts` | 305-348, 652-675 |
 | Blob URL resolution | `app/elohim-app/src/app/elohim/services/content.service.ts` | 771-809 |
-| Content viewer | `app/elohim-app/src/app/lamad/components/content-viewer/content-viewer.component.ts` | 298-368 |
-| Renderer registry | `app/elohim-app/src/app/lamad/renderers/renderer-registry.service.ts` | |
-| Path model parsing | `app/elohim-app/src/app/lamad/models/learning-path.model.ts` | 589-640 |
+| Content viewer | `app/lamad/src/app/components/content-viewer/content-viewer.component.ts` | 298-368 |
+| Renderer registry | `app/lamad/src/app/renderers/renderer-registry.service.ts` | |
+| Path model parsing | `app/lamad/src/app/models/learning-path.model.ts` | 589-640 |
