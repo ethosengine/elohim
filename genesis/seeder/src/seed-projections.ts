@@ -78,7 +78,25 @@ interface CommitmentBody {
   action: 'project-epr';
   provider: string;
   receiver: string;
-  inScopeOf: string[];
+  /**
+   * Pipe-separated scope string: `"doorway:{id}|epr:{id}"`.
+   *
+   * The Rust `CreateReaCommitmentInput` accepts `Option<String>` for
+   * `in_scope_of` (storage layer is single-string, see
+   * elohim/elohim-storage/src/db/rea_commitments.rs:53). The A7 resolver
+   * (`parse_projection_scope` in the same file) parses this exact format
+   * to reconstruct (doorwayId, eprId) when projecting commitments back
+   * out as `EprProjectionView`. Round-trip safe.
+   *
+   * NOTE: seed-operator-bindings.ts currently sends `inScopeOf: [scope]`
+   * (an array) which is a pre-existing wire-shape mismatch with the Rust
+   * struct — it deserializes via `CreateReaCommitmentInputView`'s `From`
+   * impl (views_convert/inputs.rs:280) only on paths that use the View,
+   * not the direct DB-layer struct. The /api/v1/commitments handler uses
+   * the direct struct, so the single-string form here is the correct one
+   * for that path.
+   */
+  inScopeOf: string;
   note: string;
   metadataJson: string;
   metadata: Record<string, unknown>;
@@ -130,7 +148,7 @@ export function buildProjectionCommitmentBody(spec: ProjectionSpec): CommitmentB
     action: 'project-epr',
     provider: stewardPeerId,
     receiver: stewardPeerId,
-    inScopeOf: [`doorway:${spec.doorwayId}`, `epr:${spec.eprId}`],
+    inScopeOf: `doorway:${spec.doorwayId}|epr:${spec.eprId}`,
     note: `Project ${spec.eprId} at ${spec.urlPath} on ${spec.doorwayId}`,
     metadataJson: JSON.stringify(metadataObject),
     metadata: metadataObject,
