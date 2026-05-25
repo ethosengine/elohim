@@ -1,62 +1,61 @@
 /**
- * LoginComponent Tests
+ * LoginComponent (Lit wrapper) — spec
  *
- * Tests for hosted human authentication component with context-aware routing.
+ * Tests cover the thin Angular bridge: event wiring, step transitions, and
+ * service delegation. The Lit elements themselves are not rendered (JSDOM
+ * treats custom elements as HTMLElement stubs), so assertions target
+ * component state and service call expectations.
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { LoginComponent } from './login.component';
-import { AuthService } from '../../services/auth.service';
-import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
-import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
-import { IdentityService } from '../../services/identity.service';
-import { DoorwayRegistryService } from '../../services/doorway-registry.service';
-import { TauriAuthService } from '../../services/tauri-auth.service';
-import { Router, ActivatedRoute, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
-import { AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
 import { vi } from 'vitest';
 
-describe('LoginComponent', () => {
-  let component: LoginComponent;
+import { LoginComponent } from './login.component';
+import { AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
+import { AuthService } from '../../services/auth.service';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { IdentityService } from '../../services/identity.service';
+import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
+import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
+
+describe('LoginComponent (Lit wrapper)', () => {
   let fixture: ComponentFixture<LoginComponent>;
-  let mockAuthService: any;
-  let mockPasswordProvider: any;
-  let mockOAuthProvider: any;
-  let mockIdentityService: any;
-  let mockDoorwayRegistry: any;
-  let mockTauriAuth: any;
-  let mockRouter: any;
-  let mockActivatedRoute: any;
-  let localStorageGetItemSpy: ReturnType<typeof vi.spyOn>;
-  let localStorageSetItemSpy: ReturnType<typeof vi.spyOn>;
-  let localStorageRemoveItemSpy: ReturnType<typeof vi.spyOn>;
+  let component: LoginComponent;
+
+  let mockAuthService: {
+    hasProvider: ReturnType<typeof vi.fn>;
+    registerProvider: ReturnType<typeof vi.fn>;
+    isAuthenticated: ReturnType<typeof vi.fn>;
+    login: ReturnType<typeof vi.fn>;
+  };
+  let mockPasswordProvider: { login: ReturnType<typeof vi.fn> };
+  let mockOAuthProvider: {
+    initiateLogin: ReturnType<typeof vi.fn>;
+    storeReturnUrl: ReturnType<typeof vi.fn>;
+    isFlowInProgress: ReturnType<typeof signal<boolean>>;
+  };
+  let mockIdentityService: { waitForAuthenticatedState: ReturnType<typeof vi.fn> };
+  let mockDoorwayRegistry: {
+    selectDoorwayByUrl: ReturnType<typeof vi.fn>;
+    selected: ReturnType<typeof signal<null>>;
+    selectedUrl: ReturnType<typeof signal<null>>;
+    hasSelection: ReturnType<typeof signal<boolean>>;
+  };
+  let mockActivatedRoute: { queryParams: ReturnType<typeof of> };
+  let router: Router;
 
   beforeEach(async () => {
     mockAuthService = {
+      hasProvider: vi.fn().mockReturnValue(false),
       registerProvider: vi.fn(),
-      hasProvider: vi.fn(),
-      login: vi.fn(),
-      isAuthenticated: vi.fn(),
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      login: vi.fn().mockResolvedValue({ success: true }),
     };
-    mockAuthService.hasProvider.mockReturnValue(false);
-    mockAuthService.isAuthenticated.mockReturnValue(false);
-    mockAuthService.login.mockReturnValue(
-      Promise.resolve({
-        success: true,
-        token: 'mock-token',
-        humanId: 'mock-human',
-        agentPubKey: 'mock-pubkey',
-        expiresAt: new Date(Date.now() + 3600000).toISOString(),
-        identifier: 'mock-user',
-      })
-    );
 
-    mockPasswordProvider = {
-      login: vi.fn(),
-      logout: vi.fn(),
-    };
+    mockPasswordProvider = { login: vi.fn().mockResolvedValue({}) };
 
     mockOAuthProvider = {
       initiateLogin: vi.fn(),
@@ -65,35 +64,17 @@ describe('LoginComponent', () => {
     };
 
     mockIdentityService = {
-      waitForAuthenticatedState: vi.fn(),
+      waitForAuthenticatedState: vi.fn().mockResolvedValue(true),
     };
-    mockIdentityService.waitForAuthenticatedState.mockReturnValue(Promise.resolve(true));
 
     mockDoorwayRegistry = {
       selectDoorwayByUrl: vi.fn(),
       selected: signal(null),
+      selectedUrl: signal(null),
       hasSelection: signal(false),
     };
 
-    mockTauriAuth = {
-      isTauri: signal(false),
-      needsUnlock: vi.fn().mockReturnValue(false),
-      getDoorwayStatus: vi.fn().mockReturnValue(Promise.resolve(null)),
-    };
-
-    mockRouter = { navigate: vi.fn() };
-    mockRouter.navigate.mockReturnValue(Promise.resolve(true));
-
-    mockActivatedRoute = {
-      queryParams: of({}),
-    };
-
-    // Mock localStorage
-    localStorageGetItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
-    localStorageSetItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
-    localStorageRemoveItemSpy = vi
-      .spyOn(Storage.prototype, 'removeItem')
-      .mockImplementation(() => {});
+    mockActivatedRoute = { queryParams: of({}) };
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
@@ -104,487 +85,270 @@ describe('LoginComponent', () => {
         { provide: OAuthAuthProvider, useValue: mockOAuthProvider },
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
-        { provide: TauriAuthService, useValue: mockTauriAuth },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
     }).compileComponents();
 
-    // Spy on the real Router's navigate method
-    mockRouter = TestBed.inject(Router);
-    vi.spyOn(mockRouter, 'navigate').mockResolvedValue(true);
+    router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(LoginComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
-  // ==========================================================================
-  // Component Creation
-  // ==========================================================================
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   // ==========================================================================
-  // Signals
+  // Initial state
   // ==========================================================================
 
-  it('should have isLoading signal', () => {
-    expect(component.isLoading).toBeDefined();
+  it('renders the portal-shell at the resolve step initially', () => {
+    expect(component.step).toBe('resolve');
+    const shell = fixture.nativeElement.querySelector('elohim-imagodei-portal-shell');
+    expect(shell).toBeTruthy();
   });
 
-  it('should have error signal', () => {
-    expect(component.error).toBeDefined();
+  it('starts with no error message', () => {
+    expect(component.errorMessage).toBe('');
   });
 
-  it('should have showPassword signal', () => {
-    expect(component.showPassword).toBeDefined();
+  it('registers password provider with AuthService on init', () => {
+    expect(mockAuthService.registerProvider).toHaveBeenCalledWith(mockPasswordProvider);
   });
 
-  it('should have currentStep signal', () => {
-    expect(component.currentStep).toBeDefined();
+  it('does not re-register if provider is already registered', async () => {
+    mockAuthService.hasProvider.mockReturnValue(true);
+    mockAuthService.registerProvider.mockClear();
+
+    const newFixture = TestBed.createComponent(LoginComponent);
+    newFixture.componentInstance.ngOnInit();
+
+    expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
   });
 
-  // ==========================================================================
-  // Delegated Signals
-  // ==========================================================================
+  it('redirects immediately when already authenticated', () => {
+    mockAuthService.isAuthenticated.mockReturnValue(true);
 
-  it('should delegate selectedDoorway from DoorwayRegistryService', () => {
-    expect(component.selectedDoorway).toBeDefined();
+    const newFixture = TestBed.createComponent(LoginComponent);
+    newFixture.componentInstance.ngOnInit();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/']);
   });
 
-  it('should delegate hasDoorwaySelected from DoorwayRegistryService', () => {
-    expect(component.hasDoorwaySelected).toBeDefined();
-  });
+  it('pre-fills identifier from localStorage', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue('matthew@alpha.elohim.host');
 
-  // ==========================================================================
-  // Form State
-  // ==========================================================================
+    const newFixture = TestBed.createComponent(LoginComponent);
+    newFixture.componentInstance.ngOnInit();
 
-  it('should initialize form state', () => {
-    expect(component.form).toBeDefined();
-    expect(component.form.identifier).toEqual('');
-    expect(component.form.password).toEqual('');
-    expect(component.form.rememberMe).toBe(true);
-  });
-
-  // ==========================================================================
-  // Public Methods
-  // ==========================================================================
-
-  it('should have onLogin method', () => {
-    expect(component.onLogin).toBeDefined();
-    expect(typeof component.onLogin).toBe('function');
-  });
-
-  it('should have clearError method', () => {
-    expect(component.clearError).toBeDefined();
-    expect(typeof component.clearError).toBe('function');
-  });
-
-  it('should have togglePasswordVisibility method', () => {
-    expect(component.togglePasswordVisibility).toBeDefined();
-    expect(typeof component.togglePasswordVisibility).toBe('function');
-  });
-
-  it('should have goToRegister method', () => {
-    expect(component.goToRegister).toBeDefined();
-    expect(typeof component.goToRegister).toBe('function');
-  });
-
-  it('should have goBackToFederated method', () => {
-    expect(component.goBackToFederated).toBeDefined();
-    expect(typeof component.goBackToFederated).toBe('function');
-  });
-
-  it('should have onFederatedLogin method', () => {
-    expect(component.onFederatedLogin).toBeDefined();
-    expect(typeof component.onFederatedLogin).toBe('function');
+    expect(newFixture.componentInstance.identifier).toBe('matthew@alpha.elohim.host');
   });
 
   // ==========================================================================
-  // Clear Error
+  // Step: resolve → login
   // ==========================================================================
 
-  it('should clear error message', () => {
-    component.error.set('Some error');
-    component.clearError();
-    expect(component.error()).toBeNull();
+  it('advances to login step and stores identifier on resolved event', () => {
+    component.onResolved(
+      new CustomEvent('resolved', {
+        detail: { identifier: 'matthew@alpha.elohim.host', doorwayUrl: 'https://alpha.elohim.host' },
+      }),
+    );
+
+    expect(component.step).toBe('login');
+    expect(component.identifier).toBe('matthew@alpha.elohim.host');
+  });
+
+  it('calls selectDoorwayByUrl with the resolved doorway URL', () => {
+    component.onResolved(
+      new CustomEvent('resolved', {
+        detail: { identifier: 'matthew@alpha.elohim.host', doorwayUrl: 'https://alpha.elohim.host' },
+      }),
+    );
+
+    expect(mockDoorwayRegistry.selectDoorwayByUrl).toHaveBeenCalledWith(
+      'https://alpha.elohim.host',
+    );
+  });
+
+  it('clears errorMessage on a successful resolved event', () => {
+    component.errorMessage = 'stale error';
+
+    component.onResolved(
+      new CustomEvent('resolved', {
+        detail: { identifier: 'matthew@alpha.elohim.host', doorwayUrl: 'https://alpha.elohim.host' },
+      }),
+    );
+
+    expect(component.errorMessage).toBe('');
   });
 
   // ==========================================================================
-  // Toggle Password Visibility
+  // Step: resolve error
   // ==========================================================================
 
-  it('should toggle password visibility', () => {
-    expect(component.showPassword()).toBe(false);
-    component.togglePasswordVisibility();
-    expect(component.showPassword()).toBe(true);
-    component.togglePasswordVisibility();
-    expect(component.showPassword()).toBe(false);
+  it('sets errorMessage on resolve-error event', () => {
+    component.onResolveError(
+      new CustomEvent('resolve-error', { detail: { reason: 'unknown-host' } }),
+    );
+
+    expect(component.errorMessage).toContain('unknown-host');
+  });
+
+  it('does not advance step on resolve error', () => {
+    component.onResolveError(
+      new CustomEvent('resolve-error', { detail: { reason: 'timeout' } }),
+    );
+
+    expect(component.step).toBe('resolve');
   });
 
   // ==========================================================================
-  // Step Navigation
+  // Password submit
   // ==========================================================================
 
-  it('should go back to federated step', () => {
-    component.currentStep.set('credentials');
-    component.goBackToFederated();
-    expect(component.currentStep()).toBe('federated');
-  });
+  it('calls AuthService.login with password credentials on password-submit', async () => {
+    component.identifier = 'matthew@alpha.elohim.host';
 
-  // ==========================================================================
-  // Go To Register
-  // ==========================================================================
+    await component.onPasswordSubmit(
+      new CustomEvent('password-submit', {
+        detail: { identifier: 'matthew@alpha.elohim.host', password: 'hunter2', remember: false },
+      }),
+    );
 
-  it('should navigate to register page', () => {
-    component.goToRegister();
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/register'], {
-      queryParams: { returnUrl: '/' },
-    });
-  });
-
-  // ==========================================================================
-  // Initial State
-  // ==========================================================================
-
-  it('should start with federated step', () => {
-    expect(component.currentStep()).toBe('federated');
-  });
-
-  it('should initialize with no error', () => {
-    expect(component.error()).toBeNull();
-  });
-
-  it('should initialize with loading false', () => {
-    expect(component.isLoading()).toBe(false);
-  });
-
-  // ==========================================================================
-  // ngOnInit - Lifecycle
-  // ==========================================================================
-
-  describe('ngOnInit', () => {
-    it('should register password provider if not already registered', () => {
-      mockAuthService.hasProvider.mockReturnValue(false);
-
-      component.ngOnInit();
-
-      expect(mockAuthService.registerProvider).toHaveBeenCalledWith(mockPasswordProvider);
-    });
-
-    it('should not register password provider if already registered', () => {
-      mockAuthService.hasProvider.mockReturnValue(true);
-      mockAuthService.registerProvider.mockClear();
-
-      component.ngOnInit();
-
-      expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
-    });
-
-    it('should get return URL from query params', () =>
-      new Promise<void>(done => {
-        mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
-
-        component.ngOnInit();
-
-        setTimeout(() => {
-          expect(component.returnUrl).toBe('/dashboard');
-          done();
-        }, 100);
-      }));
-
-    it('should default return URL to / when not in query params', () =>
-      new Promise<void>(done => {
-        mockActivatedRoute.queryParams = of({});
-
-        component.ngOnInit();
-
-        setTimeout(() => {
-          expect(component.returnUrl).toBe('/');
-          done();
-        }, 100);
-      }));
-
-    it('should pre-fill identifier from localStorage if remembered', () => {
-      localStorageGetItemSpy.mockReturnValue('user@example.com');
-
-      component.ngOnInit();
-
-      expect(component.form.identifier).toBe('user@example.com');
-    });
-
-    it('should redirect if already authenticated', () => {
-      mockAuthService.isAuthenticated.mockReturnValue(true);
-
-      component.ngOnInit();
-
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
-    });
-
-    // Context routing: dev browser (localhost doorwayUrl, no saved doorway)
-    // Default environment.client.doorwayUrl is localhost -> federated step
-    it('should show federated step for dev browser with no saved doorway', () => {
-      component.ngOnInit();
-
-      expect(component.currentStep()).toBe('federated');
-    });
-
-    // Context routing: Tauri with no doorway -> federated step
-    it('should show federated step for Tauri with no doorway selected', async () => {
-      (mockTauriAuth as any).isTauri = signal(true);
-
-      const newFixture = TestBed.createComponent(LoginComponent);
-      const newComponent = newFixture.componentInstance;
-      newComponent.ngOnInit();
-      await newFixture.whenStable();
-
-      expect(newComponent.currentStep()).toBe('federated');
-    });
-
-    // Context routing: Tauri with doorway selected but no key bundle -> federated
-    // (First-time user: always show federated input for identity import)
-    it('should show federated for Tauri with doorway selected', async () => {
-      (mockTauriAuth as any).isTauri = signal(true);
-      Object.defineProperty(mockDoorwayRegistry, 'hasSelection', {
-        value: signal(true),
-        writable: true,
-        configurable: true,
-      });
-
-      const newFixture = TestBed.createComponent(LoginComponent);
-      const newComponent = newFixture.componentInstance;
-      newComponent.ngOnInit();
-      await newFixture.whenStable();
-
-      expect(newComponent.currentStep()).toBe('federated');
+    expect(mockAuthService.login).toHaveBeenCalledWith('password', {
+      type: 'password',
+      identifier: 'matthew@alpha.elohim.host',
+      password: 'hunter2',
     });
   });
 
-  // ==========================================================================
-  // Federated Login
-  // ==========================================================================
+  it('navigates to returnUrl after successful password submit', async () => {
+    mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
+    const newFixture = TestBed.createComponent(LoginComponent);
+    newFixture.componentInstance.ngOnInit();
+    await newFixture.whenStable();
 
-  describe('onFederatedLogin', () => {
-    it('should show error for invalid identifier', () => {
-      component.federatedIdentifier = 'invalid';
+    await newFixture.componentInstance.onPasswordSubmit(
+      new CustomEvent('password-submit', {
+        detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: false },
+      }),
+    );
 
-      component.onFederatedLogin();
+    expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
+  });
 
-      expect(component.error()).toBe('Please enter a valid identity (e.g. you@your-doorway.host)');
-      expect(mockOAuthProvider.initiateLogin).not.toHaveBeenCalled();
-    });
+  it('persists identifier in localStorage when remember is true', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
+    component.identifier = 'matthew@alpha.elohim.host';
 
-    it('should show error for empty identifier', () => {
-      component.federatedIdentifier = '';
+    await component.onPasswordSubmit(
+      new CustomEvent('password-submit', {
+        detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: true },
+      }),
+    );
 
-      component.onFederatedLogin();
+    expect(setItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'matthew@alpha.elohim.host');
+  });
 
-      expect(component.error()).toBeTruthy();
-    });
+  it('removes identifier from localStorage when remember is false', async () => {
+    const removeItem = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {});
+    component.identifier = 'matthew@alpha.elohim.host';
 
-    it('should initiate OAuth for valid federated identifier in browser', () => {
-      component.federatedIdentifier = 'matthew@alpha.elohim.host';
+    await component.onPasswordSubmit(
+      new CustomEvent('password-submit', {
+        detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: false },
+      }),
+    );
 
-      component.onFederatedLogin();
+    expect(removeItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
+  });
 
-      expect(component.currentStep()).toBe('redirecting');
-      expect(mockDoorwayRegistry.selectDoorwayByUrl).toHaveBeenCalled();
-      expect(mockOAuthProvider.initiateLogin).toHaveBeenCalled();
-    });
+  it('surfaces error to errorMessage on password failure (AuthResult failure)', async () => {
+    mockAuthService.login.mockResolvedValue({ success: false, error: 'bad credentials' });
+    component.identifier = 'matthew@alpha.elohim.host';
 
-    it('should pass username as login_hint', () => {
-      component.federatedIdentifier = 'matthew@alpha.elohim.host';
+    await component.onPasswordSubmit(
+      new CustomEvent('password-submit', {
+        detail: { identifier: 'matthew@alpha.elohim.host', password: 'wrong', remember: false },
+      }),
+    );
 
-      component.onFederatedLogin();
+    expect(component.errorMessage).toContain('bad credentials');
+  });
 
-      const args = mockOAuthProvider.initiateLogin.mock.lastCall;
-      expect(args[2]).toBe('matthew');
-    });
+  it('surfaces error to errorMessage on thrown exception during password submit', async () => {
+    mockAuthService.login.mockRejectedValue(new Error('network error'));
+    component.identifier = 'matthew@alpha.elohim.host';
 
-    it('should clear previous error on submit', () => {
-      component.error.set('old error');
-      component.federatedIdentifier = 'matthew@alpha.elohim.host';
+    await component.onPasswordSubmit(
+      new CustomEvent('password-submit', {
+        detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: false },
+      }),
+    );
 
-      component.onFederatedLogin();
-
-      // Error should be null (cleared) since the identifier is valid
-      expect(component.error()).toBeNull();
-    });
-
-    it('should show credentials step for Tauri with valid federated identifier', () => {
-      (mockTauriAuth as any).isTauri = signal(true);
-
-      const newFixture = TestBed.createComponent(LoginComponent);
-      const newComponent = newFixture.componentInstance;
-      newComponent.federatedIdentifier = 'matthew@alpha.elohim.host';
-
-      newComponent.onFederatedLogin();
-
-      expect(newComponent.currentStep()).toBe('credentials');
-      expect(newComponent.form.identifier).toBe('matthew');
-      expect(newComponent.isLoading()).toBe(false);
-    });
+    expect(component.errorMessage).toContain('network error');
   });
 
   // ==========================================================================
-  // Login Functionality
+  // OAuth start
   // ==========================================================================
 
-  describe('onLogin', () => {
-    beforeEach(() => {
-      component.form.identifier = 'user@example.com';
-      component.form.password = 'password123';
-      component.form.rememberMe = true;
-    });
+  it('calls oauthProvider.initiateLogin on oauth-start event', async () => {
+    component.identifier = 'matthew@alpha.elohim.host';
+    // Provide doorwayUrl via the registry so the handler can resolve it
+    (mockDoorwayRegistry.selectedUrl as ReturnType<typeof signal<string | null>>) = signal(
+      'https://alpha.elohim.host',
+    );
 
-    it('should show error when identifier is empty', async () => {
-      component.form.identifier = '';
+    await component.onOAuthStart(
+      new CustomEvent('oauth-start', {
+        detail: { providerId: 'github', doorwayUrl: 'https://alpha.elohim.host' },
+      }),
+    );
 
-      await component.onLogin();
+    expect(mockOAuthProvider.initiateLogin).toHaveBeenCalled();
+  });
 
-      expect(component.error()).toBe('Please enter your email or username.');
-      expect(mockAuthService.login).not.toHaveBeenCalled();
-    });
+  it('calls oauthProvider.storeReturnUrl before initiating OAuth', async () => {
+    await component.onOAuthStart(
+      new CustomEvent('oauth-start', {
+        detail: { providerId: 'github', doorwayUrl: 'https://alpha.elohim.host' },
+      }),
+    );
 
-    it('should show error when identifier is only whitespace', async () => {
-      component.form.identifier = '   ';
+    expect(mockOAuthProvider.storeReturnUrl).toHaveBeenCalled();
+  });
 
-      await component.onLogin();
+  it('sets errorMessage when no doorway URL is available on oauth-start', async () => {
+    component.identifier = '';
+    (mockDoorwayRegistry.selectedUrl as ReturnType<typeof signal<string | null>>) = signal(null);
 
-      expect(component.error()).toBe('Please enter your email or username.');
-      expect(mockAuthService.login).not.toHaveBeenCalled();
-    });
+    await component.onOAuthStart(
+      new CustomEvent('oauth-start', { detail: { providerId: 'github' } }),
+    );
 
-    it('should show error when password is empty', async () => {
-      component.form.password = '';
+    expect(component.errorMessage).toBeTruthy();
+    expect(mockOAuthProvider.initiateLogin).not.toHaveBeenCalled();
+  });
 
-      await component.onLogin();
+  // ==========================================================================
+  // Legacy state-machine is gone
+  // ==========================================================================
 
-      expect(component.error()).toBe('Please enter your password.');
-      expect(mockAuthService.login).not.toHaveBeenCalled();
-    });
+  it('has no currentStep signal (old multi-step machine removed)', () => {
+    // The old 7-step LoginStep union is replaced by the 2-value Step type.
+    // currentStep was the old signal name — it must not exist.
+    expect((component as unknown as Record<string, unknown>)['currentStep']).toBeUndefined();
+  });
 
-    it('should set loading state during login', async () => {
-      let resolveLogin: (value: any) => void;
-      mockAuthService.login.mockReturnValue(
-        new Promise(resolve => {
-          resolveLogin = resolve;
-        })
-      );
-
-      const loginPromise = component.onLogin();
-
-      // Should be loading immediately
-      expect(component.isLoading()).toBe(true);
-
-      // Resolve the login
-      resolveLogin!({
-        success: true,
-        token: 'mock-token',
-        humanId: 'mock-human',
-        agentPubKey: 'mock-pubkey',
-        expiresAt: new Date(Date.now() + 3600000).toISOString(),
-        identifier: 'mock-user',
-      });
-
-      await loginPromise;
-
-      // Should no longer be loading after completion
-      expect(component.isLoading()).toBe(false);
-    });
-
-    it('should login successfully with valid credentials', async () => {
-      await component.onLogin();
-
-      expect(mockAuthService.login).toHaveBeenCalledWith('password', {
-        type: 'password',
-        identifier: 'user@example.com',
-        password: 'password123',
-      });
-    });
-
-    it('should trim identifier before login', async () => {
-      component.form.identifier = '  user@example.com  ';
-
-      await component.onLogin();
-
-      expect(mockAuthService.login).toHaveBeenCalledWith('password', {
-        type: 'password',
-        identifier: 'user@example.com',
-        password: 'password123',
-      });
-    });
-
-    it('should clear password from form after successful login', async () => {
-      await component.onLogin();
-
-      expect(component.form.password).toBe('');
-    });
-
-    it('should store identifier in localStorage when rememberMe is true', async () => {
-      component.form.rememberMe = true;
-
-      await component.onLogin();
-
-      expect(localStorageSetItemSpy).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'user@example.com');
-    });
-
-    it('should remove identifier from localStorage when rememberMe is false', async () => {
-      component.form.rememberMe = false;
-
-      await component.onLogin();
-
-      expect(localStorageRemoveItemSpy).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
-    });
-
-    it('should wait for authenticated state before navigation', async () => {
-      await component.onLogin();
-
-      expect(mockIdentityService.waitForAuthenticatedState).toHaveBeenCalledWith(3000);
-    });
-
-    it('should navigate to return URL after successful login', async () => {
-      component.returnUrl = '/dashboard';
-
-      await component.onLogin();
-
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/dashboard']);
-    });
-
-    it('should display error message on login failure', async () => {
-      mockAuthService.login.mockReturnValue(
-        Promise.resolve({
-          success: false,
-          error: 'Invalid credentials',
-          code: 'INVALID_CREDENTIALS',
-        })
-      );
-
-      await component.onLogin();
-
-      expect(component.error()).toBe('Invalid credentials');
-      expect(component.isLoading()).toBe(false);
-    });
-
-    it('should handle login exception', async () => {
-      mockAuthService.login.mockReturnValue(Promise.reject(new Error('Network error')));
-
-      await component.onLogin();
-
-      expect(component.error()).toBe('Network error');
-      expect(component.isLoading()).toBe(false);
-    });
-
-    it('should handle non-Error exceptions', async () => {
-      mockAuthService.login.mockReturnValue(Promise.reject('Unknown error'));
-
-      await component.onLogin();
-
-      expect(component.error()).toBe('Login failed');
-      expect(component.isLoading()).toBe(false);
-    });
+  it('has no credentials step (old Tauri-specific step removed)', () => {
+    // 'credentials' was one of the 7 old LoginStep values.
+    // The new Step type only allows 'resolve' | 'login'.
+    const validSteps: string[] = ['resolve', 'login'];
+    expect(validSteps).toContain(component.step);
   });
 });
