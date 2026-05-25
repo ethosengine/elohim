@@ -1835,12 +1835,102 @@ Steps 1-2 are blocking prerequisites; step 4 cannot land before they're green.
 - `elohim/sdk/domains/infrastructure/manifest.json` — declare observation_kinds for `infrastructure:doorway-heartbeat`, `infrastructure:blob-served`, `infrastructure:system-sample` (Stage 1)
 - `elohim/sdk/domains/{shefa,lamad,imagodei,qahal}/manifest.json` — declare per-pillar observation_kinds via Wave B/C/D additions (Stage 1)
 
-### D.6 Elohim-authoring pattern — domain-specialized agents (Gap 7)
+### D.6 Elohim-Authoring Pattern — Domain-Specialized Agents (Gap 7) — Wave D
+
+**Motivation.** The records-lifecycle's value-prop unlock — elohim narrating mundane care, inventory, stewardship into REA-shape Events at the everyday-frequency humans won't bear — requires domain-specialized agents. A generic graduation-evaluator can't handle inventory narration (needs visual-recognition of receipts), vehicle stewardship (needs maintenance-cycle awareness), care-economy bookkeeping (needs household-cadence familiarity), etc. Domain specialization is the substrate's mechanism for making elohim cognition load-bearing at the right granularity. **This is "the economy that scales love and care" made operational.**
+
+**Design — domain-elohim as graduation-evaluator specialization.**
+
+Each domain-elohim:
+1. Subscribes to specific `observation_kind` namespaces per pillar manifest (e.g., `inventory-elohim` subscribes to `shefa:receipt-scanned`, `shefa:item-disposed`, `lamad:object-recognized`; `care-stewardship-elohim` subscribes to `imagodei:care-act`, `imagodei:meal-prepared`, `imagodei:caregiving-hour`)
+2. Runs as a tokio task (or separate worker — see D-1a architecture decision below) inside elohim-storage or as a sidecar service
+3. Evaluates graduation policies per its domain (manifest-declared per observation_kind)
+4. Authors Events / Attestations / subordination links on behalf of the household under stewardship-commitment Attestation authority
+5. Reports to the operator (via Angular UI surface) when judgment is needed beyond the elohim's confidence threshold
+
+**D-1a resolution — sharded by kind_namespace.** Per operator lean: graduation evaluators shard by `kind_namespace` (within a pillar, parallel per observation_kind). Pillar-level serialization is too coarse for hub scale; EPR-level fragmentation is too fine. Kind_namespace is the natural unit of independent work.
+
+```rust
+// elohim/elohim-storage/src/services/graduation_evaluator.rs
+struct GraduationEvaluator {
+    kind_namespace: String,  // e.g., "shefa:card-swipe"
+    domain_elohim: DomainElohimAgent,  // the agent specialization
+    rate_ceiling: RateCeiling,  // per D-1b
+}
+```
+
+Each (pillar, kind_namespace) pair gets its own evaluator task. Cross-namespace parallelism is the substrate's natural throughput model.
+
+**D-1b resolution — manifest-declared rate-ceiling per attestation_kind / event_action.** Per operator lean: rate-ceiling is structural, not standing-modulated (standing-curve coupling deferred until standing system is solidly working).
+
+```jsonc
+// pillar manifest declaration
+{
+  "vocabulary_declarations": {
+    "attestation_kinds": [
+      {
+        "kind": "attestation:doorway-health",
+        "rate_ceiling": { "max_per_subject_per_day": 24, "max_per_period_hours": 1 }
+      }
+    ],
+    "action_verbs": [
+      {
+        "verb": "transfer",
+        "rate_ceiling": null  // no ceiling on transfer events
+      },
+      {
+        "verb": "served-blob-summary",
+        "rate_ceiling": { "max_per_provider_per_period": 1, "period_seconds": 3600 }
+      }
+    ]
+  }
+}
+```
+
+Substrate-floor enforcement: integrity zome rejects authoring beyond the declared ceiling. Per-pillar manifest amendment process tunes the ceiling over time.
+
+**D-1c resolution — first-quorum-wins hub failover.** Per operator lean: no designated backup hub. When a hub goes offline mid-graduation-window, any hub-in-reach can take over. The substrate's natural P2P model handles this — the first hub to reach quorum on a community-scoped Attestation issues it; subsequent attempts no-op (the integrity zome rejects duplicate Attestations with the same subject_cid + kind + window via CRDT-style dedup).
+
+```
+when community-scoped graduation window closes:
+  every hub in reach evaluates the observation_diversity_summary
+  first one to reach quorum authors the Attestation
+  the integrity zome's idempotent-check prevents duplicates
+  hubs that lost the race silently no-op
+```
+
+This eliminates the single-point-of-failure of designated backup; the substrate's P2P quorum naturally handles failover.
+
+**Domain-elohim specializations (initial set).**
+
+| Agent | Pillar | Watches | Produces |
+|---|---|---|---|
+| `inventory-elohim` | shefa | `shefa:receipt-scanned`, `shefa:item-disposed`, `shefa:item-acquired` | `Event(action="receive")`, `Resource` creates, subordination links |
+| `vehicle-elohim` | shefa | `shefa:vehicle-maintenance-log`, `shefa:vehicle-mileage` | `Event(action="maintain")`, depreciation summary Events |
+| `care-stewardship-elohim` | imagodei | `imagodei:care-act`, `imagodei:meal-prepared`, `imagodei:caregiving-hour` | Care-Events with quantities; care-account Resource updates |
+| `learning-elohim` | lamad | `lamad:content-viewed`, `lamad:mastery-check-result`, `lamad:reflection-authored` | `Event(action="attempted-quiz")`, mastery Resource updates, Attestation issuance |
+| `vision-elohim` | lamad | `lamad:image-captured`, `lamad:video-captured` | `attestation:auto-tag`, `attestation:face-cluster` |
+| `compute-stewardship-elohim` | shefa | `shefa:compute-cycle-consumed`, `shefa:compute-cycle-available` | `Event(action="executed-compute")`, compute-Resource state |
+| `commons-stewardship-elohim` | elohim | watches commons-tier reach mutations + Global Commons fee Events | Allocation Events from Global Commons; apex-elohim council attestations (D.20 interlock) |
+| `bridge-stewardship-elohim` | (per-bridge) | watches bridge-vendor's webhook stream (Plaid, Stripe, etc.) | Bridge-authored Observations under stewardship-commitment Attestation (D.8 interlock) |
+
+Each agent ships its own TypeScript service implementation in `app/elohim-app/src/app/elohim/elohim-agents/` following the existing `compute-operator-elohim` pattern.
+
+**Authority model.** Domain-elohim authors under a `stewardship-commitment` Attestation chain — the household authorizes the agent at setup time; revocation closes the Commitment chain, ending the agent's authority to author on the household's behalf. The substrate-floor invariant: any Event authored by a domain-elohim must have a current-and-valid stewardship-commitment Attestation referenced via `observation_refs` or `evidence_refs`.
+
+**Bridge-stewardship-elohim parallel-author fallback** (Phase 1 A.4 addendum): when a bridge-stewardship-elohim's primary instance is offline, a backup-stewardship-elohim (declared at bridge-vendor's Collective EPR) can continue authoring. Bridge-collective manifests declare the fallback chain.
+
+**Floor-permissive principle (carried from §1.3 of this spec).** Humans CAN author the same Events directly. The graduation evaluator + domain-elohim pattern doesn't replace human authoring — it makes the everyday-frequency narration tractable. ISO/logistics shows humans CAN bear high-flow REA; the value-prop is that elohim make the care-economy-frequency narration feasible without requiring that bookkeeping discipline of every household.
 
 **Touches:**
-- `app/elohim-app/src/app/elohim/elohim-agents/` (new) — TypeScript service implementations for `InventoryElohimService`, `VehicleElohimService`, `CareStewardshipElohimService`, etc., following the existing operator-elohim pattern
-- `elohim/elohim-storage/src/services/graduation_evaluator.rs` (extend) — per-pillar tokio tasks that the elohim-agents drive
-- `elohim/sdk/domains/*/manifest.json` — declare which elohim-agent watches which observation_kinds + handles which graduation policies
+- `app/elohim-app/src/app/elohim/elohim-agents/` — TypeScript service implementations for the 8 initial domain-elohim specializations (planned per task)
+- `elohim/elohim-storage/src/services/graduation_evaluator.rs` — extended with kind_namespace sharding + rate-ceiling enforcement + first-quorum-wins idempotent dedup
+- `elohim/sdk/domains/*/manifest.json` — declare which elohim-agent watches which observation_kinds + handles which graduation policies + per-attestation_kind/event_verb rate_ceiling
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — validate stewardship-commitment Attestation chain on domain-elohim-authored Events; idempotent-dedup check for community-scoped Attestations
+- D.8 interlock — bridge-stewardship-elohim is the bridge-side specialization
+- D.20 interlock — commons-stewardship-elohim is the Global Commons stewardship specialization
+
+---
 
 ### D.7 Dissolution Semantics (Gap 8) — Wave C
 
@@ -1953,15 +2043,561 @@ D.10's vocabulary governance gate validates these declarations; the integrity zo
 
 ### D.8 Bridge Pattern for Legacy Systems (Gap 9) — Wave D
 
-> *Drafted in Wave D — see plan task D2. Bridges reframed as substrate-native Collective EPRs per operator's correction; fee mechanics defer to D.20 Layered Commons.*
+**Motivation.** Legacy systems — banks, payment processors, KYC vendors, regulators, existing platforms — exist outside the substrate. The protocol's posture is parallel operation + subsumption-by-merit, not displacement. Without a bridge pattern, every legacy-interop need becomes a bespoke integration with no shared substrate semantics; users can't cash out cleanly; the substrate's commitment to bidirectional legibility breaks.
 
-### D.8 Bridge pattern for legacy systems (Gap 9)
+**Reframe — bridges as substrate-native Collective EPRs (per operator's mid-Phase-2 correction).** Bridges aren't passthrough adapters. Plaid Inc, Stripe Inc, banking-API providers, KYC vendors each have their own substrate presence as **Collective EPRs**. Their employees are Memberships of the collective; their commercial revenue flows into their Bridge Commons (a Commons-held Resource per D.20). Their stewardship-elohim agents handle legacy-protocol translation as a *service* — translating between the legacy vendor's API and the substrate's primitives, on behalf of households that use that translation. **Bridges ARE substrate participants**, not outside-of-substrate adapters.
+
+**Design — per-vendor bridge structure.**
+
+Each legacy vendor gets a `bridges/<vendor>/` crate (pattern reference: `bridges/valueflows/`) with three sub-crates:
+
+```
+bridges/<vendor>/
+  ├── <vendor>-bridge/        # the bridge service: speaks vendor API + authors substrate Events
+  ├── <vendor>-types/         # vendor wire shapes + manifest declarations
+  └── <vendor>-tests/         # contract tests against vendor sandbox + substrate fixtures
+```
+
+The `<vendor>-bridge` service:
+- Listens for vendor webhooks (OAuth/HTTP) via `doorway/doorway-service/src/handlers/bridges/<vendor>/`
+- Maps incoming webhook events to substrate Observations
+- Signs the Observations as the **bridge-stewardship-elohim** under a stewardship-commitment Attestation referencing the household-that-authorized-this-bridge
+- ReconcileController graduates the Observations per the pillar's graduation policies (D.5 + D.6 interlock)
+- For events the substrate authors that flow back to the vendor (user-initiated transfers, etc.), translates the substrate Event into vendor API calls; records confirmation as observation_refs on the Event
+
+**Countersignature through bridges (A-2 resolution interlock).** Per the substrate-invariant countersignature decision: when grandma's account-EPR signs a `transfer` Event and the receiver (Joe's Coffee) isn't substrate-native yet, the bridge-stewardship-elohim signs receiver-side on behalf of a stub-EPR for Joe's Coffee. When Joe's Coffee later adopts substrate, they can attest/claim the stub-EPR's history. **The bilateral-transfer invariant is preserved through bridges.**
+
+**Fee mechanics defer to D.20.** The Bridge Commons revenue model (small Commons fee per facilitated transaction + Global Commons fee per same transaction; cash-out path to legacy money) is the substrate of D.20 Layered Commons. D.8 specifies the bridge-translation machinery; D.20 specifies how value flows into/out of Bridge Commons.
+
+**Backfill pattern.** When a household first authorizes a bridge to a legacy system (e.g., Plaid sees their bank's 10-year transaction history), the bridge authors `Observation(observation_kind="bridge:backfill", payload_json={...})` for each legacy record. Graduation policies batch-graduate these into substrate Events under stewardship-elohim signature. The substrate gains a full event-history that matches the legacy system's record; the household's Monarch-shape dashboard immediately shows 10 years of substrate-native history.
+
+**Cash-out — bidirectional structural property.**
+
+When a household wants to leave a bridge:
+1. Authorize-revocation Event from the household → bridge-stewardship-elohim's commitment chain closes
+2. Bridge stops authoring new Observations
+3. Existing Events stay in substrate (permanent record)
+4. Household exports bridge-authored Events to legacy format (QFX/CSV/etc.) if needed for legacy continuity
+
+When the bridge-collective wants to cash-out their Commons-accumulated value to legacy money:
+1. Bridge-stewardship authors `Event(action="cash-out", provider=bridge_commons, receiver=legacy-USD-bank-account, observation_refs=[bank-transfer-confirmation])`
+2. Vendor-side: bridge service initiates the legacy bank-transfer via vendor API
+3. On confirmation, observation_refs link to the legacy transfer proof; Bridge Commons balance decreases by the cashed-out amount
+
+Cash-out is **structural**, not policy. Both sides can leave their relationship to the bridge at any time without losing accumulated value.
+
+**PII removal under right-to-be-forgotten (Phase 1 A.6 addendum).** Bridge-authored Attestations (especially KYC) may contain PII in `metadata_json` (name fragments, DOB, ID numbers). When a `attestation:forget-decision` Event lands per mishpat governance:
+1. ReconcileController identifies all bridge-authored Attestations with matching subject
+2. Coordinator scrubs PII fields from `metadata_json` (replaces with `<redacted>` markers); the Attestation entry's CID changes (new entry; old entry root-rewritten); downstream attestations referencing the old CID add `redaction-applied` notes
+3. Storage projection drops the PII columns from the row-level view
+
+This is the same right-to-be-forgotten flow described in `2026-05-11-observation-event-layer-design.md` §9.4, applied to bridge-authored Attestations specifically.
+
+**KYC bridge migration (Phase 1 A.6 addendum).** When a household migrates from one KYC bridge (e.g., Stripe Identity) to another (e.g., Onfido):
+1. Prior bridge's Attestations stay valid (append-only DHT); the household still has the credentials issued under the prior bridge
+2. Prior bridge can NO LONGER issue new credentials (their stewardship-commitment Attestation expires per household's revocation)
+3. New bridge's stewardship-commitment Attestation activates; new bridge can issue new credentials
+4. Household's effective identity is the union of all valid bridge-authored credentials (no single bridge holds identity authority alone)
+
+This is the same parallel-credentials pattern as multi-doorway human registration (per `project_multi_doorway_human_registration` memory).
+
+**Manifest declaration.** Per-pillar declarations for bridge kinds + per-bridge fee schedules (feed D.20):
+
+```jsonc
+// elohim/sdk/domains/shefa/manifest.json
+{
+  "bridge_kinds": [
+    {
+      "vendor": "plaid",
+      "stewardship_collective_cid": "<plaid-collective-cid>",
+      "fee_schedule": {  // feeds D.20
+        "transaction_fee_pct": 0.005,
+        "bridge_commons_share": 0.5,
+        "global_commons_share": 0.5
+      },
+      "observation_kinds_authored": ["shefa:card-swipe", "shefa:bank-statement-parsed", "shefa:account-balance-refresh"],
+      "attestation_kinds_authored": ["attestation:identity-credential", "attestation:account-linked"]
+    }
+  ]
+}
+```
 
 **Touches:**
-- `bridges/<vendor>/` (new crates per vendor — e.g., `bridges/plaid/`, `bridges/stripe/`, `bridges/banking-api/`) — pattern reference: existing `bridges/valueflows/`
-- `doorway/doorway-service/src/handlers/bridges/` (new) — HTTP route surface for bridge ingress/egress
-- `elohim/sdk/domains/shefa/manifest.json` (and others) — declare `observation_kind` for each bridge type
-- Stewardship-elohim signing pattern documented; bridges authenticate via stewardship-commitment Attestations
+- `bridges/<vendor>/` — new per-vendor crates following the existing `bridges/valueflows/` pattern reference
+- `doorway/doorway-service/src/handlers/bridges/<vendor>/` — HTTP route surface for vendor webhooks + OAuth callbacks
+- `elohim/sdk/domains/{shefa,lamad,imagodei,qahal}/manifest.json` — `bridge_kinds` per pillar with fee_schedule + observation_kinds_authored declarations
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — validate bridge-stewardship-elohim-authored Events against the bridge-collective's stewardship-commitment Attestation chain
+- `elohim/elohim-storage/src/services/bridge_stewardship_service.rs` — bridge-stewardship-elohim implementation (planned)
+- D.6 interlock — bridge-stewardship-elohim is a domain-elohim specialization
+- D.20 interlock — bridge fee schedules feed the Layered Commons ratchet
+- A-2 interlock — bridge-side countersignature preserves the bilateral-transfer invariant
+
+---
+
+### D.15 Cross-DNA Coordination Patterns (Gap 16) — Wave D
+
+**Motivation.** Phase 1 A.8 surfaced three places where the substrate's DNA boundaries produce coordination ambiguity:
+
+- `GovernanceActionChild` link from elohim DNA → mishpat DNA (governance actions live in mishpat; the link to track child outcomes lives in elohim) — but cross-DNA `create_link` is not standard HDK. The current code works because elohim DNA's coordinator zome makes a `call(CallTargetCell::OtherRole("mishpat"), "...", ...)` — that pattern isn't documented.
+- Hub-graduation failover (resolved in D.6 as first-quorum-wins) crosses DNA boundaries when the issuing hub is on a different elohim DNA cell than the graduation evaluator.
+- Meta archetype's "friend / follow" link types ambiguously cite "imagodei `AgentToRelationship`" vs. "lamad `ContentToRelated`" vs. "elohim `RelationshipBySource/Target`" — without a clear answer on which zome owns the social-graph link types, two teams could build incompatible graph projections.
+
+**Design — three coordinated patterns.**
+
+**Pattern 1: Cross-DNA link creation via coordinator-zome bridge call.** The standard pattern for creating a link in another DNA is:
+
+```rust
+// from elohim DNA's content_store coordinator
+let result = call(
+    CallTargetCell::OtherRole("mishpat".to_string()),
+    ZomeName::from("governance_actions"),
+    FunctionName::from("create_link_in_dna"),
+    None,  // cap_secret
+    payload,
+).await?;
+```
+
+The target DNA's coordinator zome exposes a `create_link_in_dna(base, target, link_type, tag)` function that wraps `create_link!` in its own integrity zome's namespace. The bridge-call pattern works at the DHT layer because both DNAs participate in the same cell's signal-fan-out.
+
+**Worked example: `GovernanceActionChild`.** When elohim DNA needs to record a governance-action child outcome, it calls into mishpat DNA's coordinator zome. Mishpat's `create_governance_action_child_link(parent_cid, child_cid)` creates the link in mishpat's link-types namespace; elohim's projection queries against mishpat via the bridge-call pattern when needed.
+
+**Pattern 2: D-2 resolution — social-graph zome ownership.** Per operator lean:
+
+| Social-graph primitive | Zome ownership | Semantic |
+|---|---|---|
+| **Symmetric friend** | imagodei DNA's `AgentToRelationship` link type | mutual reach grant; both parties' identity-graph |
+| **Asymmetric follow** | Collective EPR Membership in the followed Profile's collective | reach-extending; receiver doesn't reciprocate |
+| **Block / mute** | FeedbackSignal (`signal_kind: "mute"` per D.18 — Wave 2 application archetype dispatches add this to manifest) | locally-private; affects feed-ranking only |
+
+Meta archetype updates its application-design.md to cite these zomes precisely (operator follow-up note for the Wave 2 archetype-drafting dispatch).
+
+**Pattern 3: Hub-failover signaling across DNAs.** When the elohim DNA's graduation evaluator is sharded across multiple cell-instances (D.6 D-1a kind_namespace sharding), and one cell goes offline, the surviving cells need to detect the absence. Pattern:
+
+- Cells publish heartbeat Observations (`observation_kind: "elohim:graduation-evaluator-heartbeat"`) per shard
+- A peer-witness detection: when consensus-of-peers observes absence of expected heartbeat for >threshold, the first-quorum-wins re-takeover happens at the cell-shard level
+- The substrate's substrate-floor invariant: graduation Attestations carry a `shard_id` field in metadata; CRDT-style dedup prevents duplicates across failover (D.6 idempotent-check)
+
+**Failover scope.** Per-shard failover handles graduation-evaluator outages cleanly. Bridge-stewardship-elohim failover (Phase 1 A.4 + D.6 interlock) operates similarly: bridge-collective declares the fallback chain; first-quorum-wins among the chain takes over.
+
+**Touches:**
+- DNA boundaries (`elohim/holochain/dna/{elohim,imagodei,mishpat}/zomes/`) — document the `call(CallTargetCell::OtherRole(...))` bridge pattern in each coordinator zome's CLAUDE.md
+- Hub-failover detection in `peer_transport_manifest` watcher in elohim-storage
+- Meta archetype's `applications/meta-facebook-application-design.md` — update to cite imagodei `AgentToRelationship` for symmetric friend; Collective Membership for asymmetric follow (operator follow-up)
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — `shard_id` field on Attestation metadata for failover-dedup
+
+---
+
+### D.16 Multi-Oracle Confirmation-Class Attestation (Gap 17) — Wave D
+
+**Motivation.** Phase 1 A.6 surfaced that Monarch's `attestation:price-feed` (the daily price quote that drives investment-balance calculation) is structurally vulnerable to single-oracle-elohim chokepoint: if one oracle is captured or compromised, every household's net worth calculation is wrong. The `proof_evidence.class = confirmation` tier was designed for this — multi-attestor confirmation — but the format for the confirmer chain was never specified.
+
+**Design — multi-attestor confirmation chain format.**
+
+```rust
+pub struct ProofEvidence {
+    pub class: ProofEvidenceClass,  // witness | audit | proof | confirmation
+    // ... existing fields ...
+
+    // confirmation-class specific:
+    pub confirmer_signatures: Option<Vec<ConfirmerSignature>>,
+}
+
+pub struct ConfirmerSignature {
+    pub confirmer_cid: Cid,         // the confirming agent (oracle-elohim, council member, etc.)
+    pub confirmer_collective_cid: Option<Cid>,  // diversity-grouping
+    pub signature: Signature,         // signs the same fact as the issuer
+    pub signed_at: i64,
+}
+```
+
+**Manifest-declared confirmation requirements per attestation_kind.**
+
+```jsonc
+// elohim/sdk/domains/shefa/manifest.json
+{
+  "vocabulary_declarations": {
+    "attestation_kinds": [
+      {
+        "kind": "attestation:price-feed",
+        "default_proof_class": "confirmation",
+        "confirmation_requirements": {
+          "min_confirmer_count": 3,
+          "diversity_requirements": {
+            "distinct_confirmer_collectives": 3,  // each confirmer from a different oracle-collective
+            "distinct_regions": 2                   // geographic diversity
+          },
+          "max_confirmer_clock_skew_seconds": 300  // confirmations within 5min
+        }
+      }
+    ]
+  }
+}
+```
+
+**Validator floor (extends Floor 8).** Integrity zome rejects `proof_evidence.class = confirmation` attestations without:
+- Minimum confirmer count met
+- Diversity requirements met (verified via the inline diversity tags model from observation spec §4.3 + 6.1)
+- All confirmer signatures cryptographically valid (each signs the same canonical fact)
+
+**Applies to.** Per Phase 1 findings:
+
+| Attestation kind | Why confirmation-class |
+|---|---|
+| `attestation:price-feed` | Monarch net-worth depends on it; single-oracle chokepoint risk |
+| `attestation:computation` | AWS-shape compute verification — proof that paid-for work ran |
+| `attestation:doorway-health` | Infrastructure liveness — single-witness chokepoint at hub scale |
+| `attestation:identity-credential` | KYC chain — multi-bridge diversity prevents identity-authority capture (D.8 interlock) |
+
+**Touches:**
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/attestation_validator.rs` — extend Floor 8 with multi-attestor validation; verify min_confirmer_count + diversity_requirements + signature chain
+- `elohim/sdk/schemas/v1/views/attestation-view.schema.json` — add `confirmer_signatures` field with the ConfirmerSignature shape
+- `elohim/sdk/domains/{shefa,lamad,infrastructure}/manifest.json` — declare `confirmation_requirements` per high-stakes attestation_kind
+- D.6 interlock — graduation-evaluator authors confirmation-class attestations only when sufficient peer-witness confirmations land in the window
+
+---
+
+### D.17 Recurring Commitment Scheduler Stagger (Gap 18) — Wave D
+
+**Motivation.** Phase 1 A.5 surfaced that 1M-patron Patreon-shape recurring billing creates thundering-herd on the creator's projection node on first-of-month. No stagger discipline exists in the current Commitment scheduler. TierController has one (`blake3(cid || peer-id || epoch) % stagger_window`); the Commitment scheduler needs the analog.
+
+**Design — manifest-declared stagger discipline.**
+
+```rust
+// elohim/elohim-storage/src/services/commitment_scheduler.rs (planned)
+fn fulfillment_delay(commitment: &Commitment, agent_id: &Cid, billing_epoch: u64) -> Duration {
+    let stagger_window_seconds = get_manifest_stagger_window(commitment.action);
+    let seed = blake3(format!("{}{}{}", commitment.cid, agent_id, billing_epoch));
+    let delay_seconds = u64::from_be_bytes(seed.as_bytes()[0..8].try_into().unwrap()) % stagger_window_seconds;
+    Duration::from_secs(delay_seconds)
+}
+```
+
+When a `Commitment(action="subscribe")` fires its monthly fulfillment, the scheduler delays the actual Event-authoring by `fulfillment_delay()`. Within the billing window (default 1 hour), 1M patrons distribute uniformly via the hash; the creator's projection node sees a constant ~278/sec inbound rather than 1M-at-once.
+
+**Manifest-declared stagger windows per action_verb.**
+
+```jsonc
+// elohim/sdk/domains/shefa/manifest.json
+{
+  "vocabulary_declarations": {
+    "action_verbs": [
+      {
+        "verb": "subscribe",
+        "fulfillment_pattern": "recurring",
+        "stagger_window_seconds": 3600  // 1 hour billing distribution
+      },
+      {
+        "verb": "checkpoint",
+        "fulfillment_pattern": "recurring",
+        "stagger_window_seconds": 86400  // 24 hours (low priority)
+      },
+      {
+        "verb": "transfer",
+        "fulfillment_pattern": "immediate",
+        "stagger_window_seconds": null
+      }
+    ]
+  }
+}
+```
+
+`null` for `immediate`-fulfillment verbs (transfers fire immediately; no stagger). Recurring verbs (subscribe, checkpoint, custody-quilt periodic renewal) declare their stagger window.
+
+**Substrate-floor invariant.** Recurring-fulfillment verbs without manifest-declared stagger_window get the default `3600s` (1 hour). D.10's vocabulary governance gate validates declarations.
+
+**Touches:**
+- `elohim/elohim-storage/src/services/commitment_scheduler.rs` — new service implementing stagger discipline per the BLAKE3 hash distribution
+- `elohim/sdk/domains/*/manifest.json` — declare `fulfillment_pattern` + `stagger_window_seconds` per recurring-fulfillment action verb
+- D.12 interlock — `checkpoint` Commitment authoring uses the same stagger model
+
+---
+
+### D.18 FeedbackSignal `signal_class` Field — Care/Compute Isolation (Gap 19) — Wave D
+
+**Motivation.** Phase 1 A.7 found that `debit-firm` quarantine on a bad-compute provider would violate compute/care isolation silently — the `SIGNAL_KINDS` whitelist doesn't distinguish what kind of standing is being debited. Per `project_compute_commitments_bounded`, compute-class and care-class standing must stay isolated.
+
+**Design — `signal_class` field on FeedbackSignal.**
+
+```rust
+pub struct FeedbackSignal {
+    // ... existing fields ...
+    pub signal_class: SignalClass,  // NEW
+}
+
+pub enum SignalClass {
+    Care,        // care-economy social moves (endorse, comment, react in care contexts)
+    Compute,     // compute-tier evidence (compute-provider reliability)
+    Governance,  // governance-evidence signals (report, dispute)
+    Trust,       // identity-trust signals (vouch, key-recovery-witness)
+}
+```
+
+**Manifest-declared `signal_kind → signal_class` mapping.**
+
+```jsonc
+// elohim/sdk/domains/imagodei/manifest.json
+{
+  "vocabulary_declarations": {
+    "signal_kinds": [
+      {"kind": "endorse",  "signal_class": "care",       "standing_impact": "credit-soft"},
+      {"kind": "comment",  "signal_class": "care",       "standing_impact": null},
+      {"kind": "react",    "signal_class": "care",       "standing_impact": null},
+      {"kind": "report",   "signal_class": "governance", "standing_impact": "debit-soft"},
+      {"kind": "vouch",    "signal_class": "trust",      "standing_impact": "credit-firm"},
+      {"kind": "quarantine", "signal_class": "governance", "standing_impact": "debit-firm"}
+    ]
+  }
+}
+
+// elohim/sdk/domains/shefa/manifest.json
+{
+  "vocabulary_declarations": {
+    "signal_kinds": [
+      {"kind": "compute-failure-report", "signal_class": "compute", "standing_impact": "debit-soft"}
+    ]
+  }
+}
+```
+
+**Standing-curve isolation.** The standing-curve service computes a per-(author, signal_class) standing tuple, not a single global standing:
+
+```rust
+pub struct StandingScore {
+    pub author_cid: Cid,
+    pub care_standing: f64,
+    pub compute_standing: f64,
+    pub governance_standing: f64,
+    pub trust_standing: f64,
+}
+```
+
+Care debits affect care_standing only; compute debits affect compute_standing only. Bad-compute providers are not flagged as low-care; bad-care actors are not flagged as low-compute. Reach gating per-class: care-content reach uses care_standing; compute-marketplace participation uses compute_standing.
+
+**Substrate-floor invariant.** Integrity zome validates that signal_class on a FeedbackSignal matches its signal_kind's manifest-declared class (D.10 vocabulary governance enforces). Standing-curve service consumes signal_class to keep classes isolated.
+
+**Touches:**
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/feedback_signal.rs` — add `signal_class: SignalClass` enum field on FeedbackSignal; validation enforcing manifest-declared mapping
+- `elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json` — add `signalClass` field to wire schema
+- `elohim/sdk/domains/*/manifest.json` — declare per-signal_kind signal_class (D.10 gate validates)
+- `elohim/elohim-storage/src/services/standing_curve_service.rs` (planned per D.14) — derive per-class standing rather than global
+- D.14 interlock — `standing_scores` SQL view returns per-class tuple
+
+---
+
+### D.19 agent-private EPR-Mediated Key Recovery (Gap 20) — Wave D
+
+**Motivation.** Phase 1 A.4 (and observation spec open question #3) — when a human migrates to a new device, the observer's `agent-private` encryption key (for private observations) must be recoverable without putting the burden on the human to remember a master passphrase. Per `project_socially_derived_security` + `project_recovery_grandma_standard`: relationships are the primary security primitive; cryptography enforces what relationships authorize. **Per operator correction: EPR-mediated recovery is the primary path; cryptographic Shamir is an opt-in add-on.**
+
+**Design — primary path (EPR-mediated trusted-circle recovery).**
+
+Each agent maintains a `trusted-circle` Membership EPR — a Collective EPR (`content_type: "trusted-circle"`) where the agent's intimate household + collective stewards are Memberships. The trusted-circle is itself a substrate primitive; the agent authors it at first device-setup; Memberships can be added/removed over time via household governance.
+
+Recovery flow:
+
+```
+1. Human on new device authenticates with their substrate identity (private key) — possible
+   because device-setup ceremony loaded a partial-key recovery surface
+
+2. Or: human on new device has lost their identity-private key entirely
+   - Initiates recovery via doorway-service or local recovery flow
+   - Recovery flow surfaces a list of trusted-circle Memberships
+   - Each trusted-circle member receives a notification (in their elohim-app) to attest
+     to the recovery: "Mira is trying to recover her account on a new device. Do you
+     recognize this person?"
+   - Each member authors:
+       Attestation(content_type="attestation:key-recovery-authorization",
+                   subject_cid=recovering_agent_cid,
+                   metadata_json={"recovering_device_pubkey": "...", "context": "..."})
+
+3. When N members have authored (manifest-declared threshold, default 3 of 5):
+   - Substrate-floor invariant: the recovering device's pubkey is now authorized
+   - The agent's elohim-node on the trusted-circle stewards re-derives the
+     `agent-private` encryption key from the social-attestation chain
+   - The re-derived key is delivered to the new device via libp2p direct-message
+     under reach=agent-private
+
+4. The new device now has the agent's keys (both substrate identity AND observer's
+   agent-private encryption key); the human is fully restored
+```
+
+**"Log in with help from your people" applied to encryption keys.** The substrate doesn't ask the human to remember anything cryptographic — it asks their trusted-circle to attest that they recognize them. Grandma can recover her account because her trusted-circle (household + neighbors + community stewards) recognize her.
+
+**Design — optional add-on (Shamir secret-sharing).**
+
+Manifest opt-in: households can layer Shamir-N-of-M cryptographic split — each trusted-circle member additionally holds a Shamir share. Recovery then requires BOTH the EPR-attestation threshold AND the cryptographic share threshold.
+
+**Defense in depth where external threat surface warrants it** — not as a wealth-class concern (the substrate's friction-gradient and Global Commons ratchet prevent accumulation classes from forming structurally; there is no "high-net-worth" stratum on this protocol). The Shamir layer addresses external adversarial threat that makes social-attestation recovery insufficient on its own:
+
+- Journalists protecting sources from state subpoena (state could subpoena trusted-circle members but not their cryptographic shares without escalation)
+- Dissidents under state threat
+- Intimate-partner-violence survivors where the trusted-circle pattern itself can be compromised by an abuser within the social graph (the abuser is in the trusted-circle; the Shamir share is held by an external trusted-circle member that the abuser doesn't have access to)
+- Households stewarding strategic public-good Resources where the threat surface extends beyond household-scale relationships
+
+**Manifest-declared per-household policy.**
+
+```jsonc
+// per-household manifest
+{
+  "recovery_policy": {
+    "recovery_mode": "epr_mediated_with_shamir",  // or "epr_mediated"
+    "trusted_circle_threshold": { "n": 3, "of": 5 },
+    "shamir_threshold": { "n": 3, "of": 5 },  // null if recovery_mode is "epr_mediated"
+    "trusted_circle_cid": "<membership-epr-cid>"
+  }
+}
+```
+
+**Substrate-floor enforcement.** Integrity zome rejects key-recovery without sufficient `attestation:key-recovery-authorization` attestations. Coordinator-side flow handles Shamir share verification when manifest opts in.
+
+**Touches:**
+- `imagodei` DNA recovery flow — new `recover_agent_keys` coordinator function
+- Source-chain export logic — includes trusted-circle Membership reference
+- Multi-device pairing flow — handles the recovery ceremony
+- Trusted-circle Membership EPR pattern (declared per pillar manifest)
+- `attestation:key-recovery-authorization` subtype declaration (D.10 vocabulary governance)
+- `elohim/sdk/schemas/v1/views/attestation-view.schema.json` — `key-recovery-authorization` shape
+
+---
+
+### D.20 Layered Commons + elohim-Mediated Global Commons (Gap 21) — Wave D
+
+**Motivation.** Every value flow through the substrate ratchets a manifest-declared slice into one or more Commons-held Resources at different governance scopes. **This is where the elohim-apex thinking gets cashed out as actual value flow** — the network self-funds its development, infrastructure, and anti-concentration enforcement through substrate-native fee flows mediated by elohim councils. Not a tax (no enforcement layer); a manifest-declared substrate invariant. Per `project_elohim_councils_capture_apex` + `project_commons_elohim_co_steward`: wisdom holds the structural top of authority; the Global Commons is where wisdom-stewardship of public-good value flows lives.
+
+**Design — three Commons scopes.**
+
+```
+┌─────────────────────────────────────────────────┐
+│  Every Event(action="transfer") ratchets:        │
+│                                                  │
+│  Grandma  ─99%─►  Joe's Coffee  (the actual      │
+│                                   value transfer)│
+│        │                                         │
+│        ├──0.5%──►  Bridge Commons               │
+│        │           (Plaid Inc Collective revenue)│
+│        │                                         │
+│        └──0.5%──►  Global Commons               │
+│                    (elohim-mediated public goods)│
+└─────────────────────────────────────────────────┘
+```
+
+(Percentages are illustrative; manifest-declared per pillar/per bridge/per transaction-class.)
+
+**Three Commons scopes — each a substrate-composable EPR (no new entry types).**
+
+| Scope | What it is | Stewardship |
+|---|---|---|
+| **Bridge Commons** | Bridge-collective's revenue (Plaid, Stripe, banking-API, KYC, etc.) | Bridge-collective's own Memberships govern; legacy cash-out via D.8 |
+| **Collective Commons** | Collective EPR's shared pool (multi-family pools, credit-union-style mutual aid, organization shared funds) | Collective members + collective's co-steward elohim govern |
+| **Global Commons** | Protocol-wide; funds substrate development, new bridges, public goods, anti-concentration redistribution | **Elohim-mediated** per apex-elohim council pattern; humans don't accumulate it |
+
+**Composable EPRs (substrate-floor primitives).**
+
+```rust
+// Each Commons is a Content EPR with a Membership of stewards
+Content {
+    content_type: "commons",
+    metadata_json: serde_json::json!({
+        "scope": "global" | "collective" | "bridge",
+        "stewardship_membership_cid": "<membership-epr-cid>",
+        "anti_concentration_policy": {...},  // per pillar/scope
+    }).to_string(),
+}
+
+// Commons-held value is an EconomicResource
+EconomicResource {
+    resource_classified_as: "commons-credit",  // or "currency-USD" for stablecoin-denominated
+    parent_epr_cid: <commons_epr_cid>,
+    primary_accountable: <commons_steward_or_council_cid>,
+    governed_by: <stewardship_collective_cid>,  // D.4 governed_by field interlock
+}
+```
+
+**Fee mechanics — substrate-floor mass-conservation.** Every Event(action="transfer") may declare a manifest-defined fee split:
+
+```rust
+Event {
+    action: "transfer",
+    provider: <source>,
+    receiver: <destination>,
+    resource_quantity_value: 100.0,  // the receiver's share
+    metadata_json: serde_json::json!({
+        "fee_splits": [
+            {"commons_cid": "<bridge_commons_cid>",  "amount": 0.5},
+            {"commons_cid": "<global_commons_cid>",  "amount": 0.5}
+        ],
+        "total_authored_amount": 101.0  // mass-conservation: receiver + sum(fees) = total
+    }).to_string(),
+    // ...
+}
+```
+
+Companion fee Events land alongside the main transfer Event. Substrate-floor validation: sum of all fee_splits + receiver_amount = total_authored_amount (mass-conservation check enforced by integrity zome).
+
+**Global Commons elohim-council governance.** The apex elohim councils participate as Memberships of the Global Commons EPR. Allocation Events from the Global Commons (funding decisions — new bridges, infrastructure, public goods) require quorum of council attestations per the apex-elohim governance pattern. **The substrate's self-funding mechanism cannot be captured by self-interest** because the elohim councils don't accumulate (per `project_elohim_councils_capture_apex` — wisdom holds the apex; cannot extract for personal gain).
+
+```
+allocation flow:
+  1. Funding proposal: any participant authors a `proposal` Content EPR
+     describing what should be funded (new bridge, infrastructure work,
+     public-good investment, etc.)
+  2. Apex elohim councils (Memberships of Global Commons EPR) attest to
+     the proposal under apex-elohim governance rules
+  3. When quorum is reached:
+     Event(action="allocate", provider=global_commons_resource,
+           receiver=proposal_recipient_resource, quantity=<amount>)
+  4. The recipient (a person's elohim-agent, a Collective EPR, a bridge-
+     collective, etc.) receives the allocation; can author Events from it
+     per the allocation's authorized purpose
+```
+
+**Anti-concentration ratchet.** Per `project_friction_gradient_limitarianism`: the fee_split percentages are manifest-declared as a **friction gradient** — as an EPR accumulates large balances (relative to manifest-declared scale), a larger fraction of incoming Events ratchets into Commons. This makes accumulation mechanically expensive at the substrate floor; no high-net-worth class forms because every accumulation operation is friction-resisted.
+
+Friction-gradient declaration (per pillar manifest):
+
+```jsonc
+// elohim/sdk/domains/shefa/manifest.json
+{
+  "friction_gradient": {
+    "scale": "currency-USD",
+    "tiers": [
+      {"upper_bound": 100000,    "global_commons_share": 0.005},   // 0.5%
+      {"upper_bound": 1000000,   "global_commons_share": 0.02},    // 2%
+      {"upper_bound": 10000000,  "global_commons_share": 0.10},    // 10%
+      {"upper_bound": null,      "global_commons_share": 0.30}     // 30% above $10M-equivalent
+    ]
+  }
+}
+```
+
+As an EPR's holdings grow into higher tiers, the ratchet rate increases. Substrate refuses concentration ops at the floor by making them mechanically expensive — not by prohibition.
+
+**Cash-out path.** Bridge-collectives can author `Event(action="cash-out", provider=bridge_commons, receiver=legacy-USD-bank-account, observation_refs=[bank-transfer-confirmation])` to convert Commons-held value to legacy money. Substrate doesn't subsidize legacy translation — bridges do, at their own cost, recouped via the Commons fee. The cash-out is itself a substrate-native Event that ratchets through the Global Commons (the substrate takes its share of bridge-collective cash-out, returning value to the network even as the bridge bridges to legacy).
+
+**Manifest declaration.** Per-pillar fee splits, per-bridge fee schedules, per-Collective Commons policies, Global Commons allocation rules:
+
+```jsonc
+// elohim/sdk/domains/elohim/manifest.json — Global Commons declarations
+{
+  "global_commons": {
+    "epr_cid": "<global-commons-epr-cid>",
+    "apex_elohim_council_membership_cid": "<apex-elohim-council-membership-cid>",
+    "allocation_quorum": { "n": 5, "of": 7 },
+    "purpose_categories": ["bridge-development", "infrastructure", "public-good", "anti-concentration-redistribution"]
+  }
+}
+```
+
+**Touches:**
+- `elohim/sdk/domains/elohim/manifest.json` — Global Commons declarations + apex-elohim council Membership EPR
+- `elohim/sdk/domains/*/manifest.json` — per-pillar friction_gradient + per-pillar fee schedules
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — fee-split validation (mass-conservation check on Events with fee_splits); reject Events whose fee_splits don't sum to (total - receiver_amount)
+- `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — coordinator functions for `create_commons`, `allocate_from_commons` (apex-elohim governance gate)
+- `elohim/elohim-storage/src/services/commons_steward_service.rs` (planned) — commons-stewardship-elohim agent (D.6 interlock)
+- `elohim/elohim-storage/src/services/friction_gradient_service.rs` (planned) — per-EPR balance lookup → ratchet-tier resolution at Event-authoring time
+- D.8 interlock — bridge fee schedules feed Bridge Commons; bridge-collective stewards govern
+- D.6 interlock — commons-stewardship-elohim is the apex-elohim-council agent specialization
+- D.9 interlock — reach to commons-tier engages Global Commons elohim-council attestation chain
+- D.7 interlock — disposal of public-good Resources at commons-reach engages council witness
 
 ### D.9 Reach-Mutation Events (Gap 10) — Wave C
 
@@ -2383,6 +3019,131 @@ These are not architecture decisions; they are schema-authoring debts. D.10 (voc
 - `elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json` — `signalKind` enum: add `forget-request`
 - `elohim/elohim-storage/tests/schema_contract.rs` — add `EconomicResourceView` contract test; verify `proofClass` enum match between validator and view; verify `signalKind` enum match between whitelist and wire schema
 - `elohim/elohim-storage/src/views.rs` — extend or confirm `EconomicResourceView` Rust struct matches the new JSON schema (one or the other is the source of truth; the contract test fails the build if they diverge)
+
+---
+
+### D.14 Standing-Curve View + Policy Declaration (Gap 15) — Wave E
+
+**Motivation.** Phase 1 A.7 found that `standing_scores` is queried as a SQL view/table by feed-ranking (Meta archetype), reach-arbitration (every primitive that respects reach), and graduation-evaluation (D.6 elohim-authoring pattern) — but the view definition logic is not documented anywhere. The standing-curve policy (decay rate, vouch recovery fraction, debit weights, update frequency) needs explicit manifest declaration so collectives can tune it without code changes, and so the substrate's nervous system (reach as earned per `project_social_reach_nervous_system`) has a concrete substrate-floor specification.
+
+**Design — `standing_scores` view contract.**
+
+Per D.18 signal_class isolation, the view returns per-(author, signal_class) tuples rather than a global standing:
+
+```sql
+CREATE VIEW standing_scores AS
+WITH signal_aggregates AS (
+    SELECT
+        fs.signer_cid AS author_cid,
+        fs.signal_class,
+        SUM(
+            CASE
+                WHEN fs.standing_impact = 'credit-soft' THEN policy.credit_soft_weight
+                WHEN fs.standing_impact = 'credit-firm' THEN policy.credit_firm_weight
+                WHEN fs.standing_impact = 'debit-soft' THEN policy.debit_soft_weight
+                WHEN fs.standing_impact = 'debit-firm' THEN policy.debit_firm_weight
+                ELSE 0
+            END
+            * EXP(-policy.decay_rate_per_day * (NOW_EPOCH() - fs.observed_at) / 86400)
+        ) AS raw_score,
+        COUNT(*) FILTER (WHERE fs.signal_kind = 'vouch') * policy.vouch_recovery_fraction AS vouch_offset,
+        MAX(fs.observed_at) AS most_recent_signal_at
+    FROM feedback_signals fs
+    JOIN standing_curve_policies policy ON policy.signal_class = fs.signal_class
+    -- Optionally apply aggregate-subordinate shortcuts (D.12 interlock):
+    --   if a signal_class window has been aggregate-subordinated, use the
+    --   Commitment's aggregate_metrics instead of summing individual signals
+    GROUP BY fs.signer_cid, fs.signal_class
+)
+SELECT
+    author_cid,
+    signal_class,
+    raw_score + vouch_offset AS standing_score,
+    most_recent_signal_at
+FROM signal_aggregates;
+```
+
+The view is **derived only**; never written to directly. Services consume it as read-only.
+
+**Manifest-declared standing-curve policy per signal_class.**
+
+```jsonc
+// elohim/sdk/domains/elohim/manifest.json (or per-pillar override)
+{
+  "standing_curve_policies": [
+    {
+      "signal_class": "care",
+      "decay_rate_per_day": 0.01,
+      "vouch_recovery_fraction": 0.5,
+      "credit_soft_weight": 1,
+      "credit_firm_weight": 5,
+      "debit_soft_weight": -1,
+      "debit_firm_weight": -10,
+      "update_frequency": "eventual_60s"  // per E-1 below
+    },
+    {
+      "signal_class": "compute",
+      "decay_rate_per_day": 0.05,  // compute standing decays faster (recent performance more salient)
+      "credit_firm_weight": 3,
+      "debit_firm_weight": -8
+    },
+    {
+      "signal_class": "governance",
+      "decay_rate_per_day": 0.005,  // governance standing decays slower (cumulative)
+      "credit_firm_weight": 10,
+      "debit_firm_weight": -20
+    },
+    {
+      "signal_class": "trust",
+      "decay_rate_per_day": 0.001,  // trust nearly permanent
+      "vouch_recovery_fraction": 1.0  // vouch fully offsets prior debits in trust class
+    }
+  ]
+}
+```
+
+D.10's vocabulary governance gate validates that signal_class values referenced in standing_curve_policies match the SignalClass enum from D.18.
+
+**E-1 resolution — eventual-consistency with 60-second staleness SLA.** Per operator lean: re-derive the view on a 60-second schedule rather than on every signal arrival. The trade-off (feed ranking with 60s standing-staleness vs. hub serialization at scale) favors hub-throughput; 60s standing-staleness is imperceptible to users; real-time was premature optimization on already-noisy signal.
+
+```rust
+// elohim/elohim-storage/src/services/standing_curve_service.rs (planned)
+pub struct StandingCurveService {
+    update_interval: Duration,  // 60s default from manifest
+}
+
+impl StandingCurveService {
+    async fn refresh_standing_scores(&self) {
+        // 1. Read latest feedback_signals delta since last refresh
+        // 2. Apply aggregate-subordinate shortcuts (D.12) where windows already-aggregated
+        // 3. Recompute standing_scores view by re-executing the policy formula
+        // 4. Stamp the projection with refresh_timestamp
+    }
+}
+```
+
+Feed-ranking and reach-arbitration query the view, get scores stamped with their refresh_timestamp; consumers know freshness without needing to drive recomputation.
+
+**Standing-stewardship-elohim.** Per D.6: a `standing-stewardship-elohim` agent specialization drives the periodic recompute, monitors for anomalies (signal-cluster attacks; standing-curve oscillations), and proposes manifest amendments when the curve isn't producing healthy network dynamics.
+
+**Hub-scale efficiency.** Per Phase 1 A.7 concern: hub with 10k signals/day and 200+ active authors needs O(signals) refresh, not O(authors × signals). The 60s interval batches all signal arrivals into one recompute pass. With D.12 aggregate-subordinate handling old signals, the recompute scope is bounded by the active window.
+
+**Interlocks.**
+
+- **D.18 (signal_class field)**: per-class standing tuples are the output structure
+- **D.12 (aggregate-subordinate)**: aggregated signal windows use the Commitment's aggregate_metrics as a shortcut in the view computation
+- **D.6 (elohim-authoring)**: standing-stewardship-elohim is the agent specialization driving the recompute
+- **D.10 (vocabulary governance)**: standing_curve_policies references signal_class values; validated by the gate
+- **D.20 (Layered Commons)**: standing-curve influences reach-mutation authority (D.9 D-2 interlock — author's standing caps the max reach they can grant); this is the substrate's nervous system in action
+
+**Touches:**
+- `elohim/elohim-storage/src/db/views/standing_scores.sql` (planned) — the SQL view definition
+- `elohim/elohim-storage/src/services/standing_curve_service.rs` (planned) — periodic recompute service with 60s default interval
+- `elohim/sdk/domains/elohim/manifest.json` (and per-pillar overrides) — declare standing_curve_policies per signal_class
+- `elohim/sdk/schemas/v1/views/standing-score-view.schema.json` (planned) — wire shape for the view
+- `app/elohim-app/src/app/elohim/elohim-agents/standing-stewardship-elohim.service.ts` (planned) — agent specialization (D.6 interlock)
+- D.18 interlock — signal_class enum determines view output shape
+- D.12 interlock — aggregate-subordinate shortcuts in the view computation
 
 ---
 
