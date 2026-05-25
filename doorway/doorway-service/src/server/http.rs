@@ -56,9 +56,6 @@ enum Disposition {
     /// Registry matched but the target type is not yet handled by dispatch
     /// (BlobProxy, StreamProxy, ZomeCall, AgentProxy). Caller returns 404.
     RegistryUnhandled,
-    /// No registry match, GET method, root_app_slug is configured —
-    /// caller falls through to the root SPA bootstrap handler.
-    RootApp,
     /// No registry match and no SPA fallback applies — caller returns 404.
     NotFound,
 }
@@ -72,11 +69,12 @@ enum Disposition {
 /// the registry entirely and fell into the SPA bootstrap, breaking thumbnails.
 ///
 /// The contract: if the registry has any compiled route matching `(method, path)`,
-/// the registry decides. Otherwise, GET requests with a configured root SPA
-/// slug fall through to the SPA; anything else is 404.
+/// the registry decides. Otherwise, anything unmatched returns 404. (Root-path
+/// dispatch is now handled by the EPR router — `state.epr_router.dispatch(&path)`
+/// — which fires before this function, consulting the active projections whose
+/// `url_path == "/"` rather than a hardcoded slug env var.)
 async fn classify_dispatch(
     registry: &crate::services::RouteRegistry,
-    root_app_slug: Option<&str>,
     method: &Method,
     path: &str,
 ) -> Disposition {
@@ -109,10 +107,6 @@ async fn classify_dispatch(
         // Future: handle ZomeCall, AgentProxy, BlobProxy, StreamProxy targets.
         // For now any non-StorageProxy registry hit returns 404.
         return Disposition::RegistryUnhandled;
-    }
-
-    if *method == Method::GET && root_app_slug.is_some() {
-        return Disposition::RootApp;
     }
 
     Disposition::NotFound
@@ -1131,7 +1125,10 @@ fn is_service_path(path: &str) -> bool {
         }
     }
     // Exact-match service roots that don't carry a trailing slash in requests.
-    matches!(path, "/" | "/admin" | "/status.json")
+    // Note: "/" is intentionally NOT listed here so the EPR router (B13) can
+    // match a root projection (url_path="/") before the explicit match arm below.
+    // The explicit arm still handles WebSocket upgrades on "/" (dev-mode legacy path).
+    matches!(path, "/admin" | "/status.json")
 }
 
 /// Dispatch a request to a projected EPR (B13).
@@ -1520,7 +1517,18 @@ async fn handle_request(
                     )
                 }
             } else {
-                to_boxed(routes::handle_root_app_request(Arc::clone(&state), "/").await)
+                // Post-B14: ROOT_APP_SLUG is gone. The EPR router (consulted
+                // earlier in handle_request) handles "/" when a projection
+                // exists for url_path="/". We only reach this arm when no
+                // root projection is registered — redirect to /threshold so
+                // the operator can register one or land on the bootstrap UI.
+                to_boxed(
+                    Response::builder()
+                        .status(StatusCode::FOUND)
+                        .header("Location", "/threshold")
+                        .body(Full::new(Bytes::new()))
+                        .unwrap(),
+                )
             }
         }
 
@@ -2068,13 +2076,13 @@ async fn handle_request(
         //   1. Registry match + render_spec set + renderer available → SSR render
         //   2. Registry match + render_spec set + no renderer → StorageProxy fallback
         //   3. Registry match + no render_spec → StorageProxy
-        //   4. Registry miss + GET + slug configured → SPA bootstrap
-        //   5. Registry miss otherwise → 404
+        //   4. Registry miss → 404
+        //      (Root-path dispatch is handled by the EPR router above this match block;
+        //       ROOT_APP_SLUG is gone — the projection whose url_path="/" is the root.)
         // ====================================================================
         (_, p) => {
             let dispo = classify_dispatch(
                 &state.route_registry,
-                state.args.root_app_slug.as_deref(),
                 req.method(),
                 p,
             )
@@ -2297,9 +2305,6 @@ async fn handle_request(
                 Disposition::RegistryUnhandled => {
                     debug!(path = %p, "Registry matched but target type not yet handled");
                     to_boxed(not_found_response(p))
-                }
-                Disposition::RootApp => {
-                    to_boxed(routes::handle_root_app_request(Arc::clone(&state), p).await)
                 }
                 Disposition::NotFound => {
                     debug!(path = %p, "No registry match and no SPA fallback");
@@ -3048,15 +3053,9 @@ mod dispatch_classification_tests {
     async fn blob_path_dispatches_to_storage_proxy() {
         // Regression: the recurring thumbnail bug. /blob/<hash> must reach
         // the registry and be classified as StorageProxy, not fall through
-        // to the SPA bootstrap.
+        // to a SPA bootstrap path.
         let registry = registry_with_storage_route(HttpMethod::Get, "/blob/:hash").await;
-        let dispo = classify_dispatch(
-            &registry,
-            Some("lamad"),
-            &Method::GET,
-            "/blob/sha256-abcdef123456",
-        )
-        .await;
+        let dispo = classify_dispatch(&registry, &Method::GET, "/blob/sha256-abcdef123456").await;
         assert!(
             matches!(&dispo, Disposition::StorageProxy { endpoint } if endpoint == "http://storage:8090"),
             "GET /blob/<hash> must classify as StorageProxy, got {dispo:?}"
@@ -3069,8 +3068,7 @@ mod dispatch_classification_tests {
         // (e.g. /thumbnails/, /shards/, anything outside /api/v1/+/account/)
         // must route through the registry without a doorway code change.
         let registry = registry_with_storage_route(HttpMethod::Get, "/future/:id").await;
-        let dispo =
-            classify_dispatch(&registry, Some("lamad"), &Method::GET, "/future/some-id").await;
+        let dispo = classify_dispatch(&registry, &Method::GET, "/future/some-id").await;
         assert!(
             matches!(dispo, Disposition::StorageProxy { .. }),
             "Any registry-compiled path must route through the registry"
@@ -3078,22 +3076,16 @@ mod dispatch_classification_tests {
     }
 
     #[tokio::test]
-    async fn unregistered_get_with_slug_falls_through_to_root_app() {
-        // SPA client-side routing: paths the registry doesn't know
-        // (e.g. /learn/<id>) must serve the SPA bootstrap on GET when a
-        // root_app_slug is configured.
+    async fn unregistered_get_returns_not_found() {
+        // Root-path / SPA dispatch is handled by the EPR router (B11–B13) before
+        // classify_dispatch is reached. Unregistered paths that slip through here
+        // must return NotFound — there is no ROOT_APP_SLUG slug fallback.
         let registry = RouteRegistry::with_defaults();
-        let dispo = classify_dispatch(
-            &registry,
-            Some("lamad"),
-            &Method::GET,
-            "/learn/some-path-id",
-        )
-        .await;
+        let dispo = classify_dispatch(&registry, &Method::GET, "/learn/some-path-id").await;
         assert_eq!(
             dispo,
-            Disposition::RootApp,
-            "Unregistered GET with slug configured must fall through to SPA"
+            Disposition::NotFound,
+            "Unregistered GET with no registry match must return NotFound (EPR router handles root)"
         );
     }
 
@@ -3102,13 +3094,7 @@ mod dispatch_classification_tests {
         // API misses must 404 (not serve HTML). Without this, an unknown
         // POST /api/v1/foo would render the SPA bootstrap to a JSON client.
         let registry = RouteRegistry::with_defaults();
-        let dispo = classify_dispatch(
-            &registry,
-            Some("lamad"),
-            &Method::POST,
-            "/api/v1/no-such-route",
-        )
-        .await;
+        let dispo = classify_dispatch(&registry, &Method::POST, "/api/v1/no-such-route").await;
         assert_eq!(
             dispo,
             Disposition::NotFound,
@@ -3146,8 +3132,7 @@ mod dispatch_classification_tests {
         // not StorageProxy, so the caller can dispatch through the in-process renderer.
         let registry =
             registry_with_ssr_route(HttpMethod::Get, "/lamad/concept/:id", "angular-ssr").await;
-        let dispo =
-            classify_dispatch(&registry, Some("lamad"), &Method::GET, "/lamad/concept/abc").await;
+        let dispo = classify_dispatch(&registry, &Method::GET, "/lamad/concept/abc").await;
         match dispo {
             Disposition::SsrRoute { spec, .. } => {
                 assert_eq!(
