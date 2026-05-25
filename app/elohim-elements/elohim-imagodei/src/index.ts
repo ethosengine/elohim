@@ -24,3 +24,6 @@ export type { SettingControl } from './elohim-imagodei-setting-control.js';
 export { ElohimImagodeiSettingsPalette } from './elohim-imagodei-settings-palette.js';
 
 export { ElohimImagodeiStewardConfigureBanner } from './elohim-imagodei-steward-configure-banner.js';
+
+export { ElohimImagodeiTrustIndicator } from './elohim-imagodei-trust-indicator.js';
+export type { TrustMode } from './elohim-imagodei-trust-indicator.js';

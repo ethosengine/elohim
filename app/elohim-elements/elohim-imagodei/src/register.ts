@@ -7,6 +7,7 @@ import { ElohimImagodeiProtectedTierMarker } from './elohim-imagodei-protected-t
 import { ElohimImagodeiSettingControl } from './elohim-imagodei-setting-control.js';
 import { ElohimImagodeiSettingsPalette } from './elohim-imagodei-settings-palette.js';
 import { ElohimImagodeiStewardConfigureBanner } from './elohim-imagodei-steward-configure-banner.js';
+import { ElohimImagodeiTrustIndicator } from './elohim-imagodei-trust-indicator.js';
 
 if (!customElements.get('elohim-imagodei-introspection-panel')) {
   customElements.define('elohim-imagodei-introspection-panel', ElohimImagodeiIntrospectionPanel);
@@ -29,4 +30,8 @@ if (!customElements.get('elohim-imagodei-steward-configure-banner')) {
     'elohim-imagodei-steward-configure-banner',
     ElohimImagodeiStewardConfigureBanner
   );
+}
+
+if (!customElements.get('elohim-imagodei-trust-indicator')) {
+  customElements.define('elohim-imagodei-trust-indicator', ElohimImagodeiTrustIndicator);
 }
