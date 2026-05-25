@@ -14,7 +14,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 
 import { BracketSynthesisService } from '../../services/bracket-synthesis.service';
 import { ContributeStatementComponent } from '../contribute-statement/contribute-statement.component';

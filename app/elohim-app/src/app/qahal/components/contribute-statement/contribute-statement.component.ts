@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 
 import type { StatementView, CreateStatementInputView } from '@elohim/storage-client/generated';
 

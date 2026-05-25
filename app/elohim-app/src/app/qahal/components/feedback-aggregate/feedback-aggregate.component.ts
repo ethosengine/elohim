@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 
 import type { SignalAggregateView } from '@elohim/storage-client/generated';
 

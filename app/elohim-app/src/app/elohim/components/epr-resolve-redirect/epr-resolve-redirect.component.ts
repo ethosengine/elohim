@@ -12,7 +12,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
-import { parseEpr, eprToRoute } from '../../utils/epr-ref';
+import { parseEpr, eprToRoute } from '@elohim/service';
 
 @Component({
   selector: 'app-epr-resolve-redirect',

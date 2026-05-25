@@ -21,8 +21,8 @@
  */
 
 // Import content types from lamad (content pillar)
-import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
-import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+import { JsonLdMetadata } from '@elohim/service';
+import { OpenGraphMetadata } from '@elohim/service';
 
 import type {
   ContentReach,

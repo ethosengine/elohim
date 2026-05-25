@@ -11,7 +11,7 @@ import { catchError } from 'rxjs/operators';
 
 import { firstValueFrom, of } from 'rxjs';
 
-import type { IContentAttestation } from '../interfaces/content-attestation.interface';
+import type { IContentAttestation } from '@elohim/service';
 import type {
   ContentAttestationView,
   CreateAttestationInputView,

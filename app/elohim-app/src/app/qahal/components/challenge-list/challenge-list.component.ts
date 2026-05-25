@@ -8,7 +8,7 @@
 import { Component, inject, signal, type OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 
 import type { ChallengeView } from '@elohim/storage-client/generated';
 

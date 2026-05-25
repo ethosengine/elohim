@@ -9,7 +9,8 @@
 export { DataLoaderService } from './data-loader.service';
 export { LocalSourceChainService } from './local-source-chain.service';
 export { HolochainClientService } from './holochain-client.service';
-export { GovernanceApiService } from './governance-api.service';
+// GovernanceApiService — migrated to @elohim/service (Slice 2.1)
+export { GovernanceApiService } from '@elohim/service';
 export { ContentAttestationApiService } from './content-attestation-api.service';
 export { AttestationApiService } from './attestation-api.service';
 export type { IssueAttestationInput, RevokeAttestationInput } from './attestation-api.service';

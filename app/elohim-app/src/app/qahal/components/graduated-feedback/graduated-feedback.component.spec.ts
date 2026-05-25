@@ -7,7 +7,7 @@ import {
   GovernanceSignalService,
   FeedbackStats,
 } from '@app/elohim/services/governance-signal.service';
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
 
 import { GraduatedFeedbackComponent, FeedbackContext } from './graduated-feedback.component';

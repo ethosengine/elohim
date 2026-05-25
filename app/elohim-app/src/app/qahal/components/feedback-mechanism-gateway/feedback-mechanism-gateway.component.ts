@@ -22,7 +22,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 
 import {
   MechanismSelectionService,

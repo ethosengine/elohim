@@ -2,7 +2,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 
 import { Observable } from 'rxjs';
 
-import { extractGateFromResponse } from '../models/gated-response.model';
+import { extractGateFromResponse } from '@elohim/service';
 
 import { GateService } from './gate.service';
 

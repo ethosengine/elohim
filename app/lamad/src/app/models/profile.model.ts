@@ -11,9 +11,9 @@
  * not as consumption metrics, but as a narrative of growth.
  */
 
-import { MasteryLevel } from '@app/elohim/models/agent.model';
-import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
-import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+import { MasteryLevel } from '@elohim/service/angular/models/agent.model';
+import { JsonLdMetadata } from '@elohim/service';
+import { OpenGraphMetadata } from '@elohim/service';
 
 import { ContentType } from './content-node.model';
 

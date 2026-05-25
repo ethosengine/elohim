@@ -4,7 +4,7 @@ import { SimpleChange, SimpleChanges } from '@angular/core';
 import { of } from 'rxjs';
 
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 
 import { OpinionClusterComponent, Statement, StatementVote } from './opinion-cluster.component';
 import { type Mock, vi } from 'vitest';

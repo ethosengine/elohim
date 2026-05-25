@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { Observable, throwError } from 'rxjs';
 
-import { isGatedResponse } from '../models/gated-response.model';
+import { isGatedResponse } from '@elohim/service';
 
 import type { GateService } from './gate.service';
 

@@ -26,7 +26,7 @@ import {
   type IEprUriResolver,
 } from '../interfaces/epr-resolver.interface';
 import { decodeEprHead } from '../utils/epr-codec';
-import { type EprRef, parseEpr, eprToRoute } from '../utils/epr-ref';
+import { type EprRef, parseEpr, eprToRoute } from '@elohim/service';
 
 import { StorageClientService, type StorageContentNode } from './storage-client.service';
 

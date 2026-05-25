@@ -18,7 +18,7 @@ import {
   FrontierItem,
   MasteryLevel,
   MASTERY_LEVEL_VALUES,
-} from '../models/agent.model';
+} from '@elohim/service/angular/models/agent.model';
 
 import { DataLoaderService } from './data-loader.service';
 

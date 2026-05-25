@@ -41,9 +41,9 @@ import {
   UpstreamProposal,
   ExtensionStats,
 } from '@app/lamad/models/path-extension.model';
-import { CONTENT_ATTESTATION } from '../interfaces/content-attestation.interface';
-import { GOVERNANCE } from '../interfaces/governance.interface';
-import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
+import { CONTENT_ATTESTATION } from '@elohim/service';
+import { GOVERNANCE } from '@elohim/service';
+import { Agent, AgentProgress, AgentAttestation } from '@elohim/service/angular/models/agent.model';
 
 import { ContentResolverService } from './content-resolver.service';
 import { ContentBackendService } from './content.service';
@@ -51,8 +51,8 @@ import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
 
-import type { IContentAttestation } from '../interfaces/content-attestation.interface';
-import type { IGovernance } from '../interfaces/governance.interface';
+import type { IContentAttestation } from '@elohim/service';
+import type { IGovernance } from '@elohim/service';
 import type {
   GovernanceStateView,
   ChallengeView,

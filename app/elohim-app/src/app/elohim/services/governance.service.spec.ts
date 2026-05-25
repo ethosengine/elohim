@@ -17,7 +17,7 @@ import {
   GovernanceStateRecord,
 } from './data-loader.service';
 import { SessionHumanService } from '@elohim/identity';
-import { GovernanceApiService } from './governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 import { vi, Mock } from 'vitest';
 
 describe('GovernanceService', () => {

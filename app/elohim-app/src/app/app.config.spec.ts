@@ -4,8 +4,8 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 
 import { appConfig } from './app.config';
-import { GOVERNANCE } from './elohim/interfaces/governance.interface';
-import { CONTENT_ATTESTATION } from './elohim/interfaces/content-attestation.interface';
+import { GOVERNANCE } from '@elohim/service';
+import { CONTENT_ATTESTATION } from '@elohim/service';
 import { DATA_LOADER } from './elohim/interfaces/data-loader.interface';
 import { BLOB_FETCHER } from './elohim/interfaces/blob-fetcher.interface';
 import { STORAGE_API } from './elohim/interfaces/storage-api.interface';

@@ -33,7 +33,8 @@ export type {
 } from './storage-writer.interface';
 export { LEARNER_BACKEND } from './learner-backend.interface';
 export type { ILearnerBackend } from './learner-backend.interface';
-export { GOVERNANCE } from './governance.interface';
-export type { IGovernance } from './governance.interface';
-export { CONTENT_ATTESTATION } from './content-attestation.interface';
-export type { IContentAttestation } from './content-attestation.interface';
+// governance.interface, content-attestation.interface — migrated to @elohim/service (Slice 2.1)
+export { GOVERNANCE } from '@elohim/service/angular/interfaces/governance.interface';
+export type { IGovernance } from '@elohim/service/angular/interfaces/governance.interface';
+export { CONTENT_ATTESTATION } from '@elohim/service/angular/interfaces/content-attestation.interface';
+export type { IContentAttestation } from '@elohim/service/angular/interfaces/content-attestation.interface';

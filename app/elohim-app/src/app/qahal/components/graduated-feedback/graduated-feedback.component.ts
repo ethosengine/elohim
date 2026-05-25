@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 
 import { Subject, takeUntil } from 'rxjs';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 import {
   GovernanceSignalService,
   GraduatedFeedbackInput,

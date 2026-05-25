@@ -4,10 +4,10 @@ import { of, throwError } from 'rxjs';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
 import { LearningPath } from '@app/lamad/models/learning-path.model';
-import { AgentProgress } from '../models/agent.model';
+import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { DataLoaderService } from './data-loader.service';
-import { GOVERNANCE } from '../interfaces/governance.interface';
-import { CONTENT_ATTESTATION } from '../interfaces/content-attestation.interface';
+import { GOVERNANCE } from '@elohim/service';
+import { CONTENT_ATTESTATION } from '@elohim/service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { ContentResolverService } from './content-resolver.service';

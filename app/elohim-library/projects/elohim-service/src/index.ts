@@ -86,3 +86,47 @@ export {
 
 // Re-export main functions for convenience
 export { runImportPipeline, importContent } from './services/import-pipeline.service';
+
+// ============================================================================
+// Angular SDK surface (Slice 2.1 — cross-pillar import cleanup)
+// ============================================================================
+// Models — selective export to avoid conflict with cache module's MasteryLevel constant
+// (cache module exports a MasteryLevel const-enum; agent.model exports MasteryLevel string-union)
+// Consumers that need the agent MasteryLevel type should import from the sub-path:
+//   import type { MasteryLevel } from '@elohim/service/angular/models/agent'
+// NOTE: MasteryLevel is NOT re-exported here — it conflicts with cache module's MasteryLevel
+// constant-enum. Use sub-path import for the agent string-union type:
+//   import type { MasteryLevel } from '@elohim/service/angular/models/agent.model'
+export type {
+  Agent,
+  AgentProgress,
+  AgentAttestation,
+  NewAttestation,
+  AttestationCategory,
+  FrontierItem,
+  MasteryTier,
+} from './angular/models/agent.model';
+export {
+  getMasteryTier,
+  getMasteryProgress,
+  isAboveGate,
+  compareMasteryLevels,
+  MASTERY_LEVEL_VALUES,
+  BLOOM_LEVEL_VALUES,
+  ATTESTATION_GATE_LEVEL,
+} from './angular/models/agent.model';
+
+export * from './angular/models/json-ld.model';
+export * from './angular/models/open-graph.model';
+export * from './angular/models/gated-response.model';
+
+// Interfaces (Angular DI tokens + abstract contracts)
+export * from './angular/interfaces/governance.interface';
+export * from './angular/interfaces/content-attestation.interface';
+
+// Services
+export { GovernanceApiService } from './angular/services/governance-api.service';
+
+// Utils
+export * from './angular/utils/access-control.helper';
+export * from './angular/utils/epr-ref';

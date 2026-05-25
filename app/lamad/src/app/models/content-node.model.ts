@@ -27,7 +27,7 @@
  * - Uses Attestation patterns from protocol-core
  */
 
-import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
+import { JsonLdMetadata } from '@elohim/service';
 import { type ReachLevel, type GeographicContext } from '@elohim/storage-client';
 import {
   CONTENT_TYPES as WIRE_CONTENT_TYPES,

@@ -17,7 +17,7 @@ import { from } from 'rxjs';
 
 // @coverage: 80.0% (2026-02-24)
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 import {
   GovernanceSignalService,
   OpinionCluster,

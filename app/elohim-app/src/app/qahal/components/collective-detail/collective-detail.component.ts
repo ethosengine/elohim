@@ -5,7 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { forkJoin } from 'rxjs';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 
 import { FaceCardComponent } from '../face-card/face-card.component';
 import { FeedbackMechanismGatewayComponent } from '../feedback-mechanism-gateway/feedback-mechanism-gateway.component';

@@ -23,8 +23,25 @@ export * from './economic-event.model';
 // Contributor Presence - Stewardship lifecycle for absent contributors
 export * from './contributor-presence.model';
 
-// Agent types
-export * from './agent.model';
+// Agent types (migrated to @elohim/service — Slice 2.1)
+export type {
+  Agent,
+  AgentProgress,
+  AgentAttestation,
+  NewAttestation,
+  AttestationCategory,
+  FrontierItem,
+  MasteryTier,
+} from '@elohim/service/angular/models/agent.model';
+export {
+  getMasteryTier,
+  getMasteryProgress,
+  isAboveGate,
+  compareMasteryLevels,
+  MASTERY_LEVEL_VALUES,
+  BLOOM_LEVEL_VALUES,
+  ATTESTATION_GATE_LEVEL,
+} from '@elohim/service/angular/models/agent.model';
 export * from './elohim-agent.model';
 
 // Trust system
@@ -50,13 +67,14 @@ export * from './epr-head.model';
 
 // Infrastructure
 export * from './source-chain.model';
-export * from './json-ld.model';
-export * from './open-graph.model';
+// json-ld.model, open-graph.model — migrated to @elohim/service (Slice 2.1)
+export * from '@elohim/service/angular/models/json-ld.model';
+export * from '@elohim/service/angular/models/open-graph.model';
 export * from './verifiable-credential.model';
 
-// Gated Response - Gate evaluation extraction for mutation responses
-export { isGatedResponse, extractGateFromResponse } from './gated-response.model';
-export type { GatedResponse } from './gated-response.model';
+// Gated Response — migrated to @elohim/service (Slice 2.1)
+export { isGatedResponse, extractGateFromResponse } from '@elohim/service/angular/models/gated-response.model';
+export type { GatedResponse } from '@elohim/service/angular/models/gated-response.model';
 
 // Zome Wire Types - Centralized Holochain zome response types
 export * from './zome-wire-types';

@@ -21,7 +21,7 @@ import {
   signal,
 } from '@angular/core';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 
 import type {
   ProposalView,

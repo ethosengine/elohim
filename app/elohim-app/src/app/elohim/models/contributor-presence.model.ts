@@ -37,7 +37,7 @@
  * - Accumulated value tracked as EconomicResource
  */
 
-import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+import { OpenGraphMetadata } from '@elohim/service';
 import {
   REAAgent,
   ExternalIdentifier,

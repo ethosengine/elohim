@@ -3,7 +3,7 @@ import { of } from 'rxjs';
 import { AgentService } from './agent.service';
 import { DataLoaderService } from './data-loader.service';
 import { SessionHumanService } from '../../imagodei/services/session-human.service';
-import type { AgentProgress } from '../models/agent.model';
+import type { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { vi, Mock } from 'vitest';
 
 /**

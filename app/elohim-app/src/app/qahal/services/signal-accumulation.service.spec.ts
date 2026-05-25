@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 
 import { SignalAccumulationService } from './signal-accumulation.service';
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 import type { SignalAggregateView } from '@elohim/storage-client/generated';
 
 const mockGovernanceApi = {

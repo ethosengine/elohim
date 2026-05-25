@@ -48,7 +48,7 @@ import {
   withEstablishingContentIdsArray,
 } from '@app/elohim/adapters/storage-types.adapter';
 import { EventQuery } from '@app/elohim/models/economic-event.model';
-import { extractGateFromResponse } from '@app/elohim/models/gated-response.model';
+import { extractGateFromResponse } from '@elohim/service';
 import { handleGateError } from '@app/elohim/services/gate-error.handler';
 import { GateService } from '@app/elohim/services/gate.service';
 import {

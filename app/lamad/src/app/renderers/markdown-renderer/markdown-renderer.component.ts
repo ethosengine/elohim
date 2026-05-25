@@ -27,7 +27,7 @@ import { firstValueFrom, Subscription } from 'rxjs';
 import { EprPopoverComponent } from '@app/elohim/components/epr-popover/epr-popover.component';
 import { EprResolverService, type StepRef } from '@app/elohim/services/epr-resolver.service';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
-import { parseEpr } from '@app/elohim/utils/epr-ref';
+import { parseEpr } from '@elohim/service';
 
 import { isConceptNode } from '../../generated/content-node-types';
 import { ContentNode } from '../../models/content-node.model';

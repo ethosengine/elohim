@@ -5,7 +5,7 @@ import { catchError, map, tap } from 'rxjs/operators';
 
 import { Observable } from 'rxjs';
 
-import { extractGateFromResponse } from '../models/gated-response.model';
+import { extractGateFromResponse } from '@elohim/service';
 
 import { handleGateError } from './gate-error.handler';
 import { GateService } from './gate.service';

@@ -3,7 +3,7 @@ import { Component, OnDestroy, OnInit, inject, input } from '@angular/core';
 
 import { Subject, takeUntil } from 'rxjs';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 import {
   GovernanceSignalService,
   ReactionCounts,

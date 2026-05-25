@@ -8,14 +8,14 @@ import { environment } from '../environments/environment';
 
 import { routes } from './app.routes';
 import { apiBaseUrlInterceptor } from './elohim/interceptors/api-base-url.interceptor';
-import { CONTENT_ATTESTATION } from './elohim/interfaces/content-attestation.interface';
-import { GOVERNANCE } from './elohim/interfaces/governance.interface';
+import { CONTENT_ATTESTATION } from '@elohim/service';
+import { GOVERNANCE } from '@elohim/service';
 import { provideElohimClient, detectClientMode } from './elohim/providers/elohim-client.provider';
 import { ContentAttestationApiService } from './elohim/services/content-attestation-api.service';
 import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
 import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
 import { CustodianSelectionService } from './elohim/services/custodian-selection.service';
-import { GovernanceApiService } from './elohim/services/governance-api.service';
+import { GovernanceApiService } from '@elohim/service';
 import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
 import { ContentIOModuleWithPlugins } from '@app/lamad/content-io/content-io.module';
 
