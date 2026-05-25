@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 
@@ -9,7 +9,8 @@ import { filter, takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
 
-import { ElohimNavigatorComponent } from '@app/elohim/components/elohim-navigator/elohim-navigator.component';
+import 'elohim-core/register';
+
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
 import { RendererInitializerService } from '../../renderers/renderer-initializer.service';
@@ -17,7 +18,8 @@ import { RendererInitializerService } from '../../renderers/renderer-initializer
 @Component({
   selector: 'app-lamad-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, FormsModule, ElohimNavigatorComponent],
+  imports: [CommonModule, RouterOutlet, RouterLink, FormsModule],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './lamad-layout.component.html',
   styleUrls: ['./lamad-layout.component.css'],
 })

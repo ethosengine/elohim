@@ -7,7 +7,7 @@ import { RouterOutlet } from '@angular/router';
  * The lamad bundle is served at /lamad/ with <base href="/lamad/">.
  * Routes are defined in app.routes.ts and imported from lamad.routes.ts.
  * The LamadLayoutComponent (loaded at route '') provides the actual shell with
- * ElohimNavigatorComponent (cross-pillar via @app/elohim path alias — B18c MVP).
+ * <elohim-navigator> Lit element (cross-pillar via elohim-core workspace — Slice 2.2b).
  *
  * B18d: router-outlet at root delegates immediately to LAMAD_ROUTES.
  */

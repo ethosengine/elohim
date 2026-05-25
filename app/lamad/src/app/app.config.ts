@@ -16,8 +16,9 @@ import { environment } from '../environments/environment';
  * B18d omnibar note:
  * When spec Task B6 lands <elohim-page-chrome>, the lamad toolbar becomes a
  * standalone component with `host: { 'slot': 'omnibar' }` that slots into the
- * page chrome custom element. For now, ElohimNavigatorComponent (cross-pillar
- * via @app/elohim path alias) provides the shell from within lamad-layout.
+ * page chrome custom element. For now, the <elohim-navigator> Lit element
+ * (from elohim-core workspace, Slice 2.2b) provides the shell from within
+ * lamad-layout.
  *
  * TODO(B18d-followup): Extract lamad toolbar as a standalone slot='omnibar'
  * component once elohim-page-chrome (Task B6) is available.
