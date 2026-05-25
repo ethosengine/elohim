@@ -9,6 +9,32 @@ use std::sync::RwLock;
 
 use elohim_views::projection::EprProjectionView;
 
+/// Fetch active project-epr commitments from elohim-storage at doorway boot.
+///
+/// Calls `GET {storage_base_url}/db/rea_commitments?action=project-epr&doorwayId={doorway_id}`.
+///
+/// Non-fatal: callers MUST wrap this in a `match` / `Result` and continue on error —
+/// the EPR router starts empty and SSE events will repopulate it when storage comes up.
+pub async fn fetch_projections_from_storage(
+    storage_base_url: &str,
+    doorway_id: &str,
+    http: &reqwest::Client,
+) -> Result<Vec<EprProjectionView>, anyhow::Error> {
+    let url = format!(
+        "{}/db/rea_commitments?action=project-epr&doorwayId={}",
+        storage_base_url.trim_end_matches('/'),
+        doorway_id
+    );
+    let response = http
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await?
+        .error_for_status()?;
+    let projections: Vec<EprProjectionView> = response.json().await?;
+    Ok(projections)
+}
+
 /// In-memory routing table for this doorway's projected EPRs.
 ///
 /// Populated at boot via storage HTTP API (`GET /db/rea_commitments?

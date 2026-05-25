@@ -243,6 +243,20 @@ pub struct AppState {
     /// Enabled via `DOORWAY_PKARR_RESOLVER_ENABLED=true`.
     /// `None` means all `/pkarr/*` requests return 404.
     pub pkarr_resolver: Option<Arc<crate::services::pkarr_resolver::PkarrResolverService>>,
+
+    /// EPR projection router — routes incoming URLs to projected EPRs.
+    ///
+    /// Populated at boot from storage's `/db/rea_commitments?action=project-epr`
+    /// endpoint and refreshed by SSE events (`projection.registered` /
+    /// `projection.revoked`). Consulted before the main route match block so
+    /// pillar URLs (e.g. `/lamad`) serve their cached build without requiring
+    /// an explicit match arm per EPR.
+    ///
+    /// Starts empty. Never fails boot if storage is unreachable — the router
+    /// remains empty and SSE events repopulate it when storage comes up.
+    ///
+    /// See `src/projection/epr_router.rs` (B11) and `src/main.rs` (B12).
+    pub epr_router: Arc<crate::projection::EprRouter>,
 }
 
 /// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
@@ -376,6 +390,7 @@ impl AppState {
             render_capability: None,
             render_semaphore: None,
             pkarr_resolver: None,
+            epr_router: Arc::new(crate::projection::EprRouter::new()),
         }
     }
 
@@ -467,6 +482,7 @@ impl AppState {
             render_capability: None,
             render_semaphore: None,
             pkarr_resolver: None,
+            epr_router: Arc::new(crate::projection::EprRouter::new()),
         }
     }
 
@@ -573,6 +589,7 @@ impl AppState {
             render_capability: None,
             render_semaphore: None,
             pkarr_resolver: None,
+            epr_router: Arc::new(crate::projection::EprRouter::new()),
         }
     }
 
@@ -682,6 +699,7 @@ impl AppState {
             render_capability: None,
             render_semaphore: None,
             pkarr_resolver: None,
+            epr_router: Arc::new(crate::projection::EprRouter::new()),
         })
     }
 
@@ -1074,6 +1092,204 @@ fn infer_gate_event(path: &str) -> Option<gate_client::RelationalImpactEvent> {
     gate_client::infer_event_from_path(path)
 }
 
+/// True for paths that belong to doorway's own service surface and must never
+/// be intercepted by the EPR router — even when a projection is registered at `/`.
+///
+/// These prefixes are handled by explicit match arms above the EPR check, so they
+/// are guaranteed to reach their own handlers. Keeping this list exhaustive avoids
+/// the scenario where `/api/v1/content` silently serves an SPA because a root
+/// projection (`url_path = "/"`) matches everything.
+fn is_service_path(path: &str) -> bool {
+    // One-shot exhaustive check: each prefix belongs to a guaranteed explicit arm in
+    // handle_request. Add new service prefixes here when new explicit arms land.
+    for prefix in &[
+        "/health",
+        "/ready",
+        "/readyz",
+        "/version",
+        "/status",
+        "/debug",
+        "/admin",
+        "/auth",
+        "/hc/",
+        "/app/",
+        "/threshold",
+        "/bootstrap",
+        "/signal",
+        "/api/",
+        "/import/",
+        "/db/",
+        "/apps/",
+        "/epr-head/",
+        "/blob/",
+        "/pkarr/",
+        "/.well-known/",
+        "/identity/",
+    ] {
+        if path == *prefix || path.starts_with(prefix) {
+            return true;
+        }
+    }
+    // Exact-match service roots that don't carry a trailing slash in requests.
+    matches!(path, "/" | "/admin" | "/status.json")
+}
+
+/// Dispatch a request to a projected EPR (B13).
+///
+/// MVP scope (§8.1 + §8.2):
+/// - `reach != "commons"` → 401 (gated reach, deferred to later shift)
+/// - `mode == StewardDirect` → 501 (deferred to later shift)
+/// - `mode == Cached, reach == "commons"` → proxy to storage `/apps/{epr_id}/{sub_path}`
+///
+/// Sub-path computation:
+/// - Strip the projection's `url_path` prefix from the request path.
+/// - Fall back to `entry_file` when the remainder is empty (bare prefix hit).
+async fn dispatch_to_projected_epr(
+    state: &AppState,
+    request_path: &str,
+    projection: elohim_views::projection::EprProjectionView,
+) -> Response<Full<Bytes>> {
+    use elohim_views::projection::ProjectionMode;
+
+    // Reach gate — MVP: only commons is served. Gated projections deferred (§8.2).
+    if projection.reach != "commons" {
+        let body = serde_json::json!({
+            "error": "reach-gated",
+            "message": "This content requires authorization. Gated EPR serving is not yet implemented."
+            // TODO(B-later): consult gate_hints + req auth to serve regional-private/local projections
+        });
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .header("content-type", "application/json")
+            .body(Full::new(Bytes::from(
+                serde_json::to_vec(&body).unwrap_or_else(|_| b"{}".to_vec()),
+            )))
+            .expect("infallible 401 response");
+    }
+
+    // Mode gate — MVP: only Cached is implemented. StewardDirect deferred (§8.2).
+    if projection.mode != ProjectionMode::Cached {
+        let body = serde_json::json!({
+            "error": "steward-direct-not-implemented",
+            "message": "Steward-direct projection mode is not yet implemented in this doorway."
+            // TODO(B-later): open relay connection to steward_direct_endpoint and proxy bytes
+        });
+        return Response::builder()
+            .status(StatusCode::NOT_IMPLEMENTED)
+            .header("content-type", "application/json")
+            .body(Full::new(Bytes::from(
+                serde_json::to_vec(&body).unwrap_or_else(|_| b"{}".to_vec()),
+            )))
+            .expect("infallible 501 response");
+    }
+
+    // Storage URL is required to proxy to the bundle.
+    let storage_url = match &state.args.storage_url {
+        Some(url) => url.trim_end_matches('/').to_string(),
+        None => {
+            return Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .header("content-type", "application/json")
+                .body(Full::new(Bytes::from(
+                    r#"{"error":"Storage URL not configured"}"#,
+                )))
+                .expect("infallible 503 response");
+        }
+    };
+
+    // Strip the projection's url_path prefix from the request path.
+    let sub_path = if projection.url_path == "/" {
+        // Root projection: everything after the leading "/" is the sub-path.
+        request_path.trim_start_matches('/').to_string()
+    } else {
+        // Prefix projection (e.g. "/lamad"): strip the prefix, then the separator.
+        request_path
+            .strip_prefix(&projection.url_path)
+            .unwrap_or(request_path)
+            .trim_start_matches('/')
+            .to_string()
+    };
+
+    // Fall back to the bundle's entry file on bare prefix hits (e.g. GET /lamad).
+    let sub_path = if sub_path.is_empty() {
+        projection.entry_file.clone()
+    } else {
+        sub_path
+    };
+
+    // Proxy to storage's /apps/{epr_id}/{sub_path} — the existing bundle-serving surface.
+    // Storage's slug_index and AppFileCacheService handle caching; doorway proxies, not owns.
+    let storage_apps_path = format!("{}/apps/{}/{}", storage_url, projection.epr_id, sub_path);
+
+    tracing::debug!(
+        request_path = %request_path,
+        epr_id = %projection.epr_id,
+        storage_url = %storage_apps_path,
+        "EPR router dispatching to cached bundle"
+    );
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap_or_default();
+
+    match client.get(&storage_apps_path).send().await {
+        Ok(resp) => {
+            let status = resp.status();
+            let content_type = resp
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("application/octet-stream")
+                .to_string();
+            let cache_control = resp
+                .headers()
+                .get(reqwest::header::CACHE_CONTROL)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            match resp.bytes().await {
+                Ok(body_bytes) => {
+                    let mut builder = Response::builder()
+                        .status(status.as_u16())
+                        .header("content-type", &content_type)
+                        .header("x-epr-router", "dispatched");
+                    if let Some(cc) = cache_control {
+                        builder = builder.header("cache-control", cc);
+                    }
+                    builder
+                        .body(Full::new(Bytes::from(body_bytes)))
+                        .expect("infallible EPR proxy response")
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        epr_id = %projection.epr_id,
+                        error = %e,
+                        "EPR router: failed to read storage response body"
+                    );
+                    Response::builder()
+                        .status(StatusCode::BAD_GATEWAY)
+                        .header("content-type", "application/json")
+                        .body(Full::new(Bytes::from(r#"{"error":"storage read failed"}"#)))
+                        .expect("infallible 502 response")
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                epr_id = %projection.epr_id,
+                storage_url = %storage_apps_path,
+                error = %e,
+                "EPR router: storage request failed"
+            );
+            Response::builder()
+                .status(StatusCode::BAD_GATEWAY)
+                .header("content-type", "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"storage unreachable"}"#)))
+                .expect("infallible 502 response")
+        }
+    }
+}
+
 /// Route incoming HTTP requests
 async fn handle_request(
     state: Arc<AppState>,
@@ -1136,6 +1352,32 @@ async fn handle_request(
             return Ok(response);
         }
         return Ok(to_boxed(not_found_response(&path)));
+    }
+
+    // ── B13: EPR router — consult BEFORE the main match block ─────────────────
+    //
+    // Only fires for GET requests on non-service paths. Service paths (health,
+    // admin, api/v1/*, db/*, apps/*, etc.) are listed in `is_service_path` and
+    // must reach their own explicit match arms — even when a root projection
+    // (url_path = "/") is registered.
+    //
+    // WebSocket upgrades are also excluded: the EPR router only serves static
+    // SPA/asset bundles, never WebSocket streams.
+    if method == Method::GET
+        && !hyper_tungstenite::is_upgrade_request(&req)
+        && !is_service_path(&path)
+    {
+        if let Some(projection) = state.epr_router.dispatch(&path) {
+            tracing::debug!(
+                path = %path,
+                epr_id = %projection.epr_id,
+                url_path = %projection.url_path,
+                "EPR router matched — dispatching to projected bundle"
+            );
+            return Ok(to_boxed(
+                dispatch_to_projected_epr(&state, &path, projection).await,
+            ));
+        }
     }
 
     let response = match (method, path.as_str()) {

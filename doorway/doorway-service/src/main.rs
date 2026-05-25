@@ -549,6 +549,51 @@ async fn main() -> anyhow::Result<()> {
 
     let state = Arc::new(state);
 
+    // B12: Load active EPR projections from storage at boot.
+    //
+    // Seeds the EprRouter so pillar URLs (e.g. /lamad) are routable from the
+    // first request. Wrapped in match — never fails boot if storage isn't up yet.
+    // SSE events from Phase A's events.rs will repopulate the router as soon as
+    // storage becomes reachable.
+    {
+        let epr_http = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_default();
+
+        let node_id_str = state.args.node_id.to_string();
+        let doorway_id = state.args.doorway_id.as_deref().unwrap_or(&node_id_str);
+
+        if let Some(ref storage_url) = state.args.storage_url {
+            match doorway::projection::fetch_projections_from_storage(
+                storage_url,
+                doorway_id,
+                &epr_http,
+            )
+            .await
+            {
+                Ok(projections) => {
+                    info!(
+                        count = projections.len(),
+                        doorway_id = %doorway_id,
+                        "Loaded EPR projections at boot"
+                    );
+                    state.epr_router.replace_all(projections);
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        doorway_id = %doorway_id,
+                        "Could not load EPR projections at boot; router starts empty \
+                         (SSE events will populate it when storage is reachable)"
+                    );
+                }
+            }
+        } else {
+            info!("STORAGE_URL not configured — EPR router starts empty");
+        }
+    }
+
     // Start zome capability discovery (import configs, cache rules)
     // This populates zome_configs and import_config_store for route matching
     // Only needed on writer instances (readers serve from shared MongoDB)
