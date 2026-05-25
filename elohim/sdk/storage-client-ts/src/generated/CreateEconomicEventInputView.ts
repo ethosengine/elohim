@@ -12,4 +12,15 @@ metadata: JsonValue | null,
 /**
  * Place ID where this event occurred (spatial grounding)
  */
-atLocation: string | null, };
+atLocation: string | null, 
+/**
+ * CID of the Collab-Qahal scope under which this event is authored.
+ * When present, the HTTP handler routes the event value through the Collab's
+ * ShareAllocation and persists Settlement events before returning.
+ */
+scopeCollabCid: string | null, 
+/**
+ * Block height at which the event was authored (used for share-routing
+ * when scope_collab_cid is set; 0 for events outside a Collab scope).
+ */
+atBlockHeight: bigint, };

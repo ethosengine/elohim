@@ -13,4 +13,10 @@ metadata: JsonValue | null, dhtAnchorHash: string | null, createdAt: string,
 /**
  * Place ID where this event occurred (spatial grounding)
  */
-atLocation: string | null, };
+atLocation: string | null, 
+/**
+ * CID of the Collab-Qahal scope under which this event was authored.
+ * Set on the primary event; Settlement events carry the Collab CID in
+ * their metadata extensions block instead.
+ */
+scopeCollabCid: string | null, };
