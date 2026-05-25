@@ -11,7 +11,7 @@
  * - Practice summary from challenge pool stats
  */
 
-import type { MasteryLevel } from '@app/elohim/models/agent.model';
+import type { MasteryLevel } from '@elohim/service/angular/models/agent.model';
 
 // @coverage: 93.8% (2026-02-24)
 

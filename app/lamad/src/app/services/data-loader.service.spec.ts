@@ -1,15 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { GOVERNANCE } from '@app/elohim/interfaces/governance.interface';
-import { CONTENT_ATTESTATION } from '@app/elohim/interfaces/content-attestation.interface';
+import { GOVERNANCE } from '@elohim/service';
+import { CONTENT_ATTESTATION } from '@elohim/service';
 import { IndexedDBCacheService } from '@app/elohim/services/indexeddb-cache.service';
 import { ProjectionAPIService } from '@app/elohim/services/projection-api.service';
 import { ContentResolverService, SourceTier } from '@app/elohim/services/content-resolver.service';
 import { ContentBackendService } from '@app/elohim/services/content.service';
 import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
 import { LearningPath, PathIndex, ContentNode } from '../models';
-import { AgentProgress } from '@app/elohim/models/agent.model';
+import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { of, throwError, BehaviorSubject } from 'rxjs';
 import { vi, Mock } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';

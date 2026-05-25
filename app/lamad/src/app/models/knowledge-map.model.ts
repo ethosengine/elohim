@@ -185,7 +185,7 @@ export interface DomainKnowledgeMap extends KnowledgeMap {
 
 // MasteryLevel is imported from agent.model.ts to avoid duplication
 // Re-export for convenience within this file
-import type { MasteryLevel } from '@app/elohim/models/agent.model';
+import type { MasteryLevel } from '@elohim/service/angular/models/agent.model';
 
 export interface DomainGoal {
   id: string;
@@ -1290,4 +1290,4 @@ export interface MapMergeRequest {
   conflictResolution: 'source-wins' | 'target-wins' | 'manual';
 }
 
-export { type MasteryLevel } from '@app/elohim/models/agent.model';
+export { type MasteryLevel } from '@elohim/service/angular/models/agent.model';

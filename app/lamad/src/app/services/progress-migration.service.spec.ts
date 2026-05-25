@@ -3,7 +3,7 @@ import { of, throwError } from 'rxjs';
 import { ProgressMigrationService } from './progress-migration.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { LearningPath, PathStep } from '../models';
-import { AgentProgress } from '@app/elohim/models/agent.model';
+import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { vi, Mock } from 'vitest';
 
 describe('ProgressMigrationService', () => {

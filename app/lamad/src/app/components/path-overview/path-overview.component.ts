@@ -8,7 +8,7 @@ import { takeUntil } from 'rxjs/operators';
 
 import { Subject, forkJoin } from 'rxjs';
 
-import { AgentProgress, MasteryLevel, MasteryTier } from '@app/elohim/models/agent.model';
+import { AgentProgress, MasteryLevel, MasteryTier } from '@elohim/service/angular/models/agent.model';
 import { AgentService } from '@app/elohim/services/agent.service';
 
 import { SeoService } from '../../shared/services/seo.service';

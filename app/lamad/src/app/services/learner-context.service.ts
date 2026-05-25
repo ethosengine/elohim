@@ -1,6 +1,6 @@
 import { Injectable, Injector, inject } from '@angular/core';
 
-import { type MasteryLevel, compareMasteryLevels } from '@app/elohim/models/agent.model';
+import { type MasteryLevel, compareMasteryLevels } from '@elohim/service/angular/models/agent.model';
 
 import { DiscoveryAttestationService } from '../quiz-engine/services/discovery-attestation.service';
 import { PathAdaptationService } from '../quiz-engine/services/path-adaptation.service';

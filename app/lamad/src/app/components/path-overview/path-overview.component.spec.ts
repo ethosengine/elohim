@@ -8,7 +8,7 @@ import { AgentService } from '@app/elohim/services/agent.service';
 import { SeoService } from '../../shared/services/seo.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { LearningPath } from '../../models';
-import { AgentProgress } from '@app/elohim/models/agent.model';
+import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { vi, Mock } from 'vitest';
 
 describe('PathOverviewComponent', () => {

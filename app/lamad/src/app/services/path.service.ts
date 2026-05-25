@@ -11,7 +11,7 @@ import {
   MasteryLevel,
   MasteryTier,
   getMasteryTier,
-} from '@app/elohim/models/agent.model';
+} from '@elohim/service/angular/models/agent.model';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { type CrossPathMatch } from '@app/elohim/services/epr-resolver.service';

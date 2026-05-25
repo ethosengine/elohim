@@ -7,7 +7,7 @@ import {
 } from '../../../models/mastery-visualization';
 
 import type { LevelUpEvent } from '../../../models/learner-mastery-profile.model';
-import type { MasteryLevel } from '@app/elohim/models/agent.model';
+import type { MasteryLevel } from '@elohim/service/angular/models/agent.model';
 
 /**
  * Timeline of recent mastery level changes.

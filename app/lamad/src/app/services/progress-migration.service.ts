@@ -6,7 +6,7 @@ import { map, switchMap, catchError } from 'rxjs/operators';
 
 import { Observable, forkJoin, of } from 'rxjs';
 
-import { AgentProgress } from '@app/elohim/models/agent.model';
+import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
 /**
