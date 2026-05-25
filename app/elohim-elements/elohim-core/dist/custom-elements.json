@@ -705,6 +705,38 @@
             "name": "*",
             "module": "src/capability/index.js"
           }
+        },
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "./loader/loader.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LoaderTransport",
+          "declaration": {
+            "name": "LoaderTransport",
+            "module": "./loader/loader.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LoaderResolution",
+          "declaration": {
+            "name": "LoaderResolution",
+            "module": "./loader/loader.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LoaderOptions",
+          "declaration": {
+            "name": "LoaderOptions",
+            "module": "./loader/loader.js"
+          }
         }
       ]
     },
@@ -1009,81 +1041,73 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/localize/runtime.ts",
+      "path": "src/loader/loader.ts",
       "declarations": [
         {
-          "kind": "variable",
-          "name": "sourceLocale",
-          "type": {
-            "text": "string"
-          },
-          "default": "'en'"
-        },
-        {
-          "kind": "variable",
-          "name": "targetLocales",
-          "type": {
-            "text": "['es', 'he']"
-          },
-          "default": "['es', 'he']"
-        },
-        {
-          "kind": "variable",
-          "name": "{ getLocale, setLocale }"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "sourceLocale",
-          "declaration": {
-            "name": "sourceLocale",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "targetLocales",
-          "declaration": {
-            "name": "targetLocales",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "{ getLocale, setLocale }",
-          "declaration": {
-            "name": "{ getLocale, setLocale }",
-            "module": "src/localize/runtime.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/source-locale.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "smokeGreeting",
-          "parameters": [
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
             {
-              "name": "name",
+              "kind": "field",
+              "name": "verifyCid",
               "type": {
-                "text": "string"
-              }
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
             }
-          ],
-          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
+          ]
         }
       ],
       "exports": [
         {
           "kind": "js",
-          "name": "smokeGreeting",
+          "name": "Loader",
           "declaration": {
-            "name": "smokeGreeting",
-            "module": "src/localize/source-locale.ts"
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
           }
         }
       ]
@@ -1376,6 +1400,87 @@
           "declaration": {
             "name": "measureLuminanceChanges",
             "module": "src/testing/ua-prefs.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/runtime.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "type": {
+            "text": "string"
+          },
+          "default": "'en'"
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "['es', 'he']"
+          },
+          "default": "['es', 'he']"
+        },
+        {
+          "kind": "variable",
+          "name": "{ getLocale, setLocale }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "{ getLocale, setLocale }",
+          "declaration": {
+            "name": "{ getLocale, setLocale }",
+            "module": "src/localize/runtime.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/source-locale.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "smokeGreeting",
+          "parameters": [
+            {
+              "name": "name",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "smokeGreeting",
+          "declaration": {
+            "name": "smokeGreeting",
+            "module": "src/localize/source-locale.ts"
           }
         }
       ]

@@ -14,3 +14,6 @@ export type {
 } from './elohim-compute-tile.js';
 
 export * from './capability/index.js';
+
+export { Loader } from './loader/loader.js';
+export type { LoaderTransport, LoaderResolution, LoaderOptions } from './loader/loader.js';
