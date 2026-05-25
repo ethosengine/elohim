@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, libp2p 0.54 request-response, `ciborium` (already transitively available via `elohim-epr`), diesel + SQLite, `elohim-epr` codec crate, JSON Schema via `jsonschema` crate.
 
-**Parent spec:** `genesis/docs/superpowers/specs/2026-04-23-epr-phase-2c-libp2p-federation-design.md`
+**Parent spec:** `genesis/docs/content/elohim-protocol/architecture/2026-04-23-epr-phase-2c-libp2p-federation-design.md`
 
 **Phase 2a dependency:** The `epr_atoms` diesel tables must be landed before Task 11 begins. Batches A and B can proceed in parallel with Phase 2a work.
 
@@ -220,7 +220,7 @@ git commit -m "feat(epr-2c): add wire contract for /elohim/epr-atom/1.0.0 (trans
 //!
 //! Wire format: 4-byte BE length prefix + CBOR body.
 //!
-//! Spec: `genesis/docs/superpowers/specs/2026-04-23-epr-phase-2c-libp2p-federation-design.md`
+//! Spec: `genesis/docs/content/elohim-protocol/architecture/2026-04-23-epr-phase-2c-libp2p-federation-design.md`
 
 use async_trait::async_trait;
 use futures::prelude::*;

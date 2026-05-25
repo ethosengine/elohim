@@ -33,5 +33,5 @@ by the kind of traffic it absorbs (web2 = doorway; protocol = storage).
 
 ## Reference spec
 
-See `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
+See `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 for the architectural pattern that produced this directory.

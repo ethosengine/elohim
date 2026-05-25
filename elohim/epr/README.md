@@ -1,7 +1,7 @@
 # elohim-epr
 
 Canonical codec for the Elohim EPR (EntityPortalReference) atom defined in
-`genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`.
+`genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`.
 
 ## What this crate provides
 

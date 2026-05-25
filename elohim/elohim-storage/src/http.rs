@@ -10064,7 +10064,7 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         )
         // =====================================================================
         // /api/v1/collective + /api/v1/collab — Multi-collective collaboration EPR M1
-        // See genesis/docs/superpowers/specs/2026-05-23-multi-collective-collaboration-epr-design.md
+        // See genesis/docs/content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md
         // Writes require auth (imagodei conductor bridge); reads are public.
         // =====================================================================
         .route(
@@ -10107,7 +10107,7 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         // /api/v1/vf-graphql — Wave 3 M1 valueflows bridge endpoint.
         // Stub-stage: serves fixture EconomicEvent via the bridge's GraphQL schema.
         // M2+ adds identity bridge, M3+ adds real hREA projection.
-        // See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+        // See genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md
         // =====================================================================
         .route(
             Route::post("/api/v1/vf-graphql")

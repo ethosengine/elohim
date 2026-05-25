@@ -413,3 +413,16 @@ The only question is: **When does your family begin writing its story?**
 ---
 
 *"The future isn't about the technology we build. It's about the values we encode into it. Today, we choose care."*
+
+---
+
+## Technical Realization
+
+The protocol-layer work that makes household care legible at scale:
+
+- [`Records Lifecycle`](../architecture/2026-05-24-records-lifecycle-design.md) *(canonical)* — **the records lifecycle that lets inventory-elohim, vehicle-elohim, and care-stewardship-elohim narrate household activity into REA Events** without overwhelming the substrate. Part A §7 of every primitive specifies where elohim cognition is load-bearing; Part B.1 §"Where agentic intelligence carries the load" walks the value-prop unlock (cooking, cleaning, caregiving become legible to the household's economic picture).
+- [`Observation / Event Layer`](../../../superpowers/specs/2026-05-11-observation-event-layer-design.md) — the ephemeral peer-witnessed evidence tier; how a strawberry-handoff becomes a structured care-Event without storing surveillance.
+
+For the full canonical-specs index, see [`canonical-specs/INDEX.md`](../architecture/INDEX.md).
+
+*Strawberries become Resources. Handoffs become Events. Care-giving becomes a stream of Observations graduating to REA. The 21 life-stage archetypes each get their own observation-pipeline. None of this is metaphor — it's the spec.*

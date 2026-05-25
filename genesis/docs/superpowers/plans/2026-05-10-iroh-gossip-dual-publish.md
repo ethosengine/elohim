@@ -498,7 +498,7 @@ This task closes the n0-mitigation gap noted in `src/p2p_iroh/epr_backend.rs:64-
   ```markdown
   ### Gossip dual-publish (Phase 12 cutover gate #4)
 
-  Per `genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`
+  Per `genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`
   line 278, the gossip plane is permanent dual-stack. Implementation lives in
   `src/p2p_iroh/dual_publish/`. All publish call sites route through
   `DualGossipPublisher`, which fans out to both `LibP2PGossipPublisher` and

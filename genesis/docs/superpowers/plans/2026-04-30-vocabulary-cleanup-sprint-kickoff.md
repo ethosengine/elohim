@@ -32,7 +32,7 @@ Land three things:
 **Rationale:**
 
 1. **The Moss collision is concrete, not hypothetical.** RNO sub-project #8 (Moss Weave Tool packaging, lamad-as-applet) is High priority on the cross-wave guidance with a concrete v0.4.0 reference implementation pattern: `@theweave/api 0.6.3`, `weave.service.ts`, `weave.store.svelte.ts`, a `weave/` directory with `weave.dev.config.json`. Sharing `weave` would collide in identifier space, not just prose.
-2. **The substrate spec already treats Weave as Moss-specific.** `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md:475`: *"Moss groups federate via Weave for group-scale coordination. Elohim serves ecosystem-scale graph composition across such groups. They compose."* Adding elohim-`weave` on top muddles that composition framing.
+2. **The substrate spec already treats Weave as Moss-specific.** `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md:475`: *"Moss groups federate via Weave for group-scale coordination. Elohim serves ecosystem-scale graph composition across such groups. They compose."* Adding elohim-`weave` on top muddles that composition framing.
 3. **`quilt` fits the metaphor better than `weave`.** A quilt of N patches naturally survives losing some — matches RS(N,K) reconstruction. Threads in a weave do not.
 4. **`quilt` fits the register.** Domestic; pairs cleanly with `pantry`/`stock`/`draw`. Reinforces the household-as-resilience-unit framing.
 5. **`quilt` is collision-free.** The only existing reference is a content scenario about a person joining a quilting affinity network — not a protocol concept.

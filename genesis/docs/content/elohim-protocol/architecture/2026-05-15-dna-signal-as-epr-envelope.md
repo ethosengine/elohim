@@ -1,3 +1,18 @@
+---
+title: DnaSignal as EPR Envelope — T18 Specification
+tier: architecture
+status: Implemented (back-compat window active)
+created: 2026-05-15
+pillar coupling: elohim (EPR envelope primitive), imagodei (key-revocation producer site)
+informed-by:
+  - elohim/sdk/schemas/v1/dna-signals/key-revocation.schema.json (EPR envelope schema)
+  - The existing RecoveryV2Signal::KeyRevocationEffective (legacy signal — deprecated)
+informs:
+  - All future DnaSignal variants that need EPR-shape envelope semantics
+  - Any new dna-signal schema declared under elohim/sdk/schemas/v1/dna-signals/
+  - Future imagodei coordinator emit-site work that adopts the EPR-envelope pattern
+---
+
 # DnaSignal as EPR Envelope — T18 Specification
 
 **Date:** 2026-05-15  

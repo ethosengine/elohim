@@ -10,7 +10,7 @@
 //! correct freshness state for ownership, and the request_id /
 //! agent_cid echoed back verbatim.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the view-federation plane is dual-stack permanent. Receivers
 //! verify against the agent's DHT-anchored public key; both
 //! transports sign with the same ed25519 secret, so signatures are

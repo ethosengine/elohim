@@ -8,7 +8,7 @@
 //! compatibility report at M5.
 //!
 //! Reference spec:
-//! `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
+//! `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 //! §4.2 (Learning Ledger Schema).
 
 use serde::{Deserialize, Serialize};

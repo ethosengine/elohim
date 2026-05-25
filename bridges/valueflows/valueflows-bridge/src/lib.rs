@@ -4,7 +4,7 @@
 //! that returns 503 unimplemented for any non-trivial query and fixture
 //! `EconomicEvent` data for the M1 tracer-bullet query.
 //!
-//! See `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`.
+//! See `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`.
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};

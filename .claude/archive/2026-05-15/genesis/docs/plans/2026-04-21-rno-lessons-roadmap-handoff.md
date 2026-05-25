@@ -4,7 +4,7 @@
 **Authors:** Matthew Dowell + Opus 4.7
 **Purpose:** Hand off a decomposed roadmap of R&O-inspired adoptions to a parallel breakout session so the main session can stay focused on the elohim-core graph substrate spec.
 **Status:** Handoff (not a spec; not a plan; a decomposition + context dump)
-**Parallel work:** `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md` — the graph substrate core is being designed separately and is NOT part of this handoff. It is the *foundation* that several of these sub-projects depend on, but it is not itself one of them.
+**Parallel work:** `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md` — the graph substrate core is being designed separately and is NOT part of this handoff. It is the *foundation* that several of these sub-projects depend on, but it is not itself one of them.
 
 ---
 
@@ -427,8 +427,8 @@ The following memories in `/projects/.claude-config/projects/-projects-elohim/me
 - `elohim/holochain/dna/*/dna.yaml` — current DNA manifests (all 5 — the targets for #7)
 - `steward/device/src-tauri/tauri.conf.json` — current bundle targets (target for #5)
 - `app/elohim-app/src/app/shefa/` — shefa pillar implementation (target for #4)
-- `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` — prior EPR-shaped-atom spec; vocabulary source
-- `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md` — **parent session's parallel work**; do not duplicate
+- `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md` — prior EPR-shaped-atom spec; vocabulary source
+- `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md` — **parent session's parallel work**; do not duplicate
 
 ## 9. Out of scope for this handoff
 

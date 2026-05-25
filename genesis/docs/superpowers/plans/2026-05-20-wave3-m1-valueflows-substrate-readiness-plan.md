@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 1.85+, async-graphql 7 (matches elohim-storage's existing version), hyper 1.6 (existing), Diesel 2 (existing), Holochain happ manifest v0 (existing).
 
-**Reference spec:** `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`.
+**Reference spec:** `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`.
 
 ---
 
@@ -102,7 +102,7 @@ by the kind of traffic it absorbs (web2 = doorway; protocol = storage).
 
 ## Reference spec
 
-See `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
+See `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 for the architectural pattern that produced this directory.
 ```
 
@@ -180,7 +180,7 @@ cargo test --all
 
 ## Reference spec
 
-`genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
+`genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 ```
 
 - [ ] **Step 4: Create `bridges/valueflows/.gitignore`**
@@ -248,7 +248,7 @@ chrono = { workspace = true }
 //! compatibility report at M5.
 //!
 //! Reference spec:
-//! `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
+//! `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 //! §4.2 (Learning Ledger Schema).
 
 use serde::{Deserialize, Serialize};
@@ -428,7 +428,7 @@ tokio-test = { workspace = true }
 //! that returns 503 unimplemented for any non-trivial query and fixture
 //! `EconomicEvent` data for the M1 tracer-bullet query.
 //!
-//! See `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`.
+//! See `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`.
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
@@ -701,7 +701,7 @@ Find the `[dependencies]` section (around line 11). After the existing `doorway-
 
 ```toml
 # Wave 3 — valueflows bridge (hREA / VF-GraphQL interop).
-# See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+# See genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md
 valueflows-bridge = { path = "../../bridges/valueflows/valueflows-bridge" }
 ```
 
@@ -795,7 +795,7 @@ M3+ real hREA projection."
 
 ```sql
 -- Wave 3 M1 — learning ledger for the valueflows bridge.
--- See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md §4.2
+-- See genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md §4.2
 --
 -- Each row is one TranslationPoint observation. End-of-Wave-3 (M5) aggregates
 -- these to produce the upstream-contribution inventory + R&O compatibility report.
@@ -1616,7 +1616,7 @@ translates VF-GraphQL queries and mutations and projects them into hREA
 entries via per-Human cells provisioned during the VFBinding handshake.
 
 See:
-- `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
+- `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 - `https://github.com/h-REA/hREA/releases`
 
 ## Fetching the bundle
@@ -1656,7 +1656,7 @@ Find the end of the `roles:` list. After the last existing role (look for `- nam
   # hREA DNA — Wave 3 substrate readiness.
   # Lynn Foster's canonical hREA (h-REA/hREA). Pinned to a specific upstream
   # release; bundle fetched out-of-band into ../hrea/workdir/hrea.dna.
-  # See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md
+  # See genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md
   # version_pin: 0.0.0  <-- update when first real version is pinned
   - name: hrea
     provisioning:
@@ -1700,7 +1700,7 @@ hrea/workdir/ (gitignored). Role uses deferred: true so cells provision
 lazily per Human during the VFBinding handshake (M2), not at conductor
 startup.
 
-See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md"
+See genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md"
 ```
 
 ---
@@ -1944,7 +1944,7 @@ The hREA / VF-GraphQL bridge for the Elohim Protocol. Consumed by
 
 ## Reference docs
 
-- Spec: `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md`
+- Spec: `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md`
 - M1 plan: `genesis/docs/superpowers/plans/2026-05-20-wave3-m1-valueflows-substrate-readiness-plan.md`
 
 ## Build / test

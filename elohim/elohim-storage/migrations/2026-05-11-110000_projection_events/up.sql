@@ -3,7 +3,7 @@
 -- This table remains operational (Category C) as-is — it is NOT migrated.
 -- The post-commit projector ack log is its own concern, distinct from the
 -- new observation primitive. Cross-reference only.
--- See: genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md §10 Stage 8.
+-- See: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md §10 Stage 8.
 --
 -- Phase 4 — append-only operational log of doorway projector acks.
 -- Source of truth: DHT (EconomicEvent entry, content_store zome,

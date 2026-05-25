@@ -38,7 +38,7 @@ plan name, but the actual cluster deployment per
 (single env var `SCCACHE_ENDPOINT`) is bulletproof — swapping to quilt-S3-shim
 is a single env-var repoint per namespace. This is the **tiered-quilt Wave 3
 dogfood substrate** per
-`genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md`.
+`genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md`.
 
 **Followup status (most landed):**
 - `elohim/devfile.yaml` — `RUSTC_WRAPPER=sccache` env set ✅

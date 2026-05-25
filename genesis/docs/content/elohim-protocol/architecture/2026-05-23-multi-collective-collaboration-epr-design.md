@@ -1,3 +1,37 @@
+---
+title: Multi-Collective Collaboration EPR Design
+tier: architecture
+status: Design (pre-implementation; implementation plan to be authored once approved)
+created: 2026-05-23
+pillar coupling: qahal (collective primitive), elohim (EPR substrate), shefa (REA mutual credit)
+informed-by:
+  - 2026-05-19-qahal-collective-membership-dht-design.md (Collective + Membership DHT entries — generalizing Membership's subject is the load-bearing substrate change)
+  - 2026-05-20-wave3-valueflows-hrea-interop-design.md (the bridge that projects Collab-Qahals as VF Organizations)
+  - 2026-05-21-qahal-architecture-vision.md (one primitive, graduated capability surface; friction-gradient applied to coordination scale; commons-elohim co-steward role)
+  - elohim/sdk/schemas/v1/objects/epr.schema.json (current EPR atom shape)
+  - elohim/sdk/schemas/v1/enums/epr-kind.schema.json (existing EPR kinds reused — Commitment, Observation, Attestation, Delegation)
+  - elohim/sdk/schemas/v1/enums/reach.schema.json (reach class enforcement)
+  - genesis/docs/content/elohim-protocol/manifesto.md, constitution.md
+  - genesis/docs/content/elohim-protocol/value_scanner/epic.md (care-economy REA primitive backing chain-layer consensus weight)
+informs:
+  - All future cross-collective EPR custody work
+  - Future shared-stewardship patterns (collab-qahals composing across collectives)
+  - The Multi-Collective Collaboration EPR implementation plan
+  - All future commons-elohim co-steward primitives
+memory_anchors:
+  - project_dissolution_principle_sensemaking_collectives
+  - project_elohim_councils_capture_apex
+  - project_friction_gradient_limitarianism
+  - project_commons_elohim_co_steward
+  - project_household_living_core_lived_contrast_diffusion
+  - project_qahal_graduated_capability_surface
+  - project_no_sovereignty_stewardship_over_ownership
+  - project_first_class_graph_pattern
+  - project_socially_derived_security
+  - project_elohim_as_counsel
+  - project_elohim_subagent_specialists
+---
+
 # Multi-Collective Collaboration EPR Design
 
 **Status:** Design (pre-implementation). Implementation plan to be authored next at `genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md` via `superpowers:writing-plans` once this spec is approved.

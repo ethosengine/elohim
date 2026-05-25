@@ -6,7 +6,7 @@
 
 **Goal:** Extend the head-to-head transport bench (currently only `bench_blob_perf`) to validate iroh's perf bump on every wire plane the architecture spec marked iroh-canonical or dual-stack permanent. Each new bench mirrors `bench_blob_perf` exactly: release mode, `#[ignore]`, connection-reuse, p50/p95/p99 + throughput, lenient one-size-class-wins assertion, two-render stability check.
 
-**Hard prerequisite (gating, must hold before this plan starts):** The architecture spec at `genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md` exists and has a §"Plane-by-plane verdict and decision rule" section. **Confirmed at plan-write — spec is on dev at `bd5dd817`.**
+**Hard prerequisite (gating, must hold before this plan starts):** The architecture spec at `genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md` exists and has a §"Plane-by-plane verdict and decision rule" section. **Confirmed at plan-write — spec is on dev at `bd5dd817`.**
 
 **Architecture:** Each plane gets its own `tests/bench_<plane>_perf.rs` mirroring `bench_blob_perf.rs`. A `just bench-<plane>` recipe runs each (release + `--ignored` + `--nocapture`). A `just bench-all` umbrella target runs every plane in sequence. Final commit updates `p2p_iroh/README.md` "What works" with combined results table and appends a memory addendum to `project_iroh_parallel_stack_phases3_7_landed.md`.
 
@@ -171,7 +171,7 @@ Per `feedback_subagent_dep_conflict_supervision.md` and `feedback_subagent_scope
 
 ## See also
 
-- Spec: `genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md` (the architecture spec this plan executes against)
+- Spec: `genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md` (the architecture spec this plan executes against)
 - Original parallel-stack plan: `genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md` (Phases 1-10 produced the wire transport this plan benches)
 - Companion spec: `genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md` (transport context: hub-to-hub federation, where iroh's wins land)
 - Bench template: `elohim/elohim-storage/tests/bench_blob_perf.rs` (commit `bd0a2f75` in dev — the canonical shape)

@@ -2,7 +2,7 @@
   "$id": "epr:schema:manifest:observation-kind",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ObservationKindDeclaration",
-  "description": "Per-pillar manifest declaration of an observation_kind. See genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md §7.",
+  "description": "Per-pillar manifest declaration of an observation_kind. See genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md §7.",
   "type": "object",
   "required": ["kind", "namespace", "schema", "retention_class", "reach"],
   "properties": {

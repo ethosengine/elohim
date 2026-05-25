@@ -888,7 +888,7 @@ async fn async_main(
 
     // Phase 11 iroh parallel-stack init — production backends wired in.
     // Per plan genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
-    // and spec genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md:
+    // and spec genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md:
     // each plane's backend dispatches into the same daemon services as the
     // libp2p side. Modes are mutually exclusive at runtime, so the iroh
     // branch constructs its own SyncManager pointing at the same on-disk

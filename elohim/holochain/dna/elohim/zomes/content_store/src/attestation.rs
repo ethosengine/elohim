@@ -1,7 +1,7 @@
 //! Attestation coordinator — issuance, revocation, queries.
 //!
 //! Implements the consolidation defined in
-//! `genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md`.
+//! `genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md`.
 //!
 //! Attestation entries are `Content` entries with `content_type` matching
 //! `"attestation:<subtype>"` declared in some pillar manifest. This module

@@ -9,7 +9,7 @@
 //! adapter mapping, ShardService wiring, BlobStore I/O — the assertion
 //! blows up.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the shard plane is dual-stack permanent. This test exercises the
 //! legacy SHA-256 fetch plane the iroh side maintains for libp2p-
 //! fallback peers; the iroh-canonical BLAKE3-streamed plane is

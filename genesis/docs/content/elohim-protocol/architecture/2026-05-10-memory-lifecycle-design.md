@@ -1,3 +1,23 @@
+---
+title: Memory Lifecycle Design — Comet-Shaped Memory and Deliberate Forgetting
+tier: architecture
+status: proposal
+created: 2026-05-10
+authors: elohim-protocol research
+pillar coupling: elohim (substrate primitive), lamad (content archival), mishpat (scenario corpus hygiene), imagodei (agent memory)
+informed-by:
+  - existing Claude memory + agent working memory + EPR/DHT + content + scenarios — all share the bounded-compute / unbounded-conversation problem
+informs:
+  - All future memory-class extensions (the seven memory classes vocabulary)
+  - Records-lifecycle (sibling vocabulary; reconciles submerge/surface verbs)
+  - elohim-agent autonomous memory hygiene work
+  - EPR substrate decay specs
+  - DHT entry lifecycle specs
+  - lamad content archival specs
+  - mishpat scenario corpus hygiene specs
+  - The `/dream` skill (forthcoming) implements this spec
+---
+
 # Memory Lifecycle Design — Comet-Shaped Memory and Deliberate Forgetting
 
 **Status**: proposal

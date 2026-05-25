@@ -4,7 +4,7 @@ description: 8-wave portfolio for the missing storage-tier layer; composes on Pl
 type: project
 originSessionId: 96fee2e2-0f17-4f94-b422-d351bc13ee2f
 ---
-**Spec:** `genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md` (960 lines, 11 sections)
+**Spec:** `genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md` (960 lines, 11 sections)
 **Delivery master:** `genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md` (718 lines, 8 waves + parallel tracks)
 **Commit:** `c968369b7`
 

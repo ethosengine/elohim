@@ -1,3 +1,25 @@
+---
+title: elohim-hub / elohim-node / elohim-storage — Boundary Design
+tier: architecture
+status: Design (pre-refactor scaffold; no code moves this sprint)
+created: 2026-05-02
+pillar coupling: elohim (substrate), infrastructure (runtime composition)
+informed-by:
+  - 2026-05-01-light-up-the-topology-design.md (Light Up the Topology)
+  - 2026-05-02-blob-custody-reconciliation-design.md (Blob Custody Reconciliation)
+informs:
+  - All future hub-archetype implementations (HouseholdHub, CollectiveHub)
+  - All Phase 3+ work that needs to land in the right crate the first time (hub vs node vs storage)
+  - All future runtime composition specs (operator UI, fixtures crate) that consume the Hub trait
+memory_anchors:
+  - project_elohim_hub_elevation
+  - project_hub_archetype_abstraction
+  - project_substrate_scale_ceiling
+  - project_three_layer_truth_model
+  - project_household_horizontal_scaling
+  - project_elohim_node_role
+---
+
 # elohim-hub / elohim-node / elohim-storage — Boundary Design
 
 **Status:** Design (pre-refactor scaffold; no code moves this sprint)

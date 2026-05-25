@@ -2331,7 +2331,7 @@ struct CanonicalMetadataRef<'a> {
 /// The output is MessagePack-encoded via `holochain_serialized_bytes::encode`.
 ///
 /// **Must match the mirror function in `elohim-storage/src/services/recovery_flow_projector.rs`.**
-/// See spec doc at `genesis/docs/superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md`
+/// See spec doc at `genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md`
 /// for the field-level canonical form.
 pub fn canonical_envelope_bytes(envelope: &KeyRevocationEnvelope) -> Vec<u8> {
     let core = CanonicalEnvelopeCore {

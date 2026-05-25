@@ -1,3 +1,24 @@
+---
+title: Elohim-Core Graph Substrate — Design Spec
+tier: architecture
+status: Design (brainstorm complete, awaiting user review)
+created: 2026-04-21
+authors: Matthew Dowell + Opus 4.7
+pillar coupling: cross-cutting — foundational substrate under imagodei, lamad, shefa, mishpat, qahal; demonstrated by avodah + doorway
+informed-by:
+  - existing `elohim/sdk/` two-layer type system (envelope/payload); existing `app-manifest.schema.json` ThreeLegCoupling; existing ContentNode + EPR (EntityPortalReference) address model; existing elohim-storage diesel layer; existing `epr-resolver.service.ts`
+  - genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md (prior art for EPR-shaped content atoms; this spec generalizes its pattern)
+  - elohim/sdk/CLAUDE.md (capture test as SDK boundary rule)
+  - .claude/skills/p2p-design-gate/ (A / A2 / B / B2 / C classification)
+  - .claude/skills/epr-content-addressing/ (content-addressed link architecture)
+  - .claude/skills/rea-economics/ (REA/VF vocabulary alignment)
+informs:
+  - All future sprint specs that touch EPR (EntityPortalReference) primitives across any DNA
+  - All future bridges/<vendor>/ crates following the elohim-core graph contract
+  - Any new app-manifest declaration that adopts the ThreeLegCoupling axiom
+  - Phase 2+ planning for the elohim-epr integrator compatibility contract
+---
+
 # Elohim-Core Graph Substrate — Design Spec
 
 **Status:** Design (brainstorm complete, awaiting user review)
@@ -6,7 +27,7 @@
 **Pillar coupling:** cross-cutting — foundational substrate under imagodei, lamad, shefa, mishpat, qahal; demonstrated by avodah + doorway
 **Depends on:** existing `elohim/sdk/` two-layer type system (envelope/payload); existing `app-manifest.schema.json` ThreeLegCoupling; existing ContentNode + EPR (EntityPortalReference) address model; existing elohim-storage diesel layer; existing `epr-resolver.service.ts`
 **Related:**
-- `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` — prior art for EPR-shaped content atoms; this spec generalizes its pattern
+- `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md` — prior art for EPR-shaped content atoms; this spec generalizes its pattern
 - `elohim/sdk/CLAUDE.md` — capture test as SDK boundary rule
 - `.claude/skills/p2p-design-gate/` — A / A2 / B / B2 / C classification
 - `.claude/skills/epr-content-addressing/` — content-addressed link architecture

@@ -3,7 +3,7 @@ title: iroh Phase 11 Cutover Gate #5 — Recovery e2e Cross-Stack Harness
 status: complete
 created: 2026-05-10
 parent: genesis/docs/superpowers/plans/2026-05-08-iroh-phase11-prep.md
-spec: genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md (gate #5, line 514)
+spec: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md (gate #5, line 514)
 related:
   - genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
   - genesis/docs/superpowers/plans/2026-04-21-recovery-protocol-phase-2-m1-data-model.md
@@ -152,7 +152,7 @@ For each recovery step from Task 1, confirm the wire is dual-stack-ready per Pla
 
 - [ ] **Step 2.2:** Confirm spec gate #4 (line 513) flags `recovery-invitation` and `recovery-revocation` as **permanent post-cutover** dual-publish (not just transitional). Cite the spec line to the executor.
 
-  Expected: `grep -n "Permanent post-cutover" /projects/elohim/genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md` returns a line that includes "recovery topics".
+  Expected: `grep -n "Permanent post-cutover" /projects/elohim/genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md` returns a line that includes "recovery topics".
 
 ---
 
@@ -258,7 +258,7 @@ The header doc-comment locks in the wire-interaction contract from Task 2 and th
   ```typescript
   /**
    * Recovery cross-stack step definitions — gate #5 of iroh Phase 11 cutover
-   * (genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md line 514).
+   * (genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md line 514).
    *
    * Framework: Cucumber-JS 11 + tsx (a2o convention).
    * Tag: @recovery-cross-stack — run with: pnpm exec cucumber-js --tags '@recovery-cross-stack'
@@ -409,7 +409,7 @@ This is the lower-level Rust test that proves the dual-stack mechanics in isolat
   ```rust
   //! Phase 11 acceptance gate #5 — recovery e2e cross-stack.
   //!
-  //! Spec: genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md line 514.
+  //! Spec: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md line 514.
   //! Plan: genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md.
   //!
   //! Asserts: a recovery invitation published from one peer reaches each
@@ -542,7 +542,7 @@ Execute end-to-end. This task only fires after Plans 1+4 are merged on `dev`.
   Plan 1 (peer_transport_manifest) and Plan 4 (gossip dual-publish);
   recovery topics dual-publish permanent post-cutover per spec gate #4.
 
-  Spec: genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md (line 514, gate #5)
+  Spec: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md (line 514, gate #5)
   Plan: genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md
   ```
 

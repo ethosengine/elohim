@@ -4,7 +4,7 @@ status: design-only
 created: 2026-05-08
 parent: genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
 related:
-  - genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md (pending — gates plane scope)
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md (pending — gates plane scope)
   - elohim/elohim-storage/src/p2p_iroh/README.md
   - elohim/elohim-storage/tests/bench_blob_perf.rs
 ---
@@ -808,7 +808,7 @@ addition stays).
 
 > **ALIGNED WITH SPEC — most questions answered.** Status updates inline.
 
-The spec at `genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`
+The spec at `genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`
 landed. Status of each original question:
 
 1. ~~**Plane scope** — which planes go iroh-only, which stay libp2p-only,

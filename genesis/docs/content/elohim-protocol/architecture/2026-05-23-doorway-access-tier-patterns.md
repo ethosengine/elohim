@@ -1,3 +1,19 @@
+---
+title: Doorway Access-Tier Patterns
+tier: architecture
+status: Pattern catalog (descriptive, not prescriptive; names three patterns A / B / Recovery + one open question anon-hint; implementation deferred to subsequent shifts)
+created: 2026-05-23
+pillar coupling: doorway (web2 projection cache), elohim (peer-native substrate boundary)
+informed-by:
+  - The dual-doorway landing-page shakeout work (2026-05-23) — surfaced the warm-stream last-write-wins behavior + reach-gate boundary
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md (doorway as Track 4 web2 projection of the substrate)
+informs:
+  - Subsequent shifts that pick one of the three patterns (A / B / Recovery) to ship first
+  - All future doorway projection specs that bridge web2 visitors to peer-native content
+  - All future warm-stream / hosting-agreement read specs
+  - All future cache-scoping attack-surface red-team work
+---
+
 # Doorway Access-Tier Patterns
 
 **Created:** 2026-05-23 alongside the dual-doorway landing-page shakeout.

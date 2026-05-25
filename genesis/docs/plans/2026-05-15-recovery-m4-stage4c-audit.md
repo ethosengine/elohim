@@ -63,7 +63,7 @@ Recovery completion can proceed via either:
 1. **Social-threshold-only path**: intimate-quorum (M3) or vote-quorum (M4) reaches threshold → recovery becomes effective → `commit_key_rotation` runs the revocation-floor + freeze-floor gates → rotation lands. No Shamir involvement at any step.
 2. **Shamir-augmented path**: social threshold + Shamir reconstruction of key material from custodian shares. The reconstruction is invoked explicitly by the recovery-subject; if it fails or if no custody setup exists, the social-threshold path still completes the recovery (but does not recover the key material — the human re-keys instead of reconstructing).
 
-The architecture is correctly layered: Shamir is the OPTIONAL cryptographic proof layer atop the attestation-DHT-driven recovery flow, exactly as the architectural decision in `genesis/docs/superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md` and the protocol's three-layer truth model describe.
+The architecture is correctly layered: Shamir is the OPTIONAL cryptographic proof layer atop the attestation-DHT-driven recovery flow, exactly as the architectural decision in `genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md` and the protocol's three-layer truth model describe.
 
 ## Test coverage
 

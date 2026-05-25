@@ -119,7 +119,7 @@ When modifying a View struct:
 
 ## Observation Layer Projections
 
-Per `genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md`, the following existing operational SQL tables are observation projections:
+Per `genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md`, the following existing operational SQL tables are observation projections:
 
 - `peer_blob_inventory` — projects `infrastructure:blob-served` and `infrastructure:blob-hosted` observations. The legacy gossipsub topic `elohim/inventory/blob` is the cursor-announcement stream for both kinds.
 - `system_metrics` — projects `infrastructure:system-sample` observations (per-node only per `project_node_metrics_vs_hub_aggregation_boundary`).

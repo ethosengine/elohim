@@ -712,7 +712,7 @@ Gate-shaped capabilities (`ContentSafetyReview`, `AttestationRecommendation`, `E
 
 **Shape:** three nodes — `assemble` → `rules` → `synthesize`. One `mechanical-ruleset` step referencing a 7-valence rules-CID. Terminal emits `Verdict(StoryPointTag)` with `MintAttestation` + `EmitEconomicEvent` side effects.
 
-**Rules CID content:** the seven valences and six rules specified in `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` §5–§7, serialized as a declarative rule artifact with `contentType: gate-rules-declaration`.
+**Rules CID content:** the seven valences and six rules specified in `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md` §5–§7, serialized as a declarative rule artifact with `contentType: gate-rules-declaration`.
 
 **Consumes:** the `experience-moment` contentType's `coupling.governance.gates = ["discernment-gate-v1-mechanical"]` declaration.
 
@@ -804,7 +804,7 @@ See `gate-client/ACTIVATION.md` for the operator runbook with rollback instructi
 ### 8.3 Sibling specs (referenced, not owned)
 
 - `rakia/docs/plans/build-attestation-integration.md` — attestation primitives that GateDecisionAttestation specializes from.
-- `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` — consumer of the discernment gate; § 5–§ 7 provide the rules content.
+- `genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md` — consumer of the discernment gate; § 5–§ 7 provide the rules content.
 - Future: **Gate Challenge and Indemnification spec** — defines the accountability loop that this spec provides hook points for.
 - Future: **Elohim Participant-Type spec in imagodei** — canonicalizes elohim substance schema (this spec provisionally describes it).
 

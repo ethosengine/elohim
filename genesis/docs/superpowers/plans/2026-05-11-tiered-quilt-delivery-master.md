@@ -34,7 +34,7 @@ of self-healing dataplane Plans 1–5; absorbs Plans 2–5 as sub-systems.
 - Vitest + sweettest harness (testing)
 - MinIO (live external-archive destination)
 
-**Source-of-truth spec:** `genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md`
+**Source-of-truth spec:** `genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md`
 
 ---
 
@@ -706,7 +706,7 @@ wave required before the next plan-authoring session starts.
 ## §11 Cross-references
 
 - Source-of-truth spec:
-  `genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md`
+  `genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md`
 - Self-healing dataplane (absorbed Plans 2–5):
   `genesis/docs/superpowers/specs/2026-04-19-self-healing-p2p-dataplane-design.md`
 - Sweettest harness:
@@ -715,4 +715,4 @@ wave required before the next plan-authoring session starts.
   `genesis/manifests/RUNBOOK-minio-sccache-2026-05-09.md`
 - Vocabulary lock: `genesis/graphos/vocabulary.md`
 - EPR substrate framing:
-  `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`
+  `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`

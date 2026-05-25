@@ -1,10 +1,27 @@
+---
+title: elohim-epr Integrator Compatibility Contract
+tier: architecture
+status: Contract — authoritative for Phase 2+ planning
+created: 2026-04-21
+authors: Matthew Dowell + Opus 4.7
+pillar coupling: cross-cutting — every consumer of elohim-epr REST or GraphQL surfaces
+informed-by:
+  - genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md (parent spec)
+  - genesis/docs/superpowers/plans/2026-04-21-elohim-epr-codec-crate-plan.md (Phase 1 companion)
+informs:
+  - All future EPR REST integrators (elohim-app, genesis-seeder, future hApps)
+  - All future EPR graph integrators (Phase 4+ traversal / subscription surfaces)
+  - Every phase of the elohim-core graph substrate that ships wire shapes, storage schemas, REST endpoints, or GraphQL surfaces
+  - All future bridges/<vendor>/ crates that publish EPRs into the substrate
+---
+
 # elohim-epr Integrator Compatibility Contract
 
 **Status:** Contract — authoritative for Phase 2+ planning
 **Date:** 2026-04-21
 **Authors:** Matthew Dowell + Opus 4.7
 **Applies to:** every phase of the elohim-core graph substrate that ships wire shapes, storage schemas, REST endpoints, or GraphQL surfaces
-**Parent spec:** `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`
+**Parent spec:** `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`
 **Phase 1 companion:** `genesis/docs/superpowers/plans/2026-04-21-elohim-epr-codec-crate-plan.md`
 
 ---

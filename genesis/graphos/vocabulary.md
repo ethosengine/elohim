@@ -160,6 +160,6 @@ The HTTP routes `/store/{hash}` (legacy on doorway) and `/api/blob/{hash}` (lega
 ## Cross-references
 
 - Resolution and rationale: `genesis/docs/superpowers/plans/2026-04-30-vocabulary-cleanup-sprint-kickoff.md`
-- Boundary rule precedent: substrate-spec composition framing in `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md:475` (Moss-Weave is foreign)
+- Boundary rule precedent: substrate-spec composition framing in `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md:475` (Moss-Weave is foreign)
 - Related: `genesis/plans/2026-04-10-collectives-schema-design.md` (the holonic lattice)
 - Related: `genesis/docs/plans/2026-04-21-rno-lessons-roadmap-handoff.md` sub-project #8 (lamad-as-Moss-Weave-Tool)

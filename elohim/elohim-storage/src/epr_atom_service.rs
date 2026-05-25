@@ -5,7 +5,7 @@
 //! can route fetch / announce / fetch-batch / integrity-notify through
 //! the same code path.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the EPR-atom plane is dual-stack permanent. The receive logic
 //! (decode CBOR envelope, dedup on CID, ingest via
 //! `services::epr_service::ingest`, reach-gate served atoms by caller

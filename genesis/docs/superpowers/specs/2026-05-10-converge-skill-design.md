@@ -8,7 +8,7 @@ date: 2026-05-10
 **Status**: proposal
 **Date**: 2026-05-10
 **Sibling artifacts**:
-- Memory lifecycle spec: `genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md`
+- Memory lifecycle spec: `genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md`
 - Living memory epic: `genesis/docs/content/elohim-protocol/living_memory/epic.md`
 - Memory-kit toolkit (consumes its outputs): `.claude/skills/memory-kit/SKILL.md`
 

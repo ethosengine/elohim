@@ -1,3 +1,30 @@
+---
+title: "Wave 3 — `bridges/valueflows`: hREA / VF-GraphQL Interop Design"
+tier: architecture
+status: Design (pre-implementation; implementation plan to be authored once approved)
+created: 2026-05-20
+pillar coupling: elohim (EPR-REA substrate), shefa (REA economy), infrastructure (bridges layer)
+informed-by:
+  - genesis/docs/plans/2026-04-21-rno-lessons-cross-wave-guidance.md (Wave 3 of the cross-wave guidance — "#4 hREA / VF-GraphQL alignment")
+  - 2026-05-19-qahal-collective-membership-dht-design.md (L7 — Collective + Membership entry types that become hREA Organization + AgentRelationship)
+  - 2026-05-19-viewer-symmetry-reciprocity-qahal-substrate.md (L6 — Viewer.* GraphQL surface)
+  - /projects/research/vf-graphql/ (canonical VF schema modules, cloned at 0a52dbe)
+  - /projects/research/requests-and-offers/ (canonical R&O hApp; mapping target, cloned at a45374a7)
+informs:
+  - All future bridges/<vendor>/ crates following the VF/hREA translation pattern
+  - All apps consuming the bridges/valueflows interop layer (hosted hREA-intelligible clients)
+  - The Wave 3 implementation plan (2026-05-20-wave3-valueflows-hrea-interop-plan.md)
+  - Future upstream-contribution inventory work that aggregates VF/hREA learnings worth carrying back to upstream
+memory_anchors:
+  - project_doorway_is_federation_surface_atproto
+  - project_no_sovereignty_stewardship_over_ownership
+  - project_socially_derived_security
+  - project_recovery_grandma_standard
+  - project_graduated_recovery_authority
+  - project_elohim_as_counsel
+  - project_epr_substrate_vs_vf_graphql
+---
+
 # Wave 3 — `bridges/valueflows`: hREA / VF-GraphQL Interop Design
 
 **Status:** Design (pre-implementation). Implementation plan will be authored next at `genesis/docs/superpowers/plans/2026-05-20-wave3-valueflows-hrea-interop-plan.md` via `superpowers:writing-plans` once this spec is approved.

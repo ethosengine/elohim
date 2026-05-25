@@ -68,7 +68,7 @@ When the hub trait moves from sketch to crate, this directory will hold:
 Until then, the architectural truth lives in:
 
 - `genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md` (this spec — the canonical map)
-- `genesis/docs/superpowers/specs/2026-05-02-elohim-hub-boundaries-design.md` (the predecessor — Hub trait sketch)
+- `genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md` (the predecessor — Hub trait sketch)
 - `elohim/elohim-node/src/` (current implementation site for hub composition)
 
 ## Memory anchors

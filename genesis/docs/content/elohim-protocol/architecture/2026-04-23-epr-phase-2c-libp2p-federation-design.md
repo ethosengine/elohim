@@ -1,11 +1,30 @@
+---
+title: EPR Phase 2c — Libp2p Federation of Signed Atoms Design
+tier: architecture
+status: Design — authoritative for the Phase 2c implementation plan
+created: 2026-04-23
+authors: Matthew Dowell + Opus 4.7
+pillar coupling: elohim (substrate), infrastructure (libp2p plane)
+informed-by:
+  - genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md (parent spec)
+  - genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-epr-integrator-compatibility-contract.md (parent spec)
+  - genesis/docs/superpowers/plans/2026-04-21-elohim-epr-codec-crate-plan.md (Phase 1 companion — landed)
+  - genesis/docs/superpowers/plans/2026-04-22-elohim-epr-storage-foundation-plan.md (Phase 2a companion — planned)
+informs:
+  - The Phase 2c implementation plan
+  - Phase 2b reconciliation between legacy EprHead encoder and generalized Envelope
+  - All future libp2p-plane transport specs that move signed EPR atoms peer-to-peer
+  - Reach enforcement at the libp2p layer for any new EPR-shaped wire payloads
+---
+
 # EPR Phase 2c — Libp2p Federation of Signed Atoms Design
 
 **Status:** Design — authoritative for the Phase 2c implementation plan
 **Date:** 2026-04-23
 **Authors:** Matthew Dowell + Opus 4.7
 **Parent specs:**
-- `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`
-- `genesis/docs/superpowers/specs/2026-04-21-elohim-epr-integrator-compatibility-contract.md`
+- `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`
+- `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-epr-integrator-compatibility-contract.md`
 **Companion plans:**
 - Phase 1 (landed): `genesis/docs/superpowers/plans/2026-04-21-elohim-epr-codec-crate-plan.md`
 - Phase 2a (planned): `genesis/docs/superpowers/plans/2026-04-22-elohim-epr-storage-foundation-plan.md`

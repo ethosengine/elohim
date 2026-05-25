@@ -1,3 +1,24 @@
+---
+title: Experience-Story EPRs — Design Spec
+tier: architecture
+status: Design (brainstorm complete, awaiting user review)
+created: 2026-04-18
+authors: Matthew Dowell + Opus 4.7
+pillar coupling: lamad (app-schema vocabulary) on top of protocol primitives (ContentNode, Link)
+informed-by:
+  - existing `ContentNode` entry type in lamad DNA; existing `human` / `collective` / `role` / `feature` contentTypes; existing `epr-composite` core protocol contentFormat
+  - rakia/docs/plans/build-attestation-integration.md (sibling pattern for build attestations)
+  - elohim/brit/docs/plans/2026-04-16-phase-2a-build-attestation-primitives.md (brit Phase 2a)
+informs:
+  - All future sprint specs that touch experience-story EPR / story-point / experience-moment primitives
+  - Any new pillar manifest declaration that adopts the contentType-discriminator pattern for EPR-shaped atoms
+  - All future bridges that need to project experience-stories into web2 surfaces
+defers:
+  - Sub-project A (matthew peer persistence) — own spec depending on this one
+  - Sub-project C (doorway export/re-upload route) — own spec depending on this one
+  - Sub-project D (shefa valueflow from inter-pipeline diffs) — own spec depending on this one
+---
+
 # Experience-Story EPRs — Design Spec
 
 **Status:** Design (brainstorm complete, awaiting user review)

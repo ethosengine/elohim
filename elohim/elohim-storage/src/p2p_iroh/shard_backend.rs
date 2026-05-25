@@ -6,7 +6,7 @@
 //! so the two transports return wire-byte-identical responses for the
 //! same request.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the shard plane is dual-stack permanent. Reed-Solomon coding stays
 //! in pure Rust; framing is per-transport.
 //!

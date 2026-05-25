@@ -1,5 +1,5 @@
 -- Wave 3 M1 — learning ledger for the valueflows bridge.
--- See genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md §4.2
+-- See genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md §4.2
 --
 -- Each row is one TranslationPoint observation. End-of-Wave-3 (M5) aggregates
 -- these to produce the upstream-contribution inventory + R&O compatibility report.

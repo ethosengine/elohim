@@ -6,7 +6,7 @@
 //! without any custom client code.
 //!
 //! This module is the substrate-side mitigation for cutover gate #10
-//! per `genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`,
+//! per `genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`,
 //! Step 2 of the n0-centralization-seam mitigation plan.
 //!
 //! # NOT a route registry proxy

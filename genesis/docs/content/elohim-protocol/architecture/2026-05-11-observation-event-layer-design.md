@@ -1,16 +1,22 @@
 ---
 title: Observation/Event Layer — Witness Substrate for the Three-Layer Truth Model
+tier: architecture
 status: Draft (awaiting user review)
 created: 2026-05-11
 authors: Matthew Dowell + Opus 4.7
 pillar coupling: elohim (substrate primitive), infrastructure + lamad + mishpat + shefa + imagodei (manifest layers)
-narrative spine: genesis/docs/content/elohim-protocol/observer-protocol.md (the elohim-observer epic)
-related:
-  - genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md (sibling spec; this is the operational half of the cut attestation drew from the notary side)
-  - genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md (Track 2 substrate plane this spec extends)
+realizes:
+  - genesis/docs/content/elohim-protocol/observer-protocol.md (the elohim-observer epic)
+informed-by:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md (sibling spec; this is the operational half of the cut attestation drew from the notary side)
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md (Track 2 substrate plane this spec extends)
   - genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md (Witness/Audit/Proof/Confirmation gradient — observations feed the Audit tier's re-execution requirement)
   - genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md (trust-then-verify pattern applied to diversity computation)
   - genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md (Wave 0; this spec is a sibling to attestation consolidation under Wave 0)
+informs:
+  - All future sprint specs that touch Observation / Event primitives across any DNA
+  - Any new pillar manifest declaration of observation_kinds
+  - Future records-lifecycle / attestation-consolidation / quilt-stewardship work that consumes the witness substrate
 memory_anchors:
   - project_three_layer_truth_model
   - project_iroh_phase11_all_backends_wired

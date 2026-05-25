@@ -40,7 +40,7 @@ The brainstorming skill (`superpowers:brainstorming`) exists for exactly this sh
 
 **Substrate design (parent spec):**
 
-3. `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md` — original graph-substrate design. The projector section is directly load-bearing for item 4; the envelope/payload two-layer model frames item 3.
+3. `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md` — original graph-substrate design. The projector section is directly load-bearing for item 4; the envelope/payload two-layer model frames item 3.
 
 **Code seams where Phase 2B lands:**
 

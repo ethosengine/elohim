@@ -1,6 +1,6 @@
 -- Phase 12 of iroh parallel stack — peer_transport_manifest graduation.
 -- Replaces 2026-05-08-045024_cross_stack_peer_map (transition-bridge schema).
--- Per genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+-- Per genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
 -- lines 440-505: this is permanent structural schema, not transition-bridge.
 --
 -- Source-of-truth notes (Category C operational projection):

@@ -13,9 +13,9 @@
 **Tech Stack:** Rust (HDK 0.6 for DNAs; tokio/hyper for storage HTTP; diesel for storage projection cache); JSON Schema + ts-rs codegen for the Rust→TS boundary; sweettest for cross-DNA integration; vitest for any TS-side tests.
 
 **Substrate-currency references (read before starting):**
-- `genesis/docs/superpowers/specs/2026-05-23-multi-collective-collaboration-epr-design.md` — this plan implements §2, §5 (pre-declared root only), §6.1 Form A, §6.3 commons-pool tribute, §6.4 clean-exit, §7 VF projection at T0 of that spec
+- `genesis/docs/content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md` — this plan implements §2, §5 (pre-declared root only), §6.1 Form A, §6.3 commons-pool tribute, §6.4 clean-exit, §7 VF projection at T0 of that spec
 - `genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md` — Collective + Membership shapes; this plan generalizes them to polymorphic membership on first landing (no separate migration; Collective/Membership don't yet exist as code)
-- `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md` — VF projection patterns and extension-field conventions
+- `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md` — VF projection patterns and extension-field conventions
 - `elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs:887-960` — current `EntryTypes` enum and `LinkTypes` enum (where additions land)
 - `elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs:512` — example coordinator function (`create_human_relationship`) to mirror style/error handling
 
@@ -115,7 +115,7 @@ Write to `elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/qahal.rs`:
 ```rust
 //! Qahal substrate entries: Collective, Membership (polymorphic), CollabAgreement.
 //!
-//! Per spec: genesis/docs/superpowers/specs/2026-05-23-multi-collective-collaboration-epr-design.md
+//! Per spec: genesis/docs/content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md
 //! Pure-data validation only — link traversal happens in the coordinator zome.
 
 use hdi::prelude::*;

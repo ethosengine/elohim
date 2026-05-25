@@ -19,7 +19,7 @@ Sibling tools live alongside in `.claude/scripts/memory-kit/`. This is the
 read-only dashboard companion to /cleanup (which archives). It surfaces what
 NOT to archive (active work) and what to refresh (stale-but-unfinished).
 
-Spec reference: genesis/docs/superpowers/specs/2026-05-10-memory-lifecycle-design.md
+Spec reference: genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
 """
 
 from __future__ import annotations

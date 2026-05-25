@@ -225,7 +225,7 @@ The HHMMSS `120000` is chosen at noon UTC on 2026-05-10 to be unambiguously dist
   ```sql
   -- Phase 12 of iroh parallel stack — peer_transport_manifest graduation.
   -- Replaces 2026-05-08-045024_cross_stack_peer_map (transition-bridge schema).
-  -- Per genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+  -- Per genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
   -- lines 440-505: this is permanent structural schema, not transition-bridge.
   --
   -- Source-of-truth notes (Category C operational projection):
@@ -366,7 +366,7 @@ The HHMMSS `120000` is chosen at noon UTC on 2026-05-10 to be unambiguously dist
   from device archetypes). Existing rows migrate with capability_level=5
   default and discovery_methods inferred from which transport id was set.
 
-  Spec: genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+  Spec: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
   lines 440-505.
 
   Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
@@ -750,7 +750,7 @@ This task delivers the in-memory shape, observation/lookup/capability/discovery 
   //! Selection at call site is via [`select_transport`] (defined in
   //! Task 8 of the Phase 12 plan).
   //!
-  //! Spec: genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+  //! Spec: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
   //! lines 440-505.
 
   use diesel::prelude::*;

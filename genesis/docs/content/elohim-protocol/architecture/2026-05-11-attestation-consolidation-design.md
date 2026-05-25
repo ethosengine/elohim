@@ -1,15 +1,20 @@
 ---
 title: Attestation Consolidation — Validated Recognition as a Content Discriminator
+tier: architecture
 status: Draft (awaiting user review)
 created: 2026-05-11
 authors: Matthew Dowell + Opus 4.7
 pillar coupling: elohim (core primitive), imagodei + lamad + mishpat + infrastructure (manifest layers)
-depends on: existing `Content` entry type in elohim DNA; existing `content_type` discriminator pattern; existing `Link` primitive; existing pillar manifest registry
-related:
-  - genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md (precedent for contentType discriminator pattern)
+informed-by:
+  - existing `Content` entry type in elohim DNA; existing `content_type` discriminator pattern; existing `Link` primitive; existing pillar manifest registry
+  - genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md (precedent for contentType discriminator pattern)
   - genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md (proof-class gradient + EPR-variant framing)
   - genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md (Standing vs Attestation disambiguation, §2.2 + §4.2)
   - genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md (Wave 0; this spec supersedes Wave 0's Attestation dedupe direction)
+informs:
+  - All future sprint specs that touch attestation primitives across any DNA
+  - Any new pillar manifest declaration of attestation subtypes
+  - Future recovery-protocol redesigns that consume the Shamir-decoupling shape
 defers:
   - Observation layer (libp2p/iroh-shaped operational data) — own spec, sibling to this one
   - Per-pillar attestation subtype metadata schemas — declared in each pillar's manifest

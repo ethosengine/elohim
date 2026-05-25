@@ -1,3 +1,25 @@
+---
+title: Tiered Quilt Stewardship — Design
+tier: architecture
+status: Draft (post-brainstorm, pre-implementation)
+created: 2026-05-11
+authors: Matthew (operator decisions); spec drafted in brainstorm session 2026-05-11
+pillar coupling: elohim (substrate primitive), infrastructure (storage tiering plane)
+informed-by:
+  - genesis/graphos/vocabulary.md (quilt, pantry, stock, draw, shard, RS(N,K))
+  - Phase 11 gate #2 — iroh-canonical `/blob` for BLAKE3-capable callers (hot plane)
+informs:
+  - All future quilt-stewardship sprint specs (the 8-wave roadmap)
+  - All future REA event emissions tied to quilt movement between temperature classes (drawn / stocked-warm / stocked / shelved)
+  - All future reach-floor enforcement specs that interact with cold-archive substrate
+  - Records-lifecycle (consumes the cold-archive terminus this spec defines)
+memory_anchors:
+  - project_tiered_quilt_spec_landed_2026_05_11
+  - project_quilt_pantry_vocabulary
+  - project_storage_vocabulary_quilt
+  - project_quilt_as_native_s3_surface
+---
+
 # Tiered Quilt Stewardship — Design
 
 **Version:** 0.1
@@ -928,7 +950,7 @@ Before the delivery master writes sub-plans:
 - MinIO substrate (runbook, corrects Garage memory):
   `genesis/manifests/RUNBOOK-minio-sccache-2026-05-09.md`
 - EPR substrate framing:
-  `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`
+  `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`
 - Three-truth-layer model: memory anchor `project_three_layer_truth_model`
 - DePIN contracts as policy: memory anchor `project_depin_contracts_are_policy`
 - Placement signals as shefa inputs: memory anchor `project_placement_signals_are_shefa_inputs`

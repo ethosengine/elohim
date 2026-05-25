@@ -1278,7 +1278,7 @@ fn sweep_dependent_caches_on_revocation(
 //
 // **`canonical_envelope_bytes` must match the zome-side implementation in
 // `imagodei/zomes/imagodei/src/lib.rs` exactly.**
-// See spec at `genesis/docs/superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md`.
+// See spec at `genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md`.
 
 /// Sub-struct for canonical serialization — matches the zome-side
 /// `CanonicalEnvelopeCore` / `CanonicalMetadataRef` pair exactly.

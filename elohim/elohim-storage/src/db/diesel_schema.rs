@@ -1120,7 +1120,7 @@ diesel::table! {
 diesel::joinable!(observation_entries -> observation_sessions (session_id));
 
 // Observation/Event Layer — Stage 3 projection tables.
-// See genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md
+// See genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md
 // All four tables are Category C (operational); source of truth is the iroh-blob log.
 
 diesel::table! {
@@ -1552,7 +1552,7 @@ diesel::joinable!(node_stewardship -> humans (human_id));
 
 // Phase 12 of iroh parallel stack — permanent peer transport manifest schema.
 // Graduated from Phase 10 cross_stack_peer_map (transition-bridge) to permanent structural
-// schema per genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+// schema per genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
 // lines 440-505.
 diesel::table! {
     peer_transport_manifest (agent_cid) {

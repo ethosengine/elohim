@@ -1,6 +1,6 @@
 //! elohim-epr — canonical codec for the Elohim EPR atom.
 //!
-//! See `genesis/docs/superpowers/specs/2026-04-21-elohim-core-graph-substrate-design.md`.
+//! See `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`.
 //!
 //! # Example
 //!

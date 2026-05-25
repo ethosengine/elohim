@@ -780,3 +780,19 @@ The only question is: Are you ready to be seen?
 *From currency to recognition.*
 *From isolation to network.*
 *From extraction to flourishing.*
+
+---
+
+## Technical Realization
+
+The protocol-layer work that delivers this narrative — read these if you want the engineering picture:
+
+- [`Records Lifecycle`](../architecture/2026-05-24-records-lifecycle-design.md) *(canonical)* — **the records lifecycle that makes the Okonkwo family's economic visibility executable.** Part B.1 walks the Monarch/Mint-shape personal-finance dashboard at household scale; Part B.5 walks a Factory-as-collective; Part B.6 walks a Bank-as-collective with bridges to legacy banks; Part D specifies the substrate gaps that close the lifecycle gradient (subordination, surface, submerge, dissolution, bridges).
+- [`Observation / Event Layer`](../../../superpowers/specs/2026-05-11-observation-event-layer-design.md) — the ephemeral peer-witnessed evidence tier; the substrate primitive that makes "the network sees the nurse's 3 AM compassion" technically achievable.
+- [`Wave 3 ValueFlows / hREA Interop`](../../../superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md) — the REA / ValueFlows / hREA substrate the lifecycle wires on top of.
+- [`Tiered Quilt Stewardship`](../../../superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md) — the cold-archive surface that holds historical economic depth without melting peer nodes.
+- [`Multi-Collective Collaboration EPR`](../../../superpowers/specs/2026-05-23-multi-collective-collaboration-epr-design.md) — cross-collective EPR custody handoff (the resell-the-couch case and inter-household value flows).
+
+For the full canonical-specs index and the frontmatter-glue contract that ties them together, see [`canonical-specs/INDEX.md`](../architecture/INDEX.md).
+
+*This epic is the why. The specs are the how. The code under `elohim/holochain/dna/elohim/`, `elohim/elohim-storage/`, and `bridges/` is the what.*

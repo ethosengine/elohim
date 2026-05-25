@@ -8,7 +8,7 @@
 //! the response-building half of that flow so both transports return
 //! identical wire bytes for the same input.
 //!
-//! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
+//! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the trust plane is dual-stack permanent. Trust attestations are
 //! DHT-notarized; the wire just carries them. Both transports
 //! preserve DHT-derived integrity equally.

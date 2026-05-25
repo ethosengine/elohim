@@ -3,10 +3,10 @@ title: Doorway and Elohim-Hub — Edge Responsibilities and the Reach-Earning Th
 status: Draft (exploratory backlog spec)
 created: 2026-05-08
 related:
-  - genesis/docs/superpowers/specs/2026-05-02-elohim-hub-boundaries-design.md
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
   - genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md
   - genesis/docs/superpowers/plans/2026-04-28-doorway-blob-registry-routing.md
-  - genesis/docs/superpowers/specs/2026-04-23-epr-phase-2c-libp2p-federation-design.md
+  - genesis/docs/content/elohim-protocol/architecture/2026-04-23-epr-phase-2c-libp2p-federation-design.md
   - genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md
   - doorway/doorway-service/ARCHITECTURE.md
   - doorway/doorway-service/FEDERATION.md

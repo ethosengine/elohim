@@ -1,16 +1,21 @@
 ---
 title: iroh ↔ libp2p Complementarity — Three Substrate Transport Tracks, Anti-Capture by Design
+tier: architecture
 status: Draft (architecture spec — gates Phase 11 backend wiring)
 created: 2026-05-08
-related:
+informed-by:
   - genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
   - genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md
-  - genesis/docs/superpowers/specs/2026-05-02-elohim-hub-boundaries-design.md
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
   - genesis/plans/2026-04-13-device-archetypes-design.md
   - genesis/plans/2026-04-10-agency-phase-registration-design.md
   - genesis/docs/content/elohim-protocol/hardware-spec.md
   - elohim/elohim-storage/src/p2p_iroh/README.md
   - elohim/elohim-storage/tests/bench_blob_perf.rs
+informs:
+  - All future transport-plane specs (Phase 11 backend wiring, sync/gossip/recovery planes)
+  - All future hub-archetype work that needs to choose iroh vs libp2p per-track
+  - All future doorway projection specs that bridge web2 to the substrate
 memory_anchors:
   - project_iroh_parallel_stack_phases3_7_landed
   - project_iroh_parallel_stack_phase0_blocker
