@@ -8,6 +8,8 @@ use diesel::prelude::*;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use elohim_views::projection::{GateHintRef, ProjectionMode, StewardDirectEndpoint};
+
 use super::context::AppContext;
 use super::diesel_schema::rea_commitments;
 use super::models::{NewReaCommitment, ReaCommitment};
@@ -372,6 +374,95 @@ pub fn doorway_scope(doorway_id: &str) -> String {
         .expect("serializing a single-element string array cannot fail")
 }
 
+// ============================================================================
+// Project-EPR Commitment Validator
+// ============================================================================
+//
+// Enforces opinionated substrate constraints on project-epr commitments per
+// spec §2.4 ("no dead ends" guarantee). Called at HTTP request-time, BEFORE
+// the commitment row is built and stored, so invalid projections are rejected
+// at the boundary rather than silently persisted.
+//
+// The validator operates on ProjectEprValidationInput — a focused subset of
+// EprProjectionView — so callers do not need to construct a full view
+// (which requires additional fields from the DB) before validating.
+
+/// Policy-relevant subset of EprProjectionView fields for pre-storage validation.
+///
+/// Deliberately minimal: only the fields that the validator rules (§2.4) need.
+/// This allows validation of incoming HTTP requests before the full commitment
+/// row is constructed.
+#[derive(Debug, Clone)]
+pub struct ProjectEprValidationInput {
+    /// URL path this projection is served from (e.g. "/lamad").
+    pub url_path: String,
+    /// How the doorway serves this projection.
+    pub mode: ProjectionMode,
+    /// Reach class of the projected EPR atom.
+    pub reach: String,
+    /// EPR CID of a preview / draft build (optional).
+    pub preview_epr_ref: Option<String>,
+    /// Gate hints the access layer should surface when reach is restricted.
+    pub gate_hints: Vec<GateHintRef>,
+    /// True when this projection has no onward link — a terminal destination.
+    pub dead_end: bool,
+    /// Steward-direct endpoint, required when mode is StewardDirect.
+    pub steward_direct_endpoint: Option<StewardDirectEndpoint>,
+}
+
+/// Validate a project-epr commitment per the substrate rules (spec §2.4).
+///
+/// Returns `Ok(())` when the commitment is safe to persist. Returns
+/// `Err(StorageError::Validation(_))` with a human-readable message when any
+/// rule is violated. The four rules are:
+///
+/// 1. Non-commons reach requires `previewEprRef` OR `gateHints` (non-empty)
+///    OR `deadEnd=true` — at least one onward path for the person.
+/// 2. `stewardDirect` mode requires `stewardDirectEndpoint`.
+/// 3. `urlPath` must start with `/`.
+/// 4. `urlPath` must not have trailing slash unless it IS `/`.
+pub fn validate_project_epr_commitment(
+    input: &ProjectEprValidationInput,
+) -> Result<(), StorageError> {
+    // Rule 1: non-commons reach must declare at least one path forward
+    if input.reach != "commons"
+        && input.preview_epr_ref.is_none()
+        && input.gate_hints.is_empty()
+        && !input.dead_end
+    {
+        return Err(StorageError::Validation(
+            "Gated projection must declare at least one of: \
+             previewEprRef, gateHints (non-empty), or deadEnd=true"
+                .into(),
+        ));
+    }
+
+    // Rule 2: steward-direct mode requires an endpoint
+    if input.mode == ProjectionMode::StewardDirect && input.steward_direct_endpoint.is_none() {
+        return Err(StorageError::Validation(
+            "steward-direct mode requires stewardDirectEndpoint".into(),
+        ));
+    }
+
+    // Rule 3: url_path must start with /
+    if !input.url_path.starts_with('/') {
+        return Err(StorageError::Validation(format!(
+            "urlPath must start with '/', got: {}",
+            input.url_path
+        )));
+    }
+
+    // Rule 4: url_path must not have trailing slash unless it IS "/"
+    if input.url_path.len() > 1 && input.url_path.ends_with('/') {
+        return Err(StorageError::Validation(format!(
+            "urlPath must not have trailing slash (except '/'): {}",
+            input.url_path
+        )));
+    }
+
+    Ok(())
+}
+
 /// List active operator commitments for a doorway.
 ///
 /// Returns every Commitment with action='operate-doorway', in_scope_of matching
@@ -424,6 +515,7 @@ pub fn find_active_operator_binding(
 #[cfg(test)]
 mod operator_helper_tests {
     use super::*;
+    use elohim_views::projection::GateHintRelation;
 
     #[test]
     fn doorway_scope_produces_canonical_json_array() {
@@ -463,5 +555,95 @@ mod operator_helper_tests {
         // Schema-first codegen of this vocabulary is a future refactor; until
         // then this test is the drift detector.
         assert_eq!(PROJECT_EPR_ACTION, "project-epr");
+    }
+
+    // -------------------------------------------------------------------------
+    // Validator tests (§2.4 rules)
+    // -------------------------------------------------------------------------
+
+    fn make_project_epr_input_for_test(
+        reach: &str,
+        preview: Option<String>,
+        hints: Vec<GateHintRef>,
+        dead_end: bool,
+        endpoint: Option<StewardDirectEndpoint>,
+    ) -> ProjectEprValidationInput {
+        ProjectEprValidationInput {
+            url_path: "/test".into(),
+            mode: ProjectionMode::Cached,
+            reach: reach.into(),
+            preview_epr_ref: preview,
+            gate_hints: hints,
+            dead_end,
+            steward_direct_endpoint: endpoint,
+        }
+    }
+
+    #[test]
+    fn validator_accepts_commons_reach_without_preview_or_hints() {
+        let input = make_project_epr_input_for_test("commons", None, vec![], false, None);
+        assert!(validate_project_epr_commitment(&input).is_ok());
+    }
+
+    #[test]
+    fn validator_rejects_non_commons_reach_with_nothing_set() {
+        let input =
+            make_project_epr_input_for_test("qahal:aleph-members", None, vec![], false, None);
+        let err = validate_project_epr_commitment(&input).expect_err("should reject");
+        assert!(
+            err.to_string().contains("must declare at least one of"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validator_accepts_non_commons_with_dead_end() {
+        let input = make_project_epr_input_for_test("qahal:xyz", None, vec![], true, None);
+        assert!(validate_project_epr_commitment(&input).is_ok());
+    }
+
+    #[test]
+    fn validator_accepts_non_commons_with_preview() {
+        let input = make_project_epr_input_for_test(
+            "qahal:xyz",
+            Some("epr:preview-xyz".into()),
+            vec![],
+            false,
+            None,
+        );
+        assert!(validate_project_epr_commitment(&input).is_ok());
+    }
+
+    #[test]
+    fn validator_accepts_non_commons_with_hints() {
+        let hint = GateHintRef {
+            epr_ref: "epr:susan".into(),
+            label: Some("Talk to Susan".into()),
+            relation: GateHintRelation::PersonWhoCanGrant,
+        };
+        let input = make_project_epr_input_for_test("qahal:xyz", None, vec![hint], false, None);
+        assert!(validate_project_epr_commitment(&input).is_ok());
+    }
+
+    #[test]
+    fn validator_rejects_steward_direct_without_endpoint() {
+        let mut input = make_project_epr_input_for_test("commons", None, vec![], false, None);
+        input.mode = ProjectionMode::StewardDirect;
+        let err = validate_project_epr_commitment(&input).expect_err("should reject");
+        assert!(
+            err.to_string().contains("steward-direct mode requires"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validator_rejects_url_path_without_leading_slash() {
+        let mut input = make_project_epr_input_for_test("commons", None, vec![], false, None);
+        input.url_path = "lamad".into();
+        let err = validate_project_epr_commitment(&input).expect_err("should reject");
+        assert!(
+            err.to_string().contains("urlPath must start with"),
+            "unexpected error: {err}"
+        );
     }
 }
