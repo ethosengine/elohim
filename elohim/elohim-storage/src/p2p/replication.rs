@@ -68,10 +68,26 @@ impl ReplicationState {
         }
     }
 
-    /// Register content IDs already in local DB (call on startup)
+    /// Register content IDs already in local DB (call on startup).
+    ///
+    /// A pod that restarts with content already replicated locally is caught
+    /// up to the extent of its knowledge — there are no known gaps. We surface
+    /// that immediately so the seeder's caughtUp poll doesn't hang for 600s
+    /// waiting on a peer-discovery event that may not arrive (matthew might
+    /// also be mid-restart, the periodic ListContent tick is on a long
+    /// cadence, etc). When a peer subsequently advertises new gaps via
+    /// `discover()`, caught_up correctly resets to false until those drain.
+    ///
+    /// Fresh pods (empty `ids`) stay `caught_up=false` until at least one
+    /// inventory exchange completes — otherwise the seeder would pass before
+    /// any content has actually replicated.
     pub async fn set_local_ids(&self, ids: HashSet<String>) {
+        let had_content = !ids.is_empty();
         let mut inner = self.inner.write().await;
         inner.local_ids = ids;
+        if had_content && inner.pending.is_empty() {
+            inner.caught_up = true;
+        }
     }
 
     /// Discover content from a peer inventory. Returns IDs that are new gaps.
@@ -95,6 +111,14 @@ impl ReplicationState {
             }
             inner.pending.insert(id.clone());
             new_gaps.push(id);
+        }
+        // Maintain the invariant: caught_up=false whenever pending is non-empty.
+        // `set_local_ids` can flip caught_up=true on a restored pod; without
+        // this guard, a subsequent inventory exchange that uncovers new gaps
+        // would leave caught_up stuck at true until a mark_completed/mark_failed
+        // path called update_caught_up.
+        if !new_gaps.is_empty() {
+            inner.caught_up = false;
         }
         new_gaps
     }
@@ -218,6 +242,61 @@ mod tests {
         let s = state.status().await;
         assert_eq!(s.pending, 0);
         assert_eq!(s.failed, 1);
+    }
+
+    #[tokio::test]
+    async fn restored_pod_with_local_content_is_caught_up_on_startup() {
+        // A pod that restarts with content already replicated locally must
+        // report caught_up=true immediately so the seeder's 600s poll doesn't
+        // hang waiting on a peer-discovery event that may not fire in time.
+        let state = ReplicationState::new();
+        assert!(
+            !state.status().await.caught_up,
+            "initial state is not caught up"
+        );
+
+        let local: HashSet<String> = ["a", "b", "c"].iter().map(|s| s.to_string()).collect();
+        state.set_local_ids(local).await;
+
+        let status = state.status().await;
+        assert!(
+            status.caught_up,
+            "restored pod with local content must be caught up"
+        );
+        assert_eq!(status.pending, 0);
+        assert_eq!(status.completed, 0);
+    }
+
+    #[tokio::test]
+    async fn fresh_pod_with_no_local_content_stays_not_caught_up() {
+        // A fresh pod (no local content) must NOT claim caught_up until at
+        // least one inventory exchange completes — otherwise the seeder
+        // would pass before any content has actually replicated.
+        let state = ReplicationState::new();
+        state.set_local_ids(HashSet::new()).await;
+
+        let status = state.status().await;
+        assert!(
+            !status.caught_up,
+            "fresh pod must wait for inventory exchange"
+        );
+    }
+
+    #[tokio::test]
+    async fn pending_gaps_keep_restored_pod_not_caught_up() {
+        // If pending gaps already exist (somehow) when set_local_ids runs,
+        // we must not falsely flip caught_up.
+        let state = ReplicationState::new();
+        state.discover(vec!["new-item".to_string()]).await;
+        assert_eq!(state.status().await.pending, 1);
+
+        let local: HashSet<String> = ["existing".to_string()].into_iter().collect();
+        state.set_local_ids(local).await;
+
+        assert!(
+            !state.status().await.caught_up,
+            "pending gaps must keep caught_up=false even with local content"
+        );
     }
 
     #[tokio::test]

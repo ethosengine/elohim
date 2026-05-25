@@ -3241,7 +3241,10 @@ fn element_registry_view_matches_schema() {
 
     // Confirm camelCase wire shape before handing to schema validator.
     assert_eq!(json["eprId"], serde_json::json!("elohim-core-elements"));
-    assert_eq!(json["elements"][0]["tagName"], serde_json::json!("elohim-button"));
+    assert_eq!(
+        json["elements"][0]["tagName"],
+        serde_json::json!("elohim-button")
+    );
 
     validate_against_schema("views/element-registry-view.schema.json", &json);
 }
