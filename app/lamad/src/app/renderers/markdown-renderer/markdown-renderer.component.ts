@@ -10,7 +10,6 @@ import {
   ElementRef,
   ViewChild,
   ViewContainerRef,
-  ComponentRef,
   OnDestroy,
   inject,
 } from '@angular/core';
@@ -24,10 +23,13 @@ import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import { firstValueFrom, Subscription } from 'rxjs';
 
-import { EprPopoverComponent } from '@app/elohim/components/epr-popover/epr-popover.component';
+import 'elohim-core/register';
+
 import { EprResolverService, type StepRef } from '@app/elohim/services/epr-resolver.service';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
 import { parseEpr } from '@elohim/service';
+
+import type { ElohimEprPopover, EprHead } from 'elohim-core';
 
 import { isConceptNode } from '../../generated/content-node-types';
 import { ContentNode } from '../../models/content-node.model';
@@ -135,8 +137,14 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private readonly pathContext = inject(PathContextService);
   private readonly pathService = inject(PathService);
   private readonly router = inject(Router);
+  // Popover is now a <elohim-epr-popover> custom element appended directly to
+  // <body> (replacing the prior ViewContainerRef-based Angular component
+  // instantiation). ViewContainerRef is retained in case future renderers
+  // dynamically instantiate Angular components, but is no longer used here.
   private readonly vcr = inject(ViewContainerRef);
-  private activePopover: ComponentRef<EprPopoverComponent> | null = null;
+  private activePopover: ElohimEprPopover | null = null;
+  /** Listener cleanup callbacks for the active popover (mouseenter, dismiss, navigate). */
+  private popoverCleanup: (() => void)[] = [];
   private popoverSub: Subscription | null = null;
   private eprHoverListener?: (e: Event) => void;
   private eprLeaveListener?: (e: Event) => void;
@@ -519,6 +527,9 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
     // Get route synchronously for the "Open resource" link
     const { route } = this.eprResolver.resolveUrl(eprUri);
+    const routeHref = Array.isArray(route)
+      ? '/' + route.filter(Boolean).join('/').replace(/^\/+/, '')
+      : null;
 
     // Fetch EPR Head metadata
     this.popoverSub = this.eprResolver.resolveEprHead(eprUri).subscribe(head => {
@@ -528,28 +539,58 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       const rect = anchor.getBoundingClientRect();
       const position = { top: rect.bottom + 8, left: rect.left };
 
-      // Create popover component programmatically
-      const ref = this.vcr.createComponent(EprPopoverComponent);
+      // Create the <elohim-epr-popover> Lit custom element directly. The Lit
+      // element manages its own positioning via the `position` property +
+      // position:fixed; appended to <body> so it floats above all ancestor
+      // stacking contexts (replaces the prior ViewContainerRef-injected
+      // Angular EprPopoverComponent, which Slice 2.2 migrated to a Lit
+      // primitive). The EprHead structural type is shared between the
+      // legacy adapter and the Lit element export.
+      // TODO(Slice 2.6 follow-up Option B): rewrite the `marked` anchor
+      // pipeline so EPR refs emit <elohim-epr-link> tags directly instead
+      // of raw <a data-epr> anchors with this programmatic popover dance.
+      const popover = document.createElement('elohim-epr-popover') as ElohimEprPopover;
+      // Cast through unknown — the Lit element's EprHead structural type
+      // matches the resolver's EprHead at runtime; both have version, id,
+      // content, lamad, shefa, qahal, relationships, and optional author/
+      // updated. Slice 2.5 (storage-client EprHead export) will collapse
+      // the two declarations.
+      popover.head = head as unknown as EprHead;
+      popover.position = position;
+      popover.route = routeHref;
+      popover.visible = true;
 
-      // Ensure host is at viewport origin for correct fixed positioning
-      const hostEl = ref.location.nativeElement as HTMLElement;
-      hostEl.style.top = '0';
-      hostEl.style.left = '0';
-
-      ref.instance.head = head;
-      ref.instance.position = position;
-      ref.instance.route = route;
-      ref.instance.dismissed.subscribe(() => this.destroyPopover());
-
-      // Cancel dismiss when mouse enters the popover
-      hostEl.addEventListener('mouseenter', () => {
+      // Cancel pending dismiss when mouse enters the popover panel.
+      const onEnter = (): void => {
         if (this.popoverDismissTimer) {
           clearTimeout(this.popoverDismissTimer);
           this.popoverDismissTimer = null;
         }
-      });
+      };
+      // The Lit element fires 'epr-popover-dismiss' on mouseleave / Escape.
+      const onDismiss = (): void => this.destroyPopover();
+      // 'epr-popover-navigate' fires when the "Open resource" link inside
+      // the popover is clicked. We honor it by routing via Angular Router
+      // (the resolved route) and dismissing.
+      const onNavigate = (): void => {
+        this.destroyPopover();
+        if (route) {
+          void this.router.navigate(route);
+        }
+      };
 
-      this.activePopover = ref;
+      popover.addEventListener('mouseenter', onEnter);
+      popover.addEventListener('epr-popover-dismiss', onDismiss);
+      popover.addEventListener('epr-popover-navigate', onNavigate);
+
+      this.popoverCleanup = [
+        () => popover.removeEventListener('mouseenter', onEnter),
+        () => popover.removeEventListener('epr-popover-dismiss', onDismiss),
+        () => popover.removeEventListener('epr-popover-navigate', onNavigate),
+      ];
+
+      document.body.appendChild(popover);
+      this.activePopover = popover;
     });
   }
 
@@ -574,7 +615,9 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       this.popoverSub = null;
     }
     if (this.activePopover) {
-      this.activePopover.destroy();
+      for (const off of this.popoverCleanup) off();
+      this.popoverCleanup = [];
+      this.activePopover.remove();
       this.activePopover = null;
     }
     this.hoveredEprAnchor = null;
