@@ -12,7 +12,7 @@ import { HolochainClientService } from './elohim/services/holochain-client.servi
 import { ProtocolRouteContextService } from './elohim/services/protocol-route-context.service';
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
-import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
+import { BlobBootstrapService } from '@app/lamad/services/blob-bootstrap.service';
 import { type Mock, vi } from 'vitest';
 
 describe('AppComponent', () => {

@@ -9,8 +9,8 @@ import { vi, Mock } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 
 import { IndexedDBCacheService } from './indexeddb-cache.service';
-import { ContentNode } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+import { ContentNode } from '@app/lamad/models/content-node.model';
+import { LearningPath } from '@app/lamad/models/learning-path.model';
 
 // =============================================================================
 // In-memory IDB Mock

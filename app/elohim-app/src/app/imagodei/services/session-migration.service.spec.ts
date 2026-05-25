@@ -9,7 +9,7 @@ import { signal } from '@angular/core';
 
 import { SessionMigrationService } from './session-migration.service';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { ContentMasteryService } from '../../lamad/services/content-mastery.service';
+import { ContentMasteryService } from '@app/lamad/services/content-mastery.service';
 import { IdentityService } from './identity.service';
 import { SessionHumanService } from './session-human.service';
 import type { SessionHuman } from '../models/session-human.model';

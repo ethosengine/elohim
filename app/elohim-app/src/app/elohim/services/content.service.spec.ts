@@ -6,8 +6,8 @@ import { ContentBackendService, ContentFilters, PathFilters } from './content.se
 import { StorageClientService } from './storage-client.service';
 import { HeliaFetchService } from './helia-fetch.service';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
-import { ContentNode } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+import { ContentNode } from '@app/lamad/models/content-node.model';
+import { LearningPath } from '@app/lamad/models/learning-path.model';
 import { vi } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
 

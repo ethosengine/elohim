@@ -2,8 +2,8 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 
-import { ContentNode } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+import { ContentNode } from '@app/lamad/models/content-node.model';
+import { LearningPath } from '@app/lamad/models/learning-path.model';
 import { AgentProgress } from '../models/agent.model';
 import { DataLoaderService } from './data-loader.service';
 import { GOVERNANCE } from '../interfaces/governance.interface';

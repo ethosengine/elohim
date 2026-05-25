@@ -4,8 +4,8 @@ import { provideHttpClientTesting, HttpTestingController } from '@angular/common
 import { ContentBackendService } from './content.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { StorageClientService } from './storage-client.service';
-import { ContentNode, ContentType } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+import { ContentNode, ContentType } from '@app/lamad/models/content-node.model';
+import { LearningPath } from '@app/lamad/models/learning-path.model';
 import { vi, Mock } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
 
