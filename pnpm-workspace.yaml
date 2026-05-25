@@ -1,5 +1,6 @@
 packages:
   - app/elohim-app
+  - app/lamad
   - doorway/doorway-app
   - app/elohim-library
   - app/elohim-library/projects/elohim-service

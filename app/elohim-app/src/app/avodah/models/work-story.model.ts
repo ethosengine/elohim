@@ -1,7 +1,7 @@
 // Re-export WorkStoryMeta from generated types (schema is source of truth)
 export type { WorkStoryMeta } from '../generated/metadata-types';
 
-import type { ContentMetadata } from '../../lamad/models/content-node.model';
+import type { ContentMetadata } from '@app/lamad/models/content-node.model';
 import type { WorkStoryMeta } from '../generated/metadata-types';
 
 export type WorkStoryStatus = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done';

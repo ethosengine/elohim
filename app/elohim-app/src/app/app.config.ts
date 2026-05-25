@@ -17,7 +17,7 @@ import { CustodianMetricsReporterService } from './elohim/services/custodian-met
 import { CustodianSelectionService } from './elohim/services/custodian-selection.service';
 import { GovernanceApiService } from './elohim/services/governance-api.service';
 import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
-import { ContentIOModuleWithPlugins } from './lamad/content-io/content-io.module';
+import { ContentIOModuleWithPlugins } from '@app/lamad/content-io/content-io.module';
 
 export const appConfig: ApplicationConfig = {
   providers: [

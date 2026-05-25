@@ -57,6 +57,17 @@ pub enum StorageEvent {
     KnowledgeMapDeleted {
         id: String,
     },
+
+    // Projection commitment events — emitted when a project-epr REA Commitment
+    // is created (registered) or cancelled/revoked. Consumed by doorway's
+    // storage_events_subscriber (Pattern Z bridge) so Phase B Task B15 can
+    // react to pillar EPR projection lifecycle changes.
+    ProjectionRegistered {
+        commitment_id: String,
+    },
+    ProjectionRevoked {
+        commitment_id: String,
+    },
 }
 
 /// Trait for event listeners
@@ -194,5 +205,49 @@ mod tests {
         let bus = EventBus::new();
         // Should not panic even with no subscribers
         bus.emit(StorageEvent::ContentDeleted { id: "test".into() });
+    }
+
+    #[tokio::test]
+    async fn projection_registered_bus_round_trip() {
+        let bus = EventBus::new();
+        let mut rx = bus.subscribe();
+
+        bus.emit(StorageEvent::ProjectionRegistered {
+            commitment_id: "proj-cid-1".into(),
+        });
+
+        let event = timeout(Duration::from_millis(100), rx.recv())
+            .await
+            .expect("timeout")
+            .expect("receive error");
+
+        match event {
+            StorageEvent::ProjectionRegistered { commitment_id } => {
+                assert_eq!(commitment_id, "proj-cid-1");
+            }
+            _ => panic!("Wrong event variant: {:?}", event),
+        }
+    }
+
+    #[tokio::test]
+    async fn projection_revoked_bus_round_trip() {
+        let bus = EventBus::new();
+        let mut rx = bus.subscribe();
+
+        bus.emit(StorageEvent::ProjectionRevoked {
+            commitment_id: "proj-cid-2".into(),
+        });
+
+        let event = timeout(Duration::from_millis(100), rx.recv())
+            .await
+            .expect("timeout")
+            .expect("receive error");
+
+        match event {
+            StorageEvent::ProjectionRevoked { commitment_id } => {
+                assert_eq!(commitment_id, "proj-cid-2");
+            }
+            _ => panic!("Wrong event variant: {:?}", event),
+        }
     }
 }

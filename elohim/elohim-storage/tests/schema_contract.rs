@@ -3209,3 +3209,203 @@ fn share_allocation_refuses_zero_tribute_via_schema() {
     });
     validate_against_schema("objects/share-allocation.schema.json", &bad);
 }
+
+// ── ElementRegistryView (Task A9 — pillar EPR decomposition) ─────────────────
+//
+// Source of truth: content table with contentFormat='element-registry-manifest'
+// (Category C, operational projection — no new DHT entry type).
+// Schema: elohim/sdk/schemas/v1/views/element-registry-view.schema.json
+// Rust struct: elohim-views/src/element_registry.rs
+
+#[test]
+fn element_registry_view_matches_schema() {
+    use elohim_views::element_registry::{ElementEntry, ElementRegistryView};
+
+    // Exercises:
+    //  - minimal valid registry (one element, no view_deps)
+    //  - tagName satisfies ^[a-z][a-z0-9]*-[a-z0-9-]+$ pattern
+    //  - cid satisfies ^sha256- pattern
+    //  - version satisfies ^\d+\.\d+\.\d+ pattern
+    let view = ElementRegistryView {
+        epr_id: "elohim-core-elements".into(),
+        pillar: "elohim-core".into(),
+        elements: vec![ElementEntry {
+            tag_name: "elohim-button".into(),
+            cid: "sha256-0000000000000000000000000000000000000000000000000000000000000000".into(),
+            version: "1.0.0".into(),
+            view_deps: vec![],
+        }],
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+
+    // Confirm camelCase wire shape before handing to schema validator.
+    assert_eq!(json["eprId"], serde_json::json!("elohim-core-elements"));
+    assert_eq!(json["elements"][0]["tagName"], serde_json::json!("elohim-button"));
+
+    validate_against_schema("views/element-registry-view.schema.json", &json);
+}
+
+#[test]
+fn element_registry_view_with_view_deps_matches_schema() {
+    use elohim_views::element_registry::{ElementEntry, ElementRegistryView};
+
+    // Exercises:
+    //  - multiple elements, one with view_deps populated
+    //  - pillar = "shefa"
+    let view = ElementRegistryView {
+        epr_id: "shefa-elements".into(),
+        pillar: "shefa".into(),
+        elements: vec![
+            ElementEntry {
+                tag_name: "shefa-balance-card".into(),
+                cid: "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .into(),
+                version: "2.1.3".into(),
+                view_deps: vec!["ShefaBalanceView".into(), "AccountView".into()],
+            },
+            ElementEntry {
+                tag_name: "shefa-commitment-chip".into(),
+                cid: "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                    .into(),
+                version: "1.0.0".into(),
+                view_deps: vec![],
+            },
+        ],
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+
+    // Confirm nested camelCase (viewDeps).
+    assert_eq!(
+        json["elements"][0]["viewDeps"],
+        serde_json::json!(["ShefaBalanceView", "AccountView"])
+    );
+
+    validate_against_schema("views/element-registry-view.schema.json", &json);
+}
+
+// ── EprProjectionView (Task A5 — pillar EPR decomposition) ──────────────────
+//
+// Source of truth: rea_commitments where action='project-epr' (Notarized,
+// Category A — backed by REA Commitment entry type on the DHT).
+// Schema: elohim/sdk/schemas/v1/views/epr-projection-view.schema.json
+// Rust struct: elohim-views/src/projection.rs
+
+#[test]
+fn epr_projection_view_cached_mode_matches_schema() {
+    use elohim_views::projection::{
+        EprProjectionView, GateHintRef, GateHintRelation, ProjectionMode,
+    };
+
+    // Exercises:
+    //  - mode = "cached" (stewardDirectEndpoint must be null / absent)
+    //  - previewEprRef = null (nullable optional)
+    //  - gateHints with one entry (including label = null)
+    //  - redirectsFrom non-empty
+    let view = EprProjectionView {
+        commitment_id: "sha256-abc01234def56789abc01234def56789abc01234def56789abc01234def56789"
+            .into(),
+        epr_id: "bafyreib2vq7lamadEPRcid0123456789012345678901234567890123456".into(),
+        doorway_id: "doorway:alpha-elohim-host".into(),
+        url_path: "/lamad".into(),
+        mode: ProjectionMode::Cached,
+        reach: "commons".into(),
+        base_href: "/lamad/".into(),
+        entry_file: "index.html".into(),
+        redirects_from: vec!["/learn".into(), "/study".into()],
+        preview_epr_ref: None,
+        gate_hints: vec![GateHintRef {
+            epr_ref: "bafyreib2vq7gateEPRcid0123456789012345678901234567890123456".into(),
+            label: None,
+            relation: GateHintRelation::MembershipPrerequisite,
+        }],
+        dead_end: false,
+        steward_direct_endpoint: None,
+        seeded_at: "2026-05-25T00:00:00Z".into(),
+        seeded_by: "12D3KooWMatthewBlade01AlphaNode".into(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+
+    // stewardDirectEndpoint must be null on the wire (not absent) because the
+    // schema lists it in `required` indirectly via oneOf[null | $ref].
+    // Confirm mode serializes correctly.
+    assert_eq!(json["mode"], serde_json::json!("cached"));
+    // Confirm doorwayId satisfies the "^doorway:" pattern constraint.
+    assert!(
+        json["doorwayId"].as_str().unwrap().starts_with("doorway:"),
+        "doorwayId must begin with 'doorway:'"
+    );
+
+    validate_against_schema("views/epr-projection-view.schema.json", &json);
+}
+
+#[test]
+fn epr_projection_view_steward_direct_populated_matches_schema() {
+    use elohim_views::projection::{
+        EprProjectionView, GateHintRef, GateHintRelation, ProjectionMode, StewardDirectEndpoint,
+    };
+
+    // Exercises:
+    //  - mode = "stewardDirect" — hits the $ref branch of the oneOf
+    //  - stewardDirectEndpoint fully populated with alt_host = Some(...)
+    //  - previewEprRef = Some("bafyrei...")
+    //  - gate_hints with multiple relations
+    //  - dead_end = true
+    let view = EprProjectionView {
+        commitment_id: "sha256-feed0123feed0123feed0123feed0123feed0123feed0123feed0123feed0123"
+            .into(),
+        epr_id: "bafyreib2vq7elohimAppEPR012345678901234567890123456789012345".into(),
+        doorway_id: "doorway:shem-elohim-host".into(),
+        url_path: "/elohim-app".into(),
+        mode: ProjectionMode::StewardDirect,
+        reach: "qahal:dawn-runners".into(),
+        base_href: "/elohim-app/".into(),
+        entry_file: "index.html".into(),
+        redirects_from: vec![],
+        preview_epr_ref: Some(
+            "bafyreib2vq7previewEPR01234567890123456789012345678901234567".into(),
+        ),
+        gate_hints: vec![
+            GateHintRef {
+                epr_ref: "bafyreib2vq7grantorEPR01234567890123456789012345678901234".into(),
+                label: Some("Ask Matthew for access".into()),
+                relation: GateHintRelation::PersonWhoCanGrant,
+            },
+            GateHintRef {
+                epr_ref: "bafyreib2vq7capabilityEPR0123456789012345678901234567890".into(),
+                label: None,
+                relation: GateHintRelation::CapabilityToEarn,
+            },
+        ],
+        dead_end: true,
+        steward_direct_endpoint: Some(StewardDirectEndpoint {
+            peer_id: "12D3KooWShemBlade02".into(),
+            alt_host: Some("192.168.1.42".into()),
+            tls_cert_san: "shem-blade-02.local".into(),
+            accepts_projection_for: vec![
+                "bafyreib2vq7elohimAppEPR012345678901234567890123456789012345".into(),
+            ],
+        }),
+        seeded_at: "2026-05-25T10:30:00Z".into(),
+        seeded_by: "12D3KooWShemBlade02".into(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+
+    // Confirm mode serializes as "stewardDirect" (camelCase).
+    assert_eq!(json["mode"], serde_json::json!("stewardDirect"));
+    // Confirm stewardDirectEndpoint is present and not null.
+    assert!(
+        !json["stewardDirectEndpoint"].is_null(),
+        "stewardDirectEndpoint must be an object when mode is stewardDirect"
+    );
+    // Confirm nested peerId is present.
+    assert_eq!(
+        json["stewardDirectEndpoint"]["peerId"],
+        serde_json::json!("12D3KooWShemBlade02")
+    );
+
+    validate_against_schema("views/epr-projection-view.schema.json", &json);
+}

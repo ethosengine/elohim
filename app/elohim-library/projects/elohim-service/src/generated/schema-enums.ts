@@ -45,6 +45,7 @@ export const ALL_CONTENT_FORMATS = [
   'json',
   'sophia',
   'sophia-quiz-json',
+  'element-registry-manifest',
 ] as const;
 export const CONTENT_FORMATS = ALL_CONTENT_FORMATS;
 export type ContentFormat = (typeof ALL_CONTENT_FORMATS)[number];
@@ -104,6 +105,7 @@ export const ALL_CONTENT_TYPES = [
   'gate-rules-declaration',
   'aggregation-spec',
   'escalation-target-spec',
+  'element-registry',
 ] as const;
 export const CONTENT_TYPES = ALL_CONTENT_TYPES;
 export type ContentType = (typeof ALL_CONTENT_TYPES)[number];

@@ -549,6 +549,51 @@ async fn main() -> anyhow::Result<()> {
 
     let state = Arc::new(state);
 
+    // B12: Load active EPR projections from storage at boot.
+    //
+    // Seeds the EprRouter so pillar URLs (e.g. /lamad) are routable from the
+    // first request. Wrapped in match — never fails boot if storage isn't up yet.
+    // SSE events from Phase A's events.rs will repopulate the router as soon as
+    // storage becomes reachable.
+    {
+        let epr_http = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_default();
+
+        let node_id_str = state.args.node_id.to_string();
+        let doorway_id = state.args.doorway_id.as_deref().unwrap_or(&node_id_str);
+
+        if let Some(ref storage_url) = state.args.storage_url {
+            match doorway::projection::fetch_projections_from_storage(
+                storage_url,
+                doorway_id,
+                &epr_http,
+            )
+            .await
+            {
+                Ok(projections) => {
+                    info!(
+                        count = projections.len(),
+                        doorway_id = %doorway_id,
+                        "Loaded EPR projections at boot"
+                    );
+                    state.epr_router.replace_all(projections);
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        doorway_id = %doorway_id,
+                        "Could not load EPR projections at boot; router starts empty \
+                         (SSE events will populate it when storage is reachable)"
+                    );
+                }
+            }
+        } else {
+            info!("STORAGE_URL not configured — EPR router starts empty");
+        }
+    }
+
     // Start zome capability discovery (import configs, cache rules)
     // This populates zome_configs and import_config_store for route matching
     // Only needed on writer instances (readers serve from shared MongoDB)
@@ -741,22 +786,37 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    // Pattern Z.B.2 bridge: subscribe to storage's /api/v1/events SSE so doorway
-    // accepts content updates from substrate as they happen. Pairs with
-    // warm_stream above: warm_stream is the cold-start snapshot, this is
-    // the live tail. Doorway is a projection of substrate truth — without
-    // this subscriber, deploy-time PATCHes on /db/content/{slug} are silent
-    // to the projection caches and serve stale bundles until next restart.
-    // See genesis/docs/superpowers/specs/2026-05-23-doorway-access-tier-patterns.md
-    // (Pattern Z).
+    // Pattern Z.B.2 bridge + B15 projection refresh: subscribe to storage's
+    // /api/v1/events SSE so doorway accepts content updates and projection
+    // registration/revocation as they happen.
+    //
+    //  content.{created,updated,deleted}  → evict AppFileCache slug entry
+    //  projection.{registered,revoked}    → re-fetch all projections and call
+    //                                       EprRouter::replace_all (B15)
+    //
+    // Pairs with warm_stream above: warm_stream is the cold-start snapshot,
+    // this subscriber is the live tail. Doorway is a projection of substrate
+    // truth — without this subscriber, PATCHes and commitment changes are
+    // silent to the projection caches until next restart.
+    //
+    // See: genesis/docs/superpowers/specs/2026-05-23-doorway-access-tier-patterns.md
     if let Some(ref storage_url) = args.storage_url {
+        let node_id_str = state.args.node_id.to_string();
+        let doorway_id = state
+            .args
+            .doorway_id
+            .as_deref()
+            .unwrap_or(&node_id_str)
+            .to_string();
         let _events_handle = doorway::projection::storage_events_subscriber::spawn_subscriber_task(
             storage_url.clone(),
+            doorway_id,
             state.app_file_cache.clone(),
+            Arc::clone(&state.epr_router),
         );
         info!(
             storage_url = %storage_url,
-            "Storage events subscriber spawned (Pattern Z.B.2)"
+            "Storage events subscriber spawned (Pattern Z.B.2 + B15 projection refresh)"
         );
     }
 

@@ -1,0 +1,42 @@
+{
+  "id": "elohim-core-elements",
+  "did": "did:web:elohim.host:content:elohim-core-elements",
+  "contentType": "element-registry",
+  "title": "Elohim Core Element Registry",
+  "description": "Manifest of custom elements published by the elohim-core package — base atoms, page chrome, EPR-link primitive, context menu, etc. Consumed at build time by every pillar bundle (mandatory dependency) and at runtime by the Loader when resolving cross-pillar element references.",
+  "content": {
+    "eprId": "elohim-core-elements",
+    "pillar": "elohim-core",
+    "elements": [
+      { "tagName": "elohim-button", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-card", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-compute-tile", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": ["ComputeTileView"] },
+      { "tagName": "elohim-epr-link", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": ["EprHead"] },
+      { "tagName": "elohim-page-chrome", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-default-omnibar", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": ["CurrentUserView"] },
+      { "tagName": "elohim-skeleton", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-mention-base", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] },
+      { "tagName": "elohim-context-menu", "cid": "sha256-pending-build", "version": "1.0.0", "viewDeps": [] }
+    ]
+  },
+  "contentFormat": "element-registry-manifest",
+  "tags": ["element-registry", "elohim-core", "substrate"],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "element-registry",
+    "blobPopulatedBy": "Jenkinsfile post-build step (Phase B): write per-element bundle CIDs into content.elements[*].cid then PATCH this content row. Placeholder CIDs are tolerated for substrate testing until elohim-core bundles are built and content-addressed.",
+    "originalContentType": "element-registry",
+    "originalContentFormat": "element-registry-manifest"
+  },
+  "reach": "commons",
+  "trustScore": 1,
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1,
+      "role": "author"
+    }
+  ],
+  "createdAt": "2026-05-25T00:00:00.000000",
+  "updatedAt": "2026-05-25T00:00:00.000000"
+}

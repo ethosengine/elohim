@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:epr-projection-view",
+  "title": "EprProjectionView",
+  "description": "Notarized contract: this doorway projects this EPR at this URL path under these terms. Source of truth: rea_commitments where action='project-epr' (Notarized, Category A — backed by REA Commitment entry type on the DHT; this table is a read-optimized projection). Created via REA Commitment with action='project-epr'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commitmentId",
+    "eprId",
+    "doorwayId",
+    "urlPath",
+    "mode",
+    "reach",
+    "baseHref",
+    "entryFile",
+    "redirectsFrom",
+    "gateHints",
+    "deadEnd",
+    "seededAt",
+    "seededBy"
+  ],
+  "properties": {
+    "commitmentId": {
+      "type": "string",
+      "description": "sha256(provider_peer_id|action|scope) — stable identity for this projection commitment."
+    },
+    "eprId": {
+      "type": "string",
+      "description": "Content row id of the projected EPR."
+    },
+    "doorwayId": {
+      "type": "string",
+      "pattern": "^doorway:",
+      "description": "Doorway identifier for the projecting node (prefixed 'doorway:')."
+    },
+    "urlPath": {
+      "type": "string",
+      "pattern": "^/",
+      "description": "Absolute URL path at which this EPR is projected on the doorway."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["cached", "stewardDirect"],
+      "description": "Projection mode: cached = doorway caches and serves bytes; stewardDirect = doorway proxies to the steward node."
+    },
+    "reach": {
+      "type": "string",
+      "description": "Reach scope for this projection (e.g. commons, qahal:xxx, household:xxx)."
+    },
+    "baseHref": {
+      "type": "string",
+      "description": "Base href used when serving this EPR's assets."
+    },
+    "entryFile": {
+      "type": "string",
+      "default": "index.html",
+      "description": "Entry point file within the EPR bundle. Defaults to index.html."
+    },
+    "redirectsFrom": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Legacy URL paths that redirect to urlPath."
+    },
+    "previewEprRef": {
+      "type": ["string", "null"],
+      "description": "CIDv1 base32 of the preview EPR, if this projection has a distinct preview variant. Null when no preview is configured."
+    },
+    "gateHints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GateHintRef" },
+      "description": "Ordered list of gate hints that callers should present or resolve before accessing this projection."
+    },
+    "deadEnd": {
+      "type": "boolean",
+      "description": "True when this projection is intentionally terminal — no outbound gate hints should be followed after arriving here."
+    },
+    "stewardDirectEndpoint": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/StewardDirectEndpoint" }
+      ],
+      "description": "Present only when mode=stewardDirect. Describes the steward node the doorway proxies to. Null when mode=cached."
+    },
+    "seededAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO8601 timestamp when this projection commitment was seeded onto the DHT."
+    },
+    "seededBy": {
+      "type": "string",
+      "description": "Steward peer_id that created this projection commitment."
+    }
+  },
+  "$defs": {
+    "GateHintRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eprRef", "relation"],
+      "properties": {
+        "eprRef": {
+          "type": "string",
+          "description": "CIDv1 base32 of the EPR this gate hint points to."
+        },
+        "label": {
+          "type": ["string", "null"],
+          "description": "Human-readable label for this gate hint. Null when not provided."
+        },
+        "relation": {
+          "type": "string",
+          "enum": [
+            "personWhoCanGrant",
+            "membershipPrerequisite",
+            "contentToSync",
+            "placeToVisit",
+            "capabilityToEarn",
+            "paymentToOffer",
+            "witnessToInvolve"
+          ],
+          "description": "Semantic relation type classifying what role the referenced EPR plays as a gate."
+        }
+      }
+    },
+    "StewardDirectEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["peerId", "tlsCertSan", "acceptsProjectionFor"],
+      "properties": {
+        "peerId": {
+          "type": "string",
+          "description": "Peer ID of the steward node accepting direct proxy connections."
+        },
+        "altHost": {
+          "type": ["string", "null"],
+          "description": "Alternate hostname for the steward endpoint. Null when not configured."
+        },
+        "tlsCertSan": {
+          "type": "string",
+          "description": "TLS certificate Subject Alternative Name expected from the steward node."
+        },
+        "acceptsProjectionFor": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "EPR IDs this steward endpoint accepts projection responsibility for."
+        }
+      }
+    }
+  }
+}

@@ -631,6 +631,1085 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-context-menu.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-context-menu> — Google Drive-style fold-down menu.\n\nMVP: flat list of items. Submenu support (View as..., Where this\nleads...) deferred to a fast-follow shift per design spec §7.4.\n\nAccessibility: arrow-key navigation, Enter to select, Escape to close,\nfocus trap while open, ARIA menu role, focus restoration on close.",
+          "name": "ElohimContextMenu",
+          "cssProperties": [
+            {
+              "description": "Override background",
+              "name": "--elohim-menu-bg"
+            },
+            {
+              "description": "Override border color",
+              "name": "--elohim-menu-border"
+            },
+            {
+              "description": "Override border-radius",
+              "name": "--elohim-menu-radius"
+            },
+            {
+              "description": "Override drop shadow",
+              "name": "--elohim-menu-shadow"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The <ul> element",
+              "name": "menu"
+            },
+            {
+              "description": "Each <li> menu item",
+              "name": "item"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "open",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the menu is visible",
+              "attribute": "open",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "items",
+              "type": {
+                "text": "ContextMenuItem[]"
+              },
+              "default": "[]",
+              "description": "The menu items",
+              "attribute": "items"
+            },
+            {
+              "kind": "field",
+              "name": "focusedIndex",
+              "type": {
+                "text": "number"
+              },
+              "privacy": "private",
+              "default": "-1"
+            },
+            {
+              "kind": "field",
+              "name": "menuItems",
+              "type": {
+                "text": "NodeListOf<HTMLElement>"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "previouslyFocused",
+              "type": {
+                "text": "HTMLElement | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "clickOutsideHandler",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "firstEnabledIndex",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "number"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "focusItem",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "i",
+                  "type": {
+                    "text": "number"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "field",
+              "name": "handleKeydown",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "moveFocus",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "delta",
+                  "type": {
+                    "text": "number"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "select",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "item",
+                  "type": {
+                    "text": "ContextMenuItem"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "handleClose",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "item-select",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { id: string } } when an item is selected"
+            },
+            {
+              "name": "close",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "When the menu closes (any reason)"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "open",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the menu is visible",
+              "fieldName": "open"
+            },
+            {
+              "name": "items",
+              "type": {
+                "text": "ContextMenuItem[]"
+              },
+              "default": "[]",
+              "description": "The menu items",
+              "fieldName": "items"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-context-menu",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimContextMenu",
+          "declaration": {
+            "name": "ElohimContextMenu",
+            "module": "src/elohim-context-menu.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-default-omnibar.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-default-omnibar> — the fallback omnibar used when a bundle doesn't\nBYO its own toolbar. Minimal MVP shape: brand mark + auth indicator.\n\nThe session primitive doesn't poll cookies. On `visibilitychange` the\nelement calls session.refreshFromCookies() so cross-tab auth changes\nare picked up opportunistically on tab re-focus. Callers may also call\nsession.refreshFromCookies() directly after any auth-related event.",
+          "name": "ElohimDefaultOmnibar",
+          "cssProperties": [
+            {
+              "description": "Override background (default: blend of Canvas + currentColor)",
+              "name": "--elohim-omnibar-bg"
+            },
+            {
+              "description": "Override bottom border color",
+              "name": "--elohim-omnibar-border"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The brand mark span",
+              "name": "brand"
+            },
+            {
+              "description": "The user area (name or sign-in link)",
+              "name": "user"
+            },
+            {
+              "description": "The authenticated user's humanId (present only when signed in)",
+              "name": "user-name"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "_session",
+              "privacy": "private",
+              "default": "new Session()"
+            },
+            {
+              "kind": "field",
+              "name": "_user",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_unsub",
+              "type": {
+                "text": "() => void | undefined"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_visibilityHandler",
+              "privacy": "private"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-default-omnibar",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "designed"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimDefaultOmnibar",
+          "declaration": {
+            "name": "ElohimDefaultOmnibar",
+            "module": "src/elohim-default-omnibar.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-epr-link.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-epr-link> — the protocol's HyperCard navigation primitive.\n\nProgressive loading (L1–L4): renders a sized skeleton instantly, fills\nin title/metadata as Loader resolves, falls back to preview if the\ntarget is unreachable.\n\nDefault click: emits 'navigate' with the EPR ref. Parent decides what\nto do (card-flip in place, or hard nav, depending on display variant).\n\nRight-click: opens <elohim-context-menu> with MVP items (Open / About\nthis EPR / Copy EPR link). Submenu items (View as..., Where this\nleads...) deferred per spec §7.4.\n\nResolution is decoupled from the loader: production wiring injects a\nresolver function via the `.resolver` property. For tests / Storybook,\ndirect manipulation of internal state (via `setResolution()`) is the\nsupported test seam.",
+          "name": "ElohimEprLink",
+          "cssProperties": [
+            {
+              "description": "Override chip border color",
+              "name": "--elohim-link-border"
+            },
+            {
+              "description": "Override hover background",
+              "name": "--elohim-link-hover-bg"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The L1 skeleton placeholder",
+              "name": "skeleton"
+            },
+            {
+              "description": "The interactive chip/button rendered at L2/L3",
+              "name": "anchor"
+            },
+            {
+              "description": "The <elohim-mention-base> rendered at L4 (unreachable)",
+              "name": "fallback"
+            },
+            {
+              "description": "The <elohim-context-menu>",
+              "name": "menu"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "epr",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The epr:... reference",
+              "attribute": "epr"
+            },
+            {
+              "kind": "field",
+              "name": "display",
+              "type": {
+                "text": "EprLinkDisplay"
+              },
+              "default": "'inline'",
+              "description": "Visual variant (inline | chip | card | popover)",
+              "attribute": "display"
+            },
+            {
+              "kind": "field",
+              "name": "resolver",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Optional async resolver injected at bundle level"
+            },
+            {
+              "kind": "field",
+              "name": "loadLevel",
+              "type": {
+                "text": "EprLinkLoadLevel"
+              },
+              "privacy": "private",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "resolution",
+              "type": {
+                "text": "EprLinkResolution"
+              },
+              "privacy": "private",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "menuOpen",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "menuItems",
+              "type": {
+                "text": "ContextMenuItem[]"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "default": "[ { id: 'open', label: 'Open' }, { id: 'about', label: 'About this EPR' }, { id: 'copy', label: 'Copy EPR link' }, ]"
+            },
+            {
+              "kind": "method",
+              "name": "setResolution",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "level",
+                  "type": {
+                    "text": "EprLinkLoadLevel"
+                  }
+                },
+                {
+                  "name": "resolution",
+                  "type": {
+                    "text": "EprLinkResolution"
+                  }
+                }
+              ],
+              "description": "Test seam — directly set resolution state without going through the\nasync resolver. Tests and Storybook use this to exercise all load levels\nwithout needing a real network layer."
+            },
+            {
+              "kind": "method",
+              "name": "renderContextMenu",
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "handleClick",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "handleContextMenu",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "handleKeydown",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "handleMenuSelect",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "handleMenuClose",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "dispatchNavigate",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "description": "Default resolution flow:\n- Without a `resolver`, we transition to L2 with empty resolution\n  (just exposes the EPR id as-is). Tests use `setResolution()`\n  to advance through levels.\n- With a `resolver`, we call it and advance to L3 on success,\n  or L4 with `unreachable: true` on null / rejection."
+            }
+          ],
+          "events": [
+            {
+              "name": "navigate",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { epr: string } } on default-click activation"
+            },
+            {
+              "description": "{ detail: { epr: string } } when \"About this EPR\" is selected",
+              "name": "about"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "epr",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The epr:... reference",
+              "fieldName": "epr"
+            },
+            {
+              "name": "display",
+              "type": {
+                "text": "EprLinkDisplay"
+              },
+              "default": "'inline'",
+              "description": "Visual variant (inline | chip | card | popover)",
+              "fieldName": "display"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-epr-link",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "designed",
+              "error": "designed",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "designed",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimEprLink",
+          "declaration": {
+            "name": "ElohimEprLink",
+            "module": "src/elohim-epr-link.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-mention-base.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-mention-base> — the generic fallback chip when a specific pillar's\nmention element (e.g. <elohim-qahal-mention>) isn't loaded. Renders\ntitle + EPR id from whatever metadata is resolvable, with a subtle\nindicator that this is a fallback rendering.\n\nPillar mention elements (e.g. <elohim-lamad-mention>) supersede this\nelement when the relevant pillar bundle is loaded. This element is the\nsafe substrate-level default.",
+          "name": "ElohimMentionBase",
+          "cssProperties": [
+            {
+              "description": "Override border color",
+              "name": "--elohim-mention-border"
+            },
+            {
+              "description": "Override fallback indicator dot color",
+              "name": "--elohim-mention-fallback-dot"
+            },
+            {
+              "description": "Override chip background",
+              "name": "--elohim-mention-bg"
+            },
+            {
+              "description": "Override chip foreground text color",
+              "name": "--elohim-mention-fg"
+            },
+            {
+              "description": "Override chip border-radius",
+              "name": "--elohim-mention-radius"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The outer inline chip container",
+              "name": "chip"
+            },
+            {
+              "description": "The dot indicating this is a generic (fallback) render",
+              "name": "fallback-mark"
+            },
+            {
+              "description": "The display label text span",
+              "name": "label"
+            },
+            {
+              "description": "The EPR id text span (present only when label is shown)",
+              "name": "id"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "epr",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The EPR id being mentioned",
+              "attribute": "epr"
+            },
+            {
+              "kind": "field",
+              "name": "label",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional display label (rendered if known; falls back to epr)",
+              "attribute": "label"
+            },
+            {
+              "kind": "field",
+              "name": "pillar",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional pillar hint for iconography (reserved for future use)",
+              "attribute": "pillar"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "epr",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The EPR id being mentioned",
+              "fieldName": "epr"
+            },
+            {
+              "name": "label",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional display label (rendered if known; falls back to epr)",
+              "fieldName": "label"
+            },
+            {
+              "name": "pillar",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional pillar hint for iconography (reserved for future use)",
+              "fieldName": "pillar"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-mention-base",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "designed",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimMentionBase",
+          "declaration": {
+            "name": "ElohimMentionBase",
+            "module": "src/elohim-mention-base.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-page-chrome.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-page-chrome> — the bundle's root wrapper. Provides a slotted\nomnibar contract: bundles that have their own toolbar place it in\nslot=\"omnibar\"; bundles that don't get <elohim-default-omnibar>\nautomatically.",
+          "name": "ElohimPageChrome",
+          "cssProperties": [
+            {
+              "description": "Override sticky z-index of the omnibar host (default: 10)",
+              "name": "--elohim-chrome-omnibar-z"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The sticky container wrapping the active omnibar",
+              "name": "omnibar-host"
+            },
+            {
+              "description": "The scrolling content area",
+              "name": "main"
+            }
+          ],
+          "slots": [
+            {
+              "description": "The omnibar surface; defaults to <elohim-default-omnibar>",
+              "name": "omnibar"
+            },
+            {
+              "description": "Default slot for page content",
+              "name": ""
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "hasSlottedOmnibar",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "method",
+              "name": "_onOmnibarSlotChange",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "e",
+                  "type": {
+                    "text": "Event"
+                  }
+                }
+              ]
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-page-chrome",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimPageChrome",
+          "declaration": {
+            "name": "ElohimPageChrome",
+            "module": "src/elohim-page-chrome.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-skeleton.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-skeleton> — sized shimmer placeholder used during progressive\nloading. Renders an empty box at the declared width/height with a\nsubtle shimmer animation. Page doesn't reflow when real content arrives.",
+          "name": "ElohimSkeleton",
+          "cssProperties": [
+            {
+              "description": "Override base color",
+              "name": "--elohim-skeleton-bg"
+            },
+            {
+              "description": "Override shimmer highlight color",
+              "name": "--elohim-skeleton-shimmer"
+            },
+            {
+              "description": "Override border-radius",
+              "name": "--elohim-skeleton-radius"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "width",
+              "type": {
+                "text": "string"
+              },
+              "default": "'100%'",
+              "description": "CSS width (e.g. \"200px\" or \"100%\")",
+              "attribute": "width"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "type": {
+                "text": "string"
+              },
+              "default": "'1rem'",
+              "description": "CSS height",
+              "attribute": "height"
+            },
+            {
+              "kind": "field",
+              "name": "radius",
+              "type": {
+                "text": "string"
+              },
+              "default": "'var(--elohim-radius-sm, 4px)'",
+              "description": "Optional border-radius (default: var(--elohim-radius-sm, 4px))",
+              "attribute": "radius"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "width",
+              "type": {
+                "text": "string"
+              },
+              "default": "'100%'",
+              "description": "CSS width (e.g. \"200px\" or \"100%\")",
+              "fieldName": "width"
+            },
+            {
+              "name": "height",
+              "type": {
+                "text": "string"
+              },
+              "default": "'1rem'",
+              "description": "CSS height",
+              "fieldName": "height"
+            },
+            {
+              "name": "radius",
+              "type": {
+                "text": "string"
+              },
+              "default": "'var(--elohim-radius-sm, 4px)'",
+              "description": "Optional border-radius (default: var(--elohim-radius-sm, 4px))",
+              "fieldName": "radius"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-skeleton",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "designed",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimSkeleton",
+          "declaration": {
+            "name": "ElohimSkeleton",
+            "module": "src/elohim-skeleton.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/index.ts",
       "declarations": [],
       "exports": [
@@ -700,10 +1779,170 @@
         },
         {
           "kind": "js",
+          "name": "ElohimSkeleton",
+          "declaration": {
+            "name": "ElohimSkeleton",
+            "module": "./elohim-skeleton.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimMentionBase",
+          "declaration": {
+            "name": "ElohimMentionBase",
+            "module": "./elohim-mention-base.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimPageChrome",
+          "declaration": {
+            "name": "ElohimPageChrome",
+            "module": "./elohim-page-chrome.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimDefaultOmnibar",
+          "declaration": {
+            "name": "ElohimDefaultOmnibar",
+            "module": "./elohim-default-omnibar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimContextMenu",
+          "declaration": {
+            "name": "ElohimContextMenu",
+            "module": "./elohim-context-menu.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ContextMenuItem",
+          "declaration": {
+            "name": "ContextMenuItem",
+            "module": "./elohim-context-menu.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimEprLink",
+          "declaration": {
+            "name": "ElohimEprLink",
+            "module": "./elohim-epr-link.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprLinkDisplay",
+          "declaration": {
+            "name": "EprLinkDisplay",
+            "module": "./elohim-epr-link.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprLinkLoadLevel",
+          "declaration": {
+            "name": "EprLinkLoadLevel",
+            "module": "./elohim-epr-link.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprLinkResolution",
+          "declaration": {
+            "name": "EprLinkResolution",
+            "module": "./elohim-epr-link.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "*",
           "declaration": {
             "name": "*",
             "module": "src/capability/index.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "./loader/loader.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LoaderTransport",
+          "declaration": {
+            "name": "LoaderTransport",
+            "module": "./loader/loader.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LoaderResolution",
+          "declaration": {
+            "name": "LoaderResolution",
+            "module": "./loader/loader.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LoaderOptions",
+          "declaration": {
+            "name": "LoaderOptions",
+            "module": "./loader/loader.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "Session",
+          "declaration": {
+            "name": "Session",
+            "module": "./session/session.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "CurrentUserView",
+          "declaration": {
+            "name": "CurrentUserView",
+            "module": "./session/session.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "OmnibarContext",
+          "declaration": {
+            "name": "OmnibarContext",
+            "module": "./contracts/omnibar.contract.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprRef",
+          "declaration": {
+            "name": "EprRef",
+            "module": "./contracts/omnibar.contract.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "CapabilitySnapshot",
+          "declaration": {
+            "name": "CapabilitySnapshot",
+            "module": "./contracts/omnibar.contract.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ReachContext",
+          "declaration": {
+            "name": "ReachContext",
+            "module": "./contracts/omnibar.contract.js"
           }
         }
       ]
@@ -728,8 +1967,62 @@
             "name": "ElohimComputeTile",
             "module": "/src/elohim-compute-tile.js"
           }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-skeleton",
+          "declaration": {
+            "name": "ElohimSkeleton",
+            "module": "/src/elohim-skeleton.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-mention-base",
+          "declaration": {
+            "name": "ElohimMentionBase",
+            "module": "/src/elohim-mention-base.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-page-chrome",
+          "declaration": {
+            "name": "ElohimPageChrome",
+            "module": "/src/elohim-page-chrome.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-default-omnibar",
+          "declaration": {
+            "name": "ElohimDefaultOmnibar",
+            "module": "/src/elohim-default-omnibar.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-context-menu",
+          "declaration": {
+            "name": "ElohimContextMenu",
+            "module": "/src/elohim-context-menu.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-epr-link",
+          "declaration": {
+            "name": "ElohimEprLink",
+            "module": "/src/elohim-epr-link.js"
+          }
         }
       ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/contracts/omnibar.contract.ts",
+      "declarations": [],
+      "exports": []
     },
     {
       "kind": "javascript-module",
@@ -1376,6 +2669,203 @@
           "declaration": {
             "name": "measureLuminanceChanges",
             "module": "src/testing/ua-prefs.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/session/session.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Session",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "isAuthenticated",
+              "type": {
+                "text": "boolean"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "refreshFromCookies",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to session changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "readCookie",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string | null"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "name",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "shallowEquals",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "boolean"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                },
+                {
+                  "name": "b",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Session",
+          "declaration": {
+            "name": "Session",
+            "module": "src/session/session.ts"
           }
         }
       ]

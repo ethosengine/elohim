@@ -199,7 +199,7 @@ pub const RECOGNITION_FLOW_TYPES: [&str; 4] = [
 
 /// REA Action vocabulary - what happened in an economic event
 /// Aligned with ValueFlows specification: https://www.valueflo.ws/concepts/actions/
-pub const REA_ACTIONS: [&str; 24] = [
+pub const REA_ACTIONS: [&str; 25] = [
     // Input actions (consume/use resources)
     "use",     // Use without consuming (view content, attend session)
     "consume", // Use up completely (one-time access tokens)
@@ -238,6 +238,11 @@ pub const REA_ACTIONS: [&str; 24] = [
     // SQLite projection in rea_commitments (filtered by this action) is the
     // queryable read path; no parallel auth table.
     "operate-doorway", // Commit to operate a doorway with declared capabilities
+    // Pillar-EPR projection actions (pillar EPR decomposition)
+    // Notarizes which doorway projects which EPR at what URL path. Mirrors the
+    // operate-doorway pattern — action on existing Commitment infrastructure,
+    // not a new entry type.
+    "project-epr", // Commit to project a pillar EPR at a declared URL path
 ];
 
 /// Resource classifications for Shefa economy

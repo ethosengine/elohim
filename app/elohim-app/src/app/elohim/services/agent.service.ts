@@ -11,7 +11,7 @@ import {
   AccessLevel,
   ContentAccessMetadata,
   AccessCheckResult,
-} from '../../lamad/models/content-access.model';
+} from '@app/lamad/models/content-access.model';
 import {
   Agent,
   AgentProgress,

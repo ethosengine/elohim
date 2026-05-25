@@ -1,7 +1,7 @@
 import { Injectable, Injector, inject } from '@angular/core';
 
 import type { IIntegrityAnchor } from './integrity-anchor.interface';
-import type { BlobsForContentOutput } from '../../lamad/services/blob-manager.service';
+import type { BlobsForContentOutput } from '@app/lamad/services/blob-manager.service';
 
 /**
  * BlobMetadataAnchor — DHT integrity point for blob metadata retrieval.

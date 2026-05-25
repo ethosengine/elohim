@@ -43,8 +43,8 @@ import {
   TsContentResolver,
 } from '@elohim/service/cache/content-resolver';
 
-import { ContentNode } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+import { ContentNode } from '@app/lamad/models/content-node.model';
+import { LearningPath } from '@app/lamad/models/learning-path.model';
 
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';

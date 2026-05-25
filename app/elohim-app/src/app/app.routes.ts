@@ -10,10 +10,6 @@ export const routes: Routes = [
     data: { protocolContent: true, fallbackCid: 'elohim-host-landing' },
   },
   {
-    path: 'lamad',
-    loadChildren: async () => import('./lamad/lamad.routes').then(m => m.LAMAD_ROUTES),
-  },
-  {
     path: 'community',
     loadChildren: async () => import('./qahal/community.routes').then(m => m.COMMUNITY_ROUTES),
   },
@@ -61,7 +57,7 @@ export const routes: Routes = [
   {
     path: 'resource/:resourceId',
     loadComponent: async () =>
-      import('./lamad/components/content-viewer/content-viewer.component').then(
+      import('@app/lamad/components/content-viewer/content-viewer.component').then(
         m => m.ContentViewerComponent
       ),
     data: { protocolContent: true },

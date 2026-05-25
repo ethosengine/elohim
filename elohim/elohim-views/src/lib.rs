@@ -18,11 +18,13 @@
 //! See `genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md` for the
 //! migration history.
 
+pub mod element_registry;
 pub mod epr;
 pub mod imagodei;
 pub mod infrastructure;
 pub mod inputs;
 pub mod lamad;
+pub mod projection;
 pub mod qahal;
 pub mod shared;
 pub mod shefa;

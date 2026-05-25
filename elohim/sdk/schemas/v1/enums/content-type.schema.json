@@ -17,7 +17,8 @@
     "work-story", "work-project", "issue-report",
     "application",
     "gate-process-declaration", "universal-band-declaration",
-    "gate-rules-declaration", "aggregation-spec", "escalation-target-spec"
+    "gate-rules-declaration", "aggregation-spec", "escalation-target-spec",
+    "element-registry"
   ],
   "_tiers": {
     "core": {
@@ -38,8 +39,9 @@
                  "work-story", "work-project", "issue-report",
                  "application",
                  "gate-process-declaration", "universal-band-declaration",
-                 "gate-rules-declaration", "aggregation-spec", "escalation-target-spec"],
-      "rationale": "Community-defined vocabulary. Accepted by storage, not validated by DNA. Communities register new types without protocol changes. Includes gate-infrastructure contentTypes for the elohim-agent gate-interface primitive."
+                 "gate-rules-declaration", "aggregation-spec", "escalation-target-spec",
+                 "element-registry"],
+      "rationale": "Community-defined vocabulary. Accepted by storage, not validated by DNA. Communities register new types without protocol changes. Includes gate-infrastructure contentTypes for the elohim-agent gate-interface primitive, and element-registry for pillar component manifests (EPR decomposition)."
     }
   },
   "_dna": {

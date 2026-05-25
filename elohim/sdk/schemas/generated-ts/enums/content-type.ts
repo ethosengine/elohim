@@ -46,4 +46,5 @@ export type ContentType =
   | 'universal-band-declaration'
   | 'gate-rules-declaration'
   | 'aggregation-spec'
-  | 'escalation-target-spec';
+  | 'escalation-target-spec'
+  | 'element-registry';

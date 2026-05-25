@@ -5,6 +5,7 @@
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response};
+use std::sync::Arc;
 
 use crate::db::rea_commitments::{
     CreateReaCommitmentInput, ReaCommitmentQuery, UpdateReaCommitmentState,
@@ -13,6 +14,7 @@ use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::rea_commitment_service::ReaCommitmentService;
 use crate::services::response::{self, from_create_result, from_option, from_result};
+use crate::services::Services;
 
 use super::{get_conn, parse_body};
 
@@ -27,6 +29,7 @@ pub async fn handle(
     resource_path: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    services: Option<Arc<Services>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let path = resource_path.trim_start_matches('/');
 
@@ -35,7 +38,7 @@ pub async fn handle(
         (&Method::GET, "") => handle_list(req, pool, ctx).await,
 
         // POST /api/v1/commitments
-        (&Method::POST, "") => handle_create(req, pool, ctx).await,
+        (&Method::POST, "") => handle_create(req, pool, ctx, services).await,
 
         // GET /api/v1/commitments/agent/{agent_id}
         (&Method::GET, agent_path) if agent_path.starts_with("agent/") => {
@@ -47,7 +50,9 @@ pub async fn handle(
         (&Method::GET, id) if !id.contains('/') => handle_get_by_id(id, pool, ctx).await,
 
         // PATCH /api/v1/commitments/{id}
-        (&Method::PATCH, id) if !id.contains('/') => handle_update_state(req, id, pool, ctx).await,
+        (&Method::PATCH, id) if !id.contains('/') => {
+            handle_update_state(req, id, pool, ctx, services).await
+        }
 
         _ => Ok(response::not_found(&format!(
             "Unknown commitments route: {} /api/v1/commitments/{}",
@@ -77,13 +82,15 @@ async fn handle_create(
     req: Request<Incoming>,
     pool: &DbPool,
     ctx: &AppContext,
+    services: Option<Arc<Services>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
     // Currently null for direct storage writes. Backfill needed for pre-coherence data.
     let input: CreateReaCommitmentInput = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
+    let events = services.as_ref().map(|s| s.events.as_ref());
     Ok(from_create_result(ReaCommitmentService::create(
-        &mut conn, ctx, input,
+        &mut conn, ctx, input, events,
     )))
 }
 
@@ -104,11 +111,13 @@ async fn handle_update_state(
     id: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    services: Option<Arc<Services>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let update: UpdateReaCommitmentState = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
+    let events = services.as_ref().map(|s| s.events.as_ref());
     Ok(from_result(ReaCommitmentService::update_state(
-        &mut conn, ctx, id, &update,
+        &mut conn, ctx, id, &update, events,
     )))
 }
 

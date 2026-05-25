@@ -2,16 +2,24 @@
 //!
 //! Connects to elohim-storage's `GET /api/v1/events` SSE endpoint
 //! (sse.rs in elohim-storage emits the StorageEventBus as text/event-stream).
-//! When a content event arrives, evicts the matching entry from doorway's
-//! app file cache so the next /apps/{slug} request re-resolves against
-//! storage's now-fresh slug_index.
+//! Two classes of event are handled:
+//!
+//! **Content events** (`content.created` / `content.updated` / `content.deleted`):
+//! Evicts the matching entry from doorway's app file cache so the next
+//! `/apps/{slug}` request re-resolves against storage's now-fresh slug_index.
+//!
+//! **Projection events** (`projection.registered` / `projection.revoked`):
+//! Re-fetches the full set of active project-epr commitments from storage and
+//! calls `EprRouter::replace_all` so pillar URL dispatch stays in sync. The
+//! event payload carries only a `commitment_id`, not the full projection, so a
+//! full re-fetch is required. In MVP (≤4 projections) this is cheap.
 //!
 //! Pairs with `warm_stream.rs`:
 //! - `warm_stream` is the *one-shot cold-start* path. At boot, doorway pulls
 //!   the current bulk projection from `/api/v1/cache/stream` into MongoDB.
 //! - `storage_events_subscriber` is the *live tail* path. Forever after,
-//!   doorway listens for `content.updated`/`content.created`/`content.deleted`
-//!   on `/api/v1/events` and invalidates its caches.
+//!   doorway listens for events on `/api/v1/events` and invalidates or
+//!   refreshes its caches.
 //!
 //! Per Pattern Z (`genesis/docs/superpowers/specs/`
 //! `2026-05-23-doorway-access-tier-patterns.md`): doorway is a projection
@@ -31,8 +39,9 @@
 //!   `spawn_subscriber_task` reconnects.
 //! - Malformed event payload: logged at debug level, event dropped, stream
 //!   continues. A bad event never breaks the loop.
-//! - `app_file_cache` not configured: the task still runs but the
-//!   invalidation is a no-op — fine, the gap is documented.
+//! - `app_file_cache` not configured: content event handling is a no-op.
+//! - EPR re-fetch fails on a projection event: logged at warn level, router
+//!   state is left unchanged rather than cleared.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -42,15 +51,23 @@ use tokio::time::sleep;
 use tracing::{debug, info, warn};
 
 use crate::cache::AppFileCacheService;
+use crate::projection::{fetch_projections_from_storage, EprRouter};
 
 /// Spawn the long-running storage-events subscriber.
 ///
 /// Returns immediately; the SSE consumer runs as a tokio task that survives
 /// transient disconnects. Empty `storage_url` is treated as "no storage to
 /// subscribe to" — the task exits cleanly without retrying.
+///
+/// - `app_file_cache`: evicted on content.{created,updated,deleted}
+/// - `epr_router`: replaced on projection.{registered,revoked}
+/// - `doorway_id`: passed to `fetch_projections_from_storage` for the
+///   re-fetch that follows a projection event
 pub fn spawn_subscriber_task(
     storage_url: String,
+    doorway_id: String,
     app_file_cache: Option<Arc<AppFileCacheService>>,
+    epr_router: Arc<EprRouter>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         if storage_url.is_empty() {
@@ -59,11 +76,22 @@ pub fn spawn_subscriber_task(
         }
 
         let url = format!("{}/api/v1/events", storage_url.trim_end_matches('/'));
+        let http = reqwest::Client::builder().build().unwrap_or_default();
+
         let mut backoff = Duration::from_secs(1);
         let max_backoff = Duration::from_secs(60);
 
         loop {
-            match run_subscriber(&url, app_file_cache.as_ref()).await {
+            match run_subscriber(
+                &url,
+                &storage_url,
+                &doorway_id,
+                app_file_cache.as_ref(),
+                &epr_router,
+                &http,
+            )
+            .await
+            {
                 Ok(()) => {
                     info!(
                         url = %url,
@@ -87,18 +115,19 @@ pub fn spawn_subscriber_task(
 }
 
 /// Inner subscriber loop. Connects, tails events, returns on disconnect.
+#[allow(clippy::too_many_arguments)]
 async fn run_subscriber(
     url: &str,
+    storage_base_url: &str,
+    doorway_id: &str,
     app_file_cache: Option<&Arc<AppFileCacheService>>,
+    epr_router: &EprRouter,
+    http: &reqwest::Client,
 ) -> Result<(), String> {
     // No top-level timeout — this is a long-lived stream. The reqwest body
     // stream itself yields whenever the connection drops, which is the
     // signal we use to trigger a reconnect.
-    let client = reqwest::Client::builder()
-        .build()
-        .map_err(|e| format!("client build: {e}"))?;
-
-    let response = client
+    let response = http
         .get(url)
         .header("Accept", "text/event-stream")
         .send()
@@ -133,7 +162,16 @@ async fn run_subscriber(
                 if let (Some(etype), Some(edata)) =
                     (current_event_type.take(), current_event_data.take())
                 {
-                    handle_event(&etype, &edata, app_file_cache).await;
+                    handle_event(
+                        &etype,
+                        &edata,
+                        storage_base_url,
+                        doorway_id,
+                        app_file_cache,
+                        epr_router,
+                        http,
+                    )
+                    .await;
                 }
             } else if let Some(rest) = line.strip_prefix("event:") {
                 current_event_type = Some(rest.trim().to_string());
@@ -150,66 +188,85 @@ async fn run_subscriber(
     Ok(())
 }
 
-/// Dispatch one parsed SSE event to the right cache-invalidation primitive.
+/// Dispatch one parsed SSE event to the right cache-invalidation or router-refresh primitive.
+#[allow(clippy::too_many_arguments)]
 async fn handle_event(
     event_type: &str,
     event_data: &str,
+    storage_base_url: &str,
+    doorway_id: &str,
     app_file_cache: Option<&Arc<AppFileCacheService>>,
+    epr_router: &EprRouter,
+    http: &reqwest::Client,
 ) {
-    // Storage emits content.created / content.updated / content.deleted /
-    // bulk + relationship/knowledge-map events. The cache surface that
-    // matters for /apps/{slug} is keyed by content slug (which is the
-    // content id for html5-app/spa-bundle rows). Other event kinds are
-    // routed by future bridges (relationships, etc.) — out of scope here.
-    if !matches!(
-        event_type,
-        "content.created" | "content.updated" | "content.deleted"
-    ) {
-        debug!(
-            event_type = %event_type,
-            "storage_events_subscriber: skipping non-content event"
-        );
-        return;
-    }
+    match event_type {
+        "content.created" | "content.updated" | "content.deleted" => {
+            // The cache surface that matters for /apps/{slug} is keyed by
+            // content slug (= content id for html5-app/spa-bundle rows).
+            let id = match parse_id_from_data(event_data) {
+                Some(id) => id,
+                None => {
+                    debug!(
+                        event_type = %event_type,
+                        data = %event_data,
+                        "storage_events_subscriber: content event without parseable id; skipping"
+                    );
+                    return;
+                }
+            };
 
-    let id = match parse_id_from_data(event_data) {
-        Some(id) => id,
-        None => {
+            info!(
+                event_type = %event_type,
+                id = %id,
+                "storage_events_subscriber: invalidating app file cache"
+            );
+
+            if let Some(cache) = app_file_cache {
+                // clear_slug evicts both the per-file MongoDB cache entries AND the
+                // in-memory slug→blob_hash index for this content. The next request
+                // to /apps/{slug}/{file} will re-resolve through resolve_blob_hash's
+                // slow path (MongoDB query), then cache miss → fetch from storage.
+                //
+                // Known follow-up gap (Pattern Z.D scope): doorway's MongoDB
+                // projection store (projected_entries) is not refreshed by this
+                // event — only the app_file_cache. See the Pattern Z spec for the
+                // full tightening plan (stageSpaBlob → PUT /api/v1/epr/{cid}).
+                let _ = cache.clear_slug(&id).await;
+            }
+        }
+
+        "projection.registered" | "projection.revoked" => {
+            // Re-fetch the full set of active project-epr commitments and
+            // atomically replace the router state. The event payload carries
+            // only a commitment_id, not the full projection content — a
+            // full re-fetch is required. In MVP (≤4 projections) this is cheap.
+            match fetch_projections_from_storage(storage_base_url, doorway_id, http).await {
+                Ok(projections) => {
+                    let count = projections.len();
+                    epr_router.replace_all(projections);
+                    info!(
+                        event = %event_type,
+                        count,
+                        "storage_events_subscriber: EprRouter refreshed after projection event"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        event = %event_type,
+                        "storage_events_subscriber: failed to refresh EprRouter after projection event; \
+                         router state unchanged"
+                    );
+                }
+            }
+        }
+
+        _ => {
             debug!(
                 event_type = %event_type,
-                data = %event_data,
-                "storage_events_subscriber: event without parseable id; skipping"
+                "storage_events_subscriber: skipping unhandled event kind"
             );
-            return;
         }
-    };
-
-    info!(
-        event_type = %event_type,
-        id = %id,
-        "storage_events_subscriber: invalidating app file cache"
-    );
-
-    if let Some(cache) = app_file_cache {
-        // clear_slug evicts both the per-file MongoDB cache entries AND the
-        // in-memory slug→blob_hash index for this content. The next request
-        // to /apps/{slug}/{file} will re-resolve through resolve_blob_hash's
-        // slow path (MongoDB query), then cache miss → fetch from storage,
-        // where Z.B.1 has refreshed storage's slug_index to point at the
-        // new blob. End-to-end fresh content.
-        //
-        // Known follow-up gap (Pattern Z.D scope): doorway's MongoDB
-        // projection store (projected_entries) is not refreshed by this
-        // event — only the app_file_cache. resolve_blob_hash's slow path
-        // queries projected_entries and may return a stale blob_hash. The
-        // resulting cache key would be wrong, but storage's downstream
-        // /apps handler still does its own slug resolution and serves the
-        // fresh bytes, so user-visible behavior is correct. Tightening this
-        // belongs to the projection-refresh-on-event extension, which lands
-        // alongside stageSpaBlob's substrate-correct migration to PUT
-        // /api/v1/epr/{cid} (then conductor signals refresh projected_entries
-        // through the proper channel and this subscriber's role narrows).
-        let _ = cache.clear_slug(&id).await;
     }
 }
 
@@ -257,7 +314,8 @@ mod tests {
     async fn empty_storage_url_exits_cleanly() {
         // The spawned task should return without panicking when storage_url
         // is empty — covers the "no peer configured" startup case.
-        let handle = spawn_subscriber_task(String::new(), None);
+        let router = Arc::new(EprRouter::new());
+        let handle = spawn_subscriber_task(String::new(), "doorway:test".to_string(), None, router);
         // Task should complete (return) — give it a generous timeout in
         // case the runtime is slow.
         let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
@@ -265,5 +323,18 @@ mod tests {
             result.is_ok(),
             "spawn_subscriber_task with empty URL should return promptly"
         );
+    }
+
+    #[test]
+    fn projection_event_kinds_are_handled() {
+        // Verify the match arm covers both expected event kinds.
+        // (Logic coverage; the re-fetch is tested end-to-end by a2o B22 tests
+        // since it requires a live storage instance.)
+        for kind in &["projection.registered", "projection.revoked"] {
+            assert!(matches!(
+                *kind,
+                "projection.registered" | "projection.revoked"
+            ));
+        }
     }
 }

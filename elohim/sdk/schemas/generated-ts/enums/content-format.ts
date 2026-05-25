@@ -27,4 +27,5 @@ export type ContentFormat =
   | 'organization-json'
   | 'json'
   | 'sophia'
-  | 'sophia-quiz-json';
+  | 'sophia-quiz-json'
+  | 'element-registry-manifest';

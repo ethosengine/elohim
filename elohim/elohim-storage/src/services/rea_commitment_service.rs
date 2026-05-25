@@ -5,8 +5,10 @@ use diesel::SqliteConnection;
 use crate::db::context::AppContext;
 use crate::db::rea_commitments::{
     self, CreateReaCommitmentInput, ReaCommitmentQuery, UpdateReaCommitmentState,
+    PROJECT_EPR_ACTION,
 };
 use crate::error::StorageError;
+use crate::services::events::{EventBus, StorageEvent};
 use crate::views::ReaCommitmentView;
 
 pub struct ReaCommitmentService;
@@ -16,8 +18,16 @@ impl ReaCommitmentService {
         conn: &mut SqliteConnection,
         ctx: &AppContext,
         input: CreateReaCommitmentInput,
+        events: Option<&EventBus>,
     ) -> Result<ReaCommitmentView, StorageError> {
         let commitment = rea_commitments::create_commitment(conn, ctx, input)?;
+        if let Some(bus) = events {
+            if commitment.action == PROJECT_EPR_ACTION {
+                bus.emit(StorageEvent::ProjectionRegistered {
+                    commitment_id: commitment.id.clone(),
+                });
+            }
+        }
         Ok(ReaCommitmentView::from(commitment))
     }
 
@@ -53,8 +63,16 @@ impl ReaCommitmentService {
         ctx: &AppContext,
         id: &str,
         update: &UpdateReaCommitmentState,
+        events: Option<&EventBus>,
     ) -> Result<ReaCommitmentView, StorageError> {
         let commitment = rea_commitments::update_commitment_state(conn, ctx, id, update)?;
+        if let Some(bus) = events {
+            if commitment.action == PROJECT_EPR_ACTION && update.state == "cancelled" {
+                bus.emit(StorageEvent::ProjectionRevoked {
+                    commitment_id: commitment.id.clone(),
+                });
+            }
+        }
         Ok(ReaCommitmentView::from(commitment))
     }
 }

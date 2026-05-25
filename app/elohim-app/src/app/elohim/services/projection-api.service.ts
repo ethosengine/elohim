@@ -18,10 +18,10 @@ import { map, catchError, timeout, shareReplay } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
-import { LearningPath, parsePathView } from '../../lamad/models/learning-path.model';
+import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/content-node.model';
+import { LearningPath, parsePathView } from '@app/lamad/models/learning-path.model';
 
-import { ContentService } from './content.service';
+import { ContentBackendService } from './content.service';
 import { StorageClientService } from './storage-client.service';
 
 import type { IStorageApi, ContentFilters, RelationshipFilters } from '../interfaces';
@@ -107,7 +107,7 @@ export interface ProjectionStats {
 @Injectable({ providedIn: 'root' })
 export class ProjectionAPIService implements IStorageApi {
   private readonly http = inject(HttpClient);
-  private readonly contentService = inject(ContentService);
+  private readonly contentService = inject(ContentBackendService);
   private readonly storageClient = inject(StorageClientService);
 
   // Circuit breaker: after consecutive failures, disable for a cooldown period.

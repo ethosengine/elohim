@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:element-registry-view",
+  "title": "ElementRegistryView",
+  "description": "Manifest of custom elements a pillar exposes for cross-pillar embedding. Source of truth: content table with contentFormat='element-registry-manifest' (Category C, operational projection — no new DHT entry type; consistency comes from the underlying Content entry's existing notarization).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eprId", "pillar", "elements"],
+  "properties": {
+    "eprId": {
+      "type": "string",
+      "description": "EPR id of the registry itself (e.g. 'elohim-core-elements')."
+    },
+    "pillar": {
+      "type": "string",
+      "description": "Pillar this registry belongs to (e.g. 'elohim-core', 'lamad', 'qahal')."
+    },
+    "elements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ElementEntry" },
+      "description": "Elements published by this pillar."
+    }
+  },
+  "$defs": {
+    "ElementEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tagName", "cid", "version", "viewDeps"],
+      "properties": {
+        "tagName": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$",
+          "description": "Custom-element tag name (e.g. 'elohim-button', 'qahal-attestation-chip'). Must be a valid custom element name: lowercase, contains a hyphen."
+        },
+        "cid": {
+          "type": "string",
+          "pattern": "^sha256-",
+          "description": "Content address of the element bundle."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+",
+          "description": "Semver version string (e.g. '1.0.0')."
+        },
+        "viewDeps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "ts-rs view type names this element consumes as props."
+        }
+      }
+    }
+  }
+}

@@ -28,7 +28,7 @@ import type {
   ContentReach,
   ContentMetadata,
   ContentFlag,
-} from '../../lamad/models/content-node.model';
+} from '@app/lamad/models/content-node.model';
 // Import infrastructure types from elohim (canonical location)
 
 // ============================================================================

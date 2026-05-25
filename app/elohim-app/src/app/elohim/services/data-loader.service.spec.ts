@@ -11,7 +11,7 @@ import { CONTENT_ATTESTATION } from '../interfaces/content-attestation.interface
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { ContentResolverService } from './content-resolver.service';
-import { ContentService } from './content.service';
+import { ContentBackendService } from './content.service';
 import { LoggerService } from './logger.service';
 import { vi, Mock } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
@@ -118,7 +118,7 @@ describe('DataLoaderService', () => {
         { provide: IndexedDBCacheService, useValue: idbSpy },
         { provide: ProjectionAPIService, useValue: projectionApiSpy },
         { provide: ContentResolverService, useValue: contentResolverSpy },
-        { provide: ContentService, useValue: contentServiceSpy },
+        { provide: ContentBackendService, useValue: contentServiceSpy },
         { provide: LoggerService, useValue: loggerSpy },
       ],
     });

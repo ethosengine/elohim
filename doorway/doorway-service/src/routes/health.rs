@@ -317,22 +317,15 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         .unwrap_or((0, 0, 0));
     let projection_ready = content + humans + relationships > 0;
 
-    // root app
-    let root_slug = args.root_app_slug.as_deref().unwrap_or("").to_string();
-    let blob_hash = if let Some(ref cache) = state.app_file_cache {
-        cache
-            .resolve_blob_hash(&root_slug)
-            .await
-            .unwrap_or_default()
-    } else {
-        String::new()
-    };
-    let extracted = if let Some(ref cache) = state.app_file_cache {
-        cache.has_cached_files(&root_slug, &blob_hash).await
-    } else {
-        false
-    };
-    let root_app_ready = extracted;
+    // root projection — whichever EPR commitment declares urlPath="/" is the root.
+    // ROOT_APP_SLUG is gone; the router consults live projection data from storage.
+    let root_projection = state.epr_router.dispatch("/").map(|p| {
+        serde_json::json!({
+            "eprId": p.epr_id,
+            "urlPath": p.url_path,
+            "ready": true,
+        })
+    });
 
     let warmup = if let Some(ref ws) = state.warmup_state {
         serde_json::json!({
@@ -360,12 +353,7 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
             "humans": humans,
             "relationships": relationships,
         },
-        "rootApp": {
-            "ready": root_app_ready,
-            "slug": root_slug,
-            "blobHash": blob_hash,
-            "extracted": extracted,
-        },
+        "rootProjection": root_projection,
         "warmup": warmup,
     })
     .to_string();

@@ -151,12 +151,9 @@ spec:
             # multi-doorway-content-delivery validation.
             - name: ELOHIM_STORAGE_AUTO_REGISTER
               value: "true"
-            # Root app served at "/" — the landing-page EPR shared with
-            # doorway-alpha. Same elohim-host-landing ContentNode resolved
-            # via the same shared storage pool; differing only in surface
-            # URL (elohim.host vs alpha.elohim.host) + operator binding.
-            - name: ROOT_APP_SLUG
-              value: "elohim-host-landing"
+            # Root "/" is now served by whichever EPR commitment declares urlPath="/"
+            # in the projection. ROOT_APP_SLUG is gone — the router consults live
+            # projection data from storage (B14: drop ROOT_APP_SLUG).
             - name: ELOHIM_AGENT_URL
               value: "http://localhost:8095"
             - name: THRESHOLD_URL

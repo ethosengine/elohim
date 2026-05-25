@@ -46,7 +46,8 @@ export type ContentType =
   | 'universal-band-declaration'
   | 'gate-rules-declaration'
   | 'aggregation-spec'
-  | 'escalation-target-spec';
+  | 'escalation-target-spec'
+  | 'element-registry';
 /**
  * Content format for rendering. Core formats are DNA-notarized. Extended formats are storage-level rendering hints.
  */
@@ -73,7 +74,8 @@ export type ContentFormat =
   | 'organization-json'
   | 'json'
   | 'sophia'
-  | 'sophia-quiz-json';
+  | 'sophia-quiz-json'
+  | 'element-registry-manifest';
 /**
  * Content reach/visibility level. Ordered from most restrictive to most open. Source of truth: DNA-notarized CORE_REACH_LEVELS constant in content_store_integrity zome. Category A — enumeration values are part of the protocol vocabulary enforced by gateways without parsing payload.
  */

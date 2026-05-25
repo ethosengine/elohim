@@ -1,0 +1,13 @@
+# Angular build output
+dist/
+.angular/
+
+# Dependencies
+node_modules/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Angular compiler cache
+*.db
+*.db-lock
