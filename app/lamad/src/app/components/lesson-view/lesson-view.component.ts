@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import {
   Component,
+  CUSTOM_ELEMENTS_SCHEMA,
   Input,
   Output,
   EventEmitter,
@@ -22,10 +23,9 @@ import { takeUntil } from 'rxjs/operators';
 
 import { Subject, Subscription } from 'rxjs';
 
-import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
-import { GateFeedbackTriggerComponent } from '@app/elohim/components/gate-feedback';
+import 'elohim-core/register';
+
 import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
-import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 
 import { ContentNode } from '../../models/content-node.model';
 import { PathContext } from '../../models/exploration-context.model';
@@ -81,11 +81,9 @@ interface InlineQuizCompletionEvent {
     RouterModule,
     RelatedConceptsPanelComponent,
     MiniGraphComponent,
-    FeedbackMechanismGatewayComponent,
-    GateFeedbackTriggerComponent,
-    EprRelationshipsPanelComponent,
     // TODO: InlineQuizComponent - requires Perseus/React dependencies
   ],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -120,11 +118,11 @@ interface InlineQuizCompletionEvent {
                 }
               </div>
             }
-            <app-gate-feedback-trigger
+            <elohim-gate-feedback-trigger
               class="lesson-feedback-trigger"
-              [contentId]="content.id"
+              [attr.content-id]="content.id"
               data-testid="lesson-feedback-trigger"
-            />
+            ></elohim-gate-feedback-trigger>
           </div>
           <h1 class="lesson-title">
             {{ content.title || content.id }}
@@ -180,16 +178,16 @@ interface InlineQuizCompletionEvent {
         -->
 
         <!-- Feedback Mechanism Gateway (governance at the point of content) -->
-        <qahal-feedback-mechanism-gateway
-          [entityType]="'content'"
-          [entityId]="content.id"
-        ></qahal-feedback-mechanism-gateway>
+        <elohim-feedback-mechanism-gateway
+          [attr.entity-type]="'content'"
+          [attr.entity-id]="content.id"
+        ></elohim-feedback-mechanism-gateway>
 
         @if (eprRelationships.length > 0) {
-          <app-epr-relationships-panel
+          <elohim-epr-relationships-panel
             [relationships]="eprRelationships"
             data-testid="lesson-relationships-panel"
-          ></app-epr-relationships-panel>
+          ></elohim-epr-relationships-panel>
         }
       </div>
 

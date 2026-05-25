@@ -7,7 +7,6 @@ import { PathContext } from '../../models/exploration-context.model';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
-import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
 import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
 import { of } from 'rxjs';
 import { vi, Mock } from 'vitest';
@@ -31,10 +30,11 @@ class MockRelatedConceptsPanelComponent {
   @Output() navigate = new EventEmitter<string>();
 }
 
-@Component({ selector: 'app-epr-relationships-panel', standalone: true, template: '' })
-class MockEprRelationshipsPanelComponent {
-  @Input() relationships: any[] = [];
-}
+// Note: EprRelationshipsPanelComponent, GateFeedbackTriggerComponent, and
+// FeedbackMechanismGatewayComponent were removed in Slice 2.2b — replaced
+// with <elohim-epr-relationships-panel>, <elohim-gate-feedback-trigger>,
+// and <elohim-feedback-mechanism-gateway> Lit elements. CUSTOM_ELEMENTS_SCHEMA
+// on the component handles the unknown tags during tests.
 
 // Mock renderer component
 @Component({
@@ -107,13 +107,15 @@ describe('LessonViewComponent', () => {
       ],
     })
       // Override component imports to use mocks for shallow testing
-      // This prevents deep dependency injection chains that require complex setup
+      // This prevents deep dependency injection chains that require complex setup.
+      // Lit elements (elohim-epr-relationships-panel etc.) are handled by
+      // CUSTOM_ELEMENTS_SCHEMA on LessonViewComponent — no mock needed.
       .overrideComponent(LessonViewComponent, {
         remove: {
-          imports: [RelatedConceptsPanelComponent, MiniGraphComponent, EprRelationshipsPanelComponent],
+          imports: [RelatedConceptsPanelComponent, MiniGraphComponent],
         },
         add: {
-          imports: [MockMiniGraphComponent, MockRelatedConceptsPanelComponent, MockEprRelationshipsPanelComponent],
+          imports: [MockMiniGraphComponent, MockRelatedConceptsPanelComponent],
         },
       })
       .compileComponents();
