@@ -12,8 +12,8 @@ import { filter, take } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable } from 'rxjs';
 
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { SessionHuman } from '@app/imagodei/models/session-human.model';
+import { SessionHumanService } from '@elohim/identity';
+import { SessionHuman } from '@elohim/identity';
 import { ContentNode, ContentType } from '@app/lamad/models/content-node.model';
 import { HumanAffinity } from '@app/qahal/models/human-affinity.model';
 

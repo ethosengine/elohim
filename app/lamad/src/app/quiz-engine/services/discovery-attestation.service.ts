@@ -18,7 +18,7 @@ import { Injectable, signal, computed } from '@angular/core';
 // @coverage: 100.0% (2026-02-24)
 
 import { type ReachLevel, reachEncompasses } from '@elohim/storage-client';
-import { type Attestation } from '@app/imagodei/models/attestations.model';
+import { type Attestation } from '@elohim/identity';
 import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
 import { getDisplayConfigByFramework, getInstrument } from '../instruments/instrument-registry';

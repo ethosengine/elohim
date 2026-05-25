@@ -11,7 +11,7 @@ import {
   AssessmentIndex,
   AssessmentIndexEntry,
 } from '@app/elohim/services/data-loader.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 
 import { ContentNode } from '../models/content-node.model';
 

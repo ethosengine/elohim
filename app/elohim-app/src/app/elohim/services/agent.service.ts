@@ -11,7 +11,7 @@ import {
   AccessLevel,
   ContentAccessMetadata,
   AccessCheckResult,
-} from '@app/lamad/models/content-access.model';
+} from '@elohim/identity';
 import {
   Agent,
   AgentProgress,

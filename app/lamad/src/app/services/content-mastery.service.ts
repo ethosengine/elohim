@@ -5,11 +5,11 @@ import { Injectable, effect, inject } from '@angular/core';
 import { BehaviorSubject, Observable, Subject, catchError, map, from, of } from 'rxjs';
 
 import { LEARNER_BACKEND } from '@app/elohim/interfaces';
-import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
+import { isAboveGate, compareMasteryLevels } from '@elohim/service/angular/models/agent.model';
 import { MasteryRecordContent, SourceChainEntry } from '@elohim/storage-client';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 
 import {
   ContentMastery,

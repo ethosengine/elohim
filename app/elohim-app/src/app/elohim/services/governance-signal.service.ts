@@ -6,7 +6,7 @@ import { map, shareReplay, take, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, of, combineLatest } from 'rxjs';
 
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 import {
   EmotionalReaction,
   EmotionalReactionType,

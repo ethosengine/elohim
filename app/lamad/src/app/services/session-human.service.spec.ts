@@ -1,12 +1,12 @@
 import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 import {
   SessionHuman,
   SessionActivity,
   SessionPathProgress,
   HolochainUpgradePrompt,
-} from '@app/imagodei/models/session-human.model';
+} from '@elohim/identity';
 
 describe('SessionHumanService', () => {
   let service: SessionHumanService;

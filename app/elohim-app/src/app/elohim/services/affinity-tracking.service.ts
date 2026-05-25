@@ -6,7 +6,7 @@ import { takeUntil } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 import { ContentNode } from '@app/lamad/models/content-node.model';
 import {
   HumanAffinity,

@@ -23,8 +23,8 @@ import {
   PathsOverview,
   ProfileSummaryCompact,
 } from '@app/imagodei/models/profile.model';
-import { SessionPathProgress, SessionActivity } from '@app/imagodei/models/session-human.model';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionPathProgress, SessionActivity } from '@elohim/identity';
+import { SessionHumanService } from '@elohim/identity';
 import { PathService } from '@app/lamad/services/path.service';
 
 import { AffinityTrackingService } from './affinity-tracking.service';

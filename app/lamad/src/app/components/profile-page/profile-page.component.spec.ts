@@ -6,7 +6,7 @@ import { of, BehaviorSubject } from 'rxjs';
 
 import { ProfileService } from '@app/elohim/services/profile.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { MasteryStatsService } from '../../services/mastery-stats.service';

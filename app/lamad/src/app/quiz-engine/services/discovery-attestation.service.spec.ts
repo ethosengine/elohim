@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 
 import type { ReachLevel } from '@elohim/storage-client';
-import type { Attestation } from '@app/imagodei/models/attestations.model';
+import type { Attestation } from '@elohim/identity';
 import type { ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
 import {

@@ -3,14 +3,14 @@ import { TestBed } from '@angular/core/testing';
 import { BehaviorSubject, of, Subject } from 'rxjs';
 
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 
 import { ContentMasteryService } from './content-mastery.service';
 import { MasteryStatsService } from './mastery-stats.service';
 import { PointsService } from './points.service';
 import { PracticeService } from './practice.service';
 
-import type { SessionHuman } from '@app/imagodei/models/session-human.model';
+import type { SessionHuman } from '@elohim/identity';
 
 import type { ContentMastery } from '../models';
 import type { LevelUpEvent } from '../models/learner-mastery-profile.model';

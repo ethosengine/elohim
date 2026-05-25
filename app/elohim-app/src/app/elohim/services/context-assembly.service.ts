@@ -22,7 +22,7 @@ import { catchError, map, switchMap, take } from 'rxjs/operators';
 import { Observable, forkJoin, of, race, timer } from 'rxjs';
 
 import { IdentityService } from '@app/imagodei/services/identity.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 import { PathContextService } from '@app/lamad/services/path-context.service';
 import { RelatedConceptsService } from '@app/lamad/services/related-concepts.service';
 

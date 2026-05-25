@@ -8,7 +8,7 @@ import { Subject, of } from 'rxjs';
 
 import { ElohimNavigatorComponent } from './elohim-navigator.component';
 import { BannerService } from '@app/elohim/services/banner.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { AuthService } from '@app/imagodei/services/auth.service';

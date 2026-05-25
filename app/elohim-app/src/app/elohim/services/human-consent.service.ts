@@ -18,7 +18,7 @@ import {
 } from '@app/elohim/models/human-consent.model';
 import { HumanConsentContent } from '@elohim/storage-client';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 
 // Models
 

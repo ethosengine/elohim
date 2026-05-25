@@ -16,7 +16,7 @@ import {
   DiscussionRecord,
   GovernanceStateRecord,
 } from './data-loader.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 import { GovernanceApiService } from './governance-api.service';
 import { vi, Mock } from 'vitest';
 

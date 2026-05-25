@@ -15,8 +15,8 @@ import {
   DiscussionRecord,
   GovernanceStateRecord,
 } from '@app/elohim/services/data-loader.service';
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { GovernanceApiService } from '@elohim/service';
+import { SessionHumanService } from '@elohim/identity';
 
 import type {
   CreateProposalInputView,

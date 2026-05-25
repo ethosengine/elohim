@@ -3,9 +3,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ContentMasteryService } from './content-mastery.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 import { MasteryLevel, FRESHNESS_THRESHOLDS } from '../models';
-import { SessionHuman } from '@app/imagodei/models/session-human.model';
+import { SessionHuman } from '@elohim/identity';
 import { BehaviorSubject } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 

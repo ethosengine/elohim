@@ -6,7 +6,7 @@ import { DataLoaderService } from './data-loader.service';
 import { PathService } from '@app/lamad/services/path.service';
 import { AffinityTrackingService } from './affinity-tracking.service';
 import { AgentService } from './agent.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 import { vi, Mock } from 'vitest';
 
 describe('ProfileService', () => {

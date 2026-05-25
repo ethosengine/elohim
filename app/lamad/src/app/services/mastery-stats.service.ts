@@ -22,9 +22,9 @@ import { Injectable, OnDestroy, inject } from '@angular/core';
 
 import { BehaviorSubject, Observable, Subscription, combineLatest } from 'rxjs';
 
-import { isAboveGate } from '@app/elohim/models/agent.model';
+import { isAboveGate } from '@elohim/service/angular/models/agent.model';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 
 import {
   MASTERY_XP_WEIGHTS,

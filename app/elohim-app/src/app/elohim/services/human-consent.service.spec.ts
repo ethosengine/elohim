@@ -3,7 +3,7 @@ import { of, throwError } from 'rxjs';
 
 import { HumanConsentService } from './human-consent.service';
 import { LocalSourceChainService } from './local-source-chain.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 import { HumanConsent } from '@app/elohim/models/human-consent.model';
 import { LearningPath } from '@app/lamad/models/learning-path.model';
 import { vi, Mock } from 'vitest';

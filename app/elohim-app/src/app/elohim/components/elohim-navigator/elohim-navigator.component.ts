@@ -15,11 +15,11 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 import { AgencyBadgeComponent } from '@app/imagodei/components/agency-badge/agency-badge.component';
 import { ConnectionIndicatorComponent } from '@app/imagodei/components/connection-indicator/connection-indicator.component';
 import { UpgradeModalComponent } from '@app/imagodei/components/upgrade-modal/upgrade-modal.component';
-import { SessionHuman } from '@app/imagodei/models/session-human.model';
+import { SessionHuman } from '@elohim/identity';
 import { AuthService } from '@app/imagodei/services/auth.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { UpgradeBannerProvider } from '@app/imagodei/services/providers/upgrade-banner.provider';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '@elohim/identity';
 
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
 import {
