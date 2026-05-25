@@ -95,5 +95,9 @@
   },
   "json": {
     "description": "Raw JSON data format. Used for structured content that doesn't fit other format categories."
+  },
+  "element-registry-manifest": {
+    "description": "A manifest of custom elements a pillar exposes (ElementRegistryView wire shape). Used by the elohim-core Loader to dynamically resolve cross-pillar elements at runtime via the doorway projection layer.",
+    "renderer": "elohim-element-registry"
   }
 }

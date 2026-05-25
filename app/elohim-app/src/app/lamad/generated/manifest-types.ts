@@ -44,6 +44,7 @@ export const LAMAD_CONTENT_FORMATS = [
   'plaintext',
   'video-embed',
   'json',
+  'element-registry-manifest',
 ] as const;
 export type LamadContentFormat = (typeof LAMAD_CONTENT_FORMATS)[number];
 
