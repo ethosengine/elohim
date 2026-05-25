@@ -26,6 +26,16 @@
 
 import groovy.transform.Field
 
+// longRunning flag: pipelines that take 15min+ to complete. Orchestrator
+// dispatches these with `wait: false` (fire-and-forget) so the orchestrator
+// itself stays short (~5min). This prevents the abortPrevious cascade
+// documented as bug #5 in 2026-05-24 sweettest sprint result — when a new
+// orchestrator dispatch arrived (cron or push), the prior orchestrator was
+// aborted, which propagated to its in-flight `build(wait:true)` call and
+// killed the long downstream mid-run (cost: 55-90min lost per cascade).
+// Tradeoff: baseline advances optimistically at dispatch (not at completion);
+// if a long pipeline fails silently and no follow-up push lands, baseline
+// stays stale. Visible in the downstream pipeline's own Jenkins view.
 @Field def PIPELINES = [
     'elohim-holochain': [
         jenkinsPath: 'elohim/holochain/dna/Jenkinsfile',
@@ -34,7 +44,8 @@ import groovy.transform.Field
         dependsOn: [],
         cascades: true,       // DNA changes auto-trigger Edge redeploy (ensures new hApp bundle is installed)
         triggersGenesis: true,
-        deploymentCheck: null  // No deployment, just artifacts
+        deploymentCheck: null,  // No deployment, just artifacts
+        longRunning: true       // 55-90min sweettest; bug #5 cascade target
     ],
     'elohim-edge': [
         jenkinsPath: 'elohim/holochain/Jenkinsfile',
@@ -48,6 +59,11 @@ import groovy.transform.Field
             staging: 'https://doorway-staging.elohim.host/health',
             prod: 'https://doorway.elohim.host/health'
         ]
+        // NOT longRunning despite ~30-60min — elohim-genesis depends on edge
+        // having DEPLOYED before it seeds. Making edge fire-and-forget would
+        // race genesis ahead of deployment. Cascade risk accepted for now;
+        // followup work could move the genesis dispatch barrier inside the
+        // edge pipeline's post-deploy hook instead of orchestrator polling.
     ],
     'elohim': [
         jenkinsPath: 'Jenkinsfile',
@@ -65,6 +81,9 @@ import groovy.transform.Field
             staging: 'https://staging.elohim.host',
             prod: 'https://elohim.host'
         ]
+        // NOT longRunning — elohim-genesis depends on the app being deployed
+        // before its a2o scenarios run against the SPA. Same rationale as
+        // elohim-edge above.
     ],
     'elohim-genesis': [
         jenkinsPath: 'genesis/Jenkinsfile',
@@ -81,7 +100,8 @@ import groovy.transform.Field
         dependsOn: ['elohim-holochain'],
         manualOnly: true,
         triggersGenesis: false,
-        deploymentCheck: null
+        deploymentCheck: null,
+        longRunning: true       // Desktop build with cross-target compilation
     ],
     'elohim-sophia': [
         jenkinsPath: 'sophia.Jenkinsfile',
@@ -128,7 +148,8 @@ import groovy.transform.Field
         // retries; we don't want a missed cert or slow rollout to mark the
         // entire orchestrator UNSTABLE. propagate:false on triggerPipeline
         // already isolates build failures; this isolates deploy failures.
-        deploymentCheck: null
+        deploymentCheck: null,
+        longRunning: true       // Angular library build + Storybook gen + deploy
     ]
 ]
 
@@ -698,6 +719,15 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
         if (result.skipped) {
             echo "⏭️ ${name}: SKIPPED — Jenkins job not provisioned (${result.error})"
             unstable("${name}: registered in strategy.mjs but Jenkins multibranch job missing — create it to restore full delivery")
+        } else if (result.dispatched) {
+            // Fire-and-forget (longRunning pipeline) — orchestrator did NOT
+            // wait for downstream result. Advance baseline optimistically;
+            // outcome is visible in the downstream pipeline's own Jenkins
+            // view. See PIPELINES definition for the cascade-avoidance
+            // rationale (bug #5 of 2026-05-24 sweettest sprint).
+            def buildRef = result.buildNumber ? "#${result.buildNumber}" : "(queued)"
+            echo "🚀 ${name}: DISPATCHED ${buildRef} — fire-and-forget; baseline advanced optimistically"
+            pipelineBaselines[name] = env.GIT_COMMIT_FULL
         } else if (result.unstable) {
             echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
             pipelineBaselines[name] = env.GIT_COMMIT_FULL
@@ -712,14 +742,25 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
 }
 
 /**
- * Trigger a pipeline and wait for result
+ * Trigger a pipeline. Long-running pipelines (config.longRunning) are
+ * dispatched fire-and-forget (wait:false) so the orchestrator stays short
+ * and the abortPrevious cascade (bug #5 of 2026-05-24 sweettest sprint)
+ * can no longer kill in-flight downstreams. Short pipelines keep wait:true
+ * so the orchestrator can summarise their result inline.
+ *
+ * The wait param remains as a manual override for callers that need it
+ * (e.g. genesis dispatched as a barrier). Default is "auto" — derived
+ * from config.longRunning.
  */
-def triggerPipeline(String name, String branch, boolean wait = true, List changedFiles = []) {
-    echo "▶️ Triggering ${name}/${branch}..."
+def triggerPipeline(String name, String branch, Object wait = null, List changedFiles = []) {
+    def config = PIPELINES[name]
+    // Auto-derive wait from longRunning flag unless caller forced it.
+    boolean shouldWait = (wait == null) ? !(config?.longRunning) : (wait as boolean)
+    String waitMode = shouldWait ? 'wait-for-result' : 'fire-and-forget (longRunning)'
+    echo "▶️ Triggering ${name}/${branch} [${waitMode}]..."
 
     try {
         // Only send FORCE_DEPLOY to pipelines that actually deploy (have a deploymentCheck)
-        def config = PIPELINES[name]
         // Note: local list named `buildParams` to avoid shadowing the pipeline-scope
         // `params` accessor (needed below to forward DEPLOY_ONLY).
         def buildParams = [booleanParam(name: 'FORCE_BUILD', value: true)]
@@ -743,10 +784,27 @@ def triggerPipeline(String name, String branch, boolean wait = true, List change
 
         def result = build(
             job: "${name}/${branch}",
-            wait: wait,
+            wait: shouldWait,
             propagate: false,
             parameters: buildParams
         )
+
+        // Fire-and-forget: build() returns the RunWrapper for the queued
+        // build but result/duration are not yet known. Mark as dispatched
+        // and advance baseline optimistically — if the build later fails,
+        // the next push that touches this pipeline's patterns will
+        // re-dispatch (failures are visible in the downstream's own
+        // Jenkins view). Tradeoff documented at PIPELINES definition.
+        if (!shouldWait) {
+            return [
+                success: true,
+                dispatched: true,
+                result: 'DISPATCHED',
+                duration: 0,
+                url: result?.absoluteUrl ?: "(queued)",
+                buildNumber: result?.number ?: null
+            ]
+        }
 
         return [
             success: result.result in ['SUCCESS', 'UNSTABLE'],
@@ -1822,7 +1880,9 @@ spec:
                                 if (level.size() == 1) {
                                     def name = level[0]
                                     echo "🔨 Building: ${name}"
-                                    def result = triggerPipeline(name, env.BRANCH_NAME, true, changedFiles)
+                                    // wait=null → triggerPipeline auto-derives from
+                                    // PIPELINES[name].longRunning (bug #5 fix).
+                                    def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles)
                                     results[name] = result
                                     recordPipelineResult(name, result, pipelineBaselines)
                                 } else {
@@ -1831,7 +1891,8 @@ spec:
                                         parallelBuilds[name] = {
                                             stage(name) {
                                                 echo "🔨 Building: ${name}"
-                                                def result = triggerPipeline(name, env.BRANCH_NAME, true, changedFiles)
+                                                // wait=null → auto-derive per longRunning
+                                                def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles)
                                                 results[name] = result
                                                 recordPipelineResult(name, result, pipelineBaselines)
                                             }
