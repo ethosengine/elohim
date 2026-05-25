@@ -46,7 +46,8 @@ export type ContentType =
   | 'universal-band-declaration'
   | 'gate-rules-declaration'
   | 'aggregation-spec'
-  | 'escalation-target-spec';
+  | 'escalation-target-spec'
+  | 'element-registry';
 /**
  * Rendering format hint
  */
@@ -73,7 +74,8 @@ export type ContentFormat =
   | 'organization-json'
   | 'json'
   | 'sophia'
-  | 'sophia-quiz-json';
+  | 'sophia-quiz-json'
+  | 'element-registry-manifest';
 /**
  * Visibility/access level
  */

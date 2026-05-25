@@ -10,7 +10,8 @@
     "perseus", "perseus-json", "perseus-quiz-json",
     "video-embed", "audio-file", "html5-app", "spa-bundle",
     "human-json", "organization-json", "json",
-    "sophia", "sophia-quiz-json"
+    "sophia", "sophia-quiz-json",
+    "element-registry-manifest"
   ],
   "_tiers": {
     "core": {
@@ -22,7 +23,8 @@
                  "perseus", "perseus-json", "perseus-quiz-json",
                  "video-embed", "audio-file", "html5-app",
                  "human-json", "organization-json", "json",
-                 "sophia", "sophia-quiz-json"],
+                 "sophia", "sophia-quiz-json",
+                 "element-registry-manifest"],
       "rationale": "Rendering-specific variants. Storage-level hints for content pipeline."
     }
   },
