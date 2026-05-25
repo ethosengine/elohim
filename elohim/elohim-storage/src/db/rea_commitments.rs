@@ -8,7 +8,9 @@ use diesel::prelude::*;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use elohim_views::projection::{GateHintRef, ProjectionMode, StewardDirectEndpoint};
+use elohim_views::projection::{
+    EprProjectionView, GateHintRef, ProjectionMode, StewardDirectEndpoint,
+};
 
 use super::context::AppContext;
 use super::diesel_schema::rea_commitments;
@@ -20,7 +22,7 @@ use crate::error::StorageError;
 // ============================================================================
 
 /// Input for creating an REA commitment
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct CreateReaCommitmentInput {
     #[serde(default)]
     pub id: Option<String>,
@@ -510,6 +512,304 @@ pub fn find_active_operator_binding(
         .first(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("Operator lookup failed: {}", e)))
+}
+
+// ============================================================================
+// Project-EPR Projection Resolvers
+// ============================================================================
+//
+// These selectors operate on project-epr commitments, projecting stored
+// commitment rows into EprProjectionView values. The scope format used by
+// project-epr commitments is `doorway:{doorway_id}|epr:{epr_id}` — a
+// pipe-separated pair that encodes both the target doorway and the EPR being
+// projected. This differs from operate-doorway commitments, which use a
+// JSON-array scope (`["doorway:{id}"]`).
+//
+// "Active" for projection commitments means state is not "cancelled" or
+// "terminated" — projections are seeded as "proposed" by the bootstrap flow
+// and graduate to "active" once confirmed. The resolver accepts any
+// non-cancelled state so projections are queryable during the window between
+// seeding and DHT notarization.
+//
+// Source of truth: DHT Commitment entry (action="project-epr"). These
+// selectors read the SQLite projection only.
+
+/// Find all active project-epr commitments scoped to a specific doorway.
+///
+/// "Active" means state is not "cancelled" or "terminated". Returns all
+/// projections for the given doorway across all states except cancelled/
+/// terminated, so the access layer can resolve URL paths from the freshly-
+/// seeded set before DHT notarization completes.
+///
+/// The `doorway_id` parameter is the SHORT form (e.g. "alpha-elohim-host");
+/// the scope column stores `doorway:alpha-elohim-host|epr:{epr_id}`. The
+/// returned `EprProjectionView.doorway_id` is the LONG form
+/// (`doorway:alpha-elohim-host`).
+pub fn find_active_projections(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    doorway_id: &str,
+) -> Result<Vec<EprProjectionView>, StorageError> {
+    let scope_filter = format!("%doorway:{}|%", doorway_id);
+
+    let commitments: Vec<ReaCommitment> = rea_commitments::table
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        .filter(rea_commitments::action.eq(PROJECT_EPR_ACTION))
+        .filter(rea_commitments::in_scope_of.like(&scope_filter))
+        .filter(rea_commitments::state.ne("cancelled"))
+        .filter(rea_commitments::state.ne("terminated"))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("DB error: {}", e)))?;
+
+    commitments
+        .into_iter()
+        .map(commitment_to_projection_view)
+        .collect()
+}
+
+/// Find the project-epr commitment whose urlPath is the longest prefix
+/// of the requested path on the given doorway.
+///
+/// Implements longest-prefix semantics: if both "/" and "/lamad" are
+/// registered, a request for "/lamad/concept/foo" resolves to "/lamad".
+/// Returns `None` when no registered projection matches the path.
+pub fn find_projection_by_url_path(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    doorway_id: &str,
+    request_path: &str,
+) -> Result<Option<EprProjectionView>, StorageError> {
+    let all = find_active_projections(conn, ctx, doorway_id)?;
+    let best = all
+        .into_iter()
+        .filter(|p| path_matches_prefix(request_path, &p.url_path))
+        .max_by_key(|p| p.url_path.len());
+    Ok(best)
+}
+
+/// Returns true when `request_path` is at or under `projection_path`.
+///
+/// Rules:
+/// - projection_path "/" matches everything.
+/// - projection_path "/lamad" matches "/lamad", "/lamad/", "/lamad/foo"
+///   but NOT "/lamadx" or "/lam".
+fn path_matches_prefix(request_path: &str, projection_path: &str) -> bool {
+    if projection_path == "/" {
+        return true;
+    }
+    request_path == projection_path || request_path.starts_with(&format!("{}/", projection_path))
+}
+
+/// Convert a stored `ReaCommitment` row into an `EprProjectionView`.
+///
+/// The commitment's `metadata_json` field holds the projection details
+/// (urlPath, mode, reach, etc.). Missing fields fall back to safe defaults
+/// so the access layer degrades gracefully on partially-migrated seeds.
+fn commitment_to_projection_view(c: ReaCommitment) -> Result<EprProjectionView, StorageError> {
+    let metadata: serde_json::Value = c
+        .metadata_json
+        .as_deref()
+        .map(|s| serde_json::from_str(s))
+        .transpose()
+        .map_err(|e| StorageError::Internal(format!("metadata parse: {}", e)))?
+        .unwrap_or(serde_json::Value::Null);
+
+    let scope = c.in_scope_of.unwrap_or_default();
+    let (doorway_id, epr_id) = parse_projection_scope(&scope)?;
+
+    Ok(EprProjectionView {
+        commitment_id: c.id,
+        epr_id,
+        doorway_id,
+        url_path: metadata
+            .get("urlPath")
+            .and_then(|v| v.as_str())
+            .unwrap_or("/")
+            .to_string(),
+        mode: metadata
+            .get("mode")
+            .cloned()
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or(ProjectionMode::Cached),
+        reach: metadata
+            .get("reach")
+            .and_then(|v| v.as_str())
+            .unwrap_or("commons")
+            .to_string(),
+        base_href: metadata
+            .get("baseHref")
+            .and_then(|v| v.as_str())
+            .unwrap_or("/")
+            .to_string(),
+        entry_file: metadata
+            .get("entryFile")
+            .and_then(|v| v.as_str())
+            .unwrap_or("index.html")
+            .to_string(),
+        redirects_from: metadata
+            .get("redirectsFrom")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default(),
+        preview_epr_ref: metadata
+            .get("previewEprRef")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        gate_hints: metadata
+            .get("gateHints")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default(),
+        dead_end: metadata
+            .get("deadEnd")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        steward_direct_endpoint: metadata.get("stewardDirectEndpoint").and_then(|v| {
+            if v.is_null() {
+                None
+            } else {
+                serde_json::from_value(v.clone()).ok()
+            }
+        }),
+        seeded_at: c.created_at.to_string(),
+        seeded_by: c.provider,
+    })
+}
+
+/// Parse a `doorway:{id}|epr:{id}` scope string into its two components.
+///
+/// Returns `(doorway_id_long_form, epr_id)` where the doorway_id includes
+/// the "doorway:" prefix (e.g. `"doorway:alpha-elohim-host"`).
+fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError> {
+    let parts: Vec<&str> = scope.split('|').collect();
+    if parts.len() != 2 {
+        return Err(StorageError::Internal(format!(
+            "Malformed projection scope: {}",
+            scope
+        )));
+    }
+    let doorway_raw = parts[0]
+        .strip_prefix("doorway:")
+        .ok_or_else(|| {
+            StorageError::Internal(format!("Scope missing 'doorway:' prefix: {}", scope))
+        })?
+        .to_string();
+    let epr_id = parts[1]
+        .strip_prefix("epr:")
+        .ok_or_else(|| StorageError::Internal(format!("Scope missing 'epr:' prefix: {}", scope)))?
+        .to_string();
+    Ok((format!("doorway:{}", doorway_raw), epr_id))
+}
+
+#[cfg(test)]
+mod projection_resolver_tests {
+    use super::*;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    /// Seed 4 test projections: two on alpha-elohim-host ("/", "/lamad")
+    /// and two on elohim-host ("/", "/lamad").
+    fn seed_test_projections(conn: &mut SqliteConnection, ctx: &AppContext) {
+        let test_seed = |conn: &mut SqliteConnection, epr: &str, doorway: &str, url_path: &str| {
+            let scope = format!("doorway:{}|epr:{}", doorway, epr);
+            let id_safe = format!("{}-{}-{}", epr, doorway, url_path).replace('/', "_");
+
+            let metadata = serde_json::json!({
+                "urlPath": url_path,
+                "mode": "cached",
+                "reach": "commons",
+                "baseHref": if url_path == "/" { "/".to_string() } else { format!("{}/", url_path) },
+                "entryFile": "index.html",
+                "redirectsFrom": [],
+                "gateHints": [],
+                "deadEnd": false
+            });
+
+            create_commitment(
+                conn,
+                ctx,
+                CreateReaCommitmentInput {
+                    id: Some(id_safe),
+                    action: PROJECT_EPR_ACTION.into(),
+                    provider: "test-steward".into(),
+                    receiver: "test-operator".into(),
+                    in_scope_of: Some(scope),
+                    note: Some(epr.into()),
+                    metadata_json: Some(metadata.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        };
+
+        test_seed(conn, "elohim-host-landing", "alpha-elohim-host", "/");
+        test_seed(conn, "elohim-host-landing", "elohim-host", "/");
+        test_seed(conn, "lamad-spa", "alpha-elohim-host", "/lamad");
+        test_seed(conn, "lamad-spa", "elohim-host", "/lamad");
+    }
+
+    #[test]
+    fn find_active_projections_filters_by_doorway_id() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        seed_test_projections(&mut conn, &ctx);
+
+        let alpha = find_active_projections(&mut conn, &ctx, "alpha-elohim-host").unwrap();
+        assert_eq!(alpha.len(), 2);
+        assert!(alpha
+            .iter()
+            .all(|p| p.doorway_id == "doorway:alpha-elohim-host"));
+
+        let beta = find_active_projections(&mut conn, &ctx, "elohim-host").unwrap();
+        assert_eq!(beta.len(), 2);
+    }
+
+    #[test]
+    fn find_projection_by_url_path_longest_prefix_wins() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        seed_test_projections(&mut conn, &ctx);
+
+        let landing =
+            find_projection_by_url_path(&mut conn, &ctx, "alpha-elohim-host", "/").unwrap();
+        assert_eq!(landing.unwrap().epr_id, "elohim-host-landing");
+
+        let lamad =
+            find_projection_by_url_path(&mut conn, &ctx, "alpha-elohim-host", "/lamad/concept/foo")
+                .unwrap();
+        assert_eq!(lamad.unwrap().epr_id, "lamad-spa");
+
+        let lamad_root =
+            find_projection_by_url_path(&mut conn, &ctx, "alpha-elohim-host", "/lamad").unwrap();
+        assert_eq!(lamad_root.unwrap().epr_id, "lamad-spa");
+    }
+
+    #[test]
+    fn find_projection_by_url_path_returns_none_when_no_match() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        seed_test_projections(&mut conn, &ctx);
+
+        let nothing = find_projection_by_url_path(&mut conn, &ctx, "unknown", "/anything").unwrap();
+        assert!(nothing.is_none());
+    }
+
+    #[test]
+    fn path_matches_prefix_handles_root_and_segments() {
+        assert!(path_matches_prefix("/", "/"));
+        assert!(path_matches_prefix("/anything", "/"));
+        assert!(path_matches_prefix("/lamad", "/lamad"));
+        assert!(path_matches_prefix("/lamad/", "/lamad"));
+        assert!(path_matches_prefix("/lamad/concept/x", "/lamad"));
+        assert!(!path_matches_prefix("/lamadx", "/lamad"));
+        assert!(!path_matches_prefix("/lam", "/lamad"));
+        assert!(!path_matches_prefix("/other", "/lamad"));
+    }
 }
 
 #[cfg(test)]
