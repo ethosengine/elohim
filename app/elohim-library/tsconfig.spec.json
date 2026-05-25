@@ -13,6 +13,8 @@
     "src/**/*.spec.ts",
     "src/**/*.d.ts",
     "src/test-setup.ts",
+    "projects/elohim-identity/src/**/*.spec.ts",
+    "projects/elohim-identity/src/**/*.ts",
     "projects/elohim-service/src/resilience/**/*.spec.ts",
     "projects/elohim-service/src/resilience/**/*.ts",
     "projects/elohim-service/src/distribution/**/*.spec.ts",

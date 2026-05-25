@@ -5,6 +5,8 @@ packages:
   - doorway/doorway-app
   - app/elohim-library
   - app/elohim-library/projects/elohim-service
+  - app/elohim-library/projects/elohim-identity
+  - app/elohim-library/projects/elohim-rea-runtime
   - app/elohim-elements/elohim-core
   - app/elohim-elements/elohim-shell
   - app/elohim-elements/elohim-imagodei

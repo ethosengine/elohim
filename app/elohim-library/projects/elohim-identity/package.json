@@ -1,0 +1,23 @@
+{
+  "name": "@elohim/identity",
+  "version": "0.1.0",
+  "description": "Elohim identity SDK — session management, identity guards, profile and attestation models for the @elohim/identity surface",
+  "sideEffects": false,
+  "peerDependencies": {
+    "@angular/common": "^19.2.0",
+    "@angular/core": "^19.2.0",
+    "@angular/router": "^19.2.0",
+    "rxjs": "^7.8.0"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "keywords": [
+    "elohim",
+    "identity",
+    "session",
+    "imagodei"
+  ],
+  "author": "Elohim Protocol",
+  "license": "MIT"
+}

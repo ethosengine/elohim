@@ -11,6 +11,7 @@ export default defineConfig({
     setupFiles: ['src/test-setup.ts'],
     include: [
       'src/**/*.spec.ts',
+      'projects/elohim-identity/src/**/*.spec.ts',
       'projects/elohim-service/src/resilience/**/*.spec.ts',
       'projects/elohim-service/src/distribution/**/*.spec.ts',
       'projects/graphos/src/**/*.spec.ts',

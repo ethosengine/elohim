@@ -11,6 +11,18 @@
     "paths": {
       "lamad-ui": [
         "./dist/lamad-ui"
+      ],
+      "@elohim/identity": [
+        "./projects/elohim-identity/src/public-api.ts"
+      ],
+      "@elohim/identity/*": [
+        "./projects/elohim-identity/src/*"
+      ],
+      "@elohim/rea-runtime": [
+        "./projects/elohim-rea-runtime/src/public-api.ts"
+      ],
+      "@elohim/rea-runtime/*": [
+        "./projects/elohim-rea-runtime/src/*"
       ]
     },
     "noImplicitReturns": true,

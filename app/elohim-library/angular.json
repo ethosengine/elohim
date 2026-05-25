@@ -104,6 +104,32 @@
         }
       }
     },
+    "elohim-identity": {
+      "projectType": "library",
+      "root": "projects/elohim-identity",
+      "sourceRoot": "projects/elohim-identity/src",
+      "prefix": "lib",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:ng-packagr",
+          "options": {
+            "project": "projects/elohim-identity/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/elohim-identity/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "projects/elohim-identity/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@analogjs/vitest-angular:test"
+        }
+      }
+    },
     "lamad-ui": {
       "projectType": "library",
       "root": "projects/lamad-ui",
@@ -147,6 +173,32 @@
             },
             "development": {
               "tsConfig": "projects/graphos/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@analogjs/vitest-angular:test"
+        }
+      }
+    },
+    "elohim-rea-runtime": {
+      "projectType": "library",
+      "root": "projects/elohim-rea-runtime",
+      "sourceRoot": "projects/elohim-rea-runtime/src",
+      "prefix": "lib",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:ng-packagr",
+          "options": {
+            "project": "projects/elohim-rea-runtime/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/elohim-rea-runtime/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "projects/elohim-rea-runtime/tsconfig.lib.json"
             }
           },
           "defaultConfiguration": "production"
