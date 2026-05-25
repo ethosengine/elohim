@@ -4,6 +4,8 @@ description: Recovery in the Elohim Protocol must never permit absolute lockout;
 type: project
 originSessionId: a00556ea-66be-405a-985e-1a7a309d43a8
 ---
+**Canon (in-tree, authoritative):** `genesis/docs/architecture/cradle-to-grave-capability-gradient.md` §3.
+
 The protocol rejects unrecoverable self-sovereignty as a design failure. The "UK dump with billion-dollar Bitcoin" pattern — a single key, a single device, a single point of irreversible loss — is adversarial to humans and incompatible with what love demands. Where someone has suffered loss, the community's collective wisdom must always have a path to restoration.
 
 **The authority stack, lowest-friction to highest:**

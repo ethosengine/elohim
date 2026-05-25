@@ -7,6 +7,8 @@ metadata:
   originSessionId: 0c3107ea-a896-4db5-ae15-c9e1d7921552
 ---
 
+**Canon (in-tree, authoritative):** `genesis/docs/architecture/rea-compute-commitment-primitive.md`
+
 The protocol's bounded-authority pattern is **one primitive** instantiated across many scopes. Master the primitive once; the rest of the protocol inherits the shape.
 
 ## Shape

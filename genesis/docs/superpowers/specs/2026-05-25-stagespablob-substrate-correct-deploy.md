@@ -7,6 +7,18 @@
 
 ---
 
+## §0 — Canon References
+
+This spec depends on three foundational canon documents in `genesis/docs/architecture/`. Read them first:
+
+- [stewardship-over-sovereignty](epr:stewardship-over-sovereignty) — the philosophical anchor. Explains why "hold your own keys" is not the protocol's notion of sovereignty, why every authority surface needs a non-cryptographic recovery path, why anonymous publish has no place in this substrate. Z.D's open-question answers (§7) flow from this canon.
+- [rea-compute-commitment-primitive](epr:rea-compute-commitment-primitive) — the substrate primitive. Z.D is the first concrete instance (deploy authority). The §1 of this spec lifts the primitive's shape; the canon doc holds the gospel-tier articulation and the generalization table.
+- [cradle-to-grave-capability-gradient](epr:cradle-to-grave-capability-gradient) — how the primitive instantiates across life-stage capacities. Z.D's compromise-recovery story (§7 Q5) is the protocol-level instance row of that gradient.
+
+Implementation plan (in-tree): `genesis/docs/superpowers/plans/` will host the bite-sized task decomposition for Z.D Phase 1+2 implementation after this spec lands.
+
+---
+
 ## Why this is two specs in one
 
 The user named the lesson plainly: *"these reciprocal REA compute agreements are foundational to the entire elohim protocol — we have to master these."*

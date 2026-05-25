@@ -4,6 +4,8 @@ description: Foundational elohim principle — no component is sovereign; owners
 type: project
 originSessionId: b2c4fbee-2183-475a-8cde-b245fa745bc4
 ---
+**Canon (in-tree, authoritative):** `genesis/docs/architecture/stewardship-over-sovereignty.md`
+
 The elohim protocol rejects both **sovereignty** and **ownership** as framings — at every level. This is not a style preference; it is a worldview.
 
 **The principle:** No one is sovereign. Everything depends on something. Any claim to sovereignty — at any level, in any context, however resilient — contains a kernel of self-deception. Peers depend on wrappers, wrappers depend on orchestrators, orchestrators depend on operators, operators depend on households, households depend on the mesh. The correct framing is mutual dependency with distributed responsibility.
