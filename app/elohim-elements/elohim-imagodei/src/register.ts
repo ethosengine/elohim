@@ -40,3 +40,9 @@ if (!customElements.get('elohim-imagodei-steward-configure-banner')) {
 if (!customElements.get('elohim-imagodei-trust-indicator')) {
   customElements.define('elohim-imagodei-trust-indicator', ElohimImagodeiTrustIndicator);
 }
+
+import { ElohimImagodeiPortalShell } from './elohim-imagodei-portal-shell.js';
+
+if (!customElements.get('elohim-imagodei-portal-shell')) {
+  customElements.define('elohim-imagodei-portal-shell', ElohimImagodeiPortalShell);
+}
