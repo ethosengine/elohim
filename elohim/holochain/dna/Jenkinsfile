@@ -802,15 +802,24 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         sh '''ls -lh elohim/holochain/tests/sweettest/sweettest-archive.tar.zst elohim/holochain/tests/sweettest/.nextest-filter'''
 
                         // Stash compiled archive + filter + workspace source +
-                        // flake files. nextest's archive contains test binaries
-                        // + metadata only — it needs the original Cargo.toml +
-                        // src/ on the runtime machine so `--workspace-remap`
-                        // can map binaries→tests. Include all of sweettest/
-                        // (small without target/) so the shard has full workspace.
+                        // flake files + DNA artifacts. nextest's archive contains
+                        // test binaries + metadata only — it needs the original
+                        // Cargo.toml + src/ on the runtime machine so
+                        // `--workspace-remap` can map binaries→tests. Include all
+                        // of sweettest/ (small without target/) so the shard has
+                        // full workspace.
                         // flake.nix + flake.lock are at dna/elohim/ — needed by
                         // `nix develop` on the shard pod.
+                        // .dna files: fixtures.rs::dna_path() resolves DNAs via
+                        // three candidates relative to elohim/holochain/dna/:
+                        //   (1) <name>/workdir/<name>.dna
+                        //   (2) elohim/workdir/<name>.dna   ← shared happ workdir
+                        //   (3) <hyphen-name>/<hyphen-name>.dna  (node-registry)
+                        // DNA build stage writes to (2) for shared DNAs +
+                        // (3) for node-registry. Include both so shards resolve.
+                        // (Bug #9 of 2026-05-24 sweettest sprint — #1278 FAILURE.)
                         stash(
-                            includes: 'elohim/holochain/tests/sweettest/**,elohim/holochain/dna/elohim/flake.nix,elohim/holochain/dna/elohim/flake.lock',
+                            includes: 'elohim/holochain/tests/sweettest/**,elohim/holochain/dna/elohim/flake.nix,elohim/holochain/dna/elohim/flake.lock,elohim/holochain/dna/elohim/workdir/*.dna,elohim/holochain/dna/node-registry/node-registry.dna',
                             excludes: 'elohim/holochain/tests/sweettest/target/**,elohim/holochain/tests/sweettest/extracted-*/**',
                             name: 'sweettest-shard-input'
                         )
