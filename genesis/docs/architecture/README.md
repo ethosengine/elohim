@@ -13,7 +13,16 @@ Canon documents use `epr:` URIs for cross-references (the protocol's content-add
 | [stewardship-over-sovereignty](epr:stewardship-over-sovereignty) | `stewardship-over-sovereignty.md` | The protocol's foundational philosophical inversion. Why "hold your own keys" is not the protocol's notion of sovereignty. What stewardship, agency, and authority mean here. The grandma standard. |
 | [rea-compute-commitment-primitive](epr:rea-compute-commitment-primitive) | `rea-compute-commitment-primitive.md` | The substrate primitive (`Mishpat::Commitment` with `delegates-compute` action). One shape, instantiated across deploy / hosting / household chores / qahal moderation / content authorship / DePIN compute / recovery quorum. |
 | [cradle-to-grave-capability-gradient](epr:cradle-to-grave-capability-gradient) | `cradle-to-grave-capability-gradient.md` | Life-stage capacity transitions (child, adolescent, adult, senior, end-of-life). Graduated recovery authority (4-layer stack). Elohim-agent mediation (specialists + counsel + co-steward). |
+| [elohim-sdk](epr:elohim-sdk) | `elohim-sdk.md` | The five-library SDK boundary (`@elohim/service`, `elohim-core`, `@elohim/storage-client`, `@elohim/identity`, `@elohim/rea-runtime`). Placement principles. Substrate-API consumption patterns (doorway HTTP, EPR resolution). Cradle-to-grave inheritance across the SDK. |
 | [content-pipeline](epr:content-pipeline) | `content-pipeline.md` | The content seeding pipeline (genesis → seed-data → DHT). |
+
+## Operational canon
+
+These documents capture **how to do specific recurring protocol operations** — exhaustive enough that the next operator follows them instead of re-deriving the lessons.
+
+| Document (EPR) | Filesystem | What it captures |
+| --- | --- | --- |
+| [pillar-bundle-split-runbook](epr:pillar-bundle-split-runbook) | `pillar-bundle-split-runbook.md` | The operational runbook for splitting a pillar from `elohim-app` into its own bundle. Eight-disposition taxonomy. Wave 1/2/3 sprint shape. Bundle-creation checklist. Ten gotchas captured from the lamad split + peer-OAuth-portal integration. Foundational worked example: the lamad split. |
 
 ## Relationship to other docs
 
@@ -29,6 +38,9 @@ If you are new to the protocol, read in this order:
 1. **[stewardship-over-sovereignty](epr:stewardship-over-sovereignty)** — the foundational lens. Everything else assumes this.
 2. **[rea-compute-commitment-primitive](epr:rea-compute-commitment-primitive)** — the substrate primitive you will use whenever designing an authority delegation surface.
 3. **[cradle-to-grave-capability-gradient](epr:cradle-to-grave-capability-gradient)** — how the primitive instantiates across human life-stage capacities. Why the protocol must serve a child, a grandmother, and a recovering-from-cognitive-decline elder with the same fundamental shape.
+4. **[elohim-sdk](epr:elohim-sdk)** — the developer-facing entry point. What the operational consumption surface looks like in TypeScript. Where the substrate ends and your application begins.
+
+If you are about to split a pillar bundle out of `elohim-app`, also read **[pillar-bundle-split-runbook](epr:pillar-bundle-split-runbook)** in the operational canon.
 
 After the canon, read the specs that touch your domain. The canon will have already given you the vocabulary; the specs apply it.
 
