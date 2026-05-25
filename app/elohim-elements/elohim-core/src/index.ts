@@ -17,3 +17,6 @@ export * from './capability/index.js';
 
 export { Loader } from './loader/loader.js';
 export type { LoaderTransport, LoaderResolution, LoaderOptions } from './loader/loader.js';
+
+export { Session } from './session/session.js';
+export type { CurrentUserView } from './session/session.js';
