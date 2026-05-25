@@ -455,9 +455,13 @@ mod operator_helper_tests {
     }
 
     #[test]
-    fn project_epr_action_constant_is_stable() {
-        // The action string is content-addressed into commitment ids;
+    fn project_epr_action_matches_dna_vocabulary() {
+        // The constant here must match the entry appended to REA_ACTIONS in
+        // elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs.
+        // The action string is also content-addressed into commitment ids;
         // changing it breaks idempotency of every existing seed.
+        // Schema-first codegen of this vocabulary is a future refactor; until
+        // then this test is the drift detector.
         assert_eq!(PROJECT_EPR_ACTION, "project-epr");
     }
 }
