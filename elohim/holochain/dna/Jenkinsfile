@@ -152,6 +152,7 @@ def runSweettestShard(int n, int total, String shardPodYaml) {
                                 --extract-to extracted-${n} \\
                                 --workspace-remap . \\
                                 --config-file .config/nextest.toml \\
+                                --profile ci \\
                                 --no-fail-fast \\
                                 --test-threads=1 \\
                                 --partition hash:${n}/${total} \\
@@ -160,11 +161,13 @@ def runSweettestShard(int n, int total, String shardPodYaml) {
                         '
                         RC=\${PIPESTATUS[0]}
                         # Copy nextest JUnit (cargo target dir is inside the extract dir).
-                        # #1279/#1281 surfaced: nextest looks for config at
-                        # <workspace-root>/.config/nextest.toml; --workspace-remap .
-                        # makes workspace-root = extracted-N/ (no config there).
-                        # Fix: explicit --config-file .config/nextest.toml above
-                        # (cwd is sweettest/, where the file lives).
+                        # Bug #10 history (2026-05-24/25 sprint):
+                        # - #1279/#1281: post-stage junit found nothing (file in shard pod, not orchestrator)
+                        # - #1281/#1282: register-in-shard + --config-file still produced no junit.xml
+                        # - Final fix: --profile ci + [profile.ci.junit] in .config/nextest.toml
+                        #   (canonical nextest CI pattern; the `default` profile's JUnit
+                        #   reporter didn't activate via this code path for unclear reasons).
+                        # With --profile ci, JUnit lands at extracted-N/target/nextest/ci/junit.xml
                         echo "[shard-${n}/${total}] searching for junit.xml under extracted-${n}/..."
                         find extracted-${n} -name junit.xml -print 2>/dev/null || true
                         find extracted-${n} -name junit.xml -exec cp {} sweettest-shard-${n}-junit.xml \\; 2>/dev/null || true

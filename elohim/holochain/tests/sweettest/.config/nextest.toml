@@ -5,14 +5,30 @@
 # stage efficiency design).
 #
 # Path is relative to CARGO_TARGET_DIR/nextest/<profile>/, so for the
-# default profile JUnit lands at target/nextest/default/junit.xml.
+# `ci` profile JUnit lands at target/nextest/ci/junit.xml.
+#
+# Bug #10 history: two prior attempts to enable JUnit via the default
+# profile didn't land — `[profile.default.junit]` alone did not produce
+# the file even with --config-file explicitly pointing at this config.
+# Switching to the canonical nextest `ci` profile pattern + `--profile ci`
+# on the CLI is the recommended path per nextest's CI documentation.
 
 [profile.default]
 # Per-test slow-test threshold. Sweettest scenarios spin up real conductors;
 # anything past 5 minutes wall-clock is worth flagging.
 slow-timeout = { period = "5m", terminate-after = 3 }
 
-[profile.default.junit]
+# CI profile — used by shard runners in elohim/holochain/dna/Jenkinsfile.
+# Inherits slow-timeout from default via nextest's profile inheritance.
+[profile.ci]
+slow-timeout = { period = "5m", terminate-after = 3 }
+# Retry once on transient failures (Holochain conductor occasionally
+# flakes on first agent installation under heavy concurrent load).
+retries = 1
+# Compact failure output for CI logs; full output captured by --no-fail-fast.
+failure-output = "immediate-final"
+
+[profile.ci.junit]
 path = "junit.xml"
 report-name = "sweettest"
 # Store the absolute time each test took for cross-shard balancing analysis.
