@@ -1,8 +1,11 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
 import {
   AfterViewChecked,
+  AfterViewInit,
   Component,
   ComponentRef,
+  CUSTOM_ELEMENTS_SCHEMA,
+  ElementRef,
   HostListener,
   OnDestroy,
   OnInit,
@@ -16,11 +19,10 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 import { catchError, switchMap, takeUntil } from 'rxjs/operators';
 
-import { BehaviorSubject, Observable, Subject, Subscription, forkJoin, of } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, Subscription, firstValueFrom, forkJoin, of } from 'rxjs';
 
-import { ContentAnalyticsComponent } from '@app/elohim/components/content-analytics/content-analytics.component';
-import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
-import { GateFeedbackTriggerComponent } from '@app/elohim/components/gate-feedback';
+import 'elohim-core/register';
+
 import { TrustBadge } from '@app/elohim/models/trust-badge.model';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { AgentService } from '@app/elohim/services/agent.service';
@@ -43,13 +45,28 @@ import {
   FeedbackProfile,
   createProfileFromTemplate,
 } from '@app/lamad/models/feedback-profile.model';
+// NOTE: FeedbackMechanismGatewayComponent + GraduatedFeedbackComponent + ReactionBarComponent
+// retained pending L-slice migration of MechanismSelectionService + SignalAccumulationService
+// + GovernanceRecognitionService out of @app/qahal. The Lit equivalents
+// (<elohim-feedback-mechanism-gateway>, <elohim-graduated-feedback>, <elohim-reaction-bar>)
+// require those orchestration services to be relocated to a shared workspace first;
+// otherwise migrating the C-slice import here would force ADDING new L-slice imports
+// from @app/qahal (mechanism-selection, signal-accumulation, governance-recognition)
+// to inline-orchestrate the now-stateless Lit elements — net cross-pillar count goes up.
+// See Slice 2.2b acceptance report for the full picture.
 import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import {
   FeedbackContext,
   GraduatedFeedbackComponent,
 } from '@app/qahal/components/graduated-feedback/graduated-feedback.component';
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
-import { AttentionTrackerService } from '@elohim/rea-runtime';
+import { AttentionTrackerService, EventService } from '@elohim/rea-runtime';
+
+import type {
+  ContentAnalyticsLoader,
+  ContentAnalyticsMetrics,
+  ElohimContentAnalytics,
+} from 'elohim-core';
 
 import {
   DistributionBadgeComponent,
@@ -97,16 +114,16 @@ import type { ContentStewardshipView } from '@elohim/storage-client/generated';
     GraduatedFeedbackComponent,
     FeedbackMechanismGatewayComponent,
     FocusedViewToggleComponent,
-    ContentAnalyticsComponent,
-    EprRelationshipsPanelComponent,
     ResilienceSnapshotComponent,
     DistributionBadgeComponent,
-    GateFeedbackTriggerComponent,
   ],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
 })
-export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewChecked {
+export class ContentViewerComponent
+  implements OnInit, OnDestroy, AfterViewChecked, AfterViewInit
+{
   node: ContentNode | null = null;
   affinity = 0;
   relatedNodes: ContentNode[] = [];
@@ -200,9 +217,37 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly householdResilienceService = inject(HouseholdResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
   private readonly eprResolver = inject(EprResolverService);
+  private readonly eventService = inject(EventService);
   private readonly document = inject(DOCUMENT);
+  private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
 
   eprRelationships: EprRelationship[] = [];
+
+  /**
+   * Loader passed to the <elohim-content-analytics> Lit element. The element
+   * is stateless w.r.t. data fetching — callers inject a loader that wraps
+   * their service. Mirrors the legacy ContentAnalyticsComponent's
+   * ngOnChanges-driven forkJoin against EventService.
+   */
+  readonly analyticsLoader: ContentAnalyticsLoader = {
+    load: async (contentId: string): Promise<ContentAnalyticsMetrics | null> => {
+      try {
+        const [views, completions] = await Promise.all([
+          firstValueFrom(this.eventService.getViewCount(contentId)),
+          firstValueFrom(this.eventService.getCompletionCount(contentId)),
+        ]);
+        const viewCount = views ?? 0;
+        const completionCount = completions ?? 0;
+        return {
+          viewCount,
+          completionCount,
+          completionRate: viewCount > 0 ? Math.round((completionCount / viewCount) * 100) : 0,
+        };
+      } catch {
+        return null;
+      }
+    },
+  };
 
   /** Default feedback profile type for learning content */
   private readonly LEARNING_CONTENT_PROFILE = 'learning-content';
@@ -253,6 +298,33 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     if (this.pendingRendererLoad && this.node && this.rendererHost) {
       this.pendingRendererLoad = false;
       this.loadRenderer();
+    }
+    // Re-wire the analytics loader if a fresh <elohim-content-analytics>
+    // element has been materialized (e.g. tab switched into 'network' or
+    // *ngIf="node" flipped on after data load). Idempotent — assigning the
+    // same loader twice is harmless.
+    this.wireAnalyticsLoader();
+  }
+
+  ngAfterViewInit(): void {
+    this.wireAnalyticsLoader();
+  }
+
+  /**
+   * Set the `loader` property on every rendered <elohim-content-analytics>
+   * Lit element under our host. The Lit element is stateless w.r.t. data
+   * fetching — it calls back through the loader. Property assignment must
+   * happen after the element upgrades, hence the AfterViewInit /
+   * AfterViewChecked hooks.
+   */
+  private wireAnalyticsLoader(): void {
+    const litEls = this.elRef.nativeElement.querySelectorAll<ElohimContentAnalytics>(
+      'elohim-content-analytics'
+    );
+    for (const litEl of litEls) {
+      if (litEl.loader !== this.analyticsLoader) {
+        litEl.loader = this.analyticsLoader;
+      }
     }
   }
 

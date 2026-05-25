@@ -121,10 +121,10 @@
           >
             ✏️ Edit
           </a>
-          <app-gate-feedback-trigger
-            [contentId]="node.id"
+          <elohim-gate-feedback-trigger
+            [attr.content-id]="node.id"
             data-testid="viewer-feedback-trigger"
-          ></app-gate-feedback-trigger>
+          ></elohim-gate-feedback-trigger>
         </div>
       </div>
 
@@ -402,11 +402,11 @@
         </div>
 
         <!-- EPR Relationships (protocol-level content relationships) -->
-        <app-epr-relationships-panel
+        <elohim-epr-relationships-panel
           *ngIf="eprRelationships.length > 0"
           [relationships]="eprRelationships"
           data-testid="viewer-relationships-panel"
-        ></app-epr-relationships-panel>
+        ></elohim-epr-relationships-panel>
       </section>
 
       <!-- Trust/Attestations Tab -->
@@ -763,12 +763,12 @@
           </ng-template>
         </div>
 
-        <!-- Attention Metrics (existing) -->
-        <app-content-analytics
+        <!-- Attention Metrics (existing) — Lit element; loader wired in ngAfterViewInit. -->
+        <elohim-content-analytics
           *ngIf="node"
-          [contentId]="node.id"
+          [attr.content-id]="node.id"
           data-testid="viewer-content-analytics"
-        ></app-content-analytics>
+        ></elohim-content-analytics>
 
         <div class="network-header">
           <h3>Content Neighborhood</h3>
