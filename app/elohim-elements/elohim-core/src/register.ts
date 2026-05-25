@@ -1,5 +1,7 @@
 import { ElohimButton } from './elohim-button.js';
 import { ElohimComputeTile } from './elohim-compute-tile.js';
+import { ElohimSkeleton } from './elohim-skeleton.js';
+import { ElohimMentionBase } from './elohim-mention-base.js';
 
 // Registration lives here, not on the ElohimButton class via @customElement,
 // to keep ./index.ts truly side-effect-free. Importing from 'elohim-core'
@@ -22,4 +24,12 @@ if (!customElements.get('elohim-button')) {
 
 if (!customElements.get('elohim-compute-tile')) {
   customElements.define('elohim-compute-tile', ElohimComputeTile);
+}
+
+if (!customElements.get('elohim-skeleton')) {
+  customElements.define('elohim-skeleton', ElohimSkeleton);
+}
+
+if (!customElements.get('elohim-mention-base')) {
+  customElements.define('elohim-mention-base', ElohimMentionBase);
 }

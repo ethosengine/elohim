@@ -13,6 +13,9 @@ export type {
   ComputeTileState,
 } from './elohim-compute-tile.js';
 
+export { ElohimSkeleton } from './elohim-skeleton.js';
+export { ElohimMentionBase } from './elohim-mention-base.js';
+
 export * from './capability/index.js';
 
 export { Loader } from './loader/loader.js';

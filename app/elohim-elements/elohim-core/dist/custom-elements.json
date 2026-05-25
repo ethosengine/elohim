@@ -631,6 +631,310 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-mention-base.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-mention-base> — the generic fallback chip when a specific pillar's\nmention element (e.g. <elohim-qahal-mention>) isn't loaded. Renders\ntitle + EPR id from whatever metadata is resolvable, with a subtle\nindicator that this is a fallback rendering.\n\nPillar mention elements (e.g. <elohim-lamad-mention>) supersede this\nelement when the relevant pillar bundle is loaded. This element is the\nsafe substrate-level default.",
+          "name": "ElohimMentionBase",
+          "cssProperties": [
+            {
+              "description": "Override border color",
+              "name": "--elohim-mention-border"
+            },
+            {
+              "description": "Override fallback indicator dot color",
+              "name": "--elohim-mention-fallback-dot"
+            },
+            {
+              "description": "Override chip background",
+              "name": "--elohim-mention-bg"
+            },
+            {
+              "description": "Override chip foreground text color",
+              "name": "--elohim-mention-fg"
+            },
+            {
+              "description": "Override chip border-radius",
+              "name": "--elohim-mention-radius"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The outer inline chip container",
+              "name": "chip"
+            },
+            {
+              "description": "The dot indicating this is a generic (fallback) render",
+              "name": "fallback-mark"
+            },
+            {
+              "description": "The display label text span",
+              "name": "label"
+            },
+            {
+              "description": "The EPR id text span (present only when label is shown)",
+              "name": "id"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "epr",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The EPR id being mentioned",
+              "attribute": "epr"
+            },
+            {
+              "kind": "field",
+              "name": "label",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional display label (rendered if known; falls back to epr)",
+              "attribute": "label"
+            },
+            {
+              "kind": "field",
+              "name": "pillar",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional pillar hint for iconography (reserved for future use)",
+              "attribute": "pillar"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "epr",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The EPR id being mentioned",
+              "fieldName": "epr"
+            },
+            {
+              "name": "label",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional display label (rendered if known; falls back to epr)",
+              "fieldName": "label"
+            },
+            {
+              "name": "pillar",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "Optional pillar hint for iconography (reserved for future use)",
+              "fieldName": "pillar"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-mention-base",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "designed",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimMentionBase",
+          "declaration": {
+            "name": "ElohimMentionBase",
+            "module": "src/elohim-mention-base.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-skeleton.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-skeleton> — sized shimmer placeholder used during progressive\nloading. Renders an empty box at the declared width/height with a\nsubtle shimmer animation. Page doesn't reflow when real content arrives.",
+          "name": "ElohimSkeleton",
+          "cssProperties": [
+            {
+              "description": "Override base color",
+              "name": "--elohim-skeleton-bg"
+            },
+            {
+              "description": "Override shimmer highlight color",
+              "name": "--elohim-skeleton-shimmer"
+            },
+            {
+              "description": "Override border-radius",
+              "name": "--elohim-skeleton-radius"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "width",
+              "type": {
+                "text": "string"
+              },
+              "default": "'100%'",
+              "description": "CSS width (e.g. \"200px\" or \"100%\")",
+              "attribute": "width"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "type": {
+                "text": "string"
+              },
+              "default": "'1rem'",
+              "description": "CSS height",
+              "attribute": "height"
+            },
+            {
+              "kind": "field",
+              "name": "radius",
+              "type": {
+                "text": "string"
+              },
+              "default": "'var(--elohim-radius-sm, 4px)'",
+              "description": "Optional border-radius (default: var(--elohim-radius-sm, 4px))",
+              "attribute": "radius"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "width",
+              "type": {
+                "text": "string"
+              },
+              "default": "'100%'",
+              "description": "CSS width (e.g. \"200px\" or \"100%\")",
+              "fieldName": "width"
+            },
+            {
+              "name": "height",
+              "type": {
+                "text": "string"
+              },
+              "default": "'1rem'",
+              "description": "CSS height",
+              "fieldName": "height"
+            },
+            {
+              "name": "radius",
+              "type": {
+                "text": "string"
+              },
+              "default": "'var(--elohim-radius-sm, 4px)'",
+              "description": "Optional border-radius (default: var(--elohim-radius-sm, 4px))",
+              "fieldName": "radius"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-skeleton",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "designed",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimSkeleton",
+          "declaration": {
+            "name": "ElohimSkeleton",
+            "module": "src/elohim-skeleton.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/index.ts",
       "declarations": [],
       "exports": [
@@ -700,6 +1004,22 @@
         },
         {
           "kind": "js",
+          "name": "ElohimSkeleton",
+          "declaration": {
+            "name": "ElohimSkeleton",
+            "module": "./elohim-skeleton.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimMentionBase",
+          "declaration": {
+            "name": "ElohimMentionBase",
+            "module": "./elohim-mention-base.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "*",
           "declaration": {
             "name": "*",
@@ -737,6 +1057,54 @@
             "name": "LoaderOptions",
             "module": "./loader/loader.js"
           }
+        },
+        {
+          "kind": "js",
+          "name": "Session",
+          "declaration": {
+            "name": "Session",
+            "module": "./session/session.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "CurrentUserView",
+          "declaration": {
+            "name": "CurrentUserView",
+            "module": "./session/session.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "OmnibarContext",
+          "declaration": {
+            "name": "OmnibarContext",
+            "module": "./contracts/omnibar.contract.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprRef",
+          "declaration": {
+            "name": "EprRef",
+            "module": "./contracts/omnibar.contract.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "CapabilitySnapshot",
+          "declaration": {
+            "name": "CapabilitySnapshot",
+            "module": "./contracts/omnibar.contract.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ReachContext",
+          "declaration": {
+            "name": "ReachContext",
+            "module": "./contracts/omnibar.contract.js"
+          }
         }
       ]
     },
@@ -759,6 +1127,22 @@
           "declaration": {
             "name": "ElohimComputeTile",
             "module": "/src/elohim-compute-tile.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-skeleton",
+          "declaration": {
+            "name": "ElohimSkeleton",
+            "module": "/src/elohim-skeleton.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-mention-base",
+          "declaration": {
+            "name": "ElohimMentionBase",
+            "module": "/src/elohim-mention-base.js"
           }
         }
       ]
@@ -1035,6 +1419,217 @@
           "declaration": {
             "name": "satisfiesRequirement",
             "module": "src/capability/standing.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/contracts/omnibar.contract.ts",
+      "declarations": [],
+      "exports": []
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/runtime.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "type": {
+            "text": "string"
+          },
+          "default": "'en'"
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "['es', 'he']"
+          },
+          "default": "['es', 'he']"
+        },
+        {
+          "kind": "variable",
+          "name": "{ getLocale, setLocale }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "{ getLocale, setLocale }",
+          "declaration": {
+            "name": "{ getLocale, setLocale }",
+            "module": "src/localize/runtime.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/source-locale.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "smokeGreeting",
+          "parameters": [
+            {
+              "name": "name",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "smokeGreeting",
+          "declaration": {
+            "name": "smokeGreeting",
+            "module": "src/localize/source-locale.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/session/session.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Session",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "isAuthenticated",
+              "type": {
+                "text": "boolean"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "refreshFromCookies",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to session changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "readCookie",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string | null"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "name",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "shallowEquals",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "boolean"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                },
+                {
+                  "name": "b",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Session",
+          "declaration": {
+            "name": "Session",
+            "module": "src/session/session.ts"
           }
         }
       ]
@@ -1400,87 +1995,6 @@
           "declaration": {
             "name": "measureLuminanceChanges",
             "module": "src/testing/ua-prefs.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/runtime.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "sourceLocale",
-          "type": {
-            "text": "string"
-          },
-          "default": "'en'"
-        },
-        {
-          "kind": "variable",
-          "name": "targetLocales",
-          "type": {
-            "text": "['es', 'he']"
-          },
-          "default": "['es', 'he']"
-        },
-        {
-          "kind": "variable",
-          "name": "{ getLocale, setLocale }"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "sourceLocale",
-          "declaration": {
-            "name": "sourceLocale",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "targetLocales",
-          "declaration": {
-            "name": "targetLocales",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "{ getLocale, setLocale }",
-          "declaration": {
-            "name": "{ getLocale, setLocale }",
-            "module": "src/localize/runtime.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/source-locale.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "smokeGreeting",
-          "parameters": [
-            {
-              "name": "name",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "smokeGreeting",
-          "declaration": {
-            "name": "smokeGreeting",
-            "module": "src/localize/source-locale.ts"
           }
         }
       ]
