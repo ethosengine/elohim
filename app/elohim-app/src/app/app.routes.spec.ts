@@ -11,14 +11,16 @@ describe('App Routes', () => {
     expect(rootRoute).toBeDefined();
   });
 
-  it('should have a lamad lazy loaded route', () => {
+  it('should NOT have a lamad route (lamad is now a standalone app — pillar split)', () => {
     const lamadRoute = routes.find(r => r.path === 'lamad');
-    expect(lamadRoute).toBeDefined();
-    expect(lamadRoute?.loadChildren).toBeDefined();
+    expect(lamadRoute).toBeUndefined();
   });
 
   it('should have correct number of routes', () => {
-    expect(routes.length).toBe(14); // home, lamad, community, shefa, identity, account, doorway, avodah, map, auth/callback, resolve, resources, deliver/:slug, and 404 catch-all
+    // home, community, shefa, identity, account, doorway, avodah,
+    // auth/callback, deliver/:slug, resource/:resourceId, map, resolve,
+    // and 404 catch-all
+    expect(routes.length).toBe(13);
   });
 
   it('should have an auth callback route for OAuth', () => {
