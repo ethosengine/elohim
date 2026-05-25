@@ -646,4 +646,23 @@ mod operator_helper_tests {
             "unexpected error: {err}"
         );
     }
+
+    #[test]
+    fn validator_accepts_root_url_path() {
+        // "/" is the legal landing-EPR url path — rule 4 special-cases it.
+        let mut input = make_project_epr_input_for_test("commons", None, vec![], false, None);
+        input.url_path = "/".into();
+        assert!(validate_project_epr_commitment(&input).is_ok());
+    }
+
+    #[test]
+    fn validator_rejects_url_path_with_trailing_slash() {
+        let mut input = make_project_epr_input_for_test("commons", None, vec![], false, None);
+        input.url_path = "/lamad/".into();
+        let err = validate_project_epr_commitment(&input).expect_err("should reject");
+        assert!(
+            err.to_string().contains("trailing slash"),
+            "unexpected error: {err}"
+        );
+    }
 }
