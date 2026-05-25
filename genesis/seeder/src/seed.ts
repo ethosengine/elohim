@@ -42,6 +42,8 @@ import type { ContentFormat, ContentType, Reach } from './generated/schema-enums
 import type { CreateContentInput } from './generated/create-content-input.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
 import { applyPathThumbnail } from './path-thumbnail.js';
+import { seedOperatorBindings, defaultM5Bindings, createOperatorBindingClient } from './seed-operator-bindings.js';
+import { seedProjections, defaultProjectionSeeds, createProjectionClient } from './seed-projections.js';
 // ========================================
 // PERFORMANCE TIMING UTILITIES
 // ========================================
@@ -2081,6 +2083,26 @@ async function seed() {
     // Even without verification, warn if doorway reported failures
     console.warn(`\n⚠️ Seeding completed with issues: ${seedResult.contentSucceeded}/${seedResult.contentAttempted} content items succeeded`);
   }
+
+  // ========================================
+  // EPR OPERATOR BINDINGS
+  // Must run before projections — operator must exist as steward of record
+  // before projection commitments cite them.
+  // ========================================
+  console.log('\n=== Seeding Doorway-Operator Bindings ===');
+  await seedOperatorBindings(
+    createOperatorBindingClient(DOORWAY_URL!, DOORWAY_API_KEY),
+    defaultM5Bindings(),
+  );
+
+  // ========================================
+  // EPR PROJECTIONS
+  // ========================================
+  console.log('\n=== Seeding EPR Projections ===');
+  await seedProjections(
+    createProjectionClient(DOORWAY_URL!, DOORWAY_API_KEY),
+    defaultProjectionSeeds(),
+  );
 
   // Trigger projection cache warm-up so doorway serves freshly seeded content
   // without requiring a restart. The endpoint returns 202 and warms in background.

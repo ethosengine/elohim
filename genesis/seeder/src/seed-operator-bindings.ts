@@ -114,7 +114,7 @@ export function buildOperatorCommitmentBody(binding: OperatorBinding): Commitmen
 // operator binding is per-doorway but the human is the same.
 // =============================================================================
 
-function defaultM5Bindings(): OperatorBinding[] {
+export function defaultM5Bindings(): OperatorBinding[] {
   return [
     {
       operatorHumanId: 'human-matthew-manager',
@@ -147,6 +147,17 @@ class OperatorBindingClient extends DoorwayClient {
       body: JSON.stringify(body),
     });
   }
+}
+
+/**
+ * Factory — lets callers in seed.ts (or integration tests) construct an
+ * OperatorBindingClient without importing the private class directly.
+ */
+export function createOperatorBindingClient(
+  baseUrl: string,
+  apiKey?: string,
+): OperatorBindingClient {
+  return new OperatorBindingClient({ baseUrl, apiKey });
 }
 
 // =============================================================================

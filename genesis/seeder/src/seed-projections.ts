@@ -214,6 +214,14 @@ class ProjectionClient extends DoorwayClient {
   }
 }
 
+/**
+ * Factory — lets callers in seed.ts (or integration tests) construct a
+ * ProjectionClient without importing the private class directly.
+ */
+export function createProjectionClient(baseUrl: string, apiKey?: string): ProjectionClient {
+  return new ProjectionClient({ baseUrl, apiKey });
+}
+
 // =============================================================================
 // Seeding (fail-fast on non-409 errors)
 // =============================================================================
