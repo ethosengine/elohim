@@ -1015,6 +1015,281 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-epr-link.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-epr-link> — the protocol's HyperCard navigation primitive.\n\nProgressive loading (L1–L4): renders a sized skeleton instantly, fills\nin title/metadata as Loader resolves, falls back to preview if the\ntarget is unreachable.\n\nDefault click: emits 'navigate' with the EPR ref. Parent decides what\nto do (card-flip in place, or hard nav, depending on display variant).\n\nRight-click: opens <elohim-context-menu> with MVP items (Open / About\nthis EPR / Copy EPR link). Submenu items (View as..., Where this\nleads...) deferred per spec §7.4.\n\nResolution is decoupled from the loader: production wiring injects a\nresolver function via the `.resolver` property. For tests / Storybook,\ndirect manipulation of internal state (via `setResolution()`) is the\nsupported test seam.",
+          "name": "ElohimEprLink",
+          "cssProperties": [
+            {
+              "description": "Override chip border color",
+              "name": "--elohim-link-border"
+            },
+            {
+              "description": "Override hover background",
+              "name": "--elohim-link-hover-bg"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The L1 skeleton placeholder",
+              "name": "skeleton"
+            },
+            {
+              "description": "The interactive chip/button rendered at L2/L3",
+              "name": "anchor"
+            },
+            {
+              "description": "The <elohim-mention-base> rendered at L4 (unreachable)",
+              "name": "fallback"
+            },
+            {
+              "description": "The <elohim-context-menu>",
+              "name": "menu"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "epr",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The epr:... reference",
+              "attribute": "epr"
+            },
+            {
+              "kind": "field",
+              "name": "display",
+              "type": {
+                "text": "EprLinkDisplay"
+              },
+              "default": "'inline'",
+              "description": "Visual variant (inline | chip | card | popover)",
+              "attribute": "display"
+            },
+            {
+              "kind": "field",
+              "name": "resolver",
+              "type": {
+                "text": "Function | null"
+              },
+              "default": "null",
+              "description": "Optional async resolver injected at bundle level"
+            },
+            {
+              "kind": "field",
+              "name": "loadLevel",
+              "type": {
+                "text": "EprLinkLoadLevel"
+              },
+              "privacy": "private",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "resolution",
+              "type": {
+                "text": "EprLinkResolution"
+              },
+              "privacy": "private",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "menuOpen",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "menuItems",
+              "type": {
+                "text": "ContextMenuItem[]"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "default": "[ { id: 'open', label: 'Open' }, { id: 'about', label: 'About this EPR' }, { id: 'copy', label: 'Copy EPR link' }, ]"
+            },
+            {
+              "kind": "method",
+              "name": "setResolution",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "level",
+                  "type": {
+                    "text": "EprLinkLoadLevel"
+                  }
+                },
+                {
+                  "name": "resolution",
+                  "type": {
+                    "text": "EprLinkResolution"
+                  }
+                }
+              ],
+              "description": "Test seam — directly set resolution state without going through the\nasync resolver. Tests and Storybook use this to exercise all load levels\nwithout needing a real network layer."
+            },
+            {
+              "kind": "method",
+              "name": "renderContextMenu",
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "handleClick",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "handleContextMenu",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "handleKeydown",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "handleMenuSelect",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "handleMenuClose",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "dispatchNavigate",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "description": "Default resolution flow:\n- Without a `resolver`, we transition to L2 with empty resolution\n  (just exposes the EPR id as-is). Tests use `setResolution()`\n  to advance through levels.\n- With a `resolver`, we call it and advance to L3 on success,\n  or L4 with `unreachable: true` on null / rejection."
+            }
+          ],
+          "events": [
+            {
+              "name": "navigate",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { epr: string } } on default-click activation"
+            },
+            {
+              "description": "{ detail: { epr: string } } when \"About this EPR\" is selected",
+              "name": "about"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "epr",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "The epr:... reference",
+              "fieldName": "epr"
+            },
+            {
+              "name": "display",
+              "type": {
+                "text": "EprLinkDisplay"
+              },
+              "default": "'inline'",
+              "description": "Visual variant (inline | chip | card | popover)",
+              "fieldName": "display"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-epr-link",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "designed",
+              "error": "designed",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "designed",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimEprLink",
+          "declaration": {
+            "name": "ElohimEprLink",
+            "module": "src/elohim-epr-link.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-mention-base.ts",
       "declarations": [
         {
@@ -1552,6 +1827,38 @@
         },
         {
           "kind": "js",
+          "name": "ElohimEprLink",
+          "declaration": {
+            "name": "ElohimEprLink",
+            "module": "./elohim-epr-link.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprLinkDisplay",
+          "declaration": {
+            "name": "EprLinkDisplay",
+            "module": "./elohim-epr-link.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprLinkLoadLevel",
+          "declaration": {
+            "name": "EprLinkLoadLevel",
+            "module": "./elohim-epr-link.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprLinkResolution",
+          "declaration": {
+            "name": "EprLinkResolution",
+            "module": "./elohim-epr-link.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "*",
           "declaration": {
             "name": "*",
@@ -1699,6 +2006,14 @@
           "declaration": {
             "name": "ElohimContextMenu",
             "module": "/src/elohim-context-menu.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-epr-link",
+          "declaration": {
+            "name": "ElohimEprLink",
+            "module": "/src/elohim-epr-link.js"
           }
         }
       ]
@@ -2068,130 +2383,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/session/session.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Session",
-          "members": [
-            {
-              "kind": "field",
-              "name": "_currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "privacy": "private",
-              "default": "null"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "isAuthenticated",
-              "type": {
-                "text": "boolean"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "refreshFromCookies",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to session changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "readCookie",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "string | null"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "name",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "shallowEquals",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "boolean"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "a",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                },
-                {
-                  "name": "b",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Session",
-          "declaration": {
-            "name": "Session",
-            "module": "src/session/session.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/testing/a11y.ts",
       "declarations": [
         {
@@ -2551,6 +2742,130 @@
           "declaration": {
             "name": "Loader",
             "module": "src/loader/loader.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/session/session.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Session",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "isAuthenticated",
+              "type": {
+                "text": "boolean"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "refreshFromCookies",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to session changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "readCookie",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string | null"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "name",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "shallowEquals",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "boolean"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                },
+                {
+                  "name": "b",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Session",
+          "declaration": {
+            "name": "Session",
+            "module": "src/session/session.ts"
           }
         }
       ]

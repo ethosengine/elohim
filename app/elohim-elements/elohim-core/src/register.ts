@@ -5,6 +5,7 @@ import { ElohimMentionBase } from './elohim-mention-base.js';
 import { ElohimPageChrome } from './elohim-page-chrome.js';
 import { ElohimDefaultOmnibar } from './elohim-default-omnibar.js';
 import { ElohimContextMenu } from './elohim-context-menu.js';
+import { ElohimEprLink } from './elohim-epr-link.js';
 
 // Registration lives here, not on the ElohimButton class via @customElement,
 // to keep ./index.ts truly side-effect-free. Importing from 'elohim-core'
@@ -47,4 +48,8 @@ if (!customElements.get('elohim-default-omnibar')) {
 
 if (!customElements.get('elohim-context-menu')) {
   customElements.define('elohim-context-menu', ElohimContextMenu);
+}
+
+if (!customElements.get('elohim-epr-link')) {
+  customElements.define('elohim-epr-link', ElohimEprLink);
 }
