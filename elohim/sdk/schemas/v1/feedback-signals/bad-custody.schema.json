@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:feedback-signal/bad-custody",
+  "title": "BadCustodyFeedbackSignal",
+  "description": "FeedbackSignal kind emitted when an agent's signing key is detected in a non-witnessable secret store (e.g., plaintext repo file). Source of truth: Holochain DHT (elohim zome's existing FeedbackSignal entry type via signal_kind vocabulary; no new DHT entry type). Canon: genesis/docs/architecture/stewardship-over-sovereignty.md §4 (cryptography as accelerator, not gate; substrate-minimum is 'witnessable secret store').",
+  "type": "object",
+  "required": ["signal_kind", "target", "declarer", "evidence", "signed_at"],
+  "additionalProperties": false,
+  "properties": {
+    "signal_kind": {
+      "type": "string",
+      "const": "bad-custody"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the agent whose key custody is suspect."
+    },
+    "declarer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the observer that detected the bad custody (typically a steward, the operator's elohim-counsel, or a network witness)."
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["custody_kind"],
+      "additionalProperties": true,
+      "properties": {
+        "custody_kind": {
+          "type": "string",
+          "enum": [
+            "plaintext-repo-file",
+            "unencrypted-disk",
+            "shared-secret",
+            "expired-rotation",
+            "other"
+          ]
+        },
+        "evidence_url": {
+          "type": "string",
+          "description": "Optional URL pointing at the evidence (a public commit, a config file path, etc.). Always public so the breach is auditable."
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warn", "critical"],
+      "default": "warn"
+    },
+    "signed_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

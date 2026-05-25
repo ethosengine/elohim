@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:acknowledges-reach-change",
+  "title": "AcknowledgesReachChangeCommitment",
+  "description": "Payload shape for a Mishpat::Commitment entry with action='acknowledges-reach-change'. The operator-steward's signed acknowledgement that a republished EprHead's new reach value is intentional, releasing the doorway projection from the soft-warn pause. Source of truth: Holochain DHT (Mishpat zome, existing Commitment entry type with new action discriminator). Canon: genesis/docs/architecture/stewardship-over-sovereignty.md §6 rule 3. Spec: Z.D §3 soft-warn ceremony.",
+  "type": "object",
+  "required": [
+    "action",
+    "acknowledger",
+    "target_epr_cid",
+    "new_reach",
+    "signed_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "type": "string",
+      "const": "acknowledges-reach-change",
+      "description": "Action discriminator. Fixed."
+    },
+    "acknowledger": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the operator-steward acknowledging. Mishpat coordinator validates that the acknowledger holds the project-epr Commitment for the target EPR."
+    },
+    "target_epr_cid": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID of the new EprHead that triggered the soft-warn pause."
+    },
+    "new_reach": {
+      "type": "string",
+      "enum": [
+        "private",
+        "self",
+        "intimate",
+        "trusted",
+        "familiar",
+        "community",
+        "public",
+        "commons"
+      ],
+      "description": "The reach value the acknowledger is consenting to. Must match the new EprHead's envelope.reach exactly — Mishpat coordinator rejects mismatches as evidence of confusion or tampering."
+    },
+    "signed_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 8601 datetime when the acknowledgement was signed."
+    }
+  }
+}

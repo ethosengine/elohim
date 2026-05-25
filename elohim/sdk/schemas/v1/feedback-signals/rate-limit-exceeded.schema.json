@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:feedback-signal/rate-limit-exceeded",
+  "title": "RateLimitExceededFeedbackSignal",
+  "description": "FeedbackSignal kind emitted when an agent attempts to emit an in-scope EconomicEvent that would exceed the rate_per_hour bound of its delegates-compute Commitment. Source of truth: Holochain DHT (elohim zome's existing FeedbackSignal entry type — extending via signal_kind vocabulary per project_signal_kind_extensible_protocol_class; no new DHT entry type). Canon: genesis/docs/architecture/rea-compute-commitment-primitive.md §3 reciprocity.",
+  "type": "object",
+  "required": ["signal_kind", "target", "declarer", "evidence", "signed_at"],
+  "additionalProperties": false,
+  "properties": {
+    "signal_kind": {
+      "type": "string",
+      "const": "rate-limit-exceeded"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the agent whose rate was exceeded. For Z.D this is the deploy-svc-agent."
+    },
+    "declarer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the agent (typically storage validator or operator's elohim-counsel) that declared the breach."
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["bounded_by", "rate_per_hour", "recent_count"],
+      "additionalProperties": true,
+      "properties": {
+        "bounded_by": {
+          "type": "string",
+          "description": "CID of the delegates-compute Commitment whose rate bound was exceeded."
+        },
+        "rate_per_hour": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The bound that was breached."
+        },
+        "recent_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Actual count of in-scope events in the trailing hour window at the time of breach."
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warn", "critical"],
+      "default": "warn"
+    },
+    "signed_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

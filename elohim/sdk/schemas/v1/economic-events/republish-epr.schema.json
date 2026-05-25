@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:republish-epr",
+  "title": "RepublishEprEvent",
+  "description": "Payload shape for an EconomicEvent with action='republish-epr'. Emitted on every substrate-correct deploy of an EPR bundle. The event back-references its bounding delegates-compute Commitment via bounded_by. Source of truth: Holochain DHT (EPR substrate via FederatedEprStore + Kad StartProviding; projected to elohim-storage 'economic_events' SQLite table). Canon: genesis/docs/architecture/rea-compute-commitment-primitive.md. Spec: genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md §2.",
+  "type": "object",
+  "required": [
+    "action",
+    "performer",
+    "bounded_by",
+    "target",
+    "payload",
+    "signed_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "type": "string",
+      "const": "republish-epr",
+      "description": "Action discriminator. Fixed at 'republish-epr'."
+    },
+    "performer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the agent emitting this event. For Z.D this is the deploy-svc-agent."
+    },
+    "bounded_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID of the delegates-compute Commitment authorizing this event. The substrate's bounds validator walks this back-reference to verify standing, scope, reach ceiling, and rate limit. ALWAYS required — anonymous publish has no place in this substrate (canon §6 rule 2)."
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID of the new EprHead being published."
+    },
+    "supersedes": {
+      "type": ["string", "null"],
+      "description": "CID of the previous EprHead being superseded, or null for first-publish of a new EPR. First-publish still requires bounded_by — anonymous publish is forbidden."
+    },
+    "payload": {
+      "type": "object",
+      "required": ["blob_cid", "epr_kind", "reach"],
+      "additionalProperties": true,
+      "properties": {
+        "blob_cid": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CID of the new blob bytes (sha256 multihash + dag-cbor codec 0x71 per elohim/epr/src/cid.rs convention)."
+        },
+        "epr_kind": {
+          "type": "string",
+          "enum": [
+            "Content",
+            "Agent",
+            "Manifest",
+            "Claim",
+            "Observation",
+            "EconomicEvent",
+            "Commitment",
+            "Attestation",
+            "Delegation",
+            "FeedbackSignal"
+          ],
+          "description": "The EprKind enum value for the new EprHead. For bundle deploys this is 'Content'."
+        },
+        "reach": {
+          "type": "string",
+          "enum": [
+            "private",
+            "self",
+            "intimate",
+            "trusted",
+            "familiar",
+            "community",
+            "public",
+            "commons"
+          ],
+          "description": "Reach value declared by the new EprHead's envelope. Substrate validator checks this against the bounding Commitment's reach_ceiling."
+        },
+        "bundle_path": {
+          "type": "string",
+          "description": "Optional human-readable bundle identifier (e.g. 'lamad-spa'). For audit clarity only; substrate logic uses target CID."
+        }
+      }
+    },
+    "signed_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 8601 datetime when the event was signed. Used for rate-limit sliding-window calculations."
+    }
+  }
+}

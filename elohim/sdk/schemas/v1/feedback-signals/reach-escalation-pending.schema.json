@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:feedback-signal/reach-escalation-pending",
+  "title": "ReachEscalationPendingFeedbackSignal",
+  "description": "FeedbackSignal kind emitted by doorway when a republished EprHead carries a reach value above its projection's existing reach. The doorway pauses serving the projection until an acknowledges-reach-change Commitment is published. Source of truth: Holochain DHT (elohim zome's existing FeedbackSignal entry type via signal_kind vocabulary; no new DHT entry type). Canon: genesis/docs/architecture/stewardship-over-sovereignty.md §6 rule 3. Spec: Z.D §3 soft-warn ceremony.",
+  "type": "object",
+  "required": ["signal_kind", "target", "declarer", "evidence", "signed_at"],
+  "additionalProperties": false,
+  "properties": {
+    "signal_kind": {
+      "type": "string",
+      "const": "reach-escalation-pending"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID of the new EprHead whose reach exceeds the existing projection."
+    },
+    "declarer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Agent identifier of the doorway service-agent that paused the projection."
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["old_reach", "new_reach", "projection_commitment"],
+      "additionalProperties": true,
+      "properties": {
+        "old_reach": {
+          "type": "string",
+          "enum": [
+            "private",
+            "self",
+            "intimate",
+            "trusted",
+            "familiar",
+            "community",
+            "public",
+            "commons"
+          ]
+        },
+        "new_reach": {
+          "type": "string",
+          "enum": [
+            "private",
+            "self",
+            "intimate",
+            "trusted",
+            "familiar",
+            "community",
+            "public",
+            "commons"
+          ]
+        },
+        "projection_commitment": {
+          "type": "string",
+          "description": "CID of the project-epr Commitment whose projection is paused."
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warn", "critical"],
+      "default": "warn"
+    },
+    "signed_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
