@@ -1512,19 +1512,194 @@ WHERE ed.parent_epr_cid = :inventory_cid;
 
 ---
 
-### D.2 Surface (re-elevation) operation (Gap 3)
+### D.2 Surface (Re-elevation) Operation (Gap 3) — Wave C
+
+**Motivation.** The resell-the-couch case — a Resource that's been demoted to subordinate or shelved needs a path back to active EPR-tier status. Without it, the lifecycle gradient is a one-way trapdoor: every shelved Resource is permanently lost from active flow. The household's economic legibility breaks: "we sold the couch we put away" can't be represented; the protocol effectively erases re-use, repurposing, and gift-economy patterns that are everyday occurrences at household scale.
+
+**Design — event-sourced state machine (C-1 resolution).** The lifecycle state is **never stored on the entry**; it's derived from event history. Holochain entries are immutable; the substrate honors that by tracking state transitions via Events rather than mutating entries.
+
+```rust
+// elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+
+surface_resource(resource_cid: Cid, new_parent_epr_cid: Option<Cid>, reach_target: Option<Reach>)
+  // 1. Read current lifecycle_state from projection (latest of: active | subordinate | shelved | closed)
+  //    Validates: state must be in { subordinate, shelved } (closed Resources need revive, not surface)
+  // 2. Author Event(action="surface", subject_cid=resource_cid, new_parent=..., new_reach=...)
+  // 3. ReconcileController consumes the Event, updates projection's lifecycle_state to "active"
+  //    + updates parent_epr_cid in epr_resource_edges (D.1 adjacency table)
+  //    + updates reach scope per new_reach (D.9 reach-mutation interlock)
+  // 4. The DHT entry's CID is unchanged; identity is preserved across surface
+```
+
+The Resource's CID survives across surface because the entry itself doesn't change. What changes is the projection's view of its current state, derived from the accumulated event history. This is event-sourcing all the way: state lives in the event stream, not on the entry.
+
+**C-2 resolution — stake-class-tiered authorship authority.** Authority scales with the reach the surface produces:
+
+| Surface reach | Authority required |
+|---|---|
+| `household` (kid takes couch from family inventory) | Current custodian's Membership OR a stewardship-elohim under stewardship-commitment Attestation authored by the custodian |
+| `community` (list couch for sale within a collective) | Custodian + at least one peer-witness Attestation from another Membership in the receiving community |
+| `commons` / `commons-attested` (donate to public commons; sell broadly) | Mishpat-governance attestation chain (M-of-N council quorum per `2026-05-11-attestation-consolidation-design.md` §3.4) |
+
+Validation runs in the integrity zome:
+
+```
+validate_surface_event(event, action) {
+  let target_reach = event.new_reach.unwrap_or(current_reach_from_projection(event.subject_cid));
+  match target_reach {
+    Reach::Household | Reach::AgentPrivate => require_custodian_or_stewardship_elohim(),
+    Reach::Community | Reach::Collective => require_custodian + peer_witness_attestation(),
+    Reach::Commons | Reach::CommonsAttested => require_mishpat_governance_chain(M_of_N),
+  }
+}
+```
+
+The substrate-floor invariant: surface authorship cannot exceed the authority chain its target reach demands. Authority scales with visibility; the higher the reach the surface produces, the more witnesses are required to authorize it.
+
+**Custody transfer.** Surface may include a `new_parent_epr_cid`:
+- `None` → Resource becomes "free" (no parent custody); rare; usually only for transition-out-of-substrate cases
+- `Some(new_parent_cid)` → custody transfers to the new parent. The `epr_resource_edges` adjacency table (D.1) updates: the prior parent-child edge is closed; the new parent-child edge is created. Both edges remain in event history; only the current-state projection shows the new parent.
+
+**Couch-resell flow (canonical example).**
+
+```
+Year 1: household buys couch
+   Event(action="receive", provider=furniture-store, receiver=household,
+         resource=Couch, parent_epr_cid=household-inventory-cid)
+   → Resource Couch created at lifecycle_state="active"
+
+Year 5: couch put in cold archive (used less)
+   Commitment(action="custody-quilt", tier_floor="shelved", subject_cid=couch-cid)
+   → ReconcileController fans out: lifecycle_state="shelved"; couch bytes
+     move to peer-cellar quilt storage
+
+Year 7: kid moves out, wants couch
+   Event(action="surface", subject_cid=couch-cid,
+         new_parent_epr_cid=kid-household-inventory-cid,
+         new_reach="household")
+   → Validation: custodian (parent) authors; kid-household-reach is household-scope
+     → authority satisfied
+   → ReconcileController: lifecycle_state="active"; epr_resource_edges row
+     created for kid-household-inventory → couch
+   → Couch's CID is the same as Year 1 — full provenance chain preserved
+```
+
+The Couch Resource entity's CID is constant across 7 years and three lifecycle states. Its full event history is queryable from any peer that can resolve its CID. Anyone interested in the couch's history can audit-verify the entire chain.
+
+**Manifest declaration.** `action: "surface"` in elohim pillar manifest with stake_class declarations per the reach-tiered authority model:
+
+```jsonc
+// elohim/sdk/domains/elohim/manifest.json
+{
+  "vocabulary_declarations": {
+    "action_verbs": [
+      {
+        "verb": "surface",
+        "stake_class_by_target_reach": {
+          "household": "high",
+          "agent-private": "high",
+          "community": "high",
+          "collective": "high",
+          "commons": "governance-quorum",
+          "commons-attested": "governance-quorum"
+        },
+        "validates_against": ["lifecycle_state in {subordinate, shelved}", "authorship per reach-tier"]
+      }
+    ]
+  }
+}
+```
+
+D.10's vocabulary governance gate validates the action verb is declared; the integrity zome enforces the per-reach authority model at write time.
 
 **Touches:**
-- `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — new coordinator function `surface_resource(resource_cid, new_parent_epr_cid)` that authors the surface Event + updates custody
-- `elohim/sdk/domains/elohim/manifest.json` — declare `action: "surface"` verb with stake-class
-- Validation: integrity zome validates that surface authorship comes from current custodian or elohim-with-stewardship-commitment
+- `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — new coordinator function `surface_resource`
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — add `"surface"` to `REA_ACTIONS` (per D.10); validation rules enforcing reach-tiered authority
+- `elohim/elohim-storage/src/services/reconcile_controller.rs` — consume `Event(action="surface")`, update `lifecycle_state` projection + `epr_resource_edges` adjacency (D.1 interlock) + reach scope (D.9 interlock)
+- `elohim/sdk/domains/elohim/manifest.json` — declare `surface` action verb + per-reach stake_class model
+- D.1 interlock — surface updates parent_epr_cid in `epr_resource_edges`
+- D.7 interlock — closed Resources cannot be surfaced (must `revive` first per D.7)
+- D.9 interlock — surface may include `new_reach` parameter; per-reach authority validation matches D.9's reach-mutation Events
+- D.20 interlock — surface to `commons` / `commons-attested` reach engages the Global Commons elohim-council attestation chain
 
-### D.3 Submerge canonical signal reconciliation (Gap 4)
+---
+
+### D.3 Submerge Canonical Signal Reconciliation (Gap 4) — Wave C
+
+**Motivation.** Phase 1 A.5 surfaced that the substrate has two parallel vocabularies for "moved from active to cold archive": `submerge` (per `2026-05-10-memory-lifecycle-design.md` — for content / context / scenarios) and `quilt-demoted` (per `2026-05-11-tiered-quilt-stewardship-design.md` — for blob storage tier transitions). They describe the same lifecycle move from different angles. Without reconciliation, the substrate has two operations authoring the same substrate state, with drift-risk at every junction.
+
+**Design — single canonical authoring event with downstream projection fan-out.**
+
+The canonical authoring form is a Commitment:
+
+```rust
+Commitment {
+    action: "custody-quilt",
+    subject_cid: <epr_or_resource_cid>,
+    resource_classified_as_json: serde_json::json!([
+        "custody-shelf",
+        {
+            "tier_floor": "shelved",
+            "shelf_destination": "<URI>",
+            "diversity_role": "<optional>",
+            "covered_window": { "period_start": ..., "period_end": ... }
+        }
+    ]).to_string(),
+    state: "accepted",
+    primary_accountable: <authoring_elohim_or_human>,
+    // ... standard Commitment fields ...
+}
+```
+
+When this Commitment lands on DHT, the ReconcileController fans out:
+
+1. **memory-lifecycle effect**: project as `submerge` lifecycle operation in the memory subsystem (covered entries get `lifecycle_state="shelved"`, queryable but not actively maintained)
+2. **tiered-quilt effect**: project as `quilt-demoted` storage-tier transition (bytes move from peer-cellar warm tier to shelved cold-archive destination per `shelf_destination` URI)
+3. **records-lifecycle effect**: `lifecycle_state` projection set to `"shelved"` for the subject EPR/Resource (D.7 interlock — closed-state cannot be reached via custody-quilt; closure is `Event(action="dispose")` per D.7)
+4. **signal-aggregate interaction (D.12 interlock)**: when paired with `Commitment(action="aggregate-subordinate")` from D.12, this Commitment IS the authority that permits the aggregated signals to move to cold archive
+
+**Both upstream specs gain amendment notes** pointing here:
+- `2026-05-10-memory-lifecycle-design.md` — `submerge` is the downstream effect; the authoring event is `Commitment(action="custody-quilt", tier_floor="shelved")` per D.3
+- `2026-05-11-tiered-quilt-stewardship-design.md` — `quilt-demoted` is the downstream effect; same canonical authoring event
+
+The two prior vocabularies become aliases for projection effects of one substrate event.
+
+**C-3 resolution — shelf_destination vocabulary expansion.** The original tiered-quilt schema's `shelf_destination` covered only infrastructure URIs (`peer-cellar://household/H`, `external-archive://minio/`). Memory-lifecycle named seven socio-institutional destinations that the schema doesn't cover. Extending the existing enum with URI-scheme namespacing captures both classes in one field:
+
+```
+shelf_destination URI schemes:
+  Infrastructure (existing):
+    peer-cellar://<custody-collective>/<custodian-id>
+    external-archive://<external-system>/<bucket>
+    quilt://<quilt-network>/<storage-pool>
+
+  Socio-institutional (new — per memory-lifecycle's 7 destinations):
+    therapist-collective://<licensed-collective-cid>/<session-cid>
+    research-observatory://<observatory-collective-cid>/<study-cid>
+    gov-evidence-store://<jurisdiction>/<case-cid>
+    cultural-archive://<archive-collective-cid>/<collection>
+    lineage-archive://<lineage-collective-cid>/<generation>
+    subconscious://<agent-cid>                            (personal subconscious — agent-private)
+    peer-cellar://<custody-collective>/<custodian-id>     (alias as community subconscious)
+```
+
+Each URI scheme has manifest-declared validation rules: which collective archetypes can be addressed; whose stewardship-commitment is required to author a Commitment with that destination; what reach scope the destination is observable at.
+
+Substrate-floor invariant: a custody-quilt Commitment with `shelf_destination` scheme `therapist-collective://` must be authored by a human with active Membership in a licensed therapist-collective (validated at integrity zome via Membership-attestation chain). Other socio-institutional schemes have analogous integrity constraints.
+
+**Cancellation flow (Phase 1 A.5 addendum).** A custody-quilt Commitment is `accepted` at authoring; cancellation moves to `cancelled` state. The unresolved questions Phase 1 raised:
+
+- **Who can author cancellation?** Either party (the authoring elohim/human OR the custody-receiving collective's steward) can author a `cancel-commitment` Event. Mishpat governance for high-reach Commitments.
+- **In-progress fulfillment Events?** If the custody-quilt window is active (covered_window in progress) and a cancellation lands, in-progress signals revert to active DHT state until next custody-quilt Commitment lands.
+- **Custody-quilt handoff?** Cancellation of a custody-quilt Commitment optionally triggers a handoff Commitment to another steward, declared via `cancel_handoff: Some(new_steward_cid)`. If `None`, the bytes revert to peer-cellar warm tier and the source CID re-enters active gossip.
 
 **Touches:**
-- `elohim/elohim-storage/src/services/reconcile_controller.rs` (planned) — project `Commitment(action="custody-quilt", tier_floor=shelved)` into both `memory-lifecycle/submerge` and `tiered-quilt/quilt-demoted` downstream effects
-- `elohim/sdk/domains/elohim/manifest.json` — canonical `custody-quilt` action verb with `tier_floor` parameter
-- Retire parallel vocabularies in `2026-05-10-memory-lifecycle-design.md` and `2026-05-11-tiered-quilt-stewardship-design.md` (those specs get amendment notes pointing here)
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — `REA_ACTIONS` include `custody-quilt` (canonical) + `cancel-commitment` (cancellation flow); validation rules enforcing per-`shelf_destination`-scheme integrity constraints
+- `elohim/elohim-storage/src/services/reconcile_controller.rs` — fan-out projection: project `Commitment(action="custody-quilt", tier_floor=shelved)` into memory-lifecycle submerge + tiered-quilt quilt-demoted + records-lifecycle lifecycle_state + (if D.12 aggregate-subordinate paired) signal-aggregate state update
+- `elohim/sdk/schemas/v1/views/commitment-view.schema.json` — extend `shelf_destination` URI-scheme namespace to cover socio-institutional destinations
+- `elohim/sdk/domains/{mishpat,imagodei,lamad,shefa}/manifest.json` — declare per-scheme validation rules + which collective archetypes can be addressed under each scheme
+- `2026-05-10-memory-lifecycle-design.md` — amendment note: `submerge` is downstream of D.3 canonical authoring event
+- `2026-05-11-tiered-quilt-stewardship-design.md` — amendment note: `quilt-demoted` is downstream of D.3 canonical authoring event
 
 ### D.4 EconomicResource Consolidation (Gap 5) — Wave B
 
@@ -1667,13 +1842,118 @@ Steps 1-2 are blocking prerequisites; step 4 cannot land before they're green.
 - `elohim/elohim-storage/src/services/graduation_evaluator.rs` (extend) — per-pillar tokio tasks that the elohim-agents drive
 - `elohim/sdk/domains/*/manifest.json` — declare which elohim-agent watches which observation_kinds + handles which graduation policies
 
-### D.7 Dissolution semantics (Gap 8)
+### D.7 Dissolution Semantics (Gap 8) — Wave C
+
+**Motivation.** When something gets thrown away, that's a substrate event. Without explicit dissolution semantics, the substrate has no clean way to express end-of-life for a Resource or EPR — the lifecycle gradient stops at "shelved" (cold archive) and never reaches "closed" (terminal). This produces three downstream pathologies:
+
+- A disposed couch keeps appearing in current inventory views because no event marks its termination
+- Closed bank accounts continue to be queried as live, producing nonsense balance estimates
+- BreachScanner flags custody-quilt Commitments against CIDs that no longer have active state, generating false-positive `tier-breach` Attestations
+
+Per operator direction, this subsection closes the **implementation loop** — concrete dissolution mechanics for everyday end-of-life. The broader cradle-to-cradle philosophy (designing the disposition with the original creation in mind; ensuring every birth knows what the end looks like) is a separate design session noted in `defers:` and not within D.7's scope.
+
+**Design — close / revive lifecycle.**
+
+```rust
+Event {
+    action: "dispose",  // or "close-account" for account-EPRs; "close-organization" for collectives
+    subject_cid: <resource_or_epr_cid>,
+    provider: <current_custodian>,
+    receiver: <terminal_destination>,  // landfill / recycler / void / etc.
+    resource_quantity_value: <last_recorded_quantity>,
+    metadata_json: serde_json::json!({
+        "disposition_kind": "recycled" | "landfill" | "transferred-to-charity" | "sold-on-resell" | "consumed" | "unspecified",
+        // disposition_kind is the cradle-to-cradle hook (default "unspecified"; manifest declares upgrade path)
+    }).to_string(),
+    // ... standard Event fields ...
+}
+```
+
+When this Event lands, ReconcileController updates the subject's `lifecycle_state` projection to `"closed"`. The Event is permanent record of disposition; the projection's `closed` state is the operational signal that future-Event validation reads.
+
+**Revive (`Event(action="revive")`).** A misfire or accidental disposal can be reversed via `Event(action="revive", subject_cid=...)`. Authority for revive is the same as the original dispose (`provider` of the dispose Event, or mishpat governance). Revive transitions `lifecycle_state` from `closed` back to `active` (or to whichever state the projection's most recent non-disposal Event would have produced). Used for: undoing accidental disposals; restoring a closed account that was wrongly classified.
+
+**Field projection (derived, not stored).**
+
+```rust
+pub enum LifecycleState {
+    Active,        // current, queryable, accepts new Events
+    Subordinate,   // under a parent EPR's custody (D.1); queryable through parent
+    Shelved,       // cold-archive per D.3 custody-quilt
+    Closed,        // terminal — future Events fail validation unless action=revive
+}
+```
+
+`lifecycle_state` is **derived** from event history: the most recent Event whose action transitions state (`receive`/`produce` → active; subordination link create → subordinate; `custody-quilt tier_floor=shelved` → shelved; `dispose`/`close-account` → closed; `revive` → reverts to prior state per event history). This is per C-1 event-sourced state machine discipline.
+
+**Substrate-floor validation invariant.** Integrity zome rejects any new Event whose `subject_cid` resolves to a `closed` Resource/EPR projection, unless the new Event's action is `revive`:
+
+```
+validate_event(event) {
+  let target_state = lifecycle_state_from_projection(event.subject_cid);
+  if target_state == Closed && event.action != "revive" {
+    return Err("cannot author Event against closed subject");
+  }
+}
+```
+
+This invariant is the substrate-floor enforcement of "closed means closed." A disposed Resource cannot accumulate new state; an old bank account cannot receive new transfers. Future Events that would target the closed CID fail at the integrity layer.
+
+**Custody Commitment lifecycle when CID dissolves (Phase 1 A.5 addendum).** When a subject CID transitions to `closed`, any outstanding `custody-quilt` Commitments referencing that CID need to be cleaned up:
+
+```
+ReconcileController.on_dispose_event(event) {
+  let closed_cid = event.subject_cid;
+
+  // 1. Find any outstanding custody-quilt Commitments where subject_cid = closed_cid
+  let outstanding = query_commitments(action="custody-quilt", subject_cid=closed_cid, state="accepted");
+
+  // 2. Author Event(action="cancel-commitment") for each, with reason="subject-disposed"
+  for c in outstanding {
+    author_event(action="cancel-commitment", subject_cid=c.cid, reason="subject-disposed");
+  }
+
+  // 3. BreachScanner now skips closed-CID Commitments (lifecycle_state filter in its query)
+  //    — no false-positive tier-breach Attestations on dissolved content
+}
+```
+
+The interlock between D.7 (dissolution), D.3 (custody-quilt authoring), and the BreachScanner (tiered-quilt enforcement) is bidirectional: dissolution cleans up outstanding Commitments; BreachScanner respects closed-state when iterating its watch list.
+
+**Cradle-to-cradle hook (deferred to later design session).** The `disposition_kind` field on the dispose Event carries the early hook for future cradle-to-cradle accounting (`recycled` flows into recycling-credit Attestations; `transferred-to-charity` flows into community-benefit Resource state; etc.). Defaults to `"unspecified"`; pillar manifests declare valid disposition_kinds per pillar. This is the minimal close-the-loop while preserving forward-compat for the broader cradle-to-cradle work.
+
+**Manifest declaration.** `dispose`, `close-account`, `close-organization`, `revive` action verbs in elohim pillar manifest:
+
+```jsonc
+{
+  "vocabulary_declarations": {
+    "action_verbs": [
+      {"verb": "dispose",          "stake_class": "high", "stake_class_by_target_reach": {"household": "high", "community": "governance-quorum"}},
+      {"verb": "close-account",    "stake_class": "high"},
+      {"verb": "close-organization", "stake_class": "governance-quorum"},
+      {"verb": "revive",           "stake_class": "high", "authority": "matches prior dispose authority"}
+    ]
+  }
+}
+```
+
+D.10's vocabulary governance gate validates these declarations; the integrity zome enforces the per-action authority model.
 
 **Touches:**
-- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — add validation: future Events targeting a closed Resource/EPR fail (substrate-floor invariant)
-- `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — coordinator handles `Event(action="dispose"|"close-account")` and updates Resource/EPR state
-- `elohim/sdk/domains/elohim/manifest.json` — declare `dispose`, `close-account`, `revive` action verbs
-- `elohim/sdk/schemas/v1/views/economic-resource-view.schema.json` — add `lifecycle_state: "active" | "subordinate" | "shelved" | "closed"` field
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — `REA_ACTIONS` add `dispose`, `close-account`, `close-organization`, `revive`; validation invariant: closed Resources/EPRs reject new Events except `revive`
+- `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — coordinator functions handle the dispose/close/revive flows
+- `elohim/elohim-storage/src/services/reconcile_controller.rs` — derive `lifecycle_state` from event history per the C-1 event-sourced state machine discipline; cancel outstanding custody-quilt Commitments on dispose
+- `elohim/sdk/schemas/v1/views/economic-resource-view.schema.json` + `economic-event-view.schema.json` — `lifecycle_state` field derived in view (not entry-side field)
+- `elohim/sdk/domains/elohim/manifest.json` — declare action verbs + per-pillar `disposition_kind` enumerations for the cradle-to-cradle hook
+- D.3 interlock — closed CIDs don't receive new custody-quilt Commitments
+- D.1 interlock — subordination link creation rejected against closed parents
+- D.20 interlock — high-reach dispose Events route through Global Commons elohim-council attestation (commons-reach disposal of public-good Resources needs witness)
+
+---
+
+### D.8 Bridge Pattern for Legacy Systems (Gap 9) — Wave D
+
+> *Drafted in Wave D — see plan task D2. Bridges reframed as substrate-native Collective EPRs per operator's correction; fee mechanics defer to D.20 Layered Commons.*
 
 ### D.8 Bridge pattern for legacy systems (Gap 9)
 
@@ -1683,12 +1963,101 @@ Steps 1-2 are blocking prerequisites; step 4 cannot land before they're green.
 - `elohim/sdk/domains/shefa/manifest.json` (and others) — declare `observation_kind` for each bridge type
 - Stewardship-elohim signing pattern documented; bridges authenticate via stewardship-commitment Attestations
 
-### D.9 Reach-mutation Events (Gap 10)
+### D.9 Reach-Mutation Events (Gap 10) — Wave C
+
+**Motivation.** Reach is the substrate's nervous system — when an EPR or Resource's reach changes, the substrate's visibility, gossip cost, and attestation requirements all shift. Today, reach changes are often implicit side effects of other operations (a Resource listed for sale via marketplace UI; a Post made public via app-side toggle). The audit trail is opaque; "who could see this when?" can't be reliably reconstructed. Three concrete problems:
+
+- **Forensic ambiguity**: A Resource that was at reach=community for a month then narrowed to household can't be replayed precisely. Anyone whose access depended on the prior reach has no record of when it changed.
+- **Compounding-reach attacks**: a malicious agent can systematically widen reach beyond their actual authority by exploiting reach-change paths that don't validate authority — the substrate currently has no per-mutation authority check.
+- **Reach-mutation as first-class event interlocks**: D.1 (subordination), D.2 (surface), D.3 (submerge), D.7 (dissolution), D.20 (Layered Commons) all reference reach-state but have no canonical Event to bind to. Each operation re-derives reach-state from current-state observation rather than from a verifiable event history.
+
+Making reach-mutation a first-class Event closes all three.
+
+**Design — three new action verbs as substrate-floor Events.**
+
+```rust
+Event { action: "grant-reach",      subject_cid: <epr_or_resource>, metadata_json: serde_json::json!({"target_reach": "community", "rationale": "..."}).to_string(), ... }
+Event { action: "revoke-reach",     subject_cid: <epr_or_resource>, metadata_json: serde_json::json!({"target_reach": "household", "rationale": "..."}).to_string(), ... }
+Event { action: "reclassify-reach", subject_cid: <epr_or_resource>, metadata_json: serde_json::json!({"target_reach": "commons-attested", "rationale": "...", "prior_reach": "commons"}).to_string(), ... }
+```
+
+The Event records the transition; the projection updates the current-effective-reach view. **Current reach is derived from event history** (most recent reach-mutation Event for the subject), not stored on the entry — same C-1 event-sourced state machine discipline.
+
+**Validation rules — substrate-floor authority chain.** Reach changes validate against current standing + the per-target-reach authority model from D.2 surface (authority scales with the reach the mutation produces):
+
+```
+validate_reach_mutation_event(event) {
+  let target_reach = event.metadata_json.target_reach;
+  let current_reach = current_effective_reach_from_projection(event.subject_cid);
+  let authoring_standing = standing_score_for_author(event.provider);
+
+  // Substrate-floor: can't grant reach you don't have
+  let max_reach_author_can_grant = author_max_grantable_reach(event.provider);
+  if target_reach > max_reach_author_can_grant {
+    return Err("authoring agent cannot grant reach above their standing");
+  }
+
+  // Per-target-reach authority chain
+  match target_reach {
+    Reach::Household => require_custodian_or_authorized_stewardship_elohim(),
+    Reach::Community | Reach::Collective => require_custodian + peer_witness_attestation(),
+    Reach::Commons => require_mishpat_governance_chain(),
+    Reach::CommonsAttested => require_apex_elohim_council_quorum(),  // D.20 interlock
+  }
+}
+```
+
+**Council-arbitration for `commons` / `commons-attested` elevations.** When a Resource or EPR moves to commons-tier reach (publicly visible across the network), the elohim councils participate in the attestation chain (per `project_elohim_councils_capture_apex`). This is the same mechanism D.20 uses for Global Commons stewardship — reach to commons IS visibility to the protocol-wide layer, which is where the apex-elohim governance lives.
+
+**Audit trail — reach history is a derived view.** A query against `reach_history(subject_cid)` returns the full event-history of reach-mutations for the subject:
+
+```sql
+SELECT
+  e.observed_at,
+  (e.metadata_json::jsonb->>'target_reach') AS new_reach,
+  (e.metadata_json::jsonb->>'prior_reach') AS prior_reach,
+  e.provider AS authoring_agent,
+  e.observation_refs
+FROM economic_events e
+WHERE e.subject_cid = :subject_cid
+  AND e.action IN ('grant-reach', 'revoke-reach', 'reclassify-reach')
+ORDER BY e.observed_at ASC;
+```
+
+The view is queryable by anyone with current reach to the subject. Forensic replay: "who could see this when?" answered deterministically from the audit chain.
+
+**Interlocks with Wave A/B/C gaps.**
+
+- **D.1 (subordination)**: a Resource subordinating under a parent EPR adopts the parent's reach by default. If the subordination needs a different effective reach, a paired `reclassify-reach` Event lands alongside the subordination link.
+- **D.2 (surface)**: surface to a `commons` reach requires the council-arbitration chain; D.2's per-reach authority model uses D.9's reach-mutation Events as the canonical authority record.
+- **D.3 (submerge)**: shelved content has reach behavior governed by the `shelf_destination` URI scheme; reach-mutation Events for shelved content honor the destination's reach semantics.
+- **D.7 (dissolution)**: closed Resources/EPRs reject all reach-mutation Events (closed CIDs cannot have new reach state mutated).
+- **D.20 (Layered Commons)**: reach mutations to commons-tier engage the apex-elohim council attestation; these reach mutations are the trigger that may also produce Signal-Aggregate Commitments (per D.12) — when a post's reach widens and then contracts, its accumulated signals may aggregate-subordinate at the contraction event.
+
+**Manifest declaration.**
+
+```jsonc
+// elohim/sdk/domains/elohim/manifest.json
+{
+  "vocabulary_declarations": {
+    "action_verbs": [
+      {"verb": "grant-reach",       "stake_class": "high"},
+      {"verb": "revoke-reach",      "stake_class": "high"},
+      {"verb": "reclassify-reach",  "stake_class": "high"}
+    ]
+  }
+}
+```
+
+All three have `stake_class: high` — reach mutations are not graduatable from observations; they require direct authoring with explicit authority. D.10's vocabulary governance gate validates the declarations.
 
 **Touches:**
-- `elohim/sdk/domains/elohim/manifest.json` — declare `grant-reach`, `revoke-reach`, `reclassify-reach` action verbs
-- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — validate reach changes against current standing + elohim arbitration
-- `elohim/elohim-storage/src/views.rs` — reach-state derived view for any EPR/Resource (current effective reach + history)
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` — `REA_ACTIONS` add `grant-reach`, `revoke-reach`, `reclassify-reach`; validation rules enforcing per-target-reach authority chain
+- `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` — coordinator handles reach-mutation Events; ReconcileController derives current-effective-reach projection
+- `elohim/elohim-storage/src/views.rs` — `reach_state` derived view (current effective reach + history); used by every primitive that respects reach
+- `elohim/sdk/domains/elohim/manifest.json` — declare action verbs
+- `elohim/sdk/schemas/v1/views/economic-event-view.schema.json` — metadata_json schema for reach-mutation Events (target_reach + rationale fields)
+- D.1, D.2, D.3, D.7, D.20 interlocks (above)
 
 ---
 
