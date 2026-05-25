@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:delegates-compute",
+  "title": "DelegatesComputeCommitment",
+  "description": "Payload shape for a Mishpat::Commitment entry with action='delegates-compute'. The REA compute-commitment primitive instantiated for bounded authority delegation between agents. Source of truth: Holochain DHT (Mishpat zome, existing Commitment entry type — no new entry type needed; action discriminator distinguishes). Canon: genesis/docs/architecture/rea-compute-commitment-primitive.md. First concrete instance: Z.D deploy authority (genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md).",
+  "type": "object",
+  "required": [
+    "action",
+    "scope",
+    "provider",
+    "recipient",
+    "bounds",
+    "valid_from",
+    "valid_until"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "type": "string",
+      "const": "delegates-compute",
+      "description": "Action discriminator. Fixed at 'delegates-compute' for this commitment kind. Other Mishpat commitments use different discriminators (project-epr, acknowledges-reach-change, etc.)."
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The class of EconomicEvent the recipient is authorized to emit. Example: 'republish-epr' for Z.D deploy authority; 'serve-url-projection' for doorway hosting; 'chore-done' for household chore stewardship. See canon §5 generalization table for the full list."
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the provider — the agent granting authority. For Z.D this is the operator's steward (e.g. agent:matthew-steward)."
+    },
+    "recipient": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the recipient — the agent receiving authority. For Z.D this is the per-operator deploy-service-agent."
+    },
+    "bounds": {
+      "type": "object",
+      "description": "Enforceable conditions the substrate validates on every EconomicEvent referencing this Commitment.",
+      "required": [
+        "epr_scope",
+        "reach_ceiling",
+        "rate_per_hour",
+        "rotation_ttl_days"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "epr_scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "List of EPR identifiers the recipient may emit events about. Use ['*'] for an operator's bootstrap commitment that grants authority over all EPRs in the operator's scope (per canon §6 rule on first-publish authority)."
+        },
+        "reach_ceiling": {
+          "type": "string",
+          "description": "Maximum reach value the recipient may publish at. Default and safe value is 'commons'. Reach values above commons (community, public, familiar, trusted, intimate, self, private) require reach_elevation_acknowledged=true on this Commitment — the substrate's hedge against silent reach escalation."
+        },
+        "reach_elevation_acknowledged": {
+          "type": "boolean",
+          "description": "Required true when reach_ceiling is above 'commons' or 'community'. Forces the provider-steward to explicitly acknowledge they are granting elevated authority. See canon §6 rule 3."
+        },
+        "rate_per_hour": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum rate of in-scope EconomicEvents the recipient may emit per hour. Storage validator enforces via sliding-window query."
+        },
+        "rotation_ttl_days": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Key-rotation window in days. After this duration, the provider should rotate the recipient's key and re-issue the Commitment."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reach_ceiling": {
+                "not": {
+                  "enum": ["commons", "community"]
+                }
+              }
+            }
+          },
+          "then": {
+            "required": ["reach_elevation_acknowledged"],
+            "properties": {
+              "reach_elevation_acknowledged": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reciprocity": {
+      "type": "object",
+      "description": "Optional explicit declaration of two-way obligation. Substrate uses default reciprocity if omitted (per canon §3).",
+      "additionalProperties": true,
+      "properties": {
+        "provider_obligations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Provider's obligations to the recipient. Defaults: key-custody, soft-warn-acknowledgement, scheduled-rotation, revocation-on-compromise."
+        },
+        "recipient_obligations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Recipient's obligations to the provider. Defaults: bounded-event-signing, back-reference-commitment, reach-ceiling-enforcement, rotation-compliance."
+        }
+      }
+    },
+    "valid_from": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 8601 datetime when this Commitment becomes effective. Validated by Mishpat integrity validator to be a parseable datetime."
+    },
+    "valid_until": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 8601 datetime when this Commitment expires. Mishpat refuses events with signed_at > valid_until."
+    }
+  }
+}
