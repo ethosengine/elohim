@@ -192,9 +192,13 @@ RUN mkdir -p app/elohim-app/src/assets/fonts && \
 # the elohim-app `prebuild` hook (which fetches fonts, builds wasm, and
 # verifies the sophia submodule — none needed for the server bundle), so
 # we have to build these explicitly. Mirrors the elohim-app pipeline's
-# build order in the root Jenkinsfile (storage-client first, then core).
+# build order in the root Jenkinsfile (storage-client first, then core,
+# then imagodei — imagodei was added by commit 6b6531b1b after the
+# design/peer-oauth-portal refactor added `import 'elohim-imagodei/register'`
+# in auth-callback.component.ts).
 RUN pnpm --filter @elohim/storage-client run build && \
-    pnpm --filter elohim-core run build
+    pnpm --filter elohim-core run build && \
+    pnpm --filter elohim-imagodei run build
 
 # Build the server bundle. We invoke ng directly to bypass the `prebuild`
 # hook. The `postbuild` hook (the Node-shim script) is run explicitly
