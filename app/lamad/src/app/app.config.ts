@@ -4,6 +4,8 @@ import { provideRouter } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 
 import { routes } from './app.routes';
+import { ELOHIM_ENV } from '@elohim/service';
+import { environment } from '../environments/environment';
 
 /**
  * Lamad bundle application config.
@@ -26,5 +28,13 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(),
     provideAnimations(),
+    // ELOHIM_ENV — maps lamad-local environment to the @elohim/service token contract
+    {
+      provide: ELOHIM_ENV,
+      useValue: {
+        production: environment.production,
+        doorwayUrl: environment.client?.doorwayUrl,
+      },
+    },
   ],
 };

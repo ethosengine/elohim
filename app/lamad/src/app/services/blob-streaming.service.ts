@@ -18,7 +18,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { Observable } from 'rxjs';
 
-import { DoorwayClientService } from '@app/elohim/services/doorway-client.service';
+import { DoorwayClientService } from '@elohim/service';
 import { ContentBlob } from '../models/content-node.model';
 
 /**

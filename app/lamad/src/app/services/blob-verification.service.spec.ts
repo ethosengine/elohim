@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError, Observable } from 'rxjs';
 import { BlobVerificationService, BlobVerificationResult } from './blob-verification.service';
-import { DoorwayClientService } from '@app/elohim/services/doorway-client.service';
+import { DoorwayClientService } from '@elohim/service';
 
 /**
  * Mock DoorwayClientService that simulates server verification failure

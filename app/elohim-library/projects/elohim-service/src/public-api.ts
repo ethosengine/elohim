@@ -21,3 +21,18 @@ export { DistributionService } from './distribution/distribution.service';
 export { DistributionBadgeComponent } from './distribution/distribution-badge/distribution-badge.component';
 
 export { ObservationService } from './services/observation.service';
+
+export type { ElohimEnv } from './env/elohim-env';
+export { ELOHIM_ENV } from './env/elohim-env';
+
+export {
+  DoorwayClientService,
+} from './angular/services/doorway-client.service';
+export type {
+  VerifyBlobRequest,
+  VerifyBlobResponse,
+  CustodianInfo,
+  BestCustodianResponse,
+  StreamingVariant,
+  StreamingManifest,
+} from './angular/services/doorway-client.service';

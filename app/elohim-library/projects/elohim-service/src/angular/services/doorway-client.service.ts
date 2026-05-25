@@ -28,18 +28,19 @@
  * - POST /api/blob/verify - Server-side verification
  * - GET /api/custodian/blob/{hash} - Custodian list
  * - GET /api/custodian/blob/{hash}/best - Best custodian URL
+ *
+ * Migrated from elohim-app pillar to @elohim/service (Slice 2.1b).
+ * Environment access via ELOHIM_ENV injection token (Pattern A).
  */
 
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 97.9% (2026-02-24)
-
 import { map, catchError, timeout, retry } from 'rxjs/operators';
 
 import { Observable, throwError } from 'rxjs';
 
-import { environment } from '../../../environments/environment';
+import { ELOHIM_ENV } from '../../env/elohim-env';
 
 /**
  * Blob verification request
@@ -151,10 +152,11 @@ export class DoorwayClientService {
   private maxRetries = 3;
 
   private readonly http = inject(HttpClient);
+  private readonly env = inject(ELOHIM_ENV);
 
   constructor() {
     // Use environment config or default to same origin
-    this.baseUrl = environment.doorwayUrl ?? '';
+    this.baseUrl = this.env.doorwayUrl ?? '';
   }
 
   // ==========================================================================

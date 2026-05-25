@@ -10,6 +10,7 @@ import { routes } from './app.routes';
 import { apiBaseUrlInterceptor } from './elohim/interceptors/api-base-url.interceptor';
 import { CONTENT_ATTESTATION } from '@elohim/service';
 import { GOVERNANCE } from '@elohim/service';
+import { ELOHIM_ENV } from '@elohim/service';
 import { provideElohimClient, detectClientMode } from './elohim/providers/elohim-client.provider';
 import { ContentAttestationApiService } from './elohim/services/content-attestation-api.service';
 import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
@@ -44,6 +45,20 @@ export const appConfig: ApplicationConfig = {
     }),
     // Import ContentIO module with built-in format plugins (Markdown, Gherkin)
     importProvidersFrom(ContentIOModuleWithPlugins),
+    // ELOHIM_ENV — maps app environment to the @elohim/service token contract
+    {
+      provide: ELOHIM_ENV,
+      useValue: {
+        production: environment.production,
+        doorwayUrl: environment.client?.doorwayUrl,
+        holochain: environment.client?.holochainConductorUrl
+          ? {
+              adminUrl: environment.client.holochainConductorUrl,
+              appUrl: environment.client.holochainConductorUrl,
+            }
+          : undefined,
+      },
+    },
     // API boundary services wired to InjectionToken contracts
     { provide: GOVERNANCE, useExisting: GovernanceApiService },
     { provide: CONTENT_ATTESTATION, useExisting: ContentAttestationApiService },

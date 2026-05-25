@@ -124,8 +124,21 @@ export * from './angular/models/gated-response.model';
 export * from './angular/interfaces/governance.interface';
 export * from './angular/interfaces/content-attestation.interface';
 
+// Environment token
+export type { ElohimEnv } from './env/elohim-env';
+export { ELOHIM_ENV } from './env/elohim-env';
+
 // Services
 export { GovernanceApiService } from './angular/services/governance-api.service';
+export { DoorwayClientService } from './angular/services/doorway-client.service';
+export type {
+  VerifyBlobRequest,
+  VerifyBlobResponse,
+  CustodianInfo,
+  BestCustodianResponse,
+  StreamingVariant,
+  StreamingManifest,
+} from './angular/services/doorway-client.service';
 
 // Utils
 export * from './angular/utils/access-control.helper';
