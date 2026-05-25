@@ -1629,15 +1629,21 @@ async fn handle_request(
             ));
         }
 
-        // Database API routes (proxied to elohim-storage)
-        // GET/POST/DELETE /db/content[/{id}], /db/stats, etc.
-        // Required for browser clients since they can't access elohim-storage directly (CORS)
-        (_, p) if p.starts_with("/db/") => {
-            debug!(path = %p, "Forwarding database request to elohim-storage");
-            return Ok(to_boxed(
-                routes::handle_db_request(req, state.args.storage_url.clone(), p).await,
-            ));
-        }
+        // /db/* routes — handled by the dynamic route registry below.
+        //
+        // Removed 2026-05-25 as part of Pattern Z anti-pattern cleanup
+        // (genesis/docs/superpowers/specs/2026-05-23-doorway-access-tier-patterns.md).
+        // The old hardcoded short-circuit (handle_db_request in routes/db.rs)
+        // was the 14th instance of the per-domain proxy anti-pattern that
+        // doorway/CLAUDE.md says was deleted: "We deleted 13 identical
+        // proxy files that violated this rule. They must never come back."
+        // Storage's build_manifest() declares 28+ /db/* routes
+        // (elohim/elohim-storage/src/http.rs ~L9248+); the route registry
+        // compiles them as StorageProxy entries and forward_to_storage
+        // (storage_proxy.rs) handles all methods (GET/POST/PUT/PATCH/
+        // DELETE/HEAD) with the same CORP cross-origin header parity.
+        // Net change: -1 hand-maintained method list, +1 manifest-driven
+        // route table.
 
         // Account API routes — handled by dynamic registry fallback below
 

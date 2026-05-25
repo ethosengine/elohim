@@ -10,7 +10,10 @@ pub mod auth_routes;
 pub mod blob;
 pub mod collectives;
 pub mod dashboard_ws;
-pub mod db;
+// `db` module retired 2026-05-25 as part of Pattern Z anti-pattern cleanup —
+// see genesis/docs/superpowers/specs/2026-05-23-doorway-access-tier-patterns.md
+// and doorway/CLAUDE.md "No Per-Domain Proxy Files" rule. /db/* now flows
+// through the dynamic route registry (StorageProxy → forward_to_storage).
 pub mod debug_stream;
 pub mod elohim_agent;
 pub mod epr;
@@ -60,7 +63,7 @@ pub use blob::{
     handle_blob_request_with_storage_proxy, BlobContext, BlobError,
 };
 pub use dashboard_ws::handle_dashboard_ws;
-pub use db::handle_db_request;
+// `handle_db_request` re-export retired with the db module — see comment above.
 pub use debug_stream::{handle_debug_stream, DebugEvent, DebugHub};
 pub use federation::{
     handle_admin_add_federation_peer, handle_admin_federation_peers,
