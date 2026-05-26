@@ -25,13 +25,13 @@ export * from './models/path-metadata.model';
 export * from './models/import-context.model';
 export * from './models/manifest.model';
 
-// Parsers
-export * from './parsers/path-metadata-parser';
-export * from './parsers/markdown-parser';
-export * from './parsers/gherkin-parser';
-
-// Transformers
-export * from './transformers';
+// Parsers + transformers are CLI-only — they import node:fs / node:path /
+// node:crypto and chain through to the CLI import-pipeline service. Browser
+// consumers (elohim-app, lamad) never use them (verified via grep across
+// app/elohim-app/src + app/lamad/src — zero hits). Re-exporting them at the
+// package barrel breaks the elohim-app esbuild bundle. CLI imports them
+// directly via app/elohim-library/projects/elohim-service/src/cli/. A
+// future CLI surface that needs a barrel can land at @elohim/service/cli.
 
 // Adapters (wire format normalization for multi-transport content pipeline)
 export * from './adapters';
