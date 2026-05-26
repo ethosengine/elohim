@@ -10,6 +10,63 @@
 
 **Tech Stack:** Rust 1.81 (native build, `RUSTFLAGS=""` for storage handler code; `RUSTFLAGS='--cfg getrandom_backend="custom"'` for any zome-side changes), Holochain HDK 0.5, `holochain_client::AppWebsocket`, Diesel + SQLite (projection layer), libp2p / Holochain gossip (substrate transport — already configured for this DNA).
 
+---
+
+## Addendum 1 (2026-05-26 14:10Z) — substrate name corrections discovered during Task 1 pre-flight
+
+**Three corrections to the plan body below — supersede where they conflict:**
+
+1. **Role name is `"lamad"`, not `"elohim"`.** The elohim DNA directory (`elohim/holochain/dna/elohim/`) builds a DNA named `lamad` (per `dna.yaml:20`) which is mounted under the `lamad` role in the elohim hApp (`happ.yaml:24`). The `content_store` zome lives in this role. Use `const ROLE_NAME: &str = "lamad";` in conductor_writes.
+
+2. **Use `HcClient` + `HcClientRegistry`, not raw `AppWebsocket`.** Storage already has:
+   - `crate::hc_client::HcClient` (signed call_zome wrapper, takes `app_id + role`)
+   - `crate::hc_client_registry::HcClientRegistry` (role-keyed registry; currently has `infrastructure` + `imagodei` fields)
+   - `HttpServer.hc_registry: Option<Arc<HcClientRegistry>>` at `http.rs:184` — the conductor connection point is ALREADY in app state
+
+   Task 2 facade calls `registry.lamad.as_ref().ok_or(StorageError::Conductor("lamad bridge offline"))?.call_zome("content_store", "create_rea_commitment", payload)` — strictly through the registry, not AppWebsocket directly.
+
+3. **AppState is `HttpServer` (struct at `http.rs:134`).** Plan's references to "AppState" mean this struct. The conductor pathway is already wired in (Task 5 Step 3 is mostly a no-op — just add `lamad` to HcClientRegistry).
+
+**Revised Task 2 Step 3 (the facade code) — replaces the plan-body version:**
+
+```rust
+//! Thin facade for HTTP write handlers to call local conductor zome functions.
+//!
+//! Per elohim/holochain/dna/CLAUDE.md gospel: "Never write to storage directly
+//! for notarized types (legacy code may still do this — migrate toward
+//! conductor-first)." This module centralizes the conductor call so the
+//! migration happens once. Future Category-A migrations follow the same pattern.
+
+use std::sync::Arc;
+
+use crate::db::rea_commitments::CreateReaCommitmentInput;
+use crate::error::StorageError;
+use crate::hc_client::HcClient;
+
+const ZOME_NAME: &str = "content_store";
+
+/// Round-trip create_rea_commitment through the local conductor's content_store
+/// zome on the `lamad` role. Returns the ActionHash from the conductor's
+/// post-commit; caller re-reads the SQL projection (populated by the existing
+/// receiver at rea_projection.rs:148) to get the full view.
+pub async fn call_create_rea_commitment(
+    hc: &Arc<HcClient>,
+    input: &CreateReaCommitmentInput,
+) -> Result<Vec<u8>, StorageError> {
+    let payload = rmp_serde::to_vec_named(input)
+        .map_err(|e| StorageError::Internal(format!("encode CreateReaCommitmentInput: {e}")))?;
+    hc.call_zome(ZOME_NAME, "create_rea_commitment", &payload).await
+}
+```
+
+(Note: `HcClient::call_zome` returns `Result<Vec<u8>, StorageError>` per the trait at `hc_client.rs:20` — decoding to `ReaCommitmentOutput` is the caller's concern, since we only need ActionHash for the wait loop and the projection arrives via the post-commit receiver.)
+
+**Task 5 also simplified:** thread `Arc<HcClient>` from `state.hc_registry.as_ref().and_then(|r| r.lamad.clone())` rather than adding new AppWebsocket plumbing. Two-line touch in the handler.
+
+**Task 2 must also add `pub lamad: Option<Arc<HcClient>>` field to `HcClientRegistry`** and wire its connect at startup (mirror lines 39-44 of hc_client_registry.rs).
+
+---
+
 **Verification:** Pass criteria is end-to-end on alpha — `curl https://alpha.elohim.host/api/v1/commitments?action=project-epr` returns ≥1 row with non-null `dhtAnchorHash`, AND `curl https://alpha.elohim.host/lamad` returns 200 (HTML), AND the same on `alpha.elohim.host/` (no PLACEHOLDER in X-Content-Address).
 
 ---
