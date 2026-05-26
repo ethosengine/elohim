@@ -103,10 +103,16 @@ export interface LamadEprHead {
   relationships?: LamadEprHeadRelationship[];
 }
 
+/** Reaction-count map — named `total` for the consensus rollup; other keys are emoji/reaction names. */
+export interface LamadReactionCounts {
+  total: number;
+  [reactionKey: string]: number;
+}
+
 /** Aggregated governance signals for a content node. */
 export interface LamadAggregatedSignals {
   contentId: string;
-  reactionCounts: Record<string, number>;
+  reactionCounts: LamadReactionCounts;
   feedbackStats: unknown;
   learningSignalCount: number;
   completionCount: number;
