@@ -1,7 +1,4 @@
 import { Injectable } from '@angular/core';
-
-// @coverage: 47.0% (2026-02-24)
-
 import { BehaviorSubject, Observable } from 'rxjs';
 
 import {
@@ -14,6 +11,8 @@ import {
   ChainMetadata,
   ChainMigrationPackage,
 } from '../models/source-chain.model';
+
+// @coverage: 47.0% (2026-02-24)
 
 /**
  * LocalSourceChainService - Agent-centric source chain simulation using localStorage.

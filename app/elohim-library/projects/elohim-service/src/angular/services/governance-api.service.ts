@@ -6,10 +6,8 @@
 
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-
-import { catchError } from 'rxjs/operators';
-
 import { firstValueFrom, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 import type { IGovernance } from '../interfaces/governance.interface';
 import type {

@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 
 import { ContentBackendService, ContentFilters, PathFilters } from './content.service';
 import { StorageClientService } from './storage-client.service';
-import { HeliaFetchService } from './helia-fetch.service';
+import { BLOB_FETCHER } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 import { ContentNode } from '@app/lamad/models/content-node.model';
 import { LearningPath } from '@app/lamad/models/learning-path.model';
@@ -68,10 +68,10 @@ describe('ContentBackendService', () => {
     };
     mockStorageClient.getBlobUrl.mockImplementation((hash: string) => `/blob/${hash}`);
 
-    const mockHeliaFetch = {
+    const mockBlobFetcher = {
       fetchVerified: vi.fn(),
     };
-    mockHeliaFetch.fetchVerified.mockImplementation((cid: string) => {
+    mockBlobFetcher.fetchVerified.mockImplementation((cid: string) => {
       if (cid.includes('failblob')) {
         return Promise.reject(new Error('Blob not found'));
       }
@@ -85,7 +85,7 @@ describe('ContentBackendService', () => {
         ContentBackendService,
         { provide: ELOHIM_CLIENT, useValue: mockClient },
         { provide: StorageClientService, useValue: mockStorageClient },
-        { provide: HeliaFetchService, useValue: mockHeliaFetch },
+        { provide: BLOB_FETCHER, useValue: mockBlobFetcher },
       ],
     });
 

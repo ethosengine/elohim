@@ -148,7 +148,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     // In Che, each endpoint gets a unique URL like:
     // https://<workspace>-<endpoint>.code.ethosengine.com
     // We need to replace the endpoint suffix (angular-dev) with (hc-dev)
-    const currentUrl = new URL(globalThis.location!.href);
+    const currentUrl = new URL(globalThis.location.href);
     const hostname = currentUrl.hostname.replace(/-angular-dev\./, '-hc-dev.');
 
     this.logger.debug('Che URL resolution', {

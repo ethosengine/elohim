@@ -35,10 +35,8 @@
 
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-
-import { map, catchError, timeout, retry } from 'rxjs/operators';
-
 import { Observable, throwError } from 'rxjs';
+import { map, catchError, timeout, retry } from 'rxjs/operators';
 
 import { ELOHIM_ENV } from '../../env/elohim-env';
 

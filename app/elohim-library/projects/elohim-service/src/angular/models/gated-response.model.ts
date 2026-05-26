@@ -9,10 +9,12 @@ export interface GatedResponse<T> {
 /** Type guard: does this response include gate evaluation? */
 export function isGatedResponse(response: unknown): response is GatedResponse<unknown> {
   return (
-    response != null &&
+    response !== null &&
+    response !== undefined &&
     typeof response === 'object' &&
     'gate' in response &&
-    (response as Record<string, unknown>)['gate'] != null
+    (response as Record<string, unknown>)['gate'] !== null &&
+    (response as Record<string, unknown>)['gate'] !== undefined
   );
 }
 
