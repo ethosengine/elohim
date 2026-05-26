@@ -383,12 +383,23 @@ def seedProjectionsStage() {
     // seeded project-epr commitments. The router only refreshes at boot
     // OR via SSE 'projection.registered' events (storage_events_subscriber.rs:238),
     // and the SSE path is currently flaky in alpha (warmup.lastError to
-    // emma-alpha visible on /health/startup). A rollout restart is the
-    // deterministic refresh — empirically observed during the 2026-05-26
-    // shift that build #1039's Seed Projections stage created 6 commitments
-    // but doorway-alpha's running pod (commit b45ad43, pre-seed) never picked
-    // them up. Wrapped in its own catchError so a kubectl-permissions issue
-    // doesn't mask the seed succeeding.
+    // emma-alpha visible on /health/startup). A pod-delete is the
+    // deterministic refresh — the Deployment controller recreates the
+    // pod immediately, and its boot loads the now-populated commitments.
+    //
+    // RBAC note: `ee-jenkins` service account cannot `get deployments`
+    // in elohim-alpha (RBAC-forbidden error observed in build #1041 when
+    // we tried `kubectl rollout restart deployment/...`). But it CAN
+    // manage pods directly — the Reset Storage stage at line ~538 uses
+    // `kubectl delete pod` against storage pods successfully. So we use
+    // the pods API here too. Hedge across two label conventions then
+    // fall back to grep, so cluster label drift doesn't silently miss.
+    //
+    // Empirically observed in build #1039 that Seed Projections created
+    // 6 commitments but doorway-alpha's running pod (commit b45ad43,
+    // pre-seed) never picked them up — proving the pod restart is the
+    // missing handoff. Wrapped in catchError so an RBAC issue doesn't
+    // mask the seed itself succeeding.
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         def deployment = ''
         def namespace = ''
@@ -405,21 +416,49 @@ def seedProjectionsStage() {
 
         if (deployment && namespace) {
             sh """#!/bin/bash
-                set -euo pipefail
+                set -uo pipefail
                 echo "═══════════════════════════════════════════════════════════"
-                echo "RESTART DOORWAY — refresh EprRouter post-seed"
+                echo "RESTART DOORWAY POD — refresh EprRouter post-seed"
                 echo "═══════════════════════════════════════════════════════════"
-                echo "Deployment: ${deployment} (-n ${namespace})"
+                echo "Namespace: ${namespace}"
+                echo "Target:    pods matching '${deployment}'"
                 echo ""
-                kubectl rollout restart deployment/${deployment} -n ${namespace}
-                kubectl rollout status deployment/${deployment} -n ${namespace} --timeout=180s
-                echo ""
-                echo "✓ doorway restart complete — EprRouter should now be populated"
-                echo "  Verify: curl -s https://${doorwayHost.replace('https://', '')}/api/v1/commitments?action=project-epr | jq 'length'"
-                echo "  Verify: curl -s -o /dev/null -w '%{http_code}\\n' https://${doorwayHost.replace('https://', '')}/lamad"
+
+                # Try canonical k8s recommended label first, then a common
+                # alternative, then a grep-by-name fallback. Each branch is
+                # gated on the prior branch failing (-z stdout check).
+                PODS=\$(kubectl get pods -n ${namespace} -l app.kubernetes.io/name=${deployment} -o name 2>/dev/null || true)
+                if [ -z "\$PODS" ]; then
+                    PODS=\$(kubectl get pods -n ${namespace} -l app=${deployment} -o name 2>/dev/null || true)
+                fi
+                if [ -z "\$PODS" ]; then
+                    PODS=\$(kubectl get pods -n ${namespace} -o name 2>/dev/null | grep -F "${deployment}" || true)
+                fi
+
+                if [ -n "\$PODS" ]; then
+                    echo "Deleting pods:"
+                    echo "\$PODS" | sed 's/^/  /'
+                    echo ""
+                    echo "\$PODS" | xargs -r kubectl delete -n ${namespace} --wait=false
+                    echo ""
+                    echo "✓ doorway pods deleted; Deployment controller will recreate"
+                    echo "  New pod's boot will fetch project-epr commitments from storage"
+                    echo "  → EprRouter populated → / and /lamad serve 200"
+                    echo ""
+                    echo "  Verify (60s after this stage):"
+                    echo "    curl -s https://alpha.elohim.host/version  # commit should flip off b45ad43"
+                    echo "    curl -sI https://alpha.elohim.host/lamad  # should be 200"
+                else
+                    echo "WARNING: no doorway pods matched any selector in ${namespace}"
+                    echo "  Tried: -l app.kubernetes.io/name=${deployment}"
+                    echo "         -l app=${deployment}"
+                    echo "         pod name grep '${deployment}'"
+                    kubectl get pods -n ${namespace} 2>&1 | head -20 || true
+                    exit 1
+                fi
             """
         } else {
-            echo "Skipping doorway restart — unrecognized doorwayHost: ${doorwayHost}"
+            echo "Skipping doorway pod restart — unrecognized doorwayHost: ${doorwayHost}"
         }
     }
 }
