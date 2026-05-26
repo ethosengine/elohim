@@ -16,7 +16,7 @@ import { takeUntil, switchMap, catchError } from 'rxjs/operators';
 
 import { Subject, of } from 'rxjs';
 
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from '../../services/data-loader.service';
 
 import { DefaultCodeEditorComponent } from '../../content-io/components/default-code-editor';
 import {

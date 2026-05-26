@@ -25,8 +25,13 @@ import { firstValueFrom, Subscription } from 'rxjs';
 
 import 'elohim-core/register';
 
-import { EprResolverService, type StepRef } from '@app/elohim/services/epr-resolver.service';
-import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import {
+  LAMAD_EPR_RESOLVER,
+  type ILamadEprResolver,
+  type LamadStepRef,
+  type LamadCrossPathMatch,
+} from '../../interfaces/cross-pillar.interface';
+import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { parseEpr } from '@elohim/service';
 
 import type { ElohimEprPopover, EprHead } from 'elohim-core';
@@ -117,7 +122,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   /** When true, renderer adapts to fit within parent container without TOC/back-to-top */
   @Input() embedded = false;
   /** Path steps for context-aware EPR link resolution (provided by path step view) */
-  @Input() pathSteps: StepRef[] = [];
+  @Input() pathSteps: LamadStepRef[] = [];
   @Output() tocGenerated = new EventEmitter<TocEntry[]>();
 
   @ViewChild('contentEl') contentEl!: ElementRef<HTMLElement>;
@@ -132,8 +137,8 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private scrollListener?: () => void;
   private eprClickListener?: (e: Event) => void;
   private headingElements: HTMLElement[] = [];
-  private readonly storageClient = inject(StorageClientService);
-  private readonly eprResolver = inject(EprResolverService);
+  private readonly storageClient = inject(LAMAD_STORAGE_CLIENT);
+  private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
   private readonly pathContext = inject(PathContextService);
   private readonly pathService = inject(PathService);
   private readonly router = inject(Router);
@@ -153,10 +158,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private popoverDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Prefetched cross-path matches, keyed by content ID. */
-  private readonly crossPathCache = new Map<
-    string,
-    import('@app/elohim/services/epr-resolver.service').CrossPathMatch[]
-  >();
+  private readonly crossPathCache = new Map<string, LamadCrossPathMatch[]>();
 
   private readonly sanitizer = inject(DomSanitizer);
 

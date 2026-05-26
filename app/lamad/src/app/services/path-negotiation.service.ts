@@ -6,10 +6,14 @@ import { tap, switchMap } from 'rxjs/operators';
 
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 
-import { hasMinimumIntimacy } from '@app/elohim/models/human-consent.model';
+import { hasMinimumIntimacy } from '../models/human-consent.model';
 import { PathNegotiationContent } from '@elohim/storage-client';
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { HumanConsentService } from '@app/elohim/services/human-consent.service';
+import {
+  LAMAD_AFFINITY_TRACKING,
+  LAMAD_HUMAN_CONSENT,
+  type ILamadAffinityTracking,
+  type ILamadHumanConsent,
+} from '../interfaces/cross-pillar.interface';
 import { LocalSourceChainService } from '@elohim/service';
 
 import {
@@ -49,8 +53,8 @@ export class PathNegotiationService {
   public negotiations$ = this.negotiationsSubject.asObservable();
 
   private readonly sourceChain = inject(LocalSourceChainService);
-  private readonly consentService = inject(HumanConsentService);
-  private readonly affinityService = inject(AffinityTrackingService);
+  private readonly consentService: ILamadHumanConsent = inject(LAMAD_HUMAN_CONSENT);
+  private readonly affinityService: ILamadAffinityTracking = inject(LAMAD_AFFINITY_TRACKING);
 
   // =========================================================================
   // INITIALIZATION

@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { PathNegotiationService } from './path-negotiation.service';
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { HumanConsentService } from '@app/elohim/services/human-consent.service';
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { HumanConsent, IntimacyLevel, ConsentState } from '@app/elohim/models/human-consent.model';
+import { LocalSourceChainService } from '@elohim/service';
+import {
+  LAMAD_HUMAN_CONSENT,
+  LAMAD_AFFINITY_TRACKING,
+} from '../interfaces/cross-pillar.interface';
+import { HumanConsent, IntimacyLevel, ConsentState } from '../models/human-consent.model';
 import { NegotiationStatus, BridgingStrategy } from '../models/path-negotiation.model';
 import { vi } from 'vitest';
 
@@ -59,8 +61,8 @@ describe('PathNegotiationService', () => {
       providers: [
         PathNegotiationService,
         { provide: LocalSourceChainService, useValue: sourceChainSpy },
-        { provide: HumanConsentService, useValue: consentServiceSpy },
-        { provide: AffinityTrackingService, useValue: affinityServiceSpy },
+        { provide: LAMAD_HUMAN_CONSENT, useValue: consentServiceSpy },
+        { provide: LAMAD_AFFINITY_TRACKING, useValue: affinityServiceSpy },
       ],
     });
 
@@ -566,8 +568,8 @@ describe('PathNegotiationService', () => {
         providers: [
           PathNegotiationService,
           { provide: LocalSourceChainService, useValue: sourceChainSpy },
-          { provide: HumanConsentService, useValue: consentServiceSpy },
-          { provide: AffinityTrackingService, useValue: affinityServiceSpy },
+          { provide: LAMAD_HUMAN_CONSENT, useValue: consentServiceSpy },
+          { provide: LAMAD_AFFINITY_TRACKING, useValue: affinityServiceSpy },
         ],
       });
       const newService = TestBed.inject(PathNegotiationService);
@@ -587,8 +589,8 @@ describe('PathNegotiationService', () => {
         providers: [
           PathNegotiationService,
           { provide: LocalSourceChainService, useValue: sourceChainSpy },
-          { provide: HumanConsentService, useValue: consentServiceSpy },
-          { provide: AffinityTrackingService, useValue: affinityServiceSpy },
+          { provide: LAMAD_HUMAN_CONSENT, useValue: consentServiceSpy },
+          { provide: LAMAD_AFFINITY_TRACKING, useValue: affinityServiceSpy },
         ],
       });
       const newService = TestBed.inject(PathNegotiationService);
@@ -638,8 +640,8 @@ describe('PathNegotiationService', () => {
         providers: [
           PathNegotiationService,
           { provide: LocalSourceChainService, useValue: sourceChainSpy },
-          { provide: HumanConsentService, useValue: consentServiceSpy },
-          { provide: AffinityTrackingService, useValue: affinityServiceSpy },
+          { provide: LAMAD_HUMAN_CONSENT, useValue: consentServiceSpy },
+          { provide: LAMAD_AFFINITY_TRACKING, useValue: affinityServiceSpy },
         ],
       });
       const newService = TestBed.inject(PathNegotiationService);

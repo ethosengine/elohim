@@ -6,7 +6,7 @@ import { PathAdaptationService } from './path-adaptation.service';
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';
 import { StreakTrackerService } from './streak-tracker.service';
-import { ContentBackendService } from '@app/elohim/services/content.service';
+import { ContentBackendService } from '../../services/content-backend.service';
 import { ELOHIM_CLIENT } from '@elohim/service';
 import type { QuizResult, ContentScore } from '../models/quiz-session.model';
 import { vi } from 'vitest';

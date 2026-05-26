@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { PathService, AccessCheckResult } from './path.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { AgentService } from '@app/elohim/services/agent.service';
+import { DataLoaderService } from './data-loader.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../interfaces/agent.interface';
 import { ContentMasteryService } from './content-mastery.service';
 import { LearnerContextService } from './learner-context.service';
 import { LearningPath, PathStep, PathStepView, PathIndex, ContentNode } from '../models';
@@ -144,7 +144,7 @@ describe('PathService', () => {
       providers: [
         PathService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: AgentService, useValue: agentServiceSpyObj },
+        { provide: ILamadAgent, useValue: agentServiceSpyObj },
         { provide: ContentMasteryService, useValue: contentMasterySpyObj },
         { provide: LearnerContextService, useValue: learnerContextSpyObj },
       ],
@@ -152,7 +152,7 @@ describe('PathService', () => {
 
     service = TestBed.inject(PathService);
     dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
-    agentServiceSpy = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
+    agentServiceSpy = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
     contentMasterySpy = TestBed.inject(ContentMasteryService) as {
       [K in keyof ContentMasteryService]?: Mock;
     };

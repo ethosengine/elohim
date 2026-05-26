@@ -17,7 +17,10 @@ import {
 
 import { Subject, takeUntil } from 'rxjs';
 
-import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+import {
+  LAMAD_GOVERNANCE_SIGNAL,
+  type ILamadGovernanceSignal,
+} from '../../../interfaces/cross-pillar.interface';
 
 import { Moment, Recognition } from '../../../content-io/plugins/sophia/sophia-moment.model';
 import { SophiaWrapperComponent } from '../../../content-io/plugins/sophia/sophia-wrapper.component';
@@ -90,22 +93,30 @@ export interface InlineQuizCompletionEvent {
       [class.celebrating]="celebrating()"
     >
       <!-- Header with toggle -->
-      <header class="quiz-header" (click)="toggleCollapsed()">
+      <header
+        class="quiz-header"
+        role="button"
+        [attr.aria-expanded]="!collapsed()"
+        aria-controls="quiz-content"
+        [attr.aria-label]="getHeaderTitle()"
+        data-testid="quiz-header"
+        (click)="toggleCollapsed()"
+        (keydown.enter)="toggleCollapsed()"
+        (keydown.space)="toggleCollapsed()"
+      >
         <div class="header-content">
-          <span class="quiz-icon">{{ getHeaderIcon() }}</span>
+          <span class="quiz-icon" aria-hidden="true">{{ getHeaderIcon() }}</span>
           <h3 class="quiz-title">{{ getHeaderTitle() }}</h3>
           @if (streakAchieved()) {
             <span class="practiced-badge">Practiced!</span>
           }
         </div>
-        <button
+        <span
           class="collapse-btn"
-          [attr.aria-expanded]="!collapsed()"
-          aria-controls="quiz-content"
-          data-testid="quiz-header-toggle"
+          aria-hidden="true"
         >
           {{ collapsed() ? '▼' : '▲' }}
-        </button>
+        </span>
       </header>
 
       <!-- Quiz content -->
@@ -269,16 +280,13 @@ export interface InlineQuizCompletionEvent {
         display: flex;
         align-items: center;
         justify-content: center;
-        background: none;
-        border: none;
         color: var(--text-tertiary, #80868b);
-        cursor: pointer;
         border-radius: var(--radius-sm, 4px);
         transition: all 0.15s ease;
+        flex-shrink: 0;
       }
 
-      .collapse-btn:hover {
-        background: rgba(0, 0, 0, 0.06);
+      .quiz-header:hover .collapse-btn {
         color: var(--text-primary, #202124);
       }
 
@@ -600,7 +608,7 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
   private readonly streakTracker = inject(StreakTrackerService);
   private readonly soundService = inject(QuizSoundService);
   private readonly poolService = inject(QuestionPoolService);
-  private readonly governanceSignalService = inject(GovernanceSignalService);
+  private readonly governanceSignalService = inject<ILamadGovernanceSignal>(LAMAD_GOVERNANCE_SIGNAL);
   private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {

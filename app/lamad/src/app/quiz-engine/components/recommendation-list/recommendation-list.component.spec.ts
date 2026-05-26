@@ -6,7 +6,7 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { RecommendationListComponent } from './recommendation-list.component';
-import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { LAMAD_EPR_RESOLVER } from '../../../interfaces/cross-pillar.interface';
 import type { ContentRecommendation } from '../../services/path-adaptation.service';
 
 describe('RecommendationListComponent', () => {
@@ -40,7 +40,7 @@ describe('RecommendationListComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: EprResolverService, useValue: mockResolver },
+        { provide: LAMAD_EPR_RESOLVER, useValue: mockResolver },
       ],
     }).compileComponents();
 

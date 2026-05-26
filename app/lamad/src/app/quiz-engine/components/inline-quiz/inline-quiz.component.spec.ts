@@ -5,7 +5,7 @@ import { InlineQuizComponent } from './inline-quiz.component';
 import { StreakTrackerService } from '../../services/streak-tracker.service';
 import { QuizSoundService } from '../../services/quiz-sound.service';
 import { QuestionPoolService } from '../../services/question-pool.service';
-import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+import { LAMAD_GOVERNANCE_SIGNAL } from '../../../interfaces/cross-pillar.interface';
 import { vi } from 'vitest';
 
 describe('InlineQuizComponent', () => {
@@ -87,7 +87,7 @@ describe('InlineQuizComponent', () => {
         { provide: StreakTrackerService, useValue: mockStreakTracker },
         { provide: QuizSoundService, useValue: mockSoundService },
         { provide: QuestionPoolService, useValue: mockPoolService },
-        { provide: GovernanceSignalService, useValue: mockGovernanceSignal },
+        { provide: LAMAD_GOVERNANCE_SIGNAL, useValue: mockGovernanceSignal },
       ],
     }).compileComponents();
 

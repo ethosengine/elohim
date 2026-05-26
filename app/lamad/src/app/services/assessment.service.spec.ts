@@ -5,7 +5,7 @@ import {
   DataLoaderService,
   AssessmentIndex,
   AssessmentIndexEntry,
-} from '@app/elohim/services/data-loader.service';
+} from './data-loader.service';
 import { SessionHumanService } from '@elohim/identity';
 import { ContentNode } from '../models/content-node.model';
 import { vi, Mock } from 'vitest';

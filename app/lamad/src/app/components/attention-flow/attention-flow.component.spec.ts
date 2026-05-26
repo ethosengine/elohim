@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 
 import { AttentionFlowComponent } from './attention-flow.component';
 import { EventService } from '@elohim/rea-runtime';
-import { AgentService } from '@app/elohim/services/agent.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 
 describe('AttentionFlowComponent', () => {
   let component: AttentionFlowComponent;
@@ -44,7 +44,7 @@ describe('AttentionFlowComponent', () => {
       imports: [AttentionFlowComponent, RouterModule.forRoot([])],
       providers: [
         { provide: EventService, useValue: mockEventService },
-        { provide: AgentService, useValue: mockAgentService },
+        { provide: ILamadAgent, useValue: mockAgentService },
       ],
     }).compileComponents();
 

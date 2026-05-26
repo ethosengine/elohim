@@ -8,7 +8,7 @@
  * - Pagination support
  */
 
-import { TrustLevel } from '@app/elohim/models/trust-badge.model';
+import { TrustLevel } from './trust-badge.model';
 
 // @coverage: 66.7% (2026-02-24)
 

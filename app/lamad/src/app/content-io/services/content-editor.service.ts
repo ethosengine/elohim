@@ -4,7 +4,11 @@ import { catchError, map } from 'rxjs/operators';
 
 import { Observable, of, throwError } from 'rxjs';
 
-import { ContextAssemblyService } from '@app/elohim';
+import {
+  LAMAD_CONTEXT_ASSEMBLY,
+  type ILamadContextAssembly,
+  type LamadContextAssemblyResult,
+} from '../../interfaces/cross-pillar.interface';
 
 import { ContentNode } from '../../models/content-node.model';
 import { ContentIOExportInput } from '../interfaces/content-io-plugin.interface';
@@ -13,7 +17,19 @@ import { ValidationResult } from '../interfaces/validation-result.interface';
 import { ContentFormatRegistryService } from './content-format-registry.service';
 
 import type { ContentFormat, ContentReach, ContentType } from '../../models/content-node.model';
-import type { ContentBirthContext, ContextAssemblyResult, CreatePayload } from '@app/elohim';
+/** Structural shape for content creation payload (sent to context assembly). */
+type CreatePayload = {
+  actionType: string;
+  content: string;
+  contentType: ContentType;
+  contentFormat: ContentFormat;
+  requestedReach: string;
+  tags: string[];
+  citedContentIds: string[];
+};
+
+/** Structural shape for birth context recorded after assembly. */
+type ContentBirthContext = Record<string, unknown>;
 
 /**
  * ContentEditorService - High-level content editing operations.
@@ -37,7 +53,7 @@ export class ContentEditorService {
   private readonly drafts = new Map<string, ContentDraft>();
 
   private readonly registry = inject(ContentFormatRegistryService);
-  private readonly contextAssembly = inject(ContextAssemblyService);
+  private readonly contextAssembly = inject<ILamadContextAssembly>(LAMAD_CONTEXT_ASSEMBLY);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Permissions
@@ -410,7 +426,7 @@ export interface SaveResult {
   error?: string;
 
   /** Context assembly result (present when assembly succeeded) */
-  contextAssembly?: ContextAssemblyResult;
+  contextAssembly?: LamadContextAssemblyResult;
 
   /** Content birth context derived from assembly */
   birthContext?: ContentBirthContext;

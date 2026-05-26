@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { KnowledgeMapService } from './knowledge-map.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
+import { DataLoaderService } from './data-loader.service';
+import { LAMAD_ELOHIM_AGENT } from '../interfaces/cross-pillar.interface';
 import { KnowledgeMapType, MasteryLevel } from '../models/knowledge-map.model';
 
 describe('KnowledgeMapService', () => {
@@ -23,15 +23,13 @@ describe('KnowledgeMapService', () => {
       providers: [
         KnowledgeMapService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: ElohimAgentService, useValue: elohimServiceSpyObj },
+        { provide: LAMAD_ELOHIM_AGENT, useValue: elohimServiceSpyObj },
       ],
     });
 
     service = TestBed.inject(KnowledgeMapService);
     dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
-    elohimServiceSpy = TestBed.inject(ElohimAgentService) as {
-      [K in keyof ElohimAgentService]?: Mock;
-    };
+    elohimServiceSpy = TestBed.inject(LAMAD_ELOHIM_AGENT) as { [key: string]: Mock };
   });
 
   it('should be created', () => {

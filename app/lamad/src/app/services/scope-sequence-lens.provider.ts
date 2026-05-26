@@ -12,7 +12,10 @@ import { Injectable, inject } from '@angular/core';
 
 import { Observable, of, map, shareReplay } from 'rxjs';
 
-import { LensRegistryService } from '@app/elohim/services/lens-registry.service';
+import {
+  LAMAD_LENS_REGISTRY,
+  type ILamadLensRegistry,
+} from '../interfaces/cross-pillar.interface';
 import { getContentIcon } from '@app/lamad/utils/content-icons';
 
 import { PathService } from './path.service';
@@ -24,7 +27,7 @@ const DEFAULT_FILE_ICON = getContentIcon();
 
 @Injectable({ providedIn: 'root' })
 export class ScopeSequenceLensProvider implements LensProvider {
-  private readonly lensRegistry = inject(LensRegistryService);
+  private readonly lensRegistry = inject<ILamadLensRegistry>(LAMAD_LENS_REGISTRY);
   private readonly pathService = inject(PathService);
 
   readonly type = 'scope-sequence';

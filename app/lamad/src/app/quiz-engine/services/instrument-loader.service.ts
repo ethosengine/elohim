@@ -14,7 +14,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
 
-import { ContentBackendService } from '@app/elohim/services/content.service';
+import { ContentBackendService } from '../../services/content-backend.service';
 
 import {
   registerFromDefinition,

@@ -4,8 +4,8 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { Router, ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { GraphExplorerComponent } from './graph-explorer.component';
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { LAMAD_AFFINITY_TRACKING } from '../../interfaces/cross-pillar.interface';
+import { DataLoaderService } from '../../services/data-loader.service';
 import { HierarchicalGraphService } from '../../services/hierarchical-graph.service';
 import { ElementRef } from '@angular/core';
 import { ClusterNode, ClusterGraphData } from '../../models/cluster-graph.model';
@@ -91,15 +91,13 @@ describe('GraphExplorerComponent', () => {
     await TestBed.configureTestingModule({
       imports: [GraphExplorerComponent, RouterTestingModule],
       providers: [
-        { provide: AffinityTrackingService, useValue: affinityServiceSpy },
+        { provide: LAMAD_AFFINITY_TRACKING, useValue: affinityServiceSpy },
         { provide: HierarchicalGraphService, useValue: hierarchicalGraphSpy },
         { provide: DataLoaderService, useValue: dataLoaderSpy },
       ],
     }).compileComponents();
 
-    affinityService = TestBed.inject(AffinityTrackingService) as {
-      [K in keyof AffinityTrackingService]?: Mock;
-    };
+    affinityService = TestBed.inject(LAMAD_AFFINITY_TRACKING) as any;
     hierarchicalGraphService = TestBed.inject(HierarchicalGraphService) as {
       [K in keyof HierarchicalGraphService]?: Mock;
     };

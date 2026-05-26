@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
 // @coverage: 86.3% (2026-02-24)
@@ -8,8 +8,11 @@ import { takeUntil, catchError } from 'rxjs/operators';
 
 import { Subject, forkJoin, of } from 'rxjs';
 
-import { AgentService } from '@app/elohim/services/agent.service';
-import { ProfileService } from '@app/elohim/services/profile.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
+import {
+  LAMAD_PROFILE,
+  type ILamadProfile,
+} from '../../interfaces/cross-pillar.interface';
 import { IdentityService, isNetworkMode } from '@app/imagodei/services/identity.service';
 
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
@@ -72,8 +75,8 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     private readonly pathService: PathService,
     private readonly pathFilterService: PathFilterService,
     private readonly router: Router,
-    private readonly profileService: ProfileService,
-    private readonly agentService: AgentService,
+    @Inject(LAMAD_PROFILE) private readonly profileService: ILamadProfile,
+    @Inject(LAMAD_AGENT) private readonly agentService: ILamadAgent,
     private readonly identityService: IdentityService
   ) {
     // Load saved view mode preference

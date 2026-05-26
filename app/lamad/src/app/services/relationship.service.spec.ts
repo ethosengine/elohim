@@ -2,9 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { RelationshipService } from './relationship.service';
-import { StorageApiService } from '@app/elohim/services/storage-api.service';
+import { LAMAD_STORAGE_API } from '../interfaces/storage.interface';
 import { of } from 'rxjs';
-import { RelationshipView } from '@app/elohim/adapters/storage-types.adapter';
+import type { RelationshipView } from '@elohim/storage-client/generated';
 import { vi } from 'vitest';
 
 describe('RelationshipService', () => {
@@ -30,7 +30,7 @@ describe('RelationshipService', () => {
     TestBed.configureTestingModule({
       providers: [
         RelationshipService,
-        { provide: StorageApiService, useValue: mockStorageApi },
+        { provide: LAMAD_STORAGE_API, useValue: mockStorageApi },
         provideHttpClient(),
         provideHttpClientTesting(),
       ],

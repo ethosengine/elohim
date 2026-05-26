@@ -6,7 +6,7 @@ import { RouterModule } from '@angular/router';
 
 import { Subscription, forkJoin } from 'rxjs';
 
-import { AgentService } from '@app/elohim/services/agent.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 
 import {
   getMasteryColor,
@@ -60,7 +60,7 @@ export class LearnerDashboardComponent implements OnInit, OnDestroy {
   private readonly masteryStats = inject(MasteryStatsService);
   private readonly contentMastery = inject(ContentMasteryService);
   private readonly pathService = inject(PathService);
-  private readonly agentService = inject(AgentService);
+  private readonly agentService = inject(LAMAD_AGENT);
   private subscription: Subscription | null = null;
 
   profile: LearnerMasteryProfile | null = null;

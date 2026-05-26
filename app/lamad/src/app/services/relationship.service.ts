@@ -17,15 +17,15 @@ import { map } from 'rxjs/operators';
 
 import { Observable, forkJoin } from 'rxjs';
 
-import { RelationshipView } from '@app/elohim/adapters/storage-types.adapter';
-import { StorageApiService } from '@app/elohim/services/storage-api.service';
-import { CreateRelationshipInput } from '@app/lamad/models/content-node.model';
+import type { RelationshipView } from '@elohim/storage-client/generated';
+import { LAMAD_STORAGE_API } from '../interfaces/storage.interface';
+import { CreateRelationshipInput } from '../models/content-node.model';
 
 @Injectable({
   providedIn: 'root',
 })
 export class RelationshipService {
-  private readonly storageApi = inject(StorageApiService);
+  private readonly storageApi = inject(LAMAD_STORAGE_API);
 
   /**
    * Get all relationships for a content node (as source).

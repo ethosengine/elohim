@@ -5,8 +5,11 @@ import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { of, throwError, BehaviorSubject, NEVER } from 'rxjs';
 import { PathNavigatorComponent } from './path-navigator.component';
 import { PathService } from '../../services/path.service';
-import { AgentService } from '@app/elohim/services/agent.service';
-import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
+import {
+  LAMAD_GOVERNANCE_SIGNAL,
+  LAMAD_EPR_RESOLVER,
+} from '../../interfaces/cross-pillar.interface';
 import { PathContextService } from '../../services/path-context.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SeoService } from '../../shared/services/seo.service';
@@ -139,11 +142,15 @@ describe('PathNavigatorComponent', () => {
           mode: { type: 'browser', doorway: { url: 'http://localhost:8888' } },
         }),
         { provide: PathService, useValue: pathServiceSpy },
-        { provide: AgentService, useValue: agentServiceSpy },
+        { provide: LAMAD_AGENT, useValue: agentServiceSpy },
         { provide: ContentMasteryService, useValue: contentMasteryServiceSpy },
         { provide: PathContextService, useValue: pathContextServiceSpy },
         { provide: SeoService, useValue: seoServiceSpy },
-        { provide: GovernanceSignalService, useValue: governanceSignalServiceSpy },
+        { provide: LAMAD_GOVERNANCE_SIGNAL, useValue: governanceSignalServiceSpy },
+        {
+          provide: LAMAD_EPR_RESOLVER,
+          useValue: { resolve: vi.fn().mockReturnValue(of(null)), resolveEprHead: vi.fn().mockReturnValue(of(null)) },
+        },
         { provide: GOVERNANCE, useValue: {} },
         { provide: CONTENT_ATTESTATION, useValue: {} },
         {
@@ -154,7 +161,7 @@ describe('PathNavigatorComponent', () => {
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
-    agentService = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
+    agentService = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
     contentMasteryService = TestBed.inject(ContentMasteryService) as {
       [K in keyof ContentMasteryService]?: Mock;
     };
@@ -606,8 +613,8 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should handle lesson completion event', () => {
-      const governanceSignalService = TestBed.inject(GovernanceSignalService) as {
-        [K in keyof GovernanceSignalService]?: Mock;
+      const governanceSignalService = TestBed.inject(LAMAD_GOVERNANCE_SIGNAL) as {
+        [key: string]: Mock;
       };
 
       const completionEvent = {

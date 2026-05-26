@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HouseholdResilienceService } from './household-resilience.service';
-import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { LAMAD_STORAGE_CLIENT } from '../interfaces/storage.interface';
 import type { HouseholdResilienceView } from '../../generated/household-resilience-view';
 
 describe('HouseholdResilienceService', () => {
@@ -30,7 +30,7 @@ describe('HouseholdResilienceService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         HouseholdResilienceService,
-        { provide: StorageClientService, useValue: storageClientSpy },
+        { provide: LAMAD_STORAGE_CLIENT, useValue: storageClientSpy },
       ],
     });
 

@@ -8,6 +8,35 @@ import { ELOHIM_ENV } from '@elohim/service';
 import { environment } from '../environments/environment';
 import { LEARNER_BACKEND } from './interfaces/learner-backend.interface';
 import { LearnerBackendApiService } from './services/learner-backend-api.service';
+import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from './interfaces/storage.interface';
+import { StorageApiService } from '@app/elohim/services/storage-api.service';
+import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { LAMAD_AGENT } from './interfaces/agent.interface';
+import { AgentService } from '@app/elohim/services/agent.service';
+import {
+  LAMAD_HOLOCHAIN_CLIENT,
+  LAMAD_AFFINITY_TRACKING,
+  LAMAD_EPR_RESOLVER,
+  LAMAD_GOVERNANCE_SIGNAL,
+  LAMAD_ELOHIM_PRESENCE,
+  LAMAD_HUMAN_CONSENT,
+  LAMAD_GOVERNANCE,
+  LAMAD_PROFILE,
+  LAMAD_ELOHIM_AGENT,
+  LAMAD_CONTEXT_ASSEMBLY,
+  LAMAD_LENS_REGISTRY,
+} from './interfaces/cross-pillar.interface';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
+import { HumanConsentService } from '@app/elohim/services/human-consent.service';
+import { GovernanceService } from '@app/elohim/services/governance.service';
+import { ProfileService } from '@app/elohim/services/profile.service';
+import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
+import { ContextAssemblyService } from '@app/elohim/services/context-assembly.service';
+import { LensRegistryService } from '@app/elohim/services/lens-registry.service';
 
 /**
  * Lamad bundle application config.
@@ -42,5 +71,27 @@ export const appConfig: ApplicationConfig = {
     // LEARNER_BACKEND — concrete provider for the lamad-local learner backend token
     // (P-disposition: token + interface live in lamad/interfaces/; elohim-app's token retired)
     { provide: LEARNER_BACKEND, useClass: LearnerBackendApiService },
+    // LAMAD_STORAGE_API / LAMAD_STORAGE_CLIENT — narrow tokens that decouple lamad services
+    // from direct elohim-app class imports. The concrete classes remain in elohim-app (they
+    // have significant elohim-app consumers) but lamad services inject via these tokens.
+    // (Slice 2.1c P+inversion pattern)
+    { provide: LAMAD_STORAGE_API, useExisting: StorageApiService },
+    { provide: LAMAD_STORAGE_CLIENT, useExisting: StorageClientService },
+    { provide: LAMAD_AGENT, useExisting: AgentService },
+    // Cross-pillar P+inversion tokens — concrete classes stay in elohim-app due to
+    // non-lamad deps (imagodei, qahal, CONNECTION_STRATEGY, PerformanceMetricsService, etc.)
+    // app.config.ts is the composition root, so cross-pillar imports here are intentional.
+    // (Slice 2.1c P+inversion pattern)
+    { provide: LAMAD_HOLOCHAIN_CLIENT, useExisting: HolochainClientService },
+    { provide: LAMAD_AFFINITY_TRACKING, useExisting: AffinityTrackingService },
+    { provide: LAMAD_EPR_RESOLVER, useExisting: EprResolverService },
+    { provide: LAMAD_GOVERNANCE_SIGNAL, useExisting: GovernanceSignalService },
+    { provide: LAMAD_ELOHIM_PRESENCE, useExisting: ElohimPresenceService },
+    { provide: LAMAD_HUMAN_CONSENT, useExisting: HumanConsentService },
+    { provide: LAMAD_GOVERNANCE, useExisting: GovernanceService },
+    { provide: LAMAD_PROFILE, useExisting: ProfileService },
+    { provide: LAMAD_ELOHIM_AGENT, useExisting: ElohimAgentService },
+    { provide: LAMAD_CONTEXT_ASSEMBLY, useExisting: ContextAssemblyService },
+    { provide: LAMAD_LENS_REGISTRY, useExisting: LensRegistryService },
   ],
 };

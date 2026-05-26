@@ -1,0 +1,605 @@
+/**
+ * Projection API Service
+ *
+ * Connects to Doorway's cache API for fast reads.
+ * Uses the generic cache endpoints: /api/v1/cache/{type}/{id}
+ *
+ * The app (elohim-app) owns all content structure and transformations.
+ * Doorway is just a cache that serves stored content.
+ */
+
+import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+
+// @coverage: 88.4% (2026-02-24)
+
+import { map, catchError, timeout, shareReplay } from 'rxjs/operators';
+
+import { Observable, of } from 'rxjs';
+
+import { ELOHIM_ENV } from '@elohim/service';
+import { ContentNode, ContentType, ContentReach } from '../models/content-node.model';
+import { LearningPath, parsePathView } from '../models/learning-path.model';
+
+import { ContentBackendService } from './content-backend.service';
+import { LAMAD_STORAGE_CLIENT } from '../interfaces/storage.interface';
+import type {
+  ContentMasteryView,
+  ContentStewardshipView,
+  ContentWithTagsView,
+  RelationshipView,
+  RelationshipWithContentView,
+} from '@elohim/storage-client/generated';
+
+/**
+ * Content query filters for projection API
+ */
+export interface ContentQueryFilters {
+  /** Single ID lookup */
+  id?: string;
+  /** Multiple ID lookup */
+  ids?: string[];
+  /** Filter by content type */
+  contentType?: ContentType | ContentType[];
+  /** Filter by tags (all must match) */
+  tags?: string[];
+  /** Filter by any of these tags */
+  anyTags?: string[];
+  /** Filter by reach/visibility */
+  reach?: ContentReach | ContentReach[];
+  /** Only public content */
+  publicOnly?: boolean;
+  /** Filter by author */
+  author?: string;
+  /** Full-text search query */
+  search?: string;
+  /** Maximum results */
+  limit?: number;
+  /** Skip for pagination */
+  skip?: number;
+}
+
+/**
+ * Path query filters for projection API
+ */
+export interface PathQueryFilters {
+  /** Single ID lookup */
+  id?: string;
+  /** Multiple ID lookup */
+  ids?: string[];
+  /** Filter by difficulty */
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  /** Filter by visibility */
+  visibility?: string;
+  /** Only public paths */
+  publicOnly?: boolean;
+  /** Filter by tags */
+  tags?: string[];
+  /** Full-text search query */
+  search?: string;
+  /** Maximum results */
+  limit?: number;
+  /** Skip for pagination */
+  skip?: number;
+}
+
+/**
+ * Projection API response wrapper
+ */
+export interface ProjectionResponse<T> {
+  data: T;
+  source: 'projection' | 'conductor';
+  cachedAt?: string;
+}
+
+/**
+ * Projection store statistics
+ */
+export interface ProjectionStats {
+  totalEntries: number;
+  hotCacheEntries: number;
+  expiredEntries: number;
+  mongoConnected: boolean;
+}
+
+@Injectable({ providedIn: 'root' })
+export class ProjectionAPIService {
+  private readonly http = inject(HttpClient);
+  private readonly contentService = inject(ContentBackendService);
+  private readonly storageClient = inject(LAMAD_STORAGE_CLIENT);
+  private readonly env = inject(ELOHIM_ENV);
+
+  // Circuit breaker: after consecutive failures, disable for a cooldown period.
+  // Self-healing: retries after cooldown to detect when cache becomes populated.
+  private consecutiveFailures = 0;
+  private disabledUntil = 0;
+  private static readonly FAILURE_THRESHOLD = 3;
+  private static readonly COOLDOWN_MS = 30_000; // 30 seconds
+
+  /** Base URL for cache API */
+  private get baseUrl(): string {
+    const doorwayUrl =
+      this.env.holochain?.authUrl ?? this.env.holochain?.appUrl ?? 'http://localhost:8080';
+    const httpUrl = doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+    return `${httpUrl}/api/v1/cache`;
+  }
+
+  /** API key for authenticated requests */
+  private get apiKey(): string | undefined {
+    return this.env.holochain?.proxyApiKey;
+  }
+
+  /** Build URL with optional API key */
+  private buildApiUrl(path: string): string {
+    const url = `${this.baseUrl}${path}`;
+    if (!this.apiKey) {
+      return url;
+    }
+    const separator = path.includes('?') ? '&' : '?';
+    return `${url}${separator}apiKey=${this.apiKey}`;
+  }
+
+  /** Default timeout for projection API calls */
+  private readonly defaultTimeout = 5000;
+
+  /** Whether projection API is enabled (respects circuit breaker) */
+  get enabled(): boolean {
+    if (this.env.projectionApi?.enabled === false) return false;
+    // Circuit breaker: skip projection during cooldown
+    if (Date.now() < this.disabledUntil) return false;
+    return true;
+  }
+
+  /** Record a successful projection read — resets circuit breaker */
+  private recordSuccess(): void {
+    this.consecutiveFailures = 0;
+  }
+
+  /** Record a failed/empty projection read — trips circuit breaker after threshold */
+  private recordFailure(): void {
+    this.consecutiveFailures++;
+    if (this.consecutiveFailures >= ProjectionAPIService.FAILURE_THRESHOLD) {
+      this.disabledUntil = Date.now() + ProjectionAPIService.COOLDOWN_MS;
+      this.consecutiveFailures = 0;
+    }
+  }
+
+  // =========================================================================
+  // Read-oriented interface methods
+  // =========================================================================
+
+  /** Get a single content item by ID, with tags. */
+  getContent(id: string): Observable<ContentWithTagsView | null> {
+    if (!this.enabled) {
+      return of(null);
+    }
+
+    const url = this.buildApiUrl(`/Content/${encodeURIComponent(id)}`);
+
+    return this.http.get<ContentWithTagsView>(url).pipe(
+      timeout(this.defaultTimeout),
+      catchError((err: HttpErrorResponse) => {
+        if (err.status === 404) return of(null);
+        return of(null);
+      })
+    );
+  }
+
+  /** List content items with optional filters. */
+  getContents(filters?: ContentFilters): Observable<ContentWithTagsView[]> {
+    if (!this.enabled) {
+      return of([]);
+    }
+
+    let params = new HttpParams();
+    if (filters?.limit) params = params.set('limit', filters.limit.toString());
+    if (filters?.offset) params = params.set('skip', filters.offset.toString());
+
+    const url = this.buildApiUrl('/Content');
+
+    return this.http.get<ContentWithTagsView[]>(url, { params }).pipe(
+      timeout(this.defaultTimeout),
+      map(data => data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  /** List content relationships — not supported by projection cache. */
+  getRelationships(_filters?: RelationshipFilters): Observable<RelationshipView[]> {
+    return of([]);
+  }
+
+  /** Get relationships for a content node — not supported by projection cache. */
+  getRelatedContent(_id: string): Observable<RelationshipWithContentView[]> {
+    return of([]);
+  }
+
+  /** Get mastery state — not supported by projection cache. */
+  getMastery(_humanId: string, _contentId: string): Observable<ContentMasteryView | null> {
+    return of(null);
+  }
+
+  /** Get stewardship data — not supported by projection cache. */
+  getStewardship(_contentId: string): Observable<ContentStewardshipView | null> {
+    return of(null);
+  }
+
+  // =========================================================================
+  // Domain-Type Content Queries (used by content-resolver, data-loader)
+  // =========================================================================
+
+  /**
+   * Get a single content node by ID (returns domain ContentNode type)
+   */
+  getContentNode(id: string): Observable<ContentNode | null> {
+    if (!this.enabled) {
+      return of(null);
+    }
+
+    const url = this.buildApiUrl(`/Content/${encodeURIComponent(id)}`);
+
+    return this.http.get<Record<string, unknown>>(url).pipe(
+      timeout(this.defaultTimeout),
+      map(data => {
+        const node = this.contentService.transformRawContent(data);
+        this.recordSuccess();
+        return node;
+      }),
+      catchError((err: HttpErrorResponse) => {
+        this.recordFailure();
+        return this.handleContentError(err, `getContentNode(${id})`);
+      }),
+      shareReplay(1)
+    );
+  }
+
+  /**
+   * Query content nodes with filters
+   *
+   * Note: The generic cache API only supports limit/skip.
+   * Client-side filtering is applied for other filters.
+   */
+  queryContent(filters: ContentQueryFilters): Observable<ContentNode[]> {
+    if (!this.enabled) {
+      return of([]);
+    }
+
+    let params = new HttpParams();
+    if (filters.limit) {
+      params = params.set('limit', filters.limit.toString());
+    }
+    if (filters.skip) {
+      params = params.set('skip', filters.skip.toString());
+    }
+
+    const url = this.buildApiUrl('/Content');
+
+    return this.http.get<Record<string, unknown>[]>(url, { params }).pipe(
+      timeout(this.defaultTimeout),
+      map(data => (data ?? []).map(c => this.contentService.transformRawContent(c))),
+      // Apply client-side filters
+      map(contents => this.applyContentFilters(contents, filters)),
+      catchError((err: HttpErrorResponse) => this.handleContentArrayError(err, 'queryContent'))
+    );
+  }
+
+  /**
+   * Apply client-side content filters
+   */
+  private applyContentFilters(
+    contents: ContentNode[],
+    filters: ContentQueryFilters
+  ): ContentNode[] {
+    let result = contents;
+
+    if (filters.id) {
+      result = result.filter(c => c.id === filters.id);
+    }
+    if (filters.ids?.length) {
+      const idSet = new Set(filters.ids);
+      result = result.filter(c => idSet.has(c.id));
+    }
+    if (filters.contentType) {
+      const types = Array.isArray(filters.contentType)
+        ? filters.contentType
+        : [filters.contentType];
+      result = result.filter(c => types.includes(c.contentType));
+    }
+    if (filters.tags?.length) {
+      result = result.filter(c => filters.tags!.every(tag => c.tags?.includes(tag)));
+    }
+    if (filters.anyTags?.length) {
+      result = result.filter(c => filters.anyTags!.some(tag => c.tags?.includes(tag)));
+    }
+    if (filters.publicOnly) {
+      result = result.filter(c => c.reach === 'commons');
+    }
+    if (filters.author) {
+      result = result.filter(c => c.authorId === filters.author);
+    }
+
+    return result;
+  }
+
+  /**
+   * Batch get multiple content nodes by IDs
+   */
+  batchGetContent(ids: string[]): Observable<Map<string, ContentNode>> {
+    if (!this.enabled || ids.length === 0) {
+      return of(new Map());
+    }
+
+    return this.queryContent({ ids }).pipe(
+      map(contents => {
+        const map = new Map<string, ContentNode>();
+        contents.forEach(c => map.set(c.id, c));
+        return map;
+      })
+    );
+  }
+
+  /**
+   * Search content with full-text query
+   */
+  searchContent(query: string, limit = 50): Observable<ContentNode[]> {
+    return this.queryContent({ search: query, limit, publicOnly: true });
+  }
+
+  // =========================================================================
+  // Domain-Type Path Queries (used by content-resolver, data-loader)
+  // =========================================================================
+
+  /**
+   * Get a single learning path by ID (returns domain LearningPath type)
+   */
+  getPathNode(id: string): Observable<LearningPath | null> {
+    if (!this.enabled) {
+      return of(null);
+    }
+
+    const url = this.buildApiUrl(`/LearningPath/${encodeURIComponent(id)}`);
+
+    return this.http.get<Record<string, unknown>>(url).pipe(
+      timeout(this.defaultTimeout),
+      map(data => {
+        const path = this.transformPath(data);
+        this.recordSuccess();
+        return path;
+      }),
+      catchError((err: HttpErrorResponse) => {
+        this.recordFailure();
+        return this.handlePathError(err, `getPathNode(${id})`);
+      }),
+      shareReplay(1)
+    );
+  }
+
+  /**
+   * Get path overview (minimal data for listing)
+   * Note: Uses same endpoint as getPathNode since cache API is generic
+   */
+  getPathOverview(id: string): Observable<Partial<LearningPath> | null> {
+    return this.getPathNode(id);
+  }
+
+  /**
+   * Query paths with filters
+   *
+   * Note: The generic cache API only supports limit/skip.
+   * Client-side filtering is applied for other filters.
+   */
+  queryPaths(filters: PathQueryFilters): Observable<LearningPath[]> {
+    if (!this.enabled) {
+      return of([]);
+    }
+
+    let params = new HttpParams();
+    if (filters.limit) {
+      params = params.set('limit', filters.limit.toString());
+    }
+    if (filters.skip) {
+      params = params.set('skip', filters.skip.toString());
+    }
+
+    const url = this.buildApiUrl('/LearningPath');
+
+    return this.http.get<Record<string, unknown>[]>(url, { params }).pipe(
+      timeout(this.defaultTimeout),
+      map(data => (data ?? []).map(p => this.transformPath(p))),
+      // Apply client-side filters
+      map(paths => this.applyPathFilters(paths, filters)),
+      catchError((err: HttpErrorResponse) => this.handlePathArrayError(err, 'queryPaths'))
+    );
+  }
+
+  /**
+   * Apply client-side path filters
+   */
+  private applyPathFilters(paths: LearningPath[], filters: PathQueryFilters): LearningPath[] {
+    let result = paths;
+
+    if (filters.id) {
+      result = result.filter(p => p.id === filters.id);
+    }
+    if (filters.ids?.length) {
+      const idSet = new Set(filters.ids);
+      result = result.filter(p => idSet.has(p.id));
+    }
+    if (filters.difficulty) {
+      result = result.filter(p => p.difficulty === filters.difficulty);
+    }
+    if (filters.visibility) {
+      result = result.filter(p => p.visibility === filters.visibility);
+    }
+    if (filters.publicOnly) {
+      result = result.filter(p => p.visibility === 'public');
+    }
+    if (filters.tags?.length) {
+      result = result.filter(p => filters.tags!.some(tag => p.tags?.includes(tag)));
+    }
+
+    return result;
+  }
+
+  /**
+   * Get all public paths (path index)
+   */
+  getAllPaths(limit = 100): Observable<LearningPath[]> {
+    return this.queryPaths({ publicOnly: true, limit });
+  }
+
+  /**
+   * Batch get multiple paths by IDs
+   */
+  batchGetPaths(ids: string[]): Observable<Map<string, LearningPath>> {
+    if (!this.enabled || ids.length === 0) {
+      return of(new Map());
+    }
+
+    return this.queryPaths({ ids }).pipe(
+      map(paths => {
+        const map = new Map<string, LearningPath>();
+        paths.forEach(p => map.set(p.id, p));
+        return map;
+      })
+    );
+  }
+
+  // =========================================================================
+  // Relationships & Graph
+  // =========================================================================
+
+  /**
+   * Get related content for a node
+   */
+  getRelated(nodeId: string, depth = 1): Observable<ContentNode[]> {
+    if (!this.enabled) {
+      return of([]);
+    }
+
+    const params = new HttpParams().set('depth', depth.toString());
+
+    return this.http
+      .get<
+        ProjectionResponse<Record<string, unknown>[]>
+      >(`${this.baseUrl}/content/${encodeURIComponent(nodeId)}/related`, { params })
+      .pipe(
+        timeout(this.defaultTimeout),
+        map(response => (response.data ?? []).map(c => this.contentService.transformRawContent(c))),
+        catchError((err: HttpErrorResponse) =>
+          this.handleContentArrayError(err, `getRelated(${nodeId})`)
+        )
+      );
+  }
+
+  // =========================================================================
+  // Stats & Health
+  // =========================================================================
+
+  /**
+   * Get projection store statistics
+   */
+  getStats(): Observable<ProjectionStats | null> {
+    if (!this.enabled) {
+      return of(null);
+    }
+
+    return this.http.get<ProjectionStats>(`${this.baseUrl}/stats`).pipe(
+      timeout(this.defaultTimeout),
+      catchError((err: HttpErrorResponse) => this.handleStatsError(err, 'getStats'))
+    );
+  }
+
+  /**
+   * Check if projection API is healthy
+   */
+  isHealthy(): Observable<boolean> {
+    return this.getStats().pipe(
+      map(stats => stats !== null),
+      catchError(() => of(false))
+    );
+  }
+
+  // =========================================================================
+  // Private Helpers
+  // =========================================================================
+
+  /**
+   * Transform projected path to LearningPath (PathView) model.
+   * Constructs a synthetic ContentNode from projected data, then parses via parsePathView.
+   */
+  private transformPath(data: unknown): LearningPath {
+    const d = data as Record<string, unknown>;
+    const id = (d['id'] ?? d['docId'] ?? '') as string;
+
+    // Build a synthetic ContentNode from projected path data
+    const node: ContentNode = {
+      id,
+      contentType: 'path',
+      title: (d['title'] ?? '') as string,
+      description: (d['description'] ?? '') as string,
+      content: d['content'] ?? d['contentBody'] ?? d['sections'] ?? {},
+      contentFormat: 'epr-composite' as ContentNode['contentFormat'],
+      tags: (d['tags'] ?? []) as string[],
+      relatedNodeIds: [],
+      metadata: {
+        pathType: (d['pathType'] ?? 'course') as string,
+        difficulty: (d['difficulty'] ?? 'beginner') as string,
+        estimatedDuration: d['estimatedDuration'] as string | undefined,
+        thumbnailUrl: this.contentService.resolveBlobReference(
+          ((d['metadata'] as Record<string, unknown> | undefined)?.['thumbnailUrl'] as
+            | string
+            | undefined) ?? (d['thumbnailUrl'] as string | null | undefined)
+        ),
+        thumbnailAlt: d['thumbnailAlt'] as string | undefined,
+        version: (d['version'] ?? '1.0.0') as string,
+        purpose: (d['purpose'] ?? '') as string,
+        contributors: (d['contributors'] ?? []) as string[],
+      },
+      authorId: (d['createdBy'] ?? d['author'] ?? '') as string,
+      reach: (d['visibility'] ?? 'commons') as ContentNode['reach'],
+      createdAt: d['createdAt'] as string | undefined,
+      updatedAt: d['updatedAt'] as string | undefined,
+    };
+
+    return parsePathView(node);
+  }
+
+  /**
+   * Handle HTTP errors - returns null for single items, empty array for collections
+   */
+  private handleContentError(
+    _error: HttpErrorResponse,
+    _context: string
+  ): Observable<ContentNode | null> {
+    return of(null);
+  }
+
+  private handleContentArrayError(
+    _error: HttpErrorResponse,
+    _context: string
+  ): Observable<ContentNode[]> {
+    return of([]);
+  }
+
+  private handlePathError(
+    _error: HttpErrorResponse,
+    _context: string
+  ): Observable<LearningPath | null> {
+    return of(null);
+  }
+
+  private handlePathArrayError(
+    _error: HttpErrorResponse,
+    _context: string
+  ): Observable<LearningPath[]> {
+    return of([]);
+  }
+
+  private handleStatsError(
+    _error: HttpErrorResponse,
+    _context: string
+  ): Observable<ProjectionStats | null> {
+    return of(null);
+  }
+}

@@ -6,9 +6,12 @@ import { map, switchMap, tap } from 'rxjs/operators';
 
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
-import { generateMapId } from '@app/elohim/utils';
+import { DataLoaderService } from './data-loader.service';
+import {
+  LAMAD_ELOHIM_AGENT,
+  type ILamadElohimAgent,
+} from '../interfaces/cross-pillar.interface';
+import { generateMapId } from '../utils/id-generator';
 
 import {
   KnowledgeMap,
@@ -62,7 +65,7 @@ export class KnowledgeMapService {
   private currentAgentId = DEMO_LEARNER;
 
   private readonly dataLoader = inject(DataLoaderService);
-  private readonly elohimService = inject(ElohimAgentService);
+  private readonly elohimService = inject<ILamadElohimAgent>(LAMAD_ELOHIM_AGENT);
 
   constructor() {
     this.initializeDemoMaps();

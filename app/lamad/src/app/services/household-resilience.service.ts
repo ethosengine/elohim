@@ -3,14 +3,14 @@ import { inject, Injectable } from '@angular/core';
 
 import { Observable } from 'rxjs';
 
-import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { LAMAD_STORAGE_CLIENT } from '../interfaces/storage.interface';
 
 import type { HouseholdResilienceView } from '../../generated/household-resilience-view';
 
 @Injectable({ providedIn: 'root' })
 export class HouseholdResilienceService {
   private readonly http = inject(HttpClient);
-  private readonly storageClient = inject(StorageClientService);
+  private readonly storageClient = inject(LAMAD_STORAGE_CLIENT);
 
   get(contentId: string, viewerHouseholdId?: string): Observable<HouseholdResilienceView> {
     const baseUrl = this.storageClient.getStorageBaseUrl();

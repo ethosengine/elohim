@@ -3,8 +3,8 @@ import { MeaningMapComponent } from './meaning-map.component';
 import { provideHttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
-import { ContentIndex, DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
+import { ContentIndex, DataLoaderService } from '../../services/data-loader.service';
+import { LAMAD_AFFINITY_TRACKING } from '../../interfaces/cross-pillar.interface';
 import { ContentNode } from '../../models/content-node.model';
 import { vi, Mock } from 'vitest';
 
@@ -90,13 +90,13 @@ describe('MeaningMapComponent', () => {
       providers: [
         provideHttpClient(),
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: AffinityTrackingService, useValue: affinitySpyObj },
+        { provide: LAMAD_AFFINITY_TRACKING, useValue: affinitySpyObj },
         { provide: Router, useValue: routerSpyObj },
       ],
     }).compileComponents();
 
     dataLoaderSpy = TestBed.inject(DataLoaderService) as any;
-    affinityServiceSpy = TestBed.inject(AffinityTrackingService) as any;
+    affinityServiceSpy = TestBed.inject(LAMAD_AFFINITY_TRACKING) as any;
     routerSpy = TestBed.inject(Router) as any;
 
     fixture = TestBed.createComponent(MeaningMapComponent);

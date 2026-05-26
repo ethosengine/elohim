@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { RelatedConceptsService } from './related-concepts.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from './data-loader.service';
 import {
   ContentNode,
   ContentGraph,

@@ -6,7 +6,7 @@ import { map, switchMap, tap } from 'rxjs/operators';
 
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 
-import { generateExtensionId } from '@app/elohim/utils';
+import { generateExtensionId } from '../utils/id-generator';
 
 import { PathStep, LearningPath } from '../models/learning-path.model';
 import {

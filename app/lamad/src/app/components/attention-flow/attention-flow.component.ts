@@ -2,8 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
-import { AgentService } from '@app/elohim/services/agent.service';
+import type { EconomicEventView } from '@elohim/storage-client/generated';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import { EventService } from '@elohim/rea-runtime';
 
 /**
@@ -26,7 +26,7 @@ export class AttentionFlowComponent implements OnInit {
   isLoading = true;
 
   private readonly eventService = inject(EventService);
-  private readonly agentService = inject(AgentService);
+  private readonly agentService = inject(LAMAD_AGENT);
 
   ngOnInit(): void {
     const agentId = this.agentService.getCurrentAgentId();

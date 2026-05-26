@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, BehaviorSubject } from 'rxjs';
-import { AgentService } from '@app/elohim/services/agent.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../interfaces/agent.interface';
+import { DataLoaderService } from './data-loader.service';
 import { SessionHumanService } from '@elohim/identity';
 import { AccessLevel, ContentAccessMetadata } from '../models';
 import { Agent, AgentProgress, FrontierItem } from '@elohim/service/angular/models/agent.model';
@@ -9,7 +9,7 @@ import { SessionHuman } from '@elohim/identity';
 import { vi, Mock } from 'vitest';
 
 describe('AgentService', () => {
-  let service: AgentService;
+  let service: ILamadAgent;
   let dataLoaderSpy: any;
   let sessionHumanServiceSpy: any;
   let localStorageMock: { [key: string]: string };
@@ -123,7 +123,7 @@ describe('AgentService', () => {
     dataLoaderSpy.getLocalProgress.mockReturnValue(null);
     dataLoaderSpy.saveAgentProgress.mockReturnValue(of(undefined));
 
-    service = TestBed.inject(AgentService);
+    service = TestBed.inject(LAMAD_AGENT);
   });
 
   afterEach(() => {

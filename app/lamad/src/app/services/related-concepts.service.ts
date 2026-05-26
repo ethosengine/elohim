@@ -6,7 +6,7 @@ import { map, shareReplay, take, switchMap, catchError, tap } from 'rxjs/operato
 
 import { Observable, of, forkJoin } from 'rxjs';
 
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from './data-loader.service';
 
 import { ContentNode, ContentGraph, ContentRelationship } from '../models/content-node.model';
 import {

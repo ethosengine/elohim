@@ -123,6 +123,7 @@ export * from './angular/models/gated-response.model';
 // Interfaces (Angular DI tokens + abstract contracts)
 export * from './angular/interfaces/governance.interface';
 export * from './angular/interfaces/content-attestation.interface';
+export * from './angular/interfaces/blob-fetcher.interface';
 
 // Environment token
 export type { ElohimEnv } from './env/elohim-env';

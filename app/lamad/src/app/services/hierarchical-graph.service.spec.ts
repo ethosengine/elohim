@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { of, throwError } from 'rxjs';
 import { HierarchicalGraphService } from './hierarchical-graph.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
+import { DataLoaderService } from './data-loader.service';
+import { LAMAD_AFFINITY_TRACKING } from '../interfaces/cross-pillar.interface';
 import { LearningPath, PathChapter, PathModule, PathSection } from '../models/learning-path.model';
 import { ClusterNode, ClusterGraphData } from '../models/cluster-graph.model';
 import { ContentNode } from '../models/content-node.model';
@@ -159,7 +159,7 @@ describe('HierarchicalGraphService', () => {
       providers: [
         HierarchicalGraphService,
         { provide: DataLoaderService, useValue: dataLoaderSpy },
-        { provide: AffinityTrackingService, useValue: affinitySpy },
+        { provide: LAMAD_AFFINITY_TRACKING, useValue: affinitySpy },
       ],
     });
 

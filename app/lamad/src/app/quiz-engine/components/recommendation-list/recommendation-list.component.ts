@@ -32,7 +32,10 @@ import { firstValueFrom } from 'rxjs';
 
 import 'elohim-core/register';
 
-import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import {
+  LAMAD_EPR_RESOLVER,
+  type ILamadEprResolver,
+} from '../../../interfaces/cross-pillar.interface';
 
 import type { ElohimEprLink } from 'elohim-core';
 
@@ -124,7 +127,7 @@ export class RecommendationListComponent implements AfterViewInit, OnDestroy {
   @Input() heading = 'Strengthen Your Foundations';
   @Output() dismiss = new EventEmitter<string>();
 
-  private readonly eprResolver = inject(EprResolverService);
+  private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
   private readonly router = inject(Router);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
 

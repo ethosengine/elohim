@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-import { AgentService } from '@app/elohim/services/agent.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../interfaces/agent.interface';
 import { LAMAD_COUPLING_MAP, type ContentTypeCoupling } from '@app/lamad/generated/coupling-map';
 import {
   EconomicEventsApiService,
@@ -42,7 +42,7 @@ const USE_SIGNAL_EMIT_ENDPOINT = true;
 export class SignalHarnessService {
   private readonly economicEventsApi = inject(EconomicEventsApiService);
   private readonly signalEmit = inject(SignalEmitService);
-  private readonly agentService = inject(AgentService);
+  private readonly agentService = inject(LAMAD_AGENT);
 
   /** Minimal shape required from a content node for signal translation. */
   async onRendererComplete(

@@ -4,7 +4,7 @@ import { of, throwError, BehaviorSubject } from 'rxjs';
 import { PathOverviewComponent } from './path-overview.component';
 import { PathService } from '../../services/path.service';
 import { PathAdaptationService } from '../../quiz-engine/services/path-adaptation.service';
-import { AgentService } from '@app/elohim/services/agent.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import { SeoService } from '../../shared/services/seo.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { LearningPath } from '../../models';
@@ -183,7 +183,7 @@ describe('PathOverviewComponent', () => {
       providers: [
         provideRouter([]),
         { provide: PathService, useValue: pathServiceSpy },
-        { provide: AgentService, useValue: agentServiceSpy },
+        { provide: ILamadAgent, useValue: agentServiceSpy },
         { provide: PathAdaptationService, useValue: adaptationServiceSpy },
         { provide: SeoService, useValue: seoServiceSpy },
         { provide: ContentMasteryService, useValue: contentMasteryServiceSpy },
@@ -195,7 +195,7 @@ describe('PathOverviewComponent', () => {
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
-    agentService = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
+    agentService = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
     router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
 

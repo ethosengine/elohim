@@ -4,8 +4,8 @@ import { of, throwError } from 'rxjs';
 import { LamadHomeComponent } from './lamad-home.component';
 import { PathService } from '../../services/path.service';
 import { PathFilterService } from '../../services/path-filter.service';
-import { ProfileService } from '@app/elohim/services/profile.service';
-import { AgentService } from '@app/elohim/services/agent.service';
+import { LAMAD_PROFILE } from '../../interfaces/cross-pillar.interface';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 import { vi, Mock } from 'vitest';
@@ -96,8 +96,8 @@ describe('LamadHomeComponent', () => {
         { provide: PathService, useValue: pathServiceSpy },
         { provide: PathFilterService, useValue: pathFilterServiceSpy },
         { provide: Router, useValue: routerSpy },
-        { provide: ProfileService, useValue: profileServiceSpy },
-        { provide: AgentService, useValue: agentServiceSpy },
+        { provide: LAMAD_PROFILE, useValue: profileServiceSpy },
+        { provide: LAMAD_AGENT, useValue: agentServiceSpy },
         { provide: IdentityService, useValue: identityServiceSpy },
       ],
     }).compileComponents();
@@ -107,8 +107,8 @@ describe('LamadHomeComponent', () => {
       [K in keyof PathFilterService]?: Mock;
     };
     router = TestBed.inject(Router) as { [K in keyof Router]?: Mock };
-    profileService = TestBed.inject(ProfileService) as { [K in keyof ProfileService]?: Mock };
-    agentService = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
+    profileService = TestBed.inject(LAMAD_PROFILE) as { [key: string]: Mock };
+    agentService = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
     identityService = TestBed.inject(IdentityService) as { [K in keyof IdentityService]?: Mock };
 
     pathService.listPaths.mockReturnValue(of(mockPathIndex));

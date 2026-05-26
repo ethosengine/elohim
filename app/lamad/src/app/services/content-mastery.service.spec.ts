@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ContentMasteryService } from './content-mastery.service';
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+import { LocalSourceChainService } from '@elohim/service';
 import { SessionHumanService } from '@elohim/identity';
 import { MasteryLevel, FRESHNESS_THRESHOLDS } from '../models';
 import { SessionHuman } from '@elohim/identity';

@@ -6,7 +6,7 @@ import { map, switchMap, catchError, take } from 'rxjs/operators';
 
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from './data-loader.service';
 
 import { ContentNode, ContentGraph, ContentRelationship } from '../models/content-node.model';
 import {

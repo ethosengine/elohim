@@ -22,7 +22,11 @@ import {
   OnInit,
 } from '@angular/core';
 
-import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
+import {
+  LAMAD_ELOHIM_PRESENCE,
+  type ILamadElohimPresence,
+  type LamadPresenceMoment,
+} from '../../../interfaces/cross-pillar.interface';
 import { MasteryStatsService } from '@app/lamad/services/mastery-stats.service';
 
 import { getInstrument, type InstrumentRegistryEntry } from '../../instruments/instrument-registry';
@@ -35,7 +39,6 @@ import { DiscoveryAttestationService } from '../../services/discovery-attestatio
 import { RecommendationListComponent } from '../recommendation-list/recommendation-list.component';
 
 import type { ContentRecommendation } from '../../services/path-adaptation.service';
-import type { ElohimPresenceMoment } from '@app/elohim/models/elohim-presence.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -635,10 +638,10 @@ export interface SubscaleBar {
 export class AssessmentCompletionSummaryComponent implements OnInit {
   private readonly discoveryService = inject(DiscoveryAttestationService);
   private readonly masteryStats = inject(MasteryStatsService);
-  private readonly presenceService = inject(ElohimPresenceService);
+  private readonly presenceService = inject<ILamadElohimPresence>(LAMAD_ELOHIM_PRESENCE);
 
   /** Elohim presence moment after discovery completion */
-  readonly elohimMoment = signal<ElohimPresenceMoment | null>(null);
+  readonly elohimMoment = signal<LamadPresenceMoment | null>(null);
   readonly elohimLoading = signal(false);
 
   // ─── Inputs ──────────────────────────────────────────────────────────────────

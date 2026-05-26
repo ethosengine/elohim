@@ -4,7 +4,7 @@ import { signal } from '@angular/core';
 
 import { of, BehaviorSubject } from 'rxjs';
 
-import { ProfileService } from '@app/elohim/services/profile.service';
+import { LAMAD_PROFILE } from '../../interfaces/cross-pillar.interface';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { SessionHumanService } from '@elohim/identity';
 
@@ -97,7 +97,7 @@ describe('ProfilePageComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ProfilePageComponent],
       providers: [
-        { provide: ProfileService, useValue: profileServiceSpy },
+        { provide: LAMAD_PROFILE, useValue: profileServiceSpy },
         { provide: IdentityService, useValue: identityServiceSpy },
         { provide: SessionHumanService, useValue: sessionHumanSpy },
         { provide: ContentMasteryService, useValue: masteryServiceSpy },

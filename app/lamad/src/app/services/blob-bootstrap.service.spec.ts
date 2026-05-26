@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { BlobBootstrapService } from './blob-bootstrap.service';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { LAMAD_HOLOCHAIN_CLIENT } from '../interfaces/cross-pillar.interface';
 import { BlobCacheTiersService } from './blob-cache-tiers.service';
 import { BlobManagerService } from './blob-manager.service';
 import { signal } from '@angular/core';
@@ -26,7 +26,7 @@ describe('BlobBootstrapService', () => {
     TestBed.configureTestingModule({
       providers: [
         BlobBootstrapService,
-        { provide: HolochainClientService, useValue: holochainSpy },
+        { provide: LAMAD_HOLOCHAIN_CLIENT, useValue: holochainSpy },
         { provide: BlobManagerService, useValue: blobManagerSpy },
         { provide: BlobCacheTiersService, useValue: blobCacheSpy },
       ],

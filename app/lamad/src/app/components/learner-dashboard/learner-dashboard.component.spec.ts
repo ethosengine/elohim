@@ -5,7 +5,7 @@ import { By } from '@angular/platform-browser';
 
 import { BehaviorSubject, of } from 'rxjs';
 
-import { AgentService } from '@app/elohim/services/agent.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { MasteryStatsService } from '../../services/mastery-stats.service';
@@ -143,7 +143,7 @@ describe('LearnerDashboardComponent', () => {
         { provide: MasteryStatsService, useValue: mockMasteryStats },
         { provide: ContentMasteryService, useValue: mockContentMastery },
         { provide: PathService, useValue: mockPathService },
-        { provide: AgentService, useValue: mockAgentService },
+        { provide: ILamadAgent, useValue: mockAgentService },
         { provide: EVENT_API, useValue: { createEconomicEvent: vi.fn().mockReturnValue(of(null)), getEconomicEvents: vi.fn().mockReturnValue(of([])) } },
         { provide: AGENT_CONTEXT, useValue: { getCurrentAgentId: vi.fn().mockReturnValue('test-agent') } },
       ],

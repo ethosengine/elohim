@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { of } from 'rxjs';
 
 import { ContentEditorPageComponent } from './content-editor-page.component';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from '../../services/data-loader.service';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
 import { ContentFormatRegistryService } from '../../content-io/services/content-format-registry.service';
 import { vi } from 'vitest';

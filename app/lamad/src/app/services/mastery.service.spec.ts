@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
-import { ContentMasteryView } from '@app/elohim/adapters/storage-types.adapter';
-import { StorageApiService } from '@app/elohim/services/storage-api.service';
+import type { ContentMasteryView } from '@elohim/storage-client/generated';
+import { LAMAD_STORAGE_API } from '../interfaces/storage.interface';
 
 import {
   MasteryService,
@@ -44,7 +44,7 @@ describe('MasteryService', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [MasteryService, { provide: StorageApiService, useValue: storageApiSpy }],
+      providers: [MasteryService, { provide: LAMAD_STORAGE_API, useValue: storageApiSpy }],
     });
     service = TestBed.inject(MasteryService);
   });

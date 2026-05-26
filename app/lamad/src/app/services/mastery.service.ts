@@ -20,8 +20,8 @@ import { map } from 'rxjs/operators';
 
 import { Observable, forkJoin, of } from 'rxjs';
 
-import { ContentMasteryView } from '@app/elohim/adapters/storage-types.adapter';
-import { StorageApiService } from '@app/elohim/services/storage-api.service';
+import type { ContentMasteryView } from '@elohim/storage-client/generated';
+import { LAMAD_STORAGE_API } from '../interfaces/storage.interface';
 
 /**
  * Mastery level constants (Bloom's Taxonomy)
@@ -55,7 +55,7 @@ export const MASTERY_LEVEL_ORDER: Record<MasteryLevelType, number> = {
   providedIn: 'root',
 })
 export class MasteryService {
-  private readonly storageApi = inject(StorageApiService);
+  private readonly storageApi = inject(LAMAD_STORAGE_API);
 
   // ===========================================================================
   // Query Methods

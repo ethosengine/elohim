@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
 import { QuestionPoolService } from './question-pool.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from '../../services/data-loader.service';
 import { PathService } from '../../services/path.service';
 import type { PerseusItem } from '../../content-io/plugins/sophia/sophia-moment.model';
 import type { QuestionPool } from '../models/question-pool.model';

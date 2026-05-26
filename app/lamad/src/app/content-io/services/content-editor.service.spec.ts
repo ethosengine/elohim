@@ -2,7 +2,10 @@ import { TestBed } from '@angular/core/testing';
 
 import { of, throwError } from 'rxjs';
 
-import { ContextAssemblyService } from '@app/elohim';
+import {
+  LAMAD_CONTEXT_ASSEMBLY,
+  type LamadContextAssemblyResult,
+} from '../../interfaces/cross-pillar.interface';
 
 import { ContentNode } from '../../models/content-node.model';
 import {
@@ -13,7 +16,6 @@ import {
 import { ContentEditorService, ContentDraft, SaveResult } from './content-editor.service';
 import { ContentFormatRegistryService } from './content-format-registry.service';
 
-import type { ContextAssemblyResult } from '@app/elohim';
 import { vi } from 'vitest';
 
 describe('ContentEditorService', () => {
@@ -22,15 +24,15 @@ describe('ContentEditorService', () => {
   let mockContextAssembly: any;
 
   const buildAssemblyResult = (
-    overrides: Partial<ContextAssemblyResult> = {}
-  ): ContextAssemblyResult =>
-    ({
-      createContext: { layers: {} },
-      negotiationResult: { grantedReach: 'local', reasoning: 'test' },
-      birthContext: { negotiatedReach: 'local', createdAt: new Date().toISOString() },
-      timedOut: false,
-      ...overrides,
-    }) as unknown as ContextAssemblyResult;
+    overrides: Partial<LamadContextAssemblyResult> = {}
+  ): LamadContextAssemblyResult => ({
+    status: 'fulfilled',
+    createContext: { layers: {} },
+    negotiationResult: { grantedReach: 'local', reasoning: 'test' },
+    birthContext: { negotiatedReach: 'local', createdAt: new Date().toISOString() },
+    timedOut: false,
+    ...overrides,
+  });
 
   const createMockNode = (overrides: Partial<ContentNode> = {}): ContentNode => ({
     id: 'test-node-1',
@@ -66,7 +68,7 @@ describe('ContentEditorService', () => {
       providers: [
         ContentEditorService,
         { provide: ContentFormatRegistryService, useValue: mockRegistry },
-        { provide: ContextAssemblyService, useValue: mockContextAssembly },
+        { provide: LAMAD_CONTEXT_ASSEMBLY, useValue: mockContextAssembly },
       ],
     });
     service = TestBed.inject(ContentEditorService);

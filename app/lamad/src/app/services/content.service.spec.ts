@@ -6,8 +6,8 @@ import {
   PathReference,
   ContentAccessResult,
 } from './content.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { AgentService } from '@app/elohim/services/agent.service';
+import { DataLoaderService } from './data-loader.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../interfaces/agent.interface';
 import { ContentNode, ContentType } from '../models/content-node.model';
 import { vi, Mock } from 'vitest';
 
@@ -79,13 +79,13 @@ describe('ContentService', () => {
       providers: [
         ContentService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: AgentService, useValue: agentServiceSpyObj },
+        { provide: ILamadAgent, useValue: agentServiceSpyObj },
       ],
     });
 
     service = TestBed.inject(ContentService);
     dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
-    agentServiceSpy = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
+    agentServiceSpy = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
 
     // Default spy return values
     dataLoaderSpy.getContent.mockReturnValue(of(mockContent));

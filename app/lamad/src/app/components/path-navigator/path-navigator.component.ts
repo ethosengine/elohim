@@ -16,8 +16,11 @@ import { takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
 
-import { AgentService } from '@app/elohim/services/agent.service';
-import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
+import {
+  LAMAD_GOVERNANCE_SIGNAL,
+  type ILamadGovernanceSignal,
+} from '../../interfaces/cross-pillar.interface';
 
 import { SeoService } from '../../shared/services/seo.service';
 import { MasteryLevel } from '../../models/content-mastery.model';
@@ -155,8 +158,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly pathService: PathService,
-    private readonly agentService: AgentService,
-    private readonly governanceSignalService: GovernanceSignalService,
+    @Inject(LAMAD_AGENT) private readonly agentService: ILamadAgent,
+    @Inject(LAMAD_GOVERNANCE_SIGNAL) private readonly governanceSignalService: ILamadGovernanceSignal,
     private readonly pathContextService: PathContextService,
     @Inject(DOCUMENT) private readonly document: Document
   ) {}

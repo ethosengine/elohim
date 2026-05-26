@@ -22,9 +22,9 @@ import { map, catchError, tap, switchMap } from 'rxjs/operators';
 
 import { Observable, from, of, throwError, firstValueFrom } from 'rxjs';
 
-import { BlobMetadataAnchor } from '@app/elohim/integrity';
+import { BlobMetadataAnchor } from './blob-metadata.anchor';
 
-import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { LAMAD_STORAGE_CLIENT, type ILamadStorageClient } from '../interfaces/storage.interface';
 import { ContentBlob } from '../models/content-node.model';
 
 import { BlobFallbackService, BlobFetchResult, UrlHealth } from './blob-fallback.service';
@@ -136,7 +136,7 @@ export class BlobManagerService {
   private cacheLock = Promise.resolve();
 
   /** Storage client for strategy-aware blob URLs (lazy injected) */
-  private storageClient: StorageClientService | null = null;
+  private storageClient: ILamadStorageClient | null = null;
 
   private readonly blobMetadataAnchor = inject(BlobMetadataAnchor);
   private readonly verificationService = inject(BlobVerificationService);
@@ -198,10 +198,10 @@ export class BlobManagerService {
   }
 
   /**
-   * Lazy-inject StorageClientService to avoid circular dependency.
+   * Lazy-inject storage client via token to avoid circular dependency.
    */
-  private getStorageClient(): StorageClientService {
-    this.storageClient ??= this.injector.get(StorageClientService);
+  private getStorageClient(): ILamadStorageClient {
+    this.storageClient ??= this.injector.get(LAMAD_STORAGE_CLIENT);
     return this.storageClient;
   }
 

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
 import { PathGraphService } from './path-graph.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from './data-loader.service';
 import { LearningPath, PathStep, PathChapter } from '../models/learning-path.model';
 import { ContentNode } from '../models/content-node.model';
 import { vi } from 'vitest';

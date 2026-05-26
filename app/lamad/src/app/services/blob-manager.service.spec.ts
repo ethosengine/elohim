@@ -14,7 +14,7 @@ import { ContentBlob } from '../models/content-node.model';
 import { of, throwError } from 'rxjs';
 import { vi, Mock } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
-import { BlobMetadataAnchor } from '@app/elohim/integrity';
+import { BlobMetadataAnchor } from './blob-metadata.anchor';
 
 describe('BlobManagerService', () => {
   let service: BlobManagerService;

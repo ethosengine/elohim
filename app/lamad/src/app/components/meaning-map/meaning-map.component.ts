@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, Inject, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
@@ -8,9 +8,12 @@ import { takeUntil, map } from 'rxjs/operators';
 
 import { Subject, combineLatest } from 'rxjs';
 
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { CategoryAffinityStats } from '@app/qahal/models/human-affinity.model';
+import {
+  LAMAD_AFFINITY_TRACKING,
+  type ILamadAffinityTracking,
+  type LamadCategoryAffinityStats,
+} from '../../interfaces/cross-pillar.interface';
+import { DataLoaderService } from '../../services/data-loader.service';
 
 import { ContentNode } from '../../models';
 
@@ -19,7 +22,7 @@ interface CategorySection {
   displayName: string;
   icon: string;
   nodes: ContentNodeWithAffinity[];
-  stats: CategoryAffinityStats | null;
+  stats: LamadCategoryAffinityStats | null;
   expanded: boolean;
 }
 
@@ -50,7 +53,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly dataLoader: DataLoaderService,
-    private readonly affinityService: AffinityTrackingService,
+    @Inject(LAMAD_AFFINITY_TRACKING) private readonly affinityService: ILamadAffinityTracking,
     private readonly router: Router
   ) {}
 

@@ -6,8 +6,11 @@ import { map, tap, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
 import { Observable, of } from 'rxjs';
 
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import {
+  LAMAD_AFFINITY_TRACKING,
+  type ILamadAffinityTracking,
+} from '../interfaces/cross-pillar.interface';
+import { DataLoaderService } from './data-loader.service';
 
 import {
   ClusterNode,
@@ -101,7 +104,7 @@ export class HierarchicalGraphService {
   private currentGraphSnapshot: ClusterGraphData | null = null;
 
   private readonly dataLoader = inject(DataLoaderService);
-  private readonly affinityService = inject(AffinityTrackingService);
+  private readonly affinityService: ILamadAffinityTracking = inject(LAMAD_AFFINITY_TRACKING);
 
   /**
    * Initialize cluster graph from a learning path.

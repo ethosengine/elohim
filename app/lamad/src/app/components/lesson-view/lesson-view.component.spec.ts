@@ -7,7 +7,7 @@ import { PathContext } from '../../models/exploration-context.model';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
-import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { LAMAD_EPR_RESOLVER } from '../../interfaces/cross-pillar.interface';
 import { of } from 'rxjs';
 import { vi, Mock } from 'vitest';
 
@@ -87,7 +87,7 @@ describe('LessonViewComponent', () => {
         provideHttpClient(),
         { provide: RendererRegistryService, useValue: rendererRegistrySpy },
         {
-          provide: EprResolverService,
+          provide: LAMAD_EPR_RESOLVER,
           useValue: {
             resolve: vi.fn().mockReturnValue(of(null)),
             resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null }),
@@ -832,7 +832,7 @@ describe('LessonViewComponent', () => {
     }));
 
     it('does not render the panel when there are no relationships', fakeAsync(() => {
-      const eprResolverSpy = TestBed.inject(EprResolverService);
+      const eprResolverSpy = TestBed.inject(LAMAD_EPR_RESOLVER);
       (eprResolverSpy.resolveEprHead as Mock).mockReturnValue(of({
         version: 1,
         id: 'test-concept',

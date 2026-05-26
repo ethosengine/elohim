@@ -6,9 +6,9 @@ import { map, catchError } from 'rxjs/operators';
 
 import { Observable, of, forkJoin } from 'rxjs';
 
-import { TrustLevel, calculateTrustLevel } from '@app/elohim/models/trust-badge.model';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
+import { TrustLevel, calculateTrustLevel } from '../models/trust-badge.model';
+import { DataLoaderService } from './data-loader.service';
+import { TrustBadgeService } from './trust-badge.service';
 
 import { ContentType, ContentReach } from '../models/content-node.model';
 import { PathIndexEntry } from '../models/learning-path.model';

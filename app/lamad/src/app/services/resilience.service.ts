@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 
 import { Observable } from 'rxjs';
 
-import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { LAMAD_STORAGE_CLIENT } from '../interfaces/storage.interface';
 
 export interface ResilienceView {
   contentId: string;
@@ -63,7 +63,7 @@ export interface VerificationResultView {
 @Injectable({ providedIn: 'root' })
 export class ResilienceService {
   private readonly http = inject(HttpClient);
-  private readonly storageClient = inject(StorageClientService);
+  private readonly storageClient = inject(LAMAD_STORAGE_CLIENT);
 
   getContentResilience(contentId: string): Observable<ResilienceView> {
     const baseUrl = this.storageClient.getStorageBaseUrl();

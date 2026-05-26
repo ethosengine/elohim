@@ -5,7 +5,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
 import { BehaviorSubject, of } from 'rxjs';
 
-import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
+import { LAMAD_ELOHIM_PRESENCE } from '../../../interfaces/cross-pillar.interface';
 import { MasteryStatsService } from '../../../services/mastery-stats.service';
 import { SophiaRendererComponent } from './sophia-renderer.component';
 import { SophiaWrapperComponent } from './sophia-wrapper.component';
@@ -93,7 +93,7 @@ describe('SophiaRendererComponent', () => {
       providers: [
         { provide: MasteryStatsService, useValue: mockMasteryStats },
         {
-          provide: ElohimPresenceService,
+          provide: LAMAD_ELOHIM_PRESENCE,
           useValue: (() => {
             const spy = {
               onDiscoveryCompleted: vi.fn(),

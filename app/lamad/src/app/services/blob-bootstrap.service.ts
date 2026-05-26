@@ -16,7 +16,10 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
 
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import {
+  LAMAD_HOLOCHAIN_CLIENT,
+  type ILamadHolochainClient,
+} from '../interfaces/cross-pillar.interface';
 
 import {
   BlobBootstrapEngine,
@@ -37,7 +40,7 @@ export type { BlobBootstrapStatus, BlobBootstrapState } from './blob-bootstrap-e
 })
 export class BlobBootstrapService {
   // Injected Angular dependencies
-  private readonly holochainService = inject(HolochainClientService);
+  private readonly holochainService: ILamadHolochainClient = inject(LAMAD_HOLOCHAIN_CLIENT);
   private readonly blobManager = inject(BlobManagerService);
   private readonly blobCache = inject(BlobCacheTiersService);
 

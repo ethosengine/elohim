@@ -6,7 +6,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
-import { StorageApiService } from '@app/elohim/services/storage-api.service';
+import { LAMAD_STORAGE_API } from '../interfaces/storage.interface';
 
 import {
   StewardshipAllocationService,
@@ -85,7 +85,7 @@ describe('StewardshipAllocationService', () => {
     TestBed.configureTestingModule({
       providers: [
         StewardshipAllocationService,
-        { provide: StorageApiService, useValue: storageApiSpy },
+        { provide: LAMAD_STORAGE_API, useValue: storageApiSpy },
         provideHttpClient(),
         provideHttpClientTesting(),
       ],

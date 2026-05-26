@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { Observable } from 'rxjs';
 
-import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
+import type { EconomicEventView } from '@elohim/storage-client/generated';
 import { EventService } from '@elohim/rea-runtime';
 
 /**

@@ -12,9 +12,9 @@ import {
   MasteryTier,
   getMasteryTier,
 } from '@elohim/service/angular/models/agent.model';
-import { AgentService } from '@app/elohim/services/agent.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { type CrossPathMatch } from '@app/elohim/services/epr-resolver.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../interfaces/agent.interface';
+import { DataLoaderService } from './data-loader.service';
+import { type LamadCrossPathMatch as CrossPathMatch } from '../interfaces/cross-pillar.interface';
 
 import {
   LearningPath,
@@ -74,7 +74,7 @@ export class PathService {
   private readonly learnerContext = inject(LearnerContextService);
 
   private readonly dataLoader = inject(DataLoaderService);
-  private readonly agentService = inject(AgentService);
+  private readonly agentService = inject(LAMAD_AGENT);
 
   /**
    * Get path metadata (does NOT load step content).

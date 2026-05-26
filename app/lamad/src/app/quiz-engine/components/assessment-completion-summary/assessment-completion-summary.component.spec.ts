@@ -3,7 +3,7 @@ import { Component, signal } from '@angular/core';
 
 import { BehaviorSubject, of } from 'rxjs';
 
-import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
+import { LAMAD_ELOHIM_PRESENCE } from '../../../interfaces/cross-pillar.interface';
 import type { LearnerMasteryProfile } from '@app/lamad/models/learner-mastery-profile.model';
 import { MasteryStatsService } from '@app/lamad/services/mastery-stats.service';
 
@@ -166,7 +166,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
       providers: [
         { provide: DiscoveryAttestationService, useValue: mockDiscoveryService },
         { provide: MasteryStatsService, useValue: mockMasteryStats },
-        { provide: ElohimPresenceService, useValue: mockPresenceService },
+        { provide: LAMAD_ELOHIM_PRESENCE, useValue: mockPresenceService },
       ],
     }).compileComponents();
 

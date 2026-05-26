@@ -11,7 +11,7 @@ import { Subject } from 'rxjs';
 
 import 'elohim-core/register';
 
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from '../../services/data-loader.service';
 
 import { RendererInitializerService } from '../../renderers/renderer-initializer.service';
 

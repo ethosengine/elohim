@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { of } from 'rxjs';
 
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from './data-loader.service';
 
 import { LearnerContextService } from './learner-context.service';
 import { PathRecommendationService } from './path-recommendation.service';

@@ -7,7 +7,10 @@ import { BehaviorSubject, Observable, Subject, catchError, map, from, of } from 
 import { LEARNER_BACKEND } from '../interfaces/learner-backend.interface';
 import { isAboveGate, compareMasteryLevels } from '@elohim/service/angular/models/agent.model';
 import { MasteryRecordContent, SourceChainEntry } from '@elohim/storage-client';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import {
+  LAMAD_HOLOCHAIN_CLIENT,
+  type ILamadHolochainClient,
+} from '../interfaces/cross-pillar.interface';
 import { LocalSourceChainService } from '@elohim/service';
 import { SessionHumanService } from '@elohim/identity';
 
@@ -75,7 +78,7 @@ export class ContentMasteryService {
   private readonly sourceChain = inject(LocalSourceChainService);
   private readonly sessionHuman = inject(SessionHumanService);
   private readonly backend = inject(LEARNER_BACKEND);
-  private readonly holochainClient = inject(HolochainClientService);
+  private readonly holochainClient: ILamadHolochainClient = inject(LAMAD_HOLOCHAIN_CLIENT);
 
   constructor() {
     // Initialize when session is available

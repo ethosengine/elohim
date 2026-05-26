@@ -8,7 +8,7 @@ import { of } from 'rxjs';
 
 import { MarkdownRendererComponent, TocEntry } from './markdown-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
-import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { PathService } from '../../services/path.service';
 import { PathContextService } from '../../services/path-context.service';
 
@@ -49,7 +49,7 @@ describe('MarkdownRendererComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: StorageClientService, useValue: mockStorageClientService },
+        { provide: LAMAD_STORAGE_CLIENT, useValue: mockStorageClientService },
         { provide: PathService, useValue: mockPathService },
         { provide: PathContextService, useValue: mockPathContextService },
       ],
@@ -422,7 +422,7 @@ describe('MarkdownRendererComponent — cross-path prefetch', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         {
-          provide: StorageClientService,
+          provide: LAMAD_STORAGE_CLIENT,
           useValue: { getBlobUrl: (h: string) => `https://test/blob/${h}` },
         },
         { provide: PathService, useValue: pathServiceSpy },

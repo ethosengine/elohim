@@ -25,7 +25,7 @@ import { Injectable, signal, inject } from '@angular/core';
 
 import { Observable, of, BehaviorSubject, map, catchError, tap } from 'rxjs';
 
-import { StorageApiService } from '@app/elohim/services/storage-api.service';
+import { LAMAD_STORAGE_API } from '../interfaces/storage.interface';
 
 import {
   CreateAllocationInput,
@@ -59,7 +59,7 @@ export interface StewardPortfolio {
   providedIn: 'root',
 })
 export class StewardshipAllocationService {
-  private readonly storageApi = inject(StorageApiService);
+  private readonly storageApi = inject(LAMAD_STORAGE_API);
   private readonly http = inject(HttpClient);
 
   // ============================================================================

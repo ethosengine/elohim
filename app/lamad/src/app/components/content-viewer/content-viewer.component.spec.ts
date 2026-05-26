@@ -3,21 +3,23 @@ import { ContentViewerComponent } from './content-viewer.component';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { AgentService } from '@app/elohim/services/agent.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
+import {
+  LAMAD_AFFINITY_TRACKING,
+  LAMAD_EPR_RESOLVER,
+  LAMAD_GOVERNANCE_SIGNAL,
+  LAMAD_GOVERNANCE,
+} from '../../interfaces/cross-pillar.interface';
 import { ContentService } from '../../services/content.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
-import { GovernanceService } from '@app/elohim/services/governance.service';
+import { DataLoaderService } from '../../services/data-loader.service';
+import { TrustBadgeService } from '../../services/trust-badge.service';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
 import { PathContextService } from '../../services/path-context.service';
 import { SeoService } from '../../shared/services/seo.service';
 import { RendererRegistryService } from '../../renderers/renderer-registry.service';
 import { ContentNode } from '../../models/content-node.model';
-import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
-import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
 import { HouseholdResilienceService } from '../../services/household-resilience.service';
 import { ResilienceService as LibResilienceService } from '@elohim/service/public-api';
 import { vi, Mock } from 'vitest';
@@ -172,17 +174,17 @@ describe('ContentViewerComponent', () => {
       providers: [
         provideHttpClient(),
         provideRouter([]),
-        { provide: AffinityTrackingService, useValue: affinitySpyObj },
-        { provide: AgentService, useValue: agentSpyObj },
+        { provide: LAMAD_AFFINITY_TRACKING, useValue: affinitySpyObj },
+        { provide: LAMAD_AGENT, useValue: agentSpyObj },
         { provide: ContentService, useValue: contentSpyObj },
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: TrustBadgeService, useValue: trustBadgeSpyObj },
-        { provide: GovernanceService, useValue: governanceSpyObj },
+        { provide: LAMAD_GOVERNANCE, useValue: governanceSpyObj },
         { provide: ContentEditorService, useValue: editorSpyObj },
         { provide: PathContextService, useValue: pathContextSpyObj },
         { provide: RendererRegistryService, useValue: rendererRegistrySpyObj },
         { provide: SeoService, useValue: seoServiceSpyObj },
-        { provide: GovernanceSignalService, useValue: governanceSignalSpyObj },
+        { provide: LAMAD_GOVERNANCE_SIGNAL, useValue: governanceSignalSpyObj },
         { provide: StewardshipAllocationService, useValue: stewardshipSpyObj },
         { provide: HouseholdResilienceService, useValue: householdResilienceSpyObj },
         { provide: LibResilienceService, useValue: libResilienceSpyObj },
@@ -191,7 +193,7 @@ describe('ContentViewerComponent', () => {
         { provide: EVENT_API, useValue: { createEconomicEvent: vi.fn().mockReturnValue(of(null)), getEconomicEvents: vi.fn().mockReturnValue(of([])) } },
         { provide: AGENT_CONTEXT, useValue: { getCurrentAgentId: vi.fn().mockReturnValue('test-agent-id') } },
         {
-          provide: EprResolverService,
+          provide: LAMAD_EPR_RESOLVER,
           useValue: {
             resolveEprHead: vi.fn().mockReturnValue(of({
               version: 1,
@@ -220,12 +222,12 @@ describe('ContentViewerComponent', () => {
       ],
     }).compileComponents();
 
-    affinityServiceSpy = TestBed.inject(AffinityTrackingService);
-    agentServiceSpy = TestBed.inject(AgentService);
+    affinityServiceSpy = TestBed.inject(LAMAD_AFFINITY_TRACKING);
+    agentServiceSpy = TestBed.inject(LAMAD_AGENT);
     contentServiceSpy = TestBed.inject(ContentService);
     dataLoaderSpy = TestBed.inject(DataLoaderService);
     trustBadgeServiceSpy = TestBed.inject(TrustBadgeService);
-    governanceServiceSpy = TestBed.inject(GovernanceService);
+    governanceServiceSpy = TestBed.inject(LAMAD_GOVERNANCE);
     editorServiceSpy = TestBed.inject(ContentEditorService);
     pathContextServiceSpy = TestBed.inject(PathContextService);
     rendererRegistrySpy = TestBed.inject(RendererRegistryService);

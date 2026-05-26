@@ -6,8 +6,8 @@ import { map, switchMap, catchError } from 'rxjs/operators';
 
 import { Observable, of, forkJoin } from 'rxjs';
 
-import { AgentService } from '@app/elohim/services/agent.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../interfaces/agent.interface';
+import { DataLoaderService } from './data-loader.service';
 
 import {
   ContentNode,
@@ -119,7 +119,7 @@ const REACH_HIERARCHY: ContentReach[] = [
 @Injectable({ providedIn: 'root' })
 export class ContentService {
   private readonly dataLoader = inject(DataLoaderService);
-  private readonly agentService = inject(AgentService);
+  private readonly agentService = inject(LAMAD_AGENT);
 
   /**
    * Get content by ID.

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { BehaviorSubject, of, Subject } from 'rxjs';
 
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+import { LocalSourceChainService } from '@elohim/service';
 import { SessionHumanService } from '@elohim/identity';
 
 import { ContentMasteryService } from './content-mastery.service';

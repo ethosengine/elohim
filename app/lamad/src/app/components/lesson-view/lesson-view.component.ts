@@ -25,7 +25,10 @@ import { Subject, Subscription } from 'rxjs';
 
 import 'elohim-core/register';
 
-import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import {
+  LAMAD_EPR_RESOLVER,
+  type ILamadEprResolver,
+} from '../../interfaces/cross-pillar.interface';
 
 import { ContentNode } from '../../models/content-node.model';
 import { PathContext } from '../../models/exploration-context.model';
@@ -685,7 +688,7 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
 
   private readonly rendererRegistry = inject(RendererRegistryService);
   private readonly cdr = inject(ChangeDetectorRef);
-  private readonly eprResolver = inject(EprResolverService);
+  private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
 
   eprRelationships: EprRelationship[] = [];
 

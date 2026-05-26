@@ -9,7 +9,7 @@ import { takeUntil } from 'rxjs/operators';
 import { Subject, forkJoin } from 'rxjs';
 
 import { AgentProgress, MasteryLevel, MasteryTier } from '@elohim/service/angular/models/agent.model';
-import { AgentService } from '@app/elohim/services/agent.service';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 
 import { SeoService } from '../../shared/services/seo.service';
 import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
@@ -180,7 +180,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly pathService: PathService,
-    private readonly agentService: AgentService
+    private readonly agentService: ILamadAgent
   ) {}
 
   ngOnInit(): void {

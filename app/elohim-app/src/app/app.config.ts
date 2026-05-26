@@ -17,6 +17,8 @@ import { CustodianCommitmentService } from './elohim/services/custodian-commitme
 import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
 import { CustodianSelectionService } from './elohim/services/custodian-selection.service';
 import { GovernanceApiService } from '@elohim/service';
+import { BLOB_FETCHER } from '@elohim/service';
+import { HeliaFetchService } from './elohim/services/helia-fetch.service';
 import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
 import { ContentIOModuleWithPlugins } from '@app/lamad/content-io/content-io.module';
 
@@ -60,6 +62,7 @@ export const appConfig: ApplicationConfig = {
       },
     },
     // API boundary services wired to InjectionToken contracts
+    { provide: BLOB_FETCHER, useClass: HeliaFetchService },
     { provide: GOVERNANCE, useExisting: GovernanceApiService },
     { provide: CONTENT_ATTESTATION, useExisting: ContentAttestationApiService },
     // Shefa metrics and custodian selection services

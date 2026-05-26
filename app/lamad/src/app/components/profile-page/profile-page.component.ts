@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, computed, Inject } from '@angular/core';
 import { RouterModule, Router } from '@angular/router';
 
 // @coverage: 60.0% (2026-02-24)
@@ -8,9 +8,14 @@ import { takeUntil, catchError } from 'rxjs/operators';
 
 import { Subject, of } from 'rxjs';
 
-import { ProfileService } from '@app/elohim/services/profile.service';
+import {
+  LAMAD_PROFILE,
+  type ILamadProfile,
+  type LamadResumePoint,
+  type LamadPathsOverview,
+  type LamadTimelineEvent,
+} from '../../interfaces/cross-pillar.interface';
 import { isNetworkMode } from '@app/imagodei/models/identity.model';
-import { ResumePoint, PathsOverview, TimelineEvent } from '@app/imagodei/models/profile.model';
 import {
   SessionHuman,
   SessionActivity,
@@ -120,9 +125,9 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   activityHistory: SessionActivity[] = [];
 
   // ProfileService data
-  resumePoint: ResumePoint | null = null;
-  pathsOverview: PathsOverview | null = null;
-  timelineEvents: TimelineEvent[] = [];
+  resumePoint: LamadResumePoint | null = null;
+  pathsOverview: LamadPathsOverview | null = null;
+  timelineEvents: LamadTimelineEvent[] = [];
 
   // Mastery breakdown
   masteryByLevel: { level: MasteryLevel; count: number; label: string }[] = [];
@@ -152,7 +157,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   constructor(
     private readonly sessionHumanService: SessionHumanService,
     private readonly contentMasteryService: ContentMasteryService,
-    private readonly profileService: ProfileService
+    @Inject(LAMAD_PROFILE) private readonly profileService: ILamadProfile
   ) {}
 
   ngOnInit(): void {

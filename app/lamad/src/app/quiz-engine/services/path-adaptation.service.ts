@@ -4,7 +4,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { BehaviorSubject, Observable, map } from 'rxjs';
 
-import { ContentBackendService } from '@app/elohim/services/content.service';
+import { ContentBackendService } from '../../services/content-backend.service';
 
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';
@@ -708,7 +708,7 @@ export class PathAdaptationService {
   }
 
   private buildRecommendations(
-    graph: import('@app/elohim/services/content.service').ContentGraph | null,
+    graph: { related: { contentId: string; relationshipType: string; confidence: number }[] } | null,
     contentScore: import('../models/quiz-session.model').ContentScore,
     result: QuizResult
   ): ContentRecommendation[] {

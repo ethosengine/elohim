@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, Inject, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 // @coverage: 84.6% (2026-03-03)
@@ -9,8 +9,11 @@ import { takeUntil } from 'rxjs/operators';
 import * as d3 from 'd3';
 import { Subject } from 'rxjs';
 
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import {
+  LAMAD_AFFINITY_TRACKING,
+  type ILamadAffinityTracking,
+} from '../../interfaces/cross-pillar.interface';
+import { DataLoaderService } from '../../services/data-loader.service';
 
 import {
   ClusterNode,
@@ -93,7 +96,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     private readonly route: ActivatedRoute,
     private readonly dataLoader: DataLoaderService,
     private readonly router: Router,
-    private readonly affinityService: AffinityTrackingService,
+    @Inject(LAMAD_AFFINITY_TRACKING) private readonly affinityService: ILamadAffinityTracking,
     private readonly hierarchicalGraph: HierarchicalGraphService
   ) {}
 

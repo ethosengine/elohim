@@ -4,7 +4,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { Observable, of, forkJoin, map, catchError, shareReplay } from 'rxjs';
 
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from '../../services/data-loader.service';
 
 import { LearningPath } from '../../models/learning-path.model';
 import { PathService } from '../../services/path.service';

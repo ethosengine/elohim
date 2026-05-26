@@ -23,22 +23,26 @@ import { BehaviorSubject, Observable, Subject, Subscription, firstValueFrom, for
 
 import 'elohim-core/register';
 
-import { TrustBadge } from '@app/elohim/models/trust-badge.model';
-import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { AgentService } from '@app/elohim/services/agent.service';
+import { TrustBadge } from '../../models/trust-badge.model';
+import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
+import {
+  LAMAD_AFFINITY_TRACKING,
+  LAMAD_EPR_RESOLVER,
+  LAMAD_GOVERNANCE_SIGNAL,
+  LAMAD_GOVERNANCE,
+  type ILamadAffinityTracking,
+  type ILamadEprResolver,
+  type ILamadGovernanceSignal,
+  type ILamadGovernance,
+  type LamadAggregatedSignals,
+} from '../../interfaces/cross-pillar.interface';
 import {
   ChallengeRecord,
   DataLoaderService,
   DiscussionRecord,
   GovernanceStateRecord,
-} from '@app/elohim/services/data-loader.service';
-import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
-import {
-  AggregatedSignals,
-  GovernanceSignalService,
-} from '@app/elohim/services/governance-signal.service';
-import { GovernanceService } from '@app/elohim/services/governance.service';
-import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
+} from '../../services/data-loader.service';
+import { TrustBadgeService } from '../../services/trust-badge.service';
 import {
   DEFAULT_FEEDBACK_PROFILES,
   EmotionalReactionType,
@@ -154,7 +158,7 @@ export class ContentViewerComponent
 
   // Governance feedback (signals)
   feedbackProfile: FeedbackProfile | null = null;
-  aggregatedSignals: AggregatedSignals | null = null;
+  aggregatedSignals: LamadAggregatedSignals | null = null;
   allowedReactions: EmotionalReactionType[] = [];
   feedbackContext: FeedbackContext = 'usefulness';
   showFeedbackSection = true;
@@ -200,23 +204,23 @@ export class ContentViewerComponent
   private readonly seoService = inject(SeoService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly affinityService = inject(AffinityTrackingService);
-  private readonly agentService = inject(AgentService);
+  private readonly affinityService: ILamadAffinityTracking = inject(LAMAD_AFFINITY_TRACKING);
+  private readonly agentService = inject(LAMAD_AGENT);
   private readonly rendererRegistry = inject(RendererRegistryService);
   private readonly contentService = inject(ContentService);
   private readonly dataLoader = inject(DataLoaderService);
   private readonly trustBadgeService = inject(TrustBadgeService);
   private readonly editorService = inject(ContentEditorService);
   private readonly pathContextService = inject(PathContextService);
-  private readonly governanceService = inject(GovernanceService);
-  private readonly signalService = inject(GovernanceSignalService);
+  private readonly governanceService: ILamadGovernance = inject(LAMAD_GOVERNANCE);
+  private readonly signalService: ILamadGovernanceSignal = inject(LAMAD_GOVERNANCE_SIGNAL);
   private readonly signalHarness = inject(SignalHarnessService);
   private readonly stewardshipService = inject(StewardshipAllocationService);
   private readonly resilienceService = inject(ResilienceService);
   private readonly libResilience = inject(LibResilienceService);
   private readonly householdResilienceService = inject(HouseholdResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
-  private readonly eprResolver = inject(EprResolverService);
+  private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
   private readonly eventService = inject(EventService);
   private readonly document = inject(DOCUMENT);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);

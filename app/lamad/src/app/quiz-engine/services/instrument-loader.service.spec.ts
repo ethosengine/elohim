@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { of, throwError } from 'rxjs';
 
-import { ContentBackendService } from '@app/elohim/services/content.service';
+import { ContentBackendService } from '../../services/content-backend.service';
 
 import type { ContentNode } from '@app/lamad/models/content-node.model';
 
