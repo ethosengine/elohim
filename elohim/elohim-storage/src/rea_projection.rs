@@ -6,26 +6,27 @@
 //!
 //! DHT is the truth. Storage is the index. This handler bridges them.
 //!
+//! ## Wire format
+//!
+//! The DNA's `ProjectionSignal` enum uses `#[serde(tag = "type", content =
+//! "payload")]` (adjacent tagging). The payload variants carry the FULL
+//! DHT entry — `Agreement`, `Commitment`, `EconomicEvent` — not a
+//! pre-converted projection input. This module mirrors that wire shape via
+//! the `*Entry` structs and does the projection-input conversion inside
+//! `handle_rea_signal` (parsing `*_json` fields, downcasting f64→f32, etc.).
+//!
 //! ## Signal Flow
 //!
 //! 1. Coordinator zome commits an REA entry to the DHT
-//! 2. Post-commit hook emits a ProjectionSignal with the action_hash
-//! 3. This handler receives the signal and upserts into SQLite
-//! 4. If the record already exists (optimistic pre-write), it sets dht_anchor_hash
-//! 5. If the record is new (DHT-first write), it inserts with anchor
-//!
-//! ## Wiring
-//!
-//! TODO: Wire into conductor client's signal receive loop. The connection_loop
-//! in conductor_client.rs currently only handles request/response. To receive
-//! signals, the recv_task needs to detect signal messages (distinct from
-//! response messages) and route them to `handle_rea_signal`. Alternatively,
-//! the HcClient (hc_client.rs) may already have signal handling that can
-//! dispatch to this handler.
+//! 2. Post-commit hook emits a `ProjectionSignal` with the action_hash + entry
+//! 3. `HcClient::subscribe_rea_projection_signals` (main.rs) receives + decodes
+//! 4. This handler converts the entry shape → CreateInput → upsert_with_anchor
+//! 5. If the row already exists (optimistic pre-write), it sets dht_anchor_hash
+//! 6. If new (DHT-first write), it inserts with anchor
 
 use chrono::Utc;
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::db::agreements::{self, CreateAgreementInput};
 use crate::db::context::AppContext;
@@ -35,83 +36,199 @@ use crate::db::DbPool;
 use crate::error::StorageError;
 
 // ============================================================================
-// Signal Types — must match ProjectionSignal variants from coordinator zome
+// Signal Types — mirror DNA-side ProjectionSignal exactly
+//
+// The DNA's ProjectionSignal uses #[serde(tag = "type", content = "payload")]
+// (adjacent tagging). Variants embed the FULL DHT entry — Agreement,
+// Commitment, EconomicEvent. The *Entry structs below must match the
+// integrity-zome entry shapes field-for-field (see
+// elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs).
+//
+// Any drift here is silently fatal: serde_json::from_value returns Err,
+// the subscriber logs at debug, and the signal is dropped. Symptom is
+// "REA commitment X written via conductor but projection did not land" —
+// the in-process bounded poll times out at 1s.
 // ============================================================================
 
-/// Signal payload matching ProjectionSignal variants from content_store coordinator.
-/// The conductor serializes these as externally tagged enums.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", content = "payload")]
 pub enum ReaProjectionSignal {
     AgreementCommitted {
         action_hash: String,
-        agreement: AgreementPayload,
+        #[serde(default)]
+        entry_hash: Option<String>,
+        agreement: AgreementEntry,
+        #[serde(default)]
+        author: Option<String>,
     },
     ReaCommitmentCommitted {
         action_hash: String,
-        commitment: CommitmentPayload,
+        #[serde(default)]
+        entry_hash: Option<String>,
+        commitment: CommitmentEntry,
+        #[serde(default)]
+        author: Option<String>,
     },
     ReaEconomicEventCommitted {
         action_hash: String,
-        event: EconomicEventPayload,
+        #[serde(default)]
+        entry_hash: Option<String>,
+        event: EconomicEventEntry,
+        #[serde(default)]
+        author: Option<String>,
     },
 }
 
+/// Mirror of DNA `Agreement` entry shape.
 #[derive(Debug, Clone, Deserialize)]
-pub struct AgreementPayload {
+pub struct AgreementEntry {
     pub id: String,
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub note: Option<String>,
-    pub metadata_json: Option<String>,
+    #[serde(default)]
+    pub created_at: Option<String>,
 }
 
+/// Mirror of DNA `Commitment` entry shape. Field names/types match the
+/// integrity zome exactly — including `_json` suffixes on multi-value
+/// fields and `f64` quantities (storage downcasts to f32 in the handler).
 #[derive(Debug, Clone, Deserialize)]
-pub struct CommitmentPayload {
+pub struct CommitmentEntry {
     pub id: String,
     pub action: String,
     pub provider: String,
     pub receiver: String,
+    #[serde(default)]
     pub resource_conforms_to: Option<String>,
-    pub resource_classified_as: Option<String>,
-    pub resource_quantity_value: Option<f32>,
-    pub resource_quantity_unit: Option<String>,
-    pub effort_quantity_value: Option<f32>,
-    pub effort_quantity_unit: Option<String>,
-    pub has_beginning: Option<String>,
-    pub has_end: Option<String>,
-    pub due: Option<String>,
-    pub clause_of: Option<String>,
-    pub in_scope_of: Option<String>,
-    pub medium_of_exchange_id: Option<String>,
-    pub note: Option<String>,
-    pub metadata_json: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct EconomicEventPayload {
-    pub id: String,
-    pub action: String,
-    pub provider: String,
-    pub receiver: String,
-    pub resource_conforms_to: Option<String>,
+    #[serde(default)]
     pub resource_inventoried_as: Option<String>,
-    pub resource_classified_as: Vec<String>,
-    pub resource_quantity_value: Option<f32>,
+    /// JSON-encoded `Vec<String>` on the wire. Decoded in the handler.
+    #[serde(default)]
+    pub resource_classified_as_json: Option<String>,
+    #[serde(default)]
+    pub resource_quantity_value: Option<f64>,
+    #[serde(default)]
     pub resource_quantity_unit: Option<String>,
-    pub effort_quantity_value: Option<f32>,
+    #[serde(default)]
+    pub effort_quantity_value: Option<f64>,
+    #[serde(default)]
     pub effort_quantity_unit: Option<String>,
+    #[serde(default)]
     pub has_point_in_time: Option<String>,
-    pub has_duration: Option<String>,
+    #[serde(default)]
+    pub has_beginning: Option<String>,
+    #[serde(default)]
+    pub has_end: Option<String>,
+    #[serde(default)]
+    pub due: Option<String>,
+    #[serde(default)]
+    pub clause_of: Option<String>,
+    #[serde(default)]
+    pub agreed_in: Option<String>,
+    #[serde(default)]
     pub input_of: Option<String>,
+    #[serde(default)]
     pub output_of: Option<String>,
-    pub lamad_event_type: Option<String>,
-    pub content_id: Option<String>,
-    pub contributor_presence_id: Option<String>,
-    pub path_id: Option<String>,
-    pub triggered_by: Option<String>,
+    #[serde(default)]
+    pub satisfies: Option<String>,
+    /// JSON-encoded scope list on the wire. Decoded in the handler.
+    #[serde(default)]
+    pub in_scope_of_json: Option<String>,
+    #[serde(default)]
+    pub finished: bool,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
     pub note: Option<String>,
+    #[serde(default)]
     pub metadata_json: Option<String>,
+    #[serde(default)]
+    pub created_at: Option<String>,
+    #[serde(default)]
+    pub updated_at: Option<String>,
+}
+
+/// Mirror of DNA `EconomicEvent` entry shape.
+#[derive(Debug, Clone, Deserialize)]
+pub struct EconomicEventEntry {
+    pub id: String,
+    pub action: String,
+    pub provider: String,
+    pub receiver: String,
+    #[serde(default)]
+    pub resource_conforms_to: Option<String>,
+    #[serde(default)]
+    pub resource_inventoried_as: Option<String>,
+    #[serde(default)]
+    pub to_resource_inventoried_as: Option<String>,
+    #[serde(default)]
+    pub resource_classified_as_json: Option<String>,
+    #[serde(default)]
+    pub resource_quantity_value: Option<f64>,
+    #[serde(default)]
+    pub resource_quantity_unit: Option<String>,
+    #[serde(default)]
+    pub effort_quantity_value: Option<f64>,
+    #[serde(default)]
+    pub effort_quantity_unit: Option<String>,
+    #[serde(default)]
+    pub has_point_in_time: Option<String>,
+    #[serde(default)]
+    pub has_duration: Option<String>,
+    #[serde(default)]
+    pub input_of: Option<String>,
+    #[serde(default)]
+    pub output_of: Option<String>,
+    #[serde(default)]
+    pub fulfills_json: Option<String>,
+    #[serde(default)]
+    pub realization_of: Option<String>,
+    #[serde(default)]
+    pub satisfies_json: Option<String>,
+    #[serde(default)]
+    pub in_scope_of_json: Option<String>,
+    #[serde(default)]
+    pub note: Option<String>,
+    #[serde(default)]
+    pub state: Option<String>,
+    #[serde(default)]
+    pub triggered_by: Option<String>,
+    #[serde(default)]
     pub at_location: Option<String>,
+    #[serde(default)]
+    pub image: Option<String>,
+    #[serde(default)]
+    pub lamad_event_type: Option<String>,
+    #[serde(default)]
+    pub metadata_json: Option<String>,
+    #[serde(default)]
+    pub created_at: Option<String>,
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/// Parse a JSON-encoded `Vec<String>` field from the DNA entry. Empty
+/// string or invalid JSON → empty Vec. Used for the `_json` resource and
+/// scope fields. Drops empty entries so downstream code can treat `is_empty`
+/// as "no value".
+fn parse_json_strings(raw: Option<&str>) -> Vec<String> {
+    let s = match raw {
+        Some(s) if !s.is_empty() => s,
+        _ => return Vec::new(),
+    };
+    serde_json::from_str::<Vec<String>>(s).unwrap_or_else(|_| Vec::new())
+}
+
+/// Take the first element of a parsed JSON Vec<String>, or None.
+/// Storage's CreateReaCommitmentInput stores resource_classified_as and
+/// in_scope_of as single-value `Option<String>` columns; downstream readers
+/// can reconstruct multi-value via the DHT entry if needed.
+fn first_or_none(v: Vec<String>) -> Option<String> {
+    v.into_iter().find(|s| !s.is_empty())
 }
 
 // ============================================================================
@@ -120,8 +237,8 @@ pub struct EconomicEventPayload {
 
 /// Handle an incoming REA projection signal from the conductor.
 ///
-/// This is the main entry point — call this from the signal dispatch loop.
-/// It acquires a DB connection from the pool and upserts the record.
+/// Main entry point — called from the signal dispatch loop. Acquires a DB
+/// connection from the pool and upserts the projection row with dht_anchor_hash.
 pub fn handle_rea_signal(
     signal: ReaProjectionSignal,
     pool: &DbPool,
@@ -135,55 +252,61 @@ pub fn handle_rea_signal(
         ReaProjectionSignal::AgreementCommitted {
             action_hash,
             agreement,
+            ..
         } => {
             info!(id = %agreement.id, hash = %action_hash, "Projecting Agreement from DHT");
             let input = CreateAgreementInput {
                 id: Some(agreement.id),
                 name: agreement.name,
                 note: agreement.note,
-                metadata_json: agreement.metadata_json,
+                // Agreement DNA entry has no metadata_json; projection writes None.
+                metadata_json: None,
             };
             agreements::upsert_agreement(&mut conn, ctx, input, Some(&action_hash))?;
         }
         ReaProjectionSignal::ReaCommitmentCommitted {
             action_hash,
             commitment,
+            ..
         } => {
             info!(id = %commitment.id, hash = %action_hash, "Projecting Commitment from DHT");
+            let classified =
+                first_or_none(parse_json_strings(commitment.resource_classified_as_json.as_deref()));
+            let in_scope_of =
+                first_or_none(parse_json_strings(commitment.in_scope_of_json.as_deref()));
             let input = CreateReaCommitmentInput {
                 id: Some(commitment.id),
                 action: commitment.action,
                 provider: commitment.provider,
                 receiver: commitment.receiver,
                 resource_conforms_to: commitment.resource_conforms_to,
-                resource_classified_as: commitment.resource_classified_as,
-                resource_quantity_value: commitment.resource_quantity_value,
+                resource_classified_as: classified,
+                resource_quantity_value: commitment.resource_quantity_value.map(|v| v as f32),
                 resource_quantity_unit: commitment.resource_quantity_unit,
-                effort_quantity_value: commitment.effort_quantity_value,
+                effort_quantity_value: commitment.effort_quantity_value.map(|v| v as f32),
                 effort_quantity_unit: commitment.effort_quantity_unit,
                 has_beginning: commitment.has_beginning,
                 has_end: commitment.has_end,
                 due: commitment.due,
                 clause_of: commitment.clause_of,
-                in_scope_of: commitment.in_scope_of,
-                medium_of_exchange_id: commitment.medium_of_exchange_id,
+                in_scope_of,
+                medium_of_exchange_id: None,
                 note: commitment.note,
                 metadata_json: commitment.metadata_json,
             };
             rea_commitments::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
         }
-        ReaProjectionSignal::ReaEconomicEventCommitted { action_hash, event } => {
+        ReaProjectionSignal::ReaEconomicEventCommitted {
+            action_hash, event, ..
+        } => {
             info!(id = %event.id, hash = %action_hash, "Projecting EconomicEvent from DHT");
 
             // Phase 4 T4 — side-projection: if action='ack-projection', also
             // write into the projection_events operational log. Self-filtering:
             // other EconomicEvent actions (custody-blob, serve-blob) are ignored.
+            let classified = parse_json_strings(event.resource_classified_as_json.as_deref());
             {
-                let first_resource = event
-                    .resource_classified_as
-                    .first()
-                    .cloned()
-                    .unwrap_or_default();
+                let first_resource = classified.first().cloned().unwrap_or_default();
                 let emitted_at = event
                     .has_point_in_time
                     .clone()
@@ -196,7 +319,7 @@ pub fn handle_rea_signal(
                     &action_hash,
                     &emitted_at,
                 ) {
-                    tracing::warn!(
+                    warn!(
                         target = "rea_projection",
                         error = %e,
                         "projection_ack side-projection failed (non-fatal)"
@@ -211,19 +334,22 @@ pub fn handle_rea_signal(
                 receiver: event.receiver,
                 resource_conforms_to: event.resource_conforms_to,
                 resource_inventoried_as: event.resource_inventoried_as,
-                resource_classified_as: event.resource_classified_as,
-                resource_quantity_value: event.resource_quantity_value,
+                resource_classified_as: classified,
+                resource_quantity_value: event.resource_quantity_value.map(|v| v as f32),
                 resource_quantity_unit: event.resource_quantity_unit,
-                effort_quantity_value: event.effort_quantity_value,
+                effort_quantity_value: event.effort_quantity_value.map(|v| v as f32),
                 effort_quantity_unit: event.effort_quantity_unit,
                 has_point_in_time: event.has_point_in_time,
                 has_duration: event.has_duration,
                 input_of: event.input_of,
                 output_of: event.output_of,
                 lamad_event_type: event.lamad_event_type,
-                content_id: event.content_id,
-                contributor_presence_id: event.contributor_presence_id,
-                path_id: event.path_id,
+                // The CreateEconomicEventInput surface has app-specific link fields
+                // (content_id, contributor_presence_id, path_id) that are not on
+                // the DNA wire — leave None; the HTTP write path sets them.
+                content_id: None,
+                contributor_presence_id: None,
+                path_id: None,
                 triggered_by: event.triggered_by,
                 note: event.note,
                 metadata_json: event.metadata_json,
@@ -253,5 +379,211 @@ pub fn try_handle_signal(
             // Not an REA projection signal — caller should try other handlers
             Ok(false)
         }
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Reference fixture: a JSON shape matching what the DNA's
+    /// `ProjectionSignal::ReaCommitmentCommitted` emits over the wire
+    /// (adjacent tagging — tag + payload). This test guards against
+    /// silent breakage of the substrate-correct write path.
+    #[test]
+    fn decode_rea_commitment_signal_from_dna_wire_shape() {
+        let wire = serde_json::json!({
+            "type": "ReaCommitmentCommitted",
+            "payload": {
+                "action_hash": "uhCkk-abc123",
+                "entry_hash": "uhCEk-def456",
+                "commitment": {
+                    "id": "doorway:test|epr:test-app",
+                    "action": "project-epr",
+                    "provider": "doorway:test-doorway",
+                    "receiver": "epr:test-app",
+                    "resource_conforms_to": null,
+                    "resource_inventoried_as": null,
+                    "resource_classified_as_json": "[]",
+                    "resource_quantity_value": null,
+                    "resource_quantity_unit": null,
+                    "effort_quantity_value": null,
+                    "effort_quantity_unit": null,
+                    "has_point_in_time": null,
+                    "has_beginning": null,
+                    "has_end": null,
+                    "due": null,
+                    "clause_of": null,
+                    "agreed_in": null,
+                    "input_of": null,
+                    "output_of": null,
+                    "satisfies": null,
+                    "in_scope_of_json": "[\"doorway:test-doorway|epr:test-app\"]",
+                    "finished": false,
+                    "state": "proposed",
+                    "note": null,
+                    "metadata_json": "{}",
+                    "created_at": "2026-05-26T12:00:00Z",
+                    "updated_at": "2026-05-26T12:00:00Z"
+                },
+                "author": "uhCAk-xyz789"
+            }
+        });
+
+        let signal: ReaProjectionSignal = serde_json::from_value(wire)
+            .expect("DNA wire shape must decode into ReaProjectionSignal");
+
+        match signal {
+            ReaProjectionSignal::ReaCommitmentCommitted {
+                action_hash,
+                commitment,
+                ..
+            } => {
+                assert_eq!(action_hash, "uhCkk-abc123");
+                assert_eq!(commitment.id, "doorway:test|epr:test-app");
+                assert_eq!(commitment.action, "project-epr");
+                assert_eq!(
+                    commitment.in_scope_of_json.as_deref(),
+                    Some("[\"doorway:test-doorway|epr:test-app\"]")
+                );
+                assert!(!commitment.finished);
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decode_agreement_signal_from_dna_wire_shape() {
+        let wire = serde_json::json!({
+            "type": "AgreementCommitted",
+            "payload": {
+                "action_hash": "uhCkk-ag1",
+                "entry_hash": "uhCEk-ag2",
+                "agreement": {
+                    "id": "agreement-001",
+                    "name": "Test Agreement",
+                    "note": null,
+                    "created_at": "2026-05-26T12:00:00Z"
+                },
+                "author": "uhCAk-author"
+            }
+        });
+
+        let signal: ReaProjectionSignal = serde_json::from_value(wire).unwrap();
+        match signal {
+            ReaProjectionSignal::AgreementCommitted {
+                action_hash,
+                agreement,
+                ..
+            } => {
+                assert_eq!(action_hash, "uhCkk-ag1");
+                assert_eq!(agreement.id, "agreement-001");
+                assert_eq!(agreement.name.as_deref(), Some("Test Agreement"));
+            }
+            _ => panic!("expected AgreementCommitted"),
+        }
+    }
+
+    #[test]
+    fn decode_economic_event_signal_from_dna_wire_shape() {
+        let wire = serde_json::json!({
+            "type": "ReaEconomicEventCommitted",
+            "payload": {
+                "action_hash": "uhCkk-ee1",
+                "entry_hash": "uhCEk-ee2",
+                "event": {
+                    "id": "event-001",
+                    "action": "ack-projection",
+                    "provider": "doorway:test",
+                    "receiver": "epr:test",
+                    "resource_conforms_to": null,
+                    "resource_inventoried_as": null,
+                    "to_resource_inventoried_as": null,
+                    "resource_classified_as_json": "[\"doorway:test|epr:test\"]",
+                    "resource_quantity_value": null,
+                    "resource_quantity_unit": null,
+                    "effort_quantity_value": null,
+                    "effort_quantity_unit": null,
+                    "has_point_in_time": "2026-05-26T12:00:00Z",
+                    "has_duration": null,
+                    "input_of": null,
+                    "output_of": null,
+                    "fulfills_json": "[]",
+                    "realization_of": null,
+                    "satisfies_json": "[]",
+                    "in_scope_of_json": "[]",
+                    "note": null,
+                    "state": "settled",
+                    "triggered_by": null,
+                    "at_location": null,
+                    "image": null,
+                    "lamad_event_type": null,
+                    "metadata_json": "{}",
+                    "created_at": "2026-05-26T12:00:00Z"
+                },
+                "author": "uhCAk-author"
+            }
+        });
+
+        let signal: ReaProjectionSignal = serde_json::from_value(wire).unwrap();
+        match signal {
+            ReaProjectionSignal::ReaEconomicEventCommitted { event, .. } => {
+                assert_eq!(event.id, "event-001");
+                assert_eq!(event.action, "ack-projection");
+                assert_eq!(
+                    event.resource_classified_as_json.as_deref(),
+                    Some("[\"doorway:test|epr:test\"]")
+                );
+            }
+            _ => panic!("expected ReaEconomicEventCommitted"),
+        }
+    }
+
+    #[test]
+    fn parse_json_strings_handles_empty_and_invalid() {
+        assert_eq!(parse_json_strings(None), Vec::<String>::new());
+        assert_eq!(parse_json_strings(Some("")), Vec::<String>::new());
+        assert_eq!(parse_json_strings(Some("[]")), Vec::<String>::new());
+        assert_eq!(parse_json_strings(Some("not json")), Vec::<String>::new());
+        assert_eq!(
+            parse_json_strings(Some("[\"a\", \"b\"]")),
+            vec!["a".to_string(), "b".to_string()]
+        );
+    }
+
+    #[test]
+    fn first_or_none_picks_first_non_empty() {
+        assert_eq!(first_or_none(vec![]), None);
+        assert_eq!(first_or_none(vec!["".to_string()]), None);
+        assert_eq!(first_or_none(vec!["x".to_string()]), Some("x".to_string()));
+        assert_eq!(
+            first_or_none(vec!["a".to_string(), "b".to_string()]),
+            Some("a".to_string())
+        );
+    }
+
+    /// Old internally-tagged shape (what storage USED to expect) must FAIL
+    /// to decode — guards against accidental revert of the wire-shape fix.
+    #[test]
+    fn old_internal_tagging_shape_fails_to_decode() {
+        let stale_wire = serde_json::json!({
+            "type": "ReaCommitmentCommitted",
+            "action_hash": "uhCkk-abc",
+            "commitment": {
+                "id": "x",
+                "action": "y",
+                "provider": "p",
+                "receiver": "r"
+            }
+        });
+        let result: Result<ReaProjectionSignal, _> = serde_json::from_value(stale_wire);
+        assert!(
+            result.is_err(),
+            "internally-tagged wire shape must NOT decode (would mean storage drifted away from DNA again)"
+        );
     }
 }
