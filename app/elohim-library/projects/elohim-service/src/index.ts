@@ -38,8 +38,13 @@ export * from './adapters';
 
 // Services
 export * from './services/relationship-extractor.service';
-export * from './services/manifest.service';
-export * from './services/import-pipeline.service';
+// manifest.service + import-pipeline.service are CLI-only — they use
+// node:fs / node:path / node:crypto and cannot be bundled into the
+// browser. Browser consumers (elohim-app, lamad) never import them; the
+// CLI imports them directly via app/elohim-library/projects/elohim-service/src/cli/.
+// Re-exporting them at the package barrel breaks the elohim-app esbuild
+// bundle. If a future CLI surface needs to expose them at a barrel, add
+// a separate `@elohim/service/cli` sub-path with its own index.
 
 // Cache (framework-agnostic reach-aware caching)
 export * from './cache';
@@ -85,7 +90,8 @@ export {
 } from './client';
 
 // Re-export main functions for convenience
-export { runImportPipeline, importContent } from './services/import-pipeline.service';
+// (runImportPipeline / importContent removed from barrel — see services-block
+//  comment above. CLI imports them directly via src/cli/ which is Node-only.)
 
 // ============================================================================
 // Angular SDK surface (Slice 2.1 — cross-pillar import cleanup)
