@@ -48,14 +48,14 @@ export function transformEpic(parsed: ParsedContent, sourceNodeId?: string): Con
   addProvenanceMetadata(metadata, sourceNodeId);
 
   // Add frontmatter fields
-  if (parsed.frontmatter.epic_domain) {
-    metadata.epicDomain = parsed.frontmatter.epic_domain;
+  if (parsed.frontmatter['epic_domain']) {
+    metadata['epicDomain'] = parsed.frontmatter['epic_domain'];
   }
-  if (parsed.frontmatter.vision) {
-    metadata.vision = parsed.frontmatter.vision;
+  if (parsed.frontmatter['vision']) {
+    metadata['vision'] = parsed.frontmatter['vision'];
   }
-  if (parsed.frontmatter.scope) {
-    metadata.scope = parsed.frontmatter.scope;
+  if (parsed.frontmatter['scope']) {
+    metadata['scope'] = parsed.frontmatter['scope'];
   }
 
   // Add governance scope if present
@@ -93,8 +93,8 @@ function generateEpicId(parsed: ParsedContent): string {
   // Add epic name
   if (parsed.pathMeta.epic && parsed.pathMeta.epic !== 'other') {
     parts.push(parsed.pathMeta.epic);
-  } else if (parsed.frontmatter.epic && typeof parsed.frontmatter.epic === 'string') {
-    parts.push(parsed.frontmatter.epic);
+  } else if (parsed.frontmatter['epic'] && typeof parsed.frontmatter['epic'] === 'string') {
+    parts.push(parsed.frontmatter['epic']);
   }
 
   // Normalize and join
@@ -106,13 +106,13 @@ function generateEpicId(parsed: ParsedContent): string {
  */
 function extractEpicTitle(parsed: ParsedContent): string {
   // Priority 1: title from frontmatter
-  if (parsed.frontmatter.title && typeof parsed.frontmatter.title === 'string') {
-    return parsed.frontmatter.title;
+  if (parsed.frontmatter['title'] && typeof parsed.frontmatter['title'] === 'string') {
+    return parsed.frontmatter['title'];
   }
 
   // Priority 2: epic_domain from frontmatter
-  if (parsed.frontmatter.epic_domain && typeof parsed.frontmatter.epic_domain === 'string') {
-    return parsed.frontmatter.epic_domain;
+  if (parsed.frontmatter['epic_domain'] && typeof parsed.frontmatter['epic_domain'] === 'string') {
+    return parsed.frontmatter['epic_domain'];
   }
 
   // Priority 3: parsed title

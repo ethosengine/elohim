@@ -96,13 +96,13 @@ function extractTitle(
   pathMeta: PathMetadata
 ): string {
   // Priority 1: frontmatter title
-  if (frontmatter.title && typeof frontmatter.title === 'string') {
-    return frontmatter.title;
+  if (frontmatter['title'] && typeof frontmatter['title'] === 'string') {
+    return frontmatter['title'];
   }
 
   // Priority 2: frontmatter archetype_name
-  if (frontmatter.archetype_name && typeof frontmatter.archetype_name === 'string') {
-    return frontmatter.archetype_name;
+  if (frontmatter['archetype_name'] && typeof frontmatter['archetype_name'] === 'string') {
+    return frontmatter['archetype_name'];
   }
 
   // Priority 3: First H1 heading
@@ -246,13 +246,13 @@ function generateAnchor(text: string): string {
  */
 export function extractDescription(parsed: ParsedContent, maxLength = 300): string {
   // Priority 1: frontmatter description
-  if (parsed.frontmatter.description && typeof parsed.frontmatter.description === 'string') {
-    return truncate(parsed.frontmatter.description, maxLength);
+  if (parsed.frontmatter['description'] && typeof parsed.frontmatter['description'] === 'string') {
+    return truncate(parsed.frontmatter['description'], maxLength);
   }
 
   // Priority 2: frontmatter epic_domain
-  if (parsed.frontmatter.epic_domain && typeof parsed.frontmatter.epic_domain === 'string') {
-    return truncate(parsed.frontmatter.epic_domain, maxLength);
+  if (parsed.frontmatter['epic_domain'] && typeof parsed.frontmatter['epic_domain'] === 'string') {
+    return truncate(parsed.frontmatter['epic_domain'], maxLength);
   }
 
   // Priority 3: First paragraph of first section
@@ -291,8 +291,8 @@ export function extractTags(parsed: ParsedContent): string[] {
   const tags = new Set<string>();
 
   // From frontmatter tags
-  if (Array.isArray(parsed.frontmatter.tags)) {
-    for (const tag of parsed.frontmatter.tags) {
+  if (Array.isArray(parsed.frontmatter['tags'])) {
+    for (const tag of parsed.frontmatter['tags']) {
       if (typeof tag === 'string') {
         tags.add(tag.toLowerCase());
       }
@@ -300,13 +300,13 @@ export function extractTags(parsed: ParsedContent): string[] {
   }
 
   // From frontmatter epic
-  if (parsed.frontmatter.epic && typeof parsed.frontmatter.epic === 'string') {
-    tags.add(parsed.frontmatter.epic.toLowerCase());
+  if (parsed.frontmatter['epic'] && typeof parsed.frontmatter['epic'] === 'string') {
+    tags.add(parsed.frontmatter['epic'].toLowerCase());
   }
 
   // From frontmatter user_type
-  if (parsed.frontmatter.user_type && typeof parsed.frontmatter.user_type === 'string') {
-    tags.add(parsed.frontmatter.user_type.toLowerCase().replace(/_/g, '-'));
+  if (parsed.frontmatter['user_type'] && typeof parsed.frontmatter['user_type'] === 'string') {
+    tags.add(parsed.frontmatter['user_type'].toLowerCase().replace(/_/g, '-'));
   }
 
   // From path metadata
@@ -337,8 +337,8 @@ export function extractTags(parsed: ParsedContent): string[] {
 export function extractRelatedUsers(frontmatter: Record<string, unknown>): string[] {
   const relatedUsers: string[] = [];
 
-  if (Array.isArray(frontmatter.related_users)) {
-    for (const user of frontmatter.related_users) {
+  if (Array.isArray(frontmatter['related_users'])) {
+    for (const user of frontmatter['related_users']) {
       if (typeof user === 'string') {
         // Convert user type to node ID format
         relatedUsers.push(`archetype-${user.toLowerCase().replace(/_/g, '-')}`);
@@ -353,8 +353,8 @@ export function extractRelatedUsers(frontmatter: Record<string, unknown>): strin
  * Extract governance scope from frontmatter
  */
 export function extractGovernanceScope(frontmatter: Record<string, unknown>): string[] {
-  if (Array.isArray(frontmatter.governance_scope)) {
-    return frontmatter.governance_scope.filter(s => typeof s === 'string');
+  if (Array.isArray(frontmatter['governance_scope'])) {
+    return frontmatter['governance_scope'].filter(s => typeof s === 'string');
   }
   return [];
 }

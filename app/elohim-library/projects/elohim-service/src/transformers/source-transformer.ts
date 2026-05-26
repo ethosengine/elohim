@@ -55,17 +55,17 @@ export function transformToSourceNode(parsed: ParsedContent): ContentNode {
   };
 
   // Add frontmatter fields
-  if (parsed.frontmatter.epic) {
-    metadata.epic = parsed.frontmatter.epic;
+  if (parsed.frontmatter['epic']) {
+    metadata['epic'] = parsed.frontmatter['epic'];
   }
-  if (parsed.frontmatter.user_type) {
-    metadata.userType = parsed.frontmatter.user_type;
+  if (parsed.frontmatter['user_type']) {
+    metadata['userType'] = parsed.frontmatter['user_type'];
   }
 
   // Add governance scope if present
   const governanceScope = extractGovernanceScope(parsed.frontmatter);
   if (governanceScope.length > 0) {
-    metadata.governanceScope = governanceScope;
+    metadata['governanceScope'] = governanceScope;
   }
 
   // Extract related users for graph connections

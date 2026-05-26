@@ -48,11 +48,11 @@ export function transformArchetype(parsed: ParsedContent, sourceNodeId?: string)
   addProvenanceMetadata(metadata, sourceNodeId);
 
   // Add frontmatter fields
-  if (parsed.frontmatter.archetype_name) {
-    metadata.archetypeName = parsed.frontmatter.archetype_name;
+  if (parsed.frontmatter['archetype_name']) {
+    metadata['archetypeName'] = parsed.frontmatter['archetype_name'];
   }
-  if (parsed.frontmatter.epic_domain) {
-    metadata.epicDomain = parsed.frontmatter.epic_domain;
+  if (parsed.frontmatter['epic_domain']) {
+    metadata['epicDomain'] = parsed.frontmatter['epic_domain'];
   }
 
   // Add governance scope if present
@@ -112,13 +112,13 @@ function generateArchetypeId(parsed: ParsedContent): string {
  */
 function extractArchetypeTitle(parsed: ParsedContent): string {
   // Priority 1: archetype_name from frontmatter
-  if (parsed.frontmatter.archetype_name && typeof parsed.frontmatter.archetype_name === 'string') {
-    return parsed.frontmatter.archetype_name;
+  if (parsed.frontmatter['archetype_name'] && typeof parsed.frontmatter['archetype_name'] === 'string') {
+    return parsed.frontmatter['archetype_name'];
   }
 
   // Priority 2: title from frontmatter
-  if (parsed.frontmatter.title && typeof parsed.frontmatter.title === 'string') {
-    return parsed.frontmatter.title;
+  if (parsed.frontmatter['title'] && typeof parsed.frontmatter['title'] === 'string') {
+    return parsed.frontmatter['title'];
   }
 
   // Priority 3: parsed title

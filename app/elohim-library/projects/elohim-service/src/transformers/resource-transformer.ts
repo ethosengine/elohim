@@ -75,35 +75,35 @@ export function transformResource(parsed: ParsedContent, sourceNodeId?: string):
   addProvenanceMetadata(metadata, sourceNodeId);
 
   // Extract resource-specific frontmatter
-  if (parsed.frontmatter.author) {
-    metadata.author = parsed.frontmatter.author;
+  if (parsed.frontmatter['author']) {
+    metadata['author'] = parsed.frontmatter['author'];
   }
-  if (parsed.frontmatter.authors) {
-    metadata.authors = parsed.frontmatter.authors;
+  if (parsed.frontmatter['authors']) {
+    metadata['authors'] = parsed.frontmatter['authors'];
   }
-  if (parsed.frontmatter.url) {
-    metadata.url = parsed.frontmatter.url;
+  if (parsed.frontmatter['url']) {
+    metadata['url'] = parsed.frontmatter['url'];
   }
-  if (parsed.frontmatter.isbn) {
-    metadata.isbn = parsed.frontmatter.isbn;
+  if (parsed.frontmatter['isbn']) {
+    metadata['isbn'] = parsed.frontmatter['isbn'];
   }
-  if (parsed.frontmatter.year) {
-    metadata.year = parsed.frontmatter.year;
+  if (parsed.frontmatter['year']) {
+    metadata['year'] = parsed.frontmatter['year'];
   }
-  if (parsed.frontmatter.publisher) {
-    metadata.publisher = parsed.frontmatter.publisher;
+  if (parsed.frontmatter['publisher']) {
+    metadata['publisher'] = parsed.frontmatter['publisher'];
   }
-  if (parsed.frontmatter.duration) {
-    metadata.duration = parsed.frontmatter.duration;
+  if (parsed.frontmatter['duration']) {
+    metadata['duration'] = parsed.frontmatter['duration'];
   }
-  if (parsed.frontmatter.platform) {
-    metadata.platform = parsed.frontmatter.platform;
+  if (parsed.frontmatter['platform']) {
+    metadata['platform'] = parsed.frontmatter['platform'];
   }
-  if (parsed.frontmatter.website) {
-    metadata.website = parsed.frontmatter.website;
+  if (parsed.frontmatter['website']) {
+    metadata['website'] = parsed.frontmatter['website'];
   }
-  if (parsed.frontmatter.organization) {
-    metadata.organization = parsed.frontmatter.organization;
+  if (parsed.frontmatter['organization']) {
+    metadata['organization'] = parsed.frontmatter['organization'];
   }
 
   // Build related node IDs
@@ -126,8 +126,8 @@ export function transformResource(parsed: ParsedContent, sourceNodeId?: string):
   }
 
   // Extract related concepts from frontmatter
-  if (Array.isArray(parsed.frontmatter.related_concepts)) {
-    for (const concept of parsed.frontmatter.related_concepts) {
+  if (Array.isArray(parsed.frontmatter['related_concepts'])) {
+    for (const concept of parsed.frontmatter['related_concepts']) {
       if (typeof concept === 'string') {
         relatedNodeIds.push(`concept-${concept.toLowerCase().replace(/\s+/g, '-')}`);
       }
@@ -177,13 +177,13 @@ function generateResourceId(parsed: ParsedContent): string {
  */
 function extractResourceTitle(parsed: ParsedContent): string {
   // Priority 1: title from frontmatter
-  if (parsed.frontmatter.title && typeof parsed.frontmatter.title === 'string') {
-    return parsed.frontmatter.title;
+  if (parsed.frontmatter['title'] && typeof parsed.frontmatter['title'] === 'string') {
+    return parsed.frontmatter['title'];
   }
 
   // Priority 2: name from frontmatter (for organizations)
-  if (parsed.frontmatter.name && typeof parsed.frontmatter.name === 'string') {
-    return parsed.frontmatter.name;
+  if (parsed.frontmatter['name'] && typeof parsed.frontmatter['name'] === 'string') {
+    return parsed.frontmatter['name'];
   }
 
   // Priority 3: parsed title

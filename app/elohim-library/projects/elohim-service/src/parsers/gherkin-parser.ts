@@ -296,7 +296,7 @@ function tagsToFrontmatter(tags: GherkinTag[]): Record<string, unknown> {
   }
 
   if (simpleTags.length > 0) {
-    frontmatter.tags = simpleTags;
+    frontmatter['tags'] = simpleTags;
   }
 
   return frontmatter;
@@ -307,8 +307,8 @@ function tagsToFrontmatter(tags: GherkinTag[]): Record<string, unknown> {
  */
 export function extractGherkinDescription(parsed: ParsedContent): string {
   // Use feature description if available
-  if (parsed.frontmatter.description && typeof parsed.frontmatter.description === 'string') {
-    return parsed.frontmatter.description;
+  if (parsed.frontmatter['description'] && typeof parsed.frontmatter['description'] === 'string') {
+    return parsed.frontmatter['description'];
   }
 
   // Generate from scenarios
@@ -333,8 +333,8 @@ export function extractGherkinTags(parsed: ParsedContent): string[] {
   const tags = new Set<string>();
 
   // From frontmatter (converted from Gherkin tags)
-  if (Array.isArray(parsed.frontmatter.tags)) {
-    for (const tag of parsed.frontmatter.tags) {
+  if (Array.isArray(parsed.frontmatter['tags'])) {
+    for (const tag of parsed.frontmatter['tags']) {
       if (typeof tag === 'string') {
         tags.add(tag.toLowerCase());
       }

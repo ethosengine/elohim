@@ -61,11 +61,11 @@ function createFeatureNode(
   addProvenanceMetadata(metadata, sourceNodeId, 'gherkin-parse');
 
   // Add frontmatter fields from Gherkin tags
-  if (parsed.frontmatter.priority) {
-    metadata.priority = parsed.frontmatter.priority;
+  if (parsed.frontmatter['priority']) {
+    metadata['priority'] = parsed.frontmatter['priority'];
   }
-  if (parsed.frontmatter.status) {
-    metadata.status = parsed.frontmatter.status;
+  if (parsed.frontmatter['status']) {
+    metadata['status'] = parsed.frontmatter['status'];
   }
 
   const relatedNodeIds: string[] = [];

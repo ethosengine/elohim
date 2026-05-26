@@ -28,8 +28,8 @@ export function addProvenanceMetadata(
   extractionMethod = 'direct-import'
 ): void {
   if (sourceNodeId) {
-    metadata.derivedFrom = sourceNodeId;
-    metadata.extractionMethod = extractionMethod;
+    metadata['derivedFrom'] = sourceNodeId;
+    metadata['extractionMethod'] = extractionMethod;
   }
 }
 
@@ -44,6 +44,6 @@ export function addGovernanceScopeMetadata(
 ): void {
   const governanceScope = extractGovernanceScope(frontmatter);
   if (governanceScope.length > 0) {
-    metadata.governanceScope = governanceScope;
+    metadata['governanceScope'] = governanceScope;
   }
 }
