@@ -20,6 +20,11 @@ use crate::hc_client::{HcClient, HcClientConfig};
 pub struct HcClientRegistry {
     pub infrastructure: Option<Arc<HcClient>>,
     pub imagodei: Option<Arc<HcClient>>,
+    /// `lamad` role — hosts the `content_store` zome (REA commitments,
+    /// content rows, attestations). Required for the conductor-first HTTP
+    /// write path landing per 2026-05-26-substrate-rea-replication-fix.md
+    /// (closes Gap C/D — REA + content row replication on alpha).
+    pub lamad: Option<Arc<HcClient>>,
 }
 
 /// Connection inputs. Mirrors the relevant CLI args without depending on
@@ -38,9 +43,11 @@ impl HcClientRegistry {
     pub async fn connect(inputs: &HcRegistryInputs) -> Self {
         let infrastructure = Self::connect_role(inputs, "infrastructure").await;
         let imagodei = Self::connect_role(inputs, "imagodei").await;
+        let lamad = Self::connect_role(inputs, "lamad").await;
         Self {
             infrastructure,
             imagodei,
+            lamad,
         }
     }
 

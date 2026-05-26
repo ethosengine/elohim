@@ -50,6 +50,37 @@ pub struct CreateContentInput {
     pub content_hash: Option<String>,
 }
 
+/// Input for content_store::update_content coordinator function.
+///
+/// Patch semantics: only fields present in the input are applied; absent
+/// fields preserve the previous entry's value. Primary use case is the
+/// post-deploy blobHash update from stageSpaBlobs in Jenkinsfile, which
+/// today bypasses Holochain entirely and breaks cross-peer replication
+/// (see 2026-05-26-substrate-rea-replication-fix.md, Task 8).
+///
+/// Field naming note: this uses `blob_cid` to match the DNA Content entry's
+/// field name (Phase 0 refactor; see content_store_integrity/src/lib.rs).
+/// The HTTP wire surface and storage diesel column use `blob_hash` semantically
+/// meaning the same thing; the service layer (ContentService::update_via_conductor)
+/// translates between the two.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct UpdateContentInput {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blob_cid: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_size_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata_json: Option<String>,
+}
+
 /// Content wire type. Mirrors the integrity zome's Content entry type.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -945,6 +976,56 @@ mod tests {
         assert_eq!(decoded.id, "concept-001");
         assert_eq!(decoded.content_type, "concept");
         assert_eq!(decoded.tags.len(), 2);
+    }
+
+    #[test]
+    fn update_content_input_msgpack_roundtrip() {
+        let input = UpdateContentInput {
+            id: "elohim-host-landing".to_string(),
+            blob_cid: Some("sha256-deadbeefcafe".to_string()),
+            content_size_bytes: Some(2_048),
+            content_hash: Some("sha256-deadbeefcafe".to_string()),
+            title: None,
+            description: None,
+            metadata_json: None,
+        };
+
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
+        let decoded: UpdateContentInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.id, "elohim-host-landing");
+        assert_eq!(decoded.blob_cid.as_deref(), Some("sha256-deadbeefcafe"));
+        assert_eq!(decoded.content_size_bytes, Some(2_048));
+        assert!(decoded.title.is_none());
+    }
+
+    #[test]
+    fn update_content_input_patch_semantics() {
+        // skip_serializing_if=Option::is_none drops absent fields from the
+        // wire — confirms patch semantics (absent fields preserve previous
+        // entry's values on the receiver side, and absent in encoded bytes
+        // means the DNA's update_content fn won't overwrite to None).
+        let input = UpdateContentInput {
+            id: "x".to_string(),
+            blob_cid: Some("h".to_string()),
+            content_size_bytes: None,
+            content_hash: None,
+            title: None,
+            description: None,
+            metadata_json: None,
+        };
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
+        let decoded: UpdateContentInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.id, "x");
+        assert_eq!(decoded.blob_cid.as_deref(), Some("h"));
+        assert!(decoded.title.is_none());
+        assert!(decoded.content_size_bytes.is_none());
+
+        // Sanity: encoded bytes don't contain the keys for absent fields.
+        // A naive textual scan suffices for the named-msgpack encoding.
+        let as_str = String::from_utf8_lossy(&bytes);
+        assert!(as_str.contains("blob_cid"));
+        assert!(!as_str.contains("title"));
+        assert!(!as_str.contains("content_size_bytes"));
     }
 
     #[test]

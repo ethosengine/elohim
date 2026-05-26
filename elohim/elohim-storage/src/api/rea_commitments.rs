@@ -12,6 +12,8 @@ use crate::db::rea_commitments::{
 };
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
+use crate::hc_client::HcClient;
+use crate::hc_client_registry::HcClientRegistry;
 use crate::services::rea_commitment_service::ReaCommitmentService;
 use crate::services::response::{self, from_create_result, from_option, from_result};
 use crate::services::Services;
@@ -30,15 +32,17 @@ pub async fn handle(
     pool: &DbPool,
     ctx: &AppContext,
     services: Option<Arc<Services>>,
+    hc_registry: Option<&Arc<HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let path = resource_path.trim_start_matches('/');
+    let hc_lamad = hc_registry.and_then(|r| r.lamad.as_ref());
 
     match (&method, path) {
         // GET /api/v1/commitments
         (&Method::GET, "") => handle_list(req, pool, ctx).await,
 
         // POST /api/v1/commitments
-        (&Method::POST, "") => handle_create(req, pool, ctx, services).await,
+        (&Method::POST, "") => handle_create(req, pool, ctx, services, hc_lamad).await,
 
         // GET /api/v1/commitments/agent/{agent_id}
         (&Method::GET, agent_path) if agent_path.starts_with("agent/") => {
@@ -51,7 +55,7 @@ pub async fn handle(
 
         // PATCH /api/v1/commitments/{id}
         (&Method::PATCH, id) if !id.contains('/') => {
-            handle_update_state(req, id, pool, ctx, services).await
+            handle_update_state(req, id, pool, ctx, services, hc_lamad).await
         }
 
         _ => Ok(response::not_found(&format!(
@@ -83,15 +87,18 @@ async fn handle_create(
     pool: &DbPool,
     ctx: &AppContext,
     services: Option<Arc<Services>>,
+    hc_lamad: Option<&Arc<HcClient>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
-    // Currently null for direct storage writes. Backfill needed for pre-coherence data.
+    // dht_anchor_hash is now populated end-to-end for project-epr commitments
+    // via the conductor-first write path in ReaCommitmentService::create
+    // (substrate-rea-replication-fix plan, Task 4). Other actions still take
+    // the legacy diesel-direct path.
     let input: CreateReaCommitmentInput = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
     let events = services.as_ref().map(|s| s.events.as_ref());
-    Ok(from_create_result(ReaCommitmentService::create(
-        &mut conn, ctx, input, events,
-    )))
+    Ok(from_create_result(
+        ReaCommitmentService::create(&mut conn, ctx, input, events, hc_lamad).await,
+    ))
 }
 
 async fn handle_get_by_id(
@@ -112,13 +119,14 @@ async fn handle_update_state(
     pool: &DbPool,
     ctx: &AppContext,
     services: Option<Arc<Services>>,
+    hc_lamad: Option<&Arc<HcClient>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let update: UpdateReaCommitmentState = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
     let events = services.as_ref().map(|s| s.events.as_ref());
-    Ok(from_result(ReaCommitmentService::update_state(
-        &mut conn, ctx, id, &update, events,
-    )))
+    Ok(from_result(
+        ReaCommitmentService::update_state(&mut conn, ctx, id, &update, events, hc_lamad).await,
+    ))
 }
 
 async fn handle_get_by_agent(

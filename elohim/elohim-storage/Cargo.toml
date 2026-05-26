@@ -16,6 +16,17 @@ elohim-sdk = { path = "../../crates/elohim-sdk" }
 # Wire-shape view types (ts-rs-anchored) — atomic migration from views.rs (VIEWS.T2)
 elohim-views = { path = "../elohim-views" }
 
+# Shefa-types — canonical wire-shape for content_store coordinator function inputs
+# (CreateReaCommitmentInput, ReaCommitmentOutput, etc.). Required by the
+# services::conductor_writes facade per 2026-05-26-substrate-rea-replication-fix.md
+shefa-types = { path = "../sdk/domains/shefa/types" }
+
+# Lamad-types — canonical wire-shape for content_store CONTENT coordinator
+# functions (CreateContentInput, UpdateContentInput, ContentOutput). Required
+# by services::conductor_writes for the content side of the substrate-correct
+# write path (Task 8c).
+lamad-types = { path = "../sdk/domains/lamad/types" }
+
 # Server-side rendering via V8 / deno_core (opt-in; most peer hardware can't sustain V8)
 elohim-render = { path = "../elohim-render", optional = true }
 

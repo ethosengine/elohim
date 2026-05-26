@@ -37,6 +37,21 @@ COPY elohim/elohim-views ./elohim-views
 # build-context contains their source.
 COPY bridges ./bridges
 
+# Substrate-rea-replication-fix (2026-05-26): elohim-storage's
+# conductor_writes facade depends on `shefa-types` and `lamad-types` as
+# `path = "../sdk/domains/<dna>/types"`. From /app/Cargo.toml's perspective
+# that's `/sdk/...`. The full elohim/sdk tree is COPYd to /sdk further
+# down for the bootstrap_manifests include_str! paths, but cargo
+# resolves Cargo.toml path-deps at the dep-cache stage above — so the
+# two type crates MUST be present BEFORE line 130's first `cargo build`.
+# Without these COPYs the build aborts:
+#   error: failed to read `/sdk/domains/shefa/types/Cargo.toml`
+#   Caused by: No such file or directory (os error 2)
+# (This was the silent-deploy-failure that stalled edge #1007 onwards
+# until this Dockerfile fix.)
+COPY elohim/sdk/domains/shefa/types /sdk/domains/shefa/types
+COPY elohim/sdk/domains/lamad/types /sdk/domains/lamad/types
+
 # Fix the paths to local crates (now relative to /app)
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
     sed -i 's|path = "../../crates/elohim-sdk"|path = "crates/elohim-sdk"|' Cargo.toml && \

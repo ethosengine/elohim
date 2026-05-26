@@ -588,6 +588,188 @@ pub fn get_content_by_tag(
 }
 
 // ============================================================================
+// Substrate projection — DNA-anchored upsert
+// ============================================================================
+
+/// Patch applied to a content row by the projection signal handler.
+///
+/// Mirrors the DHT Content entry's mutable fields. `None` means "absent
+/// from the entry" (the entry's field was null/missing) — the upsert
+/// preserves the existing SQL column unless the entry carried a value.
+#[derive(Debug, Clone, Default)]
+pub struct ContentProjectionPatch {
+    pub blob_cid: Option<String>,
+    /// SQL column is i32; DNA entry is u64 — caller downcasts.
+    pub content_size_bytes: Option<i32>,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub content_type: Option<String>,
+    pub content_format: Option<String>,
+    pub reach: Option<String>,
+    pub metadata_json: Option<String>,
+}
+
+/// Upsert a content row with a DHT anchor hash. Used by the post-commit
+/// signal handler in rea_projection to project ContentCommitted signals
+/// from the lamad DNA into local SQL.
+///
+/// Behaviour:
+/// - If the row exists: UPDATE the columns present in `patch` (None →
+///   preserve existing) AND set `dht_anchor_hash`. Also mirrors `blob_cid`
+///   to the legacy `blob_hash` column so downstream readers that still
+///   key on `blob_hash` (e.g. SSR fetch shim) see the new content address.
+/// - If the row does not exist: INSERT the minimum row using whatever the
+///   patch provides, defaulting required-non-null columns. The substrate
+///   should normally hit the "update existing" branch since seeded content
+///   pre-existed in SQL via `bulk_create_content`; the insert path is the
+///   defensive fallback for content that was authored on a peer that hadn't
+///   yet seeded.
+///
+/// Anchor invariant: `dht_anchor_hash` is always set to the value passed,
+/// even on the update branch, so re-projection after entry-update
+/// (post update_content zome fn) advances the anchor to the new ActionHash.
+pub fn upsert_with_anchor(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    patch: ContentProjectionPatch,
+    dht_anchor_hash: &str,
+) -> Result<(), StorageError> {
+    use diesel::dsl::sql;
+    use diesel::sql_types::Text;
+
+    let existing = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq(id))
+        .select(diesel::dsl::count_star())
+        .first::<i64>(conn)
+        .map(|c| c > 0)
+        .unwrap_or(false);
+
+    if existing {
+        // Build a single UPDATE that touches anchor + whichever patch fields
+        // are present. Diesel doesn't generate dynamic SET clauses cleanly,
+        // so we run targeted updates per field. Each diesel::update is
+        // wrapped in the same transaction by the caller (the signal handler
+        // takes a pooled connection; this fn runs inside a single statement
+        // sequence).
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set((
+            content::dht_anchor_hash.eq(dht_anchor_hash),
+            content::updated_at.eq(sql::<Text>("CURRENT_TIMESTAMP")),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
+
+        if let Some(ref v) = patch.blob_cid {
+            diesel::update(
+                content::table
+                    .filter(content::h_app_id.eq(&ctx.h_app_id))
+                    .filter(content::id.eq(id)),
+            )
+            .set((
+                content::blob_cid.eq(v),
+                // Mirror to legacy blob_hash column so reads keyed on
+                // blob_hash (SSR fetch shim, list/get views) see the new
+                // content address. They're semantically the same SHA256
+                // per the Phase 0 refactor (substrate-rea-replication-fix
+                // Addendum 5).
+                content::blob_hash.eq(v),
+            ))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Update blob_cid failed: {}", e)))?;
+        }
+        if let Some(v) = patch.content_size_bytes {
+            diesel::update(
+                content::table
+                    .filter(content::h_app_id.eq(&ctx.h_app_id))
+                    .filter(content::id.eq(id)),
+            )
+            .set(content::content_size_bytes.eq(v))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Update size failed: {}", e)))?;
+        }
+        if let Some(ref v) = patch.title {
+            diesel::update(
+                content::table
+                    .filter(content::h_app_id.eq(&ctx.h_app_id))
+                    .filter(content::id.eq(id)),
+            )
+            .set(content::title.eq(v))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Update title failed: {}", e)))?;
+        }
+        if let Some(ref v) = patch.description {
+            diesel::update(
+                content::table
+                    .filter(content::h_app_id.eq(&ctx.h_app_id))
+                    .filter(content::id.eq(id)),
+            )
+            .set(content::description.eq(v))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Update description failed: {}", e)))?;
+        }
+        if let Some(ref v) = patch.metadata_json {
+            diesel::update(
+                content::table
+                    .filter(content::h_app_id.eq(&ctx.h_app_id))
+                    .filter(content::id.eq(id)),
+            )
+            .set(content::metadata_json.eq(v))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Update metadata failed: {}", e)))?;
+        }
+    } else {
+        // Defensive insert path. Seeded content normally exists in SQL
+        // before its first DHT projection; this branch handles content
+        // authored on a peer that hadn't yet received the seed.
+        let default_ct = default_content_type();
+        let default_cf = default_content_format();
+        let default_re = default_reach();
+        let title = patch.title.as_deref().unwrap_or("");
+        let content_type = patch.content_type.as_deref().unwrap_or(&default_ct);
+        let content_format = patch.content_format.as_deref().unwrap_or(&default_cf);
+        let reach = patch.reach.as_deref().unwrap_or(&default_re);
+        let new_content = NewContent {
+            id,
+            h_app_id: &ctx.h_app_id,
+            title,
+            description: patch.description.as_deref(),
+            content_type,
+            content_format,
+            blob_hash: patch.blob_cid.as_deref(),
+            blob_cid: patch.blob_cid.as_deref(),
+            content_size_bytes: patch.content_size_bytes,
+            metadata_json: patch.metadata_json.as_deref(),
+            reach,
+            created_by: None,
+            content_body: None,
+        };
+
+        diesel::insert_into(content::table)
+            .values(&new_content)
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+
+        // Set anchor on the just-inserted row.
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set(content::dht_anchor_hash.eq(dht_anchor_hash))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Set anchor on insert failed: {}", e)))?;
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // Stats
 // ============================================================================
 

@@ -3828,7 +3828,32 @@ impl HttpServer {
                 let view: UpdateContentInputView = serde_json::from_slice(&body_bytes)
                     .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
 
-                let update_result = services.content.update(content_id, view);
+                // Substrate-correct PATCH path: when the patch touches
+                // blob_hash AND the lamad conductor bridge is wired, route
+                // through ContentService::update_via_conductor so the entry
+                // updates flow into the DHT and propagate to all peers via
+                // gossip. Closes Gap C from the 2026-05-26 sprint-result
+                // (stageSpaBlobs PATCHes were diesel-direct, never reaching
+                // the DHT). For non-blob_hash patches (title/description/
+                // metadata-only) we keep the legacy diesel update for now —
+                // those don't break cross-peer divergence.
+                //
+                // See 2026-05-26-substrate-rea-replication-fix.md Task 8d.
+                let needs_conductor = view.blob_hash.is_some();
+                let lamad_hc = self
+                    .hc_registry
+                    .as_ref()
+                    .and_then(|r| r.lamad.clone());
+
+                let update_result = if needs_conductor && lamad_hc.is_some() {
+                    let hc = lamad_hc.expect("lamad_hc.is_some() checked above");
+                    services
+                        .content
+                        .update_via_conductor(&hc, content_id, view)
+                        .await
+                } else {
+                    services.content.update(content_id, view)
+                };
 
                 // Pattern Z.B.1 bridge: refresh the in-memory slug_index so the
                 // /apps/{slug}/{file} fast-path sees the new blob_hash. Without

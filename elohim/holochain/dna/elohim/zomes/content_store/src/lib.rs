@@ -88,6 +88,7 @@ pub use lamad_types::{
     // Progress & Mastery
     StartPathProgressInput,
     UpdateChapterInput,
+    UpdateContentInput,
     UpdatePathInput,
 };
 
@@ -126,6 +127,7 @@ pub use shefa_types::{
     CreatePremiumGateInput,
     CreateReaCommitmentInput,
     CreateReaEconomicEventInput,
+    UpdateReaCommitmentStateInput,
     // Premium Gating
     CreateStewardCredentialInput,
     CustodianCommitmentOutput,
@@ -2427,6 +2429,113 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
 
     Ok(ContentOutput {
         action_hash,
+        entry_hash,
+        content: content_to_wire(&content),
+    })
+}
+
+/// Update an existing content entry (PATCH semantics).
+///
+/// Substrate-correct PATCH path for `/db/content/{id}` per
+/// 2026-05-26-substrate-rea-replication-fix.md (Task 8b). Locates the
+/// latest Content action for the given id, reads the previous entry,
+/// applies the patch fields (None preserves the previous value), writes
+/// a new entry via `update_entry`. Post-commit fires
+/// `ProjectionSignal::ContentCommitted` (dispatches on entry type — see
+/// lib.rs:10526 — so both create_content and update_content emit it).
+/// Storage receivers project the new entry into local SQL on every peer
+/// that receives the DHT gossip update.
+///
+/// Caller responsibility: this fn **assumes the entry already exists on the
+/// DHT**. Bootstrap-from-diesel-only-row logic for content rows that were
+/// authored via `bulk_create_content` in the seeder but never published to
+/// the DHT lives in the service layer (ContentService::update_via_conductor
+/// in Task 8c), which branches on `dht_anchor_hash IS NULL`.
+///
+/// Field naming note: input uses `blob_cid` (DNA field name per the Phase 0
+/// refactor); HTTP wire / storage diesel column use `blob_hash`. The
+/// service layer translates between the two; this zome fn speaks the DNA
+/// vocabulary.
+#[hdk_extern]
+pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> {
+    // 1. Locate the latest action_hash via the content_id anchor link.
+    let anchor = StringAnchor::new("content_id", &input.id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
+    let link = links.first().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "update_content: no Content entry found for id '{}'. Call create_content first \
+             (or, from the storage service layer, lazy-bootstrap via call_create_content using \
+             the existing SQL row's data — see substrate-rea-replication-fix Task 8c).",
+            input.id
+        )))
+    })?;
+    let prev_action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "update_content: invalid action hash on content_id link".to_string(),
+        ))
+    })?;
+
+    // 2. Fetch + decode the previous entry.
+    let record = get(prev_action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "update_content: previous record not found on DHT (gossip propagation race?)".to_string(),
+        ))
+    })?;
+    let mut content: Content = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "update_content: decode previous Content entry: {e}"
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "update_content: no entry in record".to_string(),
+            ))
+        })?;
+
+    // 3. Apply the patch. None preserves the existing value.
+    if let Some(v) = input.blob_cid {
+        content.blob_cid = Some(v);
+    }
+    if let Some(v) = input.content_size_bytes {
+        content.content_size_bytes = Some(v);
+    }
+    if let Some(v) = input.content_hash {
+        content.content_hash = Some(v);
+    }
+    if let Some(v) = input.title {
+        content.title = v;
+    }
+    if let Some(v) = input.description {
+        content.description = v;
+    }
+    if let Some(v) = input.metadata_json {
+        content.metadata_json = v;
+    }
+    content.updated_at = format!("{:?}", sys_time()?);
+
+    // 4. Re-run prepare/validate against the mutated content (sets
+    //    schema_version + validation_status per healing module rules).
+    let content = healing_integration::prepare_content_for_storage(content)?;
+
+    // 5. Write the update. Integrity allows updates on Content entries
+    //    (content_store_integrity validate_update_entry falls through to
+    //    validate_create_entry for all non-FeedbackSignal types).
+    let new_action_hash = update_entry(prev_action_hash, &EntryTypes::Content(content.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::Content(content.clone()))?;
+
+    // 6. Refresh the id_anchor → action link so subsequent get_content_by_id
+    //    + future update_content calls find the new ActionHash. (Old links
+    //    remain on the DHT but won't be returned first; see ordering note
+    //    in update_rea_commitment_state for the same pattern.)
+    create_id_to_content_link(&content.id, &new_action_hash)?;
+
+    Ok(ContentOutput {
+        action_hash: new_action_hash,
         entry_hash,
         content: content_to_wire(&content),
     })
@@ -11873,6 +11982,77 @@ pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput
     } else {
         Ok(None)
     }
+}
+
+/// Update an REA Commitment's state field (e.g., transition to "cancelled").
+///
+/// Substrate-correct PATCH path for /api/v1/commitments/{id} per
+/// 2026-05-26-substrate-rea-replication-fix.md (Task 6). The update_entry
+/// produces a new ActionHash; the post-commit handler emits
+/// ProjectionSignal::ReaCommitmentCommitted (dispatches on entry type, so
+/// CREATE and UPDATE both fire the same signal — see lib.rs:10768). Storage
+/// receivers project the new state into local SQL on every peer that
+/// receives the DHT gossip update.
+#[hdk_extern]
+pub fn update_rea_commitment_state(
+    input: UpdateReaCommitmentStateInput,
+) -> ExternResult<ReaCommitmentOutput> {
+    // 1. Locate the latest action_hash via the id_anchor link.
+    let id_anchor = StringAnchor::new("commitment_id", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToCommitment)?;
+    let links = get_links(query, GetStrategy::default())?;
+    let link = links.first().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "update_rea_commitment_state: no commitment found for id {}",
+            input.id
+        )))
+    })?;
+    let prev_action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "update_rea_commitment_state: invalid action hash on id link".to_string(),
+        ))
+    })?;
+
+    // 2. Fetch + decode the previous entry.
+    let record = get(prev_action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "update_rea_commitment_state: previous record not found".to_string(),
+        ))
+    })?;
+    let mut commitment: Commitment = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "update_rea_commitment_state: decode previous Commitment: {e}"
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "update_rea_commitment_state: no entry in record".to_string(),
+            ))
+        })?;
+
+    // 3. Mutate state + finished + updated_at.
+    commitment.state = input.state;
+    if let Some(finished) = input.finished {
+        commitment.finished = finished;
+    }
+    commitment.updated_at = format!("{:?}", sys_time()?);
+
+    // 4. Write the update entry. Integrity validator allows updates on
+    //    Commitment entries (content_store_integrity/src/lib.rs:4352-4364
+    //    falls through to validate_create_entry, which Commitment passes).
+    let new_action_hash =
+        update_entry(prev_action_hash, &EntryTypes::Commitment(commitment.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
+
+    Ok(ReaCommitmentOutput {
+        action_hash: new_action_hash,
+        entry_hash,
+        commitment: commitment_to_wire(&commitment),
+    })
 }
 
 #[hdk_extern]

@@ -53,6 +53,42 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
     And the response body is the SPA index.html
     And Angular's router handles the /content/manifesto route on the client
 
+  @wip @regression @substrate-rea-replication-fix
+  Scenario: /lamad serves the SPA shell once project-epr commitments propagate via DHT
+    # Regression seatbelt for genesis/docs/superpowers/plans/
+    # 2026-05-26-substrate-rea-replication-fix.md (Gap D from the 2026-05-26
+    # sprint-result). The failure mode: project-epr commitments were written
+    # diesel-direct in ReaCommitmentService::create, never reaching the DHT.
+    # On a multi-peer alpha cluster, the doorway pod's EprRouter would read
+    # commitments only from whichever storage peer it forwarded to — so
+    # /lamad's project-epr commitment was visible to some peers and not
+    # others. The substrate-correct write path round-trips through the
+    # content_store coordinator, DHT gossip propagates to every peer,
+    # and EprRouter on any doorway pod can resolve the route.
+    Given content "lamad-spa" has been seeded as spa-bundle with a valid blobHash
+    And the SPA bundle for "lamad-spa" is extracted and cached in doorway "alpha"
+    And the project-epr commitment for "lamad-spa" has propagated across all alpha storage peers via DHT gossip
+    And the commitment row has a non-null dhtAnchorHash on every peer (proof of substrate-correct write)
+    When an unauthenticated request is made for /lamad
+    Then the response status is 200
+    And the response body is the SPA index.html
+    And Angular's router handles the /lamad route on the client
+
+  @wip @regression @substrate-rea-replication-fix
+  Scenario: /lamad survives a doorway pod restart regardless of which storage peer the new pod reads
+    # The morning of 2026-05-26 surfaced this exact regression after CI
+    # pivoted from rollout-restart to pods-API deletion (build #1042):
+    # the new doorway pod booted reading matthew's storage which had not
+    # received the seed's POSTs (those landed only on nancy's storage).
+    # With substrate-correct writes, the commitment is on every peer,
+    # so any boot-time storage peer choice is safe.
+    Given the project-epr commitment for "lamad-spa" has propagated across all alpha storage peers via DHT gossip
+    And /lamad has been confirmed serving the SPA index.html on doorway "alpha"
+    When doorway "alpha"'s pod is restarted
+    And the new pod's storage peer is selected non-deterministically from the alpha cluster
+    Then a subsequent request for /lamad returns the SPA index.html with status 200
+    And no operator intervention is required
+
   @wip
   Scenario: API routes are not caught by the root app catch-all
     # /db/ is the elohim-storage API prefix. Catch-all must not shadow it.

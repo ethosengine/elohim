@@ -323,6 +323,146 @@ def shouldRunStep(String stepName) {
     return steps.contains('all') || steps.contains(stepName)
 }
 
+/**
+ * Seeds the EPR-projection REA commitments — one per (doorway, EPR, urlPath)
+ * tuple — that the doorway's EprRouter polls from
+ * /api/v1/commitments?action=project-epr and uses to dispatch path-prefix
+ * routes (/, /lamad, /auth/portal) back through /apps/{slug}/* serving.
+ *
+ * Without these commitments alpha returns 404 for /lamad and serves the
+ * landing bundle only via /apps/... (relative chunks 404 because
+ * <base href="/"> resolves them to the root projection which doesn't exist).
+ *
+ * References:
+ *   - genesis/seeder/src/seed-projections.ts (default set: 6 commitments —
+ *     landing/lamad/imagodei across alpha-elohim-host + elohim-host)
+ *   - doorway/doorway-service/src/main.rs:554-595 (EprRouter refresh loop)
+ *   - doorway/doorway-service/src/server/http.rs:1354-1378 (dispatch site)
+ *   - .claude/shifts/2026-05-26T08-30-deliver-epr-app-iter0.sprint-result.md
+ *     (Gap A diagnosis — this stage closes it)
+ *   - genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md
+ *     (related substrate work — dev response §682-695 confirms
+ *     `storage-api-key-admin` is the canonical credential)
+ *
+ * Idempotent: re-runs collapse to 409 (id content-addressed over
+ * steward_peer_id + action + scope per seed-projections.ts:130).
+ *
+ * Body extracted to a helper above pipeline {} so the giant pipeline block
+ * stays under the 64KB CPS method-size limit (see .claude/hooks/jenkinsfile-
+ * method-size.py for the gate).
+ */
+def seedProjectionsStage() {
+    def doorwayHost = env.RESOLVED_DOORWAY_HOST
+    def apiKey = ''
+    try {
+        withCredentials([string(credentialsId: 'storage-api-key-admin', variable: 'ADMIN_KEY')]) {
+            apiKey = env.ADMIN_KEY
+        }
+    } catch (e) {
+        echo "storage-api-key-admin credential not visible — seeding without admin auth (may 401)"
+    }
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        dir('genesis/seeder') {
+            withEnv(["DOORWAY_API_KEY=${apiKey}"]) {
+                sh """#!/bin/bash
+                    set -euo pipefail
+                    echo "═══════════════════════════════════════════════════════════"
+                    echo "SEED PROJECTIONS (EPR project-epr commitments)"
+                    echo "═══════════════════════════════════════════════════════════"
+                    echo "Doorway: ${doorwayHost}"
+                    echo "Admin key: \${DOORWAY_API_KEY:+provided}\${DOORWAY_API_KEY:-not set}"
+                    echo ""
+                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-projections.ts
+                """
+            }
+        }
+    }
+
+    // Force a doorway pod restart so the EprRouter's boot-time fetch
+    // (main.rs:567 — fetch_projections_from_storage) picks up the freshly
+    // seeded project-epr commitments. The router only refreshes at boot
+    // OR via SSE 'projection.registered' events (storage_events_subscriber.rs:238),
+    // and the SSE path is currently flaky in alpha (warmup.lastError to
+    // emma-alpha visible on /health/startup). A pod-delete is the
+    // deterministic refresh — the Deployment controller recreates the
+    // pod immediately, and its boot loads the now-populated commitments.
+    //
+    // RBAC note: `ee-jenkins` service account cannot `get deployments`
+    // in elohim-alpha (RBAC-forbidden error observed in build #1041 when
+    // we tried `kubectl rollout restart deployment/...`). But it CAN
+    // manage pods directly — the Reset Storage stage at line ~538 uses
+    // `kubectl delete pod` against storage pods successfully. So we use
+    // the pods API here too. Hedge across two label conventions then
+    // fall back to grep, so cluster label drift doesn't silently miss.
+    //
+    // Empirically observed in build #1039 that Seed Projections created
+    // 6 commitments but doorway-alpha's running pod (commit b45ad43,
+    // pre-seed) never picked them up — proving the pod restart is the
+    // missing handoff. Wrapped in catchError so an RBAC issue doesn't
+    // mask the seed itself succeeding.
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        def deployment = ''
+        def namespace = ''
+        if (doorwayHost.contains('doorway-alpha.elohim.host')) {
+            deployment = 'elohim-doorway-alpha'
+            namespace = 'elohim-alpha'
+        } else if (doorwayHost.contains('doorway-staging.elohim.host')) {
+            deployment = 'elohim-doorway-staging'
+            namespace = 'elohim-staging'
+        } else if (doorwayHost.contains('doorway.elohim.host') && !doorwayHost.contains('doorway-')) {
+            deployment = 'elohim-doorway-prod'
+            namespace = 'elohim-prod'
+        }
+
+        if (deployment && namespace) {
+            sh """#!/bin/bash
+                set -uo pipefail
+                echo "═══════════════════════════════════════════════════════════"
+                echo "RESTART DOORWAY POD — refresh EprRouter post-seed"
+                echo "═══════════════════════════════════════════════════════════"
+                echo "Namespace: ${namespace}"
+                echo "Target:    pods matching '${deployment}'"
+                echo ""
+
+                # Try canonical k8s recommended label first, then a common
+                # alternative, then a grep-by-name fallback. Each branch is
+                # gated on the prior branch failing (-z stdout check).
+                PODS=\$(kubectl get pods -n ${namespace} -l app.kubernetes.io/name=${deployment} -o name 2>/dev/null || true)
+                if [ -z "\$PODS" ]; then
+                    PODS=\$(kubectl get pods -n ${namespace} -l app=${deployment} -o name 2>/dev/null || true)
+                fi
+                if [ -z "\$PODS" ]; then
+                    PODS=\$(kubectl get pods -n ${namespace} -o name 2>/dev/null | grep -F "${deployment}" || true)
+                fi
+
+                if [ -n "\$PODS" ]; then
+                    echo "Deleting pods:"
+                    echo "\$PODS" | sed 's/^/  /'
+                    echo ""
+                    echo "\$PODS" | xargs -r kubectl delete -n ${namespace} --wait=false
+                    echo ""
+                    echo "✓ doorway pods deleted; Deployment controller will recreate"
+                    echo "  New pod's boot will fetch project-epr commitments from storage"
+                    echo "  → EprRouter populated → / and /lamad serve 200"
+                    echo ""
+                    echo "  Verify (60s after this stage):"
+                    echo "    curl -s https://alpha.elohim.host/version  # commit should flip off b45ad43"
+                    echo "    curl -sI https://alpha.elohim.host/lamad  # should be 200"
+                else
+                    echo "WARNING: no doorway pods matched any selector in ${namespace}"
+                    echo "  Tried: -l app.kubernetes.io/name=${deployment}"
+                    echo "         -l app=${deployment}"
+                    echo "         pod name grep '${deployment}'"
+                    kubectl get pods -n ${namespace} 2>&1 | head -20 || true
+                    exit 1
+                fi
+            """
+        } else {
+            echo "Skipping doorway pod restart — unrecognized doorwayHost: ${doorwayHost}"
+        }
+    }
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -1316,6 +1456,22 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             }
                         }
                     }
+                }
+            }
+        }
+
+        stage('Seed Projections') {
+            // Seeds the EPR-projection REA commitments. Body extracted
+            // to seedProjectionsStage() helper above pipeline {} to stay
+            // under the 64KB CPS method-size limit. See helper for the
+            // full rationale.
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script { seedProjectionsStage() }
                 }
             }
         }

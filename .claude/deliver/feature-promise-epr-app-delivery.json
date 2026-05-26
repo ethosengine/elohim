@@ -1,0 +1,241 @@
+{
+  "name": "epr-app-delivery",
+  "handle": "epr-app delivery — https://alpha.elohim.host/lamad returns 404; landing-page assets 404",
+  "description": "Two human-visible failures on alpha as of 2026-05-26: (1) /lamad returns 404 with the doorway not-found hint (no EPR projection for url_path='/lamad' is loaded on alpha); (2) the landing page assets (fonts + Angular chunks) 404 because / redirects (via ingress) to /apps/elohim-host-landing/index.html, whose <base href='/'> + relative chunk URLs resolve to /chunk-X.js which has no EPR projection. Substrate spine for both is the EPR projection table in elohim-storage seeded via genesis/seeder/src/seed-projections.ts — GET /api/v1/commitments?action=project-epr on alpha returns [], confirming the seeder never ran against alpha.",
+  "promise": {
+    "vision_quotes": [
+      {
+        "source": "genesis/a2o/features/protocol/landing-page-dogfood.feature:1-9",
+        "text": "As Matthew, who stewards the Elohim Protocol public surface and operates the alpha doorway as the same agent, I want the landing page at alpha.elohim.host to render bytes that flow through the protocol's content-addressing path, so that the protocol's own marketing site is the first proof of the steward↔doorway hosting model — and is impossible to silently centralize."
+      },
+      {
+        "source": "genesis/a2o/features/delivery/landing-page.feature:1-6",
+        "text": "Feature: Protocol Landing Page as SPA ContentNode — As a visitor to elohim.host I want to see a fast, informative landing page that is itself delivered as a protocol content node."
+      },
+      {
+        "source": "genesis/a2o/features/delivery/spa-bundle-delivery.feature:7-10",
+        "text": "The SPA is a spa-bundle content node with a ZIP blob. Doorway extracts and caches it, serving static assets directly and falling back to index.html for SPA routes. The bootstrap page shows live progress during cold start."
+      },
+      {
+        "source": "genesis/seeder/src/seed-projections.ts:1-23",
+        "text": "Seed EPR-Projection Commitments (REA project-epr action). Each projection is an REA Commitment with action='project-epr' that notarizes 'doorway D will project EPR E at urlPath U under terms T.' Default MVP projection set: elohim-host-landing @ doorway:alpha-elohim-host urlPath '/'; lamad-spa @ doorway:alpha-elohim-host urlPath '/lamad'; imagodei-portal @ doorway:alpha-elohim-host urlPath '/auth/portal'."
+      }
+    ],
+    "plan_deliverables": [
+      {
+        "plan_path": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md",
+        "deliverable": "Post-deploy on alpha: curl -s https://alpha.elohim.host/health/startup | jq '.rootApp' → {ready: true, extracted: true, slug: 'elohim-host-landing', blobHash: 'sha256-…'}",
+        "user_visible": true
+      },
+      {
+        "plan_path": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md",
+        "deliverable": "curl -sI https://alpha.elohim.host/apps/elohim-host-landing/index.html → HTTP/2 200, content-type: text/html",
+        "user_visible": true
+      },
+      {
+        "plan_path": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md",
+        "deliverable": "Browser load of https://alpha.elohim.host/ → 302 chain resolves; SPA renders; no infinite spinner; no four-stage shell",
+        "user_visible": true
+      },
+      {
+        "plan_path": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md",
+        "deliverable": "genesis/a2o/features/protocol/landing-page-dogfood.feature runs green",
+        "user_visible": false
+      },
+      {
+        "plan_path": "genesis/seeder/src/seed-projections.ts (default seed set, lines 17-22)",
+        "deliverable": "lamad-spa @ doorway:alpha-elohim-host urlPath: '/lamad' projection commitment exists on alpha",
+        "user_visible": true
+      },
+      {
+        "plan_path": "genesis/seeder/src/seed-projections.ts (default seed set, lines 17-22)",
+        "deliverable": "elohim-host-landing @ doorway:alpha-elohim-host urlPath: '/' projection commitment exists on alpha",
+        "user_visible": true
+      },
+      {
+        "plan_path": "doorway/doorway-service/src/server/http.rs:1354-1378 (EPR router design)",
+        "deliverable": "When a projection at url_path='/' exists, GET / → 200 SPA index.html via dispatch_to_projected_epr; relative chunk URLs resolve through the same projection so /chunk-X.js returns 200",
+        "user_visible": true
+      },
+      {
+        "plan_path": "doorway/doorway-service/src/server/http.rs:1354-1378 (EPR router design)",
+        "deliverable": "When a projection at url_path='/lamad' exists, GET /lamad → 200 lamad SPA index.html; GET /lamad/<route> → 200 (SPA deep-link fallback to entry_file)",
+        "user_visible": true
+      }
+    ],
+    "manifesto_anchors": [
+      {
+        "source": "doorway/CLAUDE.md (Federated P2P Gateway)",
+        "text": "Doorways are projections of the DHT, not authorities. Content is addressed by hash. The doorway operator trusts the network, not individual routes. What IS EPR-governed is the stewardship contract: providing projection, DNS, and compute."
+      },
+      {
+        "source": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md:603-605",
+        "text": "The landing-page dual-doorway work is the protocol dogfooding itself — Matthew-stewarded EPR projected through the protocol's own content-addressing path. When the deploy silently fails to link the bytes to the row, every visitor to alpha.elohim.host/ sees the four-stage bootstrap shell stall, and the protocol's first-impression surface communicates 'this is broken.'"
+      }
+    ]
+  },
+  "verification": {
+    "scenarios_existing": [
+      "genesis/a2o/features/protocol/landing-page-dogfood.feature: The landing bundle serves at the /apps path",
+      "genesis/a2o/features/protocol/landing-page-dogfood.feature: The elohim-host-landing ContentNode exists with html5-app format",
+      "genesis/a2o/features/protocol/landing-page-dogfood.feature: An in-kind REA Commitment declares Matthew's hosting agreement",
+      "genesis/a2o/features/protocol/landing-page-dogfood.feature: The protocol-signal badge renders on the landing page",
+      "genesis/a2o/features/delivery/landing-page.feature: Landing page loads with hero section",
+      "genesis/a2o/features/delivery/landing-page.feature: Landing page has call-to-action to enter learning platform (clicking → /lamad)",
+      "genesis/a2o/features/delivery/spa-bundle-delivery.feature: Root app serves index.html at / (@wip)",
+      "genesis/a2o/features/delivery/spa-bundle-delivery.feature: SPA routes fall back to index.html so Angular handles routing (@wip)",
+      "genesis/a2o/features/delivery/spa-bundle-delivery.feature: API routes are not caught by the root app catch-all (@wip)",
+      "genesis/a2o/features/delivery/spa-bundle-delivery.feature: /apps/ still serves html5-apps and is not intercepted by the root app (@wip)"
+    ],
+    "scenarios_missing": [
+      {
+        "intent": "Assert that GET /lamad on a freshly-deployed alpha returns 200 with text/html and contains the lamad SPA's Angular shell markers (e.g. data-testid hooks from the elohim-app templates).",
+        "proposed_location": "genesis/a2o/features/delivery/spa-bundle-delivery.feature (add to existing file)"
+      },
+      {
+        "intent": "Assert that an EPR projection commitment for url_path='/lamad' exists on alpha after a fresh deploy (GET /api/v1/commitments?action=project-epr returns at least one row with inScopeOf containing 'doorway:alpha-elohim-host' and 'epr:lamad-spa').",
+        "proposed_location": "genesis/a2o/features/deployment/seed-projections-deploy.feature (new)"
+      },
+      {
+        "intent": "Assert that the alpha-doorway's primary steward URL agrees with the peer that holds the patched elohim-host-landing.blobHash, so x-content-address on the served landing page is the real sha256 hash, not the placeholder.",
+        "proposed_location": "genesis/a2o/features/deployment/spa-blob-replication.feature (new)"
+      }
+    ],
+    "screenshot_targets": [
+      {
+        "feature_slug": "protocol-landing-page-dogfood",
+        "scenario_name": "Landing page renders the protocol's first impression",
+        "what_should_be_visible": "Hero section with vision statement; manifesto summary; five pillar cards labeled Lamad/ImagoDei/Qahal/Shefa/Elohim with icons; live protocol stats; 'Start Learning' CTA button; the protocol-signal-badge pill; no console errors for chunk-*.js or assets/fonts/* (network 200s); page does not show the four-stage 'Connecting…' bootstrap shell."
+      },
+      {
+        "feature_slug": "lamad-spa-root-load",
+        "scenario_name": "Lamad SPA loads at /lamad",
+        "what_should_be_visible": "Lamad Angular shell rendered (header, navigation chrome, initial route component); no doorway not-found JSON; deep-link refresh on /lamad/<sub-route> also returns the SPA shell (Angular router handles client-side); console + network panel shows zero 404s for the SPA's chunks/assets."
+      }
+    ]
+  },
+  "scope": {
+    "philosophy": "unbounded; agent commits to whatever delivers",
+    "consent_required_paths": [
+      "**/*.production.*",
+      ".github/workflows/**",
+      "k8s/**/secrets/**",
+      "elohim/holochain/dna/**/validators/**"
+    ]
+  },
+  "budget": {
+    "iterations": 20,
+    "wall_clock_min": 480,
+    "search_calls": 50
+  },
+  "search_trail": [
+    {
+      "location": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "Authoritative plan. Documents PATCH /db/content/{id} route + stageSpaBlob rewrite; addendum identifies projection_events / cache-stream drift. Dev response refutes projection_events theory; suspects doorway STORAGE_URL points at non-matthew peer. Matches today: stewardUrl=elohim-nancy-alpha; matthew patched, nancy didn't replicate."
+    },
+    {
+      "location": "genesis/docs/plans/2026-05-23-landing-page-epr-dual-doorway.md",
+      "result": "miss",
+      "iteration": null,
+      "notes": "File listed in plans/ but does not exist when read — possibly moved or never landed under that path. Did not block diagnosis; superpowers plan supplied the substrate."
+    },
+    {
+      "location": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md",
+      "result": "hit_partial",
+      "iteration": null,
+      "notes": "60k tokens — too large to fully read here. Header design referenced by seed-projections.ts. Did not block."
+    },
+    {
+      "location": "genesis/a2o/features/protocol/landing-page-dogfood.feature",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "5 scenarios encoding the landing-page promise. Has @browser-only scenario for protocol-signal-badge."
+    },
+    {
+      "location": "genesis/a2o/features/delivery/landing-page.feature",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "8 scenarios — landing at /, hero, manifesto, pillars, CTA → /lamad. NO @wip tags = expected runnable."
+    },
+    {
+      "location": "genesis/a2o/features/delivery/spa-bundle-delivery.feature",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "13 scenarios for root SPA + apps fallback. All @wip — step definitions don't exist yet."
+    },
+    {
+      "location": "doorway/doorway-service/src/server/http.rs (lines 1354-1378, 1500-1533, 2086-2087, 2611-2624)",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "EPR router dispatch wired (B13). Post-B14: '/' → /threshold (307) when no '/' projection. not_found_response emits the WebSocket-connection hint. Service-path guard list at 1098-1132 keeps /apps/, /db/, /api/, /admin etc. out of EPR router."
+    },
+    {
+      "location": "doorway/doorway-service/src/projection/epr_router.rs",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "EprRouter::replace_all populates the projection table from EprProjectionView list. Longest-prefix-match dispatch. The router is empty unless seeded."
+    },
+    {
+      "location": "doorway/doorway-service/src/main.rs:554-595, 795-820",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "EprRouter is initialized empty (Arc::new(EprRouter::new())). replace_all called from a refresh loop (line 581) that reads projections from somewhere. Need to trace what loads them — likely from REA commitments via storage."
+    },
+    {
+      "location": "genesis/seeder/src/seed-projections.ts",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "Seeder authored. Default set covers /, /lamad, /auth/portal at both alpha-elohim-host and elohim-host doorways. POSTs to /api/v1/commitments. Idempotent via content-addressed id."
+    },
+    {
+      "location": "genesis/seeder/src/seed.ts:2102 (seedProjections invocation in main flow)",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "seedProjections is called from the main seed entry. Triggered by hc:start:seed locally. No CI Jenkinsfile reference — confirmed by grep across genesis/Jenkinsfile and root Jenkinsfile (only runProbedSeeder is mentioned, not seedProjections)."
+    },
+    {
+      "location": "Jenkinsfile, genesis/Jenkinsfile (grep for seedProjections, seed-projections, seed:projections)",
+      "result": "miss",
+      "iteration": null,
+      "notes": "Zero hits. seed-projections.ts is NOT wired into any pipeline. This is the smoking gun for why /lamad and / projections are missing on alpha — they were never seeded."
+    },
+    {
+      "location": "GET https://alpha.elohim.host/api/v1/commitments?action=project-epr",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "Returns []. Zero project-epr commitments on alpha. Confirms seeder has never run successfully against the alpha cluster."
+    },
+    {
+      "location": "GET https://alpha.elohim.host/admin/routes",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "stewardUrl: http://elohim-nancy-alpha.elohim-alpha.svc.cluster.local:8090. 3069 routes via steward_peer. Doorway-alpha is configured to talk to NANCY, not matthew."
+    },
+    {
+      "location": "GET https://alpha.elohim.host/health/startup",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "identity/storage/projection all ready=true; rootProjection=null; warmup completed with lastError 'Failed to connect to http://elohim-emma-alpha.elohim-alpha.svc.cluster.local:8090/api/v1/cache/stream'. Emma is unreachable from doorway-alpha."
+    },
+    {
+      "location": "Headers on GET https://alpha.elohim.host/apps/elohim-host-landing/index.html",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "x-content-address: sha256-PLACEHOLDER_REPLACED_BY_SEED_SCRIPT (placeholder leaked to header); x-content-slug: elohim-host-landing; x-cache: HIT. Bundle serves; metadata is wrong. Consistent with nancy holding the unpatched row even though matthew got the real hash per the 2026-05-23 plan."
+    },
+    {
+      "location": "Direct curl: GET / + GET /chunk-GUZKOC33.js + GET /apps/elohim-host-landing/chunk-GUZKOC33.js",
+      "result": "hit_relevant",
+      "iteration": null,
+      "notes": "/ → 302 to /apps/elohim-host-landing/index.html (138-byte body, ingress-shaped, NOT doorway's /threshold redirect which is 307+HTML). /chunk-GUZKOC33.js → 404. /apps/elohim-host-landing/chunk-GUZKOC33.js → 200. Confirms the base-href mismatch and the ingress redirect workaround."
+    },
+    {
+      "location": ".claude/shifts/2026-05-25T20-14-stabilize-dev-head-2026-05-25.journal.md (prior shift)",
+      "result": "hit_partial",
+      "iteration": null,
+      "notes": "Prior shift drove dev from 1-FAILURE to zero across 8 iterations; closed storybook hang, doorway Dockerfile ssr-bundle prebuild gap, and element-registry-manifest contentFormat deploy lag. Did not touch EPR projection seeding on alpha."
+    }
+  ]
+}

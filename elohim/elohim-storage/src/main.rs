@@ -642,6 +642,52 @@ async fn async_main(
                         );
                     }
 
+                    // 2026-05-26-substrate-rea-replication-fix Task 6.5 — subscribe to
+                    // ReaProjectionSignals (REA commitments, agreements, economic events)
+                    // and project them into the local SQL via rea_projection::handle_rea_signal.
+                    //
+                    // Without this subscriber, the conductor-first HTTP write path in
+                    // ReaCommitmentService::create_via_conductor would create the DHT entry
+                    // but the bounded SQL-projection poll would time out at 1s — visible to
+                    // the operator as "REA commitment X written via conductor but projection
+                    // did not land". Same shape that affected /lamad on alpha pre-fix.
+                    if let Some(subscriber_pool) = db_pool.clone() {
+                        let hc_sub = hc.clone();
+                        let ctx_sub = elohim_storage::db::AppContext::default_lamad();
+                        tokio::spawn(async move {
+                            let pool = subscriber_pool;
+                            let ctx = ctx_sub;
+                            let handle_id = hc_sub
+                                .subscribe_rea_projection_signals(
+                                    move |signal: elohim_storage::rea_projection::ReaProjectionSignal| {
+                                        if let Err(e) =
+                                            elohim_storage::rea_projection::handle_rea_signal(
+                                                signal, &pool, &ctx,
+                                            )
+                                        {
+                                            warn!(
+                                                error = %e,
+                                                "ReaProjectionSignal projection failed"
+                                            );
+                                        }
+                                    },
+                                )
+                                .await;
+                            info!(
+                                subscription_id = %handle_id,
+                                "ReaProjectionSignal subscriber registered (projects \
+                                 ReaCommitmentCommitted + AgreementCommitted + \
+                                 ReaEconomicEventCommitted → SQLite with dht_anchor_hash)"
+                            );
+                        });
+                    } else {
+                        warn!(
+                            "ReaProjectionSignal subscriber disabled: shared DB pool unavailable \
+                             — conductor-first HTTP write path will time out at 1s polling for \
+                             SQL projection"
+                        );
+                    }
+
                     // Recovery M4 — subscribe to ElohimContentSignals (attestation:* and
                     // governance-action:* Content entries) and fan them through the central
                     // elohim_content_dispatcher to both AttestationProjector + RecoveryFlowProjector.
