@@ -3,6 +3,8 @@
  *
  * Tests that Sprint 4 & 5 governance API methods call the correct
  * HTTP endpoints with proper parameters.
+ *
+ * @vitest-environment jsdom
  */
 
 import { TestBed } from '@angular/core/testing';
