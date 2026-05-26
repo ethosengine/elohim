@@ -835,7 +835,14 @@ spec:
         claimName: nix-cache-holochain
     - name: cargo-cache
       persistentVolumeClaim:
-        claimName: cargo-cache-holochain
+        # Split from cargo-cache-holochain on 2026-05-26 so the edge pipeline
+        # can bind its own openebs-hostpath PVC on its own node and run in
+        # parallel with the DNA pipeline (which keeps cargo-cache-holochain,
+        # shared with steward — those two are sequential per the orchestrator
+        # dependsOn chain). Pre-split + pre-hostpath, the cross-pipeline
+        # contention surfaced as a Jiva orphan-unmount-loop FailedMount.
+        # See genesis/manifests/nix-cache-pvc.yaml for the full rationale.
+        claimName: cargo-cache-edge
   containers:
     - name: builder
       image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest

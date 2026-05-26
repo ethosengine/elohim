@@ -1,23 +1,41 @@
-# Persistent Nix Store for Holochain builds
+# CI build caches for the Holochain pipelines (nix store, cargo, sweettest target)
 #
-# This PVC stores the /nix directory across builds to avoid re-downloading
-# the Holochain toolchain from Cachix on every build.
+# Storage class: openebs-hostpath
+#   - Node-local — each PVC binds to whichever node its first consumer pod
+#     lands on (storage class default is volumeBindingMode: WaitForFirstConsumer).
+#   - No replication, no cross-node attach. RWO is still RWO, but contention
+#     across nodes is structurally impossible: a different node simply can't
+#     see a hostpath volume bound elsewhere.
+#   - Migrated off openebs-jiva-csi-default on 2026-05-26 to retire the
+#     Jiva orphan-unmount-loop class of failures — see
+#     [[jiva_orphan_kubelet_unmount_loop]] / [[storage_class_convention]].
 #
-# Storage class: openebs-jiva-csi-default (replicated, network-attached)
-#   - Replicated across nodes for availability
-#   - Accessible from any node (important: builds run on operations node)
-#   - Data stored on storage node (hp-micro10, 4TB)
-#   - Slightly higher latency than hostpath, but flexible scheduling
+# Binding behavior:
+#   - First build of each pipeline pins its PVC to that build's node.
+#   - All subsequent builds of any pipeline that mounts the same PVC are then
+#     scheduled to that same node (k8s honors the binding). This gives us
+#     warm caches with no operator pinning required.
+#   - cargo-cache-edge and cargo-cache-holochain are separate PVCs, so the
+#     edge and DNA pipelines can independently bind to different nodes and
+#     run in parallel.
 #
-# Size: 50Gi
-#   - Holochain toolchain: ~15-20GB
-#   - Rust target cache: ~5-10GB
-#   - Buffer for multiple versions: ~15-20GB
+# OPERATOR CUTOVER (one-time, destructive):
+#   spec.storageClassName is immutable on existing PVCs. To migrate:
+#     1. Note that all warm caches will be lost — first build after migration
+#        rebuilds from scratch (toolchain re-download, full cargo rebuild,
+#        full sweettest recompile). Expect a long first build per pipeline.
+#     2. Drain in-flight Jenkins builds that hold these PVCs (or wait for
+#        them to finish).
+#     3. kubectl -n jenkins delete pvc nix-cache-holochain cargo-cache-holochain cargo-cache-edge sweettest-target-cache-holochain
+#     4. kubectl apply -f genesis/manifests/nix-cache-pvc.yaml
+#     5. Trigger one build per affected pipeline (elohim-edge, elohim-holochain,
+#        steward) to seed the new hostpath caches.
 #
-# Build node: operations (Intel NUC i5, 8 cores, 16GB RAM)
-# Storage node: storage (hp-micro10, 4TB disk)
-#
-# To apply: kubectl apply -f holochain/manifests/nix-cache-pvc.yaml
+# Sizes (unchanged from Jiva era):
+#   - nix-cache-holochain:              50Gi  (Holochain toolchain + buffer)
+#   - cargo-cache-holochain:            20Gi  (registry + downloaded sources)
+#   - cargo-cache-edge:                 20Gi  (same, for elohim-edge)
+#   - sweettest-target-cache-holochain: 20Gi  (sweettest target/release tree)
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -30,12 +48,25 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: openebs-jiva-csi-default
+  storageClassName: openebs-hostpath
   resources:
     requests:
       storage: 50Gi
 ---
 # Cargo cache for Rust builds (smaller, faster churn)
+#
+# Consumed by:
+#   - elohim-holochain (DNA WASM build, elohim/holochain/dna/Jenkinsfile)
+#   - elohim-steward  (Tauri device build, steward/device/Jenkinsfile)
+# These two pipelines are sequential per the orchestrator dependsOn chain
+# (steward dependsOn elohim-holochain), so they coexist on this single PVC.
+#
+# elohim-edge uses cargo-cache-edge (separate PVC) so edge + DNA can land on
+# different hostpath nodes and run in parallel. The split was made on
+# 2026-05-26 in the same change as the openebs-jiva → openebs-hostpath
+# migration; pre-split, contention was a Jiva-orphan-unmount-loop problem
+# (see [[jiva_orphan_kubelet_unmount_loop]]) — post-migration, the split is
+# what enables cross-node parallelism on a node-local storage class.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -47,7 +78,33 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: openebs-jiva-csi-default
+  storageClassName: openebs-hostpath
+  resources:
+    requests:
+      storage: 20Gi
+---
+# Cargo cache for the elohim-edge pipeline (elohim/holochain/Jenkinsfile)
+#
+# Split from cargo-cache-holochain on 2026-05-26 so the edge and DNA pipelines
+# can land on different hostpath nodes simultaneously. Edge and DNA fire in
+# parallel from the orchestrator when a push touches both surfaces; with the
+# split, each pipeline binds its own PVC to its own node and never blocks
+# the other. (Pre-split + pre-hostpath, this manifested as FailedMount when
+# build N's pod was still in Jiva-unmount-loop on one node while build N+1
+# wanted to attach the same RWO PVC on another — see
+# [[jiva_orphan_kubelet_unmount_loop]].)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cargo-cache-edge
+  namespace: jenkins
+  labels:
+    app: holochain-build
+    purpose: cargo-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-hostpath
   resources:
     requests:
       storage: 20Gi
@@ -64,9 +121,8 @@ spec:
 # block routes both DNA WASM builds AND the native sweettest build into
 # this volume; cargo manages the per-target subdirectory layout.
 #
-# Storage class: openebs-jiva-csi-default (same pattern as nix-cache + cargo-cache)
-#   - Backing data on hp-micro10 storage node
-#   - Network-mounted into builder pods on operations / edge nodes
+# Storage class: openebs-hostpath (same as nix-cache + cargo-cache* — see the
+# file header for the rationale and the operator cutover steps).
 #
 # Size: 20Gi
 #   - Sweettest target/release: ~2-4GB
@@ -82,7 +138,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: openebs-jiva-csi-default
+  storageClassName: openebs-hostpath
   resources:
     requests:
       storage: 20Gi
