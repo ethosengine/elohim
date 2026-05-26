@@ -8,6 +8,8 @@ use std::sync::Arc;
 use crate::db::{self, content_diesel, context::AppContext, DbPool};
 use crate::error::StorageError;
 use crate::generated_enums::{ALL_CONTENT_FORMATS, ALL_CONTENT_TYPES, ALL_REACH_LEVELS};
+use crate::hc_client::HcClient;
+use crate::services::conductor_writes;
 
 use super::events::{EventBus, StorageEvent};
 
@@ -205,6 +207,160 @@ impl ContentService {
         });
 
         Ok(result)
+    }
+
+    /// Substrate-correct PATCH path: round-trip the patch through the local
+    /// conductor's content_store zome so DHT gossip propagates the entry to
+    /// every alpha peer.
+    ///
+    /// Per substrate-rea-replication-fix Task 8c, this branches on whether
+    /// the row already has a DHT anchor:
+    ///
+    /// 1. **Lazy-migration bootstrap** (`dht_anchor_hash IS NULL`). The row
+    ///    was created via `bulk_create_content` during seeding and never
+    ///    published to the DHT. First PATCH must publish — we construct a
+    ///    full `CreateContentInput` from the existing SQL row + patch
+    ///    applied, call `create_content` on the zome, then wait for the
+    ///    `ContentCommitted` signal to project the anchor + patch into SQL.
+    ///
+    /// 2. **Standard update** (`dht_anchor_hash IS NOT NULL`). The DHT
+    ///    already has a prior entry. Send only the patched fields via
+    ///    `update_content`, which fetches the prev entry, applies the patch
+    ///    preserving absent fields, and writes the update via `update_entry`.
+    ///
+    /// Both paths converge on `ContentCommitted` → `upsert_with_anchor` →
+    /// local SQL row with the new `dht_anchor_hash` (and patched fields).
+    /// The bounded poll below sees the projection land in ~tens of ms via
+    /// the in-process signal subscriber wired in Task 6.5.
+    ///
+    /// Field naming: HTTP wire / storage diesel use `blob_hash`, DNA entry
+    /// uses `blob_cid` (Phase 0 refactor — same SHA256 SemEantically).
+    /// Translation happens here.
+    pub async fn update_via_conductor(
+        &self,
+        hc: &Arc<HcClient>,
+        id: &str,
+        view: crate::views::UpdateContentInputView,
+    ) -> Result<crate::db::models::ContentWithTags, StorageError> {
+        let existing = {
+            let mut conn = self.conn()?;
+            content_diesel::get_content_with_tags(&mut conn, &self.ctx, id, false)?
+                .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?
+        };
+
+        // Merge metadata (same logic as the legacy `update` method above).
+        let merged_metadata_json = if let Some(patch_meta) = &view.metadata {
+            let existing_meta: serde_json::Value = existing
+                .content
+                .metadata_json
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok())
+                .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+            let patch_value = patch_meta.0.clone();
+            let merged = match (existing_meta, patch_value) {
+                (serde_json::Value::Object(mut base), serde_json::Value::Object(patch)) => {
+                    for (k, v) in patch {
+                        base.insert(k, v);
+                    }
+                    serde_json::Value::Object(base)
+                }
+                (_, patch) => patch,
+            };
+            Some(serde_json::to_string(&merged).map_err(|e| {
+                StorageError::Internal(format!("Metadata serialize error: {}", e))
+            })?)
+        } else {
+            None
+        };
+
+        // The DNA target field is `blob_cid`. View carries `blob_hash`.
+        let new_blob_cid = view.blob_hash.clone();
+
+        if existing.content.dht_anchor_hash.is_none() {
+            // Lazy-migration bootstrap: publish the full entry, applying patch
+            // on top of the existing SQL row's data. Fields not patched fall
+            // through to the existing row's values.
+            let bootstrap = lamad_types::CreateContentInput {
+                id: existing.content.id.clone(),
+                content_type: existing.content.content_type.clone(),
+                title: view.title.clone().unwrap_or_else(|| existing.content.title.clone()),
+                description: view
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| existing.content.description.clone().unwrap_or_default()),
+                summary: None,
+                content: view
+                    .content_body
+                    .clone()
+                    .or_else(|| existing.content.content_body.clone())
+                    .unwrap_or_default(),
+                content_format: view
+                    .content_format
+                    .clone()
+                    .unwrap_or_else(|| existing.content.content_format.clone()),
+                tags: view.tags.clone().unwrap_or_else(|| existing.tags.clone()),
+                source_path: None,
+                related_node_ids: Vec::new(),
+                reach: view
+                    .reach
+                    .clone()
+                    .unwrap_or_else(|| existing.content.reach.clone()),
+                estimated_minutes: None,
+                thumbnail_url: None,
+                metadata_json: merged_metadata_json
+                    .clone()
+                    .or_else(|| existing.content.metadata_json.clone())
+                    .unwrap_or_else(|| "{}".to_string()),
+                blob_cid: new_blob_cid
+                    .clone()
+                    .or_else(|| existing.content.blob_cid.clone())
+                    .or_else(|| existing.content.blob_hash.clone()),
+                content_size_bytes: existing.content.content_size_bytes.map(|n| n as u64),
+                content_hash: existing.content.blob_hash.clone(),
+            };
+            conductor_writes::call_create_content(hc, &bootstrap).await?;
+        } else {
+            // Standard update: only patched fields cross the wire.
+            let patch = lamad_types::UpdateContentInput {
+                id: id.to_string(),
+                blob_cid: new_blob_cid.clone(),
+                // stageSpaBlobs sends blob_hash only; content_size_bytes/content_hash
+                // come from the entry's existing fields. Phase 1 PATCH surface is
+                // blob_cid-only — title/description/metadata go through the legacy
+                // diesel `update` for now (those bypass the substrate; substrate
+                // migration for them is a follow-up sweep).
+                content_size_bytes: None,
+                content_hash: None,
+                title: view.title.clone(),
+                description: view.description.clone(),
+                metadata_json: merged_metadata_json.clone(),
+            };
+            conductor_writes::call_update_content(hc, &patch).await?;
+        }
+
+        // Wait for the projection to land. The post-commit signal subscriber
+        // (wired in Task 6.5) routes ContentCommitted → upsert_with_anchor →
+        // SQL row; in-process delivery is tens of ms. Cap at 1s to bound
+        // pathological cases.
+        for _ in 0..20 {
+            let mut conn = self.conn()?;
+            if let Some(updated) =
+                content_diesel::get_content_with_tags(&mut conn, &self.ctx, id, false)?
+            {
+                if updated.content.dht_anchor_hash.is_some() {
+                    self.events.emit(StorageEvent::ContentUpdated {
+                        id: id.to_string(),
+                    });
+                    return Ok(updated);
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+
+        Err(StorageError::Internal(format!(
+            "content {id} written via conductor but projection did not land within 1s — \
+             check rea_projection signal pipeline (subscribe_rea_projection_signals in main.rs)"
+        )))
     }
 
     /// Delete content by ID

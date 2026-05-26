@@ -88,6 +88,51 @@ pub async fn call_update_rea_commitment_state(
         .await
 }
 
+/// Round-trip `create_content` through the local conductor (lamad role).
+///
+/// Used by the lazy-migration bootstrap path in
+/// `ContentService::update_via_conductor`: when a content row exists in
+/// local SQL (from `bulk_create_content` during seeding) but has no
+/// `dht_anchor_hash`, the first PATCH must publish the entry to the DHT
+/// *before* update_content has a prev entry to mutate. The service layer
+/// constructs `CreateContentInput` from the existing SQL row + patch and
+/// calls this helper.
+///
+/// Post-commit fires `ProjectionSignal::ContentCommitted`, projected by
+/// the receiver added in Task 8a.
+pub async fn call_create_content(
+    hc: &Arc<HcClient>,
+    input: &lamad_types::CreateContentInput,
+) -> Result<Vec<u8>, StorageError> {
+    let payload = rmp_serde::to_vec_named(input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode CreateContentInput: {e}"
+        ))
+    })?;
+    hc.call_zome(ZOME_NAME, "create_content", payload).await
+}
+
+/// Round-trip `update_content` through the local conductor (lamad role).
+///
+/// Used by `ContentService::update_via_conductor` when the SQL row already
+/// has a `dht_anchor_hash` (i.e. the entry has been published to the DHT
+/// previously and we're patching specific fields like `blob_cid`).
+///
+/// The zome assumes the entry exists; failure mode = clean 5xx with a
+/// "no Content entry found for id" message. Service layer ensures the
+/// bootstrap branch handles the no-anchor case.
+pub async fn call_update_content(
+    hc: &Arc<HcClient>,
+    input: &lamad_types::UpdateContentInput,
+) -> Result<Vec<u8>, StorageError> {
+    let payload = rmp_serde::to_vec_named(input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode UpdateContentInput: {e}"
+        ))
+    })?;
+    hc.call_zome(ZOME_NAME, "update_content", payload).await
+}
+
 #[cfg(test)]
 mod tests {
     /// Asserts that `shefa_types::CreateReaCommitmentInput` survives a
