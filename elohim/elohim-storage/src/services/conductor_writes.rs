@@ -68,3 +68,50 @@ pub async fn call_create_rea_commitment(
     })?;
     hc.call_zome(ZOME_NAME, "create_rea_commitment", payload).await
 }
+
+#[cfg(test)]
+mod tests {
+    /// Asserts that `shefa_types::CreateReaCommitmentInput` survives a
+    /// MessagePack named-fields round-trip via `rmp_serde::to_vec_named` →
+    /// `rmp_serde::from_slice`. This is the wire-shape contract between
+    /// elohim-storage's HTTP write path and the DNA's content_store zome:
+    /// if encoding drops a field or the receiving side can't decode, the
+    /// conductor call would 500 at runtime.
+    ///
+    /// Real end-to-end execution (the actual zome call landing as a DHT
+    /// entry on a sweettest conductor) is covered by Task 9's sweettest at
+    /// `elohim/holochain/tests/sweettest/tests/rea_commitment_replication.rs`.
+    #[test]
+    fn create_rea_commitment_input_serde_roundtrip() {
+        let original = shefa_types::CreateReaCommitmentInput {
+            id: "test-projection-001".to_string(),
+            action: "project-epr".to_string(),
+            provider: "doorway:alpha-elohim-host".to_string(),
+            receiver: "epr:lamad-spa".to_string(),
+            resource_classified_as: vec![],
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of: vec!["doorway:alpha-elohim-host|epr:lamad-spa".to_string()],
+            note: None,
+            metadata_json: None,
+        };
+
+        let bytes = rmp_serde::to_vec_named(&original).expect("encode");
+        let decoded: shefa_types::CreateReaCommitmentInput =
+            rmp_serde::from_slice(&bytes).expect("decode");
+
+        assert_eq!(decoded.id, original.id);
+        assert_eq!(decoded.action, original.action);
+        assert_eq!(decoded.provider, original.provider);
+        assert_eq!(decoded.receiver, original.receiver);
+        assert_eq!(decoded.in_scope_of, original.in_scope_of);
+        assert_eq!(decoded.resource_classified_as, original.resource_classified_as);
+    }
+}
+

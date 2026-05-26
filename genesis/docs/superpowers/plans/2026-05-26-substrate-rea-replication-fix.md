@@ -67,6 +67,24 @@ pub async fn call_create_rea_commitment(
 
 ---
 
+## Addendum 2 (2026-05-26 14:30Z) — Task 3 test-scaffold reality
+
+The plan's Task 3 assumed an HTTP-and-conductor integration test scaffold (`TestState::new().await`, `await_projection`, etc.). The codebase **explicitly punts on this** — see `elohim/elohim-storage/tests/api_placement_gaps.rs:1-17`:
+
+> "The codebase pattern (peer_statuses_route.rs, gate_decisions_http.rs, placement_gaps.rs) tests the DB layer and view conversion directly — no live HTTP server. `spawn_test_server` does not exist in `test_util.rs`; adding a full hyper test harness is deferred."
+
+Building a real-conductor integration test scaffold for this one migration would be a multi-day detour. Pivoting:
+
+- **Task 3**: Replace integration test with a **serialization-roundtrip unit test** in `conductor_writes.rs` itself (`#[cfg(test)] mod tests`). Proves `shefa_types::CreateReaCommitmentInput` encodes/decodes cleanly via `rmp_serde::to_vec_named` (the encoding the DNA's MessagePack reader uses). This is the contract that matters at the wire-shape level — the actual zome execution is covered by Task 9's sweettest.
+
+- **Task 9 promoted**: end-to-end coverage that today's plan deferred to a separate task moves up — Task 9's sweettest IS the regression seatbelt that the original Task 3 imagined.
+
+- **Task 4-8 migrations**: rely on `cargo build --release` (compile-time signature enforcement) as the TDD driver. The breaking signature change in Task 4 is the failing test that drives Task 5.
+
+This is a discipline tradeoff: integration coverage moves from per-task to once-at-task-9, in exchange for shipping the substrate fix to alpha sooner (the user's stated priority).
+
+---
+
 **Verification:** Pass criteria is end-to-end on alpha — `curl https://alpha.elohim.host/api/v1/commitments?action=project-epr` returns ≥1 row with non-null `dhtAnchorHash`, AND `curl https://alpha.elohim.host/lamad` returns 200 (HTML), AND the same on `alpha.elohim.host/` (no PLACEHOLDER in X-Content-Address).
 
 ---
