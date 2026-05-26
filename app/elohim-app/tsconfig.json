@@ -26,6 +26,8 @@
       "@elohim/identity/*": ["../elohim-library/projects/elohim-identity/src/*"],
       "@elohim/service": ["../elohim-library/projects/elohim-service/src/index.ts"],
       "@elohim/service/*": ["../elohim-library/projects/elohim-service/src/*"],
+      "@elohim/rea-runtime": ["../elohim-library/projects/elohim-rea-runtime/src/public-api.ts"],
+      "@elohim/rea-runtime/*": ["../elohim-library/projects/elohim-rea-runtime/src/*"],
       "@elohim/storage-client": ["node_modules/@elohim/storage-client/dist/index"],
       "@elohim/storage-client/generated": ["node_modules/@elohim/storage-client/dist/generated/index"],
       "@elohim/storage-client/wire-types": ["node_modules/@elohim/storage-client/dist/wire-types/index"],

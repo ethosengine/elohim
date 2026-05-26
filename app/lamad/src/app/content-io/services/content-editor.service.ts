@@ -278,8 +278,8 @@ export class ContentEditorService {
           ? 'Content saved. Context assembly timed out — using defaults.'
           : 'Content saved with context assembly.',
         draft,
-        contextAssembly: assemblyResult,
-        birthContext: assemblyResult.birthContext,
+        contextAssembly: assemblyResult as unknown as LamadContextAssemblyResult,
+        birthContext: assemblyResult.birthContext as ContentBirthContext | undefined,
       })),
       catchError(() =>
         of({
@@ -320,9 +320,11 @@ export class ContentEditorService {
    * Build a CreatePayload from a ContentDraft for context assembly.
    */
   private buildCreatePayload(draft: ContentDraft): CreatePayload {
+    const body = draft.content.content;
+    const contentString = typeof body === 'string' ? body : JSON.stringify(body);
     return {
       actionType: 'content-create',
-      content: draft.content.content,
+      content: contentString,
       contentType: (draft.content.contentType ?? 'concept') as ContentType,
       contentFormat: draft.content.contentFormat as ContentFormat,
       requestedReach: draft.requestedReach ?? 'local',

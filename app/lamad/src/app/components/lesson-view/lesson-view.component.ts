@@ -922,8 +922,8 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
     this.eprResolver
       .resolveEprHead(contentId)
       .pipe(takeUntil(this.destroy$))
-      .subscribe((head: EprHead | null) => {
-        this.eprRelationships = head?.relationships ?? [];
+      .subscribe(head => {
+        this.eprRelationships = (head?.relationships ?? []) as EprRelationship[];
         this.cdr.markForCheck();
       });
   }

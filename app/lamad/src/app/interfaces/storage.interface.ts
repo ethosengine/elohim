@@ -65,6 +65,7 @@ export interface LamadAllocationQuery {
   stewardPresenceId?: string;
   contentId?: string;
   governanceState?: string;
+  activeOnly?: boolean;
   limit?: number;
   offset?: number;
 }

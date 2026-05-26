@@ -50,10 +50,18 @@ export interface LamadResolvedEpr {
   route: string[] | null;
 }
 
+/** Narrow shape for resolved-content metadata that consumers display. */
+export interface LamadResolvedContentBody {
+  title: string;
+  description?: string | null;
+  reach: string;
+  [extension: string]: unknown;
+}
+
 /** Resolved EPR content — includes content metadata. */
 export interface LamadResolvedContent {
   ref: EprRef;
-  content: unknown;
+  content: LamadResolvedContentBody;
   blobUrl: string | null;
   route: string[];
 }
@@ -78,12 +86,21 @@ export interface LamadCrossPathMatch {
   stepIndex: number;
 }
 
+/** Narrow EprHead relationship — content-to-content link metadata. */
+export interface LamadEprHeadRelationship {
+  type: string;
+  target: string;
+  description?: string;
+  [extension: string]: unknown;
+}
+
 /** Narrow EprHead for popover resolution. */
 export interface LamadEprHead {
   id: string;
   title: string;
   description?: string;
   contentType?: string;
+  relationships?: LamadEprHeadRelationship[];
 }
 
 /** Aggregated governance signals for a content node. */
@@ -246,16 +263,19 @@ export interface LamadCategoryAffinityStats {
 
 /** Affinity stats narrow shape. */
 export interface LamadAffinityStats {
+  totalNodes: number;
+  engagedNodes: number;
+  averageAffinity: number;
+  byCategory: Map<string, LamadCategoryAffinityStats>;
   byCategoryId?: Map<string, LamadCategoryAffinityStats>;
-  byCategory?: Map<string, LamadCategoryAffinityStats>;
   totalEngaged?: number;
-  averageAffinity?: number;
-  [key: string]: unknown;
 }
 
 /** Context assembly result narrow shape. */
 export interface LamadContextAssemblyResult {
   status: 'fulfilled' | 'rejected';
+  timedOut?: boolean;
+  birthContext?: unknown;
   [key: string]: unknown;
 }
 
@@ -285,7 +305,7 @@ export interface ILamadAffinityTracking {
   setAffinity(nodeId: string, value: number): void;
   incrementAffinity(nodeId: string, delta: number): void;
   trackView(nodeId: string): void;
-  getStats(contentNodes: { id: string; [key: string]: unknown }[]): LamadAffinityStats;
+  getStats(contentNodes: Array<{ id: string }>): LamadAffinityStats;
 }
 
 export const LAMAD_AFFINITY_TRACKING = new InjectionToken<ILamadAffinityTracking>(
@@ -315,9 +335,20 @@ export const LAMAD_EPR_RESOLVER = new InjectionToken<ILamadEprResolver>('LamadEp
 // ILamadGovernanceSignal — narrow governance signal contract
 // ============================================================================
 
+/** Interactive completion event payload. */
+export interface LamadInteractiveCompletionInput {
+  contentId: string;
+  interactionType: string;
+  passed?: boolean;
+  score?: number;
+  details?: Record<string, unknown>;
+}
+
 export interface ILamadGovernanceSignal {
   recordLearningSignal(signal: LamadLearningSignalInput): Observable<boolean>;
   getContentSignals(contentId: string): Observable<LamadAggregatedSignals>;
+  recordInteractiveCompletion(input: LamadInteractiveCompletionInput): Observable<boolean>;
+  checkAttestationTrigger(contentId: string, score?: number, attempts?: number): Observable<boolean>;
 }
 
 export const LAMAD_GOVERNANCE_SIGNAL = new InjectionToken<ILamadGovernanceSignal>(

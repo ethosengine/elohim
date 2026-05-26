@@ -646,7 +646,7 @@ export class ContentViewerComponent
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: state => {
-          this.governanceState = state;
+          this.governanceState = state as GovernanceStateRecord | null;
         },
         error: () => {
           // Governance state is optional - content may not have explicit state
@@ -659,7 +659,7 @@ export class ContentViewerComponent
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: challenges => {
-          this.challenges = challenges;
+          this.challenges = challenges as unknown as ChallengeRecord[];
           this.isLoadingGovernance = false;
         },
         error: () => {
@@ -673,7 +673,7 @@ export class ContentViewerComponent
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: discussions => {
-          this.discussions = discussions;
+          this.discussions = discussions as unknown as DiscussionRecord[];
         },
         error: () => {
           // Discussions are optional

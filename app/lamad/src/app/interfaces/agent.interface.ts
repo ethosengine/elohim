@@ -19,8 +19,8 @@ import type {
   Agent,
   AgentProgress,
   AgentAttestation,
-  MasteryLevel,
 } from '@elohim/service';
+import type { MasteryLevel } from '@elohim/service/angular/models/agent.model';
 
 // ============================================================================
 // ILamadAgent — narrow contract for what lamad services actually call

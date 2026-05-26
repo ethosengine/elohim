@@ -31,6 +31,21 @@ import type {
   RelationshipWithContentView,
 } from '@elohim/storage-client/generated';
 
+/** Narrow filter shape for getContents — bundle-local, no cross-pillar dep. */
+export interface ContentFilters {
+  limit?: number;
+  offset?: number;
+}
+
+/** Narrow filter shape for getRelationships — bundle-local, no cross-pillar dep. */
+export interface RelationshipFilters {
+  sourceId?: string;
+  targetId?: string;
+  type?: string;
+  limit?: number;
+  offset?: number;
+}
+
 /**
  * Content query filters for projection API
  */
