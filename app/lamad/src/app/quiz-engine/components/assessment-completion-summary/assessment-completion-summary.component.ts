@@ -832,7 +832,7 @@ export class AssessmentCompletionSummaryComponent implements OnInit {
               `Based on your ${this.title()} results, I have a learning path recommendation. ` +
               `(Guided by: ${response.constitutionalReasoning.primaryPrinciple})`,
             reasoning: response.constitutionalReasoning,
-            cost: response.cost,
+            cost: response.cost as LamadPresenceMoment['cost'],
             dismissible: true,
             createdAt: response.respondedAt,
           });

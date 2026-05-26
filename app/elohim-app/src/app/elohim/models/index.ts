@@ -48,7 +48,21 @@ export * from './elohim-agent.model';
 export * from './trust-badge.model';
 
 // Human consent and relationships
-export * from './human-consent.model';
+// Selective re-export — IntimacyLevel / ConsentState / INTIMACY_LEVEL_VALUES /
+// isConsentActive / hasMinimumIntimacy / getNextIntimacyLevel are already
+// exported by the sibling protocol-core.model above; avoid TS2308 barrel
+// ambiguity by NOT re-exporting them here. Consumers needing the shared
+// symbols reach them via this barrel (which routes them through
+// protocol-core.model) or import from the specific human-consent file.
+export type {
+  HumanConsent,
+  HumanConsentStateChange,
+  ConsentRequest,
+  ConsentResponse,
+  ElevationRequest,
+  RelationshipAttestationType,
+} from './human-consent.model';
+export { RELATIONSHIP_ATTESTATION_TYPES, requiresMutualAttestation, canElevate } from './human-consent.model';
 
 // Banner notification system
 export * from './banner-notice.model';
