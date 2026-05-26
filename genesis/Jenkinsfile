@@ -377,6 +377,51 @@ def seedProjectionsStage() {
             }
         }
     }
+
+    // Force a doorway pod restart so the EprRouter's boot-time fetch
+    // (main.rs:567 — fetch_projections_from_storage) picks up the freshly
+    // seeded project-epr commitments. The router only refreshes at boot
+    // OR via SSE 'projection.registered' events (storage_events_subscriber.rs:238),
+    // and the SSE path is currently flaky in alpha (warmup.lastError to
+    // emma-alpha visible on /health/startup). A rollout restart is the
+    // deterministic refresh — empirically observed during the 2026-05-26
+    // shift that build #1039's Seed Projections stage created 6 commitments
+    // but doorway-alpha's running pod (commit b45ad43, pre-seed) never picked
+    // them up. Wrapped in its own catchError so a kubectl-permissions issue
+    // doesn't mask the seed succeeding.
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        def deployment = ''
+        def namespace = ''
+        if (doorwayHost.contains('doorway-alpha.elohim.host')) {
+            deployment = 'elohim-doorway-alpha'
+            namespace = 'elohim-alpha'
+        } else if (doorwayHost.contains('doorway-staging.elohim.host')) {
+            deployment = 'elohim-doorway-staging'
+            namespace = 'elohim-staging'
+        } else if (doorwayHost.contains('doorway.elohim.host') && !doorwayHost.contains('doorway-')) {
+            deployment = 'elohim-doorway-prod'
+            namespace = 'elohim-prod'
+        }
+
+        if (deployment && namespace) {
+            sh """#!/bin/bash
+                set -euo pipefail
+                echo "═══════════════════════════════════════════════════════════"
+                echo "RESTART DOORWAY — refresh EprRouter post-seed"
+                echo "═══════════════════════════════════════════════════════════"
+                echo "Deployment: ${deployment} (-n ${namespace})"
+                echo ""
+                kubectl rollout restart deployment/${deployment} -n ${namespace}
+                kubectl rollout status deployment/${deployment} -n ${namespace} --timeout=180s
+                echo ""
+                echo "✓ doorway restart complete — EprRouter should now be populated"
+                echo "  Verify: curl -s https://${doorwayHost.replace('https://', '')}/api/v1/commitments?action=project-epr | jq 'length'"
+                echo "  Verify: curl -s -o /dev/null -w '%{http_code}\\n' https://${doorwayHost.replace('https://', '')}/lamad"
+            """
+        } else {
+            echo "Skipping doorway restart — unrecognized doorwayHost: ${doorwayHost}"
+        }
+    }
 }
 
 pipeline {
