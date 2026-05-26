@@ -85,6 +85,154 @@ This is a discipline tradeoff: integration coverage moves from per-task to once-
 
 ---
 
+## Addendum 4 (2026-05-26 15:30Z) — Tasks 4-6 worked, but only after Task 6.5
+
+Halfway through execution the substrate revealed it's only HALF-wired. The receiver function `rea_projection::handle_rea_signal` exists fully implemented in `elohim/elohim-storage/src/rea_projection.rs:125` and appears to project REA signals correctly — but **nothing actually calls it**. The function is dead code in the codebase; `grep -rn "handle_rea_signal\|try_handle_signal"` returns only the function definition itself and matching docstrings.
+
+The conductor signal stream IS subscribed to elsewhere — `subscribe_infrastructure_signals` (routes to PeerStatus projection) and `subscribe_elohim_content_signals` (routes to AttestationProjector + RecoveryFlowProjector) — but both filter aggressively: any signal that doesn't deserialize as their specific envelope type (`InfrastructureSignal`, `ElohimContentSignal`) is logged at debug and dropped. So `ProjectionSignal::ReaCommitmentCommitted` from the DNA arrives at storage's process and is silently discarded.
+
+Without an explicit `subscribe_rea_projection_signals` subscriber wired in `main.rs`, the conductor-first HTTP write path (Tasks 4-6) would:
+1. POST → service → conductor.create_rea_commitment → DHT entry created ✓
+2. DNA post-commit emits ProjectionSignal::ReaCommitmentCommitted ✓
+3. AppWebsocket on_signal handler receives it ✓
+4. Existing subscribers try-and-fail to deserialize as their envelope type ✗
+5. Signal dropped; no SQL projection happens
+6. Service's bounded 1s poll for the projection times out
+7. HTTP 500 with "REA commitment written via conductor but projection did not land"
+
+The fix (commit `fcfc6069c` — Task 6.5) adds:
+- `HcClient::subscribe_rea_projection_signals<F>` (mirrors `subscribe_elohim_content_signals` shape, but filters on `ReaProjectionSignal`)
+- A new spawned task in `main.rs` (alongside the two existing subscribers) that wires the subscription to `rea_projection::handle_rea_signal` with the shared DB pool
+
+**This pattern recurs for EVERY new signal variant we want projected.** Future migrations (Content, Path, etc.) must add their own subscriber, not assume the dispatcher catches all signal types.
+
+---
+
+## Addendum 5 (2026-05-26 15:50Z) — Content-side architectural asymmetries
+
+Task 7-8 (content blobHash migration) hit substantially deeper substrate asymmetries than the REA side. Pre-flight investigation surfaced four:
+
+1. **Type lives in lamad-types, not shefa-types.** `CreateContentInput`/`Content`/`ContentOutput` are in `elohim/sdk/domains/lamad/types/src/lib.rs`, not shefa. (REA types live in shefa.) So `UpdateContentInput` (which I added to shefa-types during execution as part of working on Task 6 update_rea_commitment_state) needs to move to lamad-types when the content task is picked up. This isn't a bug — it's a clean-up that a fresh context should do as part of Task 7 scaffolding.
+
+2. **Field naming mismatch.** The HTTP wire (and storage diesel column) is `blob_hash: Option<String>`. The DNA's `Content` entry has `blob_cid: Option<String>` (Phase 0 refactor; see `content_store_integrity/src/lib.rs:498-499`). They semantically mean the same thing (the SHA256 content address) but require translation at the service layer. Document this rename in the zome fn docstring.
+
+3. **No bootstrap path for existing rows.** Content rows on alpha today were created via `bulk_create_content` (diesel-direct, no DHT entry). When stageSpaBlobs PATCHes blob_hash, calling `update_content` zome fn would FAIL with "no prior entry" because there's nothing on the DHT to update. The substrate-correct fix needs service-side bootstrap logic:
+   - Read existing SQL row
+   - If `dht_anchor_hash IS NULL` → call `create_content` (constructing a full CreateContentInput from the existing SQL row's data + patch applied)
+   - If `dht_anchor_hash IS NOT NULL` → call `update_content` (just the patch)
+   - Then poll SQL for projection (the same pattern as REA)
+
+   This is a LAZY MIGRATION pattern: existing rows stay diesel-only until first PATCH; then they get DHT-migrated and subsequent updates flow through.
+
+4. **No Content receiver subscriber.** Same gap as REA pre-Task 6.5: the DNA emits `ProjectionSignal::ContentCommitted` (lib.rs:10527, dispatched on entry type) but no storage-side subscriber routes it. The fix is to either:
+   - Add `ContentCommitted` variant to `rea_projection::ReaProjectionSignal` enum + handler arm in `handle_rea_signal` (reuses Task 6.5 subscriber)
+   - OR add a parallel subscriber `subscribe_content_projection_signals` + dedicated dispatcher
+
+   The first approach is simpler and aligned (REA is a misnomer — these are all "DHT-anchored entity commit signals"). Recommend extending ReaProjectionSignal.
+
+5. **content_diesel needs upsert_with_anchor.** The existing `create_content` and `update_content` in `db/content_diesel.rs` don't take `dht_anchor_hash`. The handler for ContentCommitted needs an INSERT-on-missing-PK + UPDATE-on-existing variant that sets the anchor column. Pattern: mirror `rea_commitments::upsert_with_anchor`.
+
+**Implication for plan execution**: Tasks 7-8 are bigger than the plan originally implied. Realistic scope:
+- Task 7: failing serde-roundtrip test for UpdateContentInput in lamad-types (~30 min)
+- Task 8a: add Content variant to ReaProjectionSignal + handler + content_diesel upsert_with_anchor (~1.5 hr)
+- Task 8b: add update_content + lazy-bootstrap zome surface (~1 hr)
+- Task 8c: migrate ContentService::update with bootstrap (~1 hr)
+- Task 8d: thread hc_lamad to PATCH http.rs handler (~30 min)
+- Build + commit cycles add ~30 min
+
+Total: 4-5 hours real-time, ~6 commits.
+
+---
+
+## Current state at handoff (2026-05-26 ~16:00Z)
+
+**Branch:** `dev` (qahal-m1 worktree at `/projects/elohim-worktrees/qahal-m1/`)
+**Commits ahead of origin/dev:** 9 (all local, NOT pushed)
+
+| Commit | Subject | Status |
+|---|---|---|
+| `f90ce1e90` | chore(claude): preserve feature-promise from 2026-05-26 deliver iter-0 | reference artifact |
+| `dc6430049` | docs(plan): substrate-rea-replication-fix — 10-task plan | the plan |
+| `88d160263` | docs(plan): substrate-rea-replication-fix addendum 1 — name corrections | addendum |
+| `d919f1164` | feat(elohim-storage): add conductor_writes facade + wire lamad HcClient | Task 2 |
+| `b9edb1b07` | test(elohim-storage): serde roundtrip test for CreateReaCommitmentInput | Task 3 |
+| `fff4dfd6a` | feat(elohim-storage): project-epr commitments round-trip through conductor | Tasks 4+5 |
+| `58bb9be02` | feat(elohim-dna,elohim-storage): PATCH /api/v1/commitments/{id} round-trips through conductor | Task 6 |
+| `fcfc6069c` | feat(elohim-storage): wire REA projection signal subscriber | Task 6.5 |
+| *(this commit)* | docs(plan): addenda 4-5 — execution findings + handoff state | this addendum |
+
+**Tasks status:**
+- ✅ Tasks 1-6 + 6.5 — REA commitment substrate-correct write path fully wired (project-epr commitments will replicate cross-peer once deployed)
+- ⏸️ Task 7-8 — content blobHash migration (not started; see Addendum 5 for revised scope)
+- ⏸️ Task 9 — multi-peer sweettest (covers both REA + content once 8 lands)
+- ⏸️ Task 10 — deploy + verify on alpha
+
+**Untouched files needing cleanup before content task starts:**
+- `elohim/sdk/domains/shefa/types/src/lib.rs` — `UpdateContentInput` was added here during Task 6 work but should be MOVED to `elohim/sdk/domains/lamad/types/src/lib.rs` (the content's home crate). Currently unused (no caller), so the move is risk-free.
+
+**Verification not yet done:**
+- No CI run for the REA-substrate changes; pre-push gate not run; alpha not probed
+- Sweettest seatbelt (Task 9) absent
+- Real-conductor integration test scaffold for storage tests/ still absent (per Addendum 2)
+
+**Outstanding strategic question:** Should the REA-substrate fix push to dev BEFORE the content fix lands? Pushing now:
+- Closes /lamad on alpha (the most user-visible failure)
+- Leaves the PLACEHOLDER white-screen on / unfixed (needs content substrate)
+- Provides 30-60 min of CI cycle time during which content work can proceed
+- Operator chose "atomic deploy" in original execution; this addendum revises that recommendation given the depth findings — pushing the working REA fix has independent value, and the content fix can ship as a second deploy when ready
+
+---
+
+## Handoff prompt — pick this up in a fresh context
+
+> Resume execution of `genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md` from Task 7 in worktree `/projects/elohim-worktrees/qahal-m1/` (branch: `dev`, 9 commits ahead of origin/dev).
+>
+> **Read first (in this order):**
+> 1. The plan's main body + all 5 addenda. Addenda 4 + 5 carry the execution discoveries about substrate subscriber wiring and content-side asymmetries — they supersede the plan body where they conflict.
+> 2. The "Current state at handoff" section for what's done vs remaining.
+> 3. Last night's sprint result at `.claude/shifts/2026-05-26T08-35-shift-epr-app-delivery.sprint-result.md` (Gap C + Gap D context).
+>
+> **First decision to make (with operator input):** Should the 9 existing commits push to `dev` NOW (closes /lamad alone), or hold until the content fix lands too (atomic deploy)? Addendum 5's revised recommendation is to push now. If pushing: `cd /projects/elohim-worktrees/qahal-m1 && git push origin dev`, then ci-observer the orchestrator + downstream pipelines.
+>
+> **Then execute Tasks 7-10 per Addendum 5's revised scope:**
+> - **Task 7** (failing test): move `UpdateContentInput` from shefa-types to lamad-types, add a serde-roundtrip test mirroring the one at `elohim/elohim-storage/src/services/conductor_writes.rs::tests`.
+> - **Task 8a**: add `ContentCommitted` variant to `ReaProjectionSignal` enum (`elohim/elohim-storage/src/rea_projection.rs:45`) + handler arm in `handle_rea_signal` (line 125). Add `upsert_with_anchor` to `db/content_diesel.rs` mirroring the `rea_commitments::upsert_with_anchor` shape.
+> - **Task 8b**: add `update_content` coordinator zome fn in `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` (insert near line 2434 after `create_content_unchecked`). The fn assumes prev entry exists; bootstrap logic for existing diesel-only rows lives in the SERVICE layer (Task 8c), not the zome.
+> - **Task 8c**: add `ContentService::update_via_conductor` that branches on `dht_anchor_hash IS NULL`: if null, call `call_create_content` (using the existing SQL row's data as the base + patch applied) — this is the lazy-migration bootstrap. Otherwise call `call_update_content`. Poll SQL for projection ≤1s.
+> - **Task 8d**: thread `hc_lamad` from `HcClientRegistry` through the PATCH handler at `http.rs:3821`. Branch on `input.blob_hash.is_some()` — only blob_hash patches need the conductor round-trip; other patches stay diesel-direct for now.
+> - **Task 9**: sweettest at `elohim/holochain/tests/sweettest/tests/rea_commitment_replication.rs` per plan body. Per memory `_sweettest_cross_agent_consistency`, needs `exchange_peer_infos` + `await_consistency`.
+> - **Task 10**: deploy + alpha verification per plan body.
+>
+> **Key gotchas (caught during execution):**
+> - Every new ReaProjectionSignal variant needs a corresponding signal-subscriber wired in `main.rs` (the pattern at `subscribe_rea_projection_signals` is the template). The receiver function being implemented is NOT enough — without an explicit on_signal subscription, the signal is dropped silently.
+> - Storage's `CreateReaCommitmentInput` (Option<String> id, Option<String> in_scope_of) and `shefa_types::CreateReaCommitmentInput` (String id, Vec<String> in_scope_of) diverge — conversion lives in the service layer (see `to_shefa_input` in `rea_commitment_service.rs`). Same pattern needed for content.
+> - DNA build uses plain cargo (no CARGO_TARGET_DIR override per `elohim/holochain/dna/CLAUDE.md`); storage build uses `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim__elohim-storage/dev` and `RUSTFLAGS='--cfg getrandom_backend="custom"'`.
+> - The plan's per-task "failing test" Task discipline gave way to compile-time signature enforcement + serde roundtrip tests, since the codebase explicitly punts on full HTTP+conductor integration test scaffold (see Addendum 2). Sweettest (Task 9) is the real seatbelt.
+>
+> **Stop conditions:** if any new substrate asymmetry takes >1hr to surface, checkpoint with the operator rather than grinding. Addenda 4 + 5 are evidence that this codebase has more half-built primitives than greps suggest.
+
+---
+
+Mid-execution finding: Task 8 (content blobHash) is substantially heavier than the plan body implied. The content side does NOT have a `rea_projection`-style receiver in storage — `ContentCommitted` signals fire from the DNA's post-commit (lib.rs:10527) but no storage subscriber projects them to SQL. So full substrate-correct content fix requires:
+
+1. Add a Content-signal receiver in storage (mirror `rea_projection::project_signal` shape, dispatch on `ContentCommitted`).
+2. Wire it into the signal dispatcher in `signals.rs`.
+3. Add `update_content` coordinator zome fn (does `update_entry` on the Content entry; emits via existing post-commit dispatch).
+4. Migrate ContentService::create + update_blob_hash to round-trip through it.
+
+Operator decision: do the full substrate-correct work and ship everything in one atomic deploy. Not splitting the project-epr fix from the content fix. Plan executes through Task 10 before any push.
+
+Net effect on plan ordering:
+- Task 6 stays in place (PATCH commitment state — small, mirrors Task 4-5)
+- Task 7 = serde roundtrip test for content update payload
+- Task 8 = full substrate fix per the 4 sub-steps above
+- Task 9 = sweettest seatbelt (covers both REA + content)
+- Task 10 = push + alpha verification
+
+Expected wall-clock at this point: Tasks 6-10 sequential ≈ 1-2 days. Operator's priority is correctness over speed.
+
+---
+
 **Verification:** Pass criteria is end-to-end on alpha — `curl https://alpha.elohim.host/api/v1/commitments?action=project-epr` returns ≥1 row with non-null `dhtAnchorHash`, AND `curl https://alpha.elohim.host/lamad` returns 200 (HTML), AND the same on `alpha.elohim.host/` (no PLACEHOLDER in X-Content-Address).
 
 ---
