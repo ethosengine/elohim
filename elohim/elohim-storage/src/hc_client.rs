@@ -423,6 +423,54 @@ impl HcClient {
             .await
     }
 
+    /// Subscribe to ReaProjectionSignals emitted by the content_store coordinator.
+    /// Routes ReaCommitmentCommitted (incl. updates), AgreementCommitted, and
+    /// ReaEconomicEventCommitted to the local SQL projection via
+    /// `rea_projection::handle_rea_signal`.
+    ///
+    /// Wired by main.rs alongside the infrastructure + elohim-content
+    /// subscribers. Required for the substrate-correct write path landed
+    /// per 2026-05-26-substrate-rea-replication-fix.md — without this,
+    /// HTTP POST /api/v1/commitments (project-epr) would create the DHT
+    /// entry but the SQL projection would never land, causing the service
+    /// layer's bounded poll to time out at 1s.
+    ///
+    /// Non-REA signals (Content, Attestation, etc.) are logged at debug and
+    /// dropped — they have their own dedicated subscribers.
+    pub async fn subscribe_rea_projection_signals<F>(&self, handler: F) -> String
+    where
+        F: Fn(crate::rea_projection::ReaProjectionSignal) + Send + Sync + 'static,
+    {
+        use holochain_types::signal::Signal;
+
+        self.app_ws
+            .on_signal(move |signal| {
+                if let Signal::App { signal, .. } = signal {
+                    let bytes: Vec<u8> = signal.into_inner().into();
+                    match rmp_serde::from_slice::<serde_json::Value>(&bytes) {
+                        Ok(value) => {
+                            match serde_json::from_value::<crate::rea_projection::ReaProjectionSignal>(
+                                value.clone(),
+                            ) {
+                                Ok(rea) => handler(rea),
+                                Err(e) => {
+                                    debug!(
+                                        error = %e,
+                                        value = %value,
+                                        "Received app signal not matching ReaProjectionSignal — ignoring"
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            debug!(error = %e, "Failed to msgpack-decode app signal");
+                        }
+                    }
+                }
+            })
+            .await
+    }
+
     /// Subscribe to ElohimContentSignals emitted by the elohim DNA's content_store
     /// coordinator. Each signal carries an `attestation:*` or `governance-action:*`
     /// Content entry's projection-relevant fields.
