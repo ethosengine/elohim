@@ -323,6 +323,62 @@ def shouldRunStep(String stepName) {
     return steps.contains('all') || steps.contains(stepName)
 }
 
+/**
+ * Seeds the EPR-projection REA commitments — one per (doorway, EPR, urlPath)
+ * tuple — that the doorway's EprRouter polls from
+ * /api/v1/commitments?action=project-epr and uses to dispatch path-prefix
+ * routes (/, /lamad, /auth/portal) back through /apps/{slug}/* serving.
+ *
+ * Without these commitments alpha returns 404 for /lamad and serves the
+ * landing bundle only via /apps/... (relative chunks 404 because
+ * <base href="/"> resolves them to the root projection which doesn't exist).
+ *
+ * References:
+ *   - genesis/seeder/src/seed-projections.ts (default set: 6 commitments —
+ *     landing/lamad/imagodei across alpha-elohim-host + elohim-host)
+ *   - doorway/doorway-service/src/main.rs:554-595 (EprRouter refresh loop)
+ *   - doorway/doorway-service/src/server/http.rs:1354-1378 (dispatch site)
+ *   - .claude/shifts/2026-05-26T08-30-deliver-epr-app-iter0.sprint-result.md
+ *     (Gap A diagnosis — this stage closes it)
+ *   - genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md
+ *     (related substrate work — dev response §682-695 confirms
+ *     `storage-api-key-admin` is the canonical credential)
+ *
+ * Idempotent: re-runs collapse to 409 (id content-addressed over
+ * steward_peer_id + action + scope per seed-projections.ts:130).
+ *
+ * Body extracted to a helper above pipeline {} so the giant pipeline block
+ * stays under the 64KB CPS method-size limit (see .claude/hooks/jenkinsfile-
+ * method-size.py for the gate).
+ */
+def seedProjectionsStage() {
+    def doorwayHost = env.RESOLVED_DOORWAY_HOST
+    def apiKey = ''
+    try {
+        withCredentials([string(credentialsId: 'storage-api-key-admin', variable: 'ADMIN_KEY')]) {
+            apiKey = env.ADMIN_KEY
+        }
+    } catch (e) {
+        echo "storage-api-key-admin credential not visible — seeding without admin auth (may 401)"
+    }
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        dir('genesis/seeder') {
+            withEnv(["DOORWAY_API_KEY=${apiKey}"]) {
+                sh """#!/bin/bash
+                    set -euo pipefail
+                    echo "═══════════════════════════════════════════════════════════"
+                    echo "SEED PROJECTIONS (EPR project-epr commitments)"
+                    echo "═══════════════════════════════════════════════════════════"
+                    echo "Doorway: ${doorwayHost}"
+                    echo "Admin key: \${DOORWAY_API_KEY:+provided}\${DOORWAY_API_KEY:-not set}"
+                    echo ""
+                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-projections.ts
+                """
+            }
+        }
+    }
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -1316,6 +1372,22 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             }
                         }
                     }
+                }
+            }
+        }
+
+        stage('Seed Projections') {
+            // Seeds the EPR-projection REA commitments. Body extracted
+            // to seedProjectionsStage() helper above pipeline {} to stay
+            // under the 64KB CPS method-size limit. See helper for the
+            // full rationale.
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script { seedProjectionsStage() }
                 }
             }
         }
