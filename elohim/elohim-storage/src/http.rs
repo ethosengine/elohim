@@ -6334,10 +6334,7 @@ impl HttpServer {
     /// Returns 200 + MeResponse on an active session, 401 + `{"error":…}` when
     /// no session exists (never returns a MeResponse body on the 401 path, to
     /// match doorway's contract).
-    async fn handle_auth_me(
-        &self,
-        pool: DbPool,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
+    async fn handle_auth_me(&self, pool: DbPool) -> Result<Response<Full<Bytes>>, StorageError> {
         #[derive(Debug, serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct AuthorityRef {
@@ -10509,8 +10506,7 @@ mod auth_me_tests {
         assert_eq!(json["authority"]["label"], "your conductor on this device");
         assert_eq!(json["authority"]["id"], "12D3KooWTest");
         assert_eq!(
-            json["conductorEndpoint"],
-            "your conductor on this device",
+            json["conductorEndpoint"], "your conductor on this device",
             "conductorEndpoint must be present"
         );
         // doorwayId and doorwayUrl must be absent (skip_serializing_if = None)
