@@ -27,9 +27,7 @@ export { ELOHIM_ENV } from './env/elohim-env';
 
 export * from './angular/models/source-chain.model';
 
-export {
-  DoorwayClientService,
-} from './angular/services/doorway-client.service';
+export { DoorwayClientService } from './angular/services/doorway-client.service';
 export { LocalSourceChainService } from './angular/services/local-source-chain.service';
 export type {
   VerifyBlobRequest,

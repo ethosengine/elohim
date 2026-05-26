@@ -112,7 +112,10 @@ function generateArchetypeId(parsed: ParsedContent): string {
  */
 function extractArchetypeTitle(parsed: ParsedContent): string {
   // Priority 1: archetype_name from frontmatter
-  if (parsed.frontmatter['archetype_name'] && typeof parsed.frontmatter['archetype_name'] === 'string') {
+  if (
+    parsed.frontmatter['archetype_name'] &&
+    typeof parsed.frontmatter['archetype_name'] === 'string'
+  ) {
     return parsed.frontmatter['archetype_name'];
   }
 
