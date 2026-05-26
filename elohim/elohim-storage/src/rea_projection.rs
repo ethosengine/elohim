@@ -29,6 +29,7 @@ use serde::Deserialize;
 use tracing::{info, warn};
 
 use crate::db::agreements::{self, CreateAgreementInput};
+use crate::db::content_diesel::{self, ContentProjectionPatch};
 use crate::db::context::AppContext;
 use crate::db::economic_events::{self, CreateEconomicEventInput};
 use crate::db::rea_commitments::{self, CreateReaCommitmentInput};
@@ -74,6 +75,18 @@ pub enum ReaProjectionSignal {
         #[serde(default)]
         entry_hash: Option<String>,
         event: EconomicEventEntry,
+        #[serde(default)]
+        author: Option<String>,
+    },
+    /// Lamad Content entry committed. Carries the full Content entry shape
+    /// for projection into the local SQL `content` table with anchor.
+    /// Fires from the DNA post_commit for both create_content (initial
+    /// publish) and update_content (e.g. blob_cid patches from stageSpaBlobs).
+    ContentCommitted {
+        action_hash: String,
+        #[serde(default)]
+        entry_hash: Option<String>,
+        content: ContentEntry,
         #[serde(default)]
         author: Option<String>,
     },
@@ -148,6 +161,56 @@ pub struct CommitmentEntry {
     pub created_at: Option<String>,
     #[serde(default)]
     pub updated_at: Option<String>,
+}
+
+/// Mirror of DNA `Content` entry shape (lamad zome content_store).
+///
+/// Field naming note: the DNA's blob field is `blob_cid` (Phase 0 refactor
+/// per substrate-rea-replication-fix Addendum 5). The storage projection
+/// mirrors that to both `blob_cid` AND the legacy `blob_hash` SQL column
+/// inside upsert_with_anchor.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContentEntry {
+    pub id: String,
+    pub content_type: String,
+    pub title: String,
+    pub description: String,
+    #[serde(default)]
+    pub summary: Option<String>,
+    #[serde(default)]
+    pub content: String,
+    pub content_format: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub source_path: Option<String>,
+    #[serde(default)]
+    pub related_node_ids: Vec<String>,
+    #[serde(default)]
+    pub author_id: Option<String>,
+    pub reach: String,
+    #[serde(default)]
+    pub trust_score: f64,
+    #[serde(default)]
+    pub estimated_minutes: Option<u32>,
+    #[serde(default)]
+    pub thumbnail_url: Option<String>,
+    #[serde(default)]
+    pub metadata_json: String,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
+    #[serde(default)]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub validation_status: String,
+    #[serde(default)]
+    pub blob_cid: Option<String>,
+    #[serde(default)]
+    pub content_size_bytes: Option<u64>,
+    #[serde(default)]
+    pub content_hash: Option<String>,
 }
 
 /// Mirror of DNA `EconomicEvent` entry shape.
@@ -358,6 +421,36 @@ pub fn handle_rea_signal(
             };
             economic_events::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
         }
+        ReaProjectionSignal::ContentCommitted {
+            action_hash,
+            content,
+            ..
+        } => {
+            info!(
+                id = %content.id,
+                hash = %action_hash,
+                blob_cid = ?content.blob_cid,
+                "Projecting Content from DHT"
+            );
+            // u64 → i32 with saturating cast. Real content sizes fit in
+            // i32 with room to spare (max ~2.1 GB per blob; doorway proxy
+            // caps far lower); the cast is defensive against malformed
+            // entries claiming absurd sizes.
+            let size_i32 = content
+                .content_size_bytes
+                .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+            let patch = ContentProjectionPatch {
+                blob_cid: content.blob_cid,
+                content_size_bytes: size_i32,
+                title: Some(content.title),
+                description: Some(content.description),
+                content_type: Some(content.content_type),
+                content_format: Some(content.content_format),
+                reach: Some(content.reach),
+                metadata_json: Some(content.metadata_json),
+            };
+            content_diesel::upsert_with_anchor(&mut conn, ctx, &content.id, patch, &action_hash)?;
+        }
     }
 
     Ok(())
@@ -540,6 +633,65 @@ mod tests {
                 );
             }
             _ => panic!("expected ReaEconomicEventCommitted"),
+        }
+    }
+
+    #[test]
+    fn decode_content_signal_from_dna_wire_shape() {
+        let wire = serde_json::json!({
+            "type": "ContentCommitted",
+            "payload": {
+                "action_hash": "uhCkk-content-anchor",
+                "entry_hash": "uhCEk-content-entry",
+                "content": {
+                    "id": "elohim-host-landing",
+                    "content_type": "html5-app",
+                    "title": "Elohim Host Landing",
+                    "description": "The hosted landing page bundle.",
+                    "summary": null,
+                    "content": "",
+                    "content_format": "html5-app",
+                    "tags": ["landing", "spa"],
+                    "source_path": null,
+                    "related_node_ids": [],
+                    "author_id": null,
+                    "reach": "commons",
+                    "trust_score": 1.0,
+                    "estimated_minutes": null,
+                    "thumbnail_url": null,
+                    "metadata_json": "{}",
+                    "created_at": "2026-05-26T12:00:00Z",
+                    "updated_at": "2026-05-26T13:30:00Z",
+                    "schema_version": 1,
+                    "validation_status": "Valid",
+                    "blob_cid": "sha256-deadbeefcafe1234",
+                    "content_size_bytes": 4096,
+                    "content_hash": "sha256-deadbeefcafe1234"
+                },
+                "author": "uhCAk-author"
+            }
+        });
+
+        let signal: ReaProjectionSignal = serde_json::from_value(wire)
+            .expect("DNA wire shape for ContentCommitted must decode");
+
+        match signal {
+            ReaProjectionSignal::ContentCommitted {
+                action_hash,
+                content,
+                ..
+            } => {
+                assert_eq!(action_hash, "uhCkk-content-anchor");
+                assert_eq!(content.id, "elohim-host-landing");
+                assert_eq!(
+                    content.blob_cid.as_deref(),
+                    Some("sha256-deadbeefcafe1234")
+                );
+                assert_eq!(content.content_size_bytes, Some(4096));
+                assert_eq!(content.tags.len(), 2);
+                assert!((content.trust_score - 1.0).abs() < f64::EPSILON);
+            }
+            _ => panic!("expected ContentCommitted variant"),
         }
     }
 
