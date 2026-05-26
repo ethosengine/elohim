@@ -263,13 +263,9 @@ export function canElevate(consent: HumanConsent): boolean {
   );
 }
 
-// Re-export utility functions from protocol-core for convenience
-
-export {
-  INTIMACY_LEVEL_VALUES,
-  getNextIntimacyLevel,
-  hasMinimumIntimacy,
-  type IntimacyLevel,
-  isConsentActive,
-  type ConsentState,
-} from '@elohim/storage-client';
+// IntimacyLevel / ConsentState / INTIMACY_LEVEL_VALUES / isConsentActive /
+// hasMinimumIntimacy / getNextIntimacyLevel are exported by the sibling
+// protocol-core.model in this same barrel. Re-exporting them from
+// @elohim/storage-client here would create TS2308 ambiguity at the
+// barrel — consumers reach them via @app/elohim/models or directly from
+// @elohim/storage-client.

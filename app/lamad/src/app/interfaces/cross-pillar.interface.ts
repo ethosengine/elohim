@@ -134,14 +134,28 @@ export interface LamadLearningSignalInput {
   payload: Record<string, unknown>;
 }
 
+/** Cost telemetry for an elohim presence moment. */
+export interface LamadPresenceCost {
+  tokensProcessed?: number;
+  timeMs?: number;
+  [extension: string]: unknown;
+}
+
+/** Reasoning trace for an elohim presence moment. */
+export interface LamadPresenceReasoning {
+  primaryPrinciple: string;
+  interpretation?: string;
+  [extension: string]: unknown;
+}
+
 /** Narrow presence moment for assessment completion display. */
 export interface LamadPresenceMoment {
   id: string;
   type: string;
   capability: string;
   message: string;
-  reasoning: { primaryPrinciple: string; [key: string]: unknown };
-  cost: unknown;
+  reasoning: LamadPresenceReasoning;
+  cost?: LamadPresenceCost;
   dismissible: boolean;
   createdAt: Date;
 }
