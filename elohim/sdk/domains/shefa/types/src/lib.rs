@@ -150,6 +150,21 @@ pub struct ReaCommitmentOutput {
     pub commitment: Commitment,
 }
 
+/// Input for content_store::update_rea_commitment_state coordinator function.
+///
+/// Used by the conductor-first PATCH /api/v1/commitments/{id} write path
+/// (substrate-rea-replication-fix plan, Task 6). The state transition writes
+/// a new entry via update_entry; post-commit fires ReaCommitmentCommitted
+/// which propagates the new state to all peers via DHT gossip.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct UpdateReaCommitmentStateInput {
+    pub id: String,
+    pub state: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finished: Option<bool>,
+}
+
 // =============================================================================
 // REA Economic Event Types
 // =============================================================================

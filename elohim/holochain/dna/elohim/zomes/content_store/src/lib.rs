@@ -126,6 +126,7 @@ pub use shefa_types::{
     CreatePremiumGateInput,
     CreateReaCommitmentInput,
     CreateReaEconomicEventInput,
+    UpdateReaCommitmentStateInput,
     // Premium Gating
     CreateStewardCredentialInput,
     CustodianCommitmentOutput,
@@ -11873,6 +11874,77 @@ pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput
     } else {
         Ok(None)
     }
+}
+
+/// Update an REA Commitment's state field (e.g., transition to "cancelled").
+///
+/// Substrate-correct PATCH path for /api/v1/commitments/{id} per
+/// 2026-05-26-substrate-rea-replication-fix.md (Task 6). The update_entry
+/// produces a new ActionHash; the post-commit handler emits
+/// ProjectionSignal::ReaCommitmentCommitted (dispatches on entry type, so
+/// CREATE and UPDATE both fire the same signal — see lib.rs:10768). Storage
+/// receivers project the new state into local SQL on every peer that
+/// receives the DHT gossip update.
+#[hdk_extern]
+pub fn update_rea_commitment_state(
+    input: UpdateReaCommitmentStateInput,
+) -> ExternResult<ReaCommitmentOutput> {
+    // 1. Locate the latest action_hash via the id_anchor link.
+    let id_anchor = StringAnchor::new("commitment_id", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToCommitment)?;
+    let links = get_links(query, GetStrategy::default())?;
+    let link = links.first().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "update_rea_commitment_state: no commitment found for id {}",
+            input.id
+        )))
+    })?;
+    let prev_action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "update_rea_commitment_state: invalid action hash on id link".to_string(),
+        ))
+    })?;
+
+    // 2. Fetch + decode the previous entry.
+    let record = get(prev_action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "update_rea_commitment_state: previous record not found".to_string(),
+        ))
+    })?;
+    let mut commitment: Commitment = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "update_rea_commitment_state: decode previous Commitment: {e}"
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "update_rea_commitment_state: no entry in record".to_string(),
+            ))
+        })?;
+
+    // 3. Mutate state + finished + updated_at.
+    commitment.state = input.state;
+    if let Some(finished) = input.finished {
+        commitment.finished = finished;
+    }
+    commitment.updated_at = format!("{:?}", sys_time()?);
+
+    // 4. Write the update entry. Integrity validator allows updates on
+    //    Commitment entries (content_store_integrity/src/lib.rs:4352-4364
+    //    falls through to validate_create_entry, which Commitment passes).
+    let new_action_hash =
+        update_entry(prev_action_hash, &EntryTypes::Commitment(commitment.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
+
+    Ok(ReaCommitmentOutput {
+        action_hash: new_action_hash,
+        entry_hash,
+        commitment: commitment_to_wire(&commitment),
+    })
 }
 
 #[hdk_extern]

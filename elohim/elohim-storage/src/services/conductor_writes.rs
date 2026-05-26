@@ -69,6 +69,25 @@ pub async fn call_create_rea_commitment(
     hc.call_zome(ZOME_NAME, "create_rea_commitment", payload).await
 }
 
+/// Round-trip `update_rea_commitment_state` through the local conductor.
+///
+/// The zome's update_entry produces a new ActionHash for the same logical
+/// id; the post-commit handler emits ProjectionSignal::ReaCommitmentCommitted
+/// (dispatches on entry type — CREATE and UPDATE both fire the same signal
+/// per content_store/src/lib.rs:10768). Receivers project the new state.
+pub async fn call_update_rea_commitment_state(
+    hc: &Arc<HcClient>,
+    input: &shefa_types::UpdateReaCommitmentStateInput,
+) -> Result<Vec<u8>, StorageError> {
+    let payload = rmp_serde::to_vec_named(input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode UpdateReaCommitmentStateInput: {e}"
+        ))
+    })?;
+    hc.call_zome(ZOME_NAME, "update_rea_commitment_state", payload)
+        .await
+}
+
 #[cfg(test)]
 mod tests {
     /// Asserts that `shefa_types::CreateReaCommitmentInput` survives a

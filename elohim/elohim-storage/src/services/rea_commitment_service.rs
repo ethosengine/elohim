@@ -149,12 +149,11 @@ impl ReaCommitmentService {
 
     /// Update commitment state.
     ///
-    /// NOTE: not yet migrated to conductor-first. Task 6 of the
-    /// substrate-rea-replication-fix plan will migrate this once the
-    /// content_store zome exposes an update_rea_commitment_state coordinator
-    /// function (which today is absent — see plan §pre-flight findings).
-    /// Accepts `hc_lamad` now so the handler-side plumbing is consistent
-    /// across create + update_state.
+    /// Like `create`, branches on the underlying commitment's action: for
+    /// project-epr we round-trip through the conductor's
+    /// content_store::update_rea_commitment_state coordinator (Task 6 of
+    /// the substrate-rea-replication-fix plan); other actions take the
+    /// legacy diesel-direct path.
     pub async fn update_state(
         conn: &mut SqliteConnection,
         ctx: &AppContext,
@@ -163,7 +162,16 @@ impl ReaCommitmentService {
         events: Option<&EventBus>,
         hc_lamad: Option<&Arc<HcClient>>,
     ) -> Result<ReaCommitmentView, StorageError> {
-        let _ = hc_lamad; // Reserved for Task 6 migration.
+        // Need to know the existing commitment's action to decide path.
+        let existing = rea_commitments::get_commitment(conn, ctx, id)?.ok_or_else(|| {
+            StorageError::NotFound(format!("commitment {} not found", id))
+        })?;
+
+        if existing.action == PROJECT_EPR_ACTION {
+            return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;
+        }
+
+        // Legacy diesel-direct path.
         let commitment = rea_commitments::update_commitment_state(conn, ctx, id, update)?;
         if let Some(bus) = events {
             if commitment.action == PROJECT_EPR_ACTION && update.state == "cancelled" {
@@ -173,6 +181,53 @@ impl ReaCommitmentService {
             }
         }
         Ok(ReaCommitmentView::from(commitment))
+    }
+
+    async fn update_state_via_conductor(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        id: &str,
+        update: &UpdateReaCommitmentState,
+        events: Option<&EventBus>,
+        hc_lamad: Option<&Arc<HcClient>>,
+    ) -> Result<ReaCommitmentView, StorageError> {
+        let hc = hc_lamad.ok_or_else(|| {
+            StorageError::Conductor(
+                "lamad bridge unavailable — required for project-epr commitment updates".into(),
+            )
+        })?;
+
+        let input = shefa_types::UpdateReaCommitmentStateInput {
+            id: id.to_string(),
+            state: update.state.clone(),
+            finished: update.finished,
+        };
+
+        let _output = conductor_writes::call_update_rea_commitment_state(hc, &input).await?;
+
+        // Poll for projection to reflect the new state. Same bounded wait
+        // shape as create_via_conductor.
+        for _ in 0..20 {
+            if let Some(commitment) = rea_commitments::get_commitment(conn, ctx, id)? {
+                if commitment.state == update.state {
+                    if let Some(bus) = events {
+                        if commitment.action == PROJECT_EPR_ACTION && update.state == "cancelled" {
+                            bus.emit(StorageEvent::ProjectionRevoked {
+                                commitment_id: commitment.id.clone(),
+                            });
+                        }
+                    }
+                    return Ok(ReaCommitmentView::from(commitment));
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+
+        Err(StorageError::Internal(format!(
+            "REA commitment {} state update written via conductor but \
+             projection did not reflect state={} within 1s",
+            id, update.state
+        )))
     }
 }
 
