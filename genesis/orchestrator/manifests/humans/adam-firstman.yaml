@@ -272,14 +272,21 @@ spec:
             - name: p2p
               containerPort: 9876
               protocol: TCP
-          # Cooperative memory pool — conductor + storage share one cgroup
+          # Cooperative memory pool — conductor + storage share one cgroup.
+          # Sized to match matthew (device-family-node-base): adam is the
+          # shem-side member of the genesis pair (deployments.json adam.
+          # $genesisPeerComment) AND, as of 2026-05-27, the storage backend
+          # behind doorway-B (elohim.host). Both roles together make adam
+          # symmetric with matthew on the on-prem side, so the two genesis
+          # peers carry comparable load: each services one doorway's reads
+          # plus its share of P2P gossip + DHT validation.
           resources:
             requests:
               memory: "2Gi"
-              cpu: "500m"
+              cpu: "1000m"
             limits:
-              memory: "6Gi"
-              cpu: "2000m"
+              memory: "8Gi"
+              cpu: "3000m"
           volumeMounts:
             - name: holochain-data
               mountPath: /var/local/lib/holochain
