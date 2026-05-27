@@ -22,6 +22,7 @@ import { StewardshipAllocationService } from '../../services/stewardship-allocat
 import { SignalHarnessService } from '../../services/signal-harness.service';
 import { HouseholdResilienceService } from '../../services/household-resilience.service';
 import { ResilienceService as LibResilienceService } from '@elohim/service/public-api';
+import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { vi, Mock } from 'vitest';
 import { AttentionTrackerService, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
 
@@ -174,6 +175,13 @@ describe('ContentViewerComponent', () => {
       providers: [
         provideHttpClient(),
         provideRouter([]),
+        {
+          provide: LAMAD_STORAGE_CLIENT,
+          useValue: {
+            getBlobUrl: (h: string) => `https://test/blob/${h}`,
+            getStorageBaseUrl: () => 'https://test',
+          },
+        },
         { provide: LAMAD_AFFINITY_TRACKING, useValue: affinitySpyObj },
         { provide: LAMAD_AGENT, useValue: agentSpyObj },
         { provide: ContentService, useValue: contentSpyObj },
@@ -1027,7 +1035,7 @@ describe('ContentViewerComponent', () => {
     }));
 
     it('does not render the panel when there are no relationships', fakeAsync(() => {
-      const eprResolverSpy = TestBed.inject(EprResolverService);
+      const eprResolverSpy = TestBed.inject(LAMAD_EPR_RESOLVER);
       (eprResolverSpy.resolveEprHead as Mock).mockReturnValue(of({
         version: 1,
         id: 'test-content-1',

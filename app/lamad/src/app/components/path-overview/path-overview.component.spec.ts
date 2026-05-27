@@ -183,7 +183,7 @@ describe('PathOverviewComponent', () => {
       providers: [
         provideRouter([]),
         { provide: PathService, useValue: pathServiceSpy },
-        { provide: ILamadAgent, useValue: agentServiceSpy },
+        { provide: LAMAD_AGENT, useValue: agentServiceSpy },
         { provide: PathAdaptationService, useValue: adaptationServiceSpy },
         { provide: SeoService, useValue: seoServiceSpy },
         { provide: ContentMasteryService, useValue: contentMasteryServiceSpy },
@@ -195,7 +195,7 @@ describe('PathOverviewComponent', () => {
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
-    agentService = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
+    agentService = TestBed.inject(LAMAD_AGENT) as { [K in keyof ILamadAgent]?: Mock };
     router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
 

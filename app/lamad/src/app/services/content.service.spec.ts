@@ -79,13 +79,13 @@ describe('ContentService', () => {
       providers: [
         ContentService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: ILamadAgent, useValue: agentServiceSpyObj },
+        { provide: LAMAD_AGENT, useValue: agentServiceSpyObj },
       ],
     });
 
     service = TestBed.inject(ContentService);
     dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
-    agentServiceSpy = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
+    agentServiceSpy = TestBed.inject(LAMAD_AGENT) as { [K in keyof ILamadAgent]?: Mock };
 
     // Default spy return values
     dataLoaderSpy.getContent.mockReturnValue(of(mockContent));

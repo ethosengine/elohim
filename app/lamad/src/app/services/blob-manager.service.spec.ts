@@ -15,6 +15,8 @@ import { of, throwError } from 'rxjs';
 import { vi, Mock } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
 import { BlobMetadataAnchor } from './blob-metadata.anchor';
+import { LAMAD_STORAGE_CLIENT } from '../interfaces/storage.interface';
+import { DoorwayClientService } from '@elohim/service';
 
 describe('BlobManagerService', () => {
   let service: BlobManagerService;
@@ -51,6 +53,17 @@ describe('BlobManagerService', () => {
         {
           provide: BlobMetadataAnchor,
           useValue: { zomeName: 'content_store', fnName: 'get_blobs_by_content_id', verify: vi.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: LAMAD_STORAGE_CLIENT,
+          useValue: {
+            getBlobUrl: (hash: string) => `https://test/blob/${hash}`,
+            getStorageBaseUrl: () => 'https://test',
+          },
+        },
+        {
+          provide: DoorwayClientService,
+          useValue: { verifyBlob: vi.fn(), getBestCustodian: vi.fn() },
         },
       ],
     });

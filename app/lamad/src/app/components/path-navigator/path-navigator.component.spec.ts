@@ -6,6 +6,8 @@ import { of, throwError, BehaviorSubject, NEVER } from 'rxjs';
 import { PathNavigatorComponent } from './path-navigator.component';
 import { PathService } from '../../services/path.service';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
+import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
+import { DataLoaderService } from '../../services/data-loader.service';
 import {
   LAMAD_GOVERNANCE_SIGNAL,
   LAMAD_EPR_RESOLVER,
@@ -154,6 +156,25 @@ describe('PathNavigatorComponent', () => {
         { provide: GOVERNANCE, useValue: {} },
         { provide: CONTENT_ATTESTATION, useValue: {} },
         {
+          provide: LAMAD_STORAGE_CLIENT,
+          useValue: {
+            getBlobUrl: (h: string) => `https://test/blob/${h}`,
+            getStorageBaseUrl: () => 'https://test',
+          },
+        },
+        {
+          provide: DataLoaderService,
+          useValue: {
+            getContent: vi.fn().mockReturnValue(of(null)),
+            getContentIndex: vi.fn().mockReturnValue(of({ nodes: [] })),
+            getAgent: vi.fn(),
+            getAgentProgress: vi.fn(),
+            getRelatedConcepts: vi.fn().mockReturnValue(of([])),
+            getRelationshipsForNode: vi.fn().mockReturnValue(of([])),
+            getGraph: vi.fn().mockReturnValue(of({ nodes: [], edges: [] })),
+          },
+        },
+        {
           provide: ActivatedRoute,
           useValue: { params: paramsSubject.asObservable() },
         },
@@ -161,7 +182,7 @@ describe('PathNavigatorComponent', () => {
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
-    agentService = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
+    agentService = TestBed.inject(LAMAD_AGENT) as { [K in keyof ILamadAgent]?: Mock };
     contentMasteryService = TestBed.inject(ContentMasteryService) as {
       [K in keyof ContentMasteryService]?: Mock;
     };

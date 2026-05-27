@@ -9,6 +9,7 @@ import { of } from 'rxjs';
 import { MarkdownRendererComponent, TocEntry } from './markdown-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
 import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
+import { LAMAD_EPR_RESOLVER } from '../../interfaces/cross-pillar.interface';
 import { PathService } from '../../services/path.service';
 import { PathContextService } from '../../services/path-context.service';
 
@@ -52,6 +53,16 @@ describe('MarkdownRendererComponent', () => {
         { provide: LAMAD_STORAGE_CLIENT, useValue: mockStorageClientService },
         { provide: PathService, useValue: mockPathService },
         { provide: PathContextService, useValue: mockPathContextService },
+        {
+          provide: LAMAD_EPR_RESOLVER,
+          useValue: {
+            resolve: vi.fn().mockReturnValue(of(null)),
+            resolveEprHead: vi.fn().mockReturnValue(of(null)),
+            resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null }),
+            resolveInContext: vi.fn().mockReturnValue({ route: ['/'], resolution: 'standalone' }),
+            resolveBlobUrl: vi.fn().mockReturnValue(''),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -427,6 +438,16 @@ describe('MarkdownRendererComponent — cross-path prefetch', () => {
         },
         { provide: PathService, useValue: pathServiceSpy },
         { provide: PathContextService, useValue: pathContextSpy },
+        {
+          provide: LAMAD_EPR_RESOLVER,
+          useValue: {
+            resolve: vi.fn().mockReturnValue(of(null)),
+            resolveEprHead: vi.fn().mockReturnValue(of(null)),
+            resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null }),
+            resolveInContext: vi.fn().mockReturnValue({ route: ['/'], resolution: 'standalone' }),
+            resolveBlobUrl: vi.fn().mockReturnValue(''),
+          },
+        },
       ],
     }).compileComponents();
 

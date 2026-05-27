@@ -3,6 +3,10 @@ import { LamadLayoutComponent } from './lamad-layout.component';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { ELOHIM_CLIENT, GOVERNANCE, CONTENT_ATTESTATION } from '@elohim/service';
+import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
+import { DataLoaderService } from '../../services/data-loader.service';
+import { RendererInitializerService } from '../../renderers/renderer-initializer.service';
+import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 describe('LamadLayoutComponent', () => {
@@ -25,6 +29,21 @@ describe('LamadLayoutComponent', () => {
         { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
         { provide: GOVERNANCE, useValue: {} },
         { provide: CONTENT_ATTESTATION, useValue: {} },
+        {
+          provide: LAMAD_STORAGE_CLIENT,
+          useValue: {
+            getBlobUrl: (h: string) => `https://test/blob/${h}`,
+            getStorageBaseUrl: () => 'https://test',
+          },
+        },
+        {
+          provide: DataLoaderService,
+          useValue: {
+            getContentIndex: vi.fn().mockReturnValue(of({ nodes: [] })),
+            getContent: vi.fn(),
+          },
+        },
+        { provide: RendererInitializerService, useValue: {} },
       ],
     }).compileComponents();
 

@@ -143,7 +143,7 @@ describe('LearnerDashboardComponent', () => {
         { provide: MasteryStatsService, useValue: mockMasteryStats },
         { provide: ContentMasteryService, useValue: mockContentMastery },
         { provide: PathService, useValue: mockPathService },
-        { provide: ILamadAgent, useValue: mockAgentService },
+        { provide: LAMAD_AGENT, useValue: mockAgentService },
         { provide: EVENT_API, useValue: { createEconomicEvent: vi.fn().mockReturnValue(of(null)), getEconomicEvents: vi.fn().mockReturnValue(of([])) } },
         { provide: AGENT_CONTEXT, useValue: { getCurrentAgentId: vi.fn().mockReturnValue('test-agent') } },
       ],

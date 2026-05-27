@@ -144,7 +144,7 @@ describe('PathService', () => {
       providers: [
         PathService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: ILamadAgent, useValue: agentServiceSpyObj },
+        { provide: LAMAD_AGENT, useValue: agentServiceSpyObj },
         { provide: ContentMasteryService, useValue: contentMasterySpyObj },
         { provide: LearnerContextService, useValue: learnerContextSpyObj },
       ],
@@ -152,7 +152,7 @@ describe('PathService', () => {
 
     service = TestBed.inject(PathService);
     dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
-    agentServiceSpy = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
+    agentServiceSpy = TestBed.inject(LAMAD_AGENT) as { [K in keyof ILamadAgent]?: Mock };
     contentMasterySpy = TestBed.inject(ContentMasteryService) as {
       [K in keyof ContentMasteryService]?: Mock;
     };

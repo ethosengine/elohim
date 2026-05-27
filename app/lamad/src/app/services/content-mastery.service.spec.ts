@@ -8,6 +8,8 @@ import { MasteryLevel, FRESHNESS_THRESHOLDS } from '../models';
 import { SessionHuman } from '@elohim/identity';
 import { BehaviorSubject } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
+import { LEARNER_BACKEND } from '../interfaces/learner-backend.interface';
+import { LAMAD_HOLOCHAIN_CLIENT } from '../interfaces/cross-pillar.interface';
 
 describe('ContentMasteryService', () => {
   let service: ContentMasteryService;
@@ -81,6 +83,11 @@ describe('ContentMasteryService', () => {
         ContentMasteryService,
         LocalSourceChainService,
         { provide: SessionHumanService, useValue: sessionHumanService },
+        { provide: LEARNER_BACKEND, useValue: { recordMastery: vi.fn(), getMastery: vi.fn() } },
+        {
+          provide: LAMAD_HOLOCHAIN_CLIENT,
+          useValue: { callZome: vi.fn(), isConnected: vi.fn().mockReturnValue(false) },
+        },
       ],
     });
 

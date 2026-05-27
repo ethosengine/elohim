@@ -44,7 +44,7 @@ describe('AttentionFlowComponent', () => {
       imports: [AttentionFlowComponent, RouterModule.forRoot([])],
       providers: [
         { provide: EventService, useValue: mockEventService },
-        { provide: ILamadAgent, useValue: mockAgentService },
+        { provide: LAMAD_AGENT, useValue: mockAgentService },
       ],
     }).compileComponents();
 
