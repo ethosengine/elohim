@@ -97,13 +97,14 @@ def getHumanStorageUrls(String ignored) {
 
     // Fallback: alpha-concentration when topology.json is missing/unparseable.
     // Genesis peers (genesisPeer:true) ingest content directly during seeding;
-    // everyone else replicates via P2P. Both flags below mirror the active
-    // entries in genesis/orchestrator/data/deployments.json — when adam returns
-    // (shem replacement), restore his row with genesisPeer:true.
+    // everyone else replicates via P2P. Mirrors the active alpha entries in
+    // genesis/orchestrator/data/deployments.json: matthew + adam are the
+    // genesis pair (matthew on-prem, adam on shem), jessica is the on-prem
+    // non-genesis device that exercises P2P replication.
     def humans = [
         [humanId: 'human-matthew-manager',  service: 'elohim-matthew-alpha',   namespace: 'elohim-alpha', genesisPeer: true],
+        [humanId: 'human-adam-firstman',    service: 'elohim-adam-alpha',      namespace: 'elohim-alpha', genesisPeer: true],
         [humanId: 'human-jessica-spouse',   service: 'elohim-jessica-alpha',   namespace: 'elohim-alpha', genesisPeer: false],
-        [humanId: 'human-timothy-tutor',    service: 'elohim-timothy-alpha',   namespace: 'elohim-alpha', genesisPeer: false],
     ]
     return humans.collect { h ->
         h + [storageUrl: "${h.service}.${h.namespace}.svc.cluster.local:8090"]
@@ -131,8 +132,8 @@ def getConductorAppUrls() {
         // Fallback: alpha-concentration default (mirrors getHumanStorageUrls).
         humans = [
             [name: 'matthew', service: 'elohim-matthew-alpha', namespace: 'elohim-alpha', agencyPhase: 'doorway'],
+            [name: 'adam',    service: 'elohim-adam-alpha',    namespace: 'elohim-alpha', agencyPhase: 'doorway'],
             [name: 'jessica', service: 'elohim-jessica-alpha', namespace: 'elohim-alpha', agencyPhase: 'device'],
-            [name: 'timothy', service: 'elohim-timothy-alpha', namespace: 'elohim-alpha', agencyPhase: 'device'],
         ]
     }
     def urls = humans
@@ -148,10 +149,10 @@ def getConductorAppUrls() {
  * and writes a structured conductor-readiness.json artifact.
  *
  * Aligns with the "seed whoever is ready" principle: partial-cluster
- * operation is the steady state, not an exception. If timothy's admin
- * WS is down, we want to seed adam/jessica/matthew and report timothy
- * as unready — not waste 150s of WebSocket-timeout-loop trying to seed
- * 5 humans against a dead conductor.
+ * operation is the steady state, not an exception. If a peer's admin
+ * WS is down, we want to seed the rest and report it as unready — not
+ * waste 150s of WebSocket-timeout-loop trying to seed against a dead
+ * conductor.
  *
  * The probe is a 2-second TCP connect to the admin port (= app port - 1
  * per the socat convention; see seed-conductor-identities.ts:106-115).
@@ -1406,7 +1407,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 sh """#!/bin/bash
                                     set -euo pipefail
                                     echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED CUSTODY COMMITMENTS (M1 matthew↔timothy pair)"
+                                    echo "SEED CUSTODY COMMITMENTS (M1 matthew↔jessica pair)"
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "Doorway: ${doorwayHost}"
                                     echo "Blob:    ${blobHash} (${blobSize} bytes)"
@@ -1486,16 +1487,21 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def blobHash = env.M1_BLOB_HASH
-                        def timothyUrl = 'http://elohim-timothy-alpha.elohim-alpha.svc.cluster.local:8090'
+                        // Cross-pod fetch target: jessica (non-genesis on-prem device).
+                        // The test validates substrate cross-pod blob propagation —
+                        // jessica must not have ingested the blob directly during
+                        // seeding (genesis-peer-only path), so a successful fetch
+                        // here proves the substrate replicated it across pods.
+                        def fetchPeerUrl = 'http://elohim-jessica-alpha.elohim-alpha.svc.cluster.local:8090'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             sh """#!/bin/bash
                                 set -euo pipefail
                                 echo "═══════════════════════════════════════════════════════════"
-                                echo "M1 CROSS-POD FETCH — timothy fetches blob ${blobHash} from matthew"
+                                echo "M1 CROSS-POD FETCH — jessica fetches blob ${blobHash} from matthew"
                                 echo "═══════════════════════════════════════════════════════════"
                                 # GET (not HEAD per memory feedback_head_vs_get_blob_asymmetry)
                                 STATUS=\$(curl -s -o /dev/null -w '%{http_code}' \\
-                                  "${timothyUrl}/blob/${blobHash}")
+                                  "${fetchPeerUrl}/blob/${blobHash}")
                                 echo "Fetch status: \$STATUS"
                                 if [ "\$STATUS" != "200" ]; then
                                   echo "Fetch failed — substrate did not propagate the blob"
