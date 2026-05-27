@@ -37,6 +37,16 @@ spec:
                 values:
                   - operations
                   - edge
+              # Pin to intel-nuc — same node as elohim-holochain (DNA)
+              # since steward dependsOn elohim-holochain in the orchestrator
+              # and shares cargo-cache-holochain with it. The two pipelines
+              # are sequential, so a single RWO hostpath PVC works cleanly
+              # when both stick to the same node. See
+              # elohim/holochain/dna/Jenkinsfile + nix-cache-pvc.yaml.
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - intel-nuc
   tolerations:
     - key: "workload-type"
       operator: "Equal"

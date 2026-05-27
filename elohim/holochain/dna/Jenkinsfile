@@ -211,6 +211,20 @@ spec:
                 values:
                   - operations
                   - edge
+              # Pin to intel-nuc deterministically — cargo-cache-holochain
+              # and sweettest-target-cache-holochain are hostpath
+              # WaitForFirstConsumer PVCs that need a stable node to bind
+              # to. Sibling Jenkinsfile (elohim/holochain/Jenkinsfile, the
+              # edge pipeline) pins to thinkc-p1s so the two pipelines
+              # land on different nodes and run truly in parallel — which
+              # is the whole point of the 2026-05-26 cargo-cache split
+              # (cargo-cache-edge vs cargo-cache-holochain). See
+              # genesis/manifests/nix-cache-pvc.yaml header for the full
+              # migration story.
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - intel-nuc
   tolerations:
     - key: "workload-type"
       operator: "Equal"

@@ -818,6 +818,23 @@ spec:
                 values:
                   - operations
                   - edge
+              # Pin to thinkc-p1s deterministically so the hostpath PVCs
+              # (cargo-cache-edge especially) always bind to this node.
+              # Before this pin, hostpath WaitForFirstConsumer would let
+              # the first pod's PVC bind to whichever node the scheduler
+              # picked — and if that node was resource-contended, pods 2-N
+              # would hit "volume node affinity conflict" forever (edge
+              # #1010 thrashed 6 pod attempts / ~1h before clearing). With
+              # the pin, the choice is removed: edge always lands here,
+              # the cargo-cache-edge PVC binds here, and warm-cache reuse
+              # is automatic. nix-cache-holochain is declared in volumes
+              # but never mounted (see comment in elohim/holochain/dna/
+              # Jenkinsfile), so it doesn't actually attach to this node
+              # from this pipeline.
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - thinkc-p1s
   tolerations:
     - key: "workload-type"
       operator: "Equal"
