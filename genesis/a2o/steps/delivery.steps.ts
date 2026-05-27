@@ -23,14 +23,14 @@ import { E2EWorld } from '../src/framework/world.js';
 const NO_DOORWAY = 'No doorway registered';
 const NO_RESPONSE = 'No response captured';
 
-interface AppResponse {
+export interface AppResponse {
   status: number;
   headers: Record<string, string>;
   body: Buffer;
 }
 
 /** Fetch a URL and capture status + headers for assertions. */
-async function fetchApp(baseUrl: string, path: string): Promise<AppResponse> {
+export async function fetchApp(baseUrl: string, path: string): Promise<AppResponse> {
   const { statusCode, headers, body } = await request(`${baseUrl}${path}`);
   const data = Buffer.from(await body.arrayBuffer());
   const flatHeaders: Record<string, string> = {};
@@ -41,8 +41,10 @@ async function fetchApp(baseUrl: string, path: string): Promise<AppResponse> {
   return { status: statusCode, headers: flatHeaders, body: data };
 }
 
-// Store last response for Then assertions
-const responseStore = new WeakMap<E2EWorld, AppResponse>();
+// Store last response for Then assertions.
+// Exported so sibling step files (e.g. steps/delivery/*) can write
+// captures that the shared Then assertions in this file resolve.
+export const responseStore = new WeakMap<E2EWorld, AppResponse>();
 
 // ---------------------------------------------------------------------------
 // Background: doorway and seeded-content context
