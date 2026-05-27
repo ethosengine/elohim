@@ -374,20 +374,22 @@ run_gate() {
         ;;
       sweettest-check)
         echo "[$PROJECT_NAME] Running sweettest compile check..."
-        # Che devcontainer needs BINDGEN_EXTRA_CLANG_ARGS to point at clang resource dir;
-        # Nix/Jenkins provide it automatically. Setting it unconditionally is harmless.
-        # RUSTC_WRAPPER="" bypasses sccache for this gate — sccache 0.15.0 has an
-        # unisolated stdin/UTF-8 handling bug (see memory
-        # feedback_sccache_cache_corruption_recovery). Same pattern as elohim-epr
-        # case below.
-        # OPENSSL_NO_VENDOR=1 forces datachannel-sys → openssl-sys to use the
-        # system OpenSSL via pkg-config instead of building a vendored 3.6.2 from
-        # source — the vendored path's cmake-rs build script panicked
-        # ("CMake Generate step failed") under the Che devspace toolchain even
-        # though system OpenSSL 3.5.1 + libssl-dev + pkg-config are all present.
+        # Che devcontainer needs BINDGEN_EXTRA_CLANG_ARGS to point at clang
+        # resource dir; Nix/Jenkins provide it automatically. The glob picks
+        # the highest-versioned clang include dir so this survives image
+        # clang-version bumps (caught 2026-05-27: image went 20→21).
+        #
+        # OPENSSL_NO_VENDOR=1 tells openssl-sys to use system OpenSSL via
+        # pkg-config instead of building vendored. (datachannel-sys's *own*
+        # vendored OpenSSL build is independent of this env var and still
+        # runs — that's expected; its cmake/ZLIB issue is patched at image
+        # build time, see che-devworkspaces:containers/udi-plus-mem-rust-nix.)
+        #
+        # sccache (RUSTC_WRAPPER=sccache from the devfile env) is left intact
+        # — verified 2026-05-27 to work without crashing in this image
+        # (Garage S3 backend, both cache-hit and cache-miss paths).
         BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)}" \
         RUSTFLAGS="" \
-        RUSTC_WRAPPER="" \
         OPENSSL_NO_VENDOR=1 \
           cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests 2>&1
         rc=$?
