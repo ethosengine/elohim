@@ -385,7 +385,7 @@ run_gate() {
         # source — the vendored path's cmake-rs build script panicked
         # ("CMake Generate step failed") under the Che devspace toolchain even
         # though system OpenSSL 3.5.1 + libssl-dev + pkg-config are all present.
-        BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/clang/20/include}" \
+        BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)}" \
         RUSTFLAGS="" \
         RUSTC_WRAPPER="" \
         OPENSSL_NO_VENDOR=1 \
@@ -570,7 +570,7 @@ run_gate() {
         ;;
       sweettest-check)
         echo "[$PROJECT_NAME] Running sweettest compile check..."
-        BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/clang/20/include}" \
+        BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)}" \
         RUSTFLAGS="" \
           cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests 2>&1
         rc=$?
