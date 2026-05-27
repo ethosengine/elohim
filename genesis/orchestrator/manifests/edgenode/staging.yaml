@@ -181,6 +181,9 @@ spec:
               mountPath: /opt/holochain
           # Use exec probe since conductor binds to localhost
           # bash supports /dev/tcp, ash/sh does not
+          # Generous-probe pattern (2026-05-27): timeoutSeconds: 15 absorbs
+          # CFS throttling during install_app; readiness initialDelaySeconds:
+          # 120 keeps the probe out of the WASM-compile install window.
           livenessProbe:
             exec:
               command:
@@ -189,6 +192,7 @@ spec:
                 - "echo > /dev/tcp/127.0.0.1/4444"
             initialDelaySeconds: 60
             periodSeconds: 30
+            timeoutSeconds: 15
             failureThreshold: 5
           readinessProbe:
             exec:
@@ -196,9 +200,10 @@ spec:
                 - bash
                 - -c
                 - "echo > /dev/tcp/127.0.0.1/4444"
-            initialDelaySeconds: 30
+            initialDelaySeconds: 120
             periodSeconds: 10
-            failureThreshold: 3
+            timeoutSeconds: 15
+            failureThreshold: 5
         # Socat proxy — bridges localhost-bound conductor ports to pod network
         # Doorway Deployment connects via ClusterIP service → these bridged ports
         - name: ws-proxy
@@ -228,6 +233,7 @@ spec:
               port: 8444
             initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 15
         # elohim-storage - Blob storage and import processing sidecar
         # Handles heavy R/W operations, forwards to conductor
         - name: elohim-storage
@@ -280,18 +286,25 @@ spec:
           volumeMounts:
             - name: storage-data
               mountPath: /data
+          # Generous-probe pattern (2026-05-27): elohim-storage waits on
+          # the conductor's admin WS during boot; bump readiness initial
+          # delay so we don't score the install_app phase against it.
           readinessProbe:
             httpGet:
               path: /health
               port: 8090
-            initialDelaySeconds: 5
+            initialDelaySeconds: 120
             periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 5
           livenessProbe:
             httpGet:
               path: /health
               port: 8090
-            initialDelaySeconds: 10
+            initialDelaySeconds: 180
             periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
         # hApp Installer - installs the hApp on conductor startup
         # Uses dev-latest tag - rebuilds when installer code changes
         # hApp is fetched by init container, not baked into image
