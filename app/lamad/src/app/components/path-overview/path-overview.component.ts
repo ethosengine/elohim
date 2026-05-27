@@ -169,6 +169,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   private readonly seoService = inject(SeoService);
   private readonly contentMasteryService = inject(ContentMasteryService);
   private readonly adaptationService = inject(PathAdaptationService);
+  private readonly agentService: ILamadAgent = inject(LAMAD_AGENT);
 
   /** Base route for path navigation */
   private readonly PATH_ROUTE = '/lamad/path';
@@ -179,8 +180,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
-    private readonly pathService: PathService,
-    private readonly agentService: ILamadAgent
+    private readonly pathService: PathService
   ) {}
 
   ngOnInit(): void {

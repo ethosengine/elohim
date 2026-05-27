@@ -208,28 +208,51 @@ export interface LamadDiscussionRecord {
   [key: string]: unknown;
 }
 
-/** Resume point narrow shape. */
+/** Resume point narrow shape (mirrors imagodei ResumePoint for template parity). */
 export interface LamadResumePoint {
-  contentId: string;
+  type: 'continue_path' | 'revisit_content' | 'explore_new';
+  title: string;
+  reason: string;
   pathId?: string;
   stepIndex?: number;
+  contentId?: string;
   progressPercent?: number;
+  daysSinceActive?: number;
 }
 
-/** Timeline event narrow shape. */
+/** Timeline event narrow shape (mirrors imagodei TimelineEvent for template parity). */
 export interface LamadTimelineEvent {
+  id: string;
   type: string;
-  contentId?: string;
-  title?: string;
   timestamp: string;
-  [key: string]: unknown;
+  title: string;
+  description?: string;
+  resourceId?: string;
+  resourceType?: 'path' | 'content' | 'attestation';
+  significance: 'milestone' | 'progress' | 'activity';
+  contentId?: string;
+}
+
+/** Path-with-progress narrow shape (item of LamadPathsOverview). */
+export interface LamadPathWithProgress {
+  pathId: string;
+  title: string;
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  totalSteps: number;
+  completedSteps: number;
+  currentStepIndex: number;
+  progressPercent: number;
+  startedAt?: string;
+  completedAt?: string;
+  attestationsGranted?: unknown[];
 }
 
 /** Paths overview narrow shape. */
 export interface LamadPathsOverview {
-  inProgress: unknown[];
-  completed: unknown[];
-  suggested: unknown[];
+  inProgress: LamadPathWithProgress[];
+  completed: LamadPathWithProgress[];
+  suggested: LamadPathWithProgress[];
 }
 
 /** Current focus item narrow shape. */
