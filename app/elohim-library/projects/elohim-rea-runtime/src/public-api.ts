@@ -49,6 +49,14 @@ export type {
   LensDefinition,
 } from './lib/resource-explorer.model';
 
+// Signal-emit protocol types and service (EPR write-through, Task C.3)
+export type {
+  SignalIntent,
+  SignalEmitSuccessResponse,
+  SignalEmitResult,
+} from './lib/signal-emit-types';
+export { SignalEmitService } from './lib/signal-emit.service';
+
 // Shefa DI tokens — REA action-type stewardship interfaces
 export {
   ECONOMIC_EVENT_FACTORY,
