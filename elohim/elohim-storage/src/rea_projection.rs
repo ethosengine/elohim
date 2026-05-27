@@ -333,8 +333,9 @@ pub fn handle_rea_signal(
             ..
         } => {
             info!(id = %commitment.id, hash = %action_hash, "Projecting Commitment from DHT");
-            let classified =
-                first_or_none(parse_json_strings(commitment.resource_classified_as_json.as_deref()));
+            let classified = first_or_none(parse_json_strings(
+                commitment.resource_classified_as_json.as_deref(),
+            ));
             let in_scope_of =
                 first_or_none(parse_json_strings(commitment.in_scope_of_json.as_deref()));
             let input = CreateReaCommitmentInput {
@@ -672,8 +673,8 @@ mod tests {
             }
         });
 
-        let signal: ReaProjectionSignal = serde_json::from_value(wire)
-            .expect("DNA wire shape for ContentCommitted must decode");
+        let signal: ReaProjectionSignal =
+            serde_json::from_value(wire).expect("DNA wire shape for ContentCommitted must decode");
 
         match signal {
             ReaProjectionSignal::ContentCommitted {
@@ -683,10 +684,7 @@ mod tests {
             } => {
                 assert_eq!(action_hash, "uhCkk-content-anchor");
                 assert_eq!(content.id, "elohim-host-landing");
-                assert_eq!(
-                    content.blob_cid.as_deref(),
-                    Some("sha256-deadbeefcafe1234")
-                );
+                assert_eq!(content.blob_cid.as_deref(), Some("sha256-deadbeefcafe1234"));
                 assert_eq!(content.content_size_bytes, Some(4096));
                 assert_eq!(content.tags.len(), 2);
                 assert!((content.trust_score - 1.0).abs() < f64::EPSILON);

@@ -3840,19 +3840,16 @@ impl HttpServer {
                 //
                 // See 2026-05-26-substrate-rea-replication-fix.md Task 8d.
                 let needs_conductor = view.blob_hash.is_some();
-                let lamad_hc = self
-                    .hc_registry
-                    .as_ref()
-                    .and_then(|r| r.lamad.clone());
+                let lamad_hc = self.hc_registry.as_ref().and_then(|r| r.lamad.clone());
 
-                let update_result = if needs_conductor && lamad_hc.is_some() {
-                    let hc = lamad_hc.expect("lamad_hc.is_some() checked above");
-                    services
-                        .content
-                        .update_via_conductor(&hc, content_id, view)
-                        .await
-                } else {
-                    services.content.update(content_id, view)
+                let update_result = match (needs_conductor, lamad_hc) {
+                    (true, Some(hc)) => {
+                        services
+                            .content
+                            .update_via_conductor(&hc, content_id, view)
+                            .await
+                    }
+                    _ => services.content.update(content_id, view),
                 };
 
                 // Pattern Z.B.1 bridge: refresh the in-memory slug_index so the

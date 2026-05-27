@@ -609,7 +609,7 @@ fn commitment_to_projection_view(c: ReaCommitment) -> Result<EprProjectionView, 
     let metadata: serde_json::Value = c
         .metadata_json
         .as_deref()
-        .map(|s| serde_json::from_str(s))
+        .map(serde_json::from_str)
         .transpose()
         .map_err(|e| StorageError::Internal(format!("metadata parse: {}", e)))?
         .unwrap_or(serde_json::Value::Null);

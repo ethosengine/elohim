@@ -90,6 +90,7 @@ fn seed_economic_event(
             dht_anchor_hash: None,
             at_location: None,
             verified_at: None,
+            scope_collab_cid: None,
         })
         .execute(&mut conn)
         .expect("seed economic_event");

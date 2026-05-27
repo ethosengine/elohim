@@ -163,9 +163,8 @@ impl ReaCommitmentService {
         hc_lamad: Option<&Arc<HcClient>>,
     ) -> Result<ReaCommitmentView, StorageError> {
         // Need to know the existing commitment's action to decide path.
-        let existing = rea_commitments::get_commitment(conn, ctx, id)?.ok_or_else(|| {
-            StorageError::NotFound(format!("commitment {} not found", id))
-        })?;
+        let existing = rea_commitments::get_commitment(conn, ctx, id)?
+            .ok_or_else(|| StorageError::NotFound(format!("commitment {} not found", id)))?;
 
         if existing.action == PROJECT_EPR_ACTION {
             return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;

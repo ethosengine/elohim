@@ -66,7 +66,8 @@ pub async fn call_create_rea_commitment(
             "conductor_writes: encode CreateReaCommitmentInput: {e}"
         ))
     })?;
-    hc.call_zome(ZOME_NAME, "create_rea_commitment", payload).await
+    hc.call_zome(ZOME_NAME, "create_rea_commitment", payload)
+        .await
 }
 
 /// Round-trip `update_rea_commitment_state` through the local conductor.
@@ -105,9 +106,7 @@ pub async fn call_create_content(
     input: &lamad_types::CreateContentInput,
 ) -> Result<Vec<u8>, StorageError> {
     let payload = rmp_serde::to_vec_named(input).map_err(|e| {
-        StorageError::Internal(format!(
-            "conductor_writes: encode CreateContentInput: {e}"
-        ))
+        StorageError::Internal(format!("conductor_writes: encode CreateContentInput: {e}"))
     })?;
     hc.call_zome(ZOME_NAME, "create_content", payload).await
 }
@@ -126,9 +125,7 @@ pub async fn call_update_content(
     input: &lamad_types::UpdateContentInput,
 ) -> Result<Vec<u8>, StorageError> {
     let payload = rmp_serde::to_vec_named(input).map_err(|e| {
-        StorageError::Internal(format!(
-            "conductor_writes: encode UpdateContentInput: {e}"
-        ))
+        StorageError::Internal(format!("conductor_writes: encode UpdateContentInput: {e}"))
     })?;
     hc.call_zome(ZOME_NAME, "update_content", payload).await
 }
@@ -175,7 +172,9 @@ mod tests {
         assert_eq!(decoded.provider, original.provider);
         assert_eq!(decoded.receiver, original.receiver);
         assert_eq!(decoded.in_scope_of, original.in_scope_of);
-        assert_eq!(decoded.resource_classified_as, original.resource_classified_as);
+        assert_eq!(
+            decoded.resource_classified_as,
+            original.resource_classified_as
+        );
     }
 }
-

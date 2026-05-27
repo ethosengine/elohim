@@ -376,8 +376,19 @@ run_gate() {
         echo "[$PROJECT_NAME] Running sweettest compile check..."
         # Che devcontainer needs BINDGEN_EXTRA_CLANG_ARGS to point at clang resource dir;
         # Nix/Jenkins provide it automatically. Setting it unconditionally is harmless.
+        # RUSTC_WRAPPER="" bypasses sccache for this gate — sccache 0.15.0 has an
+        # unisolated stdin/UTF-8 handling bug (see memory
+        # feedback_sccache_cache_corruption_recovery). Same pattern as elohim-epr
+        # case below.
+        # OPENSSL_NO_VENDOR=1 forces datachannel-sys → openssl-sys to use the
+        # system OpenSSL via pkg-config instead of building a vendored 3.6.2 from
+        # source — the vendored path's cmake-rs build script panicked
+        # ("CMake Generate step failed") under the Che devspace toolchain even
+        # though system OpenSSL 3.5.1 + libssl-dev + pkg-config are all present.
         BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/clang/20/include}" \
         RUSTFLAGS="" \
+        RUSTC_WRAPPER="" \
+        OPENSSL_NO_VENDOR=1 \
           cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests 2>&1
         rc=$?
         ;;
@@ -401,7 +412,14 @@ run_gate() {
     esac
   elif command -v just >/dev/null 2>&1 && [ -f justfile ]; then
     echo "[$PROJECT_NAME] Running quality gate via just..."
-    just gate 2>&1
+    # RUSTC_WRAPPER="" bypasses sccache for the local pre-push gate to avoid
+    # the unisolated sccache 0.15.0 stdin/UTF-8 bug (see memory
+    # feedback_sccache_cache_corruption_recovery). Affects only the local
+    # husky hook; CI build pods in jenkins ns still use sccache via their
+    # envFrom: secretRef: name: sccache-credentials. No-op for TS/JS gates
+    # (RUSTC_WRAPPER unused); slows down Rust gates by the sccache hit rate
+    # (acceptable, per the elohim-epr precedent earlier in this file).
+    RUSTC_WRAPPER="" just gate 2>&1
     rc=$?
   else
     # Fallback case arms below are for projects without a justfile gate, or

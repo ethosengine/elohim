@@ -249,29 +249,30 @@ impl ContentService {
         };
 
         // Merge metadata (same logic as the legacy `update` method above).
-        let merged_metadata_json = if let Some(patch_meta) = &view.metadata {
-            let existing_meta: serde_json::Value = existing
-                .content
-                .metadata_json
-                .as_deref()
-                .and_then(|s| serde_json::from_str(s).ok())
-                .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
-            let patch_value = patch_meta.0.clone();
-            let merged = match (existing_meta, patch_value) {
-                (serde_json::Value::Object(mut base), serde_json::Value::Object(patch)) => {
-                    for (k, v) in patch {
-                        base.insert(k, v);
+        let merged_metadata_json =
+            if let Some(patch_meta) = &view.metadata {
+                let existing_meta: serde_json::Value = existing
+                    .content
+                    .metadata_json
+                    .as_deref()
+                    .and_then(|s| serde_json::from_str(s).ok())
+                    .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+                let patch_value = patch_meta.0.clone();
+                let merged = match (existing_meta, patch_value) {
+                    (serde_json::Value::Object(mut base), serde_json::Value::Object(patch)) => {
+                        for (k, v) in patch {
+                            base.insert(k, v);
+                        }
+                        serde_json::Value::Object(base)
                     }
-                    serde_json::Value::Object(base)
-                }
-                (_, patch) => patch,
+                    (_, patch) => patch,
+                };
+                Some(serde_json::to_string(&merged).map_err(|e| {
+                    StorageError::Internal(format!("Metadata serialize error: {}", e))
+                })?)
+            } else {
+                None
             };
-            Some(serde_json::to_string(&merged).map_err(|e| {
-                StorageError::Internal(format!("Metadata serialize error: {}", e))
-            })?)
-        } else {
-            None
-        };
 
         // The DNA target field is `blob_cid`. View carries `blob_hash`.
         let new_blob_cid = view.blob_hash.clone();
@@ -283,7 +284,10 @@ impl ContentService {
             let bootstrap = lamad_types::CreateContentInput {
                 id: existing.content.id.clone(),
                 content_type: existing.content.content_type.clone(),
-                title: view.title.clone().unwrap_or_else(|| existing.content.title.clone()),
+                title: view
+                    .title
+                    .clone()
+                    .unwrap_or_else(|| existing.content.title.clone()),
                 description: view
                     .description
                     .clone()
@@ -348,9 +352,8 @@ impl ContentService {
                 content_diesel::get_content_with_tags(&mut conn, &self.ctx, id, false)?
             {
                 if updated.content.dht_anchor_hash.is_some() {
-                    self.events.emit(StorageEvent::ContentUpdated {
-                        id: id.to_string(),
-                    });
+                    self.events
+                        .emit(StorageEvent::ContentUpdated { id: id.to_string() });
                     return Ok(updated);
                 }
             }
