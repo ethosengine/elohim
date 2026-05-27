@@ -215,23 +215,29 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "1000m"
+          # Generous-probe pattern (2026-05-27): timeoutSeconds: 15.
           startupProbe:
             httpGet:
               path: /health
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 24
           readinessProbe:
             httpGet:
               path: /health
               port: 8080
             periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 5
           livenessProbe:
             httpGet:
               path: /health
               port: 8080
             periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
         - name: doorway-app
           image: harbor.ethosengine.com/ethosengine/doorway-app:DOORWAY_APP_TAG_PLACEHOLDER
           imagePullPolicy: Always
@@ -249,18 +255,23 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "100m"
+          # Generous-probe pattern (2026-05-27): timeoutSeconds: 15.
           readinessProbe:
             httpGet:
               path: /health
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 5
           livenessProbe:
             httpGet:
               path: /health
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
         - name: elohim-agent-sdk
           image: harbor.ethosengine.com/ethosengine/elohim-agent-sdk:AGENT_SDK_TAG_PLACEHOLDER
           imagePullPolicy: Always
@@ -285,18 +296,23 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "200m"
+          # Generous-probe pattern (2026-05-27): timeoutSeconds: 15.
           readinessProbe:
             httpGet:
               path: /health
               port: 8095
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 5
           livenessProbe:
             httpGet:
               path: /health
               port: 8095
             initialDelaySeconds: 10
             periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
 ---
 apiVersion: v1
 kind: Service

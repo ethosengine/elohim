@@ -33,18 +33,23 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 80
+        # Generous-probe pattern (2026-05-27): timeoutSeconds: 15.
         readinessProbe:
           httpGet:
             path: /healthz
             port: 80
           initialDelaySeconds: 2
           periodSeconds: 5
+          timeoutSeconds: 15
+          failureThreshold: 5
         livenessProbe:
           httpGet:
             path: /healthz
             port: 80
           initialDelaySeconds: 10
           periodSeconds: 20
+          timeoutSeconds: 15
+          failureThreshold: 5
         resources:
           requests:
             memory: "64Mi"
