@@ -141,6 +141,9 @@
 - [No brittle commands in devfile postStart](feedback_no_brittle_commands_in_poststart.md) — postStart failures abort startup; new tooling → `commands:` only.
 - [Forgetting as design](project_forgetting_as_design.md) — storyteller decides graduate/memorialize/hold; meaningful re-emergence > omniscient recall.
 - [Prefer YAML config over CLI args](feedback_config_yaml_over_cli.md) — node config = declarative YAML; CLI args = dev/testing only.
+- [CI evidence under-determines cluster diagnosis](feedback_ci_evidence_underdetermines_cluster_diagnosis.md) — UNSTABLE+failed-probes+empty API on a fresh deploy maps to ≥3 root causes; ask for `kubectl get/describe/logs` before attributing, or frame as "CI evidence, kubectl needed to disambiguate."
+- [Structural-verify tests use canonical wire shape](feedback_structural_verify_canonical_wire_shape.md) — fixture must match producer output (`sha256-<hex>`, not bare hex); synthetic shapes pass tests while production rejects every message.
+- [Generous-probe pattern for elohim manifests](project_generous_probes_pattern.md) — `timeoutSeconds: 15` + `failureThreshold: 5` baseline; readiness `initialDelaySeconds: 120` for embedded-Holochain containers (install_app + WASM compile under CFS throttling on contended nodes).
 - [HUSKY=0 OK for CI-only commits](feedback_husky_bypass_for_ci_only_changes.md) — when commit only touches Jenkinsfiles/manifests and gate fails on unrelated inherited drift in untouched paths, bypass is OK; sanity-check path doesn't overlap + failure is fmt/lint-class.
 - [JENKINS_TOKEN — autonomous on verified state](feedback_jenkins_token_strictly_guarded.md) — orchestrator triggers without per-call gate; verified state prevents build storms.
 - [No (a)(b)(c)(d) menus in auto mode](feedback_no_menu_punt_in_auto_mode.md) — Opus-judgment + in-scope inputs → decide and proceed; don't offload synthesis.

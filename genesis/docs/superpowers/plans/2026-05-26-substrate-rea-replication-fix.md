@@ -1224,3 +1224,47 @@ The FeaturePromise at `.claude/deliver/feature-promise-epr-app-delivery.json` be
 ---
 
 *Plan written 2026-05-26 by Opus 4.7 (1M context) under Matthew's direction. Based on the systematic-debugging Phase 1 + Phase 2 investigation in this session (2026-05-26 morning), the 2026-05-23 spa-blob-deploy-drift plan + dev response, the 2026-05-25 pillar-epr-decomposition plan B11-B15, last night's iter-0 + shift sprint-results, and the p2p-design-gate skill output. The architecture matches the gospel-tier prescription in elohim/holochain/dna/CLAUDE.md.*
+
+---
+
+## Task 10 close-out (2026-05-27) — HALTED on three independent regressions
+
+**Status:** Tasks 1–9 landed and reached alpha as image `1.0.0-dev-c014e896`. Task 10 verification was attempted on orchestrator `elohim-orchestrator/dev #1069` and **halted before probes could pass**. Initial agent diagnosis attributed the halt to cluster-state alone; operator's cluster-side `kubectl describe` / `kubectl logs` pass surfaced three independent regressions — one of them in substrate-rea-adjacent code.
+
+### Three independent regressions
+
+1. **Inventory verifier rejects the canonical wire format.** Every healthy alpha peer is spamming `WARN elohim_storage::inventory: Inventory snapshot failed structural verify — dropped … error=InvalidHashFormat("sha256-1f3ed518a975f0eb55ae72c7cca8ef396c8f73c61ecf730ad54920ea0a24a955")`. The verifier `is_blob_hash_shaped()` at `elohim/elohim-storage/src/p2p/inventory_gossip.rs:132–134` requires exactly 64 lowercase hex chars; the canonical wire format per `elohim-storage/CLAUDE.md` is `sha256-<64-hex>` (71 chars). The verifier landed 2026-05-02 (T13, commit `9169ab99d`) and its tests used `"a".repeat(64)` instead of real-shape strings; the mismatch went latent until substrate-rea exercised inventory gossip end-to-end on a real multi-peer cluster. Fix is small: relax `is_blob_hash_shaped` to accept the `sha256-` prefix.
+
+2. **Genesis seeder polls a workload that doesn't exist.** `elohim-timothy-tutor-alpha` has no Pod/StatefulSet/Deployment/Job anywhere in any namespace — only Services `elohim-timothy-alpha` / `-headless` exist. The "0 completed, 0 pending throughout the 600s window" symptom is what you'd see polling a name with no backing pod. Either the seeder manifest didn't render at all this run, or the polled name (`...-tutor-...`) doesn't match the deployed name (`elohim-timothy-alpha`). Worth a `helm get manifest <release> -n elohim-alpha | grep -i timothy` to compare.
+
+3. **9/14 storage peers fail readiness under CPU contention.** Initial report said "rollout timed out"; the operator's cluster-side check showed all 14 pods are scheduled + Running, but 9 are stuck Ready=0/1 because the embedded conductor's `install_app` is timing out on the admin websocket handshake. Daniel's previous-instance log ends with `Error: install_app failed: Websocket error: Timeout`; pete's readiness probe times out 52× in 16 min while install_app is still running. Root cause: shem at 48% CPU carrying 13 of 14 alpha pods + a doorway replica; each stuck conductor burns 700–1000m spinning up. The 5 healthy peers either landed on `ethosengine` or got onto shem early enough to complete install_app before contention spiked. Fix is operational: anti-affinity or topology-spread on `kubernetes.io/hostname` before re-rolling.
+
+**Separately** — and unrelated to substrate-rea — `elohim-site-alpha-service` has no backing pods. The ingress `elohim-site-alpha-ingress` exists, but no `elohim-site-alpha-*` Deployment was ever applied in this run. So `/apps/elohim-host-landing/index.html`, `/lamad`, and `/` will 404 even after the three substrate regressions clear. That frontend was never deployed; re-running Genesis won't fix it.
+
+### CI-visible facts (unchanged)
+
+**Pipeline outcomes:**
+- DNA-Lamad (elohim-holochain/dev #1292): SUCCESS
+- Edge (elohim-edge/dev #1012): UNSTABLE — storage image built + pushed, doorway-alpha rolled out clean, but `kubectl rollout status --timeout=600s` reported 9/14 storage peer StatefulSets not Ready inside the window (pete, frank, gertrude, susan, caleb, daniel, emma, eve, nancy). 5 peers succeeded (adam, matthew, jessica, james, terrance). The CI log called this a "rollout timeout"; the cluster-side ground truth (operator's pass) is that all pods are scheduled + Running but 9 fail readiness because embedded conductor `install_app` is timing out under CPU contention on `shem`.
+- Genesis (elohim-genesis/dev #1045): FAILED — `Seed Database` cascaded all 14 downstream seed stages. The CI log reported `❌ human-timothy-tutor replication timed out` after polling `0 completed, 0 pending` for the full window. The cluster-side ground truth is that no `elohim-timothy-tutor-alpha` workload exists; the seeder is polling a name that doesn't match any deployed StatefulSet.
+- App (root Jenkinsfile): NOT DISPATCHED — the substrate-rea changeset touched only `elohim-storage/*` + `holochain/*` paths.
+
+**Probe outcomes (Step 3):** all four FAILED — `[]` from `/api/v1/commitments?action=project-epr`, 404 on `/apps/elohim-host-landing/index.html`, 404 on `/lamad`, 302 redirect on `/` to a 404 destination. The `[]` is downstream of regression #1 (verifier dropping every inventory snapshot) and would persist even if the seeder ran. The 404s are downstream of the separate `elohim-site-alpha-service`-has-no-backing-pods miss noted above; re-running Genesis won't clear them.
+
+**Step 4 (pod-restart robustness):** deferred — not attempted because Step 3 never passed.
+
+**@wip removal:** reverted before commit. Step-def scaffolding for both scenarios (`genesis/a2o/steps/delivery/substrate-rea-replication.steps.ts` + the `fetchApp` / `responseStore` export from `genesis/a2o/steps/delivery.steps.ts`) is complete, dry-run-clean, lint-clean, format-clean — and left **uncommitted** in the working tree for the operator to bundle with the `@wip` removal once the cluster heals.
+
+**Operator hand-off (revised after operator's cluster pass):**
+1. **Verify the seeder manifest naming** — `helm get manifest <release> -n elohim-alpha | grep -i timothy`. Reconcile whichever side is wrong: either the seeder polls the wrong name (`...-tutor-...` vs `...-alpha`) or the manifest never rendered the `tutor` variant.
+2. **Fix the `InvalidHashFormat` verifier** at `elohim/elohim-storage/src/p2p/inventory_gossip.rs:132–134` — relax `is_blob_hash_shaped` to accept the canonical `sha256-<64-hex>` wire format (strip the `sha256-` prefix before the length check; update the existing tests at lines 140–225 to use real-shape strings instead of `"a".repeat(64)`).
+3. **Reschedule storage peers off `shem`** — anti-affinity by household or topology-spread on `kubernetes.io/hostname` before the next `kubectl rollout restart`. Otherwise install_app will time out again for the same conductor-spin-up reason.
+4. **Re-trigger Genesis** (after 1–3 land) — no Edge rerun needed; the substrate-rea image is already on the cluster. The seeder is what exercises the substrate-rea write path end-to-end.
+5. **Address the missing `elohim-site-alpha` Deployment separately** — the ingress exists but the service has no backing pods, so the landing/`/lamad` 404s won't clear via Genesis. This is a deploy gap unrelated to substrate-rea.
+6. **Re-probe alpha**; if `dhtAnchorHash` is non-null on every project-epr row and `/lamad` returns 200 (assuming #5 is also addressed), the fix is confirmed.
+7. **Then drop `@wip`** from the two scenarios + land the scaffolded step defs as `test(a2o): regression seatbelt — substrate-rea replication on alpha`.
+8. **Run `/deliver epr-app-delivery`** to mint the FeaturePromise verdict.
+
+**Sprint result:** [genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md](../sprints/2026-05-27-substrate-rea-task10-result.md) carries the full pipeline log quotes and probe outputs.
+
+*Task 10 close-out written 2026-05-27 by Opus 4.7 under Matthew's direction during the shift dispatched against orchestrator #1069.*
