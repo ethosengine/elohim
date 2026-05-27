@@ -3,11 +3,10 @@
  *
  * Lamad is the Content/Learning pillar of the Elohim Protocol.
  *
- * For services from other pillars, import directly:
- * - @app/elohim/services/* - Protocol-core (data loading, agents, trust)
- * - @app/imagodei/services/* - Identity (session, profile)
- * - @app/qahal/services/* - Community (affinity, consent, governance)
- * - @app/shefa/services/* - Economy
+ * For services from other pillars, use the SDK libraries:
+ * - @elohim/service           - Protocol-core (data loading, agents, trust)
+ * - @elohim/identity          - Identity (session, profile)
+ * - @elohim/rea-runtime       - Economy (REA, economic events, signal-emit)
  */
 
 // ============================================================================

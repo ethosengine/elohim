@@ -3,11 +3,12 @@ import { Injectable, inject } from '@angular/core';
 import { LAMAD_AGENT, type ILamadAgent } from '../interfaces/agent.interface';
 import { LAMAD_COUPLING_MAP, type ContentTypeCoupling } from '@app/lamad/generated/coupling-map';
 import {
-  EconomicEventsApiService,
   SignalEmitService,
+  ECONOMIC_EVENT_FACTORY,
+  type IEconomicEventFactory,
   type CreateEconomicEventInput,
   type SignalIntent,
-} from '@app/shefa';
+} from '@elohim/rea-runtime';
 
 import type { RendererCompletionEvent } from '../renderers/renderer-registry.service';
 import type { REAAction, LamadEventType } from '@elohim/rea-runtime';
@@ -40,7 +41,7 @@ const USE_SIGNAL_EMIT_ENDPOINT = true;
  */
 @Injectable({ providedIn: 'root' })
 export class SignalHarnessService {
-  private readonly economicEventsApi = inject(EconomicEventsApiService);
+  private readonly economicEventsApi = inject<IEconomicEventFactory>(ECONOMIC_EVENT_FACTORY);
   private readonly signalEmit = inject(SignalEmitService);
   private readonly agentService = inject(LAMAD_AGENT);
 

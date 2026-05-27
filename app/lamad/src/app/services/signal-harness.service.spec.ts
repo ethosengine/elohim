@@ -2,11 +2,11 @@ import { TestBed } from '@angular/core/testing';
 
 import { LAMAD_AGENT, type ILamadAgent } from '../interfaces/agent.interface';
 import {
-  EconomicEventsApiService,
   SignalEmitService,
+  ECONOMIC_EVENT_FACTORY,
   type SignalEmitResult,
   type SignalIntent,
-} from '@app/shefa';
+} from '@elohim/rea-runtime';
 
 import { SignalHarnessService } from './signal-harness.service';
 
@@ -25,8 +25,8 @@ describe('SignalHarnessService — EPR write-through path (Task C.3)', () => {
       providers: [
         SignalHarnessService,
         { provide: SignalEmitService, useValue: signalEmit },
-        { provide: EconomicEventsApiService, useValue: economicEvents },
-        { provide: ILamadAgent, useValue: agentService },
+        { provide: ECONOMIC_EVENT_FACTORY, useValue: economicEvents },
+        { provide: LAMAD_AGENT, useValue: agentService },
       ],
     });
     harness = TestBed.inject(SignalHarnessService);

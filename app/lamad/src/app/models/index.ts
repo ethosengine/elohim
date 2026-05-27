@@ -9,11 +9,10 @@
  * - Traveler: Agent, AgentProgress (human state)
  * - Maps: KnowledgeMap (polymorphic: domain, self, person, collective)
  *
- * For models from other pillars, import directly:
- * - @app/elohim/models/* - Protocol-core (agents, attestations, trust)
- * - @app/imagodei/models/* - Identity (profile, session)
- * - @app/qahal/models/* - Community (consent, governance, affinity)
- * - @app/shefa/models/* - Economy (REA, economic events)
+ * For models from other pillars, use the SDK libraries:
+ * - @elohim/service           - Protocol-core (agents, attestations, trust)
+ * - @elohim/identity          - Identity (profile, session)
+ * - @elohim/rea-runtime       - Economy (REA, economic events)
  */
 
 // ============================================================================

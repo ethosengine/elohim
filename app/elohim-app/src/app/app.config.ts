@@ -21,6 +21,8 @@ import { BLOB_FETCHER } from '@elohim/service';
 import { HeliaFetchService } from './elohim/services/helia-fetch.service';
 import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
 import { ContentIOModuleWithPlugins } from '@app/lamad/content-io/content-io.module';
+import { ECONOMIC_EVENT_FACTORY } from '@elohim/rea-runtime';
+import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -65,6 +67,10 @@ export const appConfig: ApplicationConfig = {
     { provide: BLOB_FETCHER, useClass: HeliaFetchService },
     { provide: GOVERNANCE, useExisting: GovernanceApiService },
     { provide: CONTENT_ATTESTATION, useExisting: ContentAttestationApiService },
+    // Wire rea-runtime's ECONOMIC_EVENT_FACTORY token to the shefa concrete service.
+    // Cross-pillar consumers (lamad signal-harness) inject via @elohim/rea-runtime's
+    // ECONOMIC_EVENT_FACTORY token, not the shefa-local one, to avoid @app/shefa imports.
+    { provide: ECONOMIC_EVENT_FACTORY, useExisting: EconomicEventsApiService },
     // Shefa metrics and custodian selection services
     CustodianCommitmentService,
     PerformanceMetricsService,
