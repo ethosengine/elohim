@@ -158,11 +158,14 @@ Single agent (general — needs full context to coordinate across slices). Seque
 **Steps:**
 
 1. Verify each Wave 2 slice landed cleanly: `git log --oneline | grep -E "Slice 2\.[1-7]"` returns the expected milestone count.
-2. Remove cross-pillar aliases from the new bundle's `tsconfig.json`. Keep only the bundle-internal `@app/<bundle>/*` alias and the `@elohim/*` library aliases.
-3. Verify the new bundle builds STANDALONE: `pnpm --filter <bundle> build` succeeds with zero source-reach into the donor bundle.
+2. **Audit which cross-pillar aliases are still in use** and partition into two sets:
+   - **Aliases used by zero remaining imports** → remove from the bundle's `tsconfig.json`.
+   - **Aliases used by remaining intentional imports** (composition-root `useExisting` wiring per §6.11; deliberate deferrals per the slice's acceptance report) → KEEP, with an inline comment that explains why and points at the relevant canon section.
+   - Run `grep -rE "from '@app/(elohim|imagodei|qahal|shefa|doorway|avodah|generated|testing)" app/<bundle>/src --include="*.ts" | sed -E "s/.*from '(@app/[a-z]+).*/\1/" | sort -u` to enumerate the actually-used set.
+3. Verify the new bundle builds: `pnpm --filter <bundle> build` succeeds. Note: under the composition-root pattern (§6.11), the bundle is not truly source-isolated from the donor — what it IS isolated from is unintentional cross-pillar imports in its own source.
 4. Verify the donor bundle still builds (bidirectional check): `pnpm --filter <donor> build` succeeds.
 5. Run the full pre-push suite. Schema tests, both bundles' tests, lint, format.
-6. Update canon docs that reference cross-pillar imports. Update `pillar-bundle-split-runbook.md` and `elohim-sdk.md` with anything this split discovered.
+6. Update canon docs that reference cross-pillar imports. Update this runbook and `elohim-sdk.md` with anything this split discovered.
 7. Commit the cutover milestone.
 
 ---
@@ -231,6 +234,51 @@ Audit for this pattern by grepping for `ViewContainerRef.createComponent` and si
 
 Source: cross-pillar import cleanup sprint Wave 2 Slice 2.6 canary report; flagged at Wave 1 manifest operator-input #4.
 
+### §6.11 — Composition-root pattern (the LAMAD_* / `useExisting` exit)
+
+A subset of cross-pillar services cannot cleanly migrate to the SDK because they have remaining out-of-scope dependencies in their pillar of origin. The lamad split surfaced ~14 such services (AgentService, EprResolverService, StorageApiService, GovernanceSignalService, ElohimPresenceService, …). Rather than block the bundle split on a full migration of each service plus its dep graph, the cleanup sprint adopted the **composition-root** pattern.
+
+**Pattern (the disposition called "P" in the lamad sprint, for "lamad-local with token bridge"):**
+
+1. The new bundle defines a narrow Angular `InjectionToken<I<Concern>>` plus `I<Concern>` interface in its internal `interfaces/cross-pillar.interface.ts`. The interface names only the methods the new bundle actually calls — not the donor pillar's full surface.
+2. The bundle's own consumer code injects via the token (`inject(LAMAD_X)`), not via the concrete class.
+3. The bundle's `app.config.ts` (the composition root) registers `{ provide: LAMAD_X, useExisting: ConcreteDonorClass }`. The `useExisting` import is the only place the bundle source imports the donor's concrete class.
+4. The donor pillar's class stays where it is. No migration required.
+
+This trades full library independence for a clean dependency surface: the bundle's source has zero unintentional cross-pillar imports, the donor service can move to the SDK later without breaking consumer code (only `app.config.ts` changes), and the narrow interface documents the actual API contract the bundle relies on.
+
+**Tsconfig retention consequence:** The bundle's `tsconfig.json` must retain `@app/<donor>/*` aliases for every pillar source the composition-root imports reach. When TypeScript compiles the bundle, it transitively compiles the imported donor source files — those files use the donor's `@app/<other>/*` aliases, which must resolve via the importing bundle's tsconfig. The composition-root pattern therefore breaks the "remove all cross-pillar aliases" Wave 3 step.
+
+**Convention going forward:** the bundle's `tsconfig.json` may keep `@app/<other-pillar>/*` aliases IF AND ONLY IF every retained alias is justified by either (a) a composition-root `useExisting` wiring or (b) a documented per-deferral acceptance report. Every retained alias gets an inline comment.
+
+Source: cross-pillar import cleanup sprint Slice 2.1c milestone (commit `02763beb3`); Wave 3 cutover discovery that alias removal broke transitively-compiled donor source.
+
+### §6.12 — Token-bridge for concrete-class DI tokens
+
+A variant of the composition-root pattern surfaces when the donor pillar already defines an `InjectionToken` whose `useValue`/`useExisting` is a concrete class with un-migratable deps. The lamad split's `ECONOMIC_EVENT_FACTORY` (defined in `@app/shefa/interfaces/economic-event-factory.interface.ts`, self-provided via `EconomicEventsApiService`) is the worked example.
+
+**Pattern:**
+
+1. Define the canonical `InjectionToken` in the SDK library (e.g. `@elohim/rea-runtime` exports `ECONOMIC_EVENT_FACTORY`).
+2. The new bundle's `app.config.ts` registers `{ provide: SDK_TOKEN, useExisting: DonorConcreteClass }`.
+3. The donor pillar continues to use its own token internally; the SDK token is the cross-pillar surface.
+4. When the donor's concrete class clears its dep barriers and migrates fully, the donor-local token consolidates into the SDK token (single source of truth restored).
+
+**When to use:** the concrete service has a dependency the SDK library cannot absorb yet, but the service's INTERFACE is stable enough to publish as an SDK token. Document the consolidation deferral in the slice's acceptance report and surface it in the runbook (this §) so the next splitter knows what's still pending.
+
+Source: cross-pillar import cleanup sprint Slice 2.4 residual (commits `0fee42d4f`, `11361812c`, `ca4f6c0c5`); reported by the slice agent as token duplication to consolidate when Slice 2.1 EconomicEventsApiService deps clear.
+
+### §6.13 — Narrow-interface drift checklist for inversion tokens
+
+LAMAD_* tokens (§6.11) and SDK tokens (§6.12) carry narrow interfaces that mirror the donor pillar's public API. The narrow interface usually omits surface area the new bundle doesn't currently need. Two drift hazards surface from this asymmetry:
+
+1. **Settle-wait / async-state methods.** The donor's full guard or service may include retry / settle logic that callers rely on. The narrow interface that the new bundle adopts may omit this method entirely. If the new bundle ever needs the settle behavior, either expand the narrow interface OR register a second richer token that delegates to the donor's full guard for that specific route.
+2. **Type mirrors of string-union enums.** The narrow interface re-declares string-union types (e.g., `LamadIdentityMode = 'hosted' | 'steward'`) rather than importing from the donor. If the donor adds a value to its enum, both ends need updating; otherwise the narrow type silently lags.
+
+**Convention going forward:** every inversion-token interface declares its mirror surfaces explicitly. The slice agent that defines the token documents in the milestone commit message a list of donor methods/types that the narrow surface DOESN'T cover, plus the rationale. The next splitter checks the drift list before extending the bundle's reach.
+
+Source: cross-pillar import cleanup sprint Slice 2.3 residual report (commit `3247740d9`); the lamadIdentityGuard intentionally omitted the imagodei guard's settle-wait loop, captured as a known limitation.
+
 ---
 
 ## §7 — Worked Example: The Lamad Split
@@ -265,7 +313,16 @@ Slice 2.7 (this runbook + the SDK boundary doc) ran in parallel from the start b
 
 ### §7.4 — The Wave 3 cutover
 
-Wave 3 (general agent, full context) removed the `@app/elohim/*`, `@app/imagodei/*`, `@app/qahal/*`, `@app/shefa/*`, `@app/generated/*` aliases from `app/lamad/tsconfig.json`. Verified bidirectional builds. Verified full pre-push suite. Committed the cutover milestone.
+Wave 3 (general agent, full context) audited the actually-used aliases in lamad post-Wave-2:
+
+- `@app/shefa`, `@app/shefa/*`, `@app/generated/*`, `@app/doorway`, `@app/doorway/*`, `@app/avodah`, `@app/avodah/*`, `@app/testing`, `@app/testing/*` — zero remaining imports in lamad. **Removed** from `app/lamad/tsconfig.json`.
+- `@app/elohim`, `@app/elohim/*` — 14 imports in `app/lamad/src/app/app.config.ts` for composition-root `useExisting` wiring of LAMAD_* tokens (§6.11). **Retained** with an inline comment block.
+- `@app/imagodei`, `@app/imagodei/*` — 1 import in `app/lamad/src/app/app.config.ts` for the `LAMAD_IDENTITY` `useExisting: IdentityService` wiring (Slice 2.3 residual outcome). **Retained**.
+- `@app/qahal`, `@app/qahal/*` — 3 imports in `app/lamad/src/app/components/content-viewer/content-viewer.component.ts` for the documented Slice 2.2b Lit-swap deferral (the swap would require ADDING new L-slice imports for MechanismSelectionService + SignalAccumulationService + GovernanceRecognitionService, net cross-pillar count goes up). **Retained**.
+
+Wave 3 verified bidirectional builds. Verified full pre-push suite. Committed the cutover milestone.
+
+**Lesson for §6.11**: removing all cross-pillar aliases is not always achievable under the composition-root pattern. The runbook's acceptance criteria (§8) reflect this: the metric that matters is "zero unintentional cross-pillar imports in the bundle's own source," not "zero aliases in the bundle's tsconfig." Every retained alias must be justified and inline-commented.
 
 ### §7.5 — The two canon docs
 
@@ -277,9 +334,10 @@ Slice 2.7 produced [elohim-sdk](epr:elohim-sdk) (the SDK boundary canon) and thi
 
 A pillar split is done when ALL of the following hold:
 
-- [ ] **The new bundle builds STANDALONE.** `pnpm --filter <bundle> build` succeeds with zero source-reach into the donor bundle's source tree.
+- [ ] **The new bundle builds.** `pnpm --filter <bundle> build` succeeds.
 - [ ] **The donor bundle still builds (bidirectional check).** `pnpm --filter <donor> build` succeeds; donor's consumers of migrated symbols resolve through the SDK libraries, not pillar source.
-- [ ] **The bundle's `tsconfig.json` has zero `@app/<other-bundle>/*` aliases.** Only the bundle-internal `@app/<bundle>/*` alias and the `@elohim/*` library aliases remain.
+- [ ] **The bundle's own source has zero unintentional cross-pillar imports.** Use `grep -rE "from '@app/(<every-other-pillar>)" app/<bundle>/src --include="*.ts"` to enumerate. Every remaining import is either (a) in the composition root (§6.11), (b) a documented deferral with a slice acceptance-report citation, or (c) a justified D-disposition copy. NO unintentional imports.
+- [ ] **The bundle's `tsconfig.json` retained-aliases are each justified.** Aliases for pillars the bundle no longer imports from are removed. Aliases retained for composition-root or deferrals are inline-commented and pointed at the relevant canon section. (See §6.11.)
 - [ ] **All pre-push gates pass.** Schema codegen freshness, both bundles' tests, lint, format, clippy on doorway, Rust workspace builds.
 - [ ] **The SDK boundary doc is updated.** If the split created a new library or moved a symbol between libraries, [elohim-sdk](epr:elohim-sdk) §3 reflects the new state.
 - [ ] **This runbook is updated.** If the split discovered a new gotcha, §6 captures it (with the commit SHA where known and the lesson named).

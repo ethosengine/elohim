@@ -5,6 +5,15 @@
     "typeRoots": ["node_modules/@types"],
     "paths": {
       "@app/lamad/*": ["./src/app/*"],
+      // Cross-pillar aliases are RETAINED under the Slice 2.1c composition-root
+      // pattern. While lamad source has zero unintentional cross-pillar imports
+      // (all remaining imports are documented composition-root or Slice 2.2b
+      // deferrals), lamad's app.config.ts imports concrete elohim-app pillar
+      // services for LAMAD_* InjectionToken `useExisting` registration. Those
+      // imported files transitively reference @app/{shefa,doorway,avodah,
+      // generated,testing}/*, so lamad's tsconfig must continue to resolve
+      // those alias targets even though lamad itself does not import them.
+      // See genesis/docs/architecture/elohim-sdk.md §composition-root.
       "@app/elohim": ["../elohim-app/src/app/elohim/index.ts"],
       "@app/elohim/*": ["../elohim-app/src/app/elohim/*"],
       "@app/imagodei": ["../elohim-app/src/app/imagodei/index.ts"],

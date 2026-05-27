@@ -205,12 +205,13 @@ The SDK's discipline IS the protocol's dignity. The same shape, served correctly
 
 ## §7 — The Cross-Pillar Import Cleanup Sprint
 
-The Elohim SDK boundary became canon during the cross-pillar import cleanup sprint (2026-05-25). The sprint took 261 cross-pillar imports out of `app/lamad/` source, classified each into one of eight dispositions (L / C / S / I / R / H / E / D / X), executed file-disjoint parallel migration slices, and removed the transitional path aliases that had let lamad reach into elohim-app at compile time.
+The Elohim SDK boundary became canon during the cross-pillar import cleanup sprint (2026-05-25). The sprint took 261 cross-pillar imports out of `app/lamad/` source, classified each into one of eight dispositions (L / C / S / I / R / H / E / D / X), executed file-disjoint parallel migration slices, and reduced the bundle's own-source cross-pillar imports to 18 — all of which are architecturally intentional (composition-root `useExisting` wiring or documented deferrals).
 
 What the sprint produced:
 
 - **The five libraries named above.** Two pre-existed (`@elohim/service`, `elohim-core`, `@elohim/storage-client`); two are new (`@elohim/identity`, `@elohim/rea-runtime`). Each library's public-api is now the SDK's published surface.
 - **The placement principle and substrate-API consumption patterns.** Captured in this canon doc, applied by every future pillar split.
+- **The composition-root pattern (LAMAD_\* inversion tokens).** Slice 2.1c surfaced that not every cross-pillar service can cleanly migrate to an SDK library — some carry remaining dependencies that resist relocation. The resolution: define a narrow `InjectionToken<I<Concern>>` inside the bundle; inject via the token in consumer code; wire `{ provide: TOKEN, useExisting: ConcreteDonorClass }` only at the composition root (`app.config.ts`). The donor's concrete class stays in place. The bundle's own source has zero unintentional cross-pillar imports; the composition root holds the only `useExisting` imports, by design. Captured in detail in [pillar-bundle-split-runbook §6.11](epr:pillar-bundle-split-runbook).
 - **The pillar-bundle-split runbook.** Captured as a sibling canon doc (`pillar-bundle-split-runbook.md`) so the next split — shefa, qahal, avodah, imagodei, account, or doorway — follows the runbook instead of re-deriving the lessons.
 
 The sprint's foundational artifacts (this canon doc + the runbook) are the durable value. The lamad split is the **first** of seven planned pillar splits per the pillar-EPR decomposition design. Each subsequent split inherits the SDK boundary documented here.
