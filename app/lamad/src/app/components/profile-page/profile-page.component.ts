@@ -10,19 +10,20 @@ import { Subject, of } from 'rxjs';
 
 import {
   LAMAD_PROFILE,
+  LAMAD_IDENTITY,
   type ILamadProfile,
+  type ILamadIdentity,
   type LamadResumePoint,
   type LamadPathsOverview,
   type LamadTimelineEvent,
 } from '../../interfaces/cross-pillar.interface';
-import { isNetworkMode } from '@app/imagodei/models/identity.model';
+import { isNetworkMode } from '../../utils/identity.utils';
 import {
   SessionHuman,
   SessionActivity,
   SessionPathProgress,
+  SessionHumanService,
 } from '@elohim/identity';
-import { IdentityService } from '@app/imagodei/services/identity.service';
-import { SessionHumanService } from '@elohim/identity';
 
 import { MasteryStats, MasteryLevel } from '../../models';
 import { ContentMasteryService } from '../../services/content-mastery.service';
@@ -49,7 +50,7 @@ import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile
   styleUrls: ['./profile-page.component.css'],
 })
 export class ProfilePageComponent implements OnInit, OnDestroy {
-  readonly identityService = inject(IdentityService); // Public for template access
+  readonly identityService: ILamadIdentity = inject(LAMAD_IDENTITY); // Public for template access
   private readonly router = inject(Router);
 
   // Tab management

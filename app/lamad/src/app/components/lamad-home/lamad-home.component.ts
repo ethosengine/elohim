@@ -11,9 +11,11 @@ import { Subject, forkJoin, of } from 'rxjs';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import {
   LAMAD_PROFILE,
+  LAMAD_IDENTITY,
   type ILamadProfile,
+  type ILamadIdentity,
 } from '../../interfaces/cross-pillar.interface';
-import { IdentityService, isNetworkMode } from '@app/imagodei/services/identity.service';
+import { isNetworkMode } from '../../utils/identity.utils';
 
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 import { CurrentFocus } from '../../models/profile.model';
@@ -77,7 +79,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     private readonly router: Router,
     @Inject(LAMAD_PROFILE) private readonly profileService: ILamadProfile,
     @Inject(LAMAD_AGENT) private readonly agentService: ILamadAgent,
-    private readonly identityService: IdentityService
+    @Inject(LAMAD_IDENTITY) private readonly identityService: ILamadIdentity
   ) {
     // Load saved view mode preference
     const savedMode = localStorage.getItem('lamad-view-mode');

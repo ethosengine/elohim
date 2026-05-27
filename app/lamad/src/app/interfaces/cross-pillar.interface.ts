@@ -481,6 +481,24 @@ export const LAMAD_CONTEXT_ASSEMBLY = new InjectionToken<ILamadContextAssembly>(
 );
 
 // ============================================================================
+// ILamadIdentity — narrow identity contract (mode, displayName, isAuthenticated)
+// ============================================================================
+
+/**
+ * Narrow identity mode type — mirrors imagodei IdentityMode but defined locally
+ * so lamad has no compile-time dependency on the imagodei model.
+ */
+export type LamadIdentityMode = 'anonymous' | 'session' | 'hosted' | 'steward' | 'migrating';
+
+export interface ILamadIdentity {
+  mode: import('@angular/core').Signal<LamadIdentityMode>;
+  displayName: import('@angular/core').Signal<string>;
+  isAuthenticated(): boolean;
+}
+
+export const LAMAD_IDENTITY = new InjectionToken<ILamadIdentity>('LamadIdentity');
+
+// ============================================================================
 // ILamadLensRegistry — narrow lens registry contract (scope-sequence registration)
 // ============================================================================
 

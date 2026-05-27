@@ -25,6 +25,7 @@ import {
   LAMAD_ELOHIM_AGENT,
   LAMAD_CONTEXT_ASSEMBLY,
   LAMAD_LENS_REGISTRY,
+  LAMAD_IDENTITY,
 } from './interfaces/cross-pillar.interface';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
@@ -37,6 +38,7 @@ import { ProfileService } from '@app/elohim/services/profile.service';
 import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
 import { ContextAssemblyService } from '@app/elohim/services/context-assembly.service';
 import { LensRegistryService } from '@app/elohim/services/lens-registry.service';
+import { IdentityService } from '@app/imagodei/services/identity.service';
 
 /**
  * Lamad bundle application config.
@@ -93,5 +95,6 @@ export const appConfig: ApplicationConfig = {
     { provide: LAMAD_ELOHIM_AGENT, useExisting: ElohimAgentService },
     { provide: LAMAD_CONTEXT_ASSEMBLY, useExisting: ContextAssemblyService },
     { provide: LAMAD_LENS_REGISTRY, useExisting: LensRegistryService },
+    { provide: LAMAD_IDENTITY, useExisting: IdentityService },
   ],
 };

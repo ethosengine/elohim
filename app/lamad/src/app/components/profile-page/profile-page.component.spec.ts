@@ -4,8 +4,7 @@ import { signal } from '@angular/core';
 
 import { of, BehaviorSubject } from 'rxjs';
 
-import { LAMAD_PROFILE } from '../../interfaces/cross-pillar.interface';
-import { IdentityService } from '@app/imagodei/services/identity.service';
+import { LAMAD_PROFILE, LAMAD_IDENTITY } from '../../interfaces/cross-pillar.interface';
 import { SessionHumanService } from '@elohim/identity';
 
 import { ContentMasteryService } from '../../services/content-mastery.service';
@@ -98,7 +97,7 @@ describe('ProfilePageComponent', () => {
       imports: [ProfilePageComponent],
       providers: [
         { provide: LAMAD_PROFILE, useValue: profileServiceSpy },
-        { provide: IdentityService, useValue: identityServiceSpy },
+        { provide: LAMAD_IDENTITY, useValue: identityServiceSpy },
         { provide: SessionHumanService, useValue: sessionHumanSpy },
         { provide: ContentMasteryService, useValue: masteryServiceSpy },
         { provide: MasteryStatsService, useValue: masteryStatsSpy },

@@ -4,9 +4,8 @@ import { of, throwError } from 'rxjs';
 import { LamadHomeComponent } from './lamad-home.component';
 import { PathService } from '../../services/path.service';
 import { PathFilterService } from '../../services/path-filter.service';
-import { LAMAD_PROFILE } from '../../interfaces/cross-pillar.interface';
+import { LAMAD_PROFILE, LAMAD_IDENTITY } from '../../interfaces/cross-pillar.interface';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
-import { IdentityService } from '@app/imagodei/services/identity.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 import { vi, Mock } from 'vitest';
 
@@ -98,7 +97,7 @@ describe('LamadHomeComponent', () => {
         { provide: Router, useValue: routerSpy },
         { provide: LAMAD_PROFILE, useValue: profileServiceSpy },
         { provide: LAMAD_AGENT, useValue: agentServiceSpy },
-        { provide: IdentityService, useValue: identityServiceSpy },
+        { provide: LAMAD_IDENTITY, useValue: identityServiceSpy },
       ],
     }).compileComponents();
 
@@ -108,8 +107,8 @@ describe('LamadHomeComponent', () => {
     };
     router = TestBed.inject(Router) as { [K in keyof Router]?: Mock };
     profileService = TestBed.inject(LAMAD_PROFILE) as { [key: string]: Mock };
-    agentService = TestBed.inject(LAMAD_AGENT) as { [K in keyof AgentService]?: Mock };
-    identityService = TestBed.inject(IdentityService) as { [K in keyof IdentityService]?: Mock };
+    agentService = TestBed.inject(LAMAD_AGENT) as { [key: string]: Mock };
+    identityService = TestBed.inject(LAMAD_IDENTITY) as { [key: string]: Mock };
 
     pathService.listPaths.mockReturnValue(of(mockPathIndex));
     pathFilterService.getFeaturedPaths.mockImplementation((paths: PathIndexEntry[]) => paths);

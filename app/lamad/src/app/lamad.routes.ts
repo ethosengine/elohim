@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { identityGuard } from '@app/imagodei/guards/identity.guard';
+import { lamadIdentityGuard } from './guards/lamad-identity.guard';
 
 // @coverage: 4.8% (2026-03-03)
 
@@ -71,7 +71,7 @@ export const LAMAD_ROUTES: Routes = [
       // Content Editor - edit existing content
       {
         path: 'resource/:resourceId/edit',
-        canActivate: [identityGuard],
+        canActivate: [lamadIdentityGuard],
         loadComponent: async () =>
           import('./components/content-editor-page/content-editor-page.component').then(
             m => m.ContentEditorPageComponent
