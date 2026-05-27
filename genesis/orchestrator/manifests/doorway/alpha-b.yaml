@@ -89,30 +89,22 @@ spec:
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins
     spec:
+      # doorway-B is the apex doorway (elohim.host). Per the 2026-05-27
+      # persona/doorway placement directive, doorway-B lives on shem
+      # (node-type=remote) with NO fallback. If shem is unhealthy this pod
+      # sits Pending — that's the intended fail-loud behavior so the apex
+      # ingress's degradation is visible rather than masked by silent
+      # rescheduling onto the on-prem cluster (which doorway-A already
+      # serves via doorway-alpha.elohim.host).
       affinity:
         nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 80
-              preference:
-                matchExpressions:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
                   - key: node-type
                     operator: In
                     values:
-                      - operations
-            - weight: 70
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - edge
-            - weight: 60
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - performance
+                      - remote
       containers:
         # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
         - name: doorway

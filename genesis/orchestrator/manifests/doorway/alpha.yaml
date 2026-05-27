@@ -75,29 +75,23 @@ spec:
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins
     spec:
+      # doorway-A is the alpha doorway (doorway-alpha.elohim.host). Per the
+      # 2026-05-27 persona/doorway placement directive, doorway-A stays on
+      # the on-prem cluster (operations/edge/performance node-types) and
+      # does NOT fall back to shem (remote). Required-during-scheduling so
+      # the scheduler refuses to land it on a remote node — keeps the
+      # Dowell-household ingress co-located with matthew/jessica/james
+      # while doorway-B carries the shem-side mirror via elohim.host.
       affinity:
         nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 80
-              preference:
-                matchExpressions:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
                   - key: node-type
                     operator: In
                     values:
                       - operations
-            - weight: 70
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
                       - edge
-            - weight: 60
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
                       - performance
       containers:
         # Doorway Gateway - Rust WebSocket gateway with auth, worker pool

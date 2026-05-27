@@ -37,16 +37,13 @@ spec:
                 values:
                   - operations
                   - edge
-              # Pin to intel-nuc — same node as elohim-holochain (DNA)
-              # since steward dependsOn elohim-holochain in the orchestrator
-              # and shares cargo-cache-holochain with it. The two pipelines
-              # are sequential, so a single RWO hostpath PVC works cleanly
-              # when both stick to the same node. See
-              # elohim/holochain/dna/Jenkinsfile + nix-cache-pvc.yaml.
-              - key: kubernetes.io/hostname
-                operator: In
-                values:
-                  - intel-nuc
+              # No kubernetes.io/hostname pin — cargo-cache-holochain is
+              # back on openebs-jiva-csi-default (cluster-wide RWO; replicas
+              # bounded off shem by JivaVolumePolicy). steward and DNA still
+              # share cargo-cache-holochain — that's safe because they're
+              # sequential per the orchestrator dependsOn chain, so only one
+              # build holds the RWO at a time regardless of which node it
+              # lands on. See genesis/manifests/nix-cache-pvc.yaml header.
   tolerations:
     - key: "workload-type"
       operator: "Equal"
