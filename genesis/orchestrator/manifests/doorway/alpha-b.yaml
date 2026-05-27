@@ -4,13 +4,20 @@
 # doorway-alpha from the same dev-branch alpha pipeline. Exists to prove the
 # doorway-federation surface end-to-end (FEDERATION_PEERS discovery, DHT
 # self-registration, cross-doorway account registration, multi-doorway
-# content delivery) without standing up a second conductor pool.
+# content delivery) end-to-end across two distinct genesis-peer backends.
 #
-# Topology:
-#   Browser → alpha.elohim.host  → elohim-doorway-alpha    ─┐
-#   Browser → elohim.host        → elohim-doorway-alpha-b  ─┴→ shared alpha
-#                                                              conductor pool
-#                                                              (matthew/jessica/…)
+# Topology (2026-05-27 realignment — adam-as-operator for doorway-B):
+#   Browser → alpha.elohim.host  → elohim-doorway-alpha    → elohim-matthew-alpha
+#                                  (on-prem placement)        (on-prem storage)
+#   Browser → elohim.host        → elohim-doorway-alpha-b  → elohim-adam-alpha
+#                                  (shem placement)           (shem storage)
+#
+# Adam + Matthew are the genesis pair (deployments.json humans[0..1]). Pairing
+# each doorway with its co-located genesis peer means federation flows actually
+# cross between two real backends with two real projection caches — not the
+# previous "both doorways read matthew" pseudo-federation where the only
+# difference was the MONGODB_DB. Cross-cluster gossip, two storage backends,
+# two operator identities — the federation test surface that matters.
 #
 # Doorway-A's DOORWAY_ID is "alpha-elohim-host"; this one's is
 # "apex-elohim-host". They federate via the FEDERATION_PEERS env var
@@ -114,7 +121,12 @@ spec:
             - "--listen"
             - "0.0.0.0:8080"
             - "--conductor-url"
-            - "ws://elohim-matthew-alpha:4445"
+            # 2026-05-27 realignment: doorway-B (on shem) now reads its
+            # co-located genesis peer adam, not matthew (on-prem). Matches
+            # the placement directive's intent — two doorways, two genesis
+            # peers, two clusters — and removes the cross-WireGuard hop on
+            # every read.
+            - "ws://elohim-adam-alpha:4445"
           ports:
             - name: gateway-ws
               containerPort: 8080
@@ -124,15 +136,18 @@ spec:
               value: "info,doorway=debug"
             - name: PROJECTION_WRITER
               value: "true"
-            # Shared alpha conductor pool — matthew (founder) + jessica (household)
-            # are the same backends doorway-A uses, so federation proves the
-            # multi-projection surface without doubling backend cost.
+            # Full alpha conductor pool (matthew, jessica, james, adam, terrance, …)
+            # injected from the Jenkins pipeline as a reach-fallback list.
+            # Primary singular backend is adam (see CONDUCTOR_ADMIN_URL /
+            # STORAGE_URL below) so doorway-B's projection cache + admin
+            # writes hit the shem-side genesis peer first; the pool is only
+            # consulted for reach when the primary can't satisfy a request.
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL
-              value: "ws://elohim-matthew-alpha:4444"
+              value: "ws://elohim-adam-alpha:4444"
             - name: STORAGE_URL
-              value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090"
+              value: "http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090"
             - name: STORAGE_URLS
               value: "STORAGE_URLS_PLACEHOLDER"
             # Auto-register doorway-B's storage as a publisher in the
