@@ -255,6 +255,38 @@ export class SessionHumanService {
   }
 
   // =========================================================================
+  // Upgrade-prompt dismissal — browser-local UI state
+  //
+  // The active prompt list is served from the substrate via
+  // GET /api/v1/identity/{agentId}/upgrade-prompts (M-AGGR-1). This pair
+  // records per-browser dismissal so the UI can suppress re-display until
+  // the next session — UI affordance only, NOT substrate-policy.
+  // =========================================================================
+
+  dismissUpgradePrompt(promptId: string): void {
+    try {
+      const key = 'lamad-dismissed-prompts';
+      const stored = localStorage.getItem(key);
+      const dismissed: string[] = stored ? (JSON.parse(stored) as string[]) : [];
+      if (!dismissed.includes(promptId)) {
+        dismissed.push(promptId);
+        localStorage.setItem(key, JSON.stringify(dismissed));
+      }
+    } catch {
+      // Ignore — dismissal is best-effort UI state
+    }
+  }
+
+  getDismissedPromptIds(): string[] {
+    try {
+      const stored = localStorage.getItem('lamad-dismissed-prompts');
+      return stored ? (JSON.parse(stored) as string[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  // =========================================================================
   // Hybrid State Management (Session + Holochain)
   // =========================================================================
 
