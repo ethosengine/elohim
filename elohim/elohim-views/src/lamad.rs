@@ -326,3 +326,37 @@ pub struct AttestationView {
     /// Optional description from the Content entry.
     pub description: Option<String>,
 }
+
+// ---------------------------------------------------------------------------
+// M-AGGR-3: ContentEngagementStats projection (Category C operational)
+// Source of truth: derived projection of EconomicEvent stream filtered by
+// content_id AND lamadEventType IN ('content-view', 'content-complete').
+// Computed on Signal::EconomicEventCreated; reconstructable from the
+// underlying EconomicEvent entries in the elohim DNA content_store zome.
+// Schema: epr:schema:view:content-engagement-stats
+// ---------------------------------------------------------------------------
+
+/// Materialized engagement statistics for a single content item.
+///
+/// Derived by grouping and counting EconomicEvent entries whose
+/// `content_id` matches and `lamadEventType` is one of the two
+/// engagement event kinds ('content-view', 'content-complete').
+/// When no events exist, all counters are zero and `completionRate`
+/// is 0.0.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContentEngagementStatsView {
+    /// Identifier of the content item this projection covers.
+    pub content_id: String,
+    /// Total count of EconomicEvents with lamadEventType='content-view'.
+    pub views: i64,
+    /// Total count of EconomicEvents with lamadEventType='content-complete'.
+    pub completions: i64,
+    /// Count of distinct provider (agent) values across content-view events.
+    pub unique_viewers: i64,
+    /// Ratio of completions to views in [0.0, 1.0]. Zero when views == 0.
+    pub completion_rate: f64,
+    /// ISO-8601 timestamp when this projection was last computed.
+    pub computed_at: String,
+}

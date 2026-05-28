@@ -55,6 +55,7 @@ export * from "./ConstitutionalLimitsStatusView";
 export * from "./Content";
 export * from "./ContentAssignmentView";
 export * from "./ContentAttestationView";
+export * from "./ContentEngagementStatsView";
 export * from "./ContentMastery";
 export * from "./ContentMasteryView";
 export * from "./ContentRulesInput";
