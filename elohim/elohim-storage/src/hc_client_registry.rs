@@ -10,6 +10,7 @@
 //! returns a 503 if the role is unconnected.
 
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{info, warn};
 
 use crate::hc_client::{HcClient, HcClientConfig};
@@ -52,26 +53,54 @@ impl HcClientRegistry {
     }
 
     async fn connect_role(inputs: &HcRegistryInputs, role: &str) -> Option<Arc<HcClient>> {
-        match HcClient::connect(HcClientConfig {
+        // Retry with exponential backoff. The conductor's cells transition
+        // through CellDisabled state during the first ~15s post-pod-boot
+        // before the kitsune handshake completes. A single-shot connect at
+        // T+9.5s permanently None-stamps the role and breaks the
+        // conductor-required project-epr write path
+        // (services/rea_commitment_service.rs::create_via_conductor → 503
+        // "lamad bridge unavailable"), failing genesis Seed Projections on
+        // every CI run since 2026-05-26. Mirrors import_api::connect_conductor's
+        // 5-attempt 2s→4s→8s→16s→30s(cap) backoff — proven on
+        // elohim-adam-alpha-0 logs to clear the race by attempt 4 (T+15s).
+        let config = HcClientConfig {
             admin_url: inputs.admin_url.clone(),
             app_url: inputs.app_url.clone(),
             app_id: inputs.app_id.clone(),
             role: Some(role.to_string()),
-        })
-        .await
-        {
-            Ok(hc) => {
-                info!(role, "HcClient connected");
-                Some(Arc::new(hc))
-            }
-            Err(e) => {
-                warn!(
-                    role,
-                    error = %e,
-                    "HcClient connect failed — routes for this role will return 503"
-                );
-                None
+        };
+        let max_attempts: u32 = 5;
+        let mut delay = Duration::from_secs(2);
+        for attempt in 1..=max_attempts {
+            match HcClient::connect(config.clone()).await {
+                Ok(hc) => {
+                    info!(role, attempt, "HcClient connected");
+                    return Some(Arc::new(hc));
+                }
+                Err(e) if attempt < max_attempts => {
+                    warn!(
+                        role,
+                        attempt,
+                        max_attempts,
+                        error = %e,
+                        delay_secs = delay.as_secs(),
+                        "HcClient connect failed — retrying (cells may still be CellDisabled)"
+                    );
+                    tokio::time::sleep(delay).await;
+                    delay = std::cmp::min(delay * 2, Duration::from_secs(30));
+                }
+                Err(e) => {
+                    warn!(
+                        role,
+                        attempt,
+                        max_attempts,
+                        error = %e,
+                        "HcClient connect failed after all attempts — routes for this role will return 503"
+                    );
+                    return None;
+                }
             }
         }
+        None
     }
 }
