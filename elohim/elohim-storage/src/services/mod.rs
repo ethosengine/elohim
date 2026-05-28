@@ -51,6 +51,7 @@ pub mod floor_protections;
 pub mod gossip_flood;
 pub mod governance_health;
 pub mod hazard;
+pub mod hub_capacity_service;
 pub mod holochain_humans_replayer;
 pub mod household_backfill;
 pub mod household_resilience;
