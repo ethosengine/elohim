@@ -30,10 +30,10 @@ pub const INVENTORY_TOPIC: &str = "elohim/inventory/blob";
 /// re-checking.
 ///
 /// ## Stage trajectory
-/// This is Stage-1 substrate placeholder. The destination is Stage-4 of
-/// the REA-compute-substrate roadmap, where hosting becomes a
-/// `Mishpat::Commitment` with `action="serve-url-projection"` and
-/// `BlobAddress` becomes the address type referenced in the Commitment's
+/// This is a Stage-2 hardening that co-exists with Stage-1 structural checks.
+/// The destination is Stage-4 of the REA-compute-substrate roadmap, where
+/// hosting becomes a `Mishpat::Commitment` with `action="serve-url-projection"`
+/// and `BlobAddress` becomes the address type referenced in the Commitment's
 /// scope field. The newtype survives the graduation unchanged.
 ///
 /// See `genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md`.
@@ -53,6 +53,7 @@ impl BlobAddress {
         }
     }
 
+    /// Borrow the inner wire string.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -108,23 +109,16 @@ pub struct BlobInventoryDelta {
 }
 
 /// Reasons a wire message can fail structural verification.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum VerifyError {
+    #[error("peer ID cannot be empty")]
     EmptyPeerId,
+    #[error("signature cannot be empty")]
     EmptySignature,
+    #[error("delta must contain at least one add or remove")]
     EmptyDelta,
+    #[error("invalid blob hash format: {0}")]
     InvalidHashFormat(String),
-}
-
-impl std::fmt::Display for VerifyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            VerifyError::EmptyPeerId => write!(f, "peer ID cannot be empty"),
-            VerifyError::EmptySignature => write!(f, "signature cannot be empty"),
-            VerifyError::EmptyDelta => write!(f, "delta must contain at least one add or remove"),
-            VerifyError::InvalidHashFormat(s) => write!(f, "invalid blob hash format: {}", s),
-        }
-    }
 }
 
 impl BlobInventorySnapshot {
