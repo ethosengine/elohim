@@ -1,6 +1,11 @@
 {
   "manifestVersion": "1.0",
   "pipeline": "elohim-orchestrator",
+  "jenkinsPath": "genesis/orchestrator/Jenkinsfile",
+  "manualOnly": false,
+  "triggersGenesis": false,
+  "cascades": false,
+  "dependsOn": [],
   "description": "CI orchestrator — Jenkinsfile linting and validation",
   "steps": {
     "lint-jenkinsfiles": {

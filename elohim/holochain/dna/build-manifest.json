@@ -1,6 +1,11 @@
 {
   "manifestVersion": "1.0",
   "pipeline": "elohim-holochain",
+  "jenkinsPath": "elohim/holochain/dna/Jenkinsfile",
+  "manualOnly": false,
+  "triggersGenesis": true,
+  "cascades": true,
+  "dependsOn": [],
   "description": "Holochain DNA compilation — WASM zomes and hApp packaging",
   "steps": {
     "build-dna-wasm": {

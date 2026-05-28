@@ -1,6 +1,11 @@
 {
   "manifestVersion": "1.0",
   "pipeline": "elohim-epr",
+  "jenkinsPath": "elohim/epr/Jenkinsfile",
+  "manualOnly": false,
+  "triggersGenesis": false,
+  "cascades": false,
+  "dependsOn": [],
   "description": "Elohim EPR codec — canonical CBOR + CIDv1 + Ed25519 for the graph substrate (Rust crate + TS SDK)",
   "steps": {
     "rust-build-test": {
