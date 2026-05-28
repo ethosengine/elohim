@@ -41,8 +41,6 @@ use hyper::{body::Incoming, Method, Request, Response};
 use serde::{Deserialize, Serialize};
 use tracing;
 
-use diesel::SqliteConnection;
-
 use crate::db::manifests::fetch_manifests_by_kind;
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
