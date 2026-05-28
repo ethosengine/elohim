@@ -1,0 +1,69 @@
+{
+  "$id": "epr:schema:view:accumulation-status",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AccumulationStatusView",
+  "description": "Source of truth: derived projection of FeedbackSignal × Manifest(kind: standing-policy) (Operational, Category C). Computed by elohim-storage on Signal::FeedbackSignalCreated and Signal::ManifestUpdated{kind: standing-policy} events. Not persisted as DHT; reconstructable from the underlying FeedbackSignal entries and standing-policy Manifest payload.",
+  "type": "object",
+  "required": [
+    "entityType",
+    "entityId",
+    "totalSignals",
+    "uniqueParticipants",
+    "consensusStrength",
+    "status",
+    "readyForSensemaking",
+    "controversyDetected",
+    "settled",
+    "computedAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "entityType": {
+      "type": "string",
+      "description": "The type of entity this accumulation status applies to (e.g. 'content', 'path')"
+    },
+    "entityId": {
+      "type": "string",
+      "description": "The identifier of the entity this accumulation status applies to"
+    },
+    "totalSignals": {
+      "type": "integer",
+      "description": "Total count of FeedbackSignal entries for this (entityType, entityId)"
+    },
+    "uniqueParticipants": {
+      "type": "integer",
+      "description": "Count of distinct signer pubkeys across FeedbackSignal entries for this entity"
+    },
+    "consensusStrength": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Normalized consensus strength in [0, 1]. 1.0 = full consensus; 0.0 = maximum diversity. Derived from normalized Shannon entropy of signal_kind distribution."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "ready_for_sensemaking", "controversy_detected", "settled"],
+      "description": "Computed accumulation status: 'pending' means insufficient signals; other values derive from standing-policy Manifest threshold comparison."
+    },
+    "readyForSensemaking": {
+      "type": "boolean",
+      "description": "True when totalSignals >= threshold.readyForSensemaking.minTotalSignals AND consensusStrength < threshold.readyForSensemaking.maxConsensusStrength"
+    },
+    "controversyDetected": {
+      "type": "boolean",
+      "description": "True when totalSignals >= threshold.controversyDetected.minTotalSignals AND consensusStrength < threshold.controversyDetected.maxConsensusStrength"
+    },
+    "settled": {
+      "type": "boolean",
+      "description": "True when totalSignals >= threshold.settled.minTotalSignals AND consensusStrength >= threshold.settled.maxConsensusStrength (read as minConsensusStrength for 'settled')"
+    },
+    "policyManifestCid": {
+      "type": ["string", "null"],
+      "description": "CID of the standing-policy Manifest whose thresholds were applied. Null when protocol defaults were used."
+    },
+    "computedAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when this projection was last computed"
+    }
+  }
+}

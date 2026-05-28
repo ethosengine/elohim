@@ -1,0 +1,86 @@
+{
+  "$id": "epr:schema:manifest-payload:standing-policy",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StandingPolicyPayload",
+  "description": "Source of truth: this schema IS the authoritative shape for Manifest{kind: 'standing-policy'} payload_json. Authored as a DHT Manifest entry via create_manifest (existing coordinator). The substrate reads this payload to derive standing rules and accumulation status projections. Category A (Notarized) via existing Manifest entry type.",
+  "type": "object",
+  "required": ["floor"],
+  "additionalProperties": true,
+  "properties": {
+    "floor": {
+      "type": "object",
+      "description": "Constitutional floor — immune classes that standing policy may not restrict",
+      "required": ["classes"],
+      "additionalProperties": false,
+      "properties": {
+        "classes": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["class", "protection"],
+            "additionalProperties": false,
+            "properties": {
+              "class": {
+                "type": "string",
+                "enum": [
+                  "local-relationship-reach",
+                  "cid-targeted-lookup",
+                  "constitutional-floor-signatures",
+                  "new-voice-baseline",
+                  "vulnerable-class-elevation"
+                ]
+              },
+              "protection": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "accumulation_thresholds": {
+      "type": "object",
+      "description": "Thresholds governing AccumulationStatus derivation from FeedbackSignal aggregates. When omitted, the substrate uses protocol defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "readyForSensemaking": {
+          "$ref": "#/$defs/accumulation_threshold",
+          "description": "Signal accumulation has produced enough diversity to warrant structured deliberation"
+        },
+        "controversyDetected": {
+          "$ref": "#/$defs/accumulation_threshold",
+          "description": "High participation with highly diverse views — active controversy present"
+        },
+        "settled": {
+          "$ref": "#/$defs/accumulation_threshold",
+          "description": "Strong consensus with sufficient participation — community has converged"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "accumulation_threshold": {
+      "type": "object",
+      "description": "A threshold pair: minimum total signals required AND maximum consensus_strength allowed (or minimum for 'settled').",
+      "required": ["minTotalSignals", "maxConsensusStrength"],
+      "additionalProperties": false,
+      "properties": {
+        "minTotalSignals": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum total signal count that must be reached before this status is eligible"
+        },
+        "maxConsensusStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "For readyForSensemaking and controversyDetected: consensus_strength must be BELOW this value. For settled: consensus_strength must be AT OR ABOVE this value (substrate interprets field name as min when used in the 'settled' threshold context)."
+        }
+      }
+    }
+  }
+}

@@ -135,6 +135,8 @@ const INTERFACE_FILES = [
   // M-REA-1: intent-driven EconomicEvent composition wire shape (Category A existing)
   // Client emits high-level LamadEventIntent; substrate composes full REA shape.
   { src: 'intents/lamad-event-intent.ts', dest: 'lamad-event-intent.ts' },
+  // M-POLICY-1: AccumulationStatus projection (Category C operational — FeedbackSignal × standing-policy Manifest)
+  { src: 'views/accumulation-status.ts', dest: 'accumulation-status.ts' },
 ];
 
 /**
@@ -427,7 +429,7 @@ async function main() {
     const refMap = await loadRefMap(SCHEMA_DIR);
 
     const allGenerated = [];
-    for (const subdir of ['enums', 'objects', 'inputs', 'views', 'p2p', 'manifests', 'attestation', 'attestation/subtypes', 'intents']) {
+    for (const subdir of ['enums', 'objects', 'inputs', 'views', 'p2p', 'manifests', 'manifest-payloads', 'attestation', 'attestation/subtypes', 'intents']) {
       const results = await generateFromDir(subdir, refMap);
       allGenerated.push(...results);
     }
