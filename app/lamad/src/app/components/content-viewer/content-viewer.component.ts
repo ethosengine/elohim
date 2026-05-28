@@ -49,20 +49,29 @@ import {
   FeedbackProfile,
   createProfileFromTemplate,
 } from '@app/lamad/models/feedback-profile.model';
-// NOTE: FeedbackMechanismGatewayComponent + GraduatedFeedbackComponent + ReactionBarComponent
-// retained as the canonical stateful orchestrators for governance feedback UX.
-// The Lit equivalents (<elohim-feedback-mechanism-gateway>, <elohim-graduated-feedback>,
-// <elohim-reaction-bar>) exist in elohim-core as STATELESS primitives that accept
-// pre-computed selection/accumulationStatus props and emit submission events. The ~1650
-// lines of orchestration that today live inside the three @app/qahal Angular components
-// (API calls, form state, submission flow, mediation/recognition wiring) have no library
-// home yet, so swapping content-viewer to the Lit elements would force that orchestration
-// to be inlined here or duplicated into a lamad-local service. Slice 2.2b closure (2026-05-28)
-// migrated 2/3 of the contributing services to @elohim/service (MechanismSelectionService,
-// SignalAccumulationService); GovernanceRecognitionService remains in @app/qahal pending
-// its RecognitionApiService chain. These three component imports are therefore documented
-// composition-root-equivalent imports under the stateful-orchestrator deferral pattern —
-// see genesis/docs/architecture/pillar-bundle-split-runbook.md §6.11 + §6.14.
+// BACKEND-MIGRATION DEFERRAL — see pillar-bundle-split-runbook.md §6.14.
+//
+// FeedbackMechanismGatewayComponent + GraduatedFeedbackComponent + ReactionBarComponent
+// from @app/qahal are retained because the Lit equivalents in elohim-core
+// (<elohim-feedback-mechanism-gateway>, <elohim-graduated-feedback>, <elohim-reaction-bar>)
+// are stateless primitives, while the Angular components encapsulate ~1650 lines of
+// stateful orchestration that does not have a legitimate client-side home: API calls to
+// governance-api, REA economic-event creation via recognition-api, submission flow,
+// mediation/reaction aggregation. Under the thin-client discipline + substrate-as-steward
+// principle, that work belongs on the backend (a doorway route or zome coordinator),
+// not in any Angular component in any pillar. The Lit swap is trivially clean ONCE the
+// backend migration lands; until then these three Angular components host the orchestration.
+//
+// Slice 2.2b closure (commit 625d02a0f, 2026-05-28) migrated 2/3 of the contributing
+// helper services to @elohim/service (MechanismSelectionService, SignalAccumulationService)
+// — both are pure-function-style helpers that are legitimately client-side or backend.
+// GovernanceRecognitionService stays in @app/qahal for now because its RecognitionApiService
+// chain is part of the orchestration that should move backend, not into a library.
+//
+// EXIT: open a backend-migration ticket for `POST /api/v1/governance/feedback`
+// (or equivalent doorway/zome surface) that owns the REA event creation + signal
+// aggregation + mediation. When that lands, content-viewer captures the Lit element's
+// submit event, POSTs to doorway, and renders the returned view. These three imports retire.
 import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import {
   FeedbackContext,

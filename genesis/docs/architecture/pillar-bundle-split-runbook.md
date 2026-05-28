@@ -279,27 +279,40 @@ LAMAD_* tokens (§6.11) and SDK tokens (§6.12) carry narrow interfaces that mir
 
 Source: cross-pillar import cleanup sprint Slice 2.3 residual report (commit `3247740d9`); the lamadIdentityGuard intentionally omitted the imagodei guard's settle-wait loop, captured as a known limitation.
 
-### §6.14 — Stateful-orchestrator deferral (component-import edge case)
+### §6.14 — Client-side stateful-orchestrator anti-pattern (smell-to-fix)
 
-The composition-root pattern (§6.11) and token-bridge (§6.12) work cleanly for SERVICE imports. They don't apply cleanly to ANGULAR COMPONENT imports — components are imported by class for template registration; you can't `useExisting` a component the way you can a service.
+The composition-root pattern (§6.11) and token-bridge (§6.12) work cleanly for SERVICE imports. They don't apply to ANGULAR COMPONENT imports — components are imported by class for template registration; you can't `useExisting` a component the way you can a service.
 
-When a cross-pillar Angular component encapsulates substantial stateful orchestration (API calls, form state, submission flow, mediation/recognition wiring) AND the protocol's blank-slate Lit equivalent in `elohim-core` is stateless (accepting computed state as `@property` and emitting events), the orchestration has nowhere to migrate to until either (a) it relocates to a library service, or (b) the consuming pillar's lamad-local service surface inlines it.
+When a cross-pillar Angular component you'd otherwise want to retire encapsulates **substantial stateful orchestration** — API calls, submission flow, REA event creation, mediation logic, recognition wiring — that orchestration **does not have a legitimate client-side home in the elohim architecture**. It is a smell, not a pattern. The substrate-as-steward principle ([stewardship-over-sovereignty](epr:stewardship-over-sovereignty) §3) and the thin-client discipline (`angular-architect` agent definition + manifest-driven doorway routes) together say:
 
-**Pattern:** when this situation arises, the component imports are documented as **stateful-orchestrator deferrals**. The deferral comment in the consuming component names:
+> **Aggregated state, transaction orchestration, and substrate writes are backend concerns. The client is thin: it captures user signals, calls doorway/zome, and renders the result. Only purely client-side concerns — UX, accessibility, sense-and-respond — live in Angular.**
 
-1. The Angular component imports being retained
-2. The blank-slate Lit equivalents that exist
-3. The size of the orchestration logic that would need to move to swap to Lit
-4. Which contributing services HAVE already migrated and which remain (per §6.12 token-bridge candidates)
-5. Pointer to this section + §6.11 for the canon justification
+Client-side stateful orchestrators usually arose because somebody built UX + orchestration together as one Angular component before the backend route existed. That's a normal evolution shape, but the substrate-correct end state is:
 
-**Worked example:** Slice 2.2b of the cross-pillar import cleanup sprint surfaced this pattern. `app/lamad/src/app/components/content-viewer/content-viewer.component.ts` retains imports of `FeedbackMechanismGatewayComponent`, `GraduatedFeedbackComponent`, and `ReactionBarComponent` from `@app/qahal`. The Slice 2.2b closure (commit `625d02a0f`) migrated `MechanismSelectionService` and `SignalAccumulationService` to `@elohim/service` (clean — type-only or library-only deps); `GovernanceRecognitionService` remains in `@app/qahal` pending its `RecognitionApiService` chain. The Lit elements (`<elohim-reaction-bar>`, `<elohim-graduated-feedback>`, `<elohim-feedback-mechanism-gateway>`) are stateless primitives. Swapping content-viewer to them would force ~1650 lines of orchestration to be inlined into content-viewer or duplicated into a lamad-local service. The deferral comment in content-viewer.component.ts L52-67 names this and points here.
+| Layer | Owns |
+|---|---|
+| Backend (doorway route / zome handler / storage projection) | API orchestration, REA economic-event creation, signal aggregation, submission flow, mediation logic, recognition wiring |
+| `elohim-core` Lit element | Stateless UI primitive — accepts pre-computed view state as `@property`, emits user-action events |
+| Client (lamad/elohim-app/etc.) Angular code | Capture event → call doorway → render result. UX, accessibility, sense-and-respond ONLY. |
 
-**Exit path:** stateful-orchestrator deferrals close when EITHER:
-- A library service emerges that wraps the orchestration (the Lit elements stay stateless; the new service does the API + form-state work; consumers compose service + Lit elements directly). This is the cleaner long-term outcome.
-- The pillar's lamad-local service surface absorbs the orchestration (the consuming bundle takes ownership). Acceptable when the orchestration is genuinely consumer-specific rather than cross-cutting.
+**The exit path is not "wait for a library service to wrap the orchestration." The exit path is moving the orchestration to backend.** Once doorway exposes the appropriate route (or the zome the appropriate coordinator function), the client side becomes thin enough that the Lit swap is trivially clean — the consuming component captures the Lit element's submit event, POSTs to doorway, the substrate does the work.
 
-Source: cross-pillar import cleanup sprint Slice 2.2b closure (commit `625d02a0f`, 2026-05-28); operator's "thorough job carry on" directive uncovered the size of the orchestration migration.
+**When you encounter this during a split:**
+
+1. Identify the orchestration that has no legitimate client home. List the API calls, the REA events being created, the aggregated state being computed.
+2. **Open a backend-migration ticket** (NOT a "wait for library service" deferral). The ticket names the substrate-correct destination: a doorway route, a zome coordinator function, a storage projection, or some combination.
+3. Document the deferral in the consuming component's import block, naming:
+   - The Angular component imports retained (because backend isn't ready yet)
+   - The blank-slate Lit equivalents that already exist in `elohim-core`
+   - The backend-migration ticket
+   - Pointer to this section
+4. The split closes with these three imports remaining and documented; the backend-migration sprint closes them properly when it lands.
+
+**Distinguishing from §6.11:** composition-root tokens are a legitimate pattern — they move a service across a pillar boundary at runtime DI without disturbing source-line cross-pillar count. §6.14 names a smell — the orchestration shouldn't be on the client at all, in any pillar.
+
+**Worked example:** Slice 2.2b of the cross-pillar import cleanup sprint surfaced this. `app/lamad/src/app/components/content-viewer/content-viewer.component.ts` retains imports of `FeedbackMechanismGatewayComponent`, `GraduatedFeedbackComponent`, and `ReactionBarComponent` from `@app/qahal`. Slice 2.2b closure (commit `625d02a0f`) migrated `MechanismSelectionService` + `SignalAccumulationService` to `@elohim/service` (those two are pure helpers — pure-function-style mechanism-ladder derivation and signal-to-status flag derivation; legitimately client-side OR backend; migrated to library to be host-agnostic). The remaining three Angular components encapsulate ~1650 lines of true orchestration: API calls to `governance-api`, REA economic-event creation via `recognition-api`, form-submission flow, mediation dialog wiring, reaction aggregation. **Those 1650 lines should not live on the client in any bundle.** The substrate-correct destination is a doorway route (`POST /api/v1/governance/feedback` or similar) that creates the REA economic event server-side, projects the signal aggregate, and returns the updated view. The three component imports are retained as a backend-migration deferral pointing at this section. The deferral comment in content-viewer.component.ts L52-67 names this.
+
+Source: cross-pillar import cleanup sprint Slice 2.2b closure (commit `625d02a0f`, 2026-05-28); operator correction `2b31aa62b...` reframed an initial "library service emerges" framing as the correct backend-migration framing.
 
 ---
 
