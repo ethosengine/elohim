@@ -37,6 +37,9 @@ pub use attention_tending::{
     AttentionTendingRecord, CreateAttentionTendingInput, RefreshTendingTtlInput,
 };
 
+// Z.D substrate-correct deploy: republish-epr EconomicEvent action validator.
+pub mod republish_epr;
+
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
     DnaProperties as BootstrapStewardDnaProperties,
@@ -12135,6 +12138,26 @@ pub fn create_rea_economic_event(
                 input.action
             ))));
         }
+    }
+
+    // Z.D substrate-correct: republish-epr events carry a schema-defined payload
+    // in metadata_json. Validate against republish-epr.schema.json shape before
+    // commit. Defense-in-depth alongside elohim-storage's republish_epr_validator.
+    if input.action == "republish-epr" {
+        let raw = input
+            .metadata_json
+            .as_deref()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+                "republish-epr action requires metadata_json carrying the republish-epr payload".into()
+            )))?;
+        let payload: serde_json::Value = serde_json::from_str(raw)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                "republish-epr metadata_json not parseable: {e}"
+            ))))?;
+        crate::republish_epr::validate_republish_epr_event(&payload)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                "republish-epr schema violation: {e}"
+            ))))?;
     }
 
     let now = sys_time()?;
