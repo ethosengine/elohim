@@ -29,6 +29,7 @@ export * from './enums/relationship-type';
 export * from './enums/relay-mode';
 export * from './enums/renderer-kind';
 export * from './enums/rivalry';
+export * from './enums/session-lifecycle-state';
 export * from './enums/share-allocation-form';
 export * from './enums/spatial-context-type';
 export * from './enums/step-type';
