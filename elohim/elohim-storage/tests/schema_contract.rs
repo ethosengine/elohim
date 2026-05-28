@@ -3978,3 +3978,179 @@ fn pillar_projection_payload_schema_declares_source_of_truth() {
         "manifest-payloads/pillar-projection.schema.json",
     );
 }
+
+// ── M-REA-2: tending-policy manifest-payload schema contract ────────────────
+//
+// Validates the tending-policy.schema.json payload shape and its alignment
+// with what the Manifest integrity validator (content_store_integrity/src/manifest.rs)
+// enforces at zome-create time. The floor sub-object must contain exactly
+// the five TENDING_IMMUNE_CLASSES listed in the integrity zome.
+
+fn tending_floor_json() -> Value {
+    serde_json::json!({
+        "floor": {
+            "classes": [
+                { "class": "accountability-information",        "protection": "corrections bypass all filters" },
+                { "class": "community-facts",                   "protection": "civic emergencies never filterable" },
+                { "class": "custodial-communications",          "protection": "ward-targeting messages bypass steward filter" },
+                { "class": "constitutional-updates",            "protection": "mishpat rule changes always reach recipients" },
+                { "class": "elohim-as-counsel-notifications",   "protection": "elohim may override filters for counsel" }
+            ]
+        }
+    })
+}
+
+#[test]
+fn tending_policy_payload_minimal_validates() {
+    // floor is the only required field; all other fields are optional.
+    validate_against_schema("manifest-payloads/tending-policy.schema.json", &tending_floor_json());
+}
+
+#[test]
+fn tending_policy_payload_with_dwell_qualification_validates() {
+    // A complete tending-policy payload with all optional fields populated.
+    let mut payload = tending_floor_json();
+    payload.as_object_mut().unwrap().insert("dwell_qualification_ms".to_string(), serde_json::json!(5000));
+    payload.as_object_mut().unwrap().insert("min_ttl_seconds".to_string(), serde_json::json!(7200));
+    payload.as_object_mut().unwrap().insert("collective_k_threshold".to_string(), serde_json::json!(10));
+    payload.as_object_mut().unwrap().insert("allowed_classifications".to_string(), serde_json::json!([
+        "values-forward", "fatigue"
+    ]));
+    validate_against_schema("manifest-payloads/tending-policy.schema.json", &payload);
+}
+
+#[test]
+fn tending_policy_payload_rejects_missing_floor() {
+    // floor sub-object is required — the integrity zome enforces this at create time.
+    let no_floor = serde_json::json!({ "dwell_qualification_ms": 3000 });
+    let schema = load_schema("manifest-payloads/tending-policy.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("tending-policy schema should compile");
+    assert!(
+        validator.iter_errors(&no_floor).next().is_some(),
+        "tending-policy payload must require the floor sub-object"
+    );
+}
+
+#[test]
+fn tending_policy_payload_schema_declares_source_of_truth() {
+    let path = schema_dir().join("manifest-payloads/tending-policy.schema.json");
+    let content = fs::read_to_string(&path)
+        .expect("manifest-payloads/tending-policy.schema.json must exist");
+    let schema_value: Value = serde_json::from_str(&content)
+        .expect("manifest-payloads/tending-policy.schema.json must be valid JSON");
+    assert_source_of_truth_declared(
+        &schema_value,
+        "manifest-payloads/tending-policy.schema.json",
+    );
+}
+
+// ── M-REA-2: attention-tending-intent schema contract ───────────────────────
+//
+// Validates that the intent wire shape for POST /api/v1/attention/tending
+// aligns with CreateAttentionTendingInput in content_store/src/attention_tending.rs.
+// Source of truth: request body wire shape (not an entity — Category B agent-scoped
+// private source chain entry). The struct is canonical for an EXISTING substrate type.
+
+#[test]
+fn attention_tending_intent_minimal_validates() {
+    // Minimum required fields: all five are required per the schema.
+    let minimal = serde_json::json!({
+        "filterSubjectJson": r#"{"contentId":"abc123"}"#,
+        "classification": "values-forward",
+        "ttlSeconds": 3600,
+        "contextJson": r#"{"pillar":"lamad"}"#,
+        "elapsedMs": 4500
+    });
+    validate_against_schema("intents/attention-tending-intent.schema.json", &minimal);
+}
+
+#[test]
+fn attention_tending_intent_with_reason_validates() {
+    // Optional reason field populated.
+    let full = serde_json::json!({
+        "filterSubjectJson": r#"{"contentId":"xyz789"}"#,
+        "classification": "fatigue",
+        "reason": "Saw this topic repeatedly this week",
+        "ttlSeconds": 7200,
+        "contextJson": r#"{"pillar":"lamad","surface":"content-viewer"}"#,
+        "elapsedMs": 1200
+    });
+    validate_against_schema("intents/attention-tending-intent.schema.json", &full);
+}
+
+#[test]
+fn attention_tending_intent_rejects_missing_required_fields() {
+    let schema = load_schema("intents/attention-tending-intent.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("attention-tending-intent schema should compile");
+
+    // Missing filterSubjectJson
+    let no_filter = serde_json::json!({
+        "classification": "values-forward",
+        "ttlSeconds": 3600,
+        "contextJson": r#"{}"#,
+        "elapsedMs": 4000
+    });
+    assert!(
+        validator.iter_errors(&no_filter).next().is_some(),
+        "Schema should require filterSubjectJson"
+    );
+
+    // Missing elapsedMs (new field replacing client-side DWELL_THRESHOLD_MS)
+    let no_elapsed = serde_json::json!({
+        "filterSubjectJson": r#"{"contentId":"abc"}"#,
+        "classification": "values-forward",
+        "ttlSeconds": 3600,
+        "contextJson": r#"{}"#
+    });
+    assert!(
+        validator.iter_errors(&no_elapsed).next().is_some(),
+        "Schema should require elapsedMs"
+    );
+
+    // ttlSeconds below minimum (3600)
+    let short_ttl = serde_json::json!({
+        "filterSubjectJson": r#"{"contentId":"abc"}"#,
+        "classification": "values-forward",
+        "ttlSeconds": 3599,
+        "contextJson": r#"{}"#,
+        "elapsedMs": 4000
+    });
+    assert!(
+        validator.iter_errors(&short_ttl).next().is_some(),
+        "Schema should reject ttlSeconds below 3600"
+    );
+}
+
+#[test]
+fn attention_tending_intent_rejects_invalid_classification() {
+    let schema = load_schema("intents/attention-tending-intent.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("attention-tending-intent schema should compile");
+
+    let bad_class = serde_json::json!({
+        "filterSubjectJson": r#"{"contentId":"abc"}"#,
+        "classification": "invalid-class",
+        "ttlSeconds": 3600,
+        "contextJson": r#"{}"#,
+        "elapsedMs": 4000
+    });
+    assert!(
+        validator.iter_errors(&bad_class).next().is_some(),
+        "Schema should reject invalid classification values"
+    );
+}
+
+#[test]
+fn attention_tending_intent_schema_declares_source_of_truth() {
+    let path = schema_dir().join("intents/attention-tending-intent.schema.json");
+    let content = fs::read_to_string(&path)
+        .expect("intents/attention-tending-intent.schema.json must exist");
+    let schema_value: Value = serde_json::from_str(&content)
+        .expect("intents/attention-tending-intent.schema.json must be valid JSON");
+    assert_source_of_truth_declared(
+        &schema_value,
+        "intents/attention-tending-intent.schema.json",
+    );
+}
