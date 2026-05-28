@@ -1181,6 +1181,9 @@ fn view_schemas_declare_source_of_truth() {
         "manifest-payloads/pillar-projection.schema.json",
         // M-AGGR-3: ContentEngagementStats projection (Category C operational — EconomicEvent stream)
         "views/content-engagement-stats-view.schema.json",
+        // Sprint 2 Task 1: BoundsValidationResult + StandingScore views
+        "views/bounds-validation-result-view.schema.json",
+        "views/standing-score-view.schema.json",
     ];
 
     for schema_name in &view_schemas {
@@ -4817,5 +4820,234 @@ fn onboarding_manifest_payload_rejects_missing_prompts() {
     assert!(
         validator.iter_errors(&no_prompts).next().is_some(),
         "Schema should require 'prompts'"
+    );
+}
+
+// =============================================================================
+// Sprint 2 Task 1: BoundsValidationResultView schema contract tests
+//
+// Ticket: Sprint 2 Task 1 — View schemas + ts-rs Rust structs
+// Source: genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md §1
+//
+// Validates bounds-validation-result-view.schema.json against realistic
+// instances covering the pass and fail (violation) branches. This view is
+// the wire shape for POST /api/v1/diagnostics/validate-bounds; source of
+// truth is pure function output — no persisted entity.
+// =============================================================================
+
+#[test]
+fn bounds_validation_result_passing_validates() {
+    // All checks pass — violation is absent (null).
+    let passing = serde_json::json!({
+        "pass": true,
+        "commitment_cid": "uhCEkSomeCommitmentCid",
+        "violation": null,
+        "checks": {
+            "commitment_found": true,
+            "active": true,
+            "scope_includes_event": true,
+            "reach_ceiling_ok": true,
+            "rate_within_limit": true,
+            "key_rotation_current": true,
+            "not_revoked": true
+        }
+    });
+    validate_against_schema(
+        "views/bounds-validation-result-view.schema.json",
+        &passing,
+    );
+}
+
+#[test]
+fn bounds_validation_result_failing_with_violation_validates() {
+    // Validation fails — violation present, checks short-circuit.
+    let failing = serde_json::json!({
+        "pass": false,
+        "commitment_cid": "uhCEkAnotherCommitmentCid",
+        "violation": {
+            "kind": "reach_ceiling_exceeded",
+            "summary": "EconomicEvent reach (Trusted) exceeds Commitment ceiling (High)."
+        },
+        "checks": {
+            "commitment_found": true,
+            "active": true,
+            "scope_includes_event": true,
+            "reach_ceiling_ok": false,
+            "rate_within_limit": false,
+            "key_rotation_current": false,
+            "not_revoked": false
+        }
+    });
+    validate_against_schema(
+        "views/bounds-validation-result-view.schema.json",
+        &failing,
+    );
+}
+
+#[test]
+fn bounds_validation_result_all_violation_kinds_valid() {
+    // Every ViolationKind enum value must be accepted by the schema.
+    for kind in &[
+        "commitment_inactive",
+        "scope_not_included",
+        "reach_ceiling_exceeded",
+        "rate_limit_exceeded",
+        "key_rotation_stale",
+        "commitment_revoked",
+        "commitment_not_found",
+    ] {
+        let instance = serde_json::json!({
+            "pass": false,
+            "commitment_cid": "uhCEkCid",
+            "violation": {
+                "kind": kind,
+                "summary": format!("Violated: {}", kind)
+            },
+            "checks": {
+                "commitment_found": true,
+                "active": false,
+                "scope_includes_event": false,
+                "reach_ceiling_ok": false,
+                "rate_within_limit": false,
+                "key_rotation_current": false,
+                "not_revoked": false
+            }
+        });
+        validate_against_schema(
+            "views/bounds-validation-result-view.schema.json",
+            &instance,
+        );
+    }
+}
+
+#[test]
+fn bounds_validation_result_rejects_missing_required_fields() {
+    let schema = load_schema("views/bounds-validation-result-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("bounds-validation-result-view schema should compile");
+
+    // Missing checks
+    let no_checks = serde_json::json!({
+        "pass": true,
+        "commitment_cid": "uhCEkCid"
+    });
+    assert!(
+        validator.iter_errors(&no_checks).next().is_some(),
+        "Schema should require 'checks'"
+    );
+
+    // Missing commitment_cid
+    let no_cid = serde_json::json!({
+        "pass": true,
+        "checks": {
+            "commitment_found": true,
+            "active": true,
+            "scope_includes_event": true,
+            "reach_ceiling_ok": true,
+            "rate_within_limit": true,
+            "key_rotation_current": true,
+            "not_revoked": true
+        }
+    });
+    assert!(
+        validator.iter_errors(&no_cid).next().is_some(),
+        "Schema should require 'commitment_cid'"
+    );
+}
+
+// =============================================================================
+// Sprint 2 Task 1: StandingScoreView schema contract tests
+//
+// Ticket: Sprint 2 Task 1 — View schemas + ts-rs Rust structs
+// Source: genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md §1
+//
+// Validates standing-score-view.schema.json against realistic instances.
+// This view is the wire shape for GET /api/v1/standing/{agent_cid}; source
+// of truth is the local SQLite operational projection (standing_view table),
+// recomputable from the FeedbackSignal subgraph (Holochain DHT).
+// =============================================================================
+
+#[test]
+fn standing_score_view_neutral_no_breaches_validates() {
+    // Cold-start or clean slate — Neutral with empty breach list.
+    let neutral = serde_json::json!({
+        "evaluator_cid": "uhCAkEvaluatorAgent",
+        "subject_cid": "uhCAkSubjectAgent",
+        "score": "Neutral",
+        "recent_breaches": [],
+        "computed_at": "2026-05-28T10:00:00Z"
+    });
+    validate_against_schema("views/standing-score-view.schema.json", &neutral);
+}
+
+#[test]
+fn standing_score_view_floor_with_breaches_validates() {
+    // Subject is at Floor standing with recent breach evidence.
+    let floor = serde_json::json!({
+        "evaluator_cid": "uhCAkEvaluatorAgent",
+        "subject_cid": "uhCAkFloorSubject",
+        "score": "Floor",
+        "debit_weight_sum": 42,
+        "recent_breaches": [
+            {
+                "signal_kind": "compute:capacity-breach",
+                "emitted_at": "2026-05-27T08:30:00Z",
+                "weight": 20,
+                "evidence_summary": "Node reported capacity at 3% for 6h window."
+            },
+            {
+                "signal_kind": "compute:replication-shortfall",
+                "emitted_at": "2026-05-26T14:00:00Z",
+                "weight": 22
+            }
+        ],
+        "computed_at": "2026-05-28T10:05:00Z"
+    });
+    validate_against_schema("views/standing-score-view.schema.json", &floor);
+}
+
+#[test]
+fn standing_score_view_all_tiers_valid() {
+    // Every StandingScoreTier value must be accepted.
+    for tier in &["Unknown", "Floor", "Low", "Neutral", "High", "Trusted"] {
+        let instance = serde_json::json!({
+            "evaluator_cid": "uhCAkEvaluatorAgent",
+            "subject_cid": "uhCAkSubjectAgent",
+            "score": tier,
+            "recent_breaches": [],
+            "computed_at": "2026-05-28T10:00:00Z"
+        });
+        validate_against_schema("views/standing-score-view.schema.json", &instance);
+    }
+}
+
+#[test]
+fn standing_score_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/standing-score-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("standing-score-view schema should compile");
+
+    // Missing score
+    let no_score = serde_json::json!({
+        "evaluator_cid": "uhCAkEval",
+        "subject_cid": "uhCAkSubject",
+        "recent_breaches": [],
+        "computed_at": "2026-05-28T10:00:00Z"
+    });
+    assert!(
+        validator.iter_errors(&no_score).next().is_some(),
+        "Schema should require 'score'"
+    );
+
+    // Missing computed_at
+    let no_timestamp = serde_json::json!({
+        "evaluator_cid": "uhCAkEval",
+        "subject_cid": "uhCAkSubject",
+        "score": "Neutral",
+        "recent_breaches": []
+    });
+    assert!(
+        validator.iter_errors(&no_timestamp).next().is_some(),
+        "Schema should require 'computed_at'"
     );
 }
