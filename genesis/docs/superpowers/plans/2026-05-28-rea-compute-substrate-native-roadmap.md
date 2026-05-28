@@ -27,7 +27,7 @@
 Phase A (Foundation — sequential)
   S0 ▣ Inventory verifier + BlobAddress hardening              [in flight, ~1 day]
   S1 ▢ Z.D substrate-correct deploy end-to-end                 [proves primitive on 1 instance]
-  S2 ▢ Bounds validator + standing aggregation primitives      [load-bearing substrate]
+  S2 ✓ Bounds validator + standing aggregation primitives      [landed 2026-05-28]
 
 Phase B (Hosting graduation — depends on A; serial within phase)
   S3 ▢ serve-url-projection schema + Commitment authoring
@@ -56,6 +56,8 @@ Phase E (Operational surface — depends on D)
 - Phase E is the human-facing audit surface; lands last so the data model is stable.
 
 **Total scope:** 11 sprints. Sprints 0–2 are 1–3 days each. Sprints 3–7 are 1–2 weeks each. Sprint 8 is 1 sprint of Angular work. Calendar: depends on parallelism applied at Phase C.
+
+**Phase A status:** Sprint 2 landed 2026-05-28 — bounds_validator + standing extension complete; see `2026-05-28-sprint2-bounds-validator-standing-aggregator.md` close-out.
 
 ---
 

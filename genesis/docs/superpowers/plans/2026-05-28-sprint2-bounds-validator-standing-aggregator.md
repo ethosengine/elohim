@@ -1653,3 +1653,55 @@ git commit -m "docs(memory): Sprint 2 close-out + bounds-validator pattern memor
 2. **Inline batch execution** — execute in this session using executing-plans. Suitable if operator wants the foundation primitive landed quickly before Sprint 1 picks up.
 
 **Recommended pairing:** Sprint 1 implementation can start in parallel with Sprint 2 Task 5 completion — Sprint 1's `republish_epr_validator` constructs an `EventForValidation` and calls `bounds_validator::validate`. As long as Task 4 has landed (validate API surface stable), Sprint 1 can proceed against the trait surface even while Tasks 5-9 finish.
+
+---
+
+## Close-out — Sprint 2 landed (2026-05-28)
+
+Sprint 2 commits on `sprint/cross-pillar-cleanup`:
+
+| Task | SHA | Subject |
+|------|-----|---------|
+| T1 | fa300b4e4 | feat(views): BoundsValidationResultView + StandingScoreView schemas + ts-rs |
+| T1 fix | a87a00040 | fix(views): explicit PascalCase on StandingScoreTier; additionalProperties:false on violation |
+| T2 | d5253880d | feat(storage): CommitmentFetcher trait + mock + conductor impl skeleton |
+| T3 | 39308632d | feat(storage): RateHistory trait + diesel impl; bounded_by column on economic_events |
+| T4 | d34892ddc | feat(storage): bounds_validator::validate happy path + EventForValidation projection |
+| T5 | c7e5fed2a | test(storage): bounds_validator 7 violation-kind cases + red-team adversarial |
+| T6 | 2f72d4ac5 | feat(storage): POST /api/v1/diagnostics/validate-bounds; validate returns checks on success |
+| T7 | 2c9c65168 | feat(storage): manifest-driven signal_weight_registry; declare 4 new signal_kinds |
+| T8 | aec488f48 | feat(storage): project_extension_signal — string-kind path consuming signal_weight_registry |
+| T9 | 56ebedc38 | feat(storage): GET /api/v1/standing/{agent_cid}?evaluator=...; pluralism-aware |
+
+Total: 10 commits.
+
+**What landed:**
+
+- Two View schemas + ts-rs Rust structs (`BoundsValidationResultView`, `StandingScoreView`) with full source-of-truth declarations and schema-contract tests.
+- `CommitmentFetcher` trait surface (mock + production-skeleton stub awaiting Sprint 1's `mishpat::get_commitment` zome surface).
+- `RateHistory` trait surface (mock + diesel-backed prod impl); `economic_events.bounded_by TEXT` column with paired index on `(bounded_by, has_point_in_time)`; migration slot `2026-05-28-050000_economic_events_add_bounded_by`. Three existing `NewEconomicEvent` construction sites updated to pass `bounded_by: None`.
+- `bounds_validator::validate(event, fetcher, rate_history) -> Result<BoundsChecksView, BoundsViolation>` — 7 substrate-wide checks: commitment_found, not_revoked, active window, scope_includes_event (action match + epr_scope membership with `*` wildcard support), reach_ceiling_ok, rate_within_limit (sliding-window via RateHistory), key_rotation_current. 8 unit tests + 6 adversarial integration tests pass.
+- `POST /api/v1/diagnostics/validate-bounds` diagnostic route wired in `http.rs` ahead of the `/api/v1/` catch-all.
+- `app-manifest.schema.json` extended with optional `debit_weight: integer >= 0` and `decay_days: integer >= 1` on signalKinds entries; 4 new entries declared in elohim domain manifest (rate-limit-exceeded=5/30, bad-custody=20/90, reach-escalation-pending=3/14, compute-breach=10/60).
+- `services::signal_weight_registry::weight_for(signal_kind) -> Option<SignalWeight>` reads the elohim manifest via `OnceLock` + CARGO_MANIFEST_DIR-relative default path. 5 unit tests.
+- `services::standing_projector::project_extension_signal(conn, evaluator, subject, signal_kind, manifest_cid)` — parallel projection path for string-named extension signal_kinds, consuming `signal_weight_registry::weight_for`. 4 integration tests pass.
+- `GET /api/v1/standing/{agent_cid}?evaluator=<cid>` read-projection route returns `StandingScoreView` with per-evaluator pluralism preserved.
+
+**Unblocked:**
+
+- Sprint 1 `republish_epr_validator` (instance of bounds_validator); Sprints 3 + 5a-e (each authors its instance validator that delegates to this primitive); Sprint 6 matchmaking gate (consumes standing read route).
+
+**Plan-vs-reality adaptations made during execution:**
+
+- T3: The plan's diesel query used `dsl::signed_at`. The actual `economic_events` schema uses `has_point_in_time` (VF ontology). Implementer adapted.
+- T5: The plan's reach-ceiling test used `reach="public"` against `ceiling="commons"`. Per the validator's `reach_rank` (commons=7, public=6), public is WITHIN commons. Implementer corrected the test inputs to use `ceiling="community"` (rank 5).
+- T7: The manifest schema's signalKinds.additionalProperties was `additionalProperties: false`. Adding the `debit_weight`/`decay_days` fields required extending the schema first (kept `additionalProperties: false` with the new fields declared in the explicit set).
+- T8: The plan assumed `project_signal` hardcodes a string-named signal_kind→weight map; reality is the typed-enum `SignalKind` (Squelch/Correction/Retraction/Quarantine/Vouch) with a `ManifestDebitWeightPolicy` already in place. Implementer adopted Option D — added a parallel `project_extension_signal` function that consumes the new signal_weight_registry without disturbing the existing pathway.
+- T1 spec observation: `StandingScoreView.debit_weight_sum` is non-Option in Rust but absent from the schema's `required` array — serializes as 0 even when there are no debits. Acceptable for Sprint 2; future change could make it `Option<i32>` if the asymmetry causes real bugs.
+
+**Follow-ups (not blocking):**
+
+- `recent_breaches` on `StandingScoreView` is empty in this sprint; populating requires a feedback_signals JOIN — Sprint 8 needs it for the audit UI.
+- Diagnostic route integration test for `POST /api/v1/diagnostics/validate-bounds` skipped — no existing harness pattern available for POST diagnostic routes. Sprint 1 should add it when wiring `mishpat::get_commitment`.
+- Pattern-hunter scan for existing X-API-Key / `if admin:` / ad-hoc auth absorbed by the bounds_validator pattern — Sprint 2 roadmap entry referenced this; captured as a separate follow-up sprint.
+- The substrate `Standing` (typed enum) ↔ `StandingScoreView` (wire tier) mapping is one-way; if Sprint 6 matchmaking needs the reverse direction (decoding a wire tier back into a `Standing`), add a `From<StandingScoreTier>` impl.
