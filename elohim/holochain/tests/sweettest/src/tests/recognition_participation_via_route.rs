@@ -126,6 +126,12 @@ async fn level_2_participation_records_weighted_economic_event() -> Result<()> {
         load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
     let elohim_dna = load_dna(ELOHIM_DNA, &network_seed(ELOHIM_DNA), Some(a1.clone())).await?;
 
+    // Capture DNA hashes before the DnaFiles are moved into setup_app_for_agent.
+    // SweetCell exposes dna_hash() (not role_name() in holochain 0.6), so we
+    // select cells by hash to keep the role intent legible and order-independent.
+    let mishpat_hash = mishpat_dna.dna_hash().clone();
+    let elohim_hash = elohim_dna.dna_hash().clone();
+
     // Both agents install both DNAs (mishpat coordinator bridges to elohim).
     let app_a = ca
         .setup_app_for_agent(
@@ -145,13 +151,13 @@ async fn level_2_participation_records_weighted_economic_event() -> Result<()> {
     let mishpat_cell_a = app_a
         .cells()
         .iter()
-        .find(|c| c.role_name() == MISHPAT_DNA)
+        .find(|c| c.dna_hash() == &mishpat_hash)
         .expect("mishpat cell A")
         .clone();
     let elohim_cell_b = app_b
         .cells()
         .iter()
-        .find(|c| c.role_name() == ELOHIM_DNA)
+        .find(|c| c.dna_hash() == &elohim_hash)
         .expect("elohim cell B")
         .clone();
 
@@ -261,6 +267,10 @@ async fn invalid_participation_type_is_rejected() -> Result<()> {
         load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
     let elohim_dna = load_dna(ELOHIM_DNA, &network_seed(ELOHIM_DNA), Some(a1.clone())).await?;
 
+    // Capture the mishpat DNA hash before the DnaFiles move into setup; select
+    // the cell by hash (SweetCell has no role_name() in holochain 0.6).
+    let mishpat_hash = mishpat_dna.dna_hash().clone();
+
     let app_a = ca
         .setup_app_for_agent("test-app-alice", a1.clone(), &[mishpat_dna, elohim_dna])
         .await?;
@@ -268,7 +278,7 @@ async fn invalid_participation_type_is_rejected() -> Result<()> {
     let mishpat_cell_a = app_a
         .cells()
         .iter()
-        .find(|c| c.role_name() == MISHPAT_DNA)
+        .find(|c| c.dna_hash() == &mishpat_hash)
         .expect("mishpat cell A")
         .clone();
 
