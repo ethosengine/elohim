@@ -1004,6 +1004,59 @@ pub struct WithdrawMembershipInputView {
 }
 
 // ---------------------------------------------------------------------------
+// M-POLICY-2: MechanismSelection projection (Category C operational)
+// Source of truth: derived projection of GovernanceState × Content.contentType
+// × Proposal? × Manifest(kind: pillar-projection, pillar: qahal). Computed on
+// Signal::GovernanceStateUpdated, Signal::ContentCreated/Updated,
+// Signal::ProposalCreated/Closed, AND Signal::ManifestUpdated{kind:
+// "pillar-projection", pillar: "qahal"} (recompute on either).
+// Schema: epr:schema:view:mechanism-selection
+// ---------------------------------------------------------------------------
+
+/// Computed mechanism selection for a (entityType, entityId) pair.
+///
+/// Derived by joining GovernanceState × Content.contentType × active Proposal?
+/// with the mechanism_ladder declared in the most recent
+/// `Manifest{kind: "pillar-projection", pillar: "qahal"}` payload.
+/// When no policy Manifest exists, protocol defaults apply (mirrors the
+/// SETTLED_STATES / MECHANISM_LEVEL_MAP / FEEDBACK_CONTENT_TYPES constants
+/// from the retired mechanism-selection.service.ts).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct MechanismSelectionView {
+    /// Type of entity (e.g. "content", "path")
+    pub entity_type: String,
+    /// Identifier of the entity
+    pub entity_id: String,
+    /// Mechanism ladder level 0–7.
+    /// 0 = context menu only; 1 = reactions; 2 = graduated feedback;
+    /// 3–7 = formal voting (psephos).
+    pub level: i32,
+    /// Name of the selected mechanism.
+    /// "none" (0), "reactions" (1), "graduated-feedback" (2),
+    /// or the proposal's votingMechanism (3–7).
+    pub mechanism: String,
+    /// Which renderer handles this level.
+    /// "angular" for levels 0–2; "psephos" for levels 3–7.
+    pub render_target: String,
+    /// True at level 0: only the context menu is available
+    pub context_menu_only: bool,
+    /// True at levels 1+: reaction bar is available
+    pub allow_reactions: bool,
+    /// True at levels 2+: graduated feedback is available
+    pub allow_graduated_feedback: bool,
+    /// For levels 3–7: ID of the active proposal. None when no active proposal.
+    pub active_proposal_id: Option<String>,
+    /// For levels 3–7: votingMechanism of the active proposal. None when no proposal.
+    pub active_proposal_mechanism: Option<String>,
+    /// CID of the pillar-projection Manifest used; null when protocol defaults applied
+    pub policy_manifest_cid: Option<String>,
+    /// ISO-8601 timestamp when this projection was last computed
+    pub computed_at: String,
+}
+
+// ---------------------------------------------------------------------------
 // M-POLICY-1: AccumulationStatus projection (Category C operational)
 // Source of truth: derived projection of FeedbackSignal × Manifest(kind:
 // standing-policy). Computed on Signal::FeedbackSignalCreated and
