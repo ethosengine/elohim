@@ -1687,6 +1687,210 @@ fn call_elohim_issue_attestation(
     }
 }
 
+// =============================================================================
+// M-REA-3: Substrate-side governance recognition
+//
+// Ticket: M-REA-3 — Phase C
+// Source: genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md §3
+//
+// Closes F-REA-3 + F-POLICY-3: the client-side GovernanceRecognitionService
+// that hardcoded WEIGHT_BY_LEVEL and composed RecognitionTrigger is retired;
+// the mishpat coordinator now reads the recognition_weight_by_level from the
+// standing-policy Manifest (or falls back to protocol defaults), composes the
+// EconomicEvent, and bridges to elohim content_store.
+//
+// No new DHT entry type — uses existing EconomicEvent (Category A, elohim DNA).
+// =============================================================================
+
+/// Protocol-default recognition weights by mechanism level.
+///
+/// Mirrors the WEIGHT_BY_LEVEL constant previously in GovernanceRecognitionService.
+/// Applied when no standing-policy Manifest with `recognition_weight_by_level` is
+/// present. Substrate operators author a Manifest to override.
+fn default_recognition_weight(mechanism_level: u8) -> f64 {
+    match mechanism_level {
+        0 => 0.1, // context-menu-only (passive signal)
+        1 => 0.1, // reaction (low friction)
+        2 => 0.3, // graduated feedback (medium friction)
+        3 => 0.5, // approval voting
+        4 => 0.7, // ranked-choice voting
+        5 => 0.7, // score voting
+        6 => 0.8, // consent-based decision
+        7 => 1.0, // deliberation (highest friction)
+        _ => 0.1, // unknown level → lowest weight
+    }
+}
+
+/// Input struct for the `create_recognition_event_from_participation` coordinator.
+///
+/// Wire-serialised via MessagePack (SerializedBytes). All fields snake_case
+/// to match the zome boundary convention. The `recognition_weight` field is
+/// pre-composed by elohim-storage from the standing-policy Manifest before
+/// forwarding to the zome, so the zome never needs to read Manifest entries
+/// directly (avoiding the link-traversal restriction in integrity zomes — this
+/// is a coordinator, so `get` is legal, but the storage-side manifest lookup
+/// is cheaper and avoids a cross-DNA bridge for policy reads).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RecognitionParticipationIntentInput {
+    /// What is being governed (e.g. "content", "proposal").
+    pub entity_type: String,
+    /// ID of the governed entity — becomes the `receiver` of the EconomicEvent.
+    pub entity_id: String,
+    /// Agent public key / human ID of the participant — becomes the `provider`.
+    pub human_id: String,
+    /// Governance mechanism level (0–7). Used for lamadEventType composition.
+    pub mechanism_level: u8,
+    /// Type of participation act — used to compose `lamadEventType`.
+    pub participation_type: String,
+    /// Pre-computed recognition weight from the standing-policy Manifest.
+    /// elohim-storage composes this from `recognition_weight_by_level[mechanism_level]`
+    /// before forwarding the call. The zome uses it directly as `resource_quantity_value`.
+    pub recognition_weight: f64,
+}
+
+/// Create a governance-participation REA EconomicEvent from a recognition intent.
+///
+/// This is the mishpat substrate-side counterpart to the retired client-side
+/// `GovernanceRecognitionService.recordParticipation()`. The method:
+///
+/// 1. Validates the participation_type (must be a known governance act).
+/// 2. Composes a `LamadEventIntentInput` with:
+///    - `lamad_event_type = "governance-{participation_type}"` (maps to REA `work` action
+///      in `intent_to_rea_triple`).
+///    - `resource_quantity_value = recognition_weight` (pre-composed from standing-policy).
+///    - `provider = human_id`, `receiver = entity_id`.
+/// 3. Bridges to `elohim::content_store::create_rea_economic_event_from_intent`.
+///    The post-commit signal on the elohim DNA writes the SQLite projection.
+///
+/// ## P2P Gate classification
+/// - Entity: RecognitionParticipationIntent — request body (intent wire shape, not entity).
+/// - EconomicEvent — Category A (existing, elohim DNA content_store_integrity).
+/// - No new DHT entry type. Projection via existing `economic_events` table.
+///
+/// ## Why the weight is pre-computed in storage, not fetched here
+/// The standing-policy Manifest lives on the elohim DNA. Reading it from mishpat
+/// would require a cross-DNA bridge call BEFORE the economic-event bridge call.
+/// elohim-storage already has the Manifest projection in SQLite (governance service
+/// reads it), so it computes the weight and passes it in. If no Manifest is found,
+/// storage passes `None` and the coordinator falls back to `default_recognition_weight`.
+#[hdk_extern]
+pub fn create_recognition_event_from_participation(
+    input: RecognitionParticipationIntentInput,
+) -> ExternResult<ActionHash> {
+    // Validate participation_type against known governance acts.
+    let known_types = ["reaction", "graduated-feedback", "vote", "block"];
+    if !known_types.contains(&input.participation_type.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Unknown participation_type '{}' — must be one of: {}",
+            input.participation_type,
+            known_types.join(", ")
+        ))));
+    }
+
+    // Compose lamad_event_type from participation_type.
+    // "governance-vote" maps to REA action "work" in intent_to_rea_triple.
+    let lamad_event_type = format!("governance-{}", input.participation_type);
+
+    // Use pre-computed weight; fall back to protocol default if zero or negative.
+    let weight = if input.recognition_weight > 0.0 {
+        input.recognition_weight
+    } else {
+        default_recognition_weight(input.mechanism_level)
+    };
+
+    // Compose the `LamadEventIntentBridgeInput` that the elohim content_store
+    // coordinator expects. Field names must match `LamadEventIntentInput` exactly
+    // (serialized via MessagePack over the cross-DNA bridge).
+    //
+    // - agent_id = human_id (participant is the provider of the recognition act)
+    // - lamad_event_type = "governance-{participation_type}"
+    //   → maps to REA action "work" via intent_to_rea_triple in content_store/src/lib.rs
+    // - content_id = entity_id (governed entity is the receiver anchor)
+    // - resource_quantity_value = weight (stewardship affinity earned)
+    // - resource_quantity_unit = "recognition"
+    let bridge_intent = LamadEventIntentBridgeInput {
+        agent_id: input.human_id.clone(),
+        lamad_event_type: lamad_event_type.clone(),
+        content_id: Some(input.entity_id.clone()),
+        path_id: None,
+        contributor_presence_id: None,
+        resource_quantity_value: Some(weight),
+        resource_quantity_unit: Some("recognition".to_string()),
+        note: Some(format!(
+            "governance participation: entity_type={} level={}",
+            input.entity_type, input.mechanism_level
+        )),
+        metadata_json: None,
+    };
+
+    call_elohim_create_rea_economic_event_from_intent(bridge_intent)
+}
+
+/// Local mirror of `LamadEventIntentInput` from elohim content_store/src/lib.rs.
+///
+/// Used for cross-DNA bridge calls from mishpat to elohim. Field names and serde
+/// attributes MUST match the elohim struct exactly — they serialize via MessagePack
+/// and any field-name mismatch produces a silent decode error on the elohim side.
+/// If elohim changes `LamadEventIntentInput`, update this mirror.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct LamadEventIntentBridgeInput {
+    pub agent_id: String,
+    pub lamad_event_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contributor_presence_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_quantity_value: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_quantity_unit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata_json: Option<String>,
+}
+
+/// Bridge helper: call elohim content_store::create_rea_economic_event_from_intent.
+///
+/// Used by `create_recognition_event_from_participation` to record the weighted
+/// governance-participation EconomicEvent on the elohim DNA without duplicating
+/// the REA composition logic. The weight is composed in mishpat (from the
+/// standing-policy Manifest payload) before this bridge call so the elohim
+/// coordinator receives a fully-composed `resource_quantity_value`.
+fn call_elohim_create_rea_economic_event_from_intent(
+    input: LamadEventIntentBridgeInput,
+) -> ExternResult<ActionHash> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("create_rea_economic_event_from_intent"),
+        None,
+        input,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::create_rea_economic_event_from_intent): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::create_rea_economic_event_from_intent".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::create_rea_economic_event_from_intent: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::create_rea_economic_event_from_intent"
+                .to_string()
+        ))),
+    }
+}
+
 /// Bridge helper: call elohim content_store::propose_governance_action.
 fn call_elohim_propose_governance_action(
     input: ConsolidatedProposeGovernanceActionInput,
