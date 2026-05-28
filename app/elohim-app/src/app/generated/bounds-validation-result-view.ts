@@ -24,7 +24,8 @@ export interface BoundsValidationResultView {
       | 'rate_limit_exceeded'
       | 'key_rotation_stale'
       | 'commitment_revoked'
-      | 'commitment_not_found';
+      | 'commitment_not_found'
+      | 'constitutional_ratio_breach';
     /**
      * Human-readable explanation including any relevant numeric bounds.
      */

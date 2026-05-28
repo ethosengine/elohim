@@ -17,7 +17,7 @@
       "properties": {
         "kind": {
           "type": "string",
-          "enum": ["commitment_inactive", "scope_not_included", "reach_ceiling_exceeded", "rate_limit_exceeded", "key_rotation_stale", "commitment_revoked", "commitment_not_found"]
+          "enum": ["commitment_inactive", "scope_not_included", "reach_ceiling_exceeded", "rate_limit_exceeded", "key_rotation_stale", "commitment_revoked", "commitment_not_found", "constitutional_ratio_breach"]
         },
         "summary": { "type": "string", "description": "Human-readable explanation including any relevant numeric bounds." }
       }
