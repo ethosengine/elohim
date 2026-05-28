@@ -15,6 +15,16 @@ import {
 // @coverage: 47.0% (2026-02-24)
 
 /**
+ * @deprecated M-AGGR-2: LocalSourceChainService is a localStorage simulation
+ * that was always meant to retire when Holochain was ready (see docstring below).
+ * Use `HolochainSourceChainService` for source-chain reads. Write paths
+ * (createEntry, createLink) migrate in M-REA-1 + M-AGGR-1.
+ *
+ * Retirement timeline:
+ * - Phase G (M-AGGR-2): HolochainSourceChainService created (read paths).
+ * - Wave B/C (M-REA-1, M-AGGR-1): write-path consumers migrate to substrate coordinators.
+ * - Final: this class deleted once all consumers are migrated.
+ *
  * LocalSourceChainService - Agent-centric source chain simulation using localStorage.
  *
  * Philosophy:
