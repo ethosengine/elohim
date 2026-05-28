@@ -565,6 +565,103 @@ async function main() {
     );
   }
 
+  // Test: Tasks 1-3 substrate additions do not introduce new validation errors
+  // for existing per-pillar manifests (Task 6 — non-regression invariant).
+  //
+  // Background: the 8 existing per-pillar manifests fail validation against
+  // app-manifest.schema.json at BASE_SHA for pre-existing schema/manifest drift
+  // (root-level keys like `attestations`, `gates`, missing required `observations`,
+  // content-type entries with `status`, observation entries with `archetype`, etc.).
+  // That drift is out of scope for B-MANIFEST.
+  //
+  // What Tasks 1-3 must NOT do: introduce new errors that reference our additions
+  // (vocabulary.stagedIntents, top-level graduation, dependentSchemas/vocabulary,
+  // SessionLifecycleState enum, $defs/StagedIntentDeclaration, $defs/GraduationPolicy).
+  //
+  // This block validates each manifest and asserts: ZERO of the error schemaPaths
+  // reference any Task 1-3 substrate addition. If we ever introduce a change that
+  // causes an existing manifest to fail for one of OUR new substrate reasons, this
+  // test surfaces it.
+  {
+    const manifestSchemaPath = resolve(__dirname, '../v1/manifest/app-manifest.schema.json');
+    const manifestSchema = await loadJson(manifestSchemaPath);
+
+    const regressionAjv = new Ajv2020({ strict: false, allErrors: true });
+
+    // Register all enum schemas under their resolved-URI keys so the manifest's
+    // `../enums/...` $refs resolve. (Same pattern as the Task 4 fixture block —
+    // see that block's comments for the namespace-collision rationale.)
+    const enumDir = resolve(__dirname, '../v1/enums');
+    const enumFiles = await (await import('node:fs/promises')).readdir(enumDir);
+    for (const file of enumFiles.filter(f => f.endsWith('.schema.json'))) {
+      const schema = await loadJson(resolve(enumDir, file));
+      const resolvedUri = `epr:enums/${file}`;
+      if (!regressionAjv.getSchema(resolvedUri)) {
+        regressionAjv.addSchema(schema, resolvedUri);
+      }
+    }
+
+    // Register additional referenced schemas (mirrors Task 4 fixture setup).
+    // The manifest schema's $id is epr:schema:manifest:app-manifest, so relative
+    // $refs like "./pillar-projection.schema.json" resolve to "epr:<filename>".
+    const manifestDir = resolve(__dirname, '../v1/manifest');
+    for (const file of ['pillar-projection.schema.json', 'observation-kind.schema.json']) {
+      try {
+        const schema = await loadJson(resolve(manifestDir, file));
+        const resolvedUri = `epr:${file}`;
+        if (!regressionAjv.getSchema(resolvedUri)) {
+          regressionAjv.addSchema(schema, resolvedUri);
+        }
+      } catch {
+        // schema may not exist; skip
+      }
+    }
+
+    const validate = regressionAjv.compile(manifestSchema);
+
+    // The Task 1-3 substrate-addition surface that Task 6 guards against.
+    // If any of these strings appear in an error's schemaPath, the test fails —
+    // meaning our additions are now visible to an existing manifest's validation.
+    const TASK_1_TO_3_SURFACE = [
+      'stagedIntents',
+      'graduation',                    // catches top-level graduation property errors
+      'dependentSchemas/vocabulary',   // catches the conditional rule
+      'StagedIntentDeclaration',       // catches $defs ref errors
+      'GraduationPolicy',              // catches $defs ref errors
+      'SessionLifecycleState',         // catches lifecycle enum ref errors
+      'session-lifecycle-state'        // catches the enum file path
+    ];
+
+    const pillars = ['avodah', 'elohim', 'imagodei', 'infrastructure', 'lamad', 'mishpat', 'qahal', 'shefa'];
+    for (const pillar of pillars) {
+      const manifestPath = resolve(__dirname, `../../domains/${pillar}/manifest.json`);
+      let manifest;
+      try {
+        manifest = await loadJson(manifestPath);
+      } catch (e) {
+        assert(false, `Pillar manifest could not be loaded: ${pillar} (${e.message})`);
+        continue;
+      }
+
+      validate(manifest);
+      const errors = validate.errors || [];
+
+      // Find any errors that reference our Task 1-3 substrate additions.
+      const ourErrors = errors.filter(err => {
+        const path = `${err.schemaPath || ''} ${err.instancePath || ''} ${err.message || ''}`;
+        return TASK_1_TO_3_SURFACE.some(token => path.includes(token));
+      });
+
+      if (ourErrors.length > 0) {
+        console.error(`Pillar ${pillar} has errors referencing Task 1-3 substrate:`, JSON.stringify(ourErrors, null, 2));
+      }
+      assert(
+        ourErrors.length === 0,
+        `Tasks 1-3 substrate additions do not introduce errors for ${pillar} manifest (Task 6 non-regression)`
+      );
+    }
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }
