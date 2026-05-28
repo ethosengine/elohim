@@ -117,6 +117,11 @@ path = "src/tests/pillar_projection_mechanism.rs"
 name = "content_engagement_via_route"
 path = "src/tests/content_engagement_via_route.rs"
 
+# M-AGGR-2: Holochain source-chain cutover — coordinator wire shape + camelCase seatbelt
+[[test]]
+name = "source_chain_via_route"
+path = "src/tests/source_chain_via_route.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
