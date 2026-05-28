@@ -167,6 +167,8 @@ use tracing::info;
 
 use crate::error::StorageError;
 pub use context::AppContext;
+// Re-export so api/* modules can use `crate::db::SqliteConnection` directly.
+pub use diesel::sqlite::SqliteConnection;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 

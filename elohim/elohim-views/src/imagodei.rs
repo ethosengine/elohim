@@ -795,3 +795,76 @@ pub struct RemovePortalHostOutputView {
     /// this as a presence check.
     pub deleted: bool,
 }
+
+// ---------------------------------------------------------------------------
+// M-AGGR-2: Holochain source-chain cutover
+//
+// Source of truth: Holochain agent source chain in imagodei DNA (Category B,
+// Agent-Scoped). Entries and links are private to the authoring agent's source
+// chain and are never gossiped to the DHT. These views are served by:
+//   GET /api/v1/source-chain/{agentId}/entries → Vec<SourceChainEntryView>
+//   GET /api/v1/source-chain/{agentId}/links   → Vec<EntryLinkView>
+// ---------------------------------------------------------------------------
+
+/// Wire view of a single record on an agent's Holochain source chain.
+///
+/// Projected from the agent's imagodei DNA source chain by the
+/// `query_my_source_chain` coordinator. `content_json` is null for system
+/// entries (Dna, AgentValidationPkg, InitZomesComplete) or entries whose
+/// type cannot be decoded.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SourceChainEntryView {
+    /// Hex-encoded ActionHash from the source-chain record header.
+    pub action_hash: String,
+    /// Hex-encoded EntryHash (hash of the serialized entry content).
+    /// Empty string for system records that carry no entry.
+    pub entry_hash: String,
+    /// Hex-encoded AgentPubKey that authored this entry.
+    pub author_agent: String,
+    /// Entry type discriminator (e.g. "Human", "ContributorPresence").
+    /// Derived from the record action's `entry_type` field.
+    pub entry_type: String,
+    /// JSON-serialized entry content. Null for system records or entries
+    /// whose type cannot be decoded to a known schema.
+    pub content_json: Option<String>,
+    /// Hex-encoded ActionHash of the preceding action in the chain.
+    /// None for the genesis record.
+    pub prev_action_hash: Option<String>,
+    /// Zero-based position of this record in the agent's source chain.
+    pub sequence: u32,
+    /// ISO-8601 timestamp when this entry was committed to the source chain.
+    pub timestamp: String,
+}
+
+/// Wire view of a single link authored by the agent on its Holochain source chain.
+///
+/// Projected from the imagodei DNA source chain by the
+/// `query_my_source_chain_links` coordinator. Both create-link and
+/// delete-link actions are reflected: `deleted = true` and `deleted_at`
+/// are set when a matching delete-link action appears in the chain.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct EntryLinkView {
+    /// Hex-encoded ActionHash of the create-link action on the source chain.
+    pub link_hash: String,
+    /// Hex-encoded AnyLinkableHash base of the link.
+    pub base_hash: String,
+    /// Hex-encoded AnyLinkableHash target of the link.
+    pub target_hash: String,
+    /// Link type discriminator as a string (derived from the action's
+    /// `link_type` field via the imagodei LinkTypes enum).
+    pub link_type: String,
+    /// Hex-encoded tag bytes; None when the link was created without a tag.
+    pub tag: Option<String>,
+    /// Hex-encoded AgentPubKey that authored this link.
+    pub author_agent: String,
+    /// ISO-8601 timestamp when this link was created.
+    pub timestamp: String,
+    /// True when a delete-link action for this link hash appears in the chain.
+    pub deleted: bool,
+    /// ISO-8601 timestamp of the delete-link action; None when not deleted.
+    pub deleted_at: Option<String>,
+}
