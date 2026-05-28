@@ -1,0 +1,46 @@
+{
+  "$id": "epr:schema:replicates-dwelling",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReplicatesDwellingCommitment",
+  "description": "Payload shape for a Mishpat::Commitment entry with action='replicates-dwelling'. Storage-availability commitment between two dwelling-hubs. Does NOT presuppose recipient can decrypt — that's the encryption-layer (separate sprint). Source of truth: Holochain DHT (existing Mishpat::Commitment entry type, action discriminator). Spec: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md §4.",
+  "type": "object",
+  "required": ["action", "provider_dwelling_hub_id", "recipient_dwelling_hub_id", "provider_role", "capacity_bytes", "scope_filter", "valid_from", "valid_until", "grace_period_days", "rotation_ttl_days", "ratio_attestation"],
+  "additionalProperties": false,
+  "properties": {
+    "action": { "const": "replicates-dwelling" },
+    "provider_dwelling_hub_id": { "type": "string", "minLength": 1 },
+    "recipient_dwelling_hub_id": { "type": "string", "minLength": 1 },
+    "provider_role": { "type": "string", "enum": ["steward_mutual", "collective_steward"] },
+    "via_collective_hub_id": { "type": ["string", "null"] },
+    "capacity_bytes": { "type": "integer", "minimum": 1 },
+    "scope_filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "epr_kinds": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["Content", "Manifest", "Claim", "Observation", "EconomicEvent", "Commitment", "Attestation", "Delegation", "FeedbackSignal"] }
+        },
+        "bytes_per_blob_max": { "type": "integer", "minimum": 1 },
+        "requires_attestations": { "type": "array", "items": { "type": "string" } },
+        "kinds_excluded": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "valid_from": { "type": "string", "minLength": 1 },
+    "valid_until": { "type": "string", "minLength": 1 },
+    "grace_period_days": { "type": "integer", "minimum": 1 },
+    "rotation_ttl_days": { "type": "integer", "minimum": 1 },
+    "ratio_attestation": {
+      "type": "object",
+      "required": ["commons_pct", "dwelling_pct", "collective_pct", "free_pct", "effective_ratio_cid"],
+      "additionalProperties": false,
+      "properties": {
+        "commons_pct":         { "type": "integer", "minimum": 0, "maximum": 100 },
+        "dwelling_pct":        { "type": "integer", "minimum": 0, "maximum": 100 },
+        "collective_pct":      { "type": "integer", "minimum": 0, "maximum": 100 },
+        "free_pct":            { "type": "integer", "minimum": 0, "maximum": 100 },
+        "effective_ratio_cid": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

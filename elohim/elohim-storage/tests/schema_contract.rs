@@ -1108,6 +1108,7 @@ fn epr_publish_input_conforms() {
     let v = EprPublishInput {
         envelope: sample_envelope_view(),
         payload: "cafebabe".into(),
+        event: None,
     };
     let json = serde_json::to_value(&v).unwrap();
     validate_against_schema("inputs/epr-publish-input.schema.json", &json);
@@ -5049,5 +5050,85 @@ fn standing_score_view_rejects_missing_required_fields() {
     assert!(
         validator.iter_errors(&no_timestamp).next().is_some(),
         "Schema should require 'computed_at'"
+    );
+}
+
+// =============================================================================
+// Sprint 3: replicates-dwelling Commitment schema
+// =============================================================================
+
+#[test]
+fn replicates_dwelling_minimal_steward_mutual_validates() {
+    let payload = serde_json::json!({
+        "action": "replicates-dwelling",
+        "provider_dwelling_hub_id": "hub:A",
+        "recipient_dwelling_hub_id": "hub:B",
+        "provider_role": "steward_mutual",
+        "capacity_bytes": 50_000_000_000u64,
+        "scope_filter": {"epr_kinds": ["Content"], "bytes_per_blob_max": 1_000_000_000u64},
+        "valid_from": "2026-05-28T00:00:00Z",
+        "valid_until": "2026-08-26T00:00:00Z",
+        "grace_period_days": 14,
+        "rotation_ttl_days": 90,
+        "ratio_attestation": {
+            "commons_pct": 20,
+            "dwelling_pct": 40,
+            "collective_pct": 25,
+            "free_pct": 15,
+            "effective_ratio_cid": "bafkrei-manifest-abc"
+        }
+    });
+    validate_against_schema("commitments/replicates-dwelling.schema.json", &payload);
+}
+
+#[test]
+fn replicates_dwelling_collective_steward_validates() {
+    let payload = serde_json::json!({
+        "action": "replicates-dwelling",
+        "provider_dwelling_hub_id": "hub:church-server",
+        "recipient_dwelling_hub_id": "hub:member-family",
+        "provider_role": "collective_steward",
+        "via_collective_hub_id": "collective:saint-marys",
+        "capacity_bytes": 100_000_000_000u64,
+        "scope_filter": {"epr_kinds": ["Content"]},
+        "valid_from": "2026-05-28T00:00:00Z",
+        "valid_until": "2026-08-26T00:00:00Z",
+        "grace_period_days": 14,
+        "rotation_ttl_days": 90,
+        "ratio_attestation": {
+            "commons_pct": 20,
+            "dwelling_pct": 40,
+            "collective_pct": 25,
+            "free_pct": 15,
+            "effective_ratio_cid": "bafkrei-manifest-abc"
+        }
+    });
+    validate_against_schema("commitments/replicates-dwelling.schema.json", &payload);
+}
+
+#[test]
+fn replicates_dwelling_rejects_unknown_provider_role() {
+    let payload = serde_json::json!({
+        "action": "replicates-dwelling",
+        "provider_dwelling_hub_id": "hub:A",
+        "recipient_dwelling_hub_id": "hub:B",
+        "provider_role": "totally-bogus",
+        "capacity_bytes": 1,
+        "scope_filter": {},
+        "valid_from": "2026-05-28T00:00:00Z",
+        "valid_until": "2026-08-26T00:00:00Z",
+        "grace_period_days": 14,
+        "rotation_ttl_days": 90,
+        "ratio_attestation": {
+            "commons_pct": 20, "dwelling_pct": 40, "collective_pct": 25, "free_pct": 15,
+            "effective_ratio_cid": "bafkrei-manifest-abc"
+        }
+    });
+    let schema = load_schema("commitments/replicates-dwelling.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors: Vec<_> = validator.iter_errors(&payload).collect();
+    assert!(
+        !errors.is_empty(),
+        "Schema must reject unknown provider_role 'totally-bogus'"
     );
 }

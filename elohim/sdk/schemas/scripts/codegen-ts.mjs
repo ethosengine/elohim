@@ -154,6 +154,8 @@ const INTERFACE_FILES = [
   // M-AGGR-1: SessionHumanView + UpgradePromptView projections (Category C operational — EconomicEvent × HumanProgress × onboarding Manifest)
   { src: 'views/session-human-view.ts', dest: 'session-human-view.ts' },
   { src: 'views/upgrade-prompt-view.ts', dest: 'upgrade-prompt-view.ts' },
+  // Sprint 3: mutual storage replication — dwelling-hub commitment payload
+  { src: 'commitments/replicates-dwelling.ts', dest: 'replicates-dwelling.ts' },
 ];
 
 /**
@@ -446,7 +448,7 @@ async function main() {
     const refMap = await loadRefMap(SCHEMA_DIR);
 
     const allGenerated = [];
-    for (const subdir of ['enums', 'objects', 'inputs', 'views', 'p2p', 'manifests', 'manifest-payloads', 'attestation', 'attestation/subtypes', 'intents']) {
+    for (const subdir of ['enums', 'objects', 'inputs', 'views', 'p2p', 'manifests', 'manifest-payloads', 'attestation', 'attestation/subtypes', 'intents', 'commitments']) {
       const results = await generateFromDir(subdir, refMap);
       allGenerated.push(...results);
     }

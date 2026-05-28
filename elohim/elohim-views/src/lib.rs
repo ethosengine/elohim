@@ -27,6 +27,7 @@ pub mod inputs;
 pub mod lamad;
 pub mod projection;
 pub mod qahal;
+pub mod replicates_dwelling;
 pub mod shared;
 pub mod shefa;
 pub mod standing;

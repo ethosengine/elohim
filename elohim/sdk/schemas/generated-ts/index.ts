@@ -190,3 +190,6 @@ export * from './attestation/subtypes/stewardship-grant-metadata';
 export * from './intents/attention-tending-intent';
 export * from './intents/lamad-event-intent';
 export * from './intents/recognition-participation-intent';
+export * from './commitments/acknowledges-reach-change';
+export * from './commitments/delegates-compute';
+export * from './commitments/replicates-dwelling';
