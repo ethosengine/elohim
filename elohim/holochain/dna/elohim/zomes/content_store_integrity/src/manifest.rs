@@ -40,6 +40,7 @@ const MANIFEST_KINDS: &[&str] = &[
     "standing-policy",
     "tending-policy",
     "onboarding",
+    "graduation-record",
 ];
 
 /// Standing-immune floor class identifiers.
@@ -257,6 +258,19 @@ mod tests {
             }
         })
         .to_string()
+    }
+
+    // -----------------------------------------------------------------------
+    // B-MANIFEST Task 5: graduation-record whitelist (substrate clearance for
+    // B-APPRAISE Phase 2 appraisal records)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn graduation_record_is_whitelisted() {
+        assert!(
+            MANIFEST_KINDS.contains(&"graduation-record"),
+            "MANIFEST_KINDS must include \"graduation-record\" for B-APPRAISE Phase 2 to author appraisal records. See genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md §4 and the parent implementation plan §1.5 Design Constraint 2."
+        );
     }
 
     // -----------------------------------------------------------------------
