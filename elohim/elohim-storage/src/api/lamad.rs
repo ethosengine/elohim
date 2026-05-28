@@ -14,6 +14,16 @@
 //! - **EconomicEvent** — Category A (existing, elohim DNA content_store zome).
 //! - **Projection:** `economic_events` table (already exists, no new table).
 //! - **Source of truth:** DHT EconomicEvent entry (via post-commit projection).
+//!
+//! ## Route placement rationale (storage vs doorway)
+//!
+//! This route lives in `elohim-storage/src/api/` rather than
+//! `doorway/doorway-service/src/routes/`. Doorway is a web2 bridge — it holds
+//! no domain logic and its routes are manifest-driven (`project_doorway_manifest_driven_routes`).
+//! The REA composition logic (`map_intent_to_rea`, `compose_event_from_intent`) IS
+//! domain logic; it belongs in storage alongside every other EconomicEvent handler.
+//! Both browser (via doorway proxy) and Tauri (direct to :8090) receive identical
+//! semantics at the same path — which is the whole point of the unified storage API.
 
 use bytes::Bytes;
 use http_body_util::Full;
