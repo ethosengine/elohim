@@ -5,7 +5,7 @@
   "description": "Per-content household-first resilience claim. Source of truth: computed projection aggregating stewardship_allocations (derived from Agreement DHT entries via stewardship-allocation link metadata, Category A2), peer_statuses (PeerStatus DHT entries in infrastructure DNA, Category A), and stewarded_nodes (NodeRegistration projection). Operational Category C — no persistence, no new DHT entry types.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contentId", "householdsStewarding", "householdsReciprocated", "protectionStatus", "details"],
+  "required": ["contentId", "householdsStewarding", "householdsReciprocated", "protectionStatus", "details", "commitmentBackedReplication"],
   "properties": {
     "contentId":               { "type": "string" },
     "householdsStewarding":    { "type": "integer", "minimum": 0, "description": "Distinct households with at least one steward for this content." },
@@ -18,6 +18,17 @@
         "stewardHouseholds": { "type": "array", "items": { "type": "string" } },
         "onlinePeerCount":   { "type": "integer", "minimum": 0 },
         "healthScore":       { "type": "number",  "minimum": 0, "maximum": 1 }
+      }
+    },
+    "commitmentBackedReplication": {
+      "type": "object",
+      "required": ["dwellingCommitments", "collectiveCommitments", "commonsCommitments", "totalPledgedBytes"],
+      "additionalProperties": false,
+      "properties": {
+        "dwellingCommitments":  { "type": "integer", "minimum": 0 },
+        "collectiveCommitments": { "type": "integer", "minimum": 0 },
+        "commonsCommitments":    { "type": "integer", "minimum": 0 },
+        "totalPledgedBytes":     { "type": "integer", "minimum": 0 }
       }
     }
   }

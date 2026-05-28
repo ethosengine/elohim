@@ -1393,6 +1393,7 @@ pub struct HouseholdResilienceView {
     pub households_reciprocated: i32,
     pub protection_status: String,
     pub details: HouseholdResilienceDetails,
+    pub commitment_backed_replication: CommitmentBackedReplication,
 }
 
 #[derive(Debug, Clone, Serialize, Default, TS)]
@@ -1496,6 +1497,7 @@ pub enum ReplicaHealth {
     Healthy,
     AtRisk,
     Critical,
+    OverReplicated,
 }
 
 /// Reach class for a CID — mirrors the protocol Reach enum's content-distribution
@@ -1553,6 +1555,73 @@ pub enum DiversityHint {
     None,
 }
 
+/// Federation-level projection coverage classification for a CID.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectionTier {
+    Local,
+    Regional,
+    Global,
+}
+
+/// Tier of a replication commitment covering a CID. Distinct 3-variant enum
+/// (no `Free`) matching the distribution-details schema; named CommitmentTier
+/// (NOT `Tier`) to avoid clobbering the 4-variant `peer_capacity::Tier` export.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum CommitmentTier {
+    Dwelling,
+    Collective,
+    Commons,
+}
+
+/// One active replicates-* commitment whose recipient + scope cover this CID.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ReplicationCommitmentRef {
+    pub commitment_cid: String,
+    pub tier: CommitmentTier,
+    pub provider_cid: String,
+    pub recipient_cid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_role: Option<crate::replicates_dwelling::ProviderRole>,
+}
+
+/// Fault-domain diversity rollup for a CID's replica set.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, Default)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct FaultDomainDiversity {
+    pub distinct_household_count: u32,
+    pub distinct_collective_count: u32,
+    pub distinct_region_count: u32,
+    pub single_fault_domain_risk: bool,
+    pub fault_modes_evaluated: Vec<String>,
+}
+
+/// RS-encoding shard descriptor for a replica peer.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ShardsByEncoding {
+    pub encoding: String,
+    pub min_shards_for_recovery: u32,
+}
+
+/// Commitment-backed replication counts for a CID's authoring household.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, Default)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct CommitmentBackedReplication {
+    pub dwelling_commitments: u32,
+    pub collective_commitments: u32,
+    pub commons_commitments: u32,
+    pub total_pledged_bytes: u64,
+}
+
 /// Inline per-CID distribution payload hydrated onto EPR/content responses.
 /// Operational (Category C) projection; not persisted.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
@@ -1571,6 +1640,7 @@ pub struct DistributionSummary {
     pub my_role: Option<MyRole>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reciprocity_hint: Option<i64>,
+    pub projection_tier: ProjectionTier,
 }
 
 /// Hardware/deployment archetype carried on an AgentPeerBinding (Category A
@@ -1600,6 +1670,10 @@ pub struct ReplicaPeer {
     pub household_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub region_tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shards_held: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shards_by_encoding: Option<ShardsByEncoding>,
 }
 
 /// Per-doorway projector row in a CID's distribution-details view.
@@ -1631,6 +1705,8 @@ pub struct DistributionDetails {
     pub recent_projection_events: Vec<JsonVal>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commitment_references: Option<Vec<String>>,
+    pub replication_commitments: Vec<ReplicationCommitmentRef>,
+    pub fault_domain_diversity: FaultDomainDiversity,
 }
 
 /// Hub-abstract placement-gap row. Describes one axis on which a content item's

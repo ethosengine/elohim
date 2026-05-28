@@ -13,9 +13,9 @@ use diesel::prelude::*;
 use crate::db::{peer_statuses, placement_gaps, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::views::{
-    HouseholdResilienceDetails, HouseholdResilienceView, PlacementGapView,
-    RegionalDistributionView, ResilienceSnapshotDetailsView, ResilienceSnapshotView,
-    StewardingCollectiveEntry,
+    CommitmentBackedReplication, HouseholdResilienceDetails, HouseholdResilienceView,
+    PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
+    ResilienceSnapshotView, StewardingCollectiveEntry,
 };
 
 /// Compute per-content household resilience. The viewer's household id is
@@ -55,6 +55,7 @@ pub fn compute(
                     online_peer_count: 0,
                     health_score: 0.0,
                 },
+                commitment_backed_replication: CommitmentBackedReplication::default(), // T15: computed
             });
         }
         Some(m) => serde_json::from_str(&m.shard_hashes_json).map_err(|e| {
@@ -122,6 +123,7 @@ pub fn compute(
             online_peer_count,
             health_score,
         },
+        commitment_backed_replication: CommitmentBackedReplication::default(), // T15: computed
     })
 }
 

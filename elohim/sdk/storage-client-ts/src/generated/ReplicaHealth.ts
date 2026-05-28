@@ -3,4 +3,4 @@
 /**
  * Replica health bucket for a CID's distribution summary.
  */
-export type ReplicaHealth = "healthy" | "at_risk" | "critical";
+export type ReplicaHealth = "healthy" | "at_risk" | "critical" | "over_replicated";

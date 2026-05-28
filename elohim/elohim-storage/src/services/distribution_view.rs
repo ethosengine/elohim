@@ -18,9 +18,9 @@ use thiserror::Error;
 use crate::db::models::PeerIdentityBindingRow;
 use crate::db::{AppContext, DbPool};
 use crate::views::{
-    DeviceArchetype, DistributionDetails, DistributionSummary, FetchSource, JsonVal, MyRole,
-    PlacementGapKind, PlacementGapRow, PlacementGapShortfall, ProjectorIdentity, ReachClass,
-    ReplicaHealth, ReplicaPeer,
+    DeviceArchetype, DistributionDetails, DistributionSummary, FaultDomainDiversity, FetchSource,
+    JsonVal, MyRole, PlacementGapKind, PlacementGapRow, PlacementGapShortfall, ProjectionTier,
+    ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
 };
 
 // ============================================================================
@@ -238,6 +238,7 @@ pub async fn compose_distribution_summary(
         last_verified_seconds,
         my_role,
         reciprocity_hint,
+        projection_tier: ProjectionTier::Local, // T15: computed
     })
 }
 
@@ -354,6 +355,8 @@ pub async fn compose_distribution_details(
         placement_gaps,
         recent_projection_events,
         commitment_references,
+        replication_commitments: Vec::new(), // T15: computed
+        fault_domain_diversity: FaultDomainDiversity::default(), // T15: computed
     })
 }
 
@@ -416,6 +419,8 @@ fn load_replica_peers_full(
             hop_hint: None,
             household_id: None,
             region_tier: None,
+            shards_held: None,    // T15: computed
+            shards_by_encoding: None, // T15: computed
         });
     }
     Ok(out)

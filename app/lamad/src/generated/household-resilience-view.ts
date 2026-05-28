@@ -20,4 +20,10 @@ export interface HouseholdResilienceView {
     onlinePeerCount?: number;
     healthScore?: number;
   };
+  commitmentBackedReplication: {
+    dwellingCommitments: number;
+    collectiveCommitments: number;
+    commonsCommitments: number;
+    totalPledgedBytes: number;
+  };
 }

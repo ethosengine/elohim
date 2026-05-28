@@ -31,4 +31,15 @@ export interface ReplicaPeer {
    * Coarse region tier (e.g. 'us-central') for diversity reasoning.
    */
   regionTier?: string;
+  /**
+   * Count of distinct RS-encoded shards this peer holds for the content. 1 if whole-blob; up to N+M for rs-N-M encoding.
+   */
+  shardsHeld?: number;
+  shardsByEncoding?: {
+    /**
+     * rs-N-M or 'whole-blob'.
+     */
+    encoding?: string;
+    minShardsForRecovery?: number;
+  };
 }

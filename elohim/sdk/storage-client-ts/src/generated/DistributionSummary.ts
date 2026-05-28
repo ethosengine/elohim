@@ -2,6 +2,7 @@
 import type { DiversityHint } from "./DiversityHint";
 import type { FetchSource } from "./FetchSource";
 import type { MyRole } from "./MyRole";
+import type { ProjectionTier } from "./ProjectionTier";
 import type { ReachClass } from "./ReachClass";
 import type { ReplicaHealth } from "./ReplicaHealth";
 
@@ -9,4 +10,4 @@ import type { ReplicaHealth } from "./ReplicaHealth";
  * Inline per-CID distribution payload hydrated onto EPR/content responses.
  * Operational (Category C) projection; not persisted.
  */
-export type DistributionSummary = { replicaCount: number, replicaTarget: number, replicaHealth: ReplicaHealth, projectorCount: number, reachClass: ReachClass, diversityHint: DiversityHint, thisFetchSource: FetchSource, lastVerifiedSeconds: bigint, myRole: MyRole | null, reciprocityHint: bigint | null, };
+export type DistributionSummary = { replicaCount: number, replicaTarget: number, replicaHealth: ReplicaHealth, projectorCount: number, reachClass: ReachClass, diversityHint: DiversityHint, thisFetchSource: FetchSource, lastVerifiedSeconds: bigint, myRole: MyRole | null, reciprocityHint: bigint | null, projectionTier: ProjectionTier, };

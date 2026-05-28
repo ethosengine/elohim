@@ -10,7 +10,8 @@
 use crate::graph::engine::{GraphEngine, GraphError};
 use crate::graph_views::data_value::*;
 use crate::views::{
-    DistributionDetails, DistributionSummary, DiversityHint, FetchSource, ReachClass, ReplicaHealth,
+    DistributionDetails, DistributionSummary, DiversityHint, FaultDomainDiversity, FetchSource,
+    ProjectionTier, ReachClass, ReplicaHealth,
 };
 use cozo::DataValue;
 
@@ -58,6 +59,7 @@ pub fn build_summary(engine: &GraphEngine, cid: &str) -> Result<DistributionSumm
         last_verified_seconds: 0,            // Composition placeholder
         my_role: None,
         reciprocity_hint: None,
+        projection_tier: ProjectionTier::Local, // T15: computed
     })
 }
 
@@ -76,6 +78,8 @@ pub fn build_details(engine: &GraphEngine, cid: &str) -> Result<DistributionDeta
         placement_gaps: vec![],
         recent_projection_events: vec![],
         commitment_references: None,
+        replication_commitments: Vec::new(), // T15: computed
+        fault_domain_diversity: FaultDomainDiversity::default(), // T15: computed
     })
 }
 

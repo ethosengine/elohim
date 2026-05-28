@@ -13,6 +13,8 @@ fn replica(peer_id: &str, archetype: DeviceArchetype) -> ReplicaPeer {
         hop_hint: None,
         household_id: None,
         region_tier: None,
+        shards_held: None,        // T15: computed
+        shards_by_encoding: None, // T15: computed
     }
 }
 

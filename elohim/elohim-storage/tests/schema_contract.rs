@@ -1854,7 +1854,8 @@ fn attention_tending_with_empty_tended_at_rejected_by_schema() {
 #[test]
 fn distribution_summary_matches_schema() {
     use elohim_storage::views::{
-        DistributionSummary, DiversityHint, FetchSource, MyRole, ReachClass, ReplicaHealth,
+        DistributionSummary, DiversityHint, FetchSource, MyRole, ProjectionTier, ReachClass,
+        ReplicaHealth,
     };
 
     let sample = DistributionSummary {
@@ -1868,6 +1869,7 @@ fn distribution_summary_matches_schema() {
         last_verified_seconds: 420,
         my_role: Some(MyRole::Replica),
         reciprocity_hint: Some(0),
+        projection_tier: ProjectionTier::Local, // T15: computed
     };
 
     let json = serde_json::to_value(&sample).unwrap();
@@ -1883,8 +1885,9 @@ fn distribution_summary_matches_schema() {
 #[test]
 fn distribution_details_matches_schema() {
     use elohim_storage::views::{
-        DeviceArchetype, DistributionDetails, DistributionSummary, DiversityHint, FetchSource,
-        ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
+        DeviceArchetype, DistributionDetails, DistributionSummary, DiversityHint,
+        FaultDomainDiversity, FetchSource, ProjectionTier, ProjectorIdentity, ReachClass,
+        ReplicaHealth, ReplicaPeer,
     };
 
     let summary = DistributionSummary {
@@ -1898,6 +1901,7 @@ fn distribution_details_matches_schema() {
         last_verified_seconds: 420,
         my_role: None,
         reciprocity_hint: None,
+        projection_tier: ProjectionTier::Local, // T15: computed
     };
 
     let sample = DistributionDetails {
@@ -1909,6 +1913,8 @@ fn distribution_details_matches_schema() {
             hop_hint: Some(2),
             household_id: Some("household-mathew".into()),
             region_tier: Some("us-central".into()),
+            shards_held: None,        // T15: computed
+            shards_by_encoding: None, // T15: computed
         }],
         projector_identities: vec![ProjectorIdentity {
             doorway_hostname: "matthew.elohim.host".into(),
@@ -1918,6 +1924,8 @@ fn distribution_details_matches_schema() {
         placement_gaps: vec![],
         recent_projection_events: vec![],
         commitment_references: Some(vec!["bafy-commit-1".into()]),
+        replication_commitments: Vec::new(), // T15: computed
+        fault_domain_diversity: FaultDomainDiversity::default(), // T15: computed
     };
 
     let json = serde_json::to_value(&sample).unwrap();
@@ -1987,9 +1995,10 @@ fn distribution_details_placement_gaps_typed() {
     // Verify that DistributionDetails serializes with typed PlacementGapRow,
     // not open-shape JsonVal — the schema now refs placement-gap-row.schema.json.
     use elohim_storage::views::{
-        DeviceArchetype, DistributionDetails, DistributionSummary, DiversityHint, FetchSource,
-        PlacementGapKind, PlacementGapRow, PlacementGapShortfall, ProjectorIdentity, ReachClass,
-        ReplicaHealth, ReplicaPeer,
+        DeviceArchetype, DistributionDetails, DistributionSummary, DiversityHint,
+        FaultDomainDiversity, FetchSource, PlacementGapKind, PlacementGapRow,
+        PlacementGapShortfall, ProjectionTier, ProjectorIdentity, ReachClass, ReplicaHealth,
+        ReplicaPeer,
     };
 
     let summary = DistributionSummary {
@@ -2003,6 +2012,7 @@ fn distribution_details_placement_gaps_typed() {
         last_verified_seconds: 60,
         my_role: None,
         reciprocity_hint: None,
+        projection_tier: ProjectionTier::Local, // T15: computed
     };
 
     let details = DistributionDetails {
@@ -2014,6 +2024,8 @@ fn distribution_details_placement_gaps_typed() {
             hop_hint: None,
             household_id: None,
             region_tier: None,
+            shards_held: None,        // T15: computed
+            shards_by_encoding: None, // T15: computed
         }],
         projector_identities: vec![ProjectorIdentity {
             doorway_hostname: "test.elohim.host".into(),
@@ -2031,6 +2043,8 @@ fn distribution_details_placement_gaps_typed() {
         }],
         recent_projection_events: vec![],
         commitment_references: None,
+        replication_commitments: Vec::new(), // T15: computed
+        fault_domain_diversity: FaultDomainDiversity::default(), // T15: computed
     };
 
     let json = serde_json::to_value(&details).unwrap();
@@ -2048,6 +2062,8 @@ fn replica_peer_matches_schema() {
         hop_hint: None,
         household_id: None,
         region_tier: None,
+        shards_held: None,        // T15: computed
+        shards_by_encoding: None, // T15: computed
     };
 
     let json = serde_json::to_value(&sample).unwrap();
@@ -2426,7 +2442,7 @@ fn freshness_offline_matches_schema() {
 #[test]
 fn distribution_summary_with_diversity_none_matches_schema() {
     use elohim_storage::views::{
-        DistributionSummary, DiversityHint, FetchSource, ReachClass, ReplicaHealth,
+        DistributionSummary, DiversityHint, FetchSource, ProjectionTier, ReachClass, ReplicaHealth,
     };
 
     let sample = DistributionSummary {
@@ -2440,6 +2456,7 @@ fn distribution_summary_with_diversity_none_matches_schema() {
         last_verified_seconds: 0,
         my_role: None,
         reciprocity_hint: None,
+        projection_tier: ProjectionTier::Local, // T15: computed
     };
 
     let json = serde_json::to_value(&sample).unwrap();
@@ -5171,4 +5188,37 @@ fn hub_capacity_view_dwelling_kind_validates() {
         "capacity": null
     });
     validate_against_schema("views/hub-capacity-view.schema.json", &payload);
+}
+
+// ── Sprint 3: Storage-replication fields in topology view schemas ─────────────
+
+#[test]
+fn distribution_summary_with_projection_tier_validates() {
+    let payload = serde_json::json!({
+        "replicaCount": 11,
+        "replicaTarget": 11,
+        "replicaHealth": "over_replicated",
+        "projectorCount": 3,
+        "reachClass": "household",
+        "diversityHint": {"kind": "collective_member_count", "value": 2},
+        "thisFetchSource": "peer_direct",
+        "lastVerifiedSeconds": 30,
+        "projectionTier": "regional"
+    });
+    validate_against_schema("views/distribution-summary.schema.json", &payload);
+}
+
+#[test]
+fn household_resilience_with_commitment_backed_replication_validates() {
+    let payload = serde_json::json!({
+        "contentId": "bafkrei-content-x",
+        "householdsStewarding": 3,
+        "householdsReciprocated": 2,
+        "protectionStatus": "protected",
+        "details": {"stewardHouseholds": ["hub:A","hub:B","hub:C"], "onlinePeerCount": 5, "healthScore": 0.95},
+        "commitmentBackedReplication": {
+            "dwellingCommitments": 3, "collectiveCommitments": 1, "commonsCommitments": 0, "totalPledgedBytes": 150_000_000_000u64
+        }
+    });
+    validate_against_schema("views/household-resilience-view.schema.json", &payload);
 }

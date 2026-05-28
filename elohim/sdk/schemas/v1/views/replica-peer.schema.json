@@ -32,6 +32,19 @@
     "regionTier": {
       "type": "string",
       "description": "Coarse region tier (e.g. 'us-central') for diversity reasoning."
+    },
+    "shardsHeld": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of distinct RS-encoded shards this peer holds for the content. 1 if whole-blob; up to N+M for rs-N-M encoding."
+    },
+    "shardsByEncoding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "encoding":              { "type": "string", "description": "rs-N-M or 'whole-blob'." },
+        "minShardsForRecovery":  { "type": "integer", "minimum": 1 }
+      }
     }
   }
 }

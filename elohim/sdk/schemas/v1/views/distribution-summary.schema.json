@@ -13,7 +13,8 @@
     "reachClass",
     "diversityHint",
     "thisFetchSource",
-    "lastVerifiedSeconds"
+    "lastVerifiedSeconds",
+    "projectionTier"
   ],
   "properties": {
     "replicaCount": {
@@ -27,8 +28,8 @@
       "description": "Target replica count derived from the CID's reach + policy."
     },
     "replicaHealth": {
-      "enum": ["healthy", "at_risk", "critical"],
-      "description": "Health bucket: healthy = at/above target, at_risk = below target, critical = below floor."
+      "enum": ["healthy", "at_risk", "critical", "over_replicated"],
+      "description": "Health bucket: healthy = at/above target, at_risk = below target, critical = below floor, over_replicated = more replicas than commitments justify; release shards to reclaim budget."
     },
     "projectorCount": {
       "type": "integer",
@@ -68,6 +69,11 @@
     "reciprocityHint": {
       "type": "integer",
       "description": "Net diff: positive = viewer hosts more than is hosted for them."
+    },
+    "projectionTier": {
+      "type": "string",
+      "enum": ["local", "regional", "global"],
+      "description": "Federation-level projection coverage. local = 1-2 projectors in same cluster; regional = 3+ projectors but ≤1 fault domain; global = projectors spanning ≥2 fault domains. Computed from projectorCount + projector geography when available."
     }
   }
 }

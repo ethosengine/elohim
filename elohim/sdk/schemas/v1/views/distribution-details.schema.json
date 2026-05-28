@@ -10,7 +10,9 @@
     "replicaPeers",
     "projectorIdentities",
     "placementGaps",
-    "recentProjectionEvents"
+    "recentProjectionEvents",
+    "replicationCommitments",
+    "faultDomainDiversity"
   ],
   "properties": {
     "summary": {
@@ -41,6 +43,34 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "CustodianCommitment CID references (rea_commitments rows) backing this distribution snapshot."
+    },
+    "replicationCommitments": {
+      "type": "array",
+      "description": "Active replicates-* commitments whose recipient + scope_filter cover this content.",
+      "items": {
+        "type": "object",
+        "required": ["commitmentCid", "tier", "providerCid", "recipientCid"],
+        "additionalProperties": false,
+        "properties": {
+          "commitmentCid": { "type": "string" },
+          "tier":          { "type": "string", "enum": ["dwelling", "collective", "commons"] },
+          "providerCid":   { "type": "string" },
+          "recipientCid":  { "type": "string" },
+          "providerRole":  { "type": "string", "enum": ["steward_mutual", "collective_steward"] }
+        }
+      }
+    },
+    "faultDomainDiversity": {
+      "type": "object",
+      "required": ["distinctHouseholdCount", "distinctCollectiveCount", "distinctRegionCount", "singleFaultDomainRisk", "faultModesEvaluated"],
+      "additionalProperties": false,
+      "properties": {
+        "distinctHouseholdCount":  { "type": "integer", "minimum": 0 },
+        "distinctCollectiveCount": { "type": "integer", "minimum": 0 },
+        "distinctRegionCount":     { "type": "integer", "minimum": 0 },
+        "singleFaultDomainRisk":   { "type": "boolean" },
+        "faultModesEvaluated":     { "type": "array", "items": { "type": "string", "enum": ["household", "collective", "region"] } }
+      }
     }
   }
 }

@@ -14,9 +14,9 @@ export interface DistributionSummary {
    */
   replicaTarget: number;
   /**
-   * Health bucket: healthy = at/above target, at_risk = below target, critical = below floor.
+   * Health bucket: healthy = at/above target, at_risk = below target, critical = below floor, over_replicated = more replicas than commitments justify; release shards to reclaim budget.
    */
-  replicaHealth: 'healthy' | 'at_risk' | 'critical';
+  replicaHealth: 'healthy' | 'at_risk' | 'critical' | 'over_replicated';
   /**
    * Number of doorways currently projecting this CID.
    */
@@ -50,6 +50,10 @@ export interface DistributionSummary {
    * Net diff: positive = viewer hosts more than is hosted for them.
    */
   reciprocityHint?: number;
+  /**
+   * Federation-level projection coverage. local = 1-2 projectors in same cluster; regional = 3+ projectors but ≤1 fault domain; global = projectors spanning ≥2 fault domains. Computed from projectorCount + projector geography when available.
+   */
+  projectionTier: 'local' | 'regional' | 'global';
 }
 /**
  * Peer-diversity hint for the replica set.
