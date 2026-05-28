@@ -1,0 +1,38 @@
+{
+  "$id": "epr:schema:intent:recognition-participation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RecognitionParticipationIntent",
+  "description": "Source of truth: request body for mishpat-coordinator-mediated governance participation EconomicEvent creation. The coordinator reads the standing-policy Manifest to look up recognition_weight_by_level[mechanismLevel], composes the EconomicEvent shape (action: raise, provider: humanId, receiver: entityId), and calls the existing create_economic_event coordinator. No new DHT entry type — uses existing EconomicEvent (Category A, elohim DNA content_store_integrity). This intent wire shape replaces client-side GovernanceRecognitionService.recordParticipation() + WEIGHT_BY_LEVEL constant (F-REA-3 + F-POLICY-3). Route: POST /api/v1/mishpat/recognition/participation.",
+  "type": "object",
+  "required": ["entityType", "entityId", "humanId", "mechanismLevel", "participationType"],
+  "additionalProperties": false,
+  "properties": {
+    "entityType": {
+      "type": "string",
+      "description": "What is being governed (e.g. 'content', 'proposal')",
+      "minLength": 1,
+      "examples": ["content", "proposal", "learning-path"]
+    },
+    "entityId": {
+      "type": "string",
+      "description": "ID of the governed entity",
+      "minLength": 1
+    },
+    "humanId": {
+      "type": "string",
+      "description": "Agent public key or human ID of the participant who performed the governance act",
+      "minLength": 1
+    },
+    "mechanismLevel": {
+      "type": "integer",
+      "description": "Governance mechanism level (0–7, maps to recognition_weight_by_level in the standing-policy Manifest). Level 0: context-menu only. Level 1: reaction. Level 2: graduated feedback. Level 3: approval. Level 4: ranked-choice. Level 5: score. Level 6: consent. Level 7: deliberation.",
+      "minimum": 0,
+      "maximum": 7
+    },
+    "participationType": {
+      "type": "string",
+      "description": "Semantic type of the participation act — used to compose the lamadEventType on the resulting EconomicEvent",
+      "enum": ["reaction", "graduated-feedback", "vote", "block"]
+    }
+  }
+}

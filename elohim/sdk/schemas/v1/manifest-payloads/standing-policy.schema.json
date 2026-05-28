@@ -42,6 +42,21 @@
         }
       }
     },
+    "recognition_weight_by_level": {
+      "type": "object",
+      "description": "Recognition weight per governance mechanism level. The substrate reads this map to compose the EconomicEvent resource_quantity_value when a governance participation event is recorded. Maps integer level keys (0–7) to float weights (0.0–1.0). Higher-friction mechanisms earn more: level 0–1 (reaction, context-menu) earn 0.1; level 2–3 (graduated feedback, approval) earn 0.3–0.5; level 4–6 (ranked-choice, score, consent) earn 0.7–0.8; level 7 (deliberation) earns 1.0. When omitted, the substrate uses protocol defaults. Source of truth: Manifest{kind: 'standing-policy'} payload_json authored via create_manifest coordinator (Category A via existing Manifest entry type). Replaces client-side WEIGHT_BY_LEVEL constant (F-POLICY-3).",
+      "additionalProperties": false,
+      "properties": {
+        "L0": { "type": "number", "minimum": 0, "maximum": 1, "description": "Context-menu-only (passive signal)" },
+        "L1": { "type": "number", "minimum": 0, "maximum": 1, "description": "Reaction (low friction)" },
+        "L2": { "type": "number", "minimum": 0, "maximum": 1, "description": "Graduated feedback (medium friction)" },
+        "L3": { "type": "number", "minimum": 0, "maximum": 1, "description": "Approval voting" },
+        "L4": { "type": "number", "minimum": 0, "maximum": 1, "description": "Ranked-choice voting" },
+        "L5": { "type": "number", "minimum": 0, "maximum": 1, "description": "Score voting" },
+        "L6": { "type": "number", "minimum": 0, "maximum": 1, "description": "Consent-based decision" },
+        "L7": { "type": "number", "minimum": 0, "maximum": 1, "description": "Deliberation (highest friction)" }
+      }
+    },
     "accumulation_thresholds": {
       "type": "object",
       "description": "Thresholds governing AccumulationStatus derivation from FeedbackSignal aggregates. When omitted, the substrate uses protocol defaults.",

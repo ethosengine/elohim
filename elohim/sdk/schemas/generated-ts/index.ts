@@ -178,4 +178,6 @@ export * from './attestation/subtypes/steward-of-record-metadata';
 export * from './attestation/subtypes/steward-transfer-metadata';
 export * from './attestation/subtypes/stewardship-appeal-metadata';
 export * from './attestation/subtypes/stewardship-grant-metadata';
+export * from './intents/attention-tending-intent';
 export * from './intents/lamad-event-intent';
+export * from './intents/recognition-participation-intent';

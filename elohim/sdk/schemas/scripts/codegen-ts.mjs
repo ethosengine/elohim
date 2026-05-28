@@ -137,6 +137,8 @@ const INTERFACE_FILES = [
   { src: 'intents/lamad-event-intent.ts', dest: 'lamad-event-intent.ts' },
   // M-REA-2: AttentionTending intent wire shape (Category B agent-scoped private source chain)
   { src: 'intents/attention-tending-intent.ts', dest: 'attention-tending-intent.ts' },
+  // M-REA-3: RecognitionParticipationIntent wire shape (Category A existing EconomicEvent via mishpat coordinator)
+  { src: 'intents/recognition-participation-intent.ts', dest: 'recognition-participation-intent.ts' },
   // M-POLICY-1: AccumulationStatus projection (Category C operational — FeedbackSignal × standing-policy Manifest)
   { src: 'views/accumulation-status.ts', dest: 'accumulation-status.ts' },
   // M-POLICY-2: MechanismSelection projection (Category C operational — GovernanceState × Content × Proposal? × pillar-projection Manifest)
