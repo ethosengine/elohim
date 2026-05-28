@@ -288,8 +288,8 @@ export class GovernanceApiService implements IGovernance {
     const emptyStatus: AccumulationStatusView = {
       entityType,
       entityId,
-      totalSignals: 0,
-      uniqueParticipants: 0,
+      totalSignals: 0n,
+      uniqueParticipants: 0n,
       consensusStrength: 0,
       status: 'pending',
       readyForSensemaking: false,
