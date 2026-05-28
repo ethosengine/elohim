@@ -342,10 +342,17 @@ async function main() {
     const manifestSchemaPath = resolve(__dirname, '../v1/manifest/app-manifest.schema.json');
     const manifestSchema = await loadJson(manifestSchemaPath);
 
-    // Register the enums referenced by the manifest schema so $refs resolve.
-    // AJV resolves "../enums/foo.schema.json" against the manifest's $id
-    // (epr:schema:manifest:app-manifest), which produces "epr:enums/foo.schema.json".
-    // We register under that resolved URI AND under the $id for robustness.
+    // AJV resolves "../enums/foo.schema.json" relative to the manifest's $id
+    // (epr:schema:manifest:app-manifest) → "epr:enums/foo.schema.json".
+    // We register under that resolved URI key — that is what the manifest's $refs
+    // actually look up. AJV also registers the schema under its own $id automatically
+    // as a side effect of addSchema, but the resolved URI is the primary key.
+
+    // A fresh Ajv2020 instance is required because the outer `ajv` registers enum
+    // schemas under their $id keys (epr:schema:enum:*), but the manifest's relative
+    // $refs resolve to epr:enums/* keys — a different namespace. The outer instance
+    // cannot satisfy both key shapes simultaneously, and its schemas are already
+    // sealed by the time this block runs.
     const fixtureAjv = new Ajv2020({ strict: false, allErrors: true });
 
     const lifecycleSchemaPath = resolve(__dirname, '../v1/enums/session-lifecycle-state.schema.json');
