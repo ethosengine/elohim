@@ -59,6 +59,7 @@ pub mod risk;
 pub mod routing;
 pub mod schedules;
 pub mod signal_emit;
+pub mod source_chain;
 pub mod spatial;
 pub mod standing;
 pub mod steward;
@@ -343,6 +344,22 @@ pub async fn handle_api_request(
         // M-REA-1: intent-driven EconomicEvent composition — POST /api/v1/lamad/events
         let resource_path = sub_path.strip_prefix("lamad").unwrap_or("");
         lamad::handle(
+            req,
+            method,
+            resource_path,
+            &pool,
+            &app_ctx,
+            hc_registry.as_ref(),
+        )
+        .await
+    } else if sub_path.starts_with("source-chain") {
+        // M-AGGR-2: Holochain source-chain cutover.
+        // GET /api/v1/source-chain/{agentId}/entries → Vec<SourceChainEntryView>
+        // GET /api/v1/source-chain/{agentId}/links   → Vec<EntryLinkView>
+        // Proxies to imagodei DNA coordinator via hc_registry.imagodei.
+        // No projection table — Category B agent-scoped private source chain.
+        let resource_path = sub_path.strip_prefix("source-chain").unwrap_or("");
+        source_chain::handle(
             req,
             method,
             resource_path,
