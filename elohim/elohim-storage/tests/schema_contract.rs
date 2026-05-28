@@ -1174,6 +1174,9 @@ fn view_schemas_declare_source_of_truth() {
         // M-POLICY-1: AccumulationStatus view + standing-policy payload schemas
         "views/accumulation-status.schema.json",
         "manifest-payloads/standing-policy.schema.json",
+        // M-POLICY-2: MechanismSelection view + pillar-projection payload schemas
+        "views/mechanism-selection.schema.json",
+        "manifest-payloads/pillar-projection.schema.json",
     ];
 
     for schema_name in &view_schemas {
@@ -3766,5 +3769,212 @@ fn standing_policy_payload_schema_declares_source_of_truth() {
     assert_source_of_truth_declared(
         &schema_value,
         "manifest-payloads/standing-policy.schema.json",
+    );
+}
+
+// =============================================================================
+// M-POLICY-2: MechanismSelection + pillar-projection payload schema contract tests
+//
+// Ticket: M-POLICY-2 (Server-side MechanismSelection) — Phase E
+// Source: genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md §3
+// =============================================================================
+
+/// Full minimal MechanismSelectionView that satisfies all required fields.
+fn minimal_mechanism_selection() -> Value {
+    serde_json::json!({
+        "entityType": "content",
+        "entityId": "concept-abc123",
+        "level": 1,
+        "mechanism": "reactions",
+        "renderTarget": "angular",
+        "contextMenuOnly": false,
+        "allowReactions": true,
+        "allowGraduatedFeedback": false,
+        "activeProposalId": null,
+        "activeProposalMechanism": null,
+        "policyManifestCid": null,
+        "computedAt": "2026-05-28T12:00:00Z"
+    })
+}
+
+#[test]
+fn mechanism_selection_view_minimal_validates() {
+    validate_against_schema(
+        "views/mechanism-selection.schema.json",
+        &minimal_mechanism_selection(),
+    );
+}
+
+#[test]
+fn mechanism_selection_view_full_validates() {
+    // Level 2: graduated feedback, policy manifest applied
+    let full = serde_json::json!({
+        "entityType": "content",
+        "entityId": "discussion-xyz",
+        "level": 2,
+        "mechanism": "graduated-feedback",
+        "renderTarget": "angular",
+        "contextMenuOnly": false,
+        "allowReactions": true,
+        "allowGraduatedFeedback": true,
+        "activeProposalId": null,
+        "activeProposalMechanism": null,
+        "policyManifestCid": "bafyreia1234567890abcdef",
+        "computedAt": "2026-05-28T15:30:00Z"
+    });
+    validate_against_schema("views/mechanism-selection.schema.json", &full);
+}
+
+#[test]
+fn mechanism_selection_view_psephos_level_validates() {
+    // Level 4: active proposal — ranked-choice, psephos render target
+    let psephos = serde_json::json!({
+        "entityType": "content",
+        "entityId": "proposal-resilience-1",
+        "level": 4,
+        "mechanism": "ranked-choice",
+        "renderTarget": "psephos",
+        "contextMenuOnly": false,
+        "allowReactions": false,
+        "allowGraduatedFeedback": false,
+        "activeProposalId": "prop-abc-123",
+        "activeProposalMechanism": "ranked-choice",
+        "policyManifestCid": null,
+        "computedAt": "2026-05-28T10:00:00Z"
+    });
+    validate_against_schema("views/mechanism-selection.schema.json", &psephos);
+}
+
+#[test]
+fn mechanism_selection_view_level_zero_validates() {
+    // Level 0: constitutional/settled state — context menu only
+    let level_zero = serde_json::json!({
+        "entityType": "path",
+        "entityId": "path-constitutional",
+        "level": 0,
+        "mechanism": "none",
+        "renderTarget": "angular",
+        "contextMenuOnly": true,
+        "allowReactions": false,
+        "allowGraduatedFeedback": false,
+        "activeProposalId": null,
+        "activeProposalMechanism": null,
+        "policyManifestCid": null,
+        "computedAt": "2026-05-28T08:00:00Z"
+    });
+    validate_against_schema("views/mechanism-selection.schema.json", &level_zero);
+}
+
+#[test]
+fn mechanism_selection_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/mechanism-selection.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("mechanism-selection schema should compile");
+
+    // Missing level
+    let no_level = {
+        let mut v = minimal_mechanism_selection();
+        v.as_object_mut().unwrap().remove("level");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_level).next().is_some(),
+        "Schema should require 'level'"
+    );
+
+    // Missing renderTarget
+    let no_render_target = {
+        let mut v = minimal_mechanism_selection();
+        v.as_object_mut().unwrap().remove("renderTarget");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_render_target).next().is_some(),
+        "Schema should require 'renderTarget'"
+    );
+
+    // Missing computedAt
+    let no_computed = {
+        let mut v = minimal_mechanism_selection();
+        v.as_object_mut().unwrap().remove("computedAt");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_computed).next().is_some(),
+        "Schema should require 'computedAt'"
+    );
+}
+
+#[test]
+fn mechanism_selection_view_rejects_invalid_render_target() {
+    let schema = load_schema("views/mechanism-selection.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("mechanism-selection schema should compile");
+
+    let mut bad = minimal_mechanism_selection();
+    *bad.get_mut("renderTarget").unwrap() = serde_json::json!("holochain");
+    assert!(
+        validator.iter_errors(&bad).next().is_some(),
+        "Schema should reject renderTarget values other than 'angular' or 'psephos'"
+    );
+}
+
+#[test]
+fn mechanism_selection_view_schema_declares_source_of_truth() {
+    let path = schema_dir().join("views/mechanism-selection.schema.json");
+    let content = fs::read_to_string(&path)
+        .expect("views/mechanism-selection.schema.json must exist");
+    let schema_value: Value = serde_json::from_str(&content)
+        .expect("views/mechanism-selection.schema.json must be valid JSON");
+    assert_source_of_truth_declared(
+        &schema_value,
+        "views/mechanism-selection.schema.json",
+    );
+}
+
+#[test]
+fn pillar_projection_payload_with_mechanism_ladder_validates() {
+    // A complete pillar-projection payload with full mechanism_ladder configuration.
+    // No floor sub-object required (unlike standing-policy).
+    let payload = serde_json::json!({
+        "mechanism_ladder": {
+            "settled_states": ["constitutional", "settled"],
+            "mechanism_level_map": {
+                "approval": 3,
+                "dot-vote": 3,
+                "ranked-choice": 4,
+                "score-vote": 5,
+                "conviction": 5,
+                "consent": 6
+            },
+            "feedback_inviting_content_types": [
+                "discussion",
+                "proposal-draft",
+                "request-for-comment",
+                "reflection"
+            ],
+            "default_level_no_proposal": 1
+        }
+    });
+    validate_against_schema("manifest-payloads/pillar-projection.schema.json", &payload);
+}
+
+#[test]
+fn pillar_projection_payload_without_ladder_validates() {
+    // mechanism_ladder is optional — an empty payload is valid (protocol defaults apply).
+    let payload = serde_json::json!({});
+    validate_against_schema("manifest-payloads/pillar-projection.schema.json", &payload);
+}
+
+#[test]
+fn pillar_projection_payload_schema_declares_source_of_truth() {
+    let path = schema_dir().join("manifest-payloads/pillar-projection.schema.json");
+    let content = fs::read_to_string(&path)
+        .expect("manifest-payloads/pillar-projection.schema.json must exist");
+    let schema_value: Value = serde_json::from_str(&content)
+        .expect("manifest-payloads/pillar-projection.schema.json must be valid JSON");
+    assert_source_of_truth_declared(
+        &schema_value,
+        "manifest-payloads/pillar-projection.schema.json",
     );
 }
