@@ -402,6 +402,36 @@ describe('jenkinsfile cps-scope lint', () => {
     });
 });
 
+// ══════════════════════════════════════════════════════════════════
+// TRIGGER-GATE PLACEMENT TESTS (Task 1 — plan 2026-05-28)
+// ══════════════════════════════════════════════════════════════════
+
+describe('commit-tag parsing gate placement', () => {
+    it('[build:*] tag parsing is NOT gated on BUILD_TRIGGER == WEBHOOK', () => {
+        const jf = readFileSync(ORCH_JENKINSFILE, 'utf8');
+        // Find the tag-aliases declaration; walk back to find its enclosing
+        // conditional; assert it is NOT the WEBHOOK gate.
+        const tagAliasIdx = jf.indexOf('def buildTagAliases');
+        assert(tagAliasIdx > 0, 'buildTagAliases declaration not found');
+        const slice = jf.slice(Math.max(0, tagAliasIdx - 800), tagAliasIdx);
+        assert(
+            !/if \(env\.BUILD_TRIGGER == 'WEBHOOK'\) \{[^}]*$/s.test(slice),
+            '[build:*] tag parsing must not be inside the WEBHOOK conditional'
+        );
+    });
+
+    it('[deploy-only] parsing IS still gated on WEBHOOK', () => {
+        const jf = readFileSync(ORCH_JENKINSFILE, 'utf8');
+        const deployIdx = jf.indexOf("DEPLOY_ONLY_FROM_TAG = 'true'");
+        assert(deployIdx > 0, 'DEPLOY_ONLY_FROM_TAG assignment not found');
+        const slice = jf.slice(Math.max(0, deployIdx - 400), deployIdx);
+        assert(
+            /if \(env\.BUILD_TRIGGER == 'WEBHOOK'\) \{/s.test(slice),
+            '[deploy-only] must remain webhook-gated'
+        );
+    });
+});
+
 // Self-test of the parser when invoked directly with a small fixture.
 // Lets us catch parser regressions in isolation.
 describe('extractScriptBlocks (parser self-test)', () => {

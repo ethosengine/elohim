@@ -1607,56 +1607,54 @@ spec:
 ═══════════════════════════════════════════════════════════════════════════════
                         """
 
-                        // Check for commit message tags (webhook-triggered builds only)
-                        if (env.BUILD_TRIGGER == 'WEBHOOK') {
-                            def commitMsg = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
-                            if (commitMsg =~ /(?i)\[(skip ci|ci skip|no ci)\]/) {
-                                echo "⏭️  [skip ci] detected in commit message — skipping all pipelines"
-                                env.SKIP_CI = 'true'
-                            }
+                        // Read HEAD commit message once. Used for [skip ci], [build:*], and
+                        // (webhook-only) [deploy-only] parsing.
+                        def commitMsg = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
 
-                            // Parse [build:*] tags to force-include pipelines
-                            // Supported: [build:edge], [build:dna], [build:app], [build:genesis], [build:all]
-                            def buildTags = []
-                            def buildTagAliases = [
-                                'edge': 'elohim-edge',
-                                'dna': 'elohim-holochain',
-                                'app': 'elohim',
-                                'genesis': 'elohim-genesis',
-                                'sophia': 'elohim-sophia',
-                                'steward': 'elohim-steward'
-                            ]
-                            def tagMatcher = (commitMsg =~ /(?i)\[build:([a-z,-]+)\]/)
-                            tagMatcher.each { match ->
-                                match[1].split(',').each { tag ->
-                                    tag = tag.trim().toLowerCase()
-                                    if (tag == 'all') {
-                                        buildTags.addAll(PIPELINES.keySet().findAll { !PIPELINES[it].manualOnly })
-                                    } else if (buildTagAliases[tag]) {
-                                        buildTags.add(buildTagAliases[tag])
-                                    } else {
-                                        echo "⚠️  Unknown [build:${tag}] — valid: ${buildTagAliases.keySet().join(', ')}, all"
-                                    }
+                        // [skip ci] — meaningful on every trigger type. Operator who tagged a commit
+                        // with [skip ci] means "do not run CI on this HEAD regardless of how this
+                        // build was kicked off" (timer, replay, webhook).
+                        if (commitMsg =~ /(?i)\[(skip ci|ci skip|no ci)\]/) {
+                            echo "⏭️  [skip ci] detected in commit message — skipping all pipelines"
+                            env.SKIP_CI = 'true'
+                        }
+
+                        // [build:*] tags — meaningful on every trigger type. The tag lives in
+                        // git history; the orchestrator MUST honor it whenever it reads HEAD,
+                        // not only on the first webhook delivery (which may be NOT_BUILT due
+                        // to milestone() supersede — see plan 2026-05-28).
+                        def buildTags = []
+                        def buildTagAliases = [
+                            'edge': 'elohim-edge',
+                            'dna': 'elohim-holochain',
+                            'app': 'elohim',
+                            'genesis': 'elohim-genesis',
+                            'sophia': 'elohim-sophia',
+                            'steward': 'elohim-steward'
+                        ]
+                        def tagMatcher = (commitMsg =~ /(?i)\[build:([a-z,-]+)\]/)
+                        tagMatcher.each { match ->
+                            match[1].split(',').each { tag ->
+                                tag = tag.trim().toLowerCase()
+                                if (tag == 'all') {
+                                    buildTags.addAll(PIPELINES.keySet().findAll { !PIPELINES[it].manualOnly })
+                                } else if (buildTagAliases[tag]) {
+                                    buildTags.add(buildTagAliases[tag])
+                                } else {
+                                    echo "⚠️  Unknown [build:${tag}] — valid: ${buildTagAliases.keySet().join(', ')}, all"
                                 }
                             }
-                            if (buildTags) {
-                                env.FORCE_BUILD_PIPELINES = buildTags.unique().join(',')
-                                echo "🔧 [build:*] tags detected — force-including: ${env.FORCE_BUILD_PIPELINES}"
-                            }
+                        }
+                        if (buildTags) {
+                            env.FORCE_BUILD_PIPELINES = buildTags.unique().join(',')
+                            echo "🔧 [build:*] tags detected — force-including: ${env.FORCE_BUILD_PIPELINES}"
+                        }
 
-                            // [deploy-only] tag → behave as if operator triggered
-                            // Build with Parameters DEPLOY_ONLY=true. Lets a webhook
-                            // push communicate "I changed manifests/RBAC/Jenkinsfile,
-                            // existing Harbor tags are valid, just redeploy" without
-                            // an operator hand-trigger.
-                            //
-                            // Effect (read by Determine Build Plan + triggerPipeline):
-                            //   - bypasses changeset analysis
-                            //   - dispatches only elohim-edge (+ elohim-genesis if SKIP_GENESIS != true)
-                            //   - propagates DEPLOY_ONLY=true to every downstream pipeline
-                            //
-                            // Operator equivalent for non-webhook runs: Build with
-                            // Parameters → DEPLOY_ONLY=true.
+                        // [deploy-only] — DELIBERATELY webhook-gated. This tag tells the orchestrator
+                        // to bypass changeset analysis and redeploy existing Harbor tags. It is only
+                        // meaningful for fresh pushes that intend a deployment; timer/replay reusing
+                        // the same HEAD must not silently retrigger a deploy.
+                        if (env.BUILD_TRIGGER == 'WEBHOOK') {
                             if (commitMsg =~ /(?i)\[deploy[-_ ]only\]/) {
                                 echo "🚀 [deploy-only] detected in commit message — DEPLOY_ONLY mode (skip builds, redeploy from env-file tags)"
                                 env.DEPLOY_ONLY_FROM_TAG = 'true'
