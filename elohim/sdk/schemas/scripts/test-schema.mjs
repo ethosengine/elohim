@@ -325,6 +325,18 @@ async function main() {
     );
   }
 
+  // Test: Task 3 review fix — stagedIntents requires non-empty content
+  {
+    const manifestSchemaPath = resolve(__dirname, '../v1/manifest/app-manifest.schema.json');
+    const manifestSchema = await loadJson(manifestSchemaPath);
+
+    const stagedIntentsDef = manifestSchema.$defs?.Vocabulary?.properties?.stagedIntents;
+    assert(
+      stagedIntentsDef?.minProperties === 1,
+      'vocabulary.stagedIntents declares minProperties: 1 (rejects empty {})'
+    );
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }

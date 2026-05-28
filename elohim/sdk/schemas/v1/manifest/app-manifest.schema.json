@@ -226,7 +226,8 @@
         },
         "stagedIntents": {
           "type": "object",
-          "description": "Optional. Per-pillar staged-intent vocabulary. Each entry declares an intent shape the session-bridge holds pre-canonically and replays into a canonical entry at graduation. Spec: 2026-05-28-app-manifest-staged-intents-design.md §2. Pillars without tentative-participation surfaces omit this section.",
+          "minProperties": 1,
+          "description": "Optional. Per-pillar staged-intent vocabulary. Each entry declares an intent shape the session-bridge holds pre-canonically and replays into a canonical entry at graduation. Spec: 2026-05-28-app-manifest-staged-intents-design.md §2. Pillars without tentative-participation surfaces omit this section. If declared, must contain at least one entry — empty {} is not a meaningful declaration.",
           "additionalProperties": {
             "$ref": "#/$defs/StagedIntentDeclaration"
           }
