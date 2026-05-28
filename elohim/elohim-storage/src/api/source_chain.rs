@@ -41,7 +41,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tracing;
 
 use crate::db::{AppContext, DbPool};
@@ -127,7 +127,7 @@ impl From<ZomeSourceChainLink> for EntryLinkView {
 /// `resource_path` arrives as `/{agentId}/entries` or `/{agentId}/links`
 /// (the `source-chain` prefix is stripped by mod.rs before dispatch).
 pub async fn handle(
-    req: Request<Incoming>,
+    _req: Request<Incoming>,
     method: Method,
     resource_path: &str,
     _pool: &DbPool,
