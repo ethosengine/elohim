@@ -14,6 +14,7 @@
   "_dna": {
     "constant": "SESSION_LIFECYCLE_STATES",
     "zome": null,
+    "tier": "core",
     "rationale": "Operational vocabulary — bridge state, not DHT-notarized state. No zome owns these as entries."
   }
 }
