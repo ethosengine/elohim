@@ -53,6 +53,7 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
         "delegates-compute" => validate_delegates_compute(&payload),
         // TODO(sprint1-task3): implement acknowledges-reach-change validation
         "acknowledges-reach-change" => validate_acknowledges_reach_change(&payload),
+        "replicates-dwelling" => validate_replicates_dwelling(&payload),
         other => Err(format!(
             "commitments::validate_commitment_payload unhandled action: {other}"
         )),
@@ -127,6 +128,67 @@ fn validate_acknowledges_reach_change(payload: &serde_json::Value) -> Result<(),
             new_reach
         ));
     }
+    Ok(())
+}
+
+fn validate_replicates_dwelling(payload: &serde_json::Value) -> Result<(), String> {
+    let required = [
+        "action", "provider_dwelling_hub_id", "recipient_dwelling_hub_id",
+        "provider_role", "capacity_bytes", "scope_filter",
+        "valid_from", "valid_until", "grace_period_days",
+        "rotation_ttl_days", "ratio_attestation",
+    ];
+    for field in required {
+        if payload.get(field).is_none() {
+            return Err(format!("replicates-dwelling missing required field: {field}"));
+        }
+    }
+    if payload["action"] != "replicates-dwelling" {
+        return Err("action field must equal 'replicates-dwelling'".into());
+    }
+
+    // provider_role enum
+    let provider_role = payload["provider_role"].as_str().unwrap_or("");
+    if provider_role != "steward_mutual" && provider_role != "collective_steward" {
+        return Err(format!("provider_role '{provider_role}' not in enum"));
+    }
+    if provider_role == "collective_steward" {
+        let via = payload.get("via_collective_hub_id").and_then(|v| v.as_str()).unwrap_or("");
+        if via.is_empty() {
+            return Err("collective_steward requires non-empty via_collective_hub_id".into());
+        }
+    }
+
+    // capacity_bytes positive
+    let capacity = payload["capacity_bytes"].as_u64().unwrap_or(0);
+    if capacity == 0 {
+        return Err("capacity_bytes must be > 0".into());
+    }
+
+    // ratio_attestation: required sub-fields + sum-to-100
+    let attestation = payload.get("ratio_attestation").and_then(|v| v.as_object())
+        .ok_or("ratio_attestation must be object")?;
+    for f in ["commons_pct", "dwelling_pct", "collective_pct", "free_pct", "effective_ratio_cid"] {
+        if !attestation.contains_key(f) {
+            return Err(format!("ratio_attestation missing field: {f}"));
+        }
+    }
+    let commons    = attestation["commons_pct"].as_u64().unwrap_or(0);
+    let dwelling   = attestation["dwelling_pct"].as_u64().unwrap_or(0);
+    let collective = attestation["collective_pct"].as_u64().unwrap_or(0);
+    let free       = attestation["free_pct"].as_u64().unwrap_or(0);
+    if commons + dwelling + collective + free != 100 {
+        return Err(format!(
+            "ratio_attestation pct sum {} != 100",
+            commons + dwelling + collective + free
+        ));
+    }
+
+    // scope_filter must be object (curation policy; can be empty)
+    if !payload.get("scope_filter").map(|v| v.is_object()).unwrap_or(false) {
+        return Err("scope_filter must be object".into());
+    }
+
     Ok(())
 }
 
@@ -257,6 +319,90 @@ mod tests {
         payload["new_reach"] = serde_json::json!("totally-bogus-reach");
         let input = CreateCommitmentInput {
             action: "acknowledges-reach-change".to_string(),
+            payload_json: payload.to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    fn well_formed_replicates_dwelling_payload() -> serde_json::Value {
+        serde_json::json!({
+            "action": "replicates-dwelling",
+            "provider_dwelling_hub_id": "hub:A",
+            "recipient_dwelling_hub_id": "hub:B",
+            "provider_role": "steward_mutual",
+            "capacity_bytes": 50_000_000_000u64,
+            "scope_filter": {"epr_kinds": ["Content"]},
+            "valid_from": "2026-05-28T00:00:00Z",
+            "valid_until": "2026-08-26T00:00:00Z",
+            "grace_period_days": 14,
+            "rotation_ttl_days": 90,
+            "ratio_attestation": {
+                "commons_pct": 20, "dwelling_pct": 40, "collective_pct": 25, "free_pct": 15,
+                "effective_ratio_cid": "bafkrei-x"
+            }
+        })
+    }
+
+    #[test]
+    fn replicates_dwelling_well_formed_validates() {
+        let input = CreateCommitmentInput {
+            action: "replicates-dwelling".to_string(),
+            payload_json: well_formed_replicates_dwelling_payload().to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_ok());
+    }
+
+    #[test]
+    fn replicates_dwelling_unknown_role_rejected() {
+        let mut payload = well_formed_replicates_dwelling_payload();
+        payload["provider_role"] = serde_json::json!("totally-bogus");
+        let input = CreateCommitmentInput {
+            action: "replicates-dwelling".to_string(),
+            payload_json: payload.to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_dwelling_collective_steward_requires_via_collective() {
+        let mut payload = well_formed_replicates_dwelling_payload();
+        payload["provider_role"] = serde_json::json!("collective_steward");
+        let input = CreateCommitmentInput {
+            action: "replicates-dwelling".to_string(),
+            payload_json: payload.to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_dwelling_collective_steward_with_via_validates() {
+        let mut payload = well_formed_replicates_dwelling_payload();
+        payload["provider_role"] = serde_json::json!("collective_steward");
+        payload["via_collective_hub_id"] = serde_json::json!("collective:church");
+        let input = CreateCommitmentInput {
+            action: "replicates-dwelling".to_string(),
+            payload_json: payload.to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_ok());
+    }
+
+    #[test]
+    fn replicates_dwelling_zero_capacity_rejected() {
+        let mut payload = well_formed_replicates_dwelling_payload();
+        payload["capacity_bytes"] = serde_json::json!(0);
+        let input = CreateCommitmentInput {
+            action: "replicates-dwelling".to_string(),
+            payload_json: payload.to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_dwelling_ratio_sum_not_100_rejected() {
+        let mut payload = well_formed_replicates_dwelling_payload();
+        payload["ratio_attestation"]["commons_pct"] = serde_json::json!(30); // sum becomes 110
+        let input = CreateCommitmentInput {
+            action: "replicates-dwelling".to_string(),
             payload_json: payload.to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
