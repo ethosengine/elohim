@@ -1179,6 +1179,8 @@ fn view_schemas_declare_source_of_truth() {
         // M-POLICY-2: MechanismSelection view + pillar-projection payload schemas
         "views/mechanism-selection.schema.json",
         "manifest-payloads/pillar-projection.schema.json",
+        // M-AGGR-3: ContentEngagementStats projection (Category C operational — EconomicEvent stream)
+        "views/content-engagement-stats-view.schema.json",
     ];
 
     for schema_name in &view_schemas {
@@ -4383,4 +4385,101 @@ fn standing_policy_with_weight_levels_only_validates() {
         }
     });
     validate_against_schema("manifest-payloads/standing-policy.schema.json", &payload);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M-AGGR-3: ContentEngagementStatsView schema tests
+// Source of truth: derived projection of EconomicEvent stream filtered by
+// (content_id, lamadEventType IN ['content-view', 'content-complete']).
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn minimal_content_engagement_stats() -> serde_json::Value {
+    serde_json::json!({
+        "contentId": "concept-foundations-1",
+        "views": 42,
+        "completions": 17,
+        "uniqueViewers": 38,
+        "completionRate": 0.405,
+        "computedAt": "2026-05-28T12:00:00Z"
+    })
+}
+
+#[test]
+fn content_engagement_stats_view_minimal_validates() {
+    validate_against_schema(
+        "views/content-engagement-stats-view.schema.json",
+        &minimal_content_engagement_stats(),
+    );
+}
+
+#[test]
+fn content_engagement_stats_view_zero_counts_validates() {
+    let zero = serde_json::json!({
+        "contentId": "new-content-no-views",
+        "views": 0,
+        "completions": 0,
+        "uniqueViewers": 0,
+        "completionRate": 0.0,
+        "computedAt": "2026-05-28T10:00:00Z"
+    });
+    validate_against_schema("views/content-engagement-stats-view.schema.json", &zero);
+}
+
+#[test]
+fn content_engagement_stats_view_full_completion_validates() {
+    // Every viewer also completed — 100% rate
+    let full = serde_json::json!({
+        "contentId": "lesson-mastery-complete",
+        "views": 10,
+        "completions": 10,
+        "uniqueViewers": 10,
+        "completionRate": 1.0,
+        "computedAt": "2026-05-28T14:00:00Z"
+    });
+    validate_against_schema("views/content-engagement-stats-view.schema.json", &full);
+}
+
+#[test]
+fn content_engagement_stats_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/content-engagement-stats-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("content-engagement-stats schema should compile");
+
+    // Missing views
+    let no_views = {
+        let mut v = minimal_content_engagement_stats();
+        v.as_object_mut().unwrap().remove("views");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_views).next().is_some(),
+        "Schema should require 'views'"
+    );
+
+    // Missing contentId
+    let no_content_id = {
+        let mut v = minimal_content_engagement_stats();
+        v.as_object_mut().unwrap().remove("contentId");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_content_id).next().is_some(),
+        "Schema should require 'contentId'"
+    );
+
+    // Missing completionRate
+    let no_rate = {
+        let mut v = minimal_content_engagement_stats();
+        v.as_object_mut().unwrap().remove("completionRate");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_rate).next().is_some(),
+        "Schema should require 'completionRate'"
+    );
+}
+
+#[test]
+fn content_engagement_stats_schema_loads() {
+    let _ = load_schema("views/content-engagement-stats-view.schema.json");
 }
