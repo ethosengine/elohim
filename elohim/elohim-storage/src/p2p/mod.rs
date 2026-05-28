@@ -33,12 +33,12 @@ pub mod attention_tending;
 pub mod behaviour;
 pub mod blob_fetch;
 pub mod blob_protocol;
+pub mod conductor_agent_info_gossip;
 pub mod dedup;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
 pub mod fanout;
 pub mod feedback_signal;
-pub mod conductor_agent_info_gossip;
 pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
@@ -2268,12 +2268,47 @@ impl P2PNode {
             }
         };
 
-        let inventory = StaticInventory::new(hashes);
+        // Convert raw filenames to validated BlobAddress instances, dropping
+        // any non-canonical entries. The production blob store always emits
+        // canonical sha256-<hex> names; this filter guards against filesystem
+        // contamination (temp files, .DS_Store, etc.).
+        use crate::p2p::inventory_gossip::BlobAddress;
+        use std::sync::Once;
+        static WARN_ONCE_BROADCAST: Once = Once::new();
+        let mut dropped_broadcast = 0_usize;
+        let blob_addresses: Vec<BlobAddress> = hashes
+            .into_iter()
+            .filter_map(|s| match BlobAddress::new(s) {
+                Ok(a) => Some(a),
+                Err(_) => {
+                    dropped_broadcast += 1;
+                    None
+                }
+            })
+            .collect();
+        if dropped_broadcast > 0 {
+            WARN_ONCE_BROADCAST.call_once(|| {
+                warn!(
+                    target: "elohim_storage::inventory",
+                    dropped = dropped_broadcast,
+                    "broadcast_inventory_snapshot: list_hashes returned non-canonical \
+                     filenames; dropped from snapshot (logged once per session)"
+                );
+            });
+        }
+        let inventory = StaticInventory::new(blob_addresses);
         let local_peer_id = self.peer_id().to_string();
         let now_micros = chrono::Utc::now().timestamp_micros();
 
         let snapshot = build_snapshot(&local_peer_id, &inventory, &self.inventory_seq, now_micros);
-        let hashes_for_record = snapshot.hashes.clone();
+        // Convert BlobAddress vec to String vec for the parity-diagnostic record.
+        // The last_gossiped field and set_last_gossiped_inventory use Vec<String>
+        // (a separate concern from the wire types); this is the single conversion site.
+        let hashes_for_record: Vec<String> = snapshot
+            .hashes
+            .iter()
+            .map(|a| a.as_str().to_string())
+            .collect();
         let snapshot_sequence = snapshot.sequence;
         // T22 review fix #2: capture count BEFORE the move so the success
         // arm can move-not-clone hashes_for_record into the parity record.
@@ -5090,10 +5125,11 @@ impl P2PNode {
                                                 .to_string();
                                             let when = micros_to_iso(snapshot.snapshot_at)
                                                 .unwrap_or(now_iso);
+                                            let hashes_str: Vec<String> = snapshot.hashes.iter().map(|b| b.as_str().to_string()).collect();
                                             match crate::db::peer_blob_inventory::apply_snapshot(
                                                 &mut conn,
                                                 &snapshot.peer_id,
-                                                &snapshot.hashes,
+                                                &hashes_str,
                                                 snapshot.sequence as i64,
                                                 &when,
                                             ) {
@@ -5138,11 +5174,13 @@ impl P2PNode {
                                                         .format("%Y-%m-%dT%H:%M:%SZ")
                                                         .to_string()
                                                 });
+                                            let added_str: Vec<String> = delta.added.iter().map(|b| b.as_str().to_string()).collect();
+                                            let removed_str: Vec<String> = delta.removed.iter().map(|b| b.as_str().to_string()).collect();
                                             match crate::db::peer_blob_inventory::apply_delta(
                                                 &mut conn,
                                                 &delta.peer_id,
-                                                &delta.added,
-                                                &delta.removed,
+                                                &added_str,
+                                                &removed_str,
                                                 delta.sequence as i64,
                                                 &when,
                                             ) {

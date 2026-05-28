@@ -94,9 +94,11 @@ mod tests {
     #[test]
     fn wire_bytes_are_small() {
         let bytes = sample().to_bytes().expect("to_bytes");
-        // ~150-byte JSON payload + ~30 bytes envelope ≈ 180 bytes
-        // Allow generous headroom for real kitsune2 agent_info (which is ~400-600 bytes).
-        assert!(bytes.len() < 1024, "payload should fit in 1KB; got {} bytes", bytes.len());
+        // ~150-byte JSON payload + ~30 bytes envelope ≈ 180 bytes for this fixture.
+        // Bound of 512 covers real kitsune2 agent_info (~400-600 bytes typical) with
+        // some slack for unusual cases — but tight enough to catch runaway field
+        // additions in future revisions.
+        assert!(bytes.len() < 512, "payload should fit in 512B; got {} bytes", bytes.len());
     }
 
     #[test]
@@ -115,6 +117,13 @@ mod tests {
     fn verify_structural_rejects_zero_timestamp() {
         let mut bad = sample();
         bad.published_at = 0;
+        assert!(bad.verify_structural().is_err());
+    }
+
+    #[test]
+    fn verify_structural_rejects_negative_timestamp() {
+        let mut bad = sample();
+        bad.published_at = -1;
         assert!(bad.verify_structural().is_err());
     }
 }
