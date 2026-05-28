@@ -3,6 +3,14 @@
   "name": "elohim",
   "version": "1.0.0",
   "description": "Cross-cutting elohim-pillar declarations — signal_kinds that span pillars and substrate-level coordination primitives.",
+  "constitutionalRatios": {
+    "description": "Sprint 3 donut defaults; per spec §5.",
+    "version": 1,
+    "commons_pct": 20,
+    "dwelling_pct": 40,
+    "collective_pct": 25,
+    "free_pct": 15
+  },
   "vocabulary": {
     "contentTypes": {}
   },
@@ -43,6 +51,14 @@
       "evidence_required": true,
       "standing_impact_allowed": ["consequential"],
       "debit_weight": 10,
+      "decay_days": 60
+    },
+    "reciprocity-imbalance": {
+      "description": "Provider-dwelling-hub authored a replicates-dwelling commitment in steward_mutual mode; counter-commitment never arrived within grace_period_days, or was unilaterally revoked. Substrate emits this signal naming the breaching party. Standing-debit moderate.",
+      "target_kinds": ["dwelling-hub", "agent"],
+      "evidence_required": true,
+      "standing_impact_allowed": ["consequential"],
+      "debit_weight": 8,
       "decay_days": 60
     }
   },

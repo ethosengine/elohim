@@ -105,6 +105,20 @@
       "$ref": "#/$defs/GraduationPolicy",
       "description": "Optional. Per-pillar graduation policy. Required IF vocabulary.stagedIntents is non-empty (see dependentSchemas). Permitted (but inert) when vocabulary.stagedIntents is absent — useful for forward-compatibility where a pillar declares graduation readiness before staged-intent vocabulary lands."
     },
+    "constitutionalRatios": {
+      "type": "object",
+      "description": "Protocol-version-stable storage donut ratios. Values clamped to DNA-enforced floor/ceiling at validation time. Sum should equal 100. Per spec 2026-05-28-mutual-storage-replication-dwelling-hub-design.md §5.",
+      "required": ["version", "commons_pct", "dwelling_pct", "collective_pct", "free_pct"],
+      "additionalProperties": false,
+      "properties": {
+        "version":        { "type": "integer", "minimum": 1 },
+        "commons_pct":    { "type": "integer", "minimum": 0, "maximum": 100 },
+        "dwelling_pct":   { "type": "integer", "minimum": 0, "maximum": 100 },
+        "collective_pct": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "free_pct":       { "type": "integer", "minimum": 0, "maximum": 100 },
+        "description":    { "type": "string" }
+      }
+    },
     "graph": {
       "type": "object",
       "description": "Graph-native projection extension (per 2026-05-16 graph-native-projection-substrate spec). Declares domain-specific edge types, node augmentations, indexes, and named Datalog rules that extend the core EPR graph schema. Applied at manifest registration time by the Rust graph registry validator.",
