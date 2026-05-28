@@ -172,15 +172,6 @@ const alphaResolver: ResolveIdentifierFn = async (identifier: string): Promise<F
 // Decorator factories
 // ---------------------------------------------------------------------------
 
-function injectAuthority(shellId: string, resolution: AuthorityResolution) {
-  setTimeout(() => {
-    const shell = document.getElementById(shellId);
-    if (shell && '_setAuthority' in shell) {
-      (shell as unknown as { _setAuthority: (r: AuthorityResolution) => void })._setAuthority(resolution);
-    }
-  }, 0);
-}
-
 function lightDecorator(story: () => unknown) {
   return html`
     <div
@@ -270,10 +261,9 @@ export const Default: Story = {
   name: 'Default (first-time welcome)',
   decorators: [lightDecorator],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="mode-a-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${firstVisitResolution}
         step="resolve"
         flywheel-hint
       >
@@ -302,8 +292,6 @@ export const Default: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('mode-a-shell', firstVisitResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -327,10 +315,9 @@ export const Dark: Story = {
   name: 'Dark (constellation)',
   decorators: [darkDecorator],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="mode-a-shell-dark"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${firstVisitResolution}
         step="resolve"
         flywheel-hint
       >
@@ -359,8 +346,6 @@ export const Dark: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('mode-a-shell-dark', firstVisitResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -404,10 +389,9 @@ export const Hebrew: Story = {
     `,
   ],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="mode-a-shell-he"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${firstVisitResolution}
         step="resolve"
         flywheel-hint
       >
@@ -427,8 +411,6 @@ export const Hebrew: Story = {
         <span slot="footer">alpha.elohim.host &middot; commons</span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('mode-a-shell-he', firstVisitResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -459,10 +441,9 @@ export const UnknownHost: Story = {
       };
     };
 
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="mode-a-shell-err"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${firstVisitResolution}
         step="resolve"
         flywheel-hint
       >
@@ -487,8 +468,6 @@ export const UnknownHost: Story = {
         <span slot="footer">alpha.elohim.host &middot; commons</span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('mode-a-shell-err', firstVisitResolution);
-    return el;
   },
   parameters: {
     docs: {

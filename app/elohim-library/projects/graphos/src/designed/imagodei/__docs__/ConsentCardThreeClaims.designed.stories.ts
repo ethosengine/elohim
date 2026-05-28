@@ -222,17 +222,8 @@ const doorwayHostResolution: AuthorityResolution = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Decorators
 // ---------------------------------------------------------------------------
-
-function injectAuthority(shellId: string, resolution: AuthorityResolution) {
-  setTimeout(() => {
-    const shell = document.getElementById(shellId);
-    if (shell && '_setAuthority' in shell) {
-      (shell as unknown as { _setAuthority: (r: AuthorityResolution) => void })._setAuthority(resolution);
-    }
-  }, 0);
-}
 
 function lightDecorator(story: () => unknown) {
   return html`
@@ -321,10 +312,9 @@ export const Default: Story = {
   name: 'Default (three claims)',
   decorators: [lightDecorator],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="consent-three-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${doorwayHostResolution}
         step="consent"
       >
         <elohim-imagodei-trust-indicator
@@ -356,8 +346,6 @@ export const Default: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('consent-three-shell', doorwayHostResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -382,10 +370,9 @@ export const Dark: Story = {
   name: 'Dark (constellation)',
   decorators: [darkDecorator],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="consent-three-shell-dark"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${doorwayHostResolution}
         step="consent"
       >
         <elohim-imagodei-trust-indicator
@@ -417,8 +404,6 @@ export const Dark: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('consent-three-shell-dark', doorwayHostResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -441,10 +426,9 @@ export const AllOptional: Story = {
   name: 'AllOptional',
   decorators: [lightDecorator],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="consent-all-optional-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${doorwayHostResolution}
         step="consent"
       >
         <elohim-imagodei-trust-indicator
@@ -474,8 +458,6 @@ export const AllOptional: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('consent-all-optional-shell', doorwayHostResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -505,10 +487,9 @@ export const PeerConductorContext: Story = {
       attestors: [susanElder, jamesCircle, martaWitness],
     };
 
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="consent-peer-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${peerResolution}
         step="consent"
       >
         <elohim-imagodei-trust-indicator
@@ -530,8 +511,6 @@ export const PeerConductorContext: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('consent-peer-shell', peerResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -574,10 +553,9 @@ export const Hebrew: Story = {
     `,
   ],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="consent-he-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${doorwayHostResolution}
         step="consent"
       >
         <elohim-imagodei-trust-indicator
@@ -596,8 +574,6 @@ export const Hebrew: Story = {
         <span slot="footer">alpha.elohim.host &middot; commons</span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('consent-he-shell', doorwayHostResolution);
-    return el;
   },
   parameters: {
     docs: {

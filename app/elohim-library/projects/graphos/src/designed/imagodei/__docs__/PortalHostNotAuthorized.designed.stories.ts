@@ -185,7 +185,6 @@ export const Default: Story = {
   decorators: [lightDecorator],
   render: () => html`
     <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
     >
       <!-- Trust-indicator intentionally omitted: no authority resolved -->
 
@@ -290,7 +289,6 @@ export const Dark: Story = {
   decorators: [darkDecorator],
   render: () => html`
     <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
     >
       <p slot="primary" style="display: none;"></p>
 
@@ -393,7 +391,6 @@ export const WithIdentifierDetail: Story = {
   decorators: [lightDecorator],
   render: () => html`
     <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
     >
       <p slot="primary" style="display: none;"></p>
 
