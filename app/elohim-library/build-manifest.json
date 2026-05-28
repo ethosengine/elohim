@@ -5,6 +5,7 @@
   "manualOnly": false,
   "triggersGenesis": false,
   "cascades": false,
+  "longRunning": true,
   "dependsOn": [],
   "description": "Elohim Storybook static design surface — build, image, deploy",
   "steps": {

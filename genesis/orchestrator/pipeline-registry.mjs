@@ -3,8 +3,8 @@
  *
  * Loads every build-manifest.json in the workspace and exposes the
  * pipeline-level fields (jenkinsPath, manualOnly, triggersGenesis,
- * cascades, dependsOn) that previously lived in Jenkinsfile.PIPELINES
- * and orchestrator-strategy.mjs.PIPELINES.
+ * cascades, dependsOn, longRunning, deploymentCheck) that previously
+ * lived in Jenkinsfile.PIPELINES and orchestrator-strategy.mjs.PIPELINES.
  *
  * Replaces orchestrator-strategy.mjs as of plan
  * 2026-05-28-orchestrator-clean-build-triggers.
@@ -13,9 +13,29 @@
 import { loadManifests } from './manifest-utils.mjs';
 
 /**
+ * Build a deploymentCheck map from manifest deployment.targets.<env>.healthCheck.
+ * Returns null if there are no targets or none have healthCheck — preserves
+ * the legacy PIPELINES behaviour where pipelines without deployments have
+ * deploymentCheck: null.
+ *
+ * @param {object|undefined} deployment
+ * @returns {Record<string,string>|null}
+ */
+function buildDeploymentCheck(deployment) {
+  const targets = deployment?.targets;
+  if (!targets) return null;
+  const out = {};
+  for (const [envName, target] of Object.entries(targets)) {
+    if (target?.healthCheck) out[envName] = target.healthCheck;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
  * @returns {Map<string, {pipeline: string, jenkinsPath?: string,
  *   manualOnly: boolean, triggersGenesis: boolean, cascades: boolean,
- *   dependsOn: string[], manifestPath: string}>}
+ *   dependsOn: string[], longRunning: boolean,
+ *   deploymentCheck: Record<string,string>|null, manifestPath: string}>}
  */
 export function loadPipelineRegistry(rootDir) {
   const manifests = loadManifests(rootDir);
@@ -35,6 +55,8 @@ export function loadPipelineRegistry(rootDir) {
       triggersGenesis: content.triggersGenesis === true,
       cascades: content.cascades === undefined ? true : content.cascades === true,
       dependsOn: Array.isArray(content.dependsOn) ? content.dependsOn : [],
+      longRunning: content.longRunning === true,
+      deploymentCheck: buildDeploymentCheck(content.deployment),
       manifestPath: path,
     });
   }

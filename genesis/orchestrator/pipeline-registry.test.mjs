@@ -50,4 +50,20 @@ describe('pipeline-registry', () => {
     assert.deepStrictEqual(deps.get('elohim-genesis'), ['elohim-edge', 'elohim']);
     assert.deepStrictEqual(deps.get('elohim-sophia'), []);
   });
+
+  test('longRunning marked correctly', () => {
+    assert.strictEqual(registry.get('elohim-holochain').longRunning, true);
+    assert.strictEqual(registry.get('elohim-steward').longRunning, true);
+    assert.strictEqual(registry.get('elohim-storybook').longRunning, true);
+    assert.strictEqual(registry.get('elohim').longRunning, false);
+    assert.strictEqual(registry.get('elohim-edge').longRunning, false);
+  });
+
+  test('deploymentCheck built from deployment.targets', () => {
+    const edge = registry.get('elohim-edge');
+    assert.ok(edge.deploymentCheck, 'elohim-edge should have deploymentCheck');
+    assert.ok(edge.deploymentCheck.alpha, 'should have alpha endpoint');
+    const sophia = registry.get('elohim-sophia');
+    assert.strictEqual(sophia.deploymentCheck, null, 'sophia has no deployment');
+  });
 });

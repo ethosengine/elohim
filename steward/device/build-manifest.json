@@ -4,6 +4,7 @@
   "jenkinsPath": "steward/device/Jenkinsfile",
   "manualOnly": true,
   "triggersGenesis": false,
+  "longRunning": true,
   "dependsOn": ["elohim-holochain"],
   "description": "Steward desktop app — Tauri + Holochain conductor",
   "steps": {

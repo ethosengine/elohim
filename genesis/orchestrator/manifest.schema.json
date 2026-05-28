@@ -40,6 +40,11 @@
       "default": true,
       "description": "If true, dependents of this pipeline auto-build when it builds. Set false for leaf pipelines that produce artifacts consumed only by themselves."
     },
+    "longRunning": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, the orchestrator fires this pipeline as fire-and-forget (doesn't block waiting for it). Used for pipelines that take >15 minutes."
+    },
     "dependsOn": {
       "type": "array",
       "items": { "type": "string" },

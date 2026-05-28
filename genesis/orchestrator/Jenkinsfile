@@ -191,12 +191,28 @@ def getPipelineMetadata(String name) {
     ).trim()
     if (!manifestPath) return [:]
     def m = readJSON(file: manifestPath)
+    // Build deploymentCheck from deployment.targets.<env>.healthCheck fields.
+    def deploymentCheck = null
+    def targets = m.deployment?.targets
+    if (targets) {
+        deploymentCheck = [:]
+        targets.each { envName, target ->
+            if (target?.healthCheck) {
+                deploymentCheck[envName] = target.healthCheck
+            }
+        }
+        if (deploymentCheck.isEmpty()) {
+            deploymentCheck = null
+        }
+    }
     return [
         jenkinsPath:     m.jenkinsPath,
         manualOnly:      m.manualOnly == true,
         triggersGenesis: m.triggersGenesis == true,
         cascades:        m.cascades == null ? true : (m.cascades == true),
         dependsOn:       m.dependsOn ?: [],
+        longRunning:     m.longRunning == true,
+        deploymentCheck: deploymentCheck,
     ]
 }
 
@@ -831,11 +847,8 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
     if (!config.jenkinsPath) {
         error "Cannot dispatch pipeline '${name}': no jenkinsPath in its build-manifest.json"
     }
-    // longRunning and deploymentCheck are PIPELINES-map fields not yet in manifests;
-    // fall back to the in-file map for those two until Task 7 migrates them.
-    def legacyConfig = PIPELINES[name]
     // Auto-derive wait from longRunning flag unless caller forced it.
-    boolean shouldWait = (wait == null) ? !(legacyConfig?.longRunning) : (wait as boolean)
+    boolean shouldWait = (wait == null) ? !(config.longRunning) : (wait as boolean)
     String waitMode = shouldWait ? 'wait-for-result' : 'fire-and-forget (longRunning)'
     echo "▶️ Triggering ${name}/${branch} [${waitMode}]..."
 
@@ -844,7 +857,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // Note: local list named `buildParams` to avoid shadowing the pipeline-scope
         // `params` accessor (needed below to forward DEPLOY_ONLY).
         def buildParams = [booleanParam(name: 'FORCE_BUILD', value: true)]
-        if (legacyConfig?.deploymentCheck) {
+        if (config.deploymentCheck) {
             buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: true))
         }
         // Propagate DEPLOY_ONLY so downstream pipelines (edge especially) skip

@@ -828,12 +828,31 @@ def walkBuildGraph(List changedFiles) {
 
     def pipelineRegistry = [:]
     graph.pipelines.each { name, manifest ->
+        // Build deploymentCheck map from deployment.targets.<env>.healthCheck.
+        // Returns null if no targets — preserves the legacy PIPELINES behavior
+        // where pipelines without deployments have deploymentCheck: null.
+        def deploymentCheck = null
+        def targets = manifest.deployment?.targets
+        if (targets) {
+            deploymentCheck = [:]
+            targets.each { envName, target ->
+                if (target?.healthCheck) {
+                    deploymentCheck[envName] = target.healthCheck
+                }
+            }
+            if (deploymentCheck.isEmpty()) {
+                deploymentCheck = null
+            }
+        }
+
         pipelineRegistry[name] = [
             jenkinsPath: manifest.jenkinsPath,
             manualOnly: manifest.manualOnly == true,
             triggersGenesis: manifest.triggersGenesis == true,
             cascades: manifest.cascades == null ? true : (manifest.cascades == true),
             dependsOn: manifest.dependsOn ?: [],
+            longRunning: manifest.longRunning == true,
+            deploymentCheck: deploymentCheck,
         ]
     }
 

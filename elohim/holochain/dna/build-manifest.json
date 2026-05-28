@@ -5,6 +5,7 @@
   "manualOnly": false,
   "triggersGenesis": true,
   "cascades": true,
+  "longRunning": true,
   "dependsOn": [],
   "description": "Holochain DNA compilation — WASM zomes and hApp packaging",
   "steps": {
