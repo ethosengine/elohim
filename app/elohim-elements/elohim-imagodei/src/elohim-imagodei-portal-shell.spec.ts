@@ -9,7 +9,10 @@ import {
 
 import './register.js';
 import { ElohimImagodeiPortalShell as ElohimImagodeiPortalShellClass } from './elohim-imagodei-portal-shell.js';
-import type { ElohimImagodeiPortalShell, AuthorityResolution } from './elohim-imagodei-portal-shell.js';
+import type {
+  ElohimImagodeiPortalShell,
+  AuthorityResolution,
+} from './elohim-imagodei-portal-shell.js';
 
 // ---------------------------------------------------------------------------
 // Fixture authority resolutions (no invented identity — labels from doorway)
@@ -37,9 +40,7 @@ const peerAuthority: AuthorityResolution = {
 describe('<elohim-imagodei-portal-shell> — authority property (host-pre-fetch contract)', () => {
   it('reflects doorway-host trustMode when host provides authority before first render', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
-      <elohim-imagodei-portal-shell
-        .authority=${doorwayAuthority}
-      ></elohim-imagodei-portal-shell>
+      <elohim-imagodei-portal-shell .authority=${doorwayAuthority}></elohim-imagodei-portal-shell>
     `);
     await el.updateComplete;
 
@@ -50,9 +51,7 @@ describe('<elohim-imagodei-portal-shell> — authority property (host-pre-fetch 
 
   it('reflects peer-conductor trustMode when host provides peer authority', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
-      <elohim-imagodei-portal-shell
-        .authority=${peerAuthority}
-      ></elohim-imagodei-portal-shell>
+      <elohim-imagodei-portal-shell .authority=${peerAuthority}></elohim-imagodei-portal-shell>
     `);
     await el.updateComplete;
 
@@ -71,42 +70,48 @@ describe('<elohim-imagodei-portal-shell> — authority property (host-pre-fetch 
   });
 
   it('emits authority-needed when authority is null on first render', async () => {
-    const el = await fixture<ElohimImagodeiPortalShell>(html`
-      <elohim-imagodei-portal-shell></elohim-imagodei-portal-shell>
-    `);
-    // authority-needed is emitted on firstUpdated — capture via a listener on parent
-    // (we listen before fixture for this test pattern with oneEvent after-the-fact
-    // by setting up before fixture and using oneEvent on a wrapper)
-    let fired = false;
-    el.addEventListener('authority-needed', () => { fired = true; });
-    // Re-trigger by creating fresh element
+    // Re-trigger by creating fresh element in a wrapper div we can capture events from
     const wrapper = document.createElement('div');
     document.body.appendChild(wrapper);
     let neededFired = false;
-    wrapper.addEventListener('authority-needed', () => { neededFired = true; }, true);
+    wrapper.addEventListener(
+      'authority-needed',
+      () => {
+        neededFired = true;
+      },
+      true
+    );
     const fresh = await fixture<ElohimImagodeiPortalShell>(
-      html`<elohim-imagodei-portal-shell></elohim-imagodei-portal-shell>`,
+      html`
+        <elohim-imagodei-portal-shell></elohim-imagodei-portal-shell>
+      `,
       { parentNode: wrapper }
     );
     await fresh.updateComplete;
-    document.body.removeChild(wrapper);
+    wrapper.remove();
     // authority-needed fires in firstUpdated which is synchronous after fixture resolves
     expect(neededFired).to.be.true;
-    // Suppress unused-variable warning — el was needed to satisfy TS
-    void fired;
   });
 
   it('does NOT emit authority-needed when authority is provided', async () => {
     let fired = false;
     const wrapper = document.createElement('div');
     document.body.appendChild(wrapper);
-    wrapper.addEventListener('authority-needed', () => { fired = true; }, true);
+    wrapper.addEventListener(
+      'authority-needed',
+      () => {
+        fired = true;
+      },
+      true
+    );
     const el = await fixture<ElohimImagodeiPortalShell>(
-      html`<elohim-imagodei-portal-shell .authority=${doorwayAuthority}></elohim-imagodei-portal-shell>`,
+      html`
+        <elohim-imagodei-portal-shell .authority=${doorwayAuthority}></elohim-imagodei-portal-shell>
+      `,
       { parentNode: wrapper }
     );
     await el.updateComplete;
-    document.body.removeChild(wrapper);
+    wrapper.remove();
     expect(fired).to.be.false;
   });
 
@@ -148,7 +153,9 @@ describe('<elohim-imagodei-portal-shell> — authority property (host-pre-fetch 
       if (typeof fn === 'function') {
         const src = fn.toString();
         expect(src, `method "${name}" must not call fetch()`).to.not.contain('fetch(');
-        expect(src, `method "${name}" must not use XMLHttpRequest`).to.not.contain('XMLHttpRequest');
+        expect(src, `method "${name}" must not use XMLHttpRequest`).to.not.contain(
+          'XMLHttpRequest'
+        );
       }
     }
   });
@@ -191,9 +198,9 @@ describe('<elohim-imagodei-portal-shell> — slot rendering', () => {
     `);
     const footerSlot = el.shadowRoot!.querySelector('slot[name="footer"]') as HTMLSlotElement;
     expect(footerSlot).to.exist;
-    expect(footerSlot.assignedElements().some(n => (n as HTMLElement).id === 'footer-text')).to.equal(
-      true
-    );
+    expect(
+      footerSlot.assignedElements().some(n => (n as HTMLElement).id === 'footer-text')
+    ).to.equal(true);
   });
 
   it('has a default header slot that renders trust-indicator + attestor-row', async () => {
@@ -213,9 +220,9 @@ describe('<elohim-imagodei-portal-shell> — slot rendering', () => {
       </elohim-imagodei-portal-shell>
     `);
     const headerSlot = el.shadowRoot!.querySelector('slot[name="header"]') as HTMLSlotElement;
-    expect(headerSlot.assignedElements().some(n => (n as HTMLElement).id === 'custom-header')).to.equal(
-      true
-    );
+    expect(
+      headerSlot.assignedElements().some(n => (n as HTMLElement).id === 'custom-header')
+    ).to.equal(true);
   });
 });
 
@@ -354,7 +361,9 @@ describe('<elohim-imagodei-portal-shell> — a11y precondition gate', () => {
   it('passes axe accessibility audit when authority is provided', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
       <elohim-imagodei-portal-shell step="resolve" .authority=${doorwayAuthority}>
-        <div slot="primary" role="region" aria-label="Resolve step"><button type="button">Continue</button></div>
+        <div slot="primary" role="region" aria-label="Resolve step">
+          <button type="button">Continue</button>
+        </div>
       </elohim-imagodei-portal-shell>
     `);
     const results = await axe.run(el);
@@ -370,17 +379,15 @@ describe('<elohim-imagodei-portal-shell> — ua-prefs precondition gate', () => 
   afterEach(() => clearMediaQueries());
 
   it('CSS omits transitions and animations (still by default)', () => {
-    const cssText = (
-      ElohimImagodeiPortalShellClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiPortalShellClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     expect(cssText).to.not.contain('transition:');
     expect(cssText).to.not.contain('animation:');
   });
 
   it('CSS has a forced-colors override block', () => {
-    const cssText = (
-      ElohimImagodeiPortalShellClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiPortalShellClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     expect(cssText).to.contain('forced-colors');
   });
 
@@ -415,9 +422,8 @@ describe('<elohim-imagodei-portal-shell> — i18n precondition gate', () => {
   });
 
   it('uses no physical CSS properties (only logical or non-positional)', () => {
-    const cssText = (
-      ElohimImagodeiPortalShellClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiPortalShellClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });

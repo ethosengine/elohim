@@ -107,10 +107,7 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
     }
 
     [part='primary-region'] {
-      background: var(
-        --elohim-portal-panel-bg,
-        color-mix(in srgb, Canvas 96%, CanvasText)
-      );
+      background: var(--elohim-portal-panel-bg, color-mix(in srgb, Canvas 96%, CanvasText));
       border-radius: var(--elohim-portal-panel-radius, 8px);
       padding: var(--elohim-portal-panel-padding, 1rem);
     }
@@ -220,7 +217,7 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
     }
   }
 
-  private _onSlotChange = (): void => {
+  private readonly _onSlotChange = (): void => {
     this._propagateContextToSlots();
   };
 
@@ -241,10 +238,7 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
         </header>
 
         <main part="primary-region">
-          <slot
-            name="primary"
-            @slotchange=${this._onSlotChange}
-          ></slot>
+          <slot name="primary" @slotchange=${this._onSlotChange}></slot>
         </main>
 
         <div part="error-region">
