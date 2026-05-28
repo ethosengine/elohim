@@ -38,9 +38,7 @@ use crate::error::StorageError;
 use crate::hc_client_registry::HcClientRegistry;
 use crate::services::response::{self, from_create_result};
 use crate::services::EconomicEventService;
-use crate::views::{
-    CreateEconomicEventInputView, EconomicEventView, JsonVal, LamadEventIntentView,
-};
+use crate::views::{CreateEconomicEventInputView, EconomicEventView, LamadEventIntentView};
 
 use super::{get_conn, parse_body};
 

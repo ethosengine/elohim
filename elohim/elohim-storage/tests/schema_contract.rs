@@ -3501,8 +3501,8 @@ fn lamad_event_intent_rejects_unknown_event_type() {
         "lamadEventType": "totally-made-up"
     });
     let schema = load_schema("intents/lamad-event-intent.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("lamad-event-intent schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("lamad-event-intent schema should compile");
     let errors: Vec<_> = validator.iter_errors(&invalid).collect();
     assert!(
         !errors.is_empty(),
@@ -3513,8 +3513,8 @@ fn lamad_event_intent_rejects_unknown_event_type() {
 #[test]
 fn lamad_event_intent_rejects_missing_required_fields() {
     let schema = load_schema("intents/lamad-event-intent.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("lamad-event-intent schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("lamad-event-intent schema should compile");
 
     // Missing agentId
     let no_agent = serde_json::json!({ "lamadEventType": "content-view" });
@@ -3534,8 +3534,8 @@ fn lamad_event_intent_rejects_missing_required_fields() {
 #[test]
 fn lamad_event_intent_schema_declares_source_of_truth() {
     let path = schema_dir().join("intents/lamad-event-intent.schema.json");
-    let content = fs::read_to_string(&path)
-        .expect("intents/lamad-event-intent.schema.json must exist");
+    let content =
+        fs::read_to_string(&path).expect("intents/lamad-event-intent.schema.json must exist");
     let schema_value: Value = serde_json::from_str(&content)
         .expect("intents/lamad-event-intent.schema.json must be valid JSON");
     assert_source_of_truth_declared(&schema_value, "intents/lamad-event-intent.schema.json");
