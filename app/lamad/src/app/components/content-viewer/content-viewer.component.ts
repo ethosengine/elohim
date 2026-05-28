@@ -50,32 +50,12 @@ import {
   FeedbackProfile,
   createProfileFromTemplate,
 } from '@app/lamad/models/feedback-profile.model';
-// BACKEND-MIGRATION DEFERRAL — see pillar-bundle-split-runbook.md §6.14.
-//
-// FeedbackMechanismGatewayComponent + GraduatedFeedbackComponent + ReactionBarComponent
-// from @app/qahal are retained because the Lit equivalents in elohim-core
-// (<elohim-feedback-mechanism-gateway>, <elohim-graduated-feedback>, <elohim-reaction-bar>)
-// are stateless primitives, while the Angular components still host submission flow,
-// mediation/reaction aggregation, and governance-signal recording via GovernanceApiService.
-//
-// Slice 2.2b CLOSED (M-POLICY-1 + M-POLICY-2 + M-REA-3, 2026-05-28):
-//   - M-POLICY-1: SignalAccumulationService retired → GET /api/v1/governance/{type}/{id}/accumulation
-//   - M-POLICY-2: MechanismSelectionService retired → GET /api/v1/governance/{type}/{id}/mechanism
-//   - M-REA-3: GovernanceRecognitionService retired → POST /api/v1/mishpat/recognition/participation
-//     Substrate reads recognition_weight_by_level from standing-policy Manifest.
-//     RecognitionApiService.distribute() deleted (was only caller).
-//
-// All three remaining @app/qahal imports below are retained for the submission-flow
-// and governance-signal aggregation orchestration which M-POLICY-1/2/M-REA-3 did
-// not cover (those belong to a future governance-feedback-backend ticket).
-// The Lit swap (Wave D) is now trivially clean — no substrate-policy logic remains
-// in these components; only legitimate UX + sense-and-respond code remains.
-import { FeedbackMechanismGatewayComponent } from '@app/qahal';
-import {
-  FeedbackContext,
-  GraduatedFeedbackComponent,
-} from '@app/qahal/components/graduated-feedback/graduated-feedback.component';
-import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
+// Substrate views pre-fetched and bound to Lit primitives — see M-POLICY-1/2 + M-REA-3.
+import type {
+  AccumulationStatus,
+  MechanismSelection,
+} from 'elohim-core';
+import { GovernanceApiService } from '@elohim/service';
 import { AttentionTrackerService, EventService } from '@elohim/rea-runtime';
 
 import type {
@@ -126,9 +106,6 @@ import type { ContentStewardshipView } from '@elohim/storage-client/generated';
     RouterModule,
     ContentDownloadComponent,
     MiniGraphComponent,
-    ReactionBarComponent,
-    GraduatedFeedbackComponent,
-    FeedbackMechanismGatewayComponent,
     FocusedViewToggleComponent,
     ResilienceSnapshotComponent,
     DistributionBadgeComponent,
@@ -172,8 +149,13 @@ export class ContentViewerComponent
   feedbackProfile: FeedbackProfile | null = null;
   aggregatedSignals: LamadAggregatedSignals | null = null;
   allowedReactions: EmotionalReactionType[] = [];
-  feedbackContext: FeedbackContext = 'usefulness';
+  feedbackContext: 'accuracy' | 'usefulness' | 'proposal' | 'clarity' | 'relevance' = 'usefulness';
   showFeedbackSection = true;
+
+  // Governance substrate views — pre-fetched and bound to Lit primitives (Wave D / M-POLICY-1+2)
+  mechanismSelection: MechanismSelection | null = null;
+  accumulationStatus: AccumulationStatus | null = null;
+  isLoadingGovernanceViews = false;
 
   // "Appears in paths" back-links (Wikipedia-style)
   containingPaths: { pathId: string; pathTitle: string; stepIndex: number }[] = [];
@@ -235,6 +217,7 @@ export class ContentViewerComponent
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
   private readonly eventService = inject(EventService);
   private readonly storageClient: ILamadStorageClient = inject(LAMAD_STORAGE_CLIENT);
+  private readonly governanceApi = inject(GovernanceApiService);
   private readonly document = inject(DOCUMENT);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
 
@@ -320,10 +303,13 @@ export class ContentViewerComponent
     // *ngIf="node" flipped on after data load). Idempotent — assigning the
     // same loader twice is harmless.
     this.wireAnalyticsLoader();
+    // Wire governance substrate views to Lit elements (idempotent).
+    this.wireGovernanceLitElements();
   }
 
   ngAfterViewInit(): void {
     this.wireAnalyticsLoader();
+    this.wireGovernanceLitElements();
   }
 
   /**
@@ -518,6 +504,9 @@ export class ContentViewerComponent
           // Load feedback profile and aggregated signals
           this.loadFeedbackProfile(contentNode);
           this.loadAggregatedSignals(nodeId);
+
+          // Pre-fetch governance substrate views for Lit primitives (Wave D / M-POLICY-1+2)
+          void this.loadGovernanceViews(nodeId);
 
           this.isLoading = false;
 
@@ -787,6 +776,64 @@ export class ContentViewerComponent
           this.aggregatedSignals = null;
         },
       });
+  }
+
+  /**
+   * Pre-fetch the substrate views needed by the Lit feedback primitives.
+   *
+   * M-POLICY-1: AccumulationStatusView → AccumulationStatus bound to
+   *   <elohim-feedback-mechanism-gateway .accumulationStatus>
+   * M-POLICY-2: MechanismSelectionView → MechanismSelection bound to
+   *   <elohim-feedback-mechanism-gateway .selection>
+   *
+   * Both are wired to the Lit element in wireGovernanceLitElements().
+   */
+  private async loadGovernanceViews(nodeId: string): Promise<void> {
+    this.isLoadingGovernanceViews = true;
+    try {
+      const [mechanismView, accumulationView] = await Promise.all([
+        this.governanceApi.getMechanismSelection('content', nodeId),
+        this.governanceApi.getAccumulationStatus('content', nodeId),
+      ]);
+      this.mechanismSelection = {
+        level: mechanismView.level as 0 | 1 | 2,
+        renderTarget: mechanismView.renderTarget as 'angular' | 'psephos',
+      };
+      this.accumulationStatus = {
+        readyForSensemaking: accumulationView.readyForSensemaking,
+        controversyDetected: accumulationView.controversyDetected,
+        settled: accumulationView.settled,
+      };
+    } catch {
+      // Governance views are supplemental — silently degrade
+      this.mechanismSelection = null;
+      this.accumulationStatus = null;
+    } finally {
+      this.isLoadingGovernanceViews = false;
+    }
+  }
+
+  /**
+   * Wire the substrate views to the rendered <elohim-feedback-mechanism-gateway>
+   * Lit element. Must run after every change-detection cycle (AfterViewChecked)
+   * because the element may be conditionally rendered via *ngIf="node".
+   */
+  private wireGovernanceLitElements(): void {
+    const gateway = this.elRef.nativeElement.querySelector<
+      HTMLElement & {
+        selection: MechanismSelection | null;
+        accumulationStatus: AccumulationStatus | null;
+        loading: boolean;
+      }
+    >('elohim-feedback-mechanism-gateway');
+    if (!gateway) return;
+    if (gateway.selection !== this.mechanismSelection) {
+      gateway.selection = this.mechanismSelection;
+    }
+    if (gateway.accumulationStatus !== this.accumulationStatus) {
+      gateway.accumulationStatus = this.accumulationStatus;
+    }
+    gateway.loading = this.isLoadingGovernanceViews;
   }
 
   // =========================================================================
