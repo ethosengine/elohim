@@ -55,7 +55,8 @@ pub fn compute(
                     online_peer_count: 0,
                     health_score: 0.0,
                 },
-                commitment_backed_replication: CommitmentBackedReplication::default(), // T15: computed
+                // Sprint-3 stub: per-tier commitment counts from rea_commitments land in follow-up
+                commitment_backed_replication: CommitmentBackedReplication::default(),
             });
         }
         Some(m) => serde_json::from_str(&m.shard_hashes_json).map_err(|e| {

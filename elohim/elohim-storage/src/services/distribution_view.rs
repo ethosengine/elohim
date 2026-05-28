@@ -69,13 +69,17 @@ pub fn replica_target_for(reach: &ReachClass) -> u32 {
 }
 
 /// Replica-health classification: count vs target.
-///   ratio >= 0.85 -> Healthy
-///   ratio >= 0.50 -> AtRisk
-///   ratio  < 0.50 -> Critical
-///   target == 0   -> Healthy (vacuous)
+///   count >= target*2 -> OverReplicated (checked first, only when target > 0)
+///   ratio >= 0.85     -> Healthy
+///   ratio >= 0.50     -> AtRisk
+///   ratio  < 0.50     -> Critical
+///   target == 0       -> Healthy (vacuous)
 pub fn replica_health_for(count: u32, target: u32) -> ReplicaHealth {
     if target == 0 {
         return ReplicaHealth::Healthy;
+    }
+    if count >= target.saturating_mul(2) {
+        return ReplicaHealth::OverReplicated;
     }
     let ratio = count as f64 / target as f64;
     if ratio >= 0.85 {
@@ -84,6 +88,49 @@ pub fn replica_health_for(count: u32, target: u32) -> ReplicaHealth {
         ReplicaHealth::AtRisk
     } else {
         ReplicaHealth::Critical
+    }
+}
+
+/// Classify the federation-coverage tier from the number of doorway projectors
+/// that have acked a blob and the number of distinct regions they span.
+///
+///   projectors 0–2  (any regions)    → Local
+///   projectors 3–5  + 0–1 regions    → Regional
+///   projectors 3–5  + 2+ regions     → Global
+///   projectors 6+   (any regions)    → Global
+pub fn compute_projection_tier(projector_count: u32, distinct_regions: u32) -> ProjectionTier {
+    match (projector_count, distinct_regions) {
+        (0..=2, _) => ProjectionTier::Local,
+        (3..=5, 0..=1) => ProjectionTier::Regional,
+        (3..=5, _) => ProjectionTier::Global,
+        _ => ProjectionTier::Global,
+    }
+}
+
+/// Compute fault-domain diversity from the known replica peers.
+///
+/// Each `ReplicaPeer` carries `household_id` and `region_tier`; collective
+/// binding is not yet on the peer row (Sprint-3 follow-up).
+pub fn compute_fault_domain_diversity(replica_peers: &[ReplicaPeer]) -> FaultDomainDiversity {
+    use std::collections::HashSet;
+    let households: HashSet<&str> = replica_peers
+        .iter()
+        .filter_map(|p| p.household_id.as_deref())
+        .collect();
+    let regions: HashSet<&str> = replica_peers
+        .iter()
+        .filter_map(|p| p.region_tier.as_deref())
+        .collect();
+    let distinct_household_count = households.len() as u32;
+    let distinct_region_count = regions.len() as u32;
+    FaultDomainDiversity {
+        distinct_household_count,
+        // ReplicaPeer carries no collective binding yet — Sprint-3 follow-up.
+        distinct_collective_count: 0,
+        distinct_region_count,
+        // Risk when all known replicas share a single household fault domain.
+        single_fault_domain_risk: distinct_household_count <= 1,
+        fault_modes_evaluated: vec!["household".to_string(), "region".to_string()],
     }
 }
 
@@ -238,7 +285,10 @@ pub async fn compose_distribution_summary(
         last_verified_seconds,
         my_role,
         reciprocity_hint,
-        projection_tier: ProjectionTier::Local, // T15: computed
+        // Sprint 3: region-diversity refinement is follow-up; coarse tier from projector_count.
+        // projector_count is in scope; distinct projector regions are not cheaply available
+        // on the summary path without an additional query, so distinct_regions passes as 0.
+        projection_tier: compute_projection_tier(projector_count, 0),
     })
 }
 
@@ -348,6 +398,8 @@ pub async fn compose_distribution_details(
         }
     };
 
+    let fault_domain_diversity = compute_fault_domain_diversity(&replica_peers);
+
     Ok(DistributionDetails {
         summary,
         replica_peers,
@@ -355,8 +407,9 @@ pub async fn compose_distribution_details(
         placement_gaps,
         recent_projection_events,
         commitment_references,
-        replication_commitments: Vec::new(), // T15: computed
-        fault_domain_diversity: FaultDomainDiversity::default(), // T15: computed
+        // Sprint-3 stub: querying rea_commitments by content-recipient + scope lands in the collective-tier follow-up
+        replication_commitments: Vec::new(),
+        fault_domain_diversity,
     })
 }
 
