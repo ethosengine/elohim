@@ -148,6 +148,9 @@ const INTERFACE_FILES = [
   // M-AGGR-2: Holochain source-chain cutover — Category B agent-scoped (imagodei DNA source chain)
   { src: 'views/source-chain-entry-view.ts', dest: 'source-chain-entry-view.ts' },
   { src: 'views/entry-link-view.ts', dest: 'entry-link-view.ts' },
+  // M-AGGR-1: SessionHumanView + UpgradePromptView projections (Category C operational — EconomicEvent × HumanProgress × onboarding Manifest)
+  { src: 'views/session-human-view.ts', dest: 'session-human-view.ts' },
+  { src: 'views/upgrade-prompt-view.ts', dest: 'upgrade-prompt-view.ts' },
 ];
 
 /**

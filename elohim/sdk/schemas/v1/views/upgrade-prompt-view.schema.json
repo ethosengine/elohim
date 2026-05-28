@@ -1,0 +1,60 @@
+{
+  "$id": "epr:schema:view:upgrade-prompt",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UpgradePromptView",
+  "description": "Source of truth: derived projection of SessionHumanView × Manifest{kind:'onboarding'} for a specific agent (Operational, Category C). Reads the onboarding Manifest payload to discover which prompts exist and their trigger conditions, then joins with the agent's SessionHumanView to determine which prompts are currently active. Reconstructable from EconomicEvent stream + onboarding Manifest at any time.",
+  "type": "object",
+  "required": [
+    "agentId",
+    "hAppId",
+    "activePrompts",
+    "computedAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "agentId": {
+      "type": "string",
+      "description": "AgentPubKey of the human whose upgrade prompts this projects"
+    },
+    "hAppId": {
+      "type": "string",
+      "description": "hApp identifier scoping this projection"
+    },
+    "activePrompts": {
+      "type": "array",
+      "description": "Ordered list of currently-active (non-dismissed) upgrade prompts derived from the onboarding Manifest",
+      "items": {
+        "type": "object",
+        "required": ["promptId", "trigger", "title", "message", "benefits"],
+        "additionalProperties": false,
+        "properties": {
+          "promptId": {
+            "type": "string",
+            "description": "Stable identifier for this prompt as declared in the onboarding Manifest"
+          },
+          "trigger": {
+            "type": "string",
+            "description": "The lamadEventType or session condition that activated this prompt (e.g. 'path-started', 'return-visit', 'progress-at-risk')"
+          },
+          "title": {
+            "type": "string",
+            "description": "Short display title for the prompt"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable message explaining why the prompt appeared"
+          },
+          "benefits": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Bullet-point benefits the agent gains by upgrading (from the Manifest payload)"
+          }
+        }
+      }
+    },
+    "computedAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when this projection was last computed"
+    }
+  }
+}

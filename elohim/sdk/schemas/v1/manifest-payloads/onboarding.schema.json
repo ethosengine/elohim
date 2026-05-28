@@ -1,0 +1,65 @@
+{
+  "$id": "epr:schema:manifest-payload:onboarding",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OnboardingManifestPayload",
+  "description": "Payload schema for Manifest entries with kind='onboarding'. Declares the set of upgrade prompts the substrate may surface to anonymous/session humans, including trigger conditions and display content. Stored as payload_json in a Manifest DHT entry in the elohim DNA content_store zome.",
+  "type": "object",
+  "required": ["prompts"],
+  "additionalProperties": false,
+  "properties": {
+    "prompts": {
+      "type": "array",
+      "description": "Ordered list of upgrade prompt definitions. The substrate projects active prompts by matching each prompt's triggerCondition against the agent's SessionHumanView.",
+      "items": {
+        "type": "object",
+        "required": ["promptId", "trigger", "triggerCondition", "title", "message", "benefits"],
+        "additionalProperties": false,
+        "properties": {
+          "promptId": {
+            "type": "string",
+            "description": "Stable identifier for this prompt (e.g. 'first-affinity', 'path-started')"
+          },
+          "trigger": {
+            "type": "string",
+            "description": "The lamadEventType or session condition that activates this prompt"
+          },
+          "triggerCondition": {
+            "type": "object",
+            "description": "Condition evaluated against SessionHumanView to determine if this prompt is active",
+            "required": ["field", "operator", "threshold"],
+            "additionalProperties": false,
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "SessionHumanView field to check (e.g. 'nodesWithAffinity', 'pathsStarted', 'pathsCompleted')"
+              },
+              "operator": {
+                "type": "string",
+                "enum": ["gte", "gt", "eq", "always"],
+                "description": "Comparison operator: gte=>=, gt=>, eq===, always=unconditional"
+              },
+              "threshold": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Threshold value for the comparison (ignored when operator='always')"
+              }
+            }
+          },
+          "title": {
+            "type": "string",
+            "description": "Short display title for the prompt"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable message explaining why the prompt appeared"
+          },
+          "benefits": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Bullet-point benefits the agent gains by upgrading"
+          }
+        }
+      }
+    }
+  }
+}
