@@ -582,6 +582,8 @@ async function main() {
   // reference any Task 1-3 substrate addition. If we ever introduce a change that
   // causes an existing manifest to fail for one of OUR new substrate reasons, this
   // test surfaces it.
+  //
+  // When future tasks extend the substrate with new named additions (e.g., new $defs, properties, or enums), extend TASK_1_TO_3_SURFACE with the new discriminating tokens before landing the schema change.
   {
     const manifestSchemaPath = resolve(__dirname, '../v1/manifest/app-manifest.schema.json');
     const manifestSchema = await loadJson(manifestSchemaPath);
@@ -592,7 +594,7 @@ async function main() {
     // `../enums/...` $refs resolve. (Same pattern as the Task 4 fixture block —
     // see that block's comments for the namespace-collision rationale.)
     const enumDir = resolve(__dirname, '../v1/enums');
-    const enumFiles = await (await import('node:fs/promises')).readdir(enumDir);
+    const enumFiles = await readdir(enumDir);
     for (const file of enumFiles.filter(f => f.endsWith('.schema.json'))) {
       const schema = await loadJson(resolve(enumDir, file));
       const resolvedUri = `epr:enums/${file}`;
@@ -649,7 +651,8 @@ async function main() {
       // Find any errors that reference our Task 1-3 substrate additions.
       const ourErrors = errors.filter(err => {
         const path = `${err.schemaPath || ''} ${err.instancePath || ''} ${err.message || ''}`;
-        return TASK_1_TO_3_SURFACE.some(token => path.includes(token));
+        const paramsStr = JSON.stringify(err.params || '');
+        return TASK_1_TO_3_SURFACE.some(token => path.includes(token) || paramsStr.includes(token));
       });
 
       if (ourErrors.length > 0) {
