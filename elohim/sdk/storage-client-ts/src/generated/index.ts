@@ -7,6 +7,7 @@
  * Source: elohim/elohim-storage/src/views.rs
  */
 
+export * from "./AccumulationStatusView";
 export * from "./AccessGrantView";
 export * from "./AccountIdentityView";
 export * from "./AccountImportResultView";

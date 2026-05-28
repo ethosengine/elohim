@@ -26,9 +26,8 @@ import {
   GovernanceApiService,
   MechanismSelectionService,
   type MechanismSelection,
-  SignalAccumulationService,
-  type AccumulationStatus,
 } from '@elohim/service';
+import type { AccumulationStatusView } from '@elohim/storage-client';
 import {
   ContextMenuOnlyComponent,
   type ContextMenuAction,
@@ -281,7 +280,6 @@ export class FeedbackMechanismGatewayComponent {
   private readonly router = inject(Router);
   private readonly governanceApi = inject(GovernanceApiService);
   private readonly mechanismSelection = inject(MechanismSelectionService);
-  private readonly signalAccumulation = inject(SignalAccumulationService);
 
   /** Reference to the native <dialog> element when the challenge form is open. */
   readonly challengeDialog = viewChild<ElementRef<HTMLDialogElement>>('challengeDialog');
@@ -295,8 +293,8 @@ export class FeedbackMechanismGatewayComponent {
   /** Active proposal for this entity (if any). */
   private readonly activeProposal = signal<ProposalView | undefined>(undefined);
 
-  /** Accumulation status derived from signal aggregates. */
-  readonly accumulationStatus = signal<AccumulationStatus | null>(null);
+  /** Accumulation status from server-side projection (M-POLICY-1). */
+  readonly accumulationStatus = signal<AccumulationStatusView | null>(null);
 
   /** Whether governance data has been loaded (distinguishes null-state from not-yet-loaded). */
   private readonly loaded = signal(false);
@@ -399,7 +397,7 @@ export class FeedbackMechanismGatewayComponent {
     const [state, proposals, accumulation] = await Promise.all([
       this.governanceApi.getGovernanceState(entityType, entityId),
       this.governanceApi.queryProposals(entityId, 'active'),
-      this.signalAccumulation.getAccumulationStatus(entityType, entityId),
+      this.governanceApi.getAccumulationStatus(entityType, entityId),
     ]);
 
     this.governanceState.set(state);

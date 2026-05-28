@@ -40,6 +40,8 @@ import type {
   SensemakingResultView,
   GovernanceDispositionView,
   UpdateDispositionInputView,
+  // M-POLICY-1: server-side AccumulationStatus projection
+  AccumulationStatusView,
 } from '@elohim/storage-client/generated';
 
 @Injectable({ providedIn: 'root' })
@@ -265,6 +267,41 @@ export class GovernanceApiService implements IGovernance {
           },
         })
         .pipe(catchError(() => of(emptyAggregate)))
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // M-POLICY-1: Server-side AccumulationStatus projection
+  //
+  // Replaces the client-side SignalAccumulationService.getAccumulationStatus().
+  // The substrate computes status flags by joining FeedbackSignal aggregates
+  // with the standing-policy Manifest thresholds. No client-side arithmetic.
+  // Route: GET /api/v1/governance/{entityType}/{entityId}/accumulation
+  // ---------------------------------------------------------------------------
+
+  async getAccumulationStatus(
+    entityType: string,
+    entityId: string,
+  ): Promise<AccumulationStatusView> {
+    const emptyStatus: AccumulationStatusView = {
+      entityType,
+      entityId,
+      totalSignals: 0,
+      uniqueParticipants: 0,
+      consensusStrength: 0,
+      status: 'pending',
+      readyForSensemaking: false,
+      controversyDetected: false,
+      settled: false,
+      policyManifestCid: null,
+      computedAt: new Date().toISOString(),
+    };
+    return firstValueFrom(
+      this.http
+        .get<AccumulationStatusView>(
+          `/api/v1/governance/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/accumulation`,
+        )
+        .pipe(catchError(() => of(emptyStatus))),
     );
   }
 

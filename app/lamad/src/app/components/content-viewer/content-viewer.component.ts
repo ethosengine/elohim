@@ -63,8 +63,9 @@ import {
 // backend migration lands; until then these three Angular components host the orchestration.
 //
 // Slice 2.2b closure (commit 625d02a0f, 2026-05-28) migrated 2/3 of the contributing
-// helper services to @elohim/service (MechanismSelectionService, SignalAccumulationService)
-// — both are pure-function-style helpers that are legitimately client-side or backend.
+// helper services to @elohim/service (MechanismSelectionService) and then to the Rust
+// substrate (SignalAccumulationService retired by M-POLICY-1 — server-side AccumulationStatus
+// projection now served by GET /api/v1/governance/{type}/{id}/accumulation via GovernanceApiService).
 // GovernanceRecognitionService stays in @app/qahal for now because its RecognitionApiService
 // chain is part of the orchestration that should move backend, not into a library.
 //

@@ -146,8 +146,9 @@ export { DoorwayClientService } from './angular/services/doorway-client.service'
 // consumed wherever feedback mechanism orchestration is needed).
 export { MechanismSelectionService } from './angular/services/mechanism-selection.service';
 export type { MechanismSelection } from './angular/services/mechanism-selection.service';
-export { SignalAccumulationService } from './angular/services/signal-accumulation.service';
-export type { AccumulationStatus } from './angular/services/signal-accumulation.service';
+// SignalAccumulationService retired by M-POLICY-1: use GovernanceApiService.getAccumulationStatus()
+// which reads the server-side AccumulationStatus projection derived from
+// FeedbackSignal × Manifest(kind: standing-policy).
 export type {
   VerifyBlobRequest,
   VerifyBlobResponse,

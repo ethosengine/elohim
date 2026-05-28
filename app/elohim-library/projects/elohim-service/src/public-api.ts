@@ -44,5 +44,4 @@ export type {
 // be orchestrated).
 export { MechanismSelectionService } from './angular/services/mechanism-selection.service';
 export type { MechanismSelection } from './angular/services/mechanism-selection.service';
-export { SignalAccumulationService } from './angular/services/signal-accumulation.service';
-export type { AccumulationStatus } from './angular/services/signal-accumulation.service';
+// SignalAccumulationService retired by M-POLICY-1: use GovernanceApiService.getAccumulationStatus().
