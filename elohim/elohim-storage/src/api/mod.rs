@@ -30,6 +30,7 @@ pub mod exchange;
 pub mod flow_planning;
 pub mod gate;
 pub mod governance;
+pub mod lamad;
 pub mod governance_actions;
 pub mod graph_views;
 pub mod hazards;
@@ -316,6 +317,10 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("gate") {
         let resource_path = sub_path.strip_prefix("gate").unwrap_or("");
         gate::handle(req, method, resource_path, &pool, &app_ctx, services).await
+    } else if sub_path.starts_with("lamad") {
+        // M-REA-1: intent-driven EconomicEvent composition — POST /api/v1/lamad/events
+        let resource_path = sub_path.strip_prefix("lamad").unwrap_or("");
+        lamad::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("token") {
         let resource_path = sub_path
             .strip_prefix("token")

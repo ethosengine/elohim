@@ -1,0 +1,78 @@
+{
+  "$id": "epr:schema:intent:lamad-event",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LamadEventIntent",
+  "description": "Source of truth: request body for coordinator-mediated EconomicEvent creation (Category A, existing). The coordinator composes the full EconomicEvent (provider/receiver/action) from the discriminated union using substrate-known PROTOCOL_EVENT_MAPPINGS. This is an intent wire shape, not an entity. The persisted source of truth is the EconomicEvent entry in the elohim DNA content_store zome, projected to the economic_events table in elohim-storage.",
+  "type": "object",
+  "required": ["agentId", "lamadEventType"],
+  "additionalProperties": false,
+  "properties": {
+    "agentId": {
+      "type": "string",
+      "description": "Agent public key of the initiating agent (provider for most event types)"
+    },
+    "lamadEventType": {
+      "type": "string",
+      "description": "Lamad event type discriminant — determines the REA action, provider, and receiver via PROTOCOL_EVENT_MAPPINGS",
+      "enum": [
+        "content-view",
+        "content-complete",
+        "path-step-complete",
+        "path-complete",
+        "session-start",
+        "session-end",
+        "assessment-start",
+        "assessment-complete",
+        "practice-attempt",
+        "quiz-submit",
+        "affinity-mark",
+        "endorsement",
+        "citation",
+        "recognition-given",
+        "recognition-received",
+        "attestation-grant",
+        "capability-earn",
+        "content-create",
+        "path-create",
+        "extension-create",
+        "map-synthesis",
+        "analysis-complete",
+        "stewardship-begin",
+        "invitation-send",
+        "presence-claim",
+        "recognition-transfer",
+        "attestation-revoke",
+        "content-flag",
+        "governance-vote"
+      ]
+    },
+    "contentId": {
+      "type": ["string", "null"],
+      "description": "Content node this event relates to (required for content-* and assessment-* types)"
+    },
+    "pathId": {
+      "type": ["string", "null"],
+      "description": "Learning path this event relates to (required for path-* types)"
+    },
+    "contributorPresenceId": {
+      "type": ["string", "null"],
+      "description": "Contributor presence this event relates to (required for recognition-given)"
+    },
+    "resourceQuantityValue": {
+      "type": ["number", "null"],
+      "description": "Quantity of resource affected (e.g. amount of recognition)"
+    },
+    "resourceQuantityUnit": {
+      "type": ["string", "null"],
+      "description": "Unit of resource quantity (e.g. 'recognition', 'unit-view')"
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "description": "Domain-specific metadata payload (e.g. assessmentId, quizId, score, stepId)"
+    },
+    "note": {
+      "type": ["string", "null"],
+      "description": "Human-readable note about this event"
+    }
+  }
+}

@@ -132,6 +132,9 @@ const INTERFACE_FILES = [
   { src: 'views/membership-view.ts', dest: 'membership-view.ts' },
   { src: 'views/collab-agreement-view.ts', dest: 'collab-agreement-view.ts' },
   { src: 'views/collab-qahal-view.ts', dest: 'collab-qahal-view.ts' },
+  // M-REA-1: intent-driven EconomicEvent composition wire shape (Category A existing)
+  // Client emits high-level LamadEventIntent; substrate composes full REA shape.
+  { src: 'intents/lamad-event-intent.ts', dest: 'lamad-event-intent.ts' },
 ];
 
 /**
@@ -424,7 +427,7 @@ async function main() {
     const refMap = await loadRefMap(SCHEMA_DIR);
 
     const allGenerated = [];
-    for (const subdir of ['enums', 'objects', 'inputs', 'views', 'p2p', 'manifests', 'attestation', 'attestation/subtypes']) {
+    for (const subdir of ['enums', 'objects', 'inputs', 'views', 'p2p', 'manifests', 'attestation', 'attestation/subtypes', 'intents']) {
       const results = await generateFromDir(subdir, refMap);
       allGenerated.push(...results);
     }

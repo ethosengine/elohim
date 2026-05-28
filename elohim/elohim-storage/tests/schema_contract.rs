@@ -1169,6 +1169,8 @@ fn view_schemas_declare_source_of_truth() {
         "views/projection-coverage.schema.json",
         "views/public-surface-state.schema.json",
         "views/view-slice.schema.json",
+        // Intent schemas — same convention: description must declare source of truth
+        "intents/lamad-event-intent.schema.json",
     ];
 
     for schema_name in &view_schemas {
@@ -3411,4 +3413,130 @@ fn epr_projection_view_steward_direct_populated_matches_schema() {
     );
 
     validate_against_schema("views/epr-projection-view.schema.json", &json);
+}
+
+// ── M-REA-1: LamadEventIntent intent schema contract ────────────────────────
+//
+// Validates that the LamadEventIntentView Rust struct serializes compatibly
+// with the `intents/lamad-event-intent.schema.json` contract.
+// Source of truth: request body wire shape (not an entity — Category A existing
+// EconomicEvent is the notarized source of truth on the DHT).
+
+#[test]
+fn lamad_event_intent_minimal_validates() {
+    // Minimum required fields only: agentId + lamadEventType
+    let minimal = serde_json::json!({
+        "agentId": "agent-abc123",
+        "lamadEventType": "content-view"
+    });
+    validate_against_schema("intents/lamad-event-intent.schema.json", &minimal);
+}
+
+#[test]
+fn lamad_event_intent_full_validates() {
+    // All optional fields populated
+    let full = serde_json::json!({
+        "agentId": "agent-abc123",
+        "lamadEventType": "recognition-given",
+        "contentId": "content-xyz",
+        "pathId": "path-456",
+        "contributorPresenceId": "presence-789",
+        "resourceQuantityValue": 1.0,
+        "resourceQuantityUnit": "recognition",
+        "metadata": { "source": "lamad-harness" },
+        "note": "Genuine recognition for quality contribution"
+    });
+    validate_against_schema("intents/lamad-event-intent.schema.json", &full);
+}
+
+#[test]
+fn lamad_event_intent_all_enum_values_are_valid() {
+    // Every lamadEventType value in the schema enum must validate.
+    // This catches drift if a new value is added to the Rust match arm
+    // without being added to the schema enum, or vice versa.
+    let schema_event_types = [
+        "content-view",
+        "content-complete",
+        "path-step-complete",
+        "path-complete",
+        "session-start",
+        "session-end",
+        "assessment-start",
+        "assessment-complete",
+        "practice-attempt",
+        "quiz-submit",
+        "affinity-mark",
+        "endorsement",
+        "citation",
+        "recognition-given",
+        "recognition-received",
+        "attestation-grant",
+        "capability-earn",
+        "content-create",
+        "path-create",
+        "extension-create",
+        "map-synthesis",
+        "analysis-complete",
+        "stewardship-begin",
+        "invitation-send",
+        "presence-claim",
+        "recognition-transfer",
+        "attestation-revoke",
+        "content-flag",
+        "governance-vote",
+    ];
+    for event_type in &schema_event_types {
+        let instance = serde_json::json!({
+            "agentId": "agent-test",
+            "lamadEventType": event_type
+        });
+        validate_against_schema("intents/lamad-event-intent.schema.json", &instance);
+    }
+}
+
+#[test]
+fn lamad_event_intent_rejects_unknown_event_type() {
+    let invalid = serde_json::json!({
+        "agentId": "agent-abc123",
+        "lamadEventType": "totally-made-up"
+    });
+    let schema = load_schema("intents/lamad-event-intent.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("lamad-event-intent schema should compile");
+    let errors: Vec<_> = validator.iter_errors(&invalid).collect();
+    assert!(
+        !errors.is_empty(),
+        "Schema should reject unknown lamadEventType values"
+    );
+}
+
+#[test]
+fn lamad_event_intent_rejects_missing_required_fields() {
+    let schema = load_schema("intents/lamad-event-intent.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("lamad-event-intent schema should compile");
+
+    // Missing agentId
+    let no_agent = serde_json::json!({ "lamadEventType": "content-view" });
+    assert!(
+        validator.iter_errors(&no_agent).next().is_some(),
+        "Schema should require agentId"
+    );
+
+    // Missing lamadEventType
+    let no_type = serde_json::json!({ "agentId": "agent-abc123" });
+    assert!(
+        validator.iter_errors(&no_type).next().is_some(),
+        "Schema should require lamadEventType"
+    );
+}
+
+#[test]
+fn lamad_event_intent_schema_declares_source_of_truth() {
+    let path = schema_dir().join("intents/lamad-event-intent.schema.json");
+    let content = fs::read_to_string(&path)
+        .expect("intents/lamad-event-intent.schema.json must exist");
+    let schema_value: Value = serde_json::from_str(&content)
+        .expect("intents/lamad-event-intent.schema.json must be valid JSON");
+    assert_source_of_truth_declared(&schema_value, "intents/lamad-event-intent.schema.json");
 }

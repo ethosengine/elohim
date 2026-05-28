@@ -182,6 +182,37 @@ pub struct InitiateClaimInputView {
     pub facilitated_by: Option<String>,
 }
 
+/// LamadEventIntent — high-level intent wire shape for POST /api/v1/lamad/events.
+///
+/// The coordinator composes the full EconomicEvent (action, provider, receiver)
+/// from this intent using PROTOCOL_EVENT_MAPPINGS. No client-side REA composition
+/// needed. Source of truth: EconomicEvent entry in the elohim DNA content_store
+/// zome (Category A, existing entry type).
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct LamadEventIntentView {
+    /// Agent public key of the initiating agent.
+    pub agent_id: String,
+    /// Lamad event type discriminant — drives PROTOCOL_EVENT_MAPPINGS lookup.
+    pub lamad_event_type: String,
+    #[serde(default)]
+    pub content_id: Option<String>,
+    #[serde(default)]
+    pub path_id: Option<String>,
+    #[serde(default)]
+    pub contributor_presence_id: Option<String>,
+    #[serde(default)]
+    pub resource_quantity_value: Option<f32>,
+    #[serde(default)]
+    pub resource_quantity_unit: Option<String>,
+    /// Domain-specific metadata (parsed object, not stringified).
+    #[serde(default)]
+    pub metadata: Option<JsonVal>,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
 /// Input for creating an economic event - camelCase API boundary type
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
