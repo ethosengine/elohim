@@ -1002,3 +1002,44 @@ pub struct WithdrawMembershipInputView {
     pub membership_cid: String,
     pub collab_qahal_cid: String,
 }
+
+// ---------------------------------------------------------------------------
+// M-POLICY-1: AccumulationStatus projection (Category C operational)
+// Source of truth: derived projection of FeedbackSignal × Manifest(kind:
+// standing-policy). Computed on Signal::FeedbackSignalCreated and
+// Signal::ManifestUpdated{kind: "standing-policy"} events.
+// Schema: epr:schema:view:accumulation-status
+// ---------------------------------------------------------------------------
+
+/// Computed governance accumulation status for a (entityType, entityId) pair.
+///
+/// Derived by joining FeedbackSignal aggregate counts with the thresholds
+/// declared in the most recent `Manifest{kind: "standing-policy"}` payload.
+/// When no policy Manifest exists, protocol defaults apply.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AccumulationStatusView {
+    /// Type of entity (e.g. "content", "path")
+    pub entity_type: String,
+    /// Identifier of the entity
+    pub entity_id: String,
+    /// Total FeedbackSignal count for this (entityType, entityId)
+    pub total_signals: i64,
+    /// Distinct signer pubkey count
+    pub unique_participants: i64,
+    /// Normalized consensus strength in [0, 1]. 1.0 = full consensus.
+    pub consensus_strength: f64,
+    /// Computed status: pending | ready_for_sensemaking | controversy_detected | settled
+    pub status: String,
+    /// True when signal count and diversity meet the readyForSensemaking threshold
+    pub ready_for_sensemaking: bool,
+    /// True when signal count and diversity meet the controversyDetected threshold
+    pub controversy_detected: bool,
+    /// True when signal count and consensus strength meet the settled threshold
+    pub settled: bool,
+    /// CID of the standing-policy Manifest used; null when protocol defaults applied
+    pub policy_manifest_cid: Option<String>,
+    /// ISO-8601 timestamp when this projection was last computed
+    pub computed_at: String,
+}
