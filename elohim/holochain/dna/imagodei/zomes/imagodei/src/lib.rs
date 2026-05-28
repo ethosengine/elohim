@@ -4571,6 +4571,234 @@ pub fn verify_credentials(hashes: Vec<ActionHash>) -> ExternResult<Vec<Credentia
 }
 
 // =============================================================================
+// M-AGGR-2: Source-chain read coordinators
+// =============================================================================
+
+/// Wire shape for a single record on the caller's source chain.
+///
+/// Used by `query_my_source_chain` and consumed by the HTTP route at
+/// `GET /api/v1/source-chain/{agentId}/entries`. Source of truth is the
+/// agent's private source chain — entries are never gossiped to the DHT.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceChainEntryRecord {
+    /// Base64-encoded ActionHash (uhCkk... prefix) from the record header.
+    pub action_hash: String,
+    /// Base64-encoded EntryHash; empty string for system records with no entry.
+    pub entry_hash: String,
+    /// Base64-encoded AgentPubKey that authored this record.
+    pub author_agent: String,
+    /// Entry type as a human-readable string (e.g. "Create:App(0)", "Dna",
+    /// "AgentValidationPkg", "InitZomesComplete"). Derived from the action variant.
+    pub entry_type: String,
+    /// JSON-serialized entry content. Absent for system entries or entries
+    /// whose bytes cannot be deserialized.
+    pub content_json: Option<String>,
+    /// Base64-encoded ActionHash of the previous action; absent for genesis.
+    pub prev_action_hash: Option<String>,
+    /// Zero-based position in the source chain.
+    pub sequence: u32,
+    /// Microseconds since Unix epoch when this record was committed.
+    /// Encoded as a decimal string to avoid i64 overflow in JSON.
+    pub timestamp: String,
+}
+
+/// Wire shape for a link authored by the caller on its source chain.
+///
+/// Used by `query_my_source_chain_links` and consumed by the HTTP route at
+/// `GET /api/v1/source-chain/{agentId}/links`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceChainLinkRecord {
+    /// Base64-encoded ActionHash of the create-link action.
+    pub link_hash: String,
+    /// Base64-encoded AnyLinkableHash base of the link.
+    pub base_hash: String,
+    /// Base64-encoded AnyLinkableHash target of the link.
+    pub target_hash: String,
+    /// Link type index as a decimal string (0, 1, 2, …).
+    pub link_type: String,
+    /// Base64-encoded tag bytes; absent when the link was created without a tag.
+    pub tag: Option<String>,
+    /// Base64-encoded AgentPubKey that authored this link.
+    pub author_agent: String,
+    /// Microseconds since Unix epoch when this link was created.
+    pub timestamp: String,
+    /// True when a delete-link action for this link hash is present in the chain.
+    pub deleted: bool,
+    /// Microseconds since Unix epoch of the delete-link action; absent when not deleted.
+    pub deleted_at: Option<String>,
+}
+
+/// Derive a human-readable entry type string from an `Action`.
+fn entry_type_label(action: &Action) -> String {
+    match action {
+        Action::Dna(_) => "Dna".to_string(),
+        Action::AgentValidationPkg(_) => "AgentValidationPkg".to_string(),
+        Action::InitZomesComplete(_) => "InitZomesComplete".to_string(),
+        Action::OpenChain(_) => "OpenChain".to_string(),
+        Action::CloseChain(_) => "CloseChain".to_string(),
+        Action::Create(c) => match &c.entry_type {
+            EntryType::App(app) => format!("Create:App({})", app.entry_index().index()),
+            EntryType::AgentPubKey => "Create:AgentPubKey".to_string(),
+            EntryType::CapClaim => "Create:CapClaim".to_string(),
+            EntryType::CapGrant => "Create:CapGrant".to_string(),
+        },
+        Action::Update(u) => match &u.entry_type {
+            EntryType::App(app) => format!("Update:App({})", app.entry_index().index()),
+            _ => "Update".to_string(),
+        },
+        Action::Delete(_) => "Delete".to_string(),
+        Action::CreateLink(_) => "CreateLink".to_string(),
+        Action::DeleteLink(_) => "DeleteLink".to_string(),
+    }
+}
+
+/// Encode an `ActionHash` to its canonical base64 string (uhCkk… prefix).
+fn action_hash_b64(h: &ActionHash) -> String {
+    serde_json::to_string(&ActionHashB64::from(h.clone()))
+        .map(|s| s.trim_matches('"').to_string())
+        .unwrap_or_default()
+}
+
+/// Encode an `AgentPubKey` to its canonical base64 string (uhCAk… prefix).
+fn agent_b64(h: &AgentPubKey) -> String {
+    serde_json::to_string(&AgentPubKeyB64::from(h.clone()))
+        .map(|s| s.trim_matches('"').to_string())
+        .unwrap_or_default()
+}
+
+/// Encode an `EntryHash` to its canonical base64 string (uhCEk… prefix).
+fn entry_hash_b64(h: &EntryHash) -> String {
+    serde_json::to_string(&EntryHashB64::from(h.clone()))
+        .map(|s| s.trim_matches('"').to_string())
+        .unwrap_or_default()
+}
+
+/// Encode an `AnyLinkableHash` to a stable base64 string.
+/// We JSON-serialize the enum variant directly (Holochain provides Serialize).
+fn any_linkable_b64(h: &AnyLinkableHash) -> String {
+    serde_json::to_string(h)
+        .map(|s| s.trim_matches('"').to_string())
+        .unwrap_or_default()
+}
+
+/// Read all records on the caller's source chain and return a structured view.
+///
+/// Returns entries in source-chain order (ascending sequence). No DHT access.
+/// Called by the HTTP route `GET /api/v1/source-chain/{agentId}/entries`.
+///
+/// ## Design (P2P gate §1.5 M-AGGR-2)
+///
+/// Category B (Agent-Scoped, private source chain). `ChainQueryFilter::new()`
+/// with no type filter returns ALL records including system entries. The route
+/// handler may filter server-side; the zome function stays general-purpose.
+#[hdk_extern]
+pub fn query_my_source_chain(_: ()) -> ExternResult<Vec<SourceChainEntryRecord>> {
+    let filter = ChainQueryFilter::new().include_entries(true);
+    let records = query(filter)?;
+
+    let mut result = Vec::with_capacity(records.len());
+    for (seq, record) in records.iter().enumerate() {
+        let action = record.action();
+        let action_hash = action_hash_b64(record.action_address());
+        let author_agent = agent_b64(action.author());
+        let entry_type = entry_type_label(action);
+        let timestamp = action.timestamp().as_micros().to_string();
+        let prev_action_hash = action.prev_action().map(action_hash_b64);
+
+        // EntryHash: use the action's entry hash when present.
+        let entry_hash = record
+            .action()
+            .entry_hash()
+            .map(entry_hash_b64)
+            .unwrap_or_default();
+
+        let content_json = match record.entry() {
+            RecordEntry::Present(entry) => serde_json::to_string(entry).ok(),
+            _ => None,
+        };
+
+        result.push(SourceChainEntryRecord {
+            action_hash,
+            entry_hash,
+            author_agent,
+            entry_type,
+            content_json,
+            prev_action_hash,
+            sequence: seq as u32,
+            timestamp,
+        });
+    }
+
+    Ok(result)
+}
+
+/// Read all create-link actions on the caller's source chain.
+///
+/// Returns links in source-chain order. Deleted links are included with
+/// `deleted = true` when a matching DeleteLink action is present.
+/// Called by `GET /api/v1/source-chain/{agentId}/links`.
+///
+/// ## Design (P2P gate §1.5 M-AGGR-2)
+///
+/// Category B. Two-pass: first collect CreateLink records, then DeleteLink
+/// records to mark soft-deleted entries. No DHT access.
+#[hdk_extern]
+pub fn query_my_source_chain_links(_: ()) -> ExternResult<Vec<SourceChainLinkRecord>> {
+    // Pass 1: CreateLink records.
+    let create_records = query(ChainQueryFilter::new().action_type(ActionType::CreateLink))?;
+
+    // Pass 2: DeleteLink records → build deleted-set keyed by create-link action hash.
+    let delete_records = query(ChainQueryFilter::new().action_type(ActionType::DeleteLink))?;
+
+    let mut deleted_map: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    for rec in &delete_records {
+        if let Action::DeleteLink(dl) = rec.action() {
+            let create_hash = action_hash_b64(&dl.link_add_address);
+            let ts = rec.action().timestamp().as_micros().to_string();
+            deleted_map.insert(create_hash, ts);
+        }
+    }
+
+    let mut result = Vec::with_capacity(create_records.len());
+    for record in &create_records {
+        if let Action::CreateLink(cl) = record.action() {
+            let link_hash = action_hash_b64(record.action_address());
+            let base_hash = any_linkable_b64(&cl.base_address);
+            let target_hash = any_linkable_b64(&cl.target_address);
+            let link_type = cl.link_type.0.to_string();
+            let tag = if cl.tag.0.is_empty() {
+                None
+            } else {
+                use base64::Engine as _;
+                Some(base64::engine::general_purpose::STANDARD.encode(&cl.tag.0))
+            };
+            let author_agent = agent_b64(record.action().author());
+            let timestamp = record.action().timestamp().as_micros().to_string();
+
+            let (deleted, deleted_at) = match deleted_map.get(&link_hash) {
+                Some(ts) => (true, Some(ts.clone())),
+                None => (false, None),
+            };
+
+            result.push(SourceChainLinkRecord {
+                link_hash,
+                base_hash,
+                target_hash,
+                link_type,
+                tag,
+                author_agent,
+                timestamp,
+                deleted,
+                deleted_at,
+            });
+        }
+    }
+
+    Ok(result)
+}
+
+// =============================================================================
 // Init
 // =============================================================================
 
