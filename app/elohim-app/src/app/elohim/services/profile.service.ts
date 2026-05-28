@@ -255,7 +255,6 @@ export class ProfileService {
    * Get chronological timeline of significant learning events.
    * These are transformation points, not just activity logs.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getTimeline(_limit = 50): Observable<TimelineEvent[]> {
     // M-AGGR-1: activity history is now substrate-derived (EconomicEvents →
     // SessionHumanView projection). Timeline from local session is no longer
