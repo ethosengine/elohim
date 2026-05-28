@@ -92,6 +92,27 @@ pub const AGENT_TYPES: [&str; 4] = [
     "elohim",       // Constitutional AI agent
 ];
 
+// ============================================================
+// Constitutional storage donut — DNA-locked walls
+// ============================================================
+//
+// Source of truth: this DNA. Protocol-version-stable constants that bound
+// every `replicates-*` commitment author. The manifest can configure ratios
+// WITHIN these walls; it cannot breach them. Upgrade requires DNA migration —
+// intentional friction; the donut walls are constitutional.
+//
+// Per spec §5 (genesis/docs/superpowers/specs/2026-05-28-mutual-storage-
+// replication-dwelling-hub-design.md): the donut prevents (a) free-riding
+// below the commons floor, (b) capture above the commons ceiling, (c)
+// over-allocation that leaves the device with no self-storage headroom.
+
+pub const COMMONS_MIN_FLOOR_PCT: u8 = 10;
+pub const COMMONS_MAX_CEILING_PCT: u8 = 60;
+pub const DWELLING_MIN_FLOOR_PCT: u8 = 10;
+pub const DWELLING_MAX_CEILING_PCT: u8 = 80;
+pub const FREE_MIN_FLOOR_PCT: u8 = 5;
+pub const FREE_MAX_CEILING_PCT: u8 = 70;
+
 // =============================================================================
 // Blob Management - Phase 1: Large Media Support (Video, Podcasts)
 // =============================================================================
