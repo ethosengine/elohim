@@ -115,7 +115,7 @@ async fn adversarial_silent_reach_escalation_blocked() {
     let event = event_against("comm-deploy-svc", "republish-epr", "epr:lamad-spa", "private");
     let result = validate(&event, &fetcher, &rate).await;
     assert!(
-        matches!(result, Ok(())),
+        result.is_ok(),
         "lower reach within ceiling must pass; got: {:?}",
         result
     );
@@ -146,7 +146,7 @@ async fn adversarial_rate_limit_exact_boundary() {
     rate.seed("comm-deploy-svc", "2026-05-28T12:00:00Z", 29);
     let result = validate(&event, &fetcher, &rate).await;
     assert!(
-        matches!(result, Ok(())),
+        result.is_ok(),
         "29 events in window must pass; got: {:?}",
         result
     );
@@ -197,7 +197,7 @@ async fn adversarial_wildcard_epr_scope_allows_unknown_target() {
     );
     let result = validate(&event, &fetcher, &rate).await;
     assert!(
-        matches!(result, Ok(())),
+        result.is_ok(),
         "wildcard epr_scope must allow unknown target; got: {:?}",
         result
     );

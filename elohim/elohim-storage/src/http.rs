@@ -886,6 +886,27 @@ impl HttpServer {
                 self.handle_inventory_parity().await
             }
 
+            // Bounds-validator diagnostic — Sprint 2 Task 6. Runs the substrate-wide
+            // bounds_validator::validate against a caller-supplied EconomicEvent payload
+            // + the production CommitmentFetcher / RateHistory. Returns
+            // BoundsValidationResultView per the schema. Matched before the /api/v1/ catch-all.
+            (Method::POST, "/api/v1/diagnostics/validate-bounds") => {
+                if let Some(ref pool) = self.db_pool {
+                    let hc_lamad = self.hc_registry.as_ref().and_then(|r| r.lamad.clone());
+                    crate::api::diagnostics_bounds::handle(
+                        req,
+                        Method::POST,
+                        pool,
+                        hc_lamad.as_ref(),
+                    )
+                    .await
+                } else {
+                    Ok(response::service_unavailable(
+                        "Database pool not configured — /api/v1/diagnostics/validate-bounds unavailable",
+                    ))
+                }
+            }
+
             // Signal-emit endpoint — composes EPR Envelope, signs via conductor,
             // ingests. Matched before the /api/v1/ catch-all so the manifest
             // registry + signing client are injected directly from HttpServer

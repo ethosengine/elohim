@@ -25,6 +25,7 @@ pub mod compute;
 pub mod contributors;
 pub mod custodians;
 pub mod dashboard;
+pub mod diagnostics_bounds;
 pub mod economic_events;
 pub mod epr;
 pub mod exchange;

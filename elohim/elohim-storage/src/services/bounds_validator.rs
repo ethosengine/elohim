@@ -29,10 +29,10 @@
 //!
 //! # Return type
 //!
-//! Returns `Result<(), BoundsViolation>`.  The success type is `()` for Sprint 2;
-//! Task 6 will refactor to `Result<BoundsChecksView, BoundsViolation>` so the
-//! happy-path caller also receives the full check trail.  Using `()` now keeps
-//! the call sites simple until the trail is genuinely needed.
+//! Returns `Result<BoundsChecksView, BoundsViolation>`.  The success path
+//! returns the full check trail (all 7 booleans true), enabling diagnostic
+//! callers (e.g. `POST /api/v1/diagnostics/validate-bounds`) to report what
+//! passed before a violation occurred.
 //!
 //! # Relationship to per-instance validators
 //!
@@ -100,13 +100,15 @@ pub struct BoundsViolation {
 /// Validate `event` against the Commitment it names, using the provided
 /// fetcher and rate-history trait objects.
 ///
-/// Returns `Ok(())` when all seven checks pass.  Returns `Err(BoundsViolation)`
-/// at the first check that fails, carrying a partial `BoundsChecksView` trail.
+/// Returns `Ok(BoundsChecksView)` (all 7 booleans true) when all checks pass,
+/// enabling the diagnostic route to report the full check trail.
+/// Returns `Err(BoundsViolation)` at the first check that fails, carrying a
+/// partial `BoundsChecksView` trail.
 pub async fn validate<F: CommitmentFetcher, R: RateHistory>(
     event: &EventForValidation,
     fetcher: &F,
     rate_history: &R,
-) -> Result<(), BoundsViolation> {
+) -> Result<BoundsChecksView, BoundsViolation> {
     let mut checks = BoundsChecksView::default();
 
     // 1. Fetch the Commitment -----------------------------------------------
@@ -307,12 +309,9 @@ pub async fn validate<F: CommitmentFetcher, R: RateHistory>(
             checks,
         });
     }
-    // checks.key_rotation_current = true; — Task 6 will change the return type
-    // to Result<BoundsChecksView, BoundsViolation> and carry this trail. For
-    // now the Ok(()) path drops checks, so the assignment is suppressed to
-    // avoid an unused_assignments warning.
+    checks.key_rotation_current = true;
 
-    Ok(())
+    Ok(checks)
 }
 
 /// Map a reach vocabulary string to a numeric rank for ceiling comparison.
@@ -381,7 +380,15 @@ mod tests {
         let rate = MockRateHistory::new(); // empty — count == 0
 
         let result = validate(&sample_event(), &fetcher, &rate).await;
-        assert!(matches!(result, Ok(())));
+        assert!(result.is_ok());
+        let checks = result.unwrap();
+        assert!(checks.commitment_found);
+        assert!(checks.not_revoked);
+        assert!(checks.active);
+        assert!(checks.scope_includes_event);
+        assert!(checks.reach_ceiling_ok);
+        assert!(checks.rate_within_limit);
+        assert!(checks.key_rotation_current);
     }
 
     #[tokio::test]
