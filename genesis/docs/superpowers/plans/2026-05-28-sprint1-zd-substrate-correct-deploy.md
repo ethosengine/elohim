@@ -1603,3 +1603,68 @@ git commit -m "docs(memory): Sprint 1 close-out + Z.D pattern memory"
 **Cross-sprint coordination with Sprint 2:** Task 6 (republish_epr_validator) depends on Sprint 2 Task 4's `bounds_validator::validate` API. If Sprint 1 runs concurrently with Sprint 2, ensure Sprint 2 Task 4 lands before Sprint 1 Task 6 implementer starts. If sequential, Sprint 2 completes first; Sprint 1 starts with a stable trait surface.
 
 **Done when:** spec §6 acceptance signals all satisfied. A real CI run on alpha completes the Z.D flow end-to-end. The bounds-violation a2o scenario passes (substrate refuses the out-of-bounds republish). The reach-escalation a2o scenario passes (soft-warn ceremony fires + acknowledgement resumes serving). The Z.1 PATCH /db/content path is deleted from the codebase. Z.D substrate-correct deploy is now the first proven instance of the REA compute-commitment primitive.
+
+---
+
+## Close-out — Sprint 1 substrate-only landing (2026-05-28)
+
+**Sprint 1 ended scope-narrowed:** primitives shipped; Z.D-as-first-instance abandoned mid-flight after a design conversation reframed the compute-commitment use case.
+
+### What landed
+
+| Task | SHA | Subject |
+|------|-----|---------|
+| T1+T2 | eb7e191df | feat(mishpat): Commitment entry type + delegates-compute coordinator + integrity validator |
+| T3 | 4bf2dcdbf | feat(mishpat): acknowledges-reach-change Commitment action + validator |
+| T4 | 1e395e876 | feat(elohim-dna): republish-epr EconomicEvent action discriminator + validator |
+| T5 | 383c79891 | feat(elohim-integrity): defense-in-depth republish-epr bounded_by requirement |
+| T6 | 0a9d373cc | feat(storage): republish_epr_validator delegates to bounds_validator + schema check |
+| T7 | b481ed1df | feat(storage): put_epr handler invokes republish_epr_validator for Z.D events |
+| revert | 5259de31c | revert: drop Z.D blueprint TS scripts |
+
+Total: 6 substrate commits + 1 revert.
+
+### Substrate primitives that are now ready for any real first instance
+
+- **`Mishpat::Commitment`** — new DHT entry type with action discriminator. Two actions validated: `delegates-compute` (full schema check: scope, provider, recipient, bounds.epr_scope, bounds.reach_ceiling, bounds.rate_per_hour, bounds.rotation_ttl_days, reach_elevation_acknowledged guard) and `acknowledges-reach-change` (acknowledger, target_epr_cid, new_reach enum, signed_at). Coordinator + integrity defense-in-depth.
+- **elohim DNA `EconomicEvent` action discriminator `republish-epr`** — schema check at coordinator (full required-fields + enum-membership) and integrity (defense-in-depth: non-empty bounded_by, anonymous-publish-forbidden). Wired into `create_rea_economic_event` dispatch.
+- **`republish_epr_validator` service** in elohim-storage — reference implementation of the per-instance validator shape (schema check → `EventForValidation` projection → delegate to `bounds_validator::validate`). Reusable as a template for Sprints 3 + 5a-e per-instance validators against the bounds-validator-pattern.
+- **`put_epr` substrate-correct 503** — when an `event` is present on `EprPublishInput`, the handler attempts bounds validation. Returns 503 substrate-correctly until the conductor bridge wires `mishpat::get_commitment` through to `ConductorCommitmentFetcher`. Harmless when no caller sends `event`.
+
+### What was scoped out and why
+
+**Z.D (SPA bundle deploy as first instance of the compute-commitment pattern) was abandoned mid-sprint.** The design conversation surfaced that SPA bundle deploy doesn't actually fit the three real use cases the operator named for REA compute-commitments:
+
+1. **Mutual storage replication between family-network peers** — bounded reciprocity contracts ("I host N GB for you; you host M GB for me"); bounds_validator enforces symmetry; FeedbackSignals (rate-limit-exceeded, bad-custody) carry meaningful weight.
+2. **Doorway projection compute agreements** — when doorway projects EPR-app content (SSR, cache occupancy), the compute cost flows to the stewards/collectives that approved the agreement; needs a metering model on doorway first.
+3. **Distributed workloads** — REA agreements for compute tasks (Jenkins-shape distributed workload but using EPR-components / storage commitments / p2p sccache instead of pods); most ambitious; needs the peer-bidding + scheduling layer designed first.
+
+Deploy doesn't fit any of these. It's not mutual (no reciprocity from a deploy-svc bot back to the operator-steward), not ongoing projection compute (one-shot publish), not distributed workload (single-CI publish). The Z.D framing slid into the compute-commitment pattern because the spec was written that way, but it was miscasting an authorship-delegation as a compute-delegation.
+
+**Deploy stays on the existing Z.1 path** (`stageSpaBlobs` in Jenkinsfile:223 → PUT `/admin/seed/blob` + PATCH `/db/content/{slug}`) until a substrate-correct content-publish replacement lands. That replacement is naturally seeder-based: seeder creates a `Content` node via the conductor with `contentType=spa-bundle` and the new blobHash; post-commit projection picks it up; doorway serves via the normal slug→content lookup; operator-steward's signing identity IS the authority attestation. No new Commitment shape needed for content publishing — the existing notarized identity-bound creation suffices. **This is a separate, smaller sprint.**
+
+### Recommended first real instance: mutual storage replication
+
+The next-bootstrap step is **compute agreements between peers in the family-network** so the resiliency epics can be proven end-to-end:
+
+- Each peer needs to compute aggregate views: **free-storage capacity vs stewarded-compute commitments** (am I over-committed? do I have headroom?)
+- Each piece of content needs to compute **resiliency and delivery metrics** (how many active replication commitments cover this CID? what's the steward-graph distance? what's the projected fetch latency given peer reach?)
+- bounds_validator runs on every replication commitment author: capacity-exceeded? scope-includes-this-CID? rate-not-exceeded (replications-per-hour)? key-rotation-current?
+- Standing debits via signal_weight_registry: `bad-custody` (peer revoked unilaterally), `rate-limit-exceeded` (peer over-committed and dropped), `reach-escalation-pending` if a peer tries to escalate from intimate to commons-reach replication without acknowledgement
+
+The deferred Sprint 1 tasks (T8–T16 from this plan) become moot when the first instance is storage replication — the CI deploy scripts and Jenkinsfile wiring were Z.D-specific. Replace with a new plan: `replicates-storage` action authoring, peer-to-peer replication handshake, capacity-aggregate views, content-resiliency views.
+
+### Scoped-out and removed
+
+- **T8, T9, T10** — Z.D TS blueprint scripts (provision-deploy-agent, author-deploy-commitment, stage-spa-blob-zd). Landed in 4e3604a66, reverted in 5259de31c. Not preserved as documentation — the schema-shape they document lives in the JSON schemas directly; preserving them as orphaned code would mislead future readers.
+- **T11, T12** — Jenkinsfile changes (Z.D blueprint stage + transitional comment on stageSpaBlobs). Never landed. The Jenkinsfile is untouched; CI deploy continues unchanged.
+- **T13, T14** — doorway subscriber `epr.republished` arm + `reach_evaluator`. Never landed. The §3 soft-warn ceremony was Z.D-specific (envelope.reach vs project-epr commitment expected_reach); the storage-replication use case has its own reach semantics that need fresh design.
+- **T15** — sweettest two-conductor Z.D integration. Never landed. The storage-replication use case will have its own sweettest.
+- **T16** — three a2o feature files for Z.D. Never landed. The storage-replication use case will have its own a2o scenarios.
+
+### Follow-ups (captured for future sprints)
+
+- **Seeder-based substrate-correct content publish** to retire the `stageSpaBlobs` Z.1 path. Small sprint. Doesn't depend on Sprint 1 substrate work.
+- **Storage replication first-instance sprint** using Sprint 1's primitives. Needs design first: replication-commitment shape, peer-handshake protocol, capacity-aggregate view, content-resiliency view. Bounds_validator and signal_weight_registry already cover the bounds-checking and standing pieces.
+- **`ConductorCommitmentFetcher` ↔ `mishpat::get_commitment`** wiring through `HcClientRegistry` to make `put_epr`'s republish-epr path live. Only useful once a real caller sends `event` on `EprPublishInput`. Defer until storage replication or another use case actually needs it.
+- **EprPublishInput's `RepublishEprEventView`** carries `payload: JsonVal` (the ts-rs-safe wrapper). When a real wire-format consumer arrives, consider whether to narrow this to typed fields.

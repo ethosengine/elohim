@@ -26,7 +26,7 @@
                                                             ── time ──▶
 Phase A (Foundation — sequential)
   S0 ▣ Inventory verifier + BlobAddress hardening              [in flight, ~1 day]
-  S1 ▢ Z.D substrate-correct deploy end-to-end                 [proves primitive on 1 instance]
+  S1 ◐ Substrate primitives shipped; Z.D as first instance ABANDONED — see close-out 2026-05-28
   S2 ✓ Bounds validator + standing aggregation primitives      [landed 2026-05-28]
 
 Phase B (Hosting graduation — depends on A; serial within phase)
@@ -57,7 +57,7 @@ Phase E (Operational surface — depends on D)
 
 **Total scope:** 11 sprints. Sprints 0–2 are 1–3 days each. Sprints 3–7 are 1–2 weeks each. Sprint 8 is 1 sprint of Angular work. Calendar: depends on parallelism applied at Phase C.
 
-**Phase A status:** Sprint 2 landed 2026-05-28 — bounds_validator + standing extension complete; see `2026-05-28-sprint2-bounds-validator-standing-aggregator.md` close-out.
+**Phase A status:** Sprint 2 landed 2026-05-28 — bounds_validator + standing extension complete; see `2026-05-28-sprint2-bounds-validator-standing-aggregator.md` close-out. **Sprint 1 substrate-only landing 2026-05-28** — Mishpat::Commitment entry type + delegates-compute + acknowledges-reach-change + republish-epr action + republish_epr_validator + put_epr substrate-correct 503 wiring shipped (T1–T7). Z.D-as-first-instance abandoned mid-flight after design conversation reframed deploy as authorship-delegation, not compute-delegation. Recommended first real instance: **mutual storage replication between family-network peers** (proves resiliency epics, lets each peer compute free-storage vs stewarded-compute aggregates, lets each content item compute resiliency + delivery metrics). See `2026-05-28-sprint1-zd-substrate-correct-deploy.md` close-out for full scope-narrowing rationale.
 
 ---
 
