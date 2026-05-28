@@ -103,7 +103,7 @@
     },
     "graduation": {
       "$ref": "#/$defs/GraduationPolicy",
-      "description": "Optional. Per-pillar graduation policy. Required IF vocabulary.stagedIntents is non-empty (see dependentSchemas)."
+      "description": "Optional. Per-pillar graduation policy. Required IF vocabulary.stagedIntents is non-empty (see dependentSchemas). Permitted (but inert) when vocabulary.stagedIntents is absent — useful for forward-compatibility where a pillar declares graduation readiness before staged-intent vocabulary lands."
     },
     "graph": {
       "type": "object",

@@ -582,8 +582,6 @@ async function main() {
   // reference any Task 1-3 substrate addition. If we ever introduce a change that
   // causes an existing manifest to fail for one of OUR new substrate reasons, this
   // test surfaces it.
-  //
-  // When future tasks extend the substrate with new named additions (e.g., new $defs, properties, or enums), extend TASK_1_TO_3_SURFACE with the new discriminating tokens before landing the schema change.
   {
     const manifestSchemaPath = resolve(__dirname, '../v1/manifest/app-manifest.schema.json');
     const manifestSchema = await loadJson(manifestSchemaPath);
@@ -624,6 +622,12 @@ async function main() {
     // The Task 1-3 substrate-addition surface that Task 6 guards against.
     // If any of these strings appear in an error's schemaPath, the test fails —
     // meaning our additions are now visible to an existing manifest's validation.
+    //
+    // MAINTENANCE: when future tasks (B-PILLAR-*, B-CRATE, B-APPRAISE Phase 2, etc.)
+    // extend the substrate with new named additions ($defs, properties, enums, or
+    // path fragments that can appear in Ajv error metadata), add their discriminating
+    // tokens to this array. The non-regression invariant only catches errors that
+    // reference a token here.
     const TASK_1_TO_3_SURFACE = [
       'stagedIntents',
       'graduation',                    // catches top-level graduation property errors

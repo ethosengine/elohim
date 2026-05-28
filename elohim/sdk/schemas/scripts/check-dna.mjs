@@ -194,7 +194,7 @@ async function main() {
     const schema = JSON.parse(schemaRaw);
 
     // Only check schemas that declare a _dna mapping
-    if (!schema._dna) continue;
+    if (!schema._dna || schema._dna.zome === null) continue;
 
     const { constant: constName } = schema._dna;
     const coreValues = schema._tiers?.core?.values || schema.enum;
