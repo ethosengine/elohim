@@ -22,6 +22,11 @@ export { ProtocolEventTypes, PROTOCOL_EVENT_MAPPINGS, PROTOCOL_UNITS } from './l
 export type { LamadEventIntent } from './lib/lamad-event-intent.types';
 
 // EventService — hREA EconomicEvent service
+// NOTE(M-REA-2): AttentionTrackerService no longer calls recordContentInteraction —
+// content-view tracking is now AttentionTending (private source-chain, POST /api/v1/attention/tending).
+// recordContentInteraction is retained because app/lamad/src/app/services/lamad-event.service.ts
+// still calls it. Full retirement of recordContentInteraction is gated on M-AGGR-1
+// (SessionHumanService projection) landing, which will migrate lamad-event.service.ts callers.
 export { EventService, EVENT_API } from './lib/event.service';
 export type {
   IEconomicEventApi,
