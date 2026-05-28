@@ -1,0 +1,47 @@
+{
+  "$id": "epr:schema:view:content-engagement-stats",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentEngagementStatsView",
+  "description": "Source of truth: derived projection of EconomicEvent stream filtered by (content_id, lamadEventType IN ['content-view', 'content-complete']) (Operational, Category C). Computed by elohim-storage on Signal::EconomicEventCreated. Not persisted as DHT; reconstructable from the underlying EconomicEvent entries in the elohim DNA content_store zome.",
+  "type": "object",
+  "required": [
+    "contentId",
+    "views",
+    "completions",
+    "uniqueViewers",
+    "completionRate",
+    "computedAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "contentId": {
+      "type": "string",
+      "description": "The identifier of the content this engagement projection covers"
+    },
+    "views": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total count of EconomicEvent entries with lamadEventType='content-view' for this contentId"
+    },
+    "completions": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total count of EconomicEvent entries with lamadEventType='content-complete' for this contentId"
+    },
+    "uniqueViewers": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of distinct provider (agent) values across content-view EconomicEvents for this contentId"
+    },
+    "completionRate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Ratio of completions to views in [0, 1]. Zero when views == 0."
+    },
+    "computedAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when this projection was last computed"
+    }
+  }
+}

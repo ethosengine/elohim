@@ -143,6 +143,8 @@ const INTERFACE_FILES = [
   { src: 'views/accumulation-status.ts', dest: 'accumulation-status.ts' },
   // M-POLICY-2: MechanismSelection projection (Category C operational — GovernanceState × Content × Proposal? × pillar-projection Manifest)
   { src: 'views/mechanism-selection.ts', dest: 'mechanism-selection.ts' },
+  // M-AGGR-3: ContentEngagementStats projection (Category C operational — EconomicEvent stream filtered by content_id + lamadEventType)
+  { src: 'views/content-engagement-stats-view.ts', dest: 'content-engagement-stats-view.ts' },
 ];
 
 /**
