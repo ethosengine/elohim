@@ -15,6 +15,7 @@
 //! ```
 
 pub mod account;
+pub mod attention;
 pub mod agreements;
 pub mod attestations;
 pub mod blob;
@@ -111,7 +112,21 @@ pub async fn handle_api_request(
     let graph_engine_ref: Option<&std::sync::Arc<crate::graph::engine::GraphEngine>> = None;
 
     // Dispatch to domain controllers
-    if sub_path.starts_with("account") {
+    if sub_path.starts_with("attention") {
+        // M-REA-2: AttentionTending private source-chain writes.
+        // POST /api/v1/attention/tending — dwell-qualifies then proxies to
+        // create_attention_tending coordinator. No projection table (private entry).
+        let resource_path = sub_path.strip_prefix("attention").unwrap_or("");
+        return attention::handle(
+            req,
+            method,
+            resource_path,
+            &pool,
+            &app_ctx,
+            hc_registry.as_ref(),
+        )
+        .await;
+    } else if sub_path.starts_with("account") {
         let resource_path = sub_path.strip_prefix("account").unwrap_or("");
         return account::handle(req, method, resource_path, &pool, hc_registry.as_ref()).await;
     } else if sub_path.starts_with("agreements") {
