@@ -53,7 +53,7 @@ use std::collections::HashSet;
 use chrono::Utc;
 use diesel::SqliteConnection;
 use sha2::{Digest, Sha256};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::db::economic_events::{
     bulk_record_events, get_economic_event, get_events_for_agent, get_events_for_content,
@@ -181,6 +181,31 @@ impl EconomicEventService {
         input: CreateEconomicEventInput,
     ) -> Result<EconomicEventView, StorageError> {
         let event = record_event(conn, ctx, input)?;
+
+        // M-AGGR-3: side-projection for engagement stats.
+        // When a content-view or content-complete event lands, recompute the
+        // materialized engagement row for that content_id.  Non-fatal: a
+        // projection failure must not roll back the primary event write.
+        if let (Some(ref lamad_type), Some(ref content_id)) =
+            (&event.lamad_event_type, &event.content_id)
+        {
+            if matches!(lamad_type.as_str(), "content-view" | "content-complete") {
+                if let Err(e) = crate::db::content_engagement_stats::project_content_engagement_stats(
+                    conn,
+                    content_id,
+                    &ctx.h_app_id,
+                ) {
+                    warn!(
+                        target = "economic_event_service",
+                        error = %e,
+                        content_id = %content_id,
+                        lamad_event_type = %lamad_type,
+                        "content_engagement_stats side-projection failed (non-fatal)"
+                    );
+                }
+            }
+        }
+
         Ok(EconomicEventView::from(event))
     }
 

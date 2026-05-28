@@ -1660,6 +1660,19 @@ diesel::table! {
 
 // Source of truth: derived projection of FeedbackSignal × Manifest(kind: standing-policy).
 // Reconstructable from FeedbackSignal + manifests tables at any time.
+// Migration: 2026-05-28-020000_content_engagement_stats
+diesel::table! {
+    content_engagement_stats (content_id, h_app_id) {
+        content_id      -> Text,
+        h_app_id        -> Text,
+        views           -> Integer,
+        completions     -> Integer,
+        unique_viewers  -> Integer,
+        completion_rate -> Double,
+        computed_at     -> Text,
+    }
+}
+
 // Migration: 2026-05-28-000000_accumulation_status
 diesel::table! {
     accumulation_status (entity_type, entity_id) {
@@ -1679,6 +1692,7 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     accumulation_status,
+    content_engagement_stats,
     access_grants,
     agreements,
     attestations,
