@@ -18,7 +18,7 @@ use super::diesel_schema::{
     contributor_presences, custodian_metrics, custodian_shares, device_policies, discussions,
     economic_events, enum_registry, governance_dispositions, governance_signals, governance_states,
     hazards, human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
-    local_sessions, node_stewardship, observation_diversity_summary, observation_entries,
+    local_sessions, mutuality_audit_log, node_stewardship, observation_diversity_summary, observation_entries,
     observation_sessions, observations, peer_blob_inventory, peer_identity_bindings,
     peer_inventory_cursor, placement_gaps, places, portal_hosts, precedents, premium_gates,
     proposal_options, proposals, ranked_votes, rea_commitments, recovery_requests,
@@ -3425,4 +3425,40 @@ pub struct NewCustodianShare {
     pub share_blob_hash: String,
     pub created_at: String,
     pub superseded_at: Option<String>,
+}
+
+// ============================================================================
+// Mutuality Audit Log (Sprint 3 — Mutual Storage Replication, §6.2)
+// Category C operational — sweep telemetry, rebuildable from Mishpat::Commitment
+// DHT entries. No dht_anchor_hash — this is not a DHT projection.
+// ============================================================================
+
+/// Queryable row from the `mutuality_audit_log` table.
+#[derive(Debug, Clone, Queryable, Identifiable, Selectable)]
+#[diesel(table_name = mutuality_audit_log)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct MutualityAuditLogRow {
+    pub id: i32,
+    pub commitment_cid: String,
+    pub provider_dwelling_hub_id: String,
+    pub recipient_dwelling_hub_id: String,
+    pub reciprocity_status: String,
+    pub days_since_authored: i32,
+    pub grace_period_days: i32,
+    pub signaled_at: Option<String>,
+    pub swept_at: String,
+}
+
+/// Insertable row for `mutuality_audit_log` (omits `id` — AUTOINCREMENT).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = mutuality_audit_log)]
+pub struct NewMutualityAuditLogRow<'a> {
+    pub commitment_cid: &'a str,
+    pub provider_dwelling_hub_id: &'a str,
+    pub recipient_dwelling_hub_id: &'a str,
+    pub reciprocity_status: &'a str,
+    pub days_since_authored: i32,
+    pub grace_period_days: i32,
+    pub signaled_at: Option<&'a str>,
+    pub swept_at: &'a str,
 }

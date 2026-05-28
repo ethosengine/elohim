@@ -1724,6 +1724,24 @@ diesel::table! {
     }
 }
 
+// Operational sweep telemetry for mutuality audit service.
+// Source of truth: local SQLite operational projection; rebuildable from Mishpat::Commitment DHT.
+// No dht_anchor_hash — sweep telemetry, not notarized.
+// Migration: 2026-05-28-100000_mutuality_audit_log
+diesel::table! {
+    mutuality_audit_log (id) {
+        id -> Integer,
+        commitment_cid -> Text,
+        provider_dwelling_hub_id -> Text,
+        recipient_dwelling_hub_id -> Text,
+        reciprocity_status -> Text,
+        days_since_authored -> Integer,
+        grace_period_days -> Integer,
+        signaled_at -> Nullable<Text>,
+        swept_at -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     accumulation_status,
     content_engagement_stats,
@@ -1769,6 +1787,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     local_sessions,
     manifests,
     mechanism_selection,
+    mutuality_audit_log,
     node_stewardship,
     audit_observations,
     observation_entries,

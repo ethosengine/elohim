@@ -160,6 +160,9 @@ pub mod custodian_shares;
 // Each row is one TranslationPoint observation; aggregated at M5.
 pub mod translation_observations;
 
+// Sprint 3 — Mutual Storage Replication §6.2: sweep telemetry (Category C operational)
+pub mod mutuality_audit_log;
+
 use std::path::Path;
 use std::time::Duration;
 
