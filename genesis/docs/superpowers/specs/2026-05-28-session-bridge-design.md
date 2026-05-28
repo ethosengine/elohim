@@ -313,49 +313,105 @@ Each pillar's staged-intent shape:
 
 ## §4 — The graduation ceremony
 
-The ceremony is the heart of the primitive. It's where tentative becomes canonical.
+The ceremony is the heart of the primitive. It's where tentative becomes canonical. It is **NOT** a mechanical replay — it's an appraisal interaction, and that framing reshapes the whole design.
+
+### The Half-Price Books metaphor
+
+The right intuition is bringing a stack of used books to the Half-Price Books counter. You hand over the batch. They appraise it. They make you an offer. You accept and walk out with a receipt, or you refuse and walk out with your stack intact. The transaction is one batched negotiation, not a series of independent item-level decisions.
+
+The graduation ceremony has the same shape: the participant brings their batched session of staged intent, the substrate (with elohim inference where needed) appraises it, and presents an offered resolution. The participant accepts and graduates, or refuses and walks away with the session intact (until they decide to discard, or until expiry).
+
+The aspiration is that the protocol's economic shape — REA + mutual credit + commons stewardship + elohim wisdom as appraiser — yields resolutions more satisfying than pennies-on-the-dollar. Guest contributions during sampling deserve fair appraisal of their actual value to the commons, not capitalist-resale-shape devaluation.
+
+### Two resolution paths per intent
+
+Each staged intent resolves through one of two paths:
+
+**Deterministic resolution** — clear 1:1 mapping from staged intent to canonical substrate entry. `StagedMasteryIntent { content_id: X, mastery_level: gold }` graduates to `ContentMastery { content_id: X, level: gold, agent: <new-agent>, attested_at: <now> }`. No negotiation needed; the substrate just accepts and writes.
+
+**Negotiated resolution** — the staged intent expresses value whose canonical form requires appraisal. Example: a visitor who sampled three different paths and contributed reflection notes on each. The notes are valuable but their canonical home isn't predetermined — are they private mastery records? Public attestation? Steward-witnessed reflections that feed into the path's lamad signal? The graduation ceremony invokes elohim inference to read the intent's content + the target context's standing-curve + the participant's profile (where consented) and produce a proposed resolution that the participant can review and accept.
 
 ### Inputs
 
 - The session lifecycle (its current state determines what staged intent is even eligible to graduate)
 - The graduating identity (agent pubkey; for visitor-graduation, this is the freshly-incarnated agent; for sampling-graduation, this is the sampler's existing identity)
 - The session's pool of staged intent (every `StagedIntent` accumulated during the session)
+- For negotiated resolutions: access to an elohim inference surface (which elohim agent / with what context window / with what authority — see §8)
 
-### Output: `GraduationManifest`
+### Output: `GraduationOffer` → participant accepts/refuses → `GraduationManifest`
 
 ```rust
+/// First the substrate produces an offer the participant can inspect.
+/// This is the "Half-Price Books counter shows you the offered price"
+/// step — explicit, reviewable, refusable.
+pub struct GraduationOffer {
+    pub deterministic_resolutions: Vec<DeterministicResolution>,
+    pub negotiated_resolutions: Vec<NegotiatedResolution>,
+    pub rejected_intents: Vec<RejectedIntent>,         // can't graduate at all — reach denied, intent stale, etc., with reasons
+    pub discarded_intents: Vec<DiscardedIntent>,       // not actionable from this lifecycle state — e.g. anonymous consent
+    pub elohim_appraisal_notes: Option<AppraisalNotes>, // narrative from inference about what the batch represents and how the offer was constructed
+}
+
+/// A negotiated resolution names the proposed canonical form + the reasoning,
+/// so the participant can refuse or counter-offer (where counter-offer is
+/// supported by the pillar).
+pub struct NegotiatedResolution {
+    pub intent: StagedIntentEnvelope,
+    pub proposed_canonical_entries: Vec<ProposedEntry>,
+    pub appraised_value: ValueSummary,               // pillar-specific: standing increment, mutual-credit issuance, attestation strength, etc.
+    pub reasoning: Option<String>,                   // narrative from elohim inference
+    pub participant_alternatives: Vec<ProposedAlternative>, // where pillar supports it: alternative resolutions the participant could pick instead
+}
+
+/// Once the participant accepts (whole batch, or selected subset where
+/// supported), the actual substrate writes happen and produce the manifest.
 pub struct GraduationManifest {
     pub graduated: Vec<GraduatedIntent>,      // succeeded — list of canonical EntryHashes per pillar
-    pub rejected: Vec<RejectedIntent>,        // could not graduate — reach denied, standing insufficient, intent stale, etc., with reasons
-    pub discarded: Vec<DiscardedIntent>,      // not actionable from this lifecycle state — e.g. anonymous consent
+    pub failed_mid_graduation: Vec<FailedIntent>,  // coordinator rejected at write time despite the offer
     pub session_terminated: bool,             // true if the session itself dissolved into membership; false for partial-graduation states
+    pub appraisal_record: Option<EntryHash>,  // optional: notarize the appraisal itself for the participant's records
 }
 ```
 
-### Per-intent algorithm
+### Per-intent algorithm (offer phase)
 
 For each staged intent in the pool:
 
-1. **Predicate check** — does `intent.is_actionable(lifecycle)` return true? If no, discard with a reason ("anonymous consent is meaningless under protocol rules").
+1. **Predicate check** — does `intent.is_actionable(lifecycle)` return true? If no, mark as discarded with a reason ("anonymous consent is meaningless under protocol rules").
 
-2. **Reach check** — does the graduating identity have the reach surface to author this entry in the target context? Sampling state has zero standing in the target; some intents need standing > 0 to graduate. If insufficient, reject with the reach gap quoted.
+2. **Reach check** — does the graduating identity have the reach surface to author this entry in the target context? Sampling state has zero standing in the target; some intents need standing > 0 to graduate. If insufficient, mark rejected with the reach gap quoted.
 
-3. **Dispatch graduation** — call the `GraduationCeremony::graduate()` impl for this intent's type. The impl knows the specific coordinator function and any per-type validation.
+3. **Classification** — deterministic or negotiated? Pillar-specific predicates (e.g. mastery is always deterministic for self-attestation; consent is always deterministic when actionable; reflection notes are always negotiated; sampling-derived signals are usually negotiated).
 
-4. **Record** — append to `manifest.graduated` (with the canonical EntryHash) or `manifest.rejected` (with the failure reason).
+4. **Deterministic resolutions** — directly produce a `DeterministicResolution` with the canonical entry shape predicted.
+
+5. **Negotiated resolutions** — invoke elohim inference with the intent + relevant target-context signals + (where consented) participant context. Produce a `NegotiatedResolution` with proposed entries, appraised value, reasoning, and any alternatives the participant can choose between.
+
+6. **Compose offer** — assemble `GraduationOffer` for the participant to review.
+
+### Participant decision phase
+
+The participant inspects the offer. Options vary by pillar but generally include:
+
+- **Accept whole batch** — graduate everything in the offer
+- **Accept subset** — graduate selected resolutions; rest stay staged for later
+- **Counter** (where supported) — pick one of the `participant_alternatives` for specific negotiated resolutions
+- **Refuse** — walk away. Staged intent remains in the session for a later attempt, or session discard releases it
+
+### Write phase
+
+Once accepted, the substrate executes the writes. Failures here go into `failed_mid_graduation` (distinct from `rejected_intents` in the offer — those never made the offer; these were offered, accepted, then failed at write). Idempotency on coordinator side allows retry of the failed subset.
 
 ### Failure modes
 
-- **Partial graduation** — some intents succeed, some don't. The manifest carries both; the participant decides what to do with the rejected pool (re-attempt later? abandon? petition for standing?).
-- **Coordinator-side validation failure** — the substrate refuses an entry that looked actionable. Manifest records the substrate's rejection reason; intent stays in the pool for re-attempt.
-- **Network failure mid-graduation** — the manifest is the source of truth for what succeeded; the participant can retry the failed subset.
-- **Identity mismatch** — graduating identity doesn't match the session's expected post-graduation identity (e.g. a different agent tries to graduate someone else's session). Hard fail; session not consumed.
+- **Partial graduation** — some accepted resolutions succeed, some fail at write. The manifest carries both; the participant can retry the failed subset.
+- **Offer staleness** — between offer construction and participant acceptance, the target-context state may have shifted (reach changed, standing recomputed, the pillar's rules updated). Offers carry an expiry; expired offers must be re-computed.
+- **Identity mismatch** — graduating identity doesn't match the session's expected post-graduation identity. Hard fail; session not consumed.
+- **Inference unavailable** — if elohim inference is unreachable for negotiated resolutions, the offer can still ship the deterministic part; negotiated intents are held back with a "needs appraisal" status. The participant can graduate deterministic now, return for negotiated later.
 
 ### Atomicity
 
-The ceremony is NOT atomic. It's intentional. Some intents may take seconds (DHT replication) while others are nearly instant. The manifest is the receipt — it lets the participant reason about partial state and decide on follow-up.
-
-This contrasts with a database-transaction model and matches the protocol's eventual-consistency substrate.
+The ceremony is NOT atomic. It's intentional. The Half-Price Books counter doesn't promise that every book transfers ownership simultaneously — they promise the receipt is true. The manifest is the receipt. This matches the protocol's eventual-consistency substrate.
 
 ---
 
@@ -406,9 +462,20 @@ The browser doesn't need to know about the session-bridge primitive directly —
 
 elohim-storage natively consumes `session-bridge` for the peer-native sampling path. Different shape:
 
-### Where state lives
+### Where state lives — sampler-hosts-own-cache, confirmed
 
-In the sampler's own elohim-storage diesel — a `sampling_session` table + a `sampling_staged_intent` table. The sampler hosts their own sampling state; the target context's substrate is not consulted until graduation.
+In the sampler's own elohim-storage diesel — a `sampling_session` table + a `sampling_staged_intent` table. The sampler hosts their own sampling state; the target context's substrate is not consulted until graduation. This is analogous to a browser holding its own cookies — the participant controls their own session state and can discard it at any time with no protocol-side coordination required.
+
+**Important — this is NOT cookies-as-surveillance.** The browser-cookie shape is the right *functional* analogy (locally controlled, discardable, scoped to a session) but the *surveillance* shape that web2 grew around cookies — persistent cross-context tracking, opaque profile building, third-party access — is exactly what the session-bridge must not reproduce. Specific guardrails:
+
+- **Ephemeral by default.** A sampling session that goes inactive for its expiry window discards itself. Persistence past the session requires explicit graduation; there is no "long-lived sampling profile" that accumulates across visits without the participant's deliberate consent + the substrate's canonical entry-creation.
+- **No cross-context profiling.** The session-bridge never aggregates staged intent across different target contexts to build a behavioral profile. Each session is scoped to one target context; intent in session-A is not visible to session-B even on the same machine. Cross-context correlation requires the participant to graduate into a peer-native identity, at which point their canonical entries are subject to the existing reach/standing rules.
+- **No third-party access.** Doorway holds web2-side session pools; other doorways do not have access to them. Sampler's elohim-storage holds peer-native sampling cache; other peers do not have access. The substrate primitives that share state across peers (DHT, libp2p protocols) are for canonical entries only, not for staged intent.
+- **Always visible to the participant.** The bridge exposes a read interface ("show me everything you currently hold about me in this session") that returns the complete staged intent pool plus any cache slices. No opacity.
+- **Discard is fail-closed.** Explicit discard clears the staged intent pool, the sampling cache, and any session metadata. The substrate retains nothing. (Per `project_forgetting_as_design` — deliberate forgetting is a first-class protocol move.)
+- **Consent before profile.** Even within a single session, if a pillar wants to use accumulated intent to inform a negotiated graduation appraisal (the elohim-inference step in §4), the appraisal scope is bounded by the session itself, not by historical sessions. Cross-session intelligence requires the participant to have graduated.
+
+The cookie metaphor names *who controls the storage and how it gets discarded*. It does not name *what the storage gets used for*. The session-bridge is on the participant's side, not the platform's side.
 
 ### Sampling cache
 
@@ -468,23 +535,39 @@ The session-bridge's `StagedEconomicEventIntent` is intentionally identical to M
 
 ## §8 — Open design questions
 
-Things this spec deliberately leaves for follow-on discussion / decision:
+### Closed by operator framing 2026-05-28
 
-1. **Storage location for the sampling cache.** Probably the sampler's own elohim-storage (their machine) rather than the host's. Justified by cost-bearer-aligned-with-benefit principle and host-can't-know-they're-being-sampled property. But worth explicit confirmation.
+The following questions had explicit answers in design discussion. Recorded here so the closure is visible alongside the new questions the answers surfaced.
 
-2. **Sampling cache expiry policy.** Time-based default? Storage-pressure-based with LRU? Per-app-manifest-defined? Probably a small default (e.g. 7 days) with explicit "stop sampling" + storage-pressure eviction.
+**[CLOSED] Storage location for the sampling cache.** Sampler hosts their own cache, browser-cookie shape (locally controlled, discardable, scoped to a session) but explicitly NOT browser-cookie surveillance-shape. Detailed guardrails in §6.
 
-3. **Staged intent surviving identity-graduation.** Concretely: anonymous visitor stages mastery in qahal-A's context → graduates to oauth-identified → much later, decides to join qahal-A and incarnate → does the long-ago mastery intent come along? Probably yes for some intent types (mastery survives because it's about the content, not the agent), no for others (consent decided long ago may no longer reflect the agent's current consent). Per-pillar staged-intent `is_actionable()` predicate should encode this.
+**[CLOSED] Staged intent surviving identity-graduation.** The graduation ceremony handles this — the batched intent is appraised holistically at graduation time, with deterministic intents resolving 1:1 and negotiated intents going through elohim inference. The Half-Price Books metaphor is canonical: you bring the batch, the substrate appraises and offers, you accept or walk away. Surviving intent doesn't survive *passively* across graduation; it survives by going through the ceremony and being explicitly accepted into canonical form.
 
-4. **What writes are allowed during sampling.** Sampling state has zero standing, so by default no substrate writes. But some writes are arguably zero-standing-permissible (e.g. self-attested mastery doesn't infringe on the host commons). Worth a per-pillar matrix.
+### Still open
 
-5. **Graduation-ceremony rollback semantics.** The ceremony is non-atomic by design. But what if a graduation-in-progress is interrupted (network failure mid-replay)? The manifest records partial success. Is there a re-graduation path that picks up the remainder, or does the participant manually re-stage failed intents? Probably the former, with idempotency on the coordinator side preventing double-writes.
+1. **Sampling cache expiry policy.** Time-based default? Storage-pressure-based with LRU? Per-app-manifest-defined? Probably a small default (e.g. 7 days, but worth tighter for anonymous browser state to reinforce the not-surveillance posture) with explicit "stop sampling" + storage-pressure eviction.
 
-6. **OAuth identity persistence vs anonymity preservation.** Some participants will want to OAuth-identify without persisting that identity post-session. Doorway should support an ephemeral-oauth mode where the OAuth subject is held only in-memory and discarded with the session, not persisted to doorway's session pool.
+2. **What writes are allowed during sampling.** Sampling state has zero standing, so by default no canonical substrate writes. The session-bridge stages intent locally, but is there a category of zero-standing-permissible local writes that don't even need staging (e.g. ephemeral UI preferences for the sampling app)? Worth a per-pillar matrix that maps "during sampling, this kind of write goes to: never / session-bridge intent pool / sampling-local cache / requires-graduation-first".
 
-7. **Sampling between collectives at different scales.** A sampler from a household-scale qahal visiting a regional-scale commons may have to sample more aggressively (more cache, more state) than a sampler at the same scale. Worth thinking about whether sampling-cache size scales with target-context size or stays bounded.
+3. **Graduation-ceremony rollback semantics.** Non-atomic by design. But what if a graduation-in-progress is interrupted between offer-accept and substrate-write (network failure)? The `failed_mid_graduation` list lets the participant retry the subset, but the participant's mental model of "I accepted that offer" doesn't match "some of it didn't actually land." UX implication: the participant needs visibility into write-state after acceptance. Spec should mandate a "graduation in progress" status surface the participant can poll.
 
-8. **Sampling as a federation primitive.** Could the same shape be used between federated commons (not just sampling-then-joining, but ongoing inter-commons participation that's never expected to graduate)? Probably yes — long-running sampling sessions become a federation pattern. Worth noting but deferring detailed design until use case clarifies.
+4. **OAuth identity persistence vs anonymity preservation.** Some participants will want to OAuth-identify (to access reach-gated content that requires identification) without persisting that identity post-session. Doorway should support an ephemeral-oauth mode where the OAuth subject is held only in-memory and discarded with the session, not persisted to doorway's session pool. This reinforces the not-surveillance posture for participants who want to dip in without committing.
+
+5. **Sampling between collectives at different scales.** A sampler from a household-scale qahal visiting a regional-scale commons may have to sample more aggressively (more cache, more state) than a sampler at the same scale. Worth thinking about whether sampling-cache size scales with target-context size or stays bounded.
+
+6. **Sampling as a federation primitive.** Could the same shape be used between federated commons (not just sampling-then-joining, but ongoing inter-commons participation that's never expected to graduate)? Probably yes — long-running sampling sessions become a federation pattern. Worth noting but deferring detailed design until use case clarifies.
+
+### New — opened by the appraisal/negotiation framing in §4
+
+7. **Which elohim is the appraiser?** Negotiated-resolution intents invoke "elohim inference" — but which elohim? The participant's home-elohim (familiar with their context, has their consented profile)? The target context's commons-elohim (per `project_commons_elohim_co_steward` — speaks for the collective interest)? A neutral third elohim acting as appraisal counsel (per `project_elohim_as_counsel`)? Possibly all three, with different roles: home-elohim represents the participant's interests, commons-elohim represents the host's interests, neutral elohim mediates and produces the offer. This is the substrate-correct shape but it's expensive — needs design about when the three-elohim ceremony is necessary vs when a simpler single-elohim appraisal suffices.
+
+8. **Appraisal authority and reproducibility.** If elohim inference produces a negotiated resolution, can the participant audit the reasoning? Re-run the appraisal with a different elohim and compare? Notarize the original appraisal as part of their graduation record? `GraduationOffer::elohim_appraisal_notes` and `GraduationManifest::appraisal_record` gesture at this but the substrate semantics need design. (Related: `project_elohim_councils_capture_apex` — wisdom holds the structural top of authority; appraisal is one of the moves wisdom makes.)
+
+9. **What does refusal cost?** A participant who refuses the graduation offer at the Half-Price Books counter walks out with their stack. In the protocol, this means: staged intent stays in the session, the session continues until expiry, the participant can later re-attempt with a new offer (presumably with shifted target-context state that might yield a different appraisal). But there's a risk of "shopping the offer" — repeatedly re-graduating to extract more favorable appraisals. The substrate should probably encode some friction or memory of prior offers to prevent appraisal-shopping while preserving the participant's right to refuse-and-return.
+
+10. **What's the negotiation primitive on the participant side?** The offer presents `participant_alternatives` for negotiated resolutions. What's the substrate semantics for the participant proposing a *novel* alternative (not on the menu)? Is that "request a re-appraisal with this counter-proposal," or "this offer is rejected; here's a new staged intent to add to the pool"? Probably the latter — keep the protocol simple by treating counter-offers as new staged intents that go through the same offer-construction cycle.
+
+11. **Avoiding the cookie-shape surveillance trap concretely.** The §6 guardrails name the principles but need substrate-level enforcement, not just convention. How does the protocol verify a doorway is honoring "no cross-context profiling"? Probably needs auditable session-pool boundaries + observable behavior the participant can verify (e.g. "show me everything you hold about me" must be a complete answer, not a filtered one). Worth a section in the doorway spec.
 
 ---
 
