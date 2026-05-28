@@ -12283,6 +12283,139 @@ pub fn get_rea_economic_event(id: String) -> ExternResult<Option<ReaEconomicEven
 }
 
 // =============================================================================
+// M-REA-1: Intent-driven EconomicEvent creation
+// =============================================================================
+//
+// `create_rea_economic_event_from_intent` is a thin coordinator wrapper that
+// accepts a high-level `LamadEventIntentInput` (client semantic intent) and
+// composes the full `CreateReaEconomicEventInput` (action, provider, receiver)
+// using the same PROTOCOL_EVENT_MAPPINGS that the storage-side handler uses.
+//
+// This makes the DHT record authoritative: the storage route calls this function
+// via the conductor, and the post-commit signal writes to the SQLite projection.
+// The REA composition lives in two places (zome + storage-side) deliberately —
+// the zome is the source-of-truth record; the storage side validates the intent
+// before forwarding. Both must agree on the mapping; drift is caught by the
+// sweettest seatbelt (test/sweettest/src/tests/lamad_intent_event.rs).
+
+/// High-level lamad-event intent — passed from elohim-storage to this zome
+/// without requiring the client to know REA action verbs.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LamadEventIntentInput {
+    pub agent_id: String,
+    pub lamad_event_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contributor_presence_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_quantity_value: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_quantity_unit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata_json: Option<String>,
+}
+
+/// Map a `LamadEventIntentInput.lamad_event_type` to `(action, provider, receiver)`.
+///
+/// Mirrors `compose_event_from_intent` in `elohim-storage/src/api/lamad.rs`.
+/// Any change to either mapping MUST be reflected in the other.
+fn intent_to_rea_triple(intent: &LamadEventIntentInput) -> Option<(String, String, String)> {
+    let agent = intent.agent_id.clone();
+    let content = intent.content_id.clone().unwrap_or_default();
+    let path = intent.path_id.clone().unwrap_or_default();
+    let presence = intent.contributor_presence_id.clone().unwrap_or_default();
+
+    match intent.lamad_event_type.as_str() {
+        "content-view" => Some(("use".into(), agent.clone(), content)),
+        "session-start" => Some(("use".into(), agent.clone(), agent.clone())),
+        "session-end" => Some(("use".into(), agent.clone(), agent.clone())),
+        "content-complete" => Some(("produce".into(), agent.clone(), agent.clone())),
+        "assessment-start" => Some(("use".into(), agent.clone(), content)),
+        "assessment-complete" => Some(("produce".into(), agent.clone(), agent.clone())),
+        "practice-attempt" => Some(("use".into(), agent.clone(), content)),
+        "quiz-submit" => Some(("produce".into(), agent.clone(), agent.clone())),
+        "path-step-complete" => Some(("produce".into(), agent.clone(), agent.clone())),
+        "path-complete" => Some(("produce".into(), agent.clone(), agent.clone())),
+        "recognition-given" => Some(("raise".into(), agent.clone(), presence)),
+        "recognition-received" => Some(("raise".into(), agent.clone(), agent.clone())),
+        "affinity-mark" => Some(("raise".into(), agent.clone(), content)),
+        "endorsement" => Some(("raise".into(), agent.clone(), content)),
+        "citation" => Some(("cite".into(), agent.clone(), content)),
+        "recognition-transfer" => Some(("transfer".into(), agent.clone(), presence)),
+        "attestation-grant" => Some(("produce".into(), agent.clone(), agent.clone())),
+        "capability-earn" => Some(("produce".into(), agent.clone(), agent.clone())),
+        "content-create" => Some(("produce".into(), agent.clone(), content)),
+        "path-create" => Some(("produce".into(), agent.clone(), path)),
+        "extension-create" => Some(("produce".into(), agent.clone(), content)),
+        "map-synthesis" => Some(("produce".into(), agent.clone(), content)),
+        "analysis-complete" => Some(("produce".into(), agent.clone(), content)),
+        "stewardship-begin" => Some(("work".into(), agent.clone(), content)),
+        "invitation-send" => Some(("deliver-service".into(), agent.clone(), content)),
+        "presence-claim" => Some(("accept".into(), agent.clone(), presence)),
+        "attestation-revoke" => Some(("modify".into(), agent.clone(), content)),
+        "content-flag" => Some(("modify".into(), agent.clone(), content)),
+        "governance-vote" => Some(("work".into(), agent.clone(), content)),
+        _ => None,
+    }
+}
+
+/// Compose a full `EconomicEvent` from a high-level `LamadEventIntentInput`.
+///
+/// Performs the PROTOCOL_EVENT_MAPPINGS lookup in-zome so the DHT record
+/// carries the correct REA action/provider/receiver without requiring the
+/// client to know REA vocabulary. Delegates to `create_rea_economic_event`
+/// for all commit, link, and signal logic.
+#[hdk_extern]
+pub fn create_rea_economic_event_from_intent(
+    intent: LamadEventIntentInput,
+) -> ExternResult<ReaEconomicEventOutput> {
+    let (action, provider, receiver) = intent_to_rea_triple(&intent).ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Unknown lamadEventType '{}' — not in PROTOCOL_EVENT_MAPPINGS. \
+             Add it to intent_to_rea_triple in content_store/src/lib.rs and \
+             to compose_event_from_intent in elohim-storage/src/api/lamad.rs.",
+            intent.lamad_event_type
+        )))
+    })?;
+
+    let id = format!(
+        "lamad-intent-{}-{}",
+        intent.lamad_event_type,
+        sys_time()
+            .map(|t| format!("{:?}", t))
+            .unwrap_or_else(|_| "0".into())
+    );
+
+    let input = CreateReaEconomicEventInput {
+        id,
+        action,
+        provider,
+        receiver,
+        resource_classified_as: vec![],
+        resource_quantity_value: intent.resource_quantity_value,
+        resource_quantity_unit: intent.resource_quantity_unit,
+        effort_quantity_value: None,
+        effort_quantity_unit: None,
+        has_point_in_time: sys_time()
+            .map(|t| format!("{:?}", t))
+            .unwrap_or_else(|_| "".into()),
+        fulfills: vec![],
+        realization_of: None,
+        lamad_event_type: Some(intent.lamad_event_type),
+        note: intent.note,
+        metadata_json: intent.metadata_json,
+        observation_refs: None,
+    };
+
+    create_rea_economic_event(input)
+}
+
+// =============================================================================
 // Attestation Consolidation — Tasks B.3 / B.4 / B.5 / B.6
 // =============================================================================
 
