@@ -127,6 +127,11 @@ path = "src/tests/source_chain_via_route.rs"
 name = "session_human_via_route"
 path = "src/tests/session_human_via_route.rs"
 
+# Sprint 3 T18: replicates-dwelling two-conductor substrate-correct seatbelt
+[[test]]
+name = "replicates_dwelling_substrate_correct_test"
+path = "src/tests/replicates_dwelling_substrate_correct_test.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
