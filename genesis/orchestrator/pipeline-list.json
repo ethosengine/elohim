@@ -1,17 +1,17 @@
 {
-  "generatedFrom": "orchestrator-strategy.mjs PIPELINES",
+  "generatedFrom": "build-manifest.json files via pipeline-registry.mjs",
   "pipelines": [
     {
-      "name": "elohim-holochain",
+      "name": "elohim-genesis",
       "manualOnly": false,
-      "triggersGenesis": true,
+      "triggersGenesis": false,
       "cascades": true
     },
     {
-      "name": "elohim-edge",
+      "name": "elohim-orchestrator",
       "manualOnly": false,
-      "triggersGenesis": true,
-      "cascades": true
+      "triggersGenesis": false,
+      "cascades": false
     },
     {
       "name": "elohim",
@@ -20,7 +20,13 @@
       "cascades": true
     },
     {
-      "name": "elohim-genesis",
+      "name": "elohim-storybook",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": false
+    },
+    {
+      "name": "elohim-sophia",
       "manualOnly": false,
       "triggersGenesis": false,
       "cascades": true
@@ -32,22 +38,22 @@
       "cascades": true
     },
     {
-      "name": "elohim-sophia",
-      "manualOnly": false,
-      "triggersGenesis": false,
-      "cascades": true
-    },
-    {
       "name": "elohim-epr",
       "manualOnly": false,
       "triggersGenesis": false,
       "cascades": false
     },
     {
-      "name": "elohim-storybook",
+      "name": "elohim-edge",
       "manualOnly": false,
-      "triggersGenesis": false,
-      "cascades": false
+      "triggersGenesis": true,
+      "cascades": true
+    },
+    {
+      "name": "elohim-holochain",
+      "manualOnly": false,
+      "triggersGenesis": true,
+      "cascades": true
     }
   ]
 }
