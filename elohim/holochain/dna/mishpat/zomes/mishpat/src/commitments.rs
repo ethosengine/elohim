@@ -105,8 +105,28 @@ fn validate_delegates_compute(payload: &serde_json::Value) -> Result<(), String>
     Ok(())
 }
 
-/// Stub — Sprint 1 Task 3 fully implements acknowledges-reach-change validation.
-fn validate_acknowledges_reach_change(_payload: &serde_json::Value) -> Result<(), String> {
+fn validate_acknowledges_reach_change(payload: &serde_json::Value) -> Result<(), String> {
+    let required = ["action", "acknowledger", "target_epr_cid", "new_reach", "signed_at"];
+    for field in required {
+        if payload.get(field).is_none() {
+            return Err(format!(
+                "acknowledges-reach-change missing required field: {field}"
+            ));
+        }
+    }
+    if payload["action"] != "acknowledges-reach-change" {
+        return Err("action field must equal 'acknowledges-reach-change'".into());
+    }
+    let valid_reach = [
+        "private", "self", "intimate", "trusted", "familiar", "community", "public", "commons",
+    ];
+    let new_reach = payload["new_reach"].as_str().unwrap_or("");
+    if !valid_reach.contains(&new_reach) {
+        return Err(format!(
+            "new_reach '{}' not a known reach value",
+            new_reach
+        ));
+    }
     Ok(())
 }
 
@@ -197,6 +217,47 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "delegates-compute".to_string(),
             payload_json: "{not valid json".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    fn well_formed_acknowledges_payload() -> serde_json::Value {
+        serde_json::json!({
+            "action": "acknowledges-reach-change",
+            "acknowledger": "agent:matthew-steward",
+            "target_epr_cid": "bafy-new-epr-head-cid",
+            "new_reach": "community",
+            "signed_at": "2026-05-29T00:00:00Z"
+        })
+    }
+
+    #[test]
+    fn acknowledges_reach_change_well_formed_validates() {
+        let input = CreateCommitmentInput {
+            action: "acknowledges-reach-change".to_string(),
+            payload_json: well_formed_acknowledges_payload().to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_ok());
+    }
+
+    #[test]
+    fn acknowledges_reach_change_missing_target_epr_cid_rejected() {
+        let mut payload = well_formed_acknowledges_payload();
+        payload.as_object_mut().unwrap().remove("target_epr_cid");
+        let input = CreateCommitmentInput {
+            action: "acknowledges-reach-change".to_string(),
+            payload_json: payload.to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn acknowledges_reach_change_unknown_reach_value_rejected() {
+        let mut payload = well_formed_acknowledges_payload();
+        payload["new_reach"] = serde_json::json!("totally-bogus-reach");
+        let input = CreateCommitmentInput {
+            action: "acknowledges-reach-change".to_string(),
+            payload_json: payload.to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
     }
