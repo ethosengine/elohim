@@ -4608,3 +4608,214 @@ fn entry_link_view_requires_deleted() {
         "Schema should require 'deleted'"
     );
 }
+
+// ── M-AGGR-1: SessionHumanView ──────────────────────────────────
+
+/// Build a minimal valid SessionHumanView JSON instance.
+fn minimal_session_human() -> serde_json::Value {
+    serde_json::json!({
+        "agentId": "uhCAkABCDEFGHIJKLMNOP1234567890",
+        "hAppId": "lamad",
+        "nodesViewed": 0,
+        "nodesWithAffinity": 0,
+        "pathsStarted": 0,
+        "pathsCompleted": 0,
+        "stepsCompleted": 0,
+        "computedAt": "2026-05-28T12:00:00Z"
+    })
+}
+
+#[test]
+fn session_human_view_minimal_validates() {
+    validate_against_schema("views/session-human-view.schema.json", &minimal_session_human());
+}
+
+#[test]
+fn session_human_view_with_journey_validates() {
+    let mut v = minimal_session_human();
+    v["journeyStartedAt"] = serde_json::json!("2026-01-15T08:30:00Z");
+    v["nodesViewed"] = serde_json::json!(12_i64);
+    v["pathsStarted"] = serde_json::json!(3_i64);
+    v["stepsCompleted"] = serde_json::json!(47_i64);
+    validate_against_schema("views/session-human-view.schema.json", &v);
+}
+
+#[test]
+fn session_human_view_null_journey_validates() {
+    let mut v = minimal_session_human();
+    v["journeyStartedAt"] = serde_json::json!(null);
+    validate_against_schema("views/session-human-view.schema.json", &v);
+}
+
+#[test]
+fn session_human_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/session-human-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("session-human-view schema should compile");
+
+    for field in &["agentId", "hAppId", "nodesViewed", "nodesWithAffinity", "pathsStarted", "pathsCompleted", "stepsCompleted", "computedAt"] {
+        let mut v = minimal_session_human();
+        v.as_object_mut().unwrap().remove(*field);
+        assert!(
+            validator.iter_errors(&v).next().is_some(),
+            "Schema should require '{field}'"
+        );
+    }
+}
+
+#[test]
+fn session_human_view_schema_declares_source_of_truth() {
+    let schema = load_schema("views/session-human-view.schema.json");
+    assert_source_of_truth_declared(&schema, "session-human-view");
+}
+
+// ── M-AGGR-1: UpgradePromptView ─────────────────────────────────
+
+/// Build a minimal valid UpgradePromptView JSON instance (empty active prompts).
+fn minimal_upgrade_prompt() -> serde_json::Value {
+    serde_json::json!({
+        "agentId": "uhCAkABCDEFGHIJKLMNOP1234567890",
+        "hAppId": "lamad",
+        "activePrompts": [],
+        "computedAt": "2026-05-28T12:00:00Z"
+    })
+}
+
+#[test]
+fn upgrade_prompt_view_minimal_validates() {
+    validate_against_schema(
+        "views/upgrade-prompt-view.schema.json",
+        &minimal_upgrade_prompt(),
+    );
+}
+
+#[test]
+fn upgrade_prompt_view_with_prompts_validates() {
+    let v = serde_json::json!({
+        "agentId": "uhCAkABCDEFGHIJKLMNOP1234567890",
+        "hAppId": "lamad",
+        "activePrompts": [
+            {
+                "promptId": "first-affinity",
+                "trigger": "contributor-presence",
+                "title": "Save Your Progress",
+                "message": "You're building a personal knowledge map!",
+                "benefits": [
+                    "Your progress syncs across devices",
+                    "Join a network of learners"
+                ]
+            },
+            {
+                "promptId": "path-started",
+                "trigger": "path-started",
+                "title": "You've Started a Journey",
+                "message": "Your learning path is stored in your browser.",
+                "benefits": ["Resume from any device"]
+            }
+        ],
+        "computedAt": "2026-05-28T14:30:00Z"
+    });
+    validate_against_schema("views/upgrade-prompt-view.schema.json", &v);
+}
+
+#[test]
+fn upgrade_prompt_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/upgrade-prompt-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("upgrade-prompt-view schema should compile");
+
+    for field in &["agentId", "hAppId", "activePrompts", "computedAt"] {
+        let mut v = minimal_upgrade_prompt();
+        v.as_object_mut().unwrap().remove(*field);
+        assert!(
+            validator.iter_errors(&v).next().is_some(),
+            "Schema should require '{field}'"
+        );
+    }
+}
+
+#[test]
+fn upgrade_prompt_view_schema_declares_source_of_truth() {
+    let schema = load_schema("views/upgrade-prompt-view.schema.json");
+    assert_source_of_truth_declared(&schema, "upgrade-prompt-view");
+}
+
+// ── M-AGGR-1: OnboardingManifestPayload ─────────────────────────
+
+/// Build a minimal valid onboarding manifest payload instance.
+fn minimal_onboarding_payload() -> serde_json::Value {
+    serde_json::json!({
+        "prompts": []
+    })
+}
+
+#[test]
+fn onboarding_manifest_payload_minimal_validates() {
+    validate_against_schema(
+        "manifest-payloads/onboarding.schema.json",
+        &minimal_onboarding_payload(),
+    );
+}
+
+#[test]
+fn onboarding_manifest_payload_with_prompts_validates() {
+    let v = serde_json::json!({
+        "prompts": [
+            {
+                "promptId": "first-affinity",
+                "trigger": "contributor-presence",
+                "triggerCondition": {
+                    "field": "nodesWithAffinity",
+                    "operator": "gte",
+                    "threshold": 1
+                },
+                "title": "Save Your Progress",
+                "message": "You're building a personal knowledge map! Install the Elohim app to save it permanently.",
+                "benefits": [
+                    "Your progress syncs across devices",
+                    "Join a network of learners",
+                    "Never lose your journey"
+                ]
+            },
+            {
+                "promptId": "path-started",
+                "trigger": "path-started",
+                "triggerCondition": {
+                    "field": "pathsStarted",
+                    "operator": "gte",
+                    "threshold": 1
+                },
+                "title": "You've Started a Journey",
+                "message": "Your learning path is stored in your browser.",
+                "benefits": ["Resume from any device", "Get updates to your paths"]
+            },
+            {
+                "promptId": "return-visit",
+                "trigger": "return-visit",
+                "triggerCondition": {
+                    "field": "nodesViewed",
+                    "operator": "always",
+                    "threshold": 0
+                },
+                "title": "Welcome Back!",
+                "message": "Good to see you again.",
+                "benefits": ["Automatic progress backup"]
+            }
+        ]
+    });
+    validate_against_schema("manifest-payloads/onboarding.schema.json", &v);
+}
+
+#[test]
+fn onboarding_manifest_payload_rejects_missing_prompts() {
+    let schema = load_schema("manifest-payloads/onboarding.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("onboarding manifest-payload schema should compile");
+
+    // Missing prompts array entirely
+    let no_prompts = serde_json::json!({});
+    assert!(
+        validator.iter_errors(&no_prompts).next().is_some(),
+        "Schema should require 'prompts'"
+    );
+}
