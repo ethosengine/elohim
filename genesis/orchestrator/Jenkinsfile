@@ -173,11 +173,47 @@ import groovy.transform.Field
 // HELPER FUNCTIONS
 // =============================================================================
 
-// Derive health endpoints from PIPELINES.deploymentCheck — single source of truth
+/**
+ * Look up pipeline metadata from the manifest-derived registry.
+ * Available after runBuildGraph() runs (Determine Build Plan stage).
+ * For Pre-flight + early stages that need metadata before the registry is
+ * populated, falls back to parsing manifests directly via find + readJSON.
+ */
+def getPipelineMetadata(String name) {
+    if (env.PIPELINE_REGISTRY_JSON) {
+        def registry = readJSON(text: env.PIPELINE_REGISTRY_JSON)
+        return registry[name] ?: [:]
+    }
+    // Pre-build-graph fallback: parse manifests directly.
+    def manifestPath = sh(
+        script: "find . -name 'build-manifest.json' -not -path '*/node_modules/*' | xargs grep -l '\"pipeline\": \"${name}\"' | head -1",
+        returnStdout: true
+    ).trim()
+    if (!manifestPath) return [:]
+    def m = readJSON(file: manifestPath)
+    return [
+        jenkinsPath:     m.jenkinsPath,
+        manualOnly:      m.manualOnly == true,
+        triggersGenesis: m.triggersGenesis == true,
+        cascades:        m.cascades == null ? true : (m.cascades == true),
+        dependsOn:       m.dependsOn ?: [],
+    ]
+}
+
+// Derive health endpoints from build-manifest.json deployment.targets.*.healthCheck fields.
 def getHealthEndpoints() {
     def endpoints = [:]
-    PIPELINES.each { name, config ->
-        config.deploymentCheck?.each { env, url -> endpoints["${name}-${env}"] = url }
+    // Read deployment health checks from build-manifest.json files.
+    def manifestPaths = sh(
+        script: "find . -name 'build-manifest.json' -not -path '*/node_modules/*'",
+        returnStdout: true
+    ).trim().split('\n').findAll { it }
+    manifestPaths.each { path ->
+        def m = readJSON(file: path)
+        def alphaCheck = m.deployment?.targets?.alpha?.healthCheck
+        if (m.pipeline && alphaCheck) {
+            endpoints[m.pipeline] = alphaCheck
+        }
     }
     return endpoints
 }
@@ -791,9 +827,15 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
  * from config.longRunning.
  */
 def triggerPipeline(String name, String branch, Object wait = null, List changedFiles = []) {
-    def config = PIPELINES[name]
+    def config = getPipelineMetadata(name)
+    if (!config.jenkinsPath) {
+        error "Cannot dispatch pipeline '${name}': no jenkinsPath in its build-manifest.json"
+    }
+    // longRunning and deploymentCheck are PIPELINES-map fields not yet in manifests;
+    // fall back to the in-file map for those two until Task 7 migrates them.
+    def legacyConfig = PIPELINES[name]
     // Auto-derive wait from longRunning flag unless caller forced it.
-    boolean shouldWait = (wait == null) ? !(config?.longRunning) : (wait as boolean)
+    boolean shouldWait = (wait == null) ? !(legacyConfig?.longRunning) : (wait as boolean)
     String waitMode = shouldWait ? 'wait-for-result' : 'fire-and-forget (longRunning)'
     echo "▶️ Triggering ${name}/${branch} [${waitMode}]..."
 
@@ -802,7 +844,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // Note: local list named `buildParams` to avoid shadowing the pipeline-scope
         // `params` accessor (needed below to forward DEPLOY_ONLY).
         def buildParams = [booleanParam(name: 'FORCE_BUILD', value: true)]
-        if (config?.deploymentCheck) {
+        if (legacyConfig?.deploymentCheck) {
             buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: true))
         }
         // Propagate DEPLOY_ONLY so downstream pipelines (edge especially) skip
@@ -928,7 +970,7 @@ def autoModeAnalyze() {
     // [build:*] commit-tag overrides
     if (env.FORCE_BUILD_PIPELINES) {
         env.FORCE_BUILD_PIPELINES.split(',').each { name ->
-            if (!pipelines.contains(name) && PIPELINES[name]) {
+            if (!pipelines.contains(name) && getPipelineMetadata(name).jenkinsPath) {
                 pipelines.add(name)
                 analysis[name].shouldRun = true
                 analysis[name].matchedPatterns.add('commit-tag:[build:*]')
@@ -941,7 +983,7 @@ def autoModeAnalyze() {
     // Genesis auto-include for dev branches when any triggering pipeline builds
     if (!pipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
         def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-        def triggeringPipeline = pipelines.find { PIPELINES[it]?.triggersGenesis }
+        def triggeringPipeline = pipelines.find { getPipelineMetadata(it).triggersGenesis }
         if (triggeringPipeline && isDevBranch) {
             pipelines.add('elohim-genesis')
             analysis['elohim-genesis'].shouldRun = true
@@ -982,16 +1024,26 @@ def manualModeAnalyze(String mode) {
             break
     }
 
+    // Build the advisory analysis map from manifest-backed metadata.
+    // In manual mode the build graph hasn't run yet, so derive the name list
+    // from PIPELINE_REGISTRY_JSON (if already populated) or from the PIPELINES
+    // map fallback — Task 7 removes the fallback once the registry is always
+    // populated before manualModeAnalyze runs.
+    def allPipelineNames = env.PIPELINE_REGISTRY_JSON
+        ? readJSON(text: env.PIPELINE_REGISTRY_JSON).keySet().toList()
+        : PIPELINES.keySet().toList()
+
     def analysis = [:]
-    PIPELINES.each { name, config ->
+    allPipelineNames.each { name ->
+        def meta = getPipelineMetadata(name)
         analysis[name] = [
             shouldRun: pipelines.contains(name),
-            manualOnly: config.manualOnly ?: false,
+            manualOnly: meta.manualOnly ?: false,
             matchedPatterns: pipelines.contains(name) ? ['manual-mode'] : [],
             matchedFileCount: 0,
             sampleFiles: [],
-            dependsOn: config.dependsOn ?: [],
-            triggersGenesis: config.triggersGenesis ?: false,
+            dependsOn: meta.dependsOn ?: [],
+            triggersGenesis: meta.triggersGenesis ?: false,
             baselineUsed: 'global'
         ]
     }
@@ -1013,14 +1065,15 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         def graphResult = runBuildGraph(changedFiles, analysis)
         graphPipelines = graphResult.pipelineSteps.keySet().toList()
 
-        // Filter to pipelines that have Jenkins jobs in the PIPELINES map.
-        graphPipelines.removeAll { !PIPELINES.containsKey(it) }
+        // Filter to dispatchable pipelines (have jenkinsPath in their manifest).
+        graphPipelines.removeAll { name -> !getPipelineMetadata(name).jenkinsPath }
 
         // Apply [build:*] commit-message overrides — graph-walker (auth
         // since 2026-04) needs to honor manual retrigger workflow.
         if (env.FORCE_BUILD_PIPELINES) {
             env.FORCE_BUILD_PIPELINES.split(',').each { name ->
-                if (!graphPipelines.contains(name) && PIPELINES[name]) {
+                def meta = getPipelineMetadata(name)
+                if (!graphPipelines.contains(name) && meta.jenkinsPath) {
                     graphPipelines.add(name)
                     echo "🔧 [build:*] force-include applied to graph result: ${name}"
                 }
@@ -1030,7 +1083,7 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         // Genesis auto-include for dev branches
         if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
             def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-            def triggeringPipeline = graphPipelines.find { PIPELINES[it]?.triggersGenesis }
+            def triggeringPipeline = graphPipelines.find { getPipelineMetadata(it).triggersGenesis }
             if (triggeringPipeline && isDevBranch) {
                 graphPipelines.add('elohim-genesis')
             }
@@ -1406,6 +1459,12 @@ def runBuildGraph(List changedFiles, Map pipelinesAnalysis) {
     def buildGraph = load('genesis/orchestrator/build-graph.groovy')
     def result = buildGraph.walkBuildGraph(changedFiles)
 
+    // Stash registry as JSON env var so all later stages can read pipeline
+    // metadata without re-parsing build-manifest.json files.
+    if (result.pipelineRegistry) {
+        env.PIPELINE_REGISTRY_JSON = writeJSON(returnText: true, json: result.pipelineRegistry)
+    }
+
     // Per-file routing matrix (always-on visibility, from Task 4)
     echo buildGraph.formatPerFileMatrix(result.graph, result.staleMap, changedFiles)
 
@@ -1637,7 +1696,10 @@ spec:
                             match[1].split(',').each { tag ->
                                 tag = tag.trim().toLowerCase()
                                 if (tag == 'all') {
-                                    buildTags.addAll(PIPELINES.keySet().findAll { !PIPELINES[it].manualOnly })
+                                    def allNonManual = env.PIPELINE_REGISTRY_JSON
+                                        ? readJSON(text: env.PIPELINE_REGISTRY_JSON).findAll { k, v -> !v.manualOnly }.keySet().toList()
+                                        : PIPELINES.keySet().findAll { !PIPELINES[it].manualOnly }
+                                    buildTags.addAll(allNonManual)
                                 } else if (buildTagAliases[tag]) {
                                     buildTags.add(buildTagAliases[tag])
                                 } else {
