@@ -42,7 +42,7 @@ fn load_ref_map() -> HashMap<String, Value> {
     let base = schema_dir();
     let mut refs = HashMap::new();
 
-    for subdir in &["enums", "views", "manifests", "objects"] {
+    for subdir in &["enums", "views", "manifests", "objects", "manifest-payloads"] {
         let dir = base.join(subdir);
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
@@ -1171,6 +1171,9 @@ fn view_schemas_declare_source_of_truth() {
         "views/view-slice.schema.json",
         // Intent schemas — same convention: description must declare source of truth
         "intents/lamad-event-intent.schema.json",
+        // M-POLICY-1: AccumulationStatus view + standing-policy payload schemas
+        "views/accumulation-status.schema.json",
+        "manifest-payloads/standing-policy.schema.json",
     ];
 
     for schema_name in &view_schemas {
@@ -3539,4 +3542,229 @@ fn lamad_event_intent_schema_declares_source_of_truth() {
     let schema_value: Value = serde_json::from_str(&content)
         .expect("intents/lamad-event-intent.schema.json must be valid JSON");
     assert_source_of_truth_declared(&schema_value, "intents/lamad-event-intent.schema.json");
+}
+
+// =============================================================================
+// M-POLICY-1: AccumulationStatus + standing-policy payload schema contract tests
+//
+// Ticket: M-POLICY-1 (Server-side AccumulationStatus) — Phase E
+// Source: genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md §3
+// =============================================================================
+
+/// Full minimal AccumulationStatusView that satisfies all required fields.
+fn minimal_accumulation_status() -> Value {
+    serde_json::json!({
+        "entityType": "content",
+        "entityId": "concept-abc123",
+        "totalSignals": 25,
+        "uniqueParticipants": 18,
+        "consensusStrength": 0.62,
+        "status": "ready_for_sensemaking",
+        "readyForSensemaking": true,
+        "controversyDetected": false,
+        "settled": false,
+        "policyManifestCid": null,
+        "computedAt": "2026-05-28T12:00:00Z"
+    })
+}
+
+#[test]
+fn accumulation_status_view_minimal_validates() {
+    validate_against_schema(
+        "views/accumulation-status.schema.json",
+        &minimal_accumulation_status(),
+    );
+}
+
+#[test]
+fn accumulation_status_view_full_validates() {
+    let full = serde_json::json!({
+        "entityType": "path",
+        "entityId": "path-resilience-1",
+        "totalSignals": 35,
+        "uniqueParticipants": 28,
+        "consensusStrength": 0.88,
+        "status": "settled",
+        "readyForSensemaking": false,
+        "controversyDetected": false,
+        "settled": true,
+        "policyManifestCid": "bafyreia1234567890abcdef",
+        "computedAt": "2026-05-28T15:30:00Z"
+    });
+    validate_against_schema("views/accumulation-status.schema.json", &full);
+}
+
+#[test]
+fn accumulation_status_view_controversy_detected_validates() {
+    let controversy = serde_json::json!({
+        "entityType": "content",
+        "entityId": "lesson-xyz",
+        "totalSignals": 14,
+        "uniqueParticipants": 11,
+        "consensusStrength": 0.22,
+        "status": "controversy_detected",
+        "readyForSensemaking": false,
+        "controversyDetected": true,
+        "settled": false,
+        "policyManifestCid": null,
+        "computedAt": "2026-05-28T09:00:00Z"
+    });
+    validate_against_schema("views/accumulation-status.schema.json", &controversy);
+}
+
+#[test]
+fn accumulation_status_view_pending_validates() {
+    let pending = serde_json::json!({
+        "entityType": "content",
+        "entityId": "new-content-1",
+        "totalSignals": 3,
+        "uniqueParticipants": 3,
+        "consensusStrength": 1.0,
+        "status": "pending",
+        "readyForSensemaking": false,
+        "controversyDetected": false,
+        "settled": false,
+        "policyManifestCid": null,
+        "computedAt": "2026-05-28T08:00:00Z"
+    });
+    validate_against_schema("views/accumulation-status.schema.json", &pending);
+}
+
+#[test]
+fn accumulation_status_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/accumulation-status.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("accumulation-status schema should compile");
+
+    // Missing status
+    let no_status = {
+        let mut v = minimal_accumulation_status();
+        v.as_object_mut().unwrap().remove("status");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_status).next().is_some(),
+        "Schema should require 'status'"
+    );
+
+    // Missing consensusStrength
+    let no_consensus = {
+        let mut v = minimal_accumulation_status();
+        v.as_object_mut().unwrap().remove("consensusStrength");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_consensus).next().is_some(),
+        "Schema should require 'consensusStrength'"
+    );
+
+    // Missing computedAt
+    let no_computed = {
+        let mut v = minimal_accumulation_status();
+        v.as_object_mut().unwrap().remove("computedAt");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_computed).next().is_some(),
+        "Schema should require 'computedAt'"
+    );
+}
+
+#[test]
+fn accumulation_status_view_rejects_unknown_status_value() {
+    let schema = load_schema("views/accumulation-status.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("accumulation-status schema should compile");
+
+    let mut bad = minimal_accumulation_status();
+    *bad.get_mut("status").unwrap() = serde_json::json!("stalemate");
+    assert!(
+        validator.iter_errors(&bad).next().is_some(),
+        "Schema should reject unknown status values"
+    );
+}
+
+#[test]
+fn accumulation_status_schema_declares_source_of_truth() {
+    let path = schema_dir().join("views/accumulation-status.schema.json");
+    let content = fs::read_to_string(&path)
+        .expect("views/accumulation-status.schema.json must exist");
+    let schema_value: Value = serde_json::from_str(&content)
+        .expect("views/accumulation-status.schema.json must be valid JSON");
+    assert_source_of_truth_declared(
+        &schema_value,
+        "views/accumulation-status.schema.json",
+    );
+}
+
+#[test]
+fn standing_policy_payload_with_accumulation_thresholds_validates() {
+    // A complete standing-policy payload with the accumulation_thresholds extension.
+    // The floor object is required by the zome integrity validator.
+    let payload = serde_json::json!({
+        "floor": {
+            "classes": [
+                { "class": "local-relationship-reach",        "protection": "unconditional family/household propagation" },
+                { "class": "cid-targeted-lookup",             "protection": "anyone with a CID can fetch" },
+                { "class": "constitutional-floor-signatures", "protection": "mishpat decisions are always verified" },
+                { "class": "new-voice-baseline",              "protection": "first-time author has nonzero floor" },
+                { "class": "vulnerable-class-elevation",      "protection": "children and displaced persons get elevated floor" }
+            ]
+        },
+        "accumulation_thresholds": {
+            "readyForSensemaking": { "minTotalSignals": 20, "maxConsensusStrength": 0.7 },
+            "controversyDetected": { "minTotalSignals": 10, "maxConsensusStrength": 0.3 },
+            "settled":             { "minTotalSignals": 30, "maxConsensusStrength": 0.85 }
+        }
+    });
+    validate_against_schema("manifest-payloads/standing-policy.schema.json", &payload);
+}
+
+#[test]
+fn standing_policy_payload_without_thresholds_validates() {
+    // accumulation_thresholds is optional — payload with only floor is valid.
+    let payload = serde_json::json!({
+        "floor": {
+            "classes": [
+                { "class": "local-relationship-reach",        "protection": "p1" },
+                { "class": "cid-targeted-lookup",             "protection": "p2" },
+                { "class": "constitutional-floor-signatures", "protection": "p3" },
+                { "class": "new-voice-baseline",              "protection": "p4" },
+                { "class": "vulnerable-class-elevation",      "protection": "p5" }
+            ]
+        }
+    });
+    validate_against_schema("manifest-payloads/standing-policy.schema.json", &payload);
+}
+
+#[test]
+fn standing_policy_payload_rejects_missing_floor() {
+    let schema = load_schema("manifest-payloads/standing-policy.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("standing-policy payload schema should compile");
+
+    let no_floor = serde_json::json!({
+        "accumulation_thresholds": {
+            "readyForSensemaking": { "minTotalSignals": 5, "maxConsensusStrength": 0.5 },
+            "controversyDetected": { "minTotalSignals": 3, "maxConsensusStrength": 0.2 },
+            "settled":             { "minTotalSignals": 10, "maxConsensusStrength": 0.9 }
+        }
+    });
+    assert!(
+        validator.iter_errors(&no_floor).next().is_some(),
+        "standing-policy payload must require 'floor'"
+    );
+}
+
+#[test]
+fn standing_policy_payload_schema_declares_source_of_truth() {
+    let path = schema_dir().join("manifest-payloads/standing-policy.schema.json");
+    let content = fs::read_to_string(&path)
+        .expect("manifest-payloads/standing-policy.schema.json must exist");
+    let schema_value: Value = serde_json::from_str(&content)
+        .expect("manifest-payloads/standing-policy.schema.json must be valid JSON");
+    assert_source_of_truth_declared(
+        &schema_value,
+        "manifest-payloads/standing-policy.schema.json",
+    );
 }

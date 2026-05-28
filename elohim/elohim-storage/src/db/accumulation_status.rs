@@ -164,14 +164,6 @@ fn compute_aggregate(
     entity_type: &str,
     entity_id: &str,
 ) -> Result<(i64, i64, f64), StorageError> {
-    #[derive(QueryableByName)]
-    struct SignalRow {
-        #[diesel(sql_type = diesel::sql_types::Text)]
-        human_id: String,
-        #[diesel(sql_type = diesel::sql_types::Text)]
-        signal_value: String,
-    }
-
     // Load signals for the entity using Diesel query builder
     let signals: Vec<(String, String)> = governance_signals::table
         .filter(governance_signals::entity_type.eq(entity_type))
