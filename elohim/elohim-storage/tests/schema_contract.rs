@@ -1171,6 +1171,8 @@ fn view_schemas_declare_source_of_truth() {
         "views/view-slice.schema.json",
         // Intent schemas — same convention: description must declare source of truth
         "intents/lamad-event-intent.schema.json",
+        // M-REA-3: RecognitionParticipationIntent wire shape + extended standing-policy payload
+        "intents/recognition-participation-intent.schema.json",
         // M-POLICY-1: AccumulationStatus view + standing-policy payload schemas
         "views/accumulation-status.schema.json",
         "manifest-payloads/standing-policy.schema.json",
@@ -4153,4 +4155,232 @@ fn attention_tending_intent_schema_declares_source_of_truth() {
         &schema_value,
         "intents/attention-tending-intent.schema.json",
     );
+}
+
+// =============================================================================
+// M-REA-3: RecognitionParticipationIntent schema contract tests
+//
+// Ticket: M-REA-3 (Substrate-side governance recognition) — Phase B
+// Source: genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md §3
+//
+// These tests validate the recognition-participation-intent.schema.json shape
+// against realistic instances and confirm the source-of-truth declaration is
+// present. The intent wire shape drives POST /api/v1/mishpat/recognition/participation;
+// the mishpat coordinator composes the EconomicEvent using the standing-policy
+// Manifest's recognition_weight_by_level. No new DHT entry type.
+// =============================================================================
+
+#[test]
+fn recognition_participation_intent_minimal_validates() {
+    // Minimal valid intent — all required fields, no optional ones.
+    let minimal = serde_json::json!({
+        "entityType": "content",
+        "entityId": "sha256-abc123",
+        "humanId": "uhCAkSomeAgentPubKey",
+        "mechanismLevel": 1,
+        "participationType": "reaction"
+    });
+    validate_against_schema(
+        "intents/recognition-participation-intent.schema.json",
+        &minimal,
+    );
+}
+
+#[test]
+fn recognition_participation_intent_level_7_deliberation_validates() {
+    // Level 7 (deliberation — highest weight) with block participation type.
+    let high_friction = serde_json::json!({
+        "entityType": "proposal",
+        "entityId": "proposal-xyz-456",
+        "humanId": "uhCAkAnotherAgent",
+        "mechanismLevel": 7,
+        "participationType": "graduated-feedback"
+    });
+    validate_against_schema(
+        "intents/recognition-participation-intent.schema.json",
+        &high_friction,
+    );
+}
+
+#[test]
+fn recognition_participation_intent_all_participation_types_validate() {
+    // Every participationType enum value must be valid.
+    for pt in &["reaction", "graduated-feedback", "vote", "block"] {
+        let instance = serde_json::json!({
+            "entityType": "content",
+            "entityId": "content-123",
+            "humanId": "agent-abc",
+            "mechanismLevel": 2,
+            "participationType": pt
+        });
+        validate_against_schema(
+            "intents/recognition-participation-intent.schema.json",
+            &instance,
+        );
+    }
+}
+
+#[test]
+fn recognition_participation_intent_rejects_missing_required_fields() {
+    let schema = load_schema("intents/recognition-participation-intent.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("recognition-participation-intent schema should compile");
+
+    // Missing humanId
+    let no_human = serde_json::json!({
+        "entityType": "content",
+        "entityId": "entity-abc",
+        "mechanismLevel": 1,
+        "participationType": "reaction"
+    });
+    assert!(
+        validator.iter_errors(&no_human).next().is_some(),
+        "Schema should require humanId"
+    );
+
+    // Missing mechanismLevel
+    let no_level = serde_json::json!({
+        "entityType": "content",
+        "entityId": "entity-abc",
+        "humanId": "agent-abc",
+        "participationType": "reaction"
+    });
+    assert!(
+        validator.iter_errors(&no_level).next().is_some(),
+        "Schema should require mechanismLevel"
+    );
+
+    // Missing participationType
+    let no_type = serde_json::json!({
+        "entityType": "content",
+        "entityId": "entity-abc",
+        "humanId": "agent-abc",
+        "mechanismLevel": 1
+    });
+    assert!(
+        validator.iter_errors(&no_type).next().is_some(),
+        "Schema should require participationType"
+    );
+}
+
+#[test]
+fn recognition_participation_intent_rejects_invalid_level() {
+    let schema = load_schema("intents/recognition-participation-intent.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("recognition-participation-intent schema should compile");
+
+    // Level 8 exceeds maximum (0–7)
+    let over_max = serde_json::json!({
+        "entityType": "content",
+        "entityId": "entity-abc",
+        "humanId": "agent-abc",
+        "mechanismLevel": 8,
+        "participationType": "reaction"
+    });
+    assert!(
+        validator.iter_errors(&over_max).next().is_some(),
+        "Schema should reject mechanismLevel > 7"
+    );
+
+    // Negative level
+    let negative = serde_json::json!({
+        "entityType": "content",
+        "entityId": "entity-abc",
+        "humanId": "agent-abc",
+        "mechanismLevel": -1,
+        "participationType": "reaction"
+    });
+    assert!(
+        validator.iter_errors(&negative).next().is_some(),
+        "Schema should reject negative mechanismLevel"
+    );
+}
+
+#[test]
+fn recognition_participation_intent_rejects_invalid_participation_type() {
+    let schema = load_schema("intents/recognition-participation-intent.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("recognition-participation-intent schema should compile");
+
+    let bad_type = serde_json::json!({
+        "entityType": "content",
+        "entityId": "entity-abc",
+        "humanId": "agent-abc",
+        "mechanismLevel": 1,
+        "participationType": "thumbs-up"
+    });
+    assert!(
+        validator.iter_errors(&bad_type).next().is_some(),
+        "Schema should reject unknown participationType"
+    );
+}
+
+#[test]
+fn recognition_participation_intent_schema_declares_source_of_truth() {
+    let path = schema_dir().join("intents/recognition-participation-intent.schema.json");
+    let content = fs::read_to_string(&path)
+        .expect("intents/recognition-participation-intent.schema.json must exist");
+    let schema_value: Value = serde_json::from_str(&content)
+        .expect("intents/recognition-participation-intent.schema.json must be valid JSON");
+    assert_source_of_truth_declared(
+        &schema_value,
+        "intents/recognition-participation-intent.schema.json",
+    );
+}
+
+#[test]
+fn standing_policy_payload_with_recognition_weight_by_level_validates() {
+    // Extended standing-policy payload with recognition_weight_by_level (M-REA-3 addition)
+    // alongside the existing accumulation_thresholds (M-POLICY-1). Both are optional,
+    // either can be omitted, and both can coexist.
+    let payload = serde_json::json!({
+        "floor": {
+            "classes": [
+                { "class": "local-relationship-reach",        "protection": "unconditional family/household propagation" },
+                { "class": "cid-targeted-lookup",             "protection": "anyone with a CID can fetch" },
+                { "class": "constitutional-floor-signatures", "protection": "mishpat decisions are always verified" },
+                { "class": "new-voice-baseline",              "protection": "first-time author has nonzero floor" },
+                { "class": "vulnerable-class-elevation",      "protection": "children and displaced persons get elevated floor" }
+            ]
+        },
+        "recognition_weight_by_level": {
+            "L0": 0.1,
+            "L1": 0.1,
+            "L2": 0.3,
+            "L3": 0.5,
+            "L4": 0.7,
+            "L5": 0.7,
+            "L6": 0.8,
+            "L7": 1.0
+        },
+        "accumulation_thresholds": {
+            "readyForSensemaking": { "minTotalSignals": 20, "maxConsensusStrength": 0.7 },
+            "controversyDetected": { "minTotalSignals": 10, "maxConsensusStrength": 0.3 },
+            "settled":             { "minTotalSignals": 30, "maxConsensusStrength": 0.85 }
+        }
+    });
+    validate_against_schema("manifest-payloads/standing-policy.schema.json", &payload);
+}
+
+#[test]
+fn standing_policy_with_weight_levels_only_validates() {
+    // recognition_weight_by_level alone (no accumulation_thresholds) is valid.
+    // Partial level maps are also valid (additionalProperties: false but all level
+    // keys are optional).
+    let payload = serde_json::json!({
+        "floor": {
+            "classes": [
+                { "class": "local-relationship-reach",        "protection": "p1" },
+                { "class": "cid-targeted-lookup",             "protection": "p2" },
+                { "class": "constitutional-floor-signatures", "protection": "p3" },
+                { "class": "new-voice-baseline",              "protection": "p4" },
+                { "class": "vulnerable-class-elevation",      "protection": "p5" }
+            ]
+        },
+        "recognition_weight_by_level": {
+            "L1": 0.1,
+            "L7": 1.0
+        }
+    });
+    validate_against_schema("manifest-payloads/standing-policy.schema.json", &payload);
 }
