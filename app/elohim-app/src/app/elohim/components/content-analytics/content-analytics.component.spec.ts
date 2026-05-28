@@ -3,29 +3,36 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ContentAnalyticsComponent } from './content-analytics.component';
-import { EventService } from '@app/shefa/services/event.service';
+import { StorageClientService } from '@app/elohim/services/storage-client.service';
 
 /**
  * ContentAnalyticsComponent unit tests.
  *
- * Tests the protocol-level analytics logic (view count, completion count,
- * completion rate calculation) by creating the component within an injection
- * context that provides a mock EventService.
+ * M-AGGR-3: component now reads from StorageClientService.getContentEngagement()
+ * (GET /api/v1/lamad/content/{contentId}/engagement) instead of EventService
+ * count methods. The projection returns a ContentEngagementStatsView with
+ * pre-computed completionRate (0.0–1.0 as a fraction).
  */
 describe('ContentAnalyticsComponent', () => {
   let component: ContentAnalyticsComponent;
-  const getViewCount = vi.fn();
-  const getCompletionCount = vi.fn();
+  const getContentEngagement = vi.fn();
 
   beforeEach(() => {
-    getViewCount.mockReset();
-    getCompletionCount.mockReset();
-    getViewCount.mockReturnValue(of(42));
-    getCompletionCount.mockReturnValue(of(8));
+    getContentEngagement.mockReset();
+    getContentEngagement.mockReturnValue(
+      of({
+        contentId: 'concept-trust',
+        views: BigInt(42),
+        completions: BigInt(8),
+        uniqueViewers: BigInt(35),
+        completionRate: 0.1904,
+        computedAt: '2026-05-28T12:00:00Z',
+      })
+    );
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: EventService, useValue: { getViewCount, getCompletionCount } },
+        { provide: StorageClientService, useValue: { getContentEngagement } },
       ],
     });
 
@@ -46,13 +53,22 @@ describe('ContentAnalyticsComponent', () => {
     expect(component.completionCount).toBe(8);
   });
 
-  it('calculates completion rate', () => {
+  it('derives completion rate from projection (rounds to integer percent)', () => {
+    // completionRate from projection is 0.0–1.0; component multiplies by 100 and rounds
     expect(component.completionRate).toBe(19);
   });
 
   it('handles zero views without division error', () => {
-    getViewCount.mockReturnValue(of(0));
-    getCompletionCount.mockReturnValue(of(0));
+    getContentEngagement.mockReturnValue(
+      of({
+        contentId: 'empty-node',
+        views: BigInt(0),
+        completions: BigInt(0),
+        uniqueViewers: BigInt(0),
+        completionRate: 0.0,
+        computedAt: '2026-05-28T12:00:00Z',
+      })
+    );
 
     component.contentId = 'empty-node';
     component.ngOnChanges();
@@ -63,10 +79,10 @@ describe('ContentAnalyticsComponent', () => {
   });
 
   it('recalculates on contentId change', () => {
-    expect(getViewCount).toHaveBeenCalledWith('concept-trust');
+    expect(getContentEngagement).toHaveBeenCalledWith('concept-trust');
 
     component.contentId = 'concept-governance';
     component.ngOnChanges();
-    expect(getViewCount).toHaveBeenCalledWith('concept-governance');
+    expect(getContentEngagement).toHaveBeenCalledWith('concept-governance');
   });
 });

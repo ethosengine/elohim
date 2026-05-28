@@ -324,34 +324,15 @@ export class EventService {
   }
 
   // ===========================================================================
-  // Analytics Helpers (unchanged)
+  // Analytics Helpers
   // ===========================================================================
-
-  /**
-   * Count events of a specific type for content.
-   */
-  countEventsForContent(contentId: string, lamadEventType?: LamadEventType): Observable<number> {
-    return this.eventApi
-      .getEconomicEvents({
-        contentId,
-        eventTypes: lamadEventType ? [lamadEventType] : undefined,
-      })
-      .pipe(map(events => events.length));
-  }
-
-  /**
-   * Get view count for content.
-   */
-  getViewCount(contentId: string): Observable<number> {
-    return this.countEventsForContent(contentId, LamadEventTypes.CONTENT_VIEW);
-  }
-
-  /**
-   * Get completion count for content.
-   */
-  getCompletionCount(contentId: string): Observable<number> {
-    return this.countEventsForContent(contentId, LamadEventTypes.CONTENT_COMPLETE);
-  }
+  //
+  // M-AGGR-3: countEventsForContent, getViewCount, getCompletionCount retired.
+  // These methods queried EconomicEvents and counted client-side (F-AGGR-3 smell).
+  // Callers should use ContentApiService.getContentEngagement(contentId) which
+  // reads the server-side ContentEngagementStatsView projection at
+  // GET /api/v1/lamad/content/{contentId}/engagement.
+  // TODO(rust-migration): remove retirement comment once all consumers migrated.
 
   /**
    * Check if an agent has viewed content.

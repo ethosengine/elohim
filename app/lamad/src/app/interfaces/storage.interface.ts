@@ -16,6 +16,7 @@ import { Observable } from 'rxjs';
 import type {
   RelationshipView,
   ContentMasteryView,
+  ContentEngagementStatsView,
   ContentStewardshipView,
   StewardshipAllocationView,
 } from '@elohim/storage-client/generated';
@@ -124,6 +125,8 @@ export const LAMAD_STORAGE_API = new InjectionToken<ILamadStorageApi>('LamadStor
 export interface ILamadStorageClient {
   getBlobUrl(blobHash: string): string;
   getStorageBaseUrl(): string;
+  // M-AGGR-3: server-side ContentEngagementStatsView projection
+  getContentEngagement(contentId: string): Observable<ContentEngagementStatsView>;
 }
 
 /**

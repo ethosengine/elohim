@@ -22,6 +22,7 @@ import { Injectable, inject } from '@angular/core';
 // @coverage: 90.5% (2026-02-24)
 
 import { Observable, catchError, map, of, throwError, timeout } from 'rxjs';
+import type { ContentEngagementStatsView } from '@elohim/storage-client';
 
 import { environment } from '../../../environments/environment';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
@@ -165,6 +166,28 @@ export class StorageClientService {
     return this.http.get<ListResponse<StorageContentNode>>(url).pipe(
       timeout(this.defaultTimeoutMs),
       catchError((error: HttpErrorResponse) => this.handleError('queryContent', error))
+    );
+  }
+
+  /**
+   * Get content engagement stats (views, completions, unique viewers) for a content item.
+   *
+   * Reads the server-side ContentEngagementStatsView projection derived from the
+   * EconomicEvent stream. The projection is keyed by content_id and updated on
+   * every content-view and content-complete event.
+   *
+   * Replaces the retired F-AGGR-3 client-side counting methods
+   * (countEventsForContent / getViewCount / getCompletionCount) in EventService.
+   *
+   * @endpoint GET /api/v1/lamad/content/{contentId}/engagement
+   */
+  getContentEngagement(contentId: string): Observable<ContentEngagementStatsView> {
+    const baseUrl = this.getStorageBaseUrl();
+    const endpoint = `${baseUrl}/api/v1/lamad/content/${encodeURIComponent(contentId)}/engagement`;
+
+    return this.http.get<ContentEngagementStatsView>(endpoint).pipe(
+      timeout(this.defaultTimeoutMs),
+      catchError((error: HttpErrorResponse) => this.handleError('getContentEngagement', error))
     );
   }
 

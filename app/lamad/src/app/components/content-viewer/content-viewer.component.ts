@@ -42,6 +42,7 @@ import {
   DiscussionRecord,
   GovernanceStateRecord,
 } from '../../services/data-loader.service';
+import { LAMAD_STORAGE_CLIENT, type ILamadStorageClient } from '../../interfaces/storage.interface';
 import { TrustBadgeService } from '../../services/trust-badge.service';
 import {
   DEFAULT_FEEDBACK_PROFILES,
@@ -233,6 +234,7 @@ export class ContentViewerComponent
   private readonly attentionTracker = inject(AttentionTrackerService);
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
   private readonly eventService = inject(EventService);
+  private readonly storageClient: ILamadStorageClient = inject(LAMAD_STORAGE_CLIENT);
   private readonly document = inject(DOCUMENT);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
 
@@ -241,22 +243,21 @@ export class ContentViewerComponent
   /**
    * Loader passed to the <elohim-content-analytics> Lit element. The element
    * is stateless w.r.t. data fetching — callers inject a loader that wraps
-   * their service. Mirrors the legacy ContentAnalyticsComponent's
-   * ngOnChanges-driven forkJoin against EventService.
+   * their service.
+   *
+   * M-AGGR-3: reads server-side ContentEngagementStatsView projection at
+   * GET /api/v1/lamad/content/{contentId}/engagement via LAMAD_STORAGE_CLIENT.
+   * completionRate is pre-computed (0.0–1.0 fraction); multiplied by 100 here
+   * for the integer-percent metric the Lit element expects.
    */
   readonly analyticsLoader: ContentAnalyticsLoader = {
     load: async (contentId: string): Promise<ContentAnalyticsMetrics | null> => {
       try {
-        const [views, completions] = await Promise.all([
-          firstValueFrom(this.eventService.getViewCount(contentId)),
-          firstValueFrom(this.eventService.getCompletionCount(contentId)),
-        ]);
-        const viewCount = views ?? 0;
-        const completionCount = completions ?? 0;
+        const stats = await firstValueFrom(this.storageClient.getContentEngagement(contentId));
         return {
-          viewCount,
-          completionCount,
-          completionRate: viewCount > 0 ? Math.round((completionCount / viewCount) * 100) : 0,
+          viewCount: Number(stats.views),
+          completionCount: Number(stats.completions),
+          completionRate: Math.round(stats.completionRate * 100),
         };
       } catch {
         return null;

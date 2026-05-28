@@ -70,6 +70,7 @@ export * from './views/collab-agreement-view';
 export * from './views/collab-qahal-view';
 export * from './views/collective-view';
 export * from './views/compute-triptych';
+export * from './views/content-engagement-stats-view';
 export * from './views/content-view';
 export * from './views/dashboard-federation-peer';
 export * from './views/dashboard-steward';

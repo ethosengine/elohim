@@ -1,9 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges, inject } from '@angular/core';
 
-import { forkJoin } from 'rxjs';
-
-import { EventService } from '@app/shefa/services/event.service';
+import { StorageClientService } from '@app/elohim/services/storage-client.service';
 
 @Component({
   selector: 'app-content-analytics',
@@ -46,7 +44,7 @@ export class ContentAnalyticsComponent implements OnChanges {
   completionRate = 0;
   isLoading = true;
 
-  private readonly eventService = inject(EventService);
+  private readonly storageClient = inject(StorageClientService);
 
   ngOnChanges(): void {
     this.loadAnalytics();
@@ -55,14 +53,14 @@ export class ContentAnalyticsComponent implements OnChanges {
   private loadAnalytics(): void {
     this.isLoading = true;
 
-    forkJoin({
-      views: this.eventService.getViewCount(this.contentId),
-      completions: this.eventService.getCompletionCount(this.contentId),
-    }).subscribe({
-      next: ({ views, completions }) => {
-        this.viewCount = views;
-        this.completionCount = completions;
-        this.completionRate = views > 0 ? Math.round((completions / views) * 100) : 0;
+    // M-AGGR-3: reads server-side ContentEngagementStatsView projection at
+    // GET /api/v1/lamad/content/{contentId}/engagement.
+    // completionRate is pre-computed by the projection writer (0.0 when views == 0).
+    this.storageClient.getContentEngagement(this.contentId).subscribe({
+      next: (stats) => {
+        this.viewCount = Number(stats.views);
+        this.completionCount = Number(stats.completions);
+        this.completionRate = Math.round(stats.completionRate * 100);
         this.isLoading = false;
       },
       error: () => {

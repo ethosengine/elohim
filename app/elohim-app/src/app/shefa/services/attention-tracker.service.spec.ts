@@ -20,8 +20,6 @@ describe('AttentionTrackerService', () => {
       recordContentView: vi.fn().mockReturnValue(of(MOCK_EVENT)),
       recordContentComplete: vi.fn().mockReturnValue(of(MOCK_EVENT)),
       hasViewed: vi.fn().mockReturnValue(of(false)),
-      getViewCount: vi.fn().mockReturnValue(of(0)),
-      getCompletionCount: vi.fn().mockReturnValue(of(0)),
     };
     agentServiceMock = {
       getCurrentAgentId: vi.fn().mockReturnValue(MOCK_AGENT_ID),
