@@ -89,6 +89,10 @@ path = "src/tests/qahal_collab_t0_test.rs"
 name = "rea_commitment_replication"
 path = "src/tests/rea_commitment_replication.rs"
 
+[[test]]
+name = "lamad_intent_event"
+path = "src/tests/lamad_intent_event.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
