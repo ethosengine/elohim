@@ -1,0 +1,69 @@
+{
+  "$id": "epr:schema:manifest-payload:pillar-projection",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PillarProjectionPayload",
+  "description": "Source of truth: this schema IS the authoritative shape for Manifest{kind: 'pillar-projection', pillar: 'qahal'} payload_json. Authored as a DHT Manifest entry via create_manifest (existing coordinator function — no new entry type). The substrate reads this payload to derive MechanismSelection projections per (entityType, entityId). Category A (Notarized) via existing Manifest entry type.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "mechanism_ladder": {
+      "type": "object",
+      "description": "Mechanism selection configuration for the qahal pillar. Drives the MechanismSelection projection derived from GovernanceState × Content.contentType × Proposal?",
+      "additionalProperties": false,
+      "properties": {
+        "settled_states": {
+          "type": "array",
+          "description": "GovernanceState.votingState values that lock content to level 0 (context menu only — no reactions, no graduated feedback, no voting)",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true,
+          "default": ["constitutional", "settled"],
+          "examples": [["constitutional", "settled"]]
+        },
+        "mechanism_level_map": {
+          "type": "object",
+          "description": "Maps proposal.votingMechanism to mechanism ladder level (3–7). Keys are votingMechanism string values; values are integer ladder levels.",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 7
+          },
+          "default": {
+            "approval": 3,
+            "dot-vote": 3,
+            "ranked-choice": 4,
+            "score-vote": 5,
+            "conviction": 5,
+            "consent": 6
+          },
+          "examples": [
+            {
+              "approval": 3,
+              "dot-vote": 3,
+              "ranked-choice": 4,
+              "score-vote": 5,
+              "conviction": 5,
+              "consent": 6
+            }
+          ]
+        },
+        "feedback_inviting_content_types": {
+          "type": "array",
+          "description": "Content type values that invite graduated feedback (level 2) when no active proposal exists. Content types not in this list receive reactions-only (level 1).",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true,
+          "default": ["discussion", "proposal-draft", "request-for-comment", "reflection"],
+          "examples": [["discussion", "proposal-draft", "request-for-comment", "reflection"]]
+        },
+        "default_level_no_proposal": {
+          "type": "integer",
+          "description": "Ladder level for content with no active proposal and a contentType not in feedback_inviting_content_types. Defaults to 1 (reactions only).",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        }
+      }
+    }
+  }
+}

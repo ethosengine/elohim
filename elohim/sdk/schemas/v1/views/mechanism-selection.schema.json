@@ -1,0 +1,75 @@
+{
+  "$id": "epr:schema:view:mechanism-selection",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MechanismSelectionView",
+  "description": "Source of truth: derived projection of GovernanceState × Content.contentType × Proposal? × Manifest{kind: 'pillar-projection', pillar: 'qahal'} payload. Category C operational projection — reconstructable at any time from the substrate entries. Triggers: Signal::GovernanceStateUpdated, Signal::ContentCreated/Updated, Signal::ProposalCreated/Closed, Signal::ManifestUpdated{kind: 'pillar-projection', pillar: 'qahal'}.",
+  "type": "object",
+  "required": [
+    "entityType",
+    "entityId",
+    "level",
+    "mechanism",
+    "renderTarget",
+    "contextMenuOnly",
+    "allowReactions",
+    "allowGraduatedFeedback",
+    "computedAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "entityType": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The type of entity (e.g. 'content', 'path', 'proposal')"
+    },
+    "entityId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The unique identifier of the entity"
+    },
+    "level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 7,
+      "description": "Mechanism ladder level (0–7). 0 = context menu only; 1 = reactions; 2 = graduated feedback; 3–7 = formal voting mechanisms"
+    },
+    "mechanism": {
+      "type": "string",
+      "description": "Name of the selected mechanism: 'none' (level 0), 'reactions' (level 1), 'graduated-feedback' (level 2), or the proposal's votingMechanism (levels 3–7)",
+      "examples": ["none", "reactions", "graduated-feedback", "approval", "dot-vote", "ranked-choice", "score-vote", "conviction", "consent"]
+    },
+    "renderTarget": {
+      "type": "string",
+      "enum": ["angular", "psephos"],
+      "description": "Which renderer handles this level. 'angular' for levels 0–2; 'psephos' for levels 3–7 (formal voting)"
+    },
+    "contextMenuOnly": {
+      "type": "boolean",
+      "description": "True at level 0: only the context menu is available (no reactions, no feedback, no voting)"
+    },
+    "allowReactions": {
+      "type": "boolean",
+      "description": "True at levels 1+: reaction bar is available"
+    },
+    "allowGraduatedFeedback": {
+      "type": "boolean",
+      "description": "True at levels 2+: graduated feedback (Loomio-style scale) is available"
+    },
+    "activeProposalId": {
+      "type": ["string", "null"],
+      "description": "For levels 3–7: the ID of the active proposal driving the formal mechanism. Null when no active proposal."
+    },
+    "activeProposalMechanism": {
+      "type": ["string", "null"],
+      "description": "For levels 3–7: the votingMechanism of the active proposal (e.g. 'approval', 'ranked-choice'). Null when no active proposal."
+    },
+    "policyManifestCid": {
+      "type": ["string", "null"],
+      "description": "CID of the pillar-projection Manifest whose mechanism_ladder was applied. Null when protocol defaults applied."
+    },
+    "computedAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when this projection was last computed"
+    }
+  }
+}

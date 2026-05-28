@@ -137,6 +137,8 @@ const INTERFACE_FILES = [
   { src: 'intents/lamad-event-intent.ts', dest: 'lamad-event-intent.ts' },
   // M-POLICY-1: AccumulationStatus projection (Category C operational — FeedbackSignal × standing-policy Manifest)
   { src: 'views/accumulation-status.ts', dest: 'accumulation-status.ts' },
+  // M-POLICY-2: MechanismSelection projection (Category C operational — GovernanceState × Content × Proposal? × pillar-projection Manifest)
+  { src: 'views/mechanism-selection.ts', dest: 'mechanism-selection.ts' },
 ];
 
 /**
