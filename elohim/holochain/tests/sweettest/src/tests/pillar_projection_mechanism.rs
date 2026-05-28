@@ -66,7 +66,7 @@ struct Manifest {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn pillar_projection_manifest_with_mechanism_ladder_round_trips() -> Result<()> {
-    let ((mut conductor_a, agent_a), (mut conductor_b, agent_b)) =
+    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] =
         two_agent_conductors().await?;
     let network = network_seed(DNA);
 
@@ -163,7 +163,7 @@ async fn pillar_projection_manifest_with_mechanism_ladder_round_trips() -> Resul
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn pillar_projection_manifest_without_ladder_validates() -> Result<()> {
-    let ((mut conductor_a, agent_a), (mut conductor_b, agent_b)) =
+    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] =
         two_agent_conductors().await?;
     let network = network_seed(DNA);
 
