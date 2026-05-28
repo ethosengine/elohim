@@ -18,11 +18,15 @@ export interface AuthorityResolution {
 
 /**
  * <elohim-imagodei-portal-shell> — the wizard's outer wrapper for the peer
- * OAuth portal. Discovers `trustMode` on mount via `authorityEndpoint` (default
- * `/auth/me`); propagates it to slotted children; renders persistent chrome
- * (trust-indicator + attestor-row in header by default; consumer can override
- * via the `header` slot); slots in the active step element via the `primary`
- * slot.
+ * OAuth portal. Renders persistent chrome (trust-indicator + attestor-row in
+ * header by default; consumer can override via the `header` slot); slots in
+ * the active step element via the `primary` slot.
+ *
+ * **Authority is host-provided.** The element does NOT fetch. Hosts MUST
+ * pre-fetch `/auth/me` (or equivalent) and bind the result to the `authority`
+ * property before or immediately after mount. When `authority` is `null` on
+ * first render the element emits `authority-needed` so hosts that missed
+ * the pre-fetch can respond.
  *
  * NEVER auto-advances steps — consumers set `step` explicitly in response to
  * child events. This keeps the wizard predictable and externally testable.
@@ -33,9 +37,11 @@ export interface AuthorityResolution {
  *
  * @element elohim-imagodei-portal-shell
  *
- * @prop {string} authorityEndpoint - URL to discover trustMode; default `/auth/me`
+ * @prop {AuthorityResolution | null} authority - Pre-fetched authority resolution from the host.
+ *   When null, the element emits `authority-needed` and renders with placeholder chrome.
  * @prop {PortalStep} step - which wizard step is active; default `resolve`
- * @prop {boolean} flywheelHint - propagated to trust-indicator in doorway-host mode
+ * @prop {boolean} flywheelHint - propagated to trust-indicator in doorway-host mode;
+ *   may also be carried in the `authority` object (authority.flywheelHint takes precedence)
  *
  * @slot header - defaults to trust-indicator + attestor-row; consumer can override
  * @slot primary - the active step element
@@ -43,7 +49,10 @@ export interface AuthorityResolution {
  * @slot error-region - rendered when error content is provided
  * @slot auth-wall - rendered when the portal itself needs auth (deferred)
  *
- * @fires {CustomEvent<AuthorityResolution>} authority-resolved - emitted after /auth/me resolves
+ * @fires {CustomEvent<void>} authority-needed - emitted on first render when `authority` is null,
+ *   giving hosts that missed the pre-fetch a signal to fetch and bind.
+ * @fires {CustomEvent<AuthorityResolution>} authority-resolved - emitted when `authority` property
+ *   is set to a non-null value (mirrors the previous resolved event for consumer compatibility).
  * @fires {CustomEvent<{step: PortalStep}>} step-change - emitted when `step` property changes
  *
  * @cssprop --elohim-portal-bg - Portal background (default: Canvas)
@@ -128,26 +137,50 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
     }
   `;
 
-  /** URL to fetch authority/trustMode from. */
-  @property({ attribute: 'authority-endpoint' }) authorityEndpoint = '/auth/me';
+  /**
+   * Pre-fetched authority resolution provided by the host. The host MUST call
+   * `GET /auth/me` (the doorway endpoint) and bind the parsed result here.
+   * When null, the element emits `authority-needed` once and renders with
+   * placeholder chrome until the host provides a value.
+   */
+  @property({ attribute: false }) authority: AuthorityResolution | null = null;
 
   /** The currently active wizard step. Consumers set this; the shell never changes it internally. */
   @property() step: PortalStep = 'resolve';
 
-  /** When true, propagated to trust-indicator to surface the "graduate to your own conductor" hint. */
+  /**
+   * Fallback flywheel hint. When the `authority` property is provided, the
+   * value from `authority.flywheelHint` takes precedence over this attribute.
+   */
   @property({ attribute: 'flywheel-hint', type: Boolean }) flywheelHint = false;
 
   @state() private _trustMode: TrustMode = 'doorway-host';
   @state() private _authorityLabel = '';
   @state() private _attestors: AttestorRef[] = [];
 
-  override connectedCallback(): void {
-    super.connectedCallback();
-    void this._discoverAuthority();
+  /** Track whether we have already emitted authority-needed for this mount. */
+  private _authorityNeededFired = false;
+
+  override firstUpdated(changed: PropertyValues): void {
+    super.firstUpdated?.(changed);
+    if (this.authority === null && !this._authorityNeededFired) {
+      this._authorityNeededFired = true;
+      this.dispatchEvent(
+        new CustomEvent('authority-needed', {
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
   }
 
   protected override updated(changed: PropertyValues): void {
     super.updated?.(changed);
+
+    if (changed.has('authority') && this.authority !== null) {
+      this._applyAuthority(this.authority);
+    }
+
     if (changed.has('step')) {
       this.dispatchEvent(
         new CustomEvent('step-change', {
@@ -157,15 +190,12 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
         })
       );
     }
+
     // Always re-propagate context when anything relevant changes.
     this._propagateContextToSlots();
   }
 
-  /**
-   * Test seam: directly set the authority resolution without an HTTP call.
-   * Calling code (and tests) may invoke this to inject authority state.
-   */
-  _setAuthority(res: AuthorityResolution): void {
+  private _applyAuthority(res: AuthorityResolution): void {
     this._trustMode = res.trustMode;
     this._authorityLabel = res.authority.label;
     this._attestors = res.attestors ?? [];
@@ -179,27 +209,6 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
         composed: true,
       })
     );
-  }
-
-  private async _discoverAuthority(): Promise<void> {
-    try {
-      const resp = await fetch(this.authorityEndpoint, { credentials: 'include' });
-      if (!resp.ok) return;
-      const data = (await resp.json()) as Record<string, unknown>;
-      const authority = (data['authority'] as Record<string, string> | undefined) ?? {};
-      const res: AuthorityResolution = {
-        trustMode: (data['trustMode'] as TrustMode | undefined) ?? 'doorway-host',
-        authority: {
-          label: (authority['label'] as string | undefined) ?? '',
-          id: authority['id'] as string | undefined,
-        },
-        flywheelHint: data['flywheelHint'] as boolean | undefined,
-        attestors: data['attestors'] as AttestorRef[] | undefined,
-      };
-      this._setAuthority(res);
-    } catch {
-      // Leave defaults; shell still renders with placeholder chrome.
-    }
   }
 
   private _propagateContextToSlots(): void {

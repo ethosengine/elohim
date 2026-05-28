@@ -9,40 +9,38 @@ import {
 
 import './register.js';
 import { ElohimImagodeiPortalShell as ElohimImagodeiPortalShellClass } from './elohim-imagodei-portal-shell.js';
-import type { ElohimImagodeiPortalShell } from './elohim-imagodei-portal-shell.js';
+import type { ElohimImagodeiPortalShell, AuthorityResolution } from './elohim-imagodei-portal-shell.js';
 
 // ---------------------------------------------------------------------------
-// trustMode discovery via authorityEndpoint
+// Fixture authority resolutions (no invented identity — labels from doorway)
 // ---------------------------------------------------------------------------
 
-describe('<elohim-imagodei-portal-shell> — trustMode discovery', () => {
-  let originalFetch: typeof window.fetch;
+const doorwayAuthority: AuthorityResolution = {
+  trustMode: 'doorway-host',
+  authority: { label: 'alpha.elohim.host', id: 'alpha' },
+  flywheelHint: true,
+  attestors: [
+    { eprRef: 'epr:attestor:susan-elder', displayName: 'Susan Miller', role: 'qahal-elder' },
+  ],
+};
 
-  beforeEach(() => {
-    originalFetch = window.fetch;
-  });
+const peerAuthority: AuthorityResolution = {
+  trustMode: 'peer-conductor',
+  authority: { label: 'your conductor on this device' },
+  flywheelHint: false,
+};
 
-  afterEach(() => {
-    (window as any).fetch = originalFetch;
-  });
+// ---------------------------------------------------------------------------
+// authority property — host-pre-fetch contract
+// ---------------------------------------------------------------------------
 
-  it('discovers trustMode from the authorityEndpoint mock', async () => {
-    (window as any).fetch = async () =>
-      new Response(
-        JSON.stringify({
-          authenticated: false,
-          trustMode: 'doorway-host',
-          authority: { label: 'alpha.elohim.host' },
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } }
-      );
-
+describe('<elohim-imagodei-portal-shell> — authority property (host-pre-fetch contract)', () => {
+  it('reflects doorway-host trustMode when host provides authority before first render', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
       <elohim-imagodei-portal-shell
-        authority-endpoint="/auth/me"
+        .authority=${doorwayAuthority}
       ></elohim-imagodei-portal-shell>
     `);
-    await oneEvent(el, 'authority-resolved');
     await el.updateComplete;
 
     expect(
@@ -50,23 +48,12 @@ describe('<elohim-imagodei-portal-shell> — trustMode discovery', () => {
     ).to.equal('doorway-host');
   });
 
-  it('discovers peer-conductor trustMode correctly', async () => {
-    (window as any).fetch = async () =>
-      new Response(
-        JSON.stringify({
-          authenticated: true,
-          trustMode: 'peer-conductor',
-          authority: { label: 'your-local-conductor' },
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } }
-      );
-
+  it('reflects peer-conductor trustMode when host provides peer authority', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
       <elohim-imagodei-portal-shell
-        authority-endpoint="/auth/me"
+        .authority=${peerAuthority}
       ></elohim-imagodei-portal-shell>
     `);
-    await oneEvent(el, 'authority-resolved');
     await el.updateComplete;
 
     expect(
@@ -74,57 +61,96 @@ describe('<elohim-imagodei-portal-shell> — trustMode discovery', () => {
     ).to.equal('peer-conductor');
   });
 
-  it('survives a failed fetch without throwing (resilient default)', async () => {
-    (window as any).fetch = async () => {
-      throw new Error('network error');
-    };
-
-    // Should not throw; renders with fallback defaults
+  it('renders with placeholder chrome when authority is null (loading state)', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
-      <elohim-imagodei-portal-shell
-        authority-endpoint="/auth/me"
-      ></elohim-imagodei-portal-shell>
+      <elohim-imagodei-portal-shell></elohim-imagodei-portal-shell>
     `);
     await el.updateComplete;
-    expect(el).to.exist;
-    // Default trust mode is doorway-host
-    const indicator = el.shadowRoot!.querySelector('elohim-imagodei-trust-indicator');
-    expect(indicator?.getAttribute('trust-mode')).to.equal('doorway-host');
+    // Renders without error; default trust-mode placeholder shown
+    expect(el.shadowRoot!.querySelector('elohim-imagodei-trust-indicator')).to.exist;
   });
 
-  it('survives a non-OK HTTP response without throwing', async () => {
-    (window as any).fetch = async () =>
-      new Response(null, { status: 500 });
-
+  it('emits authority-needed when authority is null on first render', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
-      <elohim-imagodei-portal-shell
-        authority-endpoint="/auth/me"
-      ></elohim-imagodei-portal-shell>
+      <elohim-imagodei-portal-shell></elohim-imagodei-portal-shell>
     `);
+    // authority-needed is emitted on firstUpdated — capture via a listener on parent
+    // (we listen before fixture for this test pattern with oneEvent after-the-fact
+    // by setting up before fixture and using oneEvent on a wrapper)
+    let fired = false;
+    el.addEventListener('authority-needed', () => { fired = true; });
+    // Re-trigger by creating fresh element
+    const wrapper = document.createElement('div');
+    document.body.appendChild(wrapper);
+    let neededFired = false;
+    wrapper.addEventListener('authority-needed', () => { neededFired = true; }, true);
+    const fresh = await fixture<ElohimImagodeiPortalShell>(
+      html`<elohim-imagodei-portal-shell></elohim-imagodei-portal-shell>`,
+      { parentNode: wrapper }
+    );
+    await fresh.updateComplete;
+    document.body.removeChild(wrapper);
+    // authority-needed fires in firstUpdated which is synchronous after fixture resolves
+    expect(neededFired).to.be.true;
+    // Suppress unused-variable warning — el was needed to satisfy TS
+    void fired;
+  });
+
+  it('does NOT emit authority-needed when authority is provided', async () => {
+    let fired = false;
+    const wrapper = document.createElement('div');
+    document.body.appendChild(wrapper);
+    wrapper.addEventListener('authority-needed', () => { fired = true; }, true);
+    const el = await fixture<ElohimImagodeiPortalShell>(
+      html`<elohim-imagodei-portal-shell .authority=${doorwayAuthority}></elohim-imagodei-portal-shell>`,
+      { parentNode: wrapper }
+    );
     await el.updateComplete;
-    expect(el).to.exist;
+    document.body.removeChild(wrapper);
+    expect(fired).to.be.false;
   });
 
-  it('emits authority-resolved with the parsed resolution detail', async () => {
-    (window as any).fetch = async () =>
-      new Response(
-        JSON.stringify({
-          trustMode: 'doorway-host',
-          authority: { label: 'alpha.elohim.host', id: 'host-1' },
-          flywheelHint: true,
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } }
-      );
-
+  it('emits authority-resolved when authority property is set', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
-      <elohim-imagodei-portal-shell
-        authority-endpoint="/auth/me"
-      ></elohim-imagodei-portal-shell>
+      <elohim-imagodei-portal-shell></elohim-imagodei-portal-shell>
     `);
-    const ev = (await oneEvent(el, 'authority-resolved')) as CustomEvent;
+
+    const resolved = oneEvent(el, 'authority-resolved');
+    el.authority = doorwayAuthority;
+    const ev = (await resolved) as CustomEvent<AuthorityResolution>;
     expect(ev.detail.trustMode).to.equal('doorway-host');
     expect(ev.detail.authority.label).to.equal('alpha.elohim.host');
     expect(ev.detail.flywheelHint).to.be.true;
+  });
+
+  it('updates rendered trust-indicator when authority property is changed after mount', async () => {
+    const el = await fixture<ElohimImagodeiPortalShell>(html`
+      <elohim-imagodei-portal-shell .authority=${doorwayAuthority}></elohim-imagodei-portal-shell>
+    `);
+    await el.updateComplete;
+
+    el.authority = peerAuthority;
+    await el.updateComplete;
+
+    expect(
+      el.shadowRoot!.querySelector('elohim-imagodei-trust-indicator')?.getAttribute('trust-mode')
+    ).to.equal('peer-conductor');
+  });
+
+  it('element contains no fetch, XMLHttpRequest, or other network calls', () => {
+    // Structural contract: the element source does not contain network calls.
+    // This is the primary acceptance gate for M-ELEM-1.
+    // If this test compiles and the element still works, the class does not own fetching.
+    const proto = ElohimImagodeiPortalShellClass.prototype as Record<string, unknown>;
+    const methodNames = Object.getOwnPropertyNames(proto).filter(k => k !== 'constructor');
+    for (const name of methodNames) {
+      const fn = proto[name];
+      if (typeof fn === 'function') {
+        const src = fn.toString();
+        expect(src, `method "${name}" must not call fetch()`).to.not.contain('fetch(');
+        expect(src, `method "${name}" must not use XMLHttpRequest`).to.not.contain('XMLHttpRequest');
+      }
+    }
   });
 });
 
@@ -255,46 +281,37 @@ describe('<elohim-imagodei-portal-shell> — step management (no auto-advance)',
 // ---------------------------------------------------------------------------
 
 describe('<elohim-imagodei-portal-shell> — context propagation', () => {
-  it('propagates trustMode + authority to slotted children via property assignment', async () => {
+  it('propagates trustMode + authority to slotted children when authority property is set', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
       <elohim-imagodei-portal-shell step="login">
         <div slot="primary" id="child"></div>
       </elohim-imagodei-portal-shell>
     `);
 
-    (el as any)._setAuthority({
-      trustMode: 'peer-conductor',
-      authority: { label: 'your conductor' },
-    });
+    el.authority = peerAuthority;
     await el.updateComplete;
 
     const child = el.querySelector('#child') as any;
     expect(child.trustMode).to.equal('peer-conductor');
-    expect(child.authority).to.deep.equal({ label: 'your conductor' });
+    expect(child.authority).to.deep.equal({ label: 'your conductor on this device' });
   });
 
-  it('propagates updated authority when _setAuthority called again', async () => {
+  it('propagates updated authority when authority property is changed again', async () => {
     const el = await fixture<ElohimImagodeiPortalShell>(html`
       <elohim-imagodei-portal-shell step="login">
         <div slot="primary" id="child"></div>
       </elohim-imagodei-portal-shell>
     `);
 
-    (el as any)._setAuthority({
-      trustMode: 'doorway-host',
-      authority: { label: 'first authority' },
-    });
+    el.authority = doorwayAuthority;
     await el.updateComplete;
 
-    (el as any)._setAuthority({
-      trustMode: 'peer-conductor',
-      authority: { label: 'updated authority' },
-    });
+    el.authority = peerAuthority;
     await el.updateComplete;
 
     const child = el.querySelector('#child') as any;
     expect(child.trustMode).to.equal('peer-conductor');
-    expect(child.authority).to.deep.equal({ label: 'updated authority' });
+    expect(child.authority).to.deep.equal({ label: 'your conductor on this device' });
   });
 });
 
@@ -328,6 +345,16 @@ describe('<elohim-imagodei-portal-shell> — a11y precondition gate', () => {
       <elohim-imagodei-portal-shell step="login">
         <div slot="primary"><button type="button">Go</button></div>
         <div slot="error-region" role="alert">Something went wrong</div>
+      </elohim-imagodei-portal-shell>
+    `);
+    const results = await axe.run(el);
+    expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
+  });
+
+  it('passes axe accessibility audit when authority is provided', async () => {
+    const el = await fixture<ElohimImagodeiPortalShell>(html`
+      <elohim-imagodei-portal-shell step="resolve" .authority=${doorwayAuthority}>
+        <div slot="primary" role="region" aria-label="Resolve step"><button type="button">Continue</button></div>
       </elohim-imagodei-portal-shell>
     `);
     const results = await axe.run(el);
