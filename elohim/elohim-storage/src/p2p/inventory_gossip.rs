@@ -137,10 +137,18 @@ fn is_blob_hash_shaped(s: &str) -> bool {
 mod tests {
     use super::*;
 
+    /// Canonical wire-format hash fixture — matches `BlobStore::store`
+    /// output. Production producer always emits this prefix; the verifier
+    /// enforces it. Do NOT replace with bare hex.
+    #[cfg(test)]
+    fn sha256_wire(byte: char) -> String {
+        format!("sha256-{}", std::iter::repeat(byte).take(64).collect::<String>())
+    }
+
     fn sample_snapshot() -> BlobInventorySnapshot {
         BlobInventorySnapshot {
             peer_id: "12D3KooWtest1".to_string(),
-            hashes: vec!["a".repeat(64), "b".repeat(64)],
+            hashes: vec![sha256_wire('a'), sha256_wire('b')],
             snapshot_at: 1_700_000_000_000_000,
             sequence: 42,
             signature: vec![0x00],
@@ -150,8 +158,8 @@ mod tests {
     fn sample_delta() -> BlobInventoryDelta {
         BlobInventoryDelta {
             peer_id: "12D3KooWtest1".to_string(),
-            added: vec!["c".repeat(64)],
-            removed: vec!["a".repeat(64)],
+            added: vec![sha256_wire('c')],
+            removed: vec![sha256_wire('a')],
             emitted_at: 1_700_000_001_000_000,
             sequence: 43,
             signature: vec![0x00],
