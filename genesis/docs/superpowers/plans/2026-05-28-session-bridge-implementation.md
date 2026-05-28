@@ -1,0 +1,702 @@
+# Session-Bridge Implementation Plan — Visitor + Peer Graduation Substrate
+
+> **Plan status:** Roadmap. No code. Each ticket below is a discrete substrate-first slice that lands the session-bridge primitive described in the spec.
+>
+> **Spec basis:** `genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md` (commit `9a0c55a61`).
+>
+> **Sister plan:** `genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md` — task M-AGGR-2's "deferred deletion" of `LocalSourceChainService` is the immediate work this plan closes. The 4 deferred write-path consumers route through the bridge instead of a direct localStorage simulation.
+>
+> **P2P Design Gate output:** §1.5 below — every entity classified before any HTTP route, storage table, or coordinator call is proposed. The bridge introduces NO new DHT entry types by design — it is the substrate of *tentative* state that precedes notarization.
+
+---
+
+## §1 — Why this plan exists
+
+The cross-pillar import cleanup sprint (2026-05-25..28) executed the thin-client backend-migration plan through Wave C. Ticket M-AGGR-2 cut the 4 read-path consumers of `LocalSourceChainService` to `HolochainSourceChainService`, then stopped at task #14 — *delete `LocalSourceChainService`* — because 4 write-path consumers still depended on it:
+
+- `app/lamad/src/app/services/path-negotiation.service.ts` (691 lines) — commits path-negotiation entries
+- `app/lamad/src/app/services/content-mastery.service.ts` (766 lines) — records mastery attainment entries
+- `app/lamad/src/app/services/mastery-stats.service.ts` (465 lines) — writes derived mastery aggregations
+- `app/elohim-app/src/app/elohim/services/human-consent.service.ts` (555 lines) — commits consent decisions
+
+The original framing was "rip them off the simulation, write directly to substrate coordinators." That framing didn't survive contact with the realer question: *what should an anonymous browser visitor or an OAuth-identified visitor be able to express before they have a peer-native identity to attach the writes to?*
+
+The spec answers: a **session-bridge** primitive holds tentative intent during pre-canonical lifecycle states (anonymous → oauth → peer-native-sampling) and replays it through the canonical coordinators at a graduation ceremony. Task #14 is then not "delete a simulation" — it's "migrate the 4 consumers to a substrate-correct primitive that has its own first-class shape."
+
+This plan converts spec §1–§11 into substrate-first tickets, sequenced so any phase stall preserves the prior committed work, and gated so the existing `LocalSourceChainService` survives in place until its substrate-correct replacement is ready.
+
+---
+
+## §1.5 — P2P Design Gate (mandatory before tickets)
+
+Every entity the bridge introduces was walked through `.claude/skills/p2p-design-gate/SKILL.md`. The headline result confirms the spec's substrate framing: **the bridge introduces NO new DHT entry types**. Tentative state is not notary state by definition — it is operational projection. Canonical state appears at graduation time and uses existing entry types in the destination pillars.
+
+### Entity classifications
+
+| Entity | Classification | Source of truth | DHT entry type | Storage projection | Address strategy |
+|---|---|---|---|---|---|
+| `SessionLifecycle` (enum + per-variant fields) | **Category C** (operational) | Local SQLite — doorway session pool (web2 paths) OR sampler's elohim-storage diesel (peer-native sampling path) | None | YES — `session_lifecycle` table per host runtime | Slug/UUID (session_id; no content to hash; the session IS its identifier) |
+| `StagedIntent` envelope (generic) | **Category C** | Local SQLite per host runtime, keyed by session_id | None | YES — `staged_intent` table per host runtime | Slug/UUID (stage_receipt_id) |
+| `StagedMasteryIntent` (lamad variant) | **Category C** | Same `staged_intent` table; pillar discriminator + JSON payload | None for the staged shape itself — graduates to existing `ContentMastery` entry (Category B2, agent-scoped + attestation) | Existing `staged_intent` row | Slug/UUID (stage_receipt_id) |
+| `StagedPathExploredIntent` (lamad variant) | **Category C** | Same `staged_intent` table | Graduates to existing `HumanProgress` entry update | Existing `staged_intent` row | Slug/UUID |
+| `StagedConsentIntent` (imagodei variant) | **Category C** | Same `staged_intent` table | Graduates to existing imagodei `Consent` entry; `is_actionable()` returns false from `Anonymous` lifecycle | Existing `staged_intent` row | Slug/UUID |
+| `StagedMembershipApplicationIntent` (qahal variant) | **Category C** | Same `staged_intent` table | Graduates to existing qahal `MembershipApplication` entry (Category A, notarized) | Existing `staged_intent` row | Slug/UUID |
+| `StagedEconomicEventIntent` (shefa variant) | **Category C** | Same `staged_intent` table; intent shape identical to M-REA-1's `LamadEventIntent` | Graduates via M-REA-1's existing `POST /api/v1/lamad/events` coordinator → existing `EconomicEvent` entry | Existing `staged_intent` row | Slug/UUID |
+| `SamplingCache` | **Category C** | Sampler's local pantry slot (peer-native path) OR doorway's projection cache (web2 path) | None — reconstructable from target context's manifest substrate | YES — `sampling_cache` table per host runtime | Slug/UUID (cache_root, session-scoped) |
+| `GraduationOffer` | **Category C** | Ephemeral; computed at graduation time | None | NO persistent table — ephemeral object held in service memory; serialized to caller; can be re-computed | Slug/UUID (offer_id, expiry-tracked) |
+| `GraduationManifest` | **Category C** (with optional Category A handle) | Service return value; OPTIONALLY notarized as `Manifest{kind:"graduation-record"}` (existing `Manifest` entry type, new whitelisted kind — see Design Constraint 2 below) | None for the manifest object; OPTIONAL existing `Manifest` entry for the appraisal record | Service return value + optional projection of the appraisal record | Slug/UUID (manifest_id) |
+
+### Anti-pattern check — confirmed none apply
+
+- ✗ UUID primary key for a notarized entity — every staged-intent UUID is for an *operational* row; the canonical entry produced at graduation gets its `ActionHash` from the coordinator and is referenced as `dht_anchor_hash` on any related projection.
+- ✗ REST route as design starting point — every ticket below starts at the bridge trait surface (3a-equivalent), then the storage projection (3b), then the HTTP route or Tauri-direct call (3c).
+- ✗ CID stored as a relational FK — the staged_intent rows reference content by content_id slug (existing convention) and resolve to canonical EntryHashes ONLY at graduation time.
+- ✗ Standalone table for agent state — staged intent is session-scoped, not agent-state. Anonymous and OAuth lifecycles have no peer-native agent identity yet; their state correctly lives in the session-bridge's operational tables.
+- ✗ Three address formats undefined — every entity above declares Slug/UUID (sessions and stages have no content to hash; they have no canonical EntryHash to reference until graduation).
+- ✗ Missing source-of-truth declaration — every storage projection in this plan carries the comment `-- Source of truth: local (operational, pre-canonical staging — graduates to {target_entry_type} on commitment)`.
+- ✗ Creating new entry type when one exists — **explicitly avoided**. NO new entry types proposed for the bridge itself. The optional appraisal record reuses the existing `Manifest` entry type with a new `kind` value.
+- ✗ Putting granular data on the DHT — staged intent is by design private-to-the-host-runtime and never gossiped. Sampling-cache slices are private to the sampler.
+
+### Design constraints discovered
+
+1. **The bridge is non-notarized BY DESIGN.** Spec §0 + §2 frame this primitive as the substrate of tentative participation — explicitly pre-canonical. Treating any of its primary entities as Category A would betray the design. The gate confirms operational projection is the substrate-correct shape.
+
+2. **Optional graduation-record manifest is the ONLY DHT-adjacent move.** §4's `GraduationManifest::appraisal_record: Option<EntryHash>` gestures at notarizing the appraisal for the participant's records. Implementation reuses the existing `Manifest` entry type with kind `"graduation-record"` — to be whitelisted in `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/manifest.rs:MANIFEST_KINDS` alongside existing `standing-policy` / `tending-policy` / `pillar-projection` / `onboarding` / `app`. This is the only DNA touch in the plan. No new entry type; one new manifest kind whitelisted.
+
+3. **No DHT capacity pressure.** Lamad ~73/~100, Mishpat 11/~100 entirely untouched. The new manifest kind costs one constant entry in a whitelist, not an entry type.
+
+4. **Storage projection ownership splits cleanly.** Doorway-side runtimes (web2 paths: anonymous + OAuth-identified) own `session_lifecycle` / `staged_intent` / `sampling_cache` tables in doorway-service's existing SQLite. Sampler-side runtimes (peer-native sampling) own the same three table shapes in elohim-storage's diesel. The bridge trait abstracts over the storage backend; runtimes provide their own.
+
+5. **The four pillar staged-intent shapes inherit existing canonical entries.** The bridge doesn't redesign mastery, consent, membership, or economic-event entries. It holds simpler pre-canonical shapes and replays through the existing coordinators (M-REA-1 for shefa; the existing `create_human_progress` / `create_content_mastery` / etc. for lamad; existing `create_consent` for imagodei; existing `create_membership_application` for qahal). The bridge is the orchestrator, not a substrate redesign.
+
+6. **Mishpat has no staged-intent shape in v1.** Spec §3 names four pillar variants — lamad, imagodei, qahal, shefa. Spec §7 explicitly notes governance-shape entries (`AttentionTending`, `FeedbackSignal`, `Commitment`, `GovernanceState`) are NOT staged-intent shapes — they require accrued standing and are agent-authored, not visitor-stageable. A `B-PILLAR-MISHPAT` ticket exists in the user's draft sequence; the gate output reclassifies it as "no v1 staged-intent shape; reject any pre-membership governance intent with a reach-gap reason." See §6 deferred decisions.
+
+---
+
+## §2 — Audit findings (what this plan inherits)
+
+### §2.1 — Task #14 carry-over (the four deferred consumers)
+
+| Consumer | Lines | Current write-path role | Bridge-aware destination |
+|---|---|---|---|
+| `app/lamad/src/app/services/path-negotiation.service.ts` | 691 | Calls `sourceChain.createEntry(...)` with `path-negotiation` content; reads back via `getEntriesByType` | Stage `StagedPathExploredIntent` via `bridge.stage()` while pre-member; write directly to substrate coordinator when member |
+| `app/lamad/src/app/services/content-mastery.service.ts` | 766 | Per docstring, supports "visitor mode: localStorage" via `LocalSourceChainService`; commits mastery attainment | Stage `StagedMasteryIntent` while pre-member; write to substrate when member |
+| `app/lamad/src/app/services/mastery-stats.service.ts` | 465 | Reads + writes derived aggregations to `LocalSourceChainService` | Read from session-bridge intent pool when pre-member; read from canonical projections when member; never writes (aggregations derive) |
+| `app/elohim-app/src/app/elohim/services/human-consent.service.ts` | 555 | Commits `Consent` entries | Stage `StagedConsentIntent` from OAuth+ (anonymous rejects per `is_actionable()`); write directly when member |
+
+**Re-export chain to clean up:**
+- `app/elohim-app/src/app/elohim/services/index.ts:10-11` — re-exports `LocalSourceChainService` from `@elohim/service`
+- `app/elohim-library/projects/elohim-service/src/public-api.ts:32` — exports `LocalSourceChainService` to the library public API
+- `app/elohim-library/projects/elohim-service/src/index.ts:160` — same, secondary export
+
+All three retire when `LocalSourceChainService` is deleted (B-DELETE).
+
+### §2.2 — Test-spec carry-over
+
+| Spec file | Migration |
+|---|---|
+| `app/lamad/src/app/services/path-negotiation.service.spec.ts` | Mock the session-bridge instead of `LocalSourceChainService` |
+| `app/lamad/src/app/services/content-mastery.service.spec.ts` | Same |
+| `app/lamad/src/app/services/mastery-stats.service.spec.ts` | Same |
+| `app/elohim-app/src/app/elohim/services/human-consent.service.spec.ts` | Same |
+| `app/elohim-library/projects/elohim-service/src/angular/services/local-source-chain.service.spec.ts` | Delete with the service |
+
+### §2.3 — What's legitimately staying in place during the bridge land
+
+- `HolochainSourceChainService` (`app/elohim-library/projects/elohim-service/src/angular/services/holochain-source-chain.service.ts`) — the M-AGGR-2 read-path replacement. The bridge consumers below MAY read through this for canonical member-state views; the bridge does not replace the read-path service.
+- Doorway's existing OAuth surfaces (`doorway/doorway-service/src/auth_routes.rs` + `identity.rs`) — the bridge promotes anonymous → oauth-identified by binding to these surfaces, not by replacing them.
+- M-REA-1's `POST /api/v1/lamad/events` route — the bridge's shefa graduation replays through this existing route, not a parallel implementation.
+
+---
+
+## §3 — Migration tickets (substrate-first sequencing)
+
+Every ticket follows the design order from `.claude/skills/p2p-design-gate/SKILL.md` Step 3: **(3a) Trait / coordinator surface → (3b) Storage projection + signal → (3c) HTTP route or Tauri-direct call LAST**.
+
+Per-phase commit discipline: each lettered step is a commit boundary. A ticket stalls cleanly between phases.
+
+Watchdog discipline (per `feedback_multi_agent_pvc_pacing` memory): no full-workspace cargo builds inside ticket phases. Each phase builds only the crates it modifies. Workspace build runs only at ticket close.
+
+---
+
+### Ticket B-CRATE: `crates/session-bridge/` skeleton
+
+**Spec section:** §2 (crate public surface), §3 (intent envelope shape).
+
+**Step 3a — Trait surface, types, no consumers:** Add `crates/session-bridge/` (separate Cargo crate, not under `bridges/` — convention per spec §2: `bridges/` translates between adjacent canonical substrates; this primitive translates between tentative and canonical of the SAME substrate). Crate exports:
+- `SessionLifecycle` enum with four variants (Anonymous, OauthIdentified, PeerNativeSampling, PeerNativeMember) plus shared timestamp + expiry fields.
+- `StagedIntent` trait (generic over `Pillar` + `GraduatedEntry`; carries `target_context()` + `is_actionable()` predicates).
+- `GraduationCeremony` trait (one impl per intent type; async `graduate()` returning `Result<Vec<EntryHash>, GraduationFailure>`).
+- `SessionBridge` trait (lifecycle ops: `open_anonymous`, `promote_to_oauth`, `open_sampling`, `stage`, `graduate`, `discard`).
+- `SamplingCache`, `GraduationOffer`, `GraduationManifest`, `StageReceipt`, `BridgeError`, `GraduationFailure` value types.
+- `PillarTag` marker trait + zero-cost discriminator enum.
+- `ContextHandle` newtype (wraps qahal/commons identifier; opaque to the bridge).
+
+**Step 3b — Storage backend abstraction:** Define `BridgeStorage` trait with `load_session` / `save_session` / `stage` / `read_staged_intent_for_session` / `clear_session_state` async ops. The bridge crate provides:
+- An in-memory `MemBridgeStorage` for unit tests.
+- A trait-only contract for production backends (doorway-service + elohim-storage implement separately in their own crates).
+
+No signal projection at this layer — the bridge itself is not a signal source. Consumers wrap the bridge with whatever signal/event surface they need (e.g., doorway emits SSE, browser-side service emits BehaviorSubject).
+
+**Step 3c — Public surface only:** No HTTP routes. No Tauri commands. The crate ships traits + types + the in-memory test backend. Consumers wire up routes/IPC in later tickets.
+
+**Schema artifacts:**
+- `elohim/sdk/schemas/v1/intents/session-bridge/lifecycle.schema.json` — shared `SessionLifecycle` wire format.
+- `elohim/sdk/schemas/v1/intents/session-bridge/stage-receipt.schema.json` — receipt returned from `stage()`.
+- `elohim/sdk/schemas/v1/intents/session-bridge/graduation-offer.schema.json` — offer object.
+- `elohim/sdk/schemas/v1/intents/session-bridge/graduation-manifest.schema.json` — receipt of graduated intent.
+
+Per-pillar staged-intent schemas land in their respective B-PILLAR-* tickets.
+
+**Acceptance — when this ticket closes:**
+1. `crates/session-bridge/` builds clean (cargo build + clippy with `-D warnings` + cargo fmt --check).
+2. Trait surface covers spec §2 verbatim (operator review against spec §2 type signatures).
+3. JSON wire-format schema files added (no new DHT entry types — every entity in this ticket classified Category C in §1.5); `pnpm run schema:codegen:ts` produces TS interface types in `@elohim/storage-client` (no-op consumer until B-DOORWAY).
+4. Unit tests cover `MemBridgeStorage` lifecycle + a `StagedIntent` predicate matrix per spec §3 patterns 1-4.
+5. Crate is excluded from the `elohim/Cargo.toml` workspace `members` list to avoid coupling to the WASM RUSTFLAGS override (per CLAUDE.md "RUSTFLAGS Override Required" gotcha).
+
+**Dependencies:** None. This is the foundation ticket.
+
+**Commits expected:** ~3 (crate skeleton + traits; storage backend abstraction + in-mem impl + tests; schemas + codegen wiring).
+
+---
+
+### Ticket B-DOORWAY: Doorway HTTP wrapping + browser-side `VisitorSessionService`
+
+**Spec section:** §5 (doorway consumer wrapping, web2 visitor path).
+
+**Step 3a — Doorway-side `SessionBridge` implementation:** Add `doorway/doorway-service/src/session_bridge/` module. Implements `BridgeStorage` against doorway-service's existing SQLite store (a new table set, separate from existing projection tables; see Step 3b). Implements `SessionBridge` trait with web2-shaped lifecycle:
+- `open_anonymous` issues a session_id (UUID) bound to a `ContextHandle`.
+- `promote_to_oauth` triggers when an authenticated OAuth callback arrives on the existing auth routes; migrates staged intent from anonymous → oauth-identified.
+- `open_sampling` returns `BridgeError::WrongRuntime` — sampling lifecycle is sampler-side, not doorway-side. (Spec §1's transition table confirms peer-native sampling never originates at doorway.)
+- `graduate` invokes the per-pillar `GraduationCeremony` impls (which arrive in B-PILLAR-* tickets); for B-DOORWAY, graduation against zero registered ceremonies returns an empty `GraduationManifest`. The wiring is in place; the resolutions populate in later tickets.
+
+**Step 3b — Storage projection + signal:**
+- New migration `doorway/doorway-service/migrations/<timestamp>_session_bridge.sql` creates three tables: `session_lifecycle`, `staged_intent`, `sampling_cache` (sampling cache shape lands here too even though doorway never opens sampling sessions — keeps the schema uniform with elohim-storage's eventual native impl).
+- Each table carries a source-of-truth comment: `-- Source of truth: local (operational, pre-canonical staging — graduates to canonical entries via session-bridge GraduationCeremony impls)`.
+- Doorway emits no DHT-adjacent post-commit signal for bridge operations; bridge state is operational and never gossiped. The browser observes state via SSE-style HTTP routes (existing pattern at `doorway/doorway-service/src/sse.rs`).
+
+**Step 3c — HTTP surface (LAST):** Add `doorway/doorway-service/src/routes/visitor_session.rs` per spec §5:
+- `POST /api/v1/visitor/session/open` — body `{contextHandle}` returns `{sessionId, expiresAt}`.
+- `POST /api/v1/visitor/session/{sessionId}/oauth-promote` — wraps existing OAuth callback.
+- `POST /api/v1/visitor/session/{sessionId}/stage/{pillar}` — body is pillar-specific `StagedIntent` JSON; returns `{stageReceiptId}`.
+- `GET /api/v1/visitor/session/{sessionId}/staged-intent` — returns full intent pool (per spec §6 "always visible to the participant" guardrail).
+- `POST /api/v1/visitor/session/{sessionId}/graduate` — body `{newAgentPubKey, qahalContextHandle}`; returns `GraduationOffer` first; client confirms via PATCH; returns `GraduationManifest`. (Two-step accept-then-execute, per spec §4 Half-Price Books flow.)
+- `PATCH /api/v1/visitor/session/{sessionId}/graduate/{offerId}/accept` — body `{acceptedResolutionIds: [...]}` for partial-accept; returns `GraduationManifest`.
+- `DELETE /api/v1/visitor/session/{sessionId}` — discard.
+
+Each route has tests under `doorway/doorway-service/tests/visitor_session/`; tests use the in-memory `MemBridgeStorage` plus a doorway-test conductor.
+
+**Step 3d — Browser-side wrapper:** Add `app/elohim-library/projects/elohim-service/src/angular/services/visitor-session.service.ts` (`VisitorSessionService`). Thin HTTP wrapper around the routes above; exposes a reactive `staged-intent$` BehaviorSubject for UI binding; no orchestration logic per `app/elohim-library/CLAUDE.md` thin-client discipline. Export via `public-api.ts`.
+
+**Acceptance:**
+1. Migration applies cleanly on a fresh doorway-service SQLite.
+2. The 6 HTTP routes are reachable, return correct shapes per spec §5, and pass route tests with the no-ceremonies graduation path returning empty manifests.
+3. `VisitorSessionService` is exported from `@elohim/service` and consumers can import it; no orchestration logic is added (review for thin-client compliance per library CLAUDE.md).
+4. Schema artifacts from B-CRATE codegen as TS types; `VisitorSessionService` uses them, no local interfaces.
+
+**Dependencies:** B-CRATE.
+
+**Commits expected:** ~4 (doorway storage impl + migration; HTTP routes + tests; browser-side service + tests; schema codegen wiring at the consumer side).
+
+**Watchdog:** doorway crate build only; do NOT trigger full elohim-storage or holochain workspace builds during this ticket.
+
+---
+
+### Ticket B-PILLAR-LAMAD: Lamad staged-intent shapes + GraduationCeremony
+
+**Spec section:** §3 lamad pattern (mastery + path-explored).
+
+**Step 3a — Two `StagedIntent` impls + two `GraduationCeremony` impls:**
+- `StagedMasteryIntent` carries `{content_id, mastery_level, felt_at, context}`. `is_actionable()` returns true from `OauthIdentified` and later lifecycles (mastery against an unknown agent is meaningless). Graduates to the existing `ContentMastery` entry on the agent's source chain (Category B2 per existing classification).
+- `StagedPathExploredIntent` carries `{path_id, step_indexes_visited, committed_step_index, context}`. `is_actionable()` returns true from `OauthIdentified` onward. Graduates to existing `HumanProgress` entry update.
+- Each `GraduationCeremony` impl calls the existing lamad coordinator function via doorway's existing zome-call surface; the bridge does not duplicate substrate composition.
+- v1 = deterministic graduation only. Negotiated path (multiple paths sampled, reflection notes attached) is gated on B-APPRAISE.
+
+**Step 3b — No new storage projection.** The staged intent rows live in the existing `staged_intent` table from B-DOORWAY (pillar discriminator column distinguishes); the canonical entries land in the existing lamad projections (already covered by M-AGGR-2's read paths).
+
+**Step 3c — HTTP surface piggybacks on B-DOORWAY's `stage` + `graduate` routes.** The pillar discriminator in the URL path (`/stage/lamad`) routes to lamad-pillar deserialization + the lamad ceremony impl. No new routes.
+
+**Schema artifacts:**
+- `elohim/sdk/schemas/v1/intents/session-bridge/staged-mastery-intent.schema.json`
+- `elohim/sdk/schemas/v1/intents/session-bridge/staged-path-explored-intent.schema.json`
+
+**Acceptance:**
+1. Both staged-intent shapes serialize/deserialize cleanly across the doorway boundary.
+2. Two-conductor sweettest covers the deterministic graduation: a freshly-incarnated agent's source chain shows the graduated `ContentMastery` + `HumanProgress` entries.
+3. Predicate matrix tests cover `is_actionable()` for all four lifecycle states.
+
+**Dependencies:** B-CRATE + B-DOORWAY.
+
+**Commits expected:** ~2 (intent + ceremony impls + schemas; sweettest + predicate tests).
+
+---
+
+### Ticket B-PILLAR-IMAGODEI: Imagodei consent staged-intent + GraduationCeremony
+
+**Spec section:** §3 imagodei pattern (consent).
+
+**Step 3a — One `StagedIntent` + one `GraduationCeremony`:**
+- `StagedConsentIntent` carries `{subject, decision, decided_at, context}`. `is_actionable()` returns false from `Anonymous` (spec §3 imagodei constraint: "anonymous consent is meaningless — no identifiable consenter"). Returns true from `OauthIdentified` and later. Graduates to existing imagodei `Consent` entry.
+- Graduation calls the existing imagodei `create_consent` coordinator via doorway's zome-call surface.
+
+**Step 3b — No new storage.** Existing `staged_intent` table; pillar discriminator routes deserialization. Existing imagodei consent projection holds the canonical entry post-graduation.
+
+**Step 3c — HTTP surface piggybacks** on B-DOORWAY's `stage` + `graduate` routes via the `imagodei` pillar discriminator.
+
+**Schema artifact:** `elohim/sdk/schemas/v1/intents/session-bridge/staged-consent-intent.schema.json`.
+
+**Acceptance:**
+1. Anonymous-lifecycle stage attempts return `BridgeError::IntentNotActionable` per the spec §3 constraint; the test surface explicitly covers this rejection.
+2. OAuth-identified stages accumulate; graduation produces the `Consent` entry on the freshly-incarnated source chain.
+3. The `human-consent.service.ts` migration target is conceptually unblocked (the actual cutover happens in B-CONSUMERS).
+
+**Dependencies:** B-CRATE + B-DOORWAY.
+
+**Commits expected:** ~2 (intent + ceremony + schema; predicate + sweettest).
+
+---
+
+### Ticket B-PILLAR-QAHAL: Qahal membership-application staged-intent + GraduationCeremony
+
+**Spec section:** §3 qahal pattern (membership-application).
+
+**Step 3a — One `StagedIntent` + one `GraduationCeremony`:**
+- `StagedMembershipApplicationIntent` carries `{applying_to, sponsor_witnesses, stated_intent, applied_at}`. `is_actionable()` true from `OauthIdentified` onward (a member-applying-to-X can only be a member-applying-from-known-identity, however nascent). Graduates to existing qahal `MembershipApplication` entry (Category A — notarized membership claim).
+- Sponsor-witness accrual happens during sampling/pre-member lifecycles; the intent shape carries the running list. Graduation submits the application with whatever sponsor list has accrued.
+- v1 deterministic: every intent in the pool graduates 1:1 to a `MembershipApplication` entry. Negotiated mode (qahal-elohim co-steward appraises whether the application meets the qahal's standards) is gated on B-APPRAISE.
+
+**Step 3b — Existing `staged_intent` table.** Canonical entry lands in qahal's existing `membership_applications` projection (already in mishpat zome — qahal DNA shares the entry type per spec §11 + memory `project_qahal_graduated_capability_surface`).
+
+**Step 3c — HTTP surface piggybacks** with `qahal` pillar discriminator.
+
+**Schema artifact:** `elohim/sdk/schemas/v1/intents/session-bridge/staged-membership-application-intent.schema.json`.
+
+**Acceptance:**
+1. Sponsor-witness accrual is observable through the `GET /staged-intent` surface (the participant can see who has sponsored them so far).
+2. Graduation produces a `MembershipApplication` entry on the qahal-B DHT; the qahal's coordinator validates it through existing validation logic.
+3. Two-conductor sweettest models a sampler-A's session graduating into membership in qahal-B (the seed scenario for the peer-native sampling path).
+
+**Dependencies:** B-CRATE + B-DOORWAY.
+
+**Commits expected:** ~2.
+
+---
+
+### Ticket B-PILLAR-SHEFA: Shefa economic-event staged-intent + GraduationCeremony
+
+**Spec section:** §3 shefa pattern.
+
+**Step 3a — One `StagedIntent` + one `GraduationCeremony`:**
+- `StagedEconomicEventIntent` is intentionally identical to M-REA-1's `LamadEventIntent` (per spec §3 + §7 "M-REA-1's `LamadEventIntent` surface"). The bridge holds the same intent shape pre-incarnation; the substrate composes the canonical `EconomicEvent` post-incarnation.
+- Graduation replays each staged intent through M-REA-1's existing `POST /api/v1/lamad/events` route (which the M-REA-1 coordinator backs). The bridge does NOT duplicate substrate composition logic.
+- `is_actionable()` true from `OauthIdentified` onward (economic events require an actor with at least an OAuth-identifiable provenance).
+
+**Step 3b — Existing `staged_intent` table + existing `economic_events` projection** (the latter unchanged — M-REA-1 already projects it).
+
+**Step 3c — HTTP surface piggybacks** with `shefa` pillar discriminator. Graduation issues internal POSTs to the M-REA-1 route.
+
+**Schema artifact:** `elohim/sdk/schemas/v1/intents/session-bridge/staged-economic-event-intent.schema.json`. Should be byte-identical to the existing `lamad-event-intent.schema.json` modulo the schema title; ensure with a schema-equivalence test.
+
+**Acceptance:**
+1. Staged shefa intents serialize identically to M-REA-1's `LamadEventIntent` (round-trip test asserts this).
+2. Graduation replays through the existing M-REA-1 route; canonical `EconomicEvent` entries appear in the substrate projection.
+3. No parallel REA composition logic is introduced (review confirms the ceremony delegates to M-REA-1).
+
+**Dependencies:** B-CRATE + B-DOORWAY + M-REA-1 must be landed.
+
+**Commits expected:** ~2.
+
+---
+
+### Ticket B-PILLAR-MISHPAT: Mishpat staged-intent (DEFERRED, no v1 shape)
+
+**Spec section:** §3 — does NOT define a mishpat staged-intent shape. §7 explicitly notes governance entries (`AttentionTending`, `FeedbackSignal`, `Commitment`, `GovernanceState`) are agent-authored with accrued standing — NOT visitor-stageable.
+
+**Gate output reframe (from user's draft):** The user's ticket draft listed "B-PILLAR-* (one ticket each: lamad, imagodei, qahal, shefa, mishpat)" — five tickets. The gate analysis reclassifies mishpat as a v1 non-target:
+- No staged-intent shape is defined in spec §3 for mishpat.
+- Spec §7 establishes that mishpat-shaped writes require existing peer-native standing, which pre-member visitors lack by definition.
+- For v1, the bridge rejects any attempt to stage a mishpat intent with `BridgeError::PillarNotStageable` carrying the reach-gap reason "governance moves require accrued standing in the target context."
+
+**Minimal v1 surface (this ticket lands):** Add the `mishpat` pillar discriminator to the rejection list. Add a test asserting that `POST /api/v1/visitor/session/{sessionId}/stage/mishpat` returns 422 with the reach-gap reason. No `StagedIntent` impl; no `GraduationCeremony` impl.
+
+**Deferred to v2 (see §6 deferred decisions):** If a future use case surfaces a mishpat-shaped visitor intent (e.g. visitor signing onto a public petition without yet being a qahal member), revisit and design a `StagedPublicSignatureIntent` shape. v1 does not anticipate this.
+
+**Acceptance:**
+1. The mishpat stage-rejection route test passes.
+2. Plan §6 entry "mishpat staged intent shape" is updated to "v1 = explicit rejection; v2 = revisit if use case surfaces."
+
+**Dependencies:** B-CRATE + B-DOORWAY.
+
+**Commits expected:** ~1.
+
+---
+
+### Ticket B-APPRAISE: Elohim inference surface for negotiated graduation (v1 = deterministic-only; negotiated upgrade gated)
+
+**Spec section:** §4 (negotiated resolution + appraisal), §8 Q7 (which elohim appraises) — DEFERRED per `DO NOT RESOLVE`.
+
+**Step 3a — Two-phase landing:**
+
+**Phase 1 (v1):** Land the `GraduationOffer` / `NegotiatedResolution` types from B-CRATE in active use, but with `negotiated_resolutions` always empty. Every staged intent classifies as `DeterministicResolution`. The bridge ships a usable graduation path without any inference dependency. The Half-Price Books offer is a strict 1:1 mapping; refusal still works; partial-accept still works.
+
+**Phase 2 (v1.5, gated on operator design pass for §8 Q7):** Introduce a single-elohim appraisal trait `AppraisalAgent` with `appraise(intent, target_context_signals) -> AppraisalResult` async surface. Wire one of the three §8 Q7 options:
+- (a) Participant's home-elohim (familiar; consented profile)
+- (b) Target context's commons-elohim (per `project_commons_elohim_co_steward`)
+- (c) Neutral counsel elohim (per `project_elohim_as_counsel`)
+
+For v1.5, the smallest-reasonable-default is **(a) home-elohim only**. Three-elohim ceremony (home + commons + neutral) deferred behind a §6 operator decision.
+
+**Step 3b — Optional appraisal-record manifest:**
+
+When the participant accepts the offer, the bridge OPTIONALLY notarizes the appraisal as a `Manifest{kind: "graduation-record"}` entry on the graduating identity's source chain (private). This requires whitelisting `"graduation-record"` in `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/manifest.rs:MANIFEST_KINDS` and extending the manifest payload schema with `manifest-payloads/graduation-record.schema.json`.
+
+The `appraisal_record: Option<EntryHash>` field on `GraduationManifest` populates with the ActionHash when notarization is requested; participant opts in per graduation event (default: opt-in is the smallest-reasonable-default — explicit auditability).
+
+**Step 3c — HTTP surface unchanged.** The graduation routes from B-DOORWAY already expose `GraduationOffer` / `GraduationManifest`; Phase 1 returns offers with empty `negotiated_resolutions`; Phase 2 returns populated ones.
+
+**Schema artifacts:**
+- `elohim/sdk/schemas/v1/intents/session-bridge/appraisal-result.schema.json` (Phase 2)
+- `elohim/sdk/schemas/v1/manifest-payloads/graduation-record.schema.json` (Phase 2)
+
+**Acceptance:**
+1. Phase 1 lands with deterministic-only graduation flowing end-to-end across the existing B-DOORWAY routes; participant can accept, refuse, partial-accept.
+2. Phase 2 (gated): a single appraisal agent (home-elohim) produces `NegotiatedResolution` entries for the qahal-membership flow (the most appraisal-relevant pillar); other pillars stay deterministic in Phase 2 unless the operator extends the gate.
+3. The `Manifest{kind: "graduation-record"}` entry validates against the new payload schema; sweettest verifies the entry round-trips through the DHT.
+
+**Dependencies:** Phase 1 has no dependencies beyond B-CRATE + B-DOORWAY. Phase 2 dependent on §6 Q7 operator decision.
+
+**Commits expected:** ~2 (Phase 1 land; Phase 2 land if/when unblocked).
+
+---
+
+### Ticket B-CONSUMERS: Migrate 4 deferred LocalSourceChain consumers to bridge-aware writes
+
+**Spec section:** §9 (task #14 closure).
+
+This is the immediate closure of M-AGGR-2's deferred deletion. Each consumer migration is independent; they can ship in parallel commits.
+
+**Step 3a/3b/3c (consumer-level — pure client work):**
+
+Each consumer follows the same pattern:
+1. Inject `VisitorSessionService` (in `@app/elohim-app` consumers) OR `LamadVisitorSessionService` wrapper (for `@app/lamad` consumers — lamad is its own ng workspace, so a thin DI re-export lives in `app/lamad/src/app/services/`).
+2. Replace `LocalSourceChainService.createEntry(...)` calls with `bridge.stage(...)` calls, parameterized by the pillar staged-intent shape.
+3. For read paths (`getEntriesByType`, etc.), keep the existing `HolochainSourceChainService` for member-state reads; route pre-member reads through `bridge.readStagedIntent()`.
+4. Test specs swap mocks from `LocalSourceChainService` → `VisitorSessionService` (and the lamad re-export wrapper where used).
+
+**Per-consumer notes:**
+
+- **`human-consent.service.ts`** (`app/elohim-app/src/app/elohim/services/`) — direct `VisitorSessionService` injection. Anonymous-state consent attempts now surface a "consent requires identification — please sign in" UX prompt (the bridge returns `BridgeError::IntentNotActionable` per B-PILLAR-IMAGODEI's predicate). Update `human-consent.service.spec.ts` to mock the bridge.
+- **`content-mastery.service.ts`** (`app/lamad/src/app/services/`) — depends on the lamad workspace's wrapper. The docstring at line 47 ("Visitor mode: localStorage via LocalSourceChainService (no account needed)") rewrites to "Visitor mode: bridge-staged via VisitorSessionService (no account needed; graduates at incarnation)."
+- **`path-negotiation.service.ts`** (`app/lamad/src/app/services/`) — same wrapper pattern. Note: the `hasMinimumIntimacy(...)` consent check at line 9 should continue to gate negotiation; the bridge merely changes the storage backend for the negotiation entries.
+- **`mastery-stats.service.ts`** (`app/lamad/src/app/services/`) — read-only consumer; reads through the bridge for pre-member sessions; reads through `HolochainSourceChainService` for member-state.
+
+**Acceptance per consumer:**
+1. All tests in the consumer's spec file pass with the bridge mock.
+2. `pnpm run lint` clean for both `app/elohim-app` and `app/lamad` workspaces.
+3. The 4 imports of `LocalSourceChainService` retire (verified by `grep -rn LocalSourceChainService app/` returning only the service definition itself + the deprecation docstring).
+
+**Dependencies:** B-PILLAR-LAMAD + B-PILLAR-IMAGODEI must be landed. B-DOORWAY must expose the routes.
+
+**Commits expected:** ~5 (one per consumer + one for the lamad-workspace DI wrapper).
+
+**Watchdog:** Angular workspace builds only (`pnpm --filter @app/elohim-app build`, `pnpm --filter @app/lamad build`); do NOT trigger Rust builds during this ticket.
+
+---
+
+### Ticket B-DELETE: Delete `LocalSourceChainService`
+
+**Spec section:** §9 step 5.
+
+Trivial after B-CONSUMERS lands clean. Deletes:
+- `app/elohim-library/projects/elohim-service/src/angular/services/local-source-chain.service.ts` (605 lines)
+- `app/elohim-library/projects/elohim-service/src/angular/services/local-source-chain.service.spec.ts`
+- The re-export at `app/elohim-app/src/app/elohim/services/index.ts:10-11`
+- The exports at `app/elohim-library/projects/elohim-service/src/public-api.ts:32` and `index.ts:160`
+
+Also delete model file IF unused by `HolochainSourceChainService`:
+- `app/elohim-library/projects/elohim-service/src/angular/models/source-chain.model.ts` (verify by grep before deleting; the model types `SourceChainEntry`, `EntryLink`, etc. may continue to be used by `HolochainSourceChainService` — keep what's still referenced).
+
+**Acceptance:**
+1. `grep -rn LocalSourceChainService app/` returns zero matches.
+2. Both library + app + lamad workspaces build clean.
+3. The deprecation docstring lineage retires.
+
+**Dependencies:** B-CONSUMERS complete.
+
+**Commits expected:** ~1.
+
+---
+
+### Ticket B-STORAGE: elohim-storage native `SessionBridge` wrapping (peer-native sampling path, Rust-native)
+
+**Spec section:** §6 (elohim-storage consumer wrapping).
+
+**Step 3a — Rust-native `SessionBridge` implementation:**
+
+Add `elohim/elohim-storage/src/session_bridge/` module. Implements `BridgeStorage` against elohim-storage's existing diesel surface. Implements `SessionBridge` trait with peer-native-shaped lifecycle:
+- `open_sampling` issues a session_id bound to the sampler's existing peer-native identity + a target `ContextHandle`. Acquires the target's app manifest via the existing manifest substrate; RS-decodes the necessary projection slices into a sampler-local `pantry` slot per the quilt vocabulary (`project_quilt_pantry_vocabulary`).
+- `open_anonymous` / `promote_to_oauth` return `BridgeError::WrongRuntime` — those lifecycles are doorway-side. This is the symmetric inverse of B-DOORWAY's reciprocal `WrongRuntime` on `open_sampling`.
+- `graduate` issues a libp2p coordinator call to the target context's qahal coordinator (per B-SAMPLING) — the sampler isn't a member yet, so the call is shaped as a `membership-application + initial-state-bundle` request.
+- Tauri-direct callers (steward desktop) hit `SessionBridge` methods directly through the storage-client SDK; no HTTP layer.
+
+**Step 3b — Storage projection:** New diesel migration `elohim/elohim-storage/migrations/<timestamp>_session_bridge.sql` creates:
+- `sampling_session` table (mirrors doorway's `session_lifecycle` shape but scoped to peer-native sampling lifecycles only)
+- `sampling_staged_intent` table (mirrors doorway's `staged_intent`)
+- `sampling_cache` table (mirrors doorway's; same shape)
+
+Each table carries the source-of-truth comment. **Critically: this storage NEVER projects to the DHT** — staged intent + sampling cache are sampler-local state, invisible to the target context per spec §6 (sampling is invisible to the host until graduation by design).
+
+Per-pillar `GraduationCeremony` impls register against the storage-bridge as well as the doorway-bridge (the impls themselves are shared between runtimes — they're trait impls in the bridge crate; the bridge implementations differ in storage, not in pillar-specific graduation logic).
+
+**Step 3c — No HTTP route.** Tauri callers invoke the trait directly. Browser callers MUST go through doorway (sampling is peer-native by definition).
+
+**Schema artifacts:** Shared with B-DOORWAY (same per-pillar staged-intent schemas; same lifecycle schema). No new schemas.
+
+**Acceptance:**
+1. Diesel migration applies clean on a fresh elohim-storage SQLite (per `feedback_diesel_migration_timestamp_collision` memory: ensure timestamp is unique against the existing migration set).
+2. A sampler-side integration test models sampling a foreign qahal: open sampling session → stage 3 mastery intents + 1 path-explored intent → discard → assert all state cleared (fail-closed per spec §6 guardrails).
+3. A second integration test models the graduation: open sampling → stage → graduate → verify canonical entries land in the target via the existing per-pillar coordinator paths.
+4. Cross-context profiling guardrail: a test asserts that two sampling sessions on the same elohim-storage targeting different contexts do NOT cross-pollinate staged intent (per spec §6 "no cross-context profiling").
+
+**Dependencies:** B-CRATE + B-PILLAR-* (the trait impls).
+
+**Commits expected:** ~3 (storage impl + migration; cross-context guardrail tests; integration tests).
+
+**Watchdog:** elohim-storage crate build only (RUSTFLAGS=`--cfg getrandom_backend="custom"` per CLAUDE.md gotcha). Do NOT trigger workspace build.
+
+---
+
+### Ticket B-SAMPLING: Peer-native libp2p sampling-handshake protocol
+
+**Spec section:** §6 (peer-native sampling path) + §9 step 7.
+
+**Step 3a — libp2p protocol behaviour:**
+
+Add a new request-response codec in `elohim/elohim-storage/src/p2p/session_bridge.rs` covering:
+- `SamplingHandshakeRequest { sampler_agent_id, target_context }` → response with `app_manifest` + RS-decoded projection slice manifest.
+- `SamplingCacheFetch { cache_root, slice_id }` → response with the slice bytes (drawn from the target's existing quilt-pantry surface — no new substrate primitive).
+- `GraduationRequest { sampler_agent_id, target_context, staged_intent_bundle, new_membership_application }` → routed to the target context's qahal coordinator; response with `GraduationManifest`.
+
+Per `project_libp2p_protocols` (referenced via skill `libp2p-protocols`): MessagePack codec; conventional request-response shape; behaviour composed into the existing elohim-storage libp2p swarm.
+
+**Step 3b — Inventory + signal:** The target context's elohim-storage emits a `SamplingObserved` signal ONLY when graduation arrives (i.e., the host first learns a sampler existed when they ask to join). This honors spec §6 "sampling is invisible from the host's perspective by design." The signal projects to the existing inventory surface; no new table.
+
+**Step 3c — No HTTP route.** Sampling-handshake is libp2p-only. Web2 visitors do not sample; they OAuth-identify at a doorway and graduate via the doorway-wrapped path.
+
+**Acceptance:**
+1. Two-node integration test (per `project_alpha_topology_bootstrap_pair`) models a sampler on node-A acquiring qahal-B's manifest + projection slices from node-B's elohim-storage.
+2. Graduation test: sampler-A submits `GraduationRequest`; qahal-B's coordinator validates + accepts; sampler-A becomes a member of qahal-B; their staged intent appears as canonical entries on the qahal-B DHT.
+3. Host-invisibility test: the sampling phase alone produces no observable signal on qahal-B's host node; only the graduation request triggers the `SamplingObserved` signal.
+4. Cross-context guardrail test (libp2p layer): a sampling session for qahal-B cannot read qahal-C's projection slices through the same sampling protocol.
+
+**Dependencies:** B-STORAGE + B-PILLAR-QAHAL.
+
+**Commits expected:** ~3 (codec + behaviour; graduation request flow + tests; host-invisibility + cross-context guardrail tests).
+
+**Watchdog:** elohim-storage crate build only + steward/node crate build (the libp2p behaviour binds at the node layer per the existing pattern).
+
+---
+
+## §4 — Sequencing & waves
+
+The waves below honor the constraint that any phase stall preserves the prior committed work.
+
+### Wave A — Foundation (single ticket, no parallelism)
+
+- **B-CRATE** — `crates/session-bridge/` skeleton. Lands first; everything depends on it.
+
+### Wave B — Visitor path stand-up (parallelizable after A)
+
+- **B-DOORWAY** — HTTP surface + browser-side service.
+- (B-PILLAR-* tickets below depend on B-DOORWAY only for the wired graduation surface; the impls land in parallel)
+
+### Wave C — Pillar staged-intent shapes (parallelizable; all depend on B-CRATE + B-DOORWAY)
+
+- **B-PILLAR-LAMAD** — mastery + path-explored intents.
+- **B-PILLAR-IMAGODEI** — consent intent (anonymous rejection enforced).
+- **B-PILLAR-QAHAL** — membership-application intent.
+- **B-PILLAR-SHEFA** — economic-event intent (delegates to M-REA-1).
+- **B-PILLAR-MISHPAT** — rejection-only surface (v1 has no staged shape).
+
+### Wave D — Original task #14 closure
+
+- **B-CONSUMERS** — migrate 4 deferred consumers; depends on B-PILLAR-LAMAD + B-PILLAR-IMAGODEI.
+- **B-DELETE** — delete `LocalSourceChainService`; depends on B-CONSUMERS.
+
+After Wave D, the immediate spec-§9 goal is met: the long-promised deletion happens; the substrate-correct primitive backs the 4 ex-consumers; the visitor-graduation path is fully wired end-to-end.
+
+### Wave E — Negotiated graduation upgrade (gated)
+
+- **B-APPRAISE Phase 1** — empty `negotiated_resolutions` shipped through existing offer surface; everything stays deterministic. Lands as part of Wave C (no operator decision needed).
+- **B-APPRAISE Phase 2** — single-elohim appraisal; depends on §6 Q7 operator decision.
+
+### Wave F — Peer-native sampling
+
+- **B-STORAGE** — elohim-storage native bridge; depends on B-CRATE + Wave C pillar impls.
+- **B-SAMPLING** — libp2p handshake protocol; depends on B-STORAGE + B-PILLAR-QAHAL.
+
+Wave F is genuinely new substrate work. If Wave F stalls (the most risk-laden ticket sequence), Waves A–D have already delivered the visitor-graduation path + closed task #14.
+
+### Suggested kickoff ordering for a sprint
+
+| Day | Wave | Tickets |
+|---|---|---|
+| 1 | A | B-CRATE |
+| 2–3 | B | B-DOORWAY |
+| 3–4 | C (parallel) | B-PILLAR-LAMAD, B-PILLAR-IMAGODEI, B-PILLAR-QAHAL, B-PILLAR-SHEFA, B-PILLAR-MISHPAT |
+| 4 | C+ | B-APPRAISE Phase 1 |
+| 5 | D | B-CONSUMERS (parallel across the 4 consumers) → B-DELETE |
+| 6–7 | F | B-STORAGE |
+| 7–8 | F | B-SAMPLING |
+| (gated) | E | B-APPRAISE Phase 2 (when §6 Q7 lands) |
+
+---
+
+## §5 — Acceptance criteria (per ticket)
+
+A ticket closes when:
+
+1. **P2P Design Gate output recorded** — every new entity classified per §1.5 above; new classifications added as the implementation surfaces them.
+2. **Schema artifacts** — new intent / view / payload schemas land under `elohim/sdk/schemas/v1/intents/session-bridge/` (or `manifest-payloads/` for B-APPRAISE Phase 2); conventions per `elohim/sdk/schemas/v1/views/CONVENTIONS.md`.
+3. **Rust types in the bridge crate or runtime** — `#[serde(rename_all = "camelCase")]` + `#[derive(TS)]` where the type crosses the Rust-to-TypeScript boundary.
+4. **Schema contract test** — added to `elohim/elohim-storage/tests/schema_contract.rs` for any view/payload that crosses the storage boundary; added to a new `doorway/doorway-service/tests/session_bridge_schema_contract.rs` for doorway-only types.
+5. **TS codegen** — `pnpm run schema:codegen:ts` regenerates types in `@elohim/storage-client`; consumers use the generated types, no local interfaces (per `app/elohim-library/CLAUDE.md` mock-data discipline).
+6. **Storage migration (where applicable)** — diesel migration applies clean; the new table carries `-- Source of truth: local (operational, pre-canonical staging — graduates to {target_entry_type} on commitment)`.
+7. **Trait surface stable** — the `SessionBridge` / `StagedIntent` / `GraduationCeremony` trait signatures match spec §2 verbatim; deviations are documented in this plan inline before the impl ships.
+8. **HTTP route (where applicable)** — registered in `doorway/doorway-service/src/routes/visitor_session.rs`; route tests cover happy path + failure modes; cross-context guardrails tested.
+9. **Sweettest (where applicable)** — two-conductor sweettest covers any graduation flow that touches a DHT entry (B-PILLAR-LAMAD, B-PILLAR-IMAGODEI, B-PILLAR-QAHAL, B-APPRAISE Phase 2 graduation-record manifest). Per `feedback_sweettest_cross_agent_consistency`: tests use `exchange_peer_info` + `await_consistency` for cross-agent observation.
+10. **A2o scenario added** under `genesis/a2o/features/<pillar>/` if user-visible behavior changed. The visitor-graduation flow is a high-value a2o target; B-DOORWAY ticket close MUST include at least one a2o scenario covering anonymous→OAuth-identified→peer-native-member.
+11. **Memory hygiene** — update memory `feedback_subagent_silent_impl_drops` discipline: before close, count the trait impls expected vs landed (5 pillars planned; 4 with full graduations; 1 rejection-only).
+12. **Watchdog discipline** — no full-workspace cargo builds during ticket phases; per-crate builds only; workspace build at ticket close.
+
+---
+
+## §6 — Deliberately deferred (operator decisions)
+
+The spec §8 holds 11 open questions. This plan ships smallest-reasonable defaults for each so implementation can proceed without prejudging the canonical answer. Each default is reversible by a follow-up operator design pass.
+
+### From the original spec §8 (Q1–Q6)
+
+**Q1 — Sampling cache expiry policy.**
+- *Operator decision:* time-based vs storage-pressure vs per-app-manifest configurable.
+- *v1 default:* hardcoded defaults per lifecycle — Anonymous: 60 minutes; OauthIdentified: 24 hours; PeerNativeSampling: 7 days. Storage-pressure LRU eviction superimposes (eviction kicks in when sampling-cache total exceeds 100MB per host runtime). Per-app-manifest override is deferred.
+- *Implementation surface:* hardcoded constants in B-CRATE; replaced with config-driven values when operator decides.
+
+**Q2 — Zero-standing-permissible writes during sampling.**
+- *Operator decision:* per-pillar matrix of "during sampling, this write goes to: never / session-bridge intent pool / sampling-local cache / requires-graduation-first."
+- *v1 default:* NO category of zero-standing-permissible writes. Every write goes through `bridge.stage()`. Ephemeral UI prefs (themes, layouts) live in browser localStorage outside the bridge's purview.
+- *Implementation surface:* documented in the visitor-session API doc; revisit when a concrete use case for a zero-standing write surfaces.
+
+**Q3 — Graduation rollback / partial-success UX.**
+- *Operator decision:* whether `failed_mid_graduation` triggers automatic retry, manual retry, or just a visible status.
+- *v1 default:* `failed_mid_graduation` triggers a visible status surface. The participant sees the partial manifest, can manually retry the failed subset, and the bridge holds the failed intents in the session pool until expiry. No automatic retry.
+- *Implementation surface:* `GET /api/v1/visitor/session/{sessionId}/graduate-status` route added in B-DOORWAY; UI surface deferred to a follow-up Angular ticket.
+
+**Q4 — OAuth ephemeral mode for anonymity preservation.**
+- *Operator decision:* whether to support "OAuth-identify for content access, but don't persist the OAuth subject past session expiry."
+- *v1 default:* OAuth subject persists for the session lifetime (24 hours) then discards with session expiry. No long-term persistence past the session. Adequate for the not-surveillance posture; full ephemeral mode (memory-only, never written to SQLite) deferred.
+- *Implementation surface:* documented as a session lifetime semantics note; full ephemeral mode adds an `ephemeral: bool` flag to `open_anonymous` in a v1.5 follow-up.
+
+**Q5 — Sampling cache size scale rules.**
+- *Operator decision:* whether sampling-cache size scales with target-context size or stays bounded.
+- *v1 default:* hard cap of 100MB per sampling session (bounded). Target-context-size scaling deferred. If a sampler hits the cap, the session is degraded — further slice fetches return `BridgeError::SamplingCapacityExceeded` and the participant is prompted to graduate-or-walk-away.
+- *Implementation surface:* `SAMPLING_CACHE_BYTES_MAX` constant in B-CRATE; per-context override via app-manifest field deferred.
+
+**Q6 — Sampling as a federation primitive.**
+- *Operator decision:* whether long-running sampling becomes a federation pattern.
+- *v1 default:* sampling is "sample-then-join-or-walk-away." Long-running federation sampling is out of scope. The substrate enforces this via the expiry policy in Q1 — sampling sessions cannot persist indefinitely without graduating.
+- *Implementation surface:* none; revisit if federation use case surfaces a need for indefinite sampling.
+
+### From the appraisal/negotiation framing in spec §4 (Q7–Q11)
+
+**Q7 — Which elohim appraises (home / commons-co-steward / neutral / all three)?**
+- *Operator decision:* which of the three elohim categories runs the appraisal, or whether all three participate (three-elohim ceremony).
+- *v1 default:* **(a) participant's home-elohim only** (single-elohim path). The home-elohim is the only one with consented participant profile, so this is the lowest-friction starting point. Commons-elohim + neutral counsel deferred behind explicit operator design pass — both have substantial substrate implications (cross-substrate elohim invocation surface; consent + reach gates between elohim).
+- *Implementation surface:* `AppraisalAgent` trait in B-APPRAISE Phase 2 takes a single agent; multi-agent ceremony adds a `MultiAgentAppraisal` trait later.
+
+**Q8 — Appraisal auditability and reproducibility.**
+- *Operator decision:* whether appraisals are reproducible, notarized, comparable.
+- *v1 default:* the optional `appraisal_record` (notarized as `Manifest{kind: "graduation-record"}` per Design Constraint 2) defaults to opt-in per graduation event. Notarization records the appraisal narrative + inputs hash. Re-appraisal is supported by re-running the offer ceremony; output comparison is the participant's responsibility (manual diff). Cryptographic reproducibility (deterministic appraisal output) is deferred.
+- *Implementation surface:* the `graduation-record` manifest kind in B-APPRAISE Phase 2; cryptographic reproducibility revisits if appraisal-determinism becomes a requirement.
+
+**Q9 — Cost of refusal (preventing appraisal-shopping).**
+- *Operator decision:* what friction prevents repeated re-graduation attempts to extract more favorable appraisals.
+- *v1 default:* NO friction. The participant can re-request a graduation offer freely; the bridge does not track prior-offer history. Appraisal-shopping resistance is deferred to a §8 follow-up spec. Rationale: v1 has deterministic-only Phase 1 (no negotiated resolutions = no appraisal to shop); Phase 2's negotiated resolutions surface this question explicitly when they ship.
+- *Implementation surface:* none in v1. Phase 2 might add a `prior_offer_count` field to the session lifecycle if shopping resistance becomes a v1.5 requirement.
+
+**Q10 — Counter-offer mechanics on the participant side.**
+- *Operator decision:* whether the participant can propose a novel alternative not on the menu, and whether that's a re-appraisal request or a new staged intent.
+- *v1 default:* counter-offer = a new staged intent through the same offer-construction cycle (the simpler treatment per the spec's own suggestion). Novel counter-proposals are not a distinct primitive in v1.
+- *Implementation surface:* documented in the visitor-session API doc; revisit if a UX surface emerges where the simpler treatment feels brittle.
+
+**Q11 — Substrate-level enforcement of no-cross-context-profiling.**
+- *Operator decision:* whether the no-cross-context-profiling guardrails (spec §6) are enforced cryptographically, by audit, or by convention.
+- *v1 default:* enforcement is by **convention + unit test + code review**. The session-bridge crate ships a `CrossContextLeakageTest` asserting that two sessions on the same storage backend with different `target_context` values do NOT share staged intent or sampling cache state (the B-STORAGE acceptance criterion #4 above). Cryptographic enforcement (per-context encryption keys, opaque session-pool boundaries) is deferred to a doorway-spec follow-up.
+- *Implementation surface:* the leakage test as documented; cryptographic boundary revisits if a threat model surfaces convention-only enforcement as inadequate.
+
+### Plan-discovered deferrals (additions to the operator decision queue)
+
+These surfaced during the gate analysis above and are NOT in the spec §8 list. They wait for operator review.
+
+**Q12 — Mishpat staged-intent shape (if any).**
+- *Background:* §3 names four pillar variants; mishpat is omitted. §7 explicitly notes mishpat-shaped entries require accrued standing. The user's draft sequence listed B-PILLAR-MISHPAT alongside the four other pillars.
+- *v1 default:* rejection-only surface (per B-PILLAR-MISHPAT ticket above). Reach-gap reason returned to caller.
+- *Operator decision needed if/when:* a concrete use case for a visitor-stageable mishpat intent surfaces (e.g. petition-signing without prior membership).
+
+**Q13 — Pillar-discriminator extensibility.**
+- *Background:* the URL path `POST /api/v1/visitor/session/{sessionId}/stage/{pillar}` hardcodes the five known pillars (lamad/imagodei/qahal/shefa/mishpat). Future pillars (avodah, account) would need to register themselves.
+- *v1 default:* the five pillars are hardcoded in the route's pillar-discriminator enum. A `PillarRegistry` trait or runtime registration is deferred.
+- *Operator decision needed if/when:* a new pillar lands.
+
+---
+
+## §7 — Why this plan matters beyond the immediate work
+
+The thin-client backend-migration plan named one pattern (substrate orchestration that leaked client-side). This plan names a deeper one: **the protocol had no first-class vocabulary for tentative participation.** Every layer that needed it improvised — `LocalSourceChainService` simulated a source chain in localStorage; consumers branched on "visitor mode vs member mode" with no shared abstraction; identity graduation was framed as a one-step OAuth move when it's really at least two (anonymous → OAuth → peer-native).
+
+The session-bridge primitive resolves that by naming the missing layer: a substrate of pre-canonical staged intent + a graduation ceremony that replays into canonical state at incarnation. The four lifecycle states (Anonymous, OauthIdentified, PeerNativeSampling, PeerNativeMember) become explicit; the bridge enforces the predicate matrix; consumers branch on a typed lifecycle, not on a brittle "isAnonymous" boolean.
+
+This matters for three orbital reasons:
+
+1. **It aligns onboarding with the qahal graduated capability surface.** The qahal pillar carries graduated capabilities (`project_qahal_graduated_capability_surface`); the session-bridge slots in BELOW the lowest membership tier as a "pre-tier" that participation crosses through. Without it, pre-member experience was a hack; with it, pre-member is a first-class participation grade.
+
+2. **It honors the "grandma standard" recovery model.** Heavy account incarnation (`project_recovery_grandma_standard`) was always going to be at odds with low-friction sampling — the session-bridge resolves the tension by letting people sample, accumulate intent, and graduate ONLY when they're ready for the heavy ceremony. Refusal stays a first-class participation choice.
+
+3. **It models the Half-Price Books appraisal surface for the negotiated graduation.** Per `project_elohim_councils_capture_apex` and `project_dissolution_principle_sensemaking_collectives`, elohim wisdom holds the structural top of authority in the protocol's mature shape. Negotiated graduation is one of the first substrate primitives where elohim inference actively shapes a canonical outcome (vs. observing one). B-APPRAISE Phase 2 is the proving ground for "wisdom as load-bearing primitive" at participant-graduation scale.
+
+Future flows that fit the same shape — sampling between federated commons, deep-archive surfaces inviting graduation to active state, recovery-quorum incarnation — will inherit this primitive rather than re-inventing it. The bridge is the protocol's vocabulary for "not-yet-incarnated, but expressing intent."
+
+---
+
+## §8 — References
+
+- Spec: `genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md`
+- Sister plan: `genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md` — task M-AGGR-2's deferred deletion is what this plan closes
+- P2P Design Gate: `.claude/skills/p2p-design-gate/SKILL.md`
+- Schema conventions: `elohim/sdk/schemas/v1/views/CONVENTIONS.md`
+- Bridges convention (why this is NOT in `bridges/`): `bridges/CLAUDE.md`
+- Manifest entry type + whitelisted kinds: `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/manifest.rs`
+- Library scope discipline (thin-client invariant for B-CONSUMERS): `app/elohim-library/CLAUDE.md`
+- Lamad reference client conventions: `app/lamad/CLAUDE.md`
+- Memory references:
+  - `project_qahal_graduated_capability_surface` — the graduated capability shape this primitive slots beneath
+  - `project_account_layer_oauth_graduation` — refined here as two-step graduation
+  - `project_peer_native_account_canonical_surface` — peer-native steward via account management
+  - `project_recovery_grandma_standard` — heavy account ceremony, ambient onboarding
+  - `project_elohim_as_counsel` — appraisal as one move wisdom makes (B-APPRAISE Q7)
+  - `project_commons_elohim_co_steward` — one of the three appraiser candidates (B-APPRAISE Q7)
+  - `project_forgetting_as_design` — discard semantics for sampling sessions
+  - `project_doorway_full_facilitator_sprint` — doorway as the web2-facing surface (B-DOORWAY)
+  - `project_doorway_is_federation_surface_atproto` — bridge pattern at doorway
+  - `project_imagodei_three_surfaces` — identity surface decomposition
+  - `project_socially_derived_security` — why account incarnation is heavy by design
+  - `project_quilt_pantry_vocabulary` — sampling-cache slice storage (B-STORAGE)
+  - `feedback_subagent_silent_impl_drops` — impl-count discipline at ticket close
+  - `feedback_diesel_migration_timestamp_collision` — migration timestamp discipline
+  - `feedback_sweettest_cross_agent_consistency` — sweettest discipline for cross-agent flows
+  - `feedback_multi_agent_pvc_pacing` — watchdog: per-crate builds in ticket phases
+  - `feedback_session_orchestrate_vs_implement` — sequencing discipline
+- M-REA-1 commits (intent surface shared by `StagedEconomicEventIntent`): `aece1093c` → `8cc0b759f`
+- M-AGGR-2 commits (read-side cutover; this plan completes the write-side): `6e184ef96` → `6c1fde7bc`
+- Spec commit on `sprint/cross-pillar-cleanup`: `9a0c55a61`
