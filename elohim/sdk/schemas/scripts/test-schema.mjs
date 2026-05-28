@@ -291,6 +291,40 @@ async function main() {
     );
   }
 
+  // Test: vocabulary.stagedIntents + top-level graduation + dependentSchemas (Task 3)
+  {
+    const manifestSchemaPath = resolve(__dirname, '../v1/manifest/app-manifest.schema.json');
+    const manifestSchema = await loadJson(manifestSchemaPath);
+
+    // The Vocabulary $def carries the contentTypes/contentFormats/relationships/signals/observations
+    // properties. We're adding stagedIntents as a sibling.
+    const vocabProps = manifestSchema.$defs?.Vocabulary?.properties;
+    assert(
+      vocabProps?.stagedIntents !== undefined,
+      'vocabulary.stagedIntents property is declared (under $defs/Vocabulary)'
+    );
+    assert(
+      vocabProps?.stagedIntents?.additionalProperties?.$ref === '#/$defs/StagedIntentDeclaration',
+      'vocabulary.stagedIntents.additionalProperties references $defs/StagedIntentDeclaration'
+    );
+
+    assert(
+      manifestSchema.properties?.graduation?.$ref === '#/$defs/GraduationPolicy',
+      'top-level graduation property references $defs/GraduationPolicy'
+    );
+
+    // Conditional: if vocabulary.stagedIntents is non-empty, top-level graduation must be present.
+    // JSON Schema 2020-12 expresses this via "dependentSchemas" on vocabulary, OR a top-level
+    // allOf with if/then. Either is acceptable — assert one or the other shape is present.
+    const hasDependentSchemas = manifestSchema.dependentSchemas?.vocabulary !== undefined;
+    const hasAllOfIfThen = Array.isArray(manifestSchema.allOf) &&
+      manifestSchema.allOf.some(clause => clause.if && clause.then);
+    assert(
+      hasDependentSchemas || hasAllOfIfThen,
+      'Conditional rule present: stagedIntents non-empty implies top-level graduation required'
+    );
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }
