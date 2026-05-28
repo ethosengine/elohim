@@ -29,9 +29,15 @@ export type {
   EconomicEventQuery,
 } from './lib/event.service';
 
-// AttentionTrackerService — dwell-time attention tracking as economic events
-export { AttentionTrackerService, AGENT_CONTEXT, DWELL_THRESHOLD_MS } from './lib/attention-tracker.service';
+// AttentionTrackerService — native AttentionTending writes via POST /api/v1/attention/tending
+// M-REA-2: DWELL_THRESHOLD_MS retired — substrate policy via tending-policy Manifest.
+// AGENT_CONTEXT and IAgentContext are retained; consumers must still provide AgentService.
+export { AttentionTrackerService, AGENT_CONTEXT } from './lib/attention-tracker.service';
 export type { IAgentContext } from './lib/attention-tracker.service';
+
+// AttentionTendingApiService — thin HTTP wrapper for POST /api/v1/attention/tending (M-REA-2)
+export { AttentionTendingApiService } from './lib/attention-tending-api.service';
+export type { AttentionTendingIntent, AttentionTendingAck } from './lib/attention-tending-api.service';
 
 // ResourceExplorerService — stewardship resource browsing
 export {
