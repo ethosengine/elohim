@@ -24,6 +24,7 @@ pub mod diesel_schema;
 pub mod models;
 
 // Diesel modules for graph relationships and domain models
+pub mod accumulation_status;
 pub mod agreements;
 pub mod collectives;
 pub mod comments;

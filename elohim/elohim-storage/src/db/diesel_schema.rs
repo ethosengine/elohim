@@ -1636,7 +1636,28 @@ diesel::table! {
     }
 }
 
+// M-POLICY-1: AccumulationStatus projection (Category C operational).
+// Source of truth: derived projection of FeedbackSignal × Manifest(kind: standing-policy).
+// Reconstructable from FeedbackSignal + manifests tables at any time.
+// Migration: 2026-05-28-000000_accumulation_status
+diesel::table! {
+    accumulation_status (entity_type, entity_id) {
+        entity_type           -> Text,
+        entity_id             -> Text,
+        total_signals         -> Integer,
+        unique_participants   -> Integer,
+        consensus_strength    -> Double,
+        status                -> Text,
+        ready_for_sensemaking -> Integer,
+        controversy_detected  -> Integer,
+        settled               -> Integer,
+        policy_manifest_cid   -> Nullable<Text>,
+        computed_at           -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
+    accumulation_status,
     access_grants,
     agreements,
     attestations,
