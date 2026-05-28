@@ -242,6 +242,37 @@ async function main() {
     );
   }
 
+  // Test: app-manifest $defs additions for staged-intents substrate
+  {
+    const manifestSchemaPath = resolve(__dirname, '../v1/manifest/app-manifest.schema.json');
+    const manifestSchema = await loadJson(manifestSchemaPath);
+    assert(
+      manifestSchema.$defs?.StagedIntentDeclaration !== undefined,
+      '$defs/StagedIntentDeclaration is defined on app-manifest.schema.json'
+    );
+    assert(
+      manifestSchema.$defs?.GraduationPolicy !== undefined,
+      '$defs/GraduationPolicy is defined on app-manifest.schema.json'
+    );
+    const sid = manifestSchema.$defs?.StagedIntentDeclaration;
+    const sidRequired = Array.isArray(sid?.required) ? sid.required : [];
+    assert(
+      sidRequired.includes('description') &&
+        sidRequired.includes('intentSchema') &&
+        sidRequired.includes('graduatesTo') &&
+        sidRequired.includes('actionableFrom') &&
+        sidRequired.includes('resolutionMode') &&
+        sidRequired.includes('coupling'),
+      'StagedIntentDeclaration requires all six declared fields (description / intentSchema / graduatesTo / actionableFrom / resolutionMode / coupling)'
+    );
+    const gp = manifestSchema.$defs?.GraduationPolicy;
+    const gpRequired = Array.isArray(gp?.required) ? gp.required : [];
+    assert(
+      gpRequired.includes('deterministicCeremony'),
+      'GraduationPolicy requires deterministicCeremony'
+    );
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }
