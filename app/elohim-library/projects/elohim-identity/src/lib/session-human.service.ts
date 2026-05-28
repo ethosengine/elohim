@@ -1,6 +1,15 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 94.9% (2026-02-24)
+// M-AGGR-1 migration: session activity counting and upgrade prompts are now
+// substrate projections served by:
+//   GET /api/v1/identity/{agentId}/session          → SessionHumanView
+//   GET /api/v1/identity/{agentId}/upgrade-prompts  → UpgradePromptView
+//
+// Consumers that called record*() methods should emit intents via M-REA-1's
+// EventService.emitEvent() instead.
+//
+// @coverage: 94.9% (2026-02-24) — coverage scope now covers session-identity
+// lifecycle only; projection-derived stats covered by schema contract tests.
 
 import { BehaviorSubject, Observable } from 'rxjs';
 
@@ -14,38 +23,31 @@ import {
   SessionHuman,
   SessionPathProgress,
   SessionMigration,
-  HolochainUpgradePrompt,
   SessionState,
   UpgradeIntent,
 } from './session-human.model';
 
 /**
- * SessionHumanService - Manages temporary session identity for MVP.
+ * SessionHumanService — session identity for anonymous visitors.
  *
- * Philosophy:
- * - Zero-friction entry: humans explore immediately
- * - Progress persists in localStorage during session
- * - Meaningful moments prompt Holochain "upgrade" (prompts now driven by
- *   UpgradePromptView projection via /api/v1/identity/{agentId}/upgrade-prompts)
- * - Migration preserves all session progress
+ * Scope (post M-AGGR-1):
+ * - Session lifecycle: sessionId, accessLevel, isAnonymous
+ * - Content access control (visitor vs gated vs protected)
+ * - Upgrade intent tracking (which upgrade stage the human is navigating)
+ * - Profile metadata (displayName, bio, avatar, locale, interests)
+ * - Upgrade-prompt dismissal (browser-local UI state)
+ * - Migration helpers: prepareMigration(), markAsMigrated(), clearAfterMigration()
  *
- * Holochain migration:
- * - This service becomes a thin wrapper around HolochainService
- * - Session data migrates to agent's private source chain
- * - sessionId maps to AgentPubKey
+ * NOT this service's scope:
+ * - Activity counting (nodesViewed, pathsStarted, etc.) → SessionHumanView substrate projection
+ * - Upgrade prompt content/determination → UpgradePromptView substrate projection
+ * - REA event creation → EventService.emitEvent() (M-REA-1)
  *
  * Storage keys:
- * - lamad-session: SessionHuman object
- * - lamad-session-{sessionId}-affinity: Affinity data
- * - lamad-session-{sessionId}-progress-{pathId}: Path progress
- *
- * Migrated from @app/imagodei/services/session-human.service to
- * @elohim/identity as part of Slice 2.3 cross-pillar import cleanup.
- *
- * M-AGGR-1: activity tracking (record* methods) and upgrade-prompt
- * localStorage management have moved to the Rust substrate. Callers
- * should emit EconomicEvents via the lamad-event service and read
- * UpgradePromptView from /api/v1/identity/{agentId}/upgrade-prompts.
+ * - lamad-session: SessionHuman identity object
+ * - lamad-dismissed-prompts: browser-local UI dismissal state (NOT substrate-mirrored)
+ * - lamad-session-{sessionId}-affinity: Affinity data (other services)
+ * - lamad-session-{sessionId}-progress-{pathId}: Path progress (other services)
  */
 @Injectable({ providedIn: 'root' })
 export class SessionHumanService {
@@ -366,18 +368,6 @@ export class SessionHumanService {
     } catch {
       return [];
     }
-  }
-
-  /**
-   * Get active (non-dismissed) upgrade prompts from a substrate-provided list.
-   * @deprecated Use the substrate UpgradePromptView directly via
-   * GET /api/v1/identity/{agentId}/upgrade-prompts and filter against
-   * getDismissedPromptIds(). This shim bridges callers until they migrate.
-   */
-  getActiveUpgradePrompts(): HolochainUpgradePrompt[] {
-    // M-AGGR-1: prompt content is now substrate-driven. Return empty so existing
-    // callers see no locally-managed prompts; they should migrate to the route.
-    return [];
   }
 
   /**
