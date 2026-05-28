@@ -545,6 +545,15 @@ pub struct P2PNode {
     /// `record_predecessor` call in `handle_epr_atom_request` is silently skipped
     /// (best-effort — the Announce response is never affected).
     sealing_keys: Option<Arc<crate::api::epr::SealingKeyPair>>,
+    /// Step-zero substrate gossip: bounded mpsc sender for inbound
+    /// `ConductorAgentInfo` envelopes received on the
+    /// `CONDUCTOR_AGENT_INFO_TOPIC`. `None` when the feature flag
+    /// (`ENABLE_CONDUCTOR_AGENT_INFO_GOSSIP`) is off — gossip edge silently
+    /// drops in that case. When `Some`, the subscriber worker (spawned in
+    /// `main.rs`) drains the receiver end via
+    /// `conductor_agent_info_gossip::spawn_agent_info_subscriber_worker`.
+    agent_info_inbound_tx:
+        Option<mpsc::Sender<crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo>>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -762,6 +771,11 @@ pub enum P2PCommand {
     /// `KeyRevocationEffective` signals. Best-effort — subscriber discovery is
     /// eventual; publish failure does not affect projection correctness.
     PublishRecoveryRevocation(crate::p2p::recovery_revocation::RecoveryRevocationMessage),
+    /// Step-zero substrate gossip — broadcast a Holochain conductor's agent_info JSON
+    /// to peer pods so their embedded conductors learn about us regardless of
+    /// signal_url. Producer: `conductor_agent_info_gossip::publish_once`.
+    /// See `genesis/docs/superpowers/specs/2026-05-28-conductor-agent-info-substrate-gossip-design.md`.
+    PublishConductorAgentInfo(crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo),
     /// Advertise that this node holds the EPR atom with the given CID by issuing
     /// `kademlia.start_providing(...)`. Triggered by `FederatedEprStore::put`
     /// when the fanout policy includes a Kad/KadLight channel for the EPR's reach.
@@ -998,6 +1012,7 @@ impl P2PHandle {
                     P2PCommand::PublishRecoveryInvitation(_) => {} // fire-and-forget
                     P2PCommand::PublishIdentityBinding(_) => {} // fire-and-forget
                     P2PCommand::PublishRecoveryRevocation(_) => {} // fire-and-forget
+                    P2PCommand::PublishConductorAgentInfo(_) => {} // fire-and-forget
                     P2PCommand::KadStartProviding { .. } => {} // fire-and-forget
                     P2PCommand::PublishEprAnnounce { .. } => {} // fire-and-forget
                     P2PCommand::DirectNotifyIntegrity { .. } => {} // fire-and-forget (D.5 best-effort)
@@ -1649,6 +1664,7 @@ impl P2PNode {
             inventory_seq: inventory_broadcaster::SequenceAllocator::new(0),
             gossip_publisher: default_gossip_publisher,
             sealing_keys: None,
+            agent_info_inbound_tx: None,
         })
     }
 
@@ -1711,6 +1727,20 @@ impl P2PNode {
     /// sealing keys are constructed after the node.
     pub fn set_sealing_keys(&mut self, keys: Arc<crate::api::epr::SealingKeyPair>) {
         self.sealing_keys = Some(keys);
+    }
+
+    /// Wire the agent-info inbound mpsc sender for step-zero substrate gossip.
+    ///
+    /// Called from `main.rs` AFTER constructing the bounded mpsc channel,
+    /// only when the `ENABLE_CONDUCTOR_AGENT_INFO_GOSSIP` env flag is on.
+    /// The receiver end is handed to
+    /// `conductor_agent_info_gossip::spawn_agent_info_subscriber_worker`.
+    /// When unset (default), the inbound gossip arm silently drops messages.
+    pub fn set_agent_info_inbound_tx(
+        &mut self,
+        tx: mpsc::Sender<crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo>,
+    ) {
+        self.agent_info_inbound_tx = Some(tx);
     }
 
     /// Replace the gossip publisher in-place (non-consuming `&mut self` variant).
@@ -2605,6 +2635,34 @@ impl P2PNode {
                     revocation_id = %msg.revocation_id,
                     error = ?e,
                     "Failed to encode RecoveryRevocationMessage"
+                ),
+            },
+            // Step-zero substrate gossip: publish a Holochain conductor's
+            // agent_info JSON via DualGossipPublisher. Best-effort — publish
+            // failure is logged and the next 60s heartbeat retries.
+            P2PCommand::PublishConductorAgentInfo(payload) => match payload.to_bytes() {
+                Ok(bytes) => {
+                    if let Err(e) = self.gossip_publisher.publish(
+                        crate::p2p::conductor_agent_info_gossip::CONDUCTOR_AGENT_INFO_TOPIC,
+                        bytes,
+                    ) {
+                        warn!(
+                            target: "elohim_storage::agent_info",
+                            error = %e,
+                            "PublishConductorAgentInfo dual-publish failed"
+                        );
+                    } else {
+                        debug!(
+                            target: "elohim_storage::agent_info",
+                            published_at = payload.published_at,
+                            "conductor agent_info published to substrate"
+                        );
+                    }
+                }
+                Err(e) => warn!(
+                    target: "elohim_storage::agent_info",
+                    error = ?e,
+                    "PublishConductorAgentInfo to_bytes failed"
                 ),
             },
             // D.2: announce atom provider record to Kademlia DHT.
@@ -5000,6 +5058,47 @@ impl P2PNode {
                                     from = %propagation_source,
                                     error = ?e,
                                     "Failed to decode IdentityBindingGossip"
+                                ),
+                            }
+                        } else if message.topic.as_str()
+                            == crate::p2p::conductor_agent_info_gossip::CONDUCTOR_AGENT_INFO_TOPIC
+                        {
+                            // Step-zero substrate gossip — edge handler. Lightweight:
+                            // decode, structural verify, try_send into bounded mpsc.
+                            // The subscriber worker (spawned in main.rs) drains the
+                            // mpsc, rate-limits, batches, and calls admin_ws.add_agent_info.
+                            //
+                            // Channel-full drops are safe by design: the next 60s
+                            // publisher heartbeat re-delivers, so at most one heartbeat
+                            // window of latency on stabilization. Feature flag off
+                            // (agent_info_inbound_tx = None) → silently ignore.
+                            match crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo::from_bytes(
+                                &message.data,
+                            ) {
+                                Ok(payload) => {
+                                    if let Err(reason) = payload.verify_structural() {
+                                        debug!(
+                                            target: "elohim_storage::agent_info",
+                                            from = %propagation_source,
+                                            reason = %reason,
+                                            "ConductorAgentInfo failed structural verify — dropped"
+                                        );
+                                    } else if let Some(tx) = &self.agent_info_inbound_tx {
+                                        if tx.try_send(payload).is_err() {
+                                            debug!(
+                                                target: "elohim_storage::agent_info",
+                                                from = %propagation_source,
+                                                "agent_info inbound queue full — dropped (heartbeat will re-deliver)"
+                                            );
+                                        }
+                                    }
+                                    // else: feature flag is off, no sender wired — silently ignore
+                                }
+                                Err(e) => debug!(
+                                    target: "elohim_storage::agent_info",
+                                    from = %propagation_source,
+                                    error = %e,
+                                    "ConductorAgentInfo decode failed — dropped"
                                 ),
                             }
                         } else if message.topic.as_str() == RECOVERY_REVOCATION_TOPIC {

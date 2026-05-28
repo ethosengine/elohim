@@ -147,7 +147,7 @@ fn parse_thresholds(payload_json: &str) -> AccumulationThresholds {
         controversy_min_signals: controversy_min,
         controversy_max_consensus: controversy_max,
         settled_min_signals: settled_min,
-        settled_min_consensus: settled_min_consensus,
+        settled_min_consensus,
     }
 }
 

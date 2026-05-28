@@ -15,9 +15,9 @@
 //! mechanism-selection.service.ts that are being retired by this ticket):
 //! - settled_states: ["constitutional", "settled"]
 //! - mechanism_level_map: {approval:3, dot-vote:3, ranked-choice:4,
-//!                          score-vote:5, conviction:5, consent:6}
+//!   score-vote:5, conviction:5, consent:6}
 //! - feedback_inviting_content_types: ["discussion", "proposal-draft",
-//!                                      "request-for-comment", "reflection"]
+//!   "request-for-comment", "reflection"]
 //! - default_level_no_proposal: 1 (reactions only)
 
 use diesel::prelude::*;
@@ -220,6 +220,10 @@ struct GovernanceStateSlim {
 struct ProposalSlim {
     id: String,
     voting_mechanism: String,
+    // Queried for symmetry with the proposals table shape but not yet consumed
+    // by the mechanism-derivation logic. Retain the field so the row decodes
+    // against the live schema; mark unread to satisfy clippy.
+    #[allow(dead_code)]
     status: String,
 }
 
