@@ -1349,6 +1349,50 @@ pub async fn handle(
             Ok(response::ok(&view))
         }
 
+        // =====================================================================
+        // M-POLICY-2: MechanismSelection projection
+        // GET /api/v1/governance/{entityType}/{entityId}/mechanism
+        //
+        // Returns MechanismSelectionView derived from GovernanceState ×
+        // Content.contentType × Proposal? × Manifest(kind: pillar-projection,
+        // pillar: qahal). Recomputes on every call so the response reflects
+        // current substrate state; a future cache layer may serve the
+        // pre-computed row from mechanism_selection table instead (see
+        // fetch_mechanism_selection).
+        // =====================================================================
+        (&Method::GET, path) if path.ends_with("/mechanism") => {
+            // Path shape: /{entityType}/{entityId}/mechanism
+            // Strip leading '/' + trailing '/mechanism' to extract segments.
+            let inner = path
+                .trim_start_matches('/')
+                .trim_end_matches("/mechanism");
+            // inner = "{entityType}/{entityId}"
+            let mut parts = inner.splitn(2, '/');
+            let entity_type = match parts.next() {
+                Some(s) if !s.is_empty() => s,
+                _ => {
+                    return Ok(response::bad_request(
+                        "Path must be /{entityType}/{entityId}/mechanism",
+                    ))
+                }
+            };
+            let entity_id = match parts.next() {
+                Some(s) if !s.is_empty() => s,
+                _ => {
+                    return Ok(response::bad_request(
+                        "Path must be /{entityType}/{entityId}/mechanism",
+                    ))
+                }
+            };
+            let mut conn = get_conn(pool)?;
+            let view = crate::db::mechanism_selection::project_mechanism_selection(
+                &mut conn,
+                entity_type,
+                entity_id,
+            )?;
+            Ok(response::ok(&view))
+        }
+
         _ => Ok(response::not_found(&format!(
             "Unknown governance route: {} {}",
             method, resource_path
