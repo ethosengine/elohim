@@ -2,10 +2,10 @@
 /**
  * Registry vs Cluster Drift Detector
  *
- * For each pipeline in orchestrator-strategy.mjs PIPELINES, probe its
+ * For each pipeline in the build-manifest.json registry, probe its
  * Jenkins job and report:
- *   - registry-only: declared in PIPELINES but no Jenkins job exists
- *   - cluster-only: Jenkins job exists but not in PIPELINES (orphan)
+ *   - registry-only: declared in manifests but no Jenkins job exists
+ *   - cluster-only: Jenkins job exists but not in manifest registry (orphan)
  *
  * Exit codes:
  *   0 — no drift
@@ -19,7 +19,13 @@
  */
 
 import process from 'node:process';
-import { PIPELINES } from '../orchestrator-strategy.mjs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { loadPipelineRegistry } from '../pipeline-registry.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, '../../..');
+const registry = loadPipelineRegistry(ROOT);
 
 const JENKINS_URL = process.env.JENKINS_URL;
 if (!JENKINS_URL) { console.error('FATAL: JENKINS_URL must be set'); process.exit(2); }
@@ -43,7 +49,7 @@ async function listOrchestratorChildJobs() {
 }
 
 async function main() {
-  const registryNames = new Set(Object.keys(PIPELINES));
+  const registryNames = new Set([...registry.keys()]);
   const clusterNames = new Set(await listOrchestratorChildJobs());
 
   const registryOnly = [];

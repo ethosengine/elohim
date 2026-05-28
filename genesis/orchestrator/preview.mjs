@@ -9,13 +9,113 @@
 // (staged + unstaged + untracked) then runs the same simulate() logic
 // that the orchestrator uses in Jenkins.
 //
-// The algorithm is imported from ./orchestrator-strategy.mjs — the
-// pure-function module shared with orchestrator-strategy.test.mjs. So
-// what you see locally is what Jenkins will decide.
+// The algorithm uses pipeline-registry.mjs (manifest-backed) to determine
+// which pipelines are affected by changed files.
 
 import { execFileSync } from 'node:child_process';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-import { simulate, PIPELINES } from './orchestrator-strategy.mjs';
+import { loadPipelineRegistry, nonManualPipelines } from './pipeline-registry.mjs';
+import { loadManifests } from './manifest-utils.mjs';
+import { walkGraph } from './graph-walker.mjs';
+import { parseCommitTags, parseSkipCi } from './commit-tag-parser.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, '../..');
+const registry = loadPipelineRegistry(ROOT);
+
+/**
+ * Build a map from gate-project-name → pipeline-name by scanning manifests.
+ * e.g. 'elohim-app' → 'elohim', 'elohim-library' → 'elohim'
+ */
+function buildGateProjectToPipelineMap(manifests) {
+  const map = new Map();
+  for (const { content } of manifests) {
+    if (!content.gate?.projects || !content.pipeline) continue;
+    for (const projectName of Object.keys(content.gate.projects)) {
+      map.set(projectName, content.pipeline);
+    }
+  }
+  return map;
+}
+
+/**
+ * Simulate what the orchestrator would decide for a set of changed files
+ * and commit message. Uses the manifest-backed pipeline registry.
+ *
+ * @param {{ changedFiles?: string[], commitMsg?: string }} opts
+ * @returns {{ pipelines: string[], analysis: Record<string, {shouldRun: boolean, manualOnly: boolean, matchedPatterns: string[], sampleFiles: string[]}>, skipped: boolean }}
+ */
+function simulate({ changedFiles = [], commitMsg = '' } = {}) {
+  if (parseSkipCi(commitMsg)) {
+    // Build an analysis map showing all pipelines as skip
+    const analysis = {};
+    for (const [name, entry] of registry) {
+      analysis[name] = { shouldRun: false, manualOnly: entry.manualOnly, matchedPatterns: [], sampleFiles: [] };
+    }
+    return { pipelines: [], analysis, skipped: true };
+  }
+
+  const manifests = loadManifests(ROOT);
+  const gateProjectToPipeline = buildGateProjectToPipelineMap(manifests);
+
+  // Walk the graph to find which gate projects are triggered
+  const graphResult = walkGraph(manifests, changedFiles);
+
+  // Map gate projects back to pipeline names
+  const triggeredPipelines = new Set();
+  const pipelineMatchedFiles = new Map();
+  const pipelineSampleFiles = new Map();
+
+  for (const project of graphResult.projects) {
+    const pipelineName = gateProjectToPipeline.get(project.name);
+    if (pipelineName) {
+      triggeredPipelines.add(pipelineName);
+      if (!pipelineMatchedFiles.has(pipelineName)) {
+        pipelineMatchedFiles.set(pipelineName, []);
+        pipelineSampleFiles.set(pipelineName, []);
+      }
+      pipelineMatchedFiles.get(pipelineName).push(...project.reasons);
+      // Collect sample files (up to 5) for the per-file routing view
+      const fileReasons = project.reasons.filter(r => r.startsWith('source: ')).map(r => r.slice(8));
+      const existing = pipelineSampleFiles.get(pipelineName);
+      for (const f of fileReasons) {
+        if (existing.length < 5 && !existing.includes(f)) existing.push(f);
+      }
+    }
+  }
+
+  // Apply [build:*] commit-tag overrides
+  const forcedByTag = parseCommitTags(commitMsg, registry);
+  for (const name of forcedByTag) {
+    if (registry.has(name)) {
+      triggeredPipelines.add(name);
+      if (!pipelineMatchedFiles.has(name)) {
+        pipelineMatchedFiles.set(name, ['[build:*] commit tag override']);
+        pipelineSampleFiles.set(name, []);
+      }
+    }
+  }
+
+  // Filter out manualOnly pipelines
+  const pipelines = [...triggeredPipelines].filter(p => !registry.get(p)?.manualOnly);
+
+  // Build analysis map (all pipelines, including those that won't run)
+  const analysis = {};
+  for (const [name, entry] of registry) {
+    const matched = pipelineMatchedFiles.get(name) || [];
+    const shouldRun = pipelines.includes(name);
+    analysis[name] = {
+      shouldRun,
+      manualOnly: entry.manualOnly,
+      matchedPatterns: matched,
+      sampleFiles: pipelineSampleFiles.get(name) || [],
+    };
+  }
+
+  return { pipelines, analysis, skipped: false };
+}
 
 const baseRef = process.argv[2] || 'origin/dev';
 
@@ -97,7 +197,7 @@ console.log('+------------------------------------------------------------------
 console.log('|                     ORCHESTRATOR DECISION (preview)                      |');
 console.log('+--------------------------------------------------------------------------+');
 
-const allNames = Object.keys(PIPELINES).sort();
+const allNames = nonManualPipelines(registry).sort();
 for (const name of allNames) {
   const info = analysis[name];
   const willRun = (info && info.shouldRun) || pipelines.includes(name);
