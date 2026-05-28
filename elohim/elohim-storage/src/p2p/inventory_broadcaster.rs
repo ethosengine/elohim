@@ -11,7 +11,7 @@
 //! Source of truth for "what blobs do I host": the local blob store; the
 //! enumeration is delegated to `LocalInventory` so it can be mocked in tests.
 
-use crate::p2p::inventory_gossip::{BlobInventoryDelta, BlobInventorySnapshot};
+use crate::p2p::inventory_gossip::{BlobAddress, BlobInventoryDelta, BlobInventorySnapshot};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -19,7 +19,7 @@ use std::sync::Arc;
 /// Trait for enumerating the local blob inventory. Production: walks the
 /// blob store. Tests: returns a fixed set.
 pub trait LocalInventory: Send + Sync {
-    fn current_hashes(&self) -> Vec<String>;
+    fn current_hashes(&self) -> Vec<BlobAddress>;
 }
 
 /// T22 review fix #1: wraps a pre-fetched list of hashes for `LocalInventory`.
@@ -29,16 +29,16 @@ pub trait LocalInventory: Send + Sync {
 /// `build_snapshot`. Previously `BlobStoreInventory` swallowed the error and
 /// returned an empty `Vec`, which caused `apply_snapshot` on every remote peer
 /// to evict this peer's inventory entries during a transient I/O blip.
-pub struct StaticInventory(Vec<String>);
+pub struct StaticInventory(Vec<BlobAddress>);
 
 impl StaticInventory {
-    pub fn new(hashes: Vec<String>) -> Self {
+    pub fn new(hashes: Vec<BlobAddress>) -> Self {
         Self(hashes)
     }
 }
 
 impl LocalInventory for StaticInventory {
-    fn current_hashes(&self) -> Vec<String> {
+    fn current_hashes(&self) -> Vec<BlobAddress> {
         self.0.clone()
     }
 }
@@ -85,8 +85,8 @@ pub fn build_snapshot<I: LocalInventory>(
 /// Build a delta for the given add/remove batch.
 pub fn build_delta(
     peer_id: &str,
-    added: Vec<String>,
-    removed: Vec<String>,
+    added: Vec<BlobAddress>,
+    removed: Vec<BlobAddress>,
     seq: &SequenceAllocator,
     now_micros: i64,
 ) -> BlobInventoryDelta {
@@ -116,10 +116,18 @@ pub fn resolved_cadence(archetype: Option<&str>, config_override: Option<u64>) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::p2p::inventory_gossip::BlobAddress;
 
-    struct MockInventory(Vec<String>);
+    fn sha256_wire(byte: char) -> String {
+        format!(
+            "sha256-{}",
+            std::iter::repeat(byte).take(64).collect::<String>()
+        )
+    }
+
+    struct MockInventory(Vec<BlobAddress>);
     impl LocalInventory for MockInventory {
-        fn current_hashes(&self) -> Vec<String> {
+        fn current_hashes(&self) -> Vec<BlobAddress> {
             self.0.clone()
         }
     }
@@ -135,7 +143,10 @@ mod tests {
 
     #[test]
     fn snapshot_includes_inventory_and_advances_sequence() {
-        let inv = MockInventory(vec!["a".repeat(64), "b".repeat(64)]);
+        let inv = MockInventory(vec![
+            BlobAddress::new(sha256_wire('a')).unwrap(),
+            BlobAddress::new(sha256_wire('b')).unwrap(),
+        ]);
         let alloc = SequenceAllocator::new(10);
         let snapshot = build_snapshot("12D3KooWtest", &inv, &alloc, 1_700_000_000_000_000);
 
@@ -150,8 +161,8 @@ mod tests {
         let alloc = SequenceAllocator::new(0);
         let delta = build_delta(
             "12D3KooWtest",
-            vec!["a".repeat(64)],
-            vec!["b".repeat(64)],
+            vec![BlobAddress::new(sha256_wire('a')).unwrap()],
+            vec![BlobAddress::new(sha256_wire('b')).unwrap()],
             &alloc,
             1_700_000_001_000_000,
         );
@@ -187,9 +198,11 @@ mod tests {
     /// own `list_hashes` tests cover the I/O behavior.
     #[test]
     fn static_inventory_returns_provided_hashes() {
-        let inv = StaticInventory::new(vec!["aaa".to_string(), "bbb".to_string()]);
+        let addr_a = BlobAddress::new(sha256_wire('a')).unwrap();
+        let addr_b = BlobAddress::new(sha256_wire('b')).unwrap();
+        let inv = StaticInventory::new(vec![addr_a.clone(), addr_b.clone()]);
         let hashes = inv.current_hashes();
-        assert_eq!(hashes, vec!["aaa".to_string(), "bbb".to_string()]);
+        assert_eq!(hashes, vec![addr_a, addr_b]);
     }
 
     /// T22 review fix #4: unknown archetype strings (typos, future archetypes
@@ -237,7 +250,11 @@ pub fn compute_parity<I: LocalInventory>(
     last_gossiped: &[String],
     now_iso: &str,
 ) -> ParityReport {
-    let local: HashSet<String> = local_store.current_hashes().into_iter().collect();
+    let local: HashSet<String> = local_store
+        .current_hashes()
+        .into_iter()
+        .map(|a| a.as_str().to_string())
+        .collect();
     let gossiped: HashSet<String> = last_gossiped.iter().cloned().collect();
 
     let mut gossiped_but_missing: Vec<String> = gossiped.difference(&local).cloned().collect();
@@ -258,19 +275,29 @@ pub fn compute_parity<I: LocalInventory>(
 #[cfg(test)]
 mod parity_tests {
     use super::*;
+    use crate::p2p::inventory_gossip::BlobAddress;
 
-    struct MockInventory(Vec<String>);
+    fn sha256_wire(byte: char) -> String {
+        format!(
+            "sha256-{}",
+            std::iter::repeat(byte).take(64).collect::<String>()
+        )
+    }
+
+    struct MockInventory(Vec<BlobAddress>);
     impl LocalInventory for MockInventory {
-        fn current_hashes(&self) -> Vec<String> {
+        fn current_hashes(&self) -> Vec<BlobAddress> {
             self.0.clone()
         }
     }
 
     #[test]
     fn parity_clean_when_sets_match() {
-        let hashes = vec!["aaa".to_string(), "bbb".to_string()];
-        let inv = MockInventory(hashes.clone());
-        let report = compute_parity(&inv, &hashes, "2026-05-02T00:00:00Z");
+        let addr_a = BlobAddress::new(sha256_wire('a')).unwrap();
+        let addr_b = BlobAddress::new(sha256_wire('b')).unwrap();
+        let hashes_str = vec![addr_a.as_str().to_string(), addr_b.as_str().to_string()];
+        let inv = MockInventory(vec![addr_a, addr_b]);
+        let report = compute_parity(&inv, &hashes_str, "2026-05-02T00:00:00Z");
 
         assert!(report.gossiped_but_missing.is_empty());
         assert!(report.local_but_not_gossiped.is_empty());
@@ -281,12 +308,19 @@ mod parity_tests {
 
     #[test]
     fn parity_detects_gossiped_but_missing() {
-        // Gossip claims "ccc" is hosted but filesystem only has "aaa" and "bbb"
-        let local = MockInventory(vec!["aaa".to_string(), "bbb".to_string()]);
-        let gossiped = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string()];
+        // Gossip claims sha256_wire('c') is hosted but filesystem only has 'a' and 'b'.
+        let addr_a = BlobAddress::new(sha256_wire('a')).unwrap();
+        let addr_b = BlobAddress::new(sha256_wire('b')).unwrap();
+        let addr_c_str = sha256_wire('c');
+        let local = MockInventory(vec![addr_a.clone(), addr_b.clone()]);
+        let gossiped = vec![
+            addr_a.as_str().to_string(),
+            addr_b.as_str().to_string(),
+            addr_c_str.clone(),
+        ];
         let report = compute_parity(&local, &gossiped, "2026-05-02T00:00:00Z");
 
-        assert_eq!(report.gossiped_but_missing, vec!["ccc".to_string()]);
+        assert_eq!(report.gossiped_but_missing, vec![addr_c_str]);
         assert!(report.local_but_not_gossiped.is_empty());
         assert_eq!(report.filesystem_count, 2);
         assert_eq!(report.gossiped_count, 3);
@@ -294,13 +328,18 @@ mod parity_tests {
 
     #[test]
     fn parity_detects_local_but_not_gossiped() {
-        // Filesystem has "ddd" that was never included in the gossip snapshot
-        let local = MockInventory(vec!["aaa".to_string(), "ddd".to_string()]);
-        let gossiped = vec!["aaa".to_string()];
+        // Filesystem has sha256_wire('d') that was never included in the gossip snapshot.
+        let addr_a = BlobAddress::new(sha256_wire('a')).unwrap();
+        let addr_d = BlobAddress::new(sha256_wire('d')).unwrap();
+        let local = MockInventory(vec![addr_a.clone(), addr_d.clone()]);
+        let gossiped = vec![addr_a.as_str().to_string()];
         let report = compute_parity(&local, &gossiped, "2026-05-02T00:00:00Z");
 
         assert!(report.gossiped_but_missing.is_empty());
-        assert_eq!(report.local_but_not_gossiped, vec!["ddd".to_string()]);
+        assert_eq!(
+            report.local_but_not_gossiped,
+            vec![addr_d.as_str().to_string()]
+        );
         assert_eq!(report.filesystem_count, 2);
         assert_eq!(report.gossiped_count, 1);
     }

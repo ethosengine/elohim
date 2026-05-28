@@ -87,9 +87,12 @@ async fn inventory_delta_round_trips_via_iroh_gossip() -> Result<()> {
     .map_err(|_| anyhow::anyhow!("fetcher never saw provider as neighbor"))?;
 
     // Provider broadcasts a structurally-valid inventory delta payload.
+    // Use canonical sha256-<hex> wire format so any future structural verify
+    // on this path accepts the message.
+    let valid_hash = format!("sha256-{}", "0".repeat(64));
     let delta = BlobInventoryDeltaWire {
         peer_id: format!("{provider_id}"),
-        added: vec!["0".repeat(64)],
+        added: vec![valid_hash],
         removed: vec![],
         emitted_at: 1_700_000_000_000_000,
         sequence: 1,

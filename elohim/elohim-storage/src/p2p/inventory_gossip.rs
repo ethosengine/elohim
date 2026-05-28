@@ -84,8 +84,10 @@ impl std::fmt::Display for BlobAddress {
 pub struct BlobInventorySnapshot {
     /// Multibase-encoded libp2p PeerId of the broadcaster.
     pub peer_id: String,
-    /// Set of blob hashes the peer currently hosts.
-    pub hashes: Vec<String>,
+    /// Set of blob hashes the peer currently hosts. Each entry is a validated
+    /// `sha256-<64 lowercase hex>` address; malformed strings are rejected at
+    /// deserialize time by `BlobAddress`'s `TryFrom<String>` impl.
+    pub hashes: Vec<BlobAddress>,
     /// Microseconds since epoch — when the snapshot was computed.
     pub snapshot_at: i64,
     /// Per-peer monotonic counter. Snapshots advance the receiver's high-watermark.
@@ -98,8 +100,12 @@ pub struct BlobInventorySnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlobInventoryDelta {
     pub peer_id: String,
-    pub added: Vec<String>,
-    pub removed: Vec<String>,
+    /// Hashes added to this peer's inventory. Each entry is a validated
+    /// `sha256-<64 lowercase hex>` address.
+    pub added: Vec<BlobAddress>,
+    /// Hashes removed from this peer's inventory. Each entry is a validated
+    /// `sha256-<64 lowercase hex>` address.
+    pub removed: Vec<BlobAddress>,
     /// Microseconds since epoch — when the delta was emitted.
     pub emitted_at: i64,
     /// Per-peer monotonic counter. Receivers gap-detect on `expected_next` mismatch.
@@ -137,18 +143,15 @@ impl BlobInventorySnapshot {
     /// Enforces:
     /// - peer_id is non-empty
     /// - signature is non-empty (Stage 1; Ed25519 in Stage 2)
-    /// - blob hashes look like sha256 hex (64 hex chars) — defensive only
+    ///
+    /// Hash-format validation is now enforced at deserialize time by `BlobAddress`'s
+    /// `TryFrom<String>` impl, so this method no longer needs to loop over hashes.
     pub fn verify_structural(&self) -> Result<(), VerifyError> {
         if self.peer_id.is_empty() {
             return Err(VerifyError::EmptyPeerId);
         }
         if self.signature.is_empty() {
             return Err(VerifyError::EmptySignature);
-        }
-        for hash in &self.hashes {
-            if !is_blob_hash_shaped(hash) {
-                return Err(VerifyError::InvalidHashFormat(hash.clone()));
-            }
         }
         Ok(())
     }
@@ -167,6 +170,9 @@ impl BlobInventoryDelta {
     ///
     /// In addition to the snapshot rules, deltas must carry at least one
     /// add or remove. Empty deltas are protocol violations.
+    ///
+    /// Hash-format validation is now enforced at deserialize time by `BlobAddress`'s
+    /// `TryFrom<String>` impl, so this method no longer needs to loop over hashes.
     pub fn verify_structural(&self) -> Result<(), VerifyError> {
         if self.peer_id.is_empty() {
             return Err(VerifyError::EmptyPeerId);
@@ -176,11 +182,6 @@ impl BlobInventoryDelta {
         }
         if self.added.is_empty() && self.removed.is_empty() {
             return Err(VerifyError::EmptyDelta);
-        }
-        for hash in self.added.iter().chain(self.removed.iter()) {
-            if !is_blob_hash_shaped(hash) {
-                return Err(VerifyError::InvalidHashFormat(hash.clone()));
-            }
         }
         Ok(())
     }
@@ -192,11 +193,9 @@ impl BlobInventoryDelta {
 /// shape (BlobStore::store → list_hashes → StoreAdapter::current_hashes);
 /// this verifier matches.
 fn is_blob_hash_shaped(s: &str) -> bool {
-    s.strip_prefix("sha256-")
-        .is_some_and(|hex| {
-            hex.len() == 64
-                && hex.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
-        })
+    s.strip_prefix("sha256-").is_some_and(|hex| {
+        hex.len() == 64 && hex.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    })
 }
 
 #[cfg(test)]
@@ -207,13 +206,19 @@ mod tests {
     /// output. Production producer always emits this prefix; the verifier
     /// enforces it. Do NOT replace with bare hex.
     fn sha256_wire(byte: char) -> String {
-        format!("sha256-{}", std::iter::repeat(byte).take(64).collect::<String>())
+        format!(
+            "sha256-{}",
+            std::iter::repeat(byte).take(64).collect::<String>()
+        )
     }
 
     fn sample_snapshot() -> BlobInventorySnapshot {
         BlobInventorySnapshot {
             peer_id: "12D3KooWtest1".to_string(),
-            hashes: vec![sha256_wire('a'), sha256_wire('b')],
+            hashes: vec![
+                BlobAddress::new(sha256_wire('a')).unwrap(),
+                BlobAddress::new(sha256_wire('b')).unwrap(),
+            ],
             snapshot_at: 1_700_000_000_000_000,
             sequence: 42,
             signature: vec![0x00],
@@ -223,8 +228,8 @@ mod tests {
     fn sample_delta() -> BlobInventoryDelta {
         BlobInventoryDelta {
             peer_id: "12D3KooWtest1".to_string(),
-            added: vec![sha256_wire('c')],
-            removed: vec![sha256_wire('a')],
+            added: vec![BlobAddress::new(sha256_wire('c')).unwrap()],
+            removed: vec![BlobAddress::new(sha256_wire('a')).unwrap()],
             emitted_at: 1_700_000_001_000_000,
             sequence: 43,
             signature: vec![0x00],
@@ -266,44 +271,49 @@ mod tests {
         assert_eq!(s.verify_structural(), Err(VerifyError::EmptySignature));
     }
 
+    /// Wire-path rejection: a snapshot whose `hashes` array contains a bare hex
+    /// string (missing `sha256-` prefix) must fail to decode, because
+    /// `BlobAddress`'s `TryFrom<String>` impl rejects non-canonical strings at
+    /// deserialize time — before `verify_structural` ever runs.
     #[test]
-    fn snapshot_verify_rejects_malformed_hash() {
-        let mut s = sample_snapshot();
-        s.hashes.push("notahex!".to_string());
-        assert!(matches!(
-            s.verify_structural(),
-            Err(VerifyError::InvalidHashFormat(_))
-        ));
+    fn snapshot_decode_rejects_bare_hex_without_prefix() {
+        let bad = serde_json::json!({
+            "peer_id": "12D3KooWtest1",
+            "hashes": ["a".repeat(64)],
+            "snapshot_at": 1_700_000_000_000_000_i64,
+            "sequence": 42_u64,
+            "signature": [0_u8],
+        });
+        let bytes = rmp_serde::to_vec_named(&bad).unwrap();
+        assert!(BlobInventorySnapshot::from_bytes(&bytes).is_err());
     }
 
+    /// Wire-path rejection: wrong algorithm prefix (`sha512-` instead of `sha256-`).
     #[test]
-    fn snapshot_verify_rejects_bare_hex_without_prefix() {
-        let mut s = sample_snapshot();
-        s.hashes.push("a".repeat(64));  // missing sha256- prefix
-        assert!(matches!(
-            s.verify_structural(),
-            Err(VerifyError::InvalidHashFormat(_))
-        ));
+    fn snapshot_decode_rejects_wrong_prefix() {
+        let bad = serde_json::json!({
+            "peer_id": "12D3KooWtest1",
+            "hashes": [format!("sha512-{}", "a".repeat(64))],
+            "snapshot_at": 1_700_000_000_000_000_i64,
+            "sequence": 42_u64,
+            "signature": [0_u8],
+        });
+        let bytes = rmp_serde::to_vec_named(&bad).unwrap();
+        assert!(BlobInventorySnapshot::from_bytes(&bytes).is_err());
     }
 
+    /// Wire-path rejection: correct prefix but wrong hex length (32 instead of 64).
     #[test]
-    fn snapshot_verify_rejects_wrong_prefix() {
-        let mut s = sample_snapshot();
-        s.hashes.push(format!("sha512-{}", "a".repeat(64)));
-        assert!(matches!(
-            s.verify_structural(),
-            Err(VerifyError::InvalidHashFormat(_))
-        ));
-    }
-
-    #[test]
-    fn snapshot_verify_rejects_wrong_hex_length() {
-        let mut s = sample_snapshot();
-        s.hashes.push(format!("sha256-{}", "a".repeat(32)));  // 32 instead of 64
-        assert!(matches!(
-            s.verify_structural(),
-            Err(VerifyError::InvalidHashFormat(_))
-        ));
+    fn snapshot_decode_rejects_wrong_hex_length() {
+        let bad = serde_json::json!({
+            "peer_id": "12D3KooWtest1",
+            "hashes": [format!("sha256-{}", "a".repeat(32))],
+            "snapshot_at": 1_700_000_000_000_000_i64,
+            "sequence": 42_u64,
+            "signature": [0_u8],
+        });
+        let bytes = rmp_serde::to_vec_named(&bad).unwrap();
+        assert!(BlobInventorySnapshot::from_bytes(&bytes).is_err());
     }
 
     #[test]
@@ -317,16 +327,6 @@ mod tests {
         d.added.clear();
         d.removed.clear();
         assert_eq!(d.verify_structural(), Err(VerifyError::EmptyDelta));
-    }
-
-    #[test]
-    fn delta_verify_rejects_malformed_hash() {
-        let mut d = sample_delta();
-        d.added.push("notahex!".to_string());
-        assert!(matches!(
-            d.verify_structural(),
-            Err(VerifyError::InvalidHashFormat(_))
-        ));
     }
 
     #[test]

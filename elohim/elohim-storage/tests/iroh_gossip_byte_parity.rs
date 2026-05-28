@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 
 use elohim_storage::p2p::feedback_signal::{FeedbackSignal, SignalKind, StandingImpact};
 use elohim_storage::p2p::identity_binding_gossip::{IdentityBindingGossip, IDENTITY_BINDING_TOPIC};
-use elohim_storage::p2p::inventory_gossip::{BlobInventorySnapshot, INVENTORY_TOPIC};
+use elohim_storage::p2p::inventory_gossip::{BlobAddress, BlobInventorySnapshot, INVENTORY_TOPIC};
 use elohim_storage::p2p::recovery_invitation::{RecoveryInvitation, RECOVERY_INVITATION_TOPIC};
 use elohim_storage::p2p::recovery_revocation::RecoveryRevocationMessage;
 
@@ -112,7 +112,10 @@ fn inventory_snapshot_byte_parity() {
 
     let snapshot = BlobInventorySnapshot {
         peer_id: "12D3KooWPeer1".to_string(),
-        hashes: vec!["a".repeat(64), "b".repeat(64)],
+        hashes: vec![
+            BlobAddress::new(format!("sha256-{}", "a".repeat(64))).unwrap(),
+            BlobAddress::new(format!("sha256-{}", "b".repeat(64))).unwrap(),
+        ],
         sequence: 7,
         snapshot_at: 1_700_000_000_000_000,
         signature: vec![1u8; 32],

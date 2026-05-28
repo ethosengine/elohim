@@ -26,7 +26,7 @@ use std::sync::{Arc, Mutex};
 
 use elohim_storage::p2p::feedback_signal::{FeedbackSignal, SignalKind, StandingImpact};
 use elohim_storage::p2p::identity_binding_gossip::{IdentityBindingGossip, IDENTITY_BINDING_TOPIC};
-use elohim_storage::p2p::inventory_gossip::{BlobInventorySnapshot, INVENTORY_TOPIC};
+use elohim_storage::p2p::inventory_gossip::{BlobAddress, BlobInventorySnapshot, INVENTORY_TOPIC};
 use elohim_storage::p2p::recovery_invitation::{RecoveryInvitation, RECOVERY_INVITATION_TOPIC};
 use elohim_storage::p2p::recovery_revocation::RecoveryRevocationMessage;
 use elohim_storage::p2p::RECOVERY_REVOCATION_TOPIC;
@@ -139,7 +139,10 @@ fn provider_dual_publishes_all_wire_types_to_both_subscribers() {
     // -----------------------------------------------------------------------
     let snapshot = BlobInventorySnapshot {
         peer_id: "12D3KooWProvider".to_string(),
-        hashes: vec!["a".repeat(64), "b".repeat(64)],
+        hashes: vec![
+            BlobAddress::new(format!("sha256-{}", "a".repeat(64))).unwrap(),
+            BlobAddress::new(format!("sha256-{}", "b".repeat(64))).unwrap(),
+        ],
         sequence: 1,
         snapshot_at: 1_700_000_000_000_000,
         signature: vec![0xAAu8; 32],
@@ -318,7 +321,7 @@ fn provider_iroh_absent_all_types_delivered_via_libp2p() {
 
     let snapshot = BlobInventorySnapshot {
         peer_id: "12D3KooWLibp2pOnly".to_string(),
-        hashes: vec!["c".repeat(64)],
+        hashes: vec![BlobAddress::new(format!("sha256-{}", "c".repeat(64))).unwrap()],
         sequence: 2,
         snapshot_at: 1_700_000_001_000_000,
         signature: vec![0xBBu8; 32],

@@ -63,10 +63,15 @@ fn dual_publisher_routes_inventory_snapshot_to_both_transports() {
         Some(Arc::new(iroh_mock.clone()) as Arc<dyn GossipPublisher>),
     );
 
-    // Build a realistic inventory snapshot.
+    // Build a realistic inventory snapshot with canonical wire-format addresses.
+    use elohim_storage::p2p::inventory_gossip::BlobAddress;
     let snapshot = BlobInventorySnapshot {
         peer_id: "12D3KooWTestPeer".to_string(),
-        hashes: vec!["a".repeat(64), "b".repeat(64), "c".repeat(64)],
+        hashes: vec![
+            BlobAddress::new(format!("sha256-{}", "a".repeat(64))).unwrap(),
+            BlobAddress::new(format!("sha256-{}", "b".repeat(64))).unwrap(),
+            BlobAddress::new(format!("sha256-{}", "c".repeat(64))).unwrap(),
+        ],
         sequence: 42,
         snapshot_at: 1_700_000_000_000_000,
         signature: vec![0u8; 32],
@@ -139,9 +144,10 @@ fn inventory_snapshot_reaches_libp2p_when_iroh_absent() {
         None, // iroh not configured
     );
 
+    use elohim_storage::p2p::inventory_gossip::BlobAddress;
     let snapshot = BlobInventorySnapshot {
         peer_id: "test-peer".to_string(),
-        hashes: vec!["0".repeat(64)],
+        hashes: vec![BlobAddress::new(format!("sha256-{}", "0".repeat(64))).unwrap()],
         sequence: 1,
         snapshot_at: 1_000_000,
         signature: vec![],

@@ -2292,11 +2292,40 @@ impl HttpServer {
     async fn handle_inventory_parity(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         use crate::p2p::inventory_broadcaster::{compute_parity, ParityReport};
 
-        // StoreAdapter satisfies LocalInventory by delegating to BlobStore::list_hashes.
+        // StoreAdapter satisfies LocalInventory by delegating to BlobStore::list_hashes,
+        // converting raw filenames to validated BlobAddress instances and dropping
+        // any non-canonical entries (logged once per session).
         struct StoreAdapter<'a>(&'a crate::blob_store::BlobStore);
         impl crate::p2p::inventory_broadcaster::LocalInventory for StoreAdapter<'_> {
-            fn current_hashes(&self) -> Vec<String> {
-                self.0.list_hashes().unwrap_or_default()
+            fn current_hashes(&self) -> Vec<crate::p2p::inventory_gossip::BlobAddress> {
+                use crate::p2p::inventory_gossip::BlobAddress;
+                use std::sync::Once;
+                static WARN_ONCE: Once = Once::new();
+
+                let raw = self.0.list_hashes().unwrap_or_default();
+                let mut dropped = 0_usize;
+                let addresses: Vec<BlobAddress> = raw
+                    .into_iter()
+                    .filter_map(|s| match BlobAddress::new(s) {
+                        Ok(a) => Some(a),
+                        Err(_) => {
+                            dropped += 1;
+                            None
+                        }
+                    })
+                    .collect();
+
+                if dropped > 0 {
+                    WARN_ONCE.call_once(|| {
+                        tracing::warn!(
+                            target: "elohim_storage::inventory",
+                            dropped,
+                            "BlobStore::list_hashes returned non-canonical filenames; \
+                             dropped from inventory advertisement (logged once per session)"
+                        );
+                    });
+                }
+                addresses
             }
         }
 
@@ -8611,6 +8640,18 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/lamad — Intent-driven EconomicEvent composition (M-REA-1)
+        // Client sends high-level LamadEventIntent; substrate composes full REA
+        // shape via PROTOCOL_EVENT_MAPPINGS. Eliminates F-REA-1 client-side REA
+        // composition. Source of truth: EconomicEvent DHT entry (Category A).
+        // =====================================================================
+        .route(
+            Route::post("/api/v1/lamad/events")
+                .handler("emit_lamad_event")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/stewardship — Stewardship allocations and policy
         // =====================================================================
         .route(
@@ -10360,6 +10401,11 @@ mod tests {
             landing.render.as_deref(),
             Some("angular-ssr"),
             "/ must declare render=angular-ssr"
+        );
+        // M-REA-1: intent-driven EconomicEvent composition
+        assert!(
+            paths.contains(&"/api/v1/lamad/events"),
+            "missing /api/v1/lamad/events (M-REA-1)"
         );
         // Ensure infrastructure routes are NOT in the manifest
         assert!(

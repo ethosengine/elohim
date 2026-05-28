@@ -5125,7 +5125,11 @@ impl P2PNode {
                                                 .to_string();
                                             let when = micros_to_iso(snapshot.snapshot_at)
                                                 .unwrap_or(now_iso);
-                                            let hashes_str: Vec<String> = snapshot.hashes.iter().map(|b| b.as_str().to_string()).collect();
+                                            let hashes_str: Vec<String> = snapshot
+                                                .hashes
+                                                .iter()
+                                                .map(|b| b.as_str().to_string())
+                                                .collect();
                                             match crate::db::peer_blob_inventory::apply_snapshot(
                                                 &mut conn,
                                                 &snapshot.peer_id,
@@ -5174,8 +5178,16 @@ impl P2PNode {
                                                         .format("%Y-%m-%dT%H:%M:%SZ")
                                                         .to_string()
                                                 });
-                                            let added_str: Vec<String> = delta.added.iter().map(|b| b.as_str().to_string()).collect();
-                                            let removed_str: Vec<String> = delta.removed.iter().map(|b| b.as_str().to_string()).collect();
+                                            let added_str: Vec<String> = delta
+                                                .added
+                                                .iter()
+                                                .map(|b| b.as_str().to_string())
+                                                .collect();
+                                            let removed_str: Vec<String> = delta
+                                                .removed
+                                                .iter()
+                                                .map(|b| b.as_str().to_string())
+                                                .collect();
                                             match crate::db::peer_blob_inventory::apply_delta(
                                                 &mut conn,
                                                 &delta.peer_id,
