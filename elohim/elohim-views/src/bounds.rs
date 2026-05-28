@@ -34,7 +34,7 @@ pub enum ViolationKind {
     CommitmentNotFound,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct BoundsChecksView {
