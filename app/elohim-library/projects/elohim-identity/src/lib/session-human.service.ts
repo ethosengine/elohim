@@ -12,12 +12,9 @@ import {
 } from './content-access.model';
 import {
   SessionHuman,
-  SessionStats,
-  SessionActivity,
   SessionPathProgress,
   SessionMigration,
   HolochainUpgradePrompt,
-  UpgradeTrigger,
   SessionState,
   UpgradeIntent,
 } from './session-human.model';
@@ -28,7 +25,8 @@ import {
  * Philosophy:
  * - Zero-friction entry: humans explore immediately
  * - Progress persists in localStorage during session
- * - Meaningful moments prompt Holochain "upgrade"
+ * - Meaningful moments prompt Holochain "upgrade" (prompts now driven by
+ *   UpgradePromptView projection via /api/v1/identity/{agentId}/upgrade-prompts)
  * - Migration preserves all session progress
  *
  * Holochain migration:
@@ -40,27 +38,23 @@ import {
  * - lamad-session: SessionHuman object
  * - lamad-session-{sessionId}-affinity: Affinity data
  * - lamad-session-{sessionId}-progress-{pathId}: Path progress
- * - lamad-session-{sessionId}-activities: Activity history
  *
  * Migrated from @app/imagodei/services/session-human.service to
  * @elohim/identity as part of Slice 2.3 cross-pillar import cleanup.
+ *
+ * M-AGGR-1: activity tracking (record* methods) and upgrade-prompt
+ * localStorage management have moved to the Rust substrate. Callers
+ * should emit EconomicEvents via the lamad-event service and read
+ * UpgradePromptView from /api/v1/identity/{agentId}/upgrade-prompts.
  */
 @Injectable({ providedIn: 'root' })
 export class SessionHumanService {
   private readonly STORAGE_KEY = 'lamad-session';
-  private readonly ACTIVITY_LIMIT = 1000; // Max activities to store
-
-  // Upgrade trigger constants
-  private readonly PROGRESS_AT_RISK = 'progress-at-risk';
-  private readonly SESSION_AT_RISK = 'progress-at-risk';
   private readonly NOT_AUTHENTICATED = 'not-authenticated';
 
   private readonly sessionSubject = new BehaviorSubject<SessionHuman | null>(null);
-  private readonly upgradePromptsSubject = new BehaviorSubject<HolochainUpgradePrompt[]>([]);
 
   public readonly session$: Observable<SessionHuman | null> = this.sessionSubject.asObservable();
-  public readonly upgradePrompts$: Observable<HolochainUpgradePrompt[]> =
-    this.upgradePromptsSubject.asObservable();
 
   constructor() {
     this.initializeSession();
@@ -83,22 +77,12 @@ export class SessionHumanService {
       existing.stats.sessionCount++;
       this.saveSession(existing);
       this.sessionSubject.next(existing);
-
-      // Check if this is a return visit (session older than 24h)
-      const lastActive = new Date(existing.lastActiveAt).getTime();
-      const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
-      if (lastActive < dayAgo) {
-        this.triggerUpgradePrompt('return-visit');
-      }
     } else {
       // Create new session
       const session = this.createNewSession();
       this.saveSession(session);
       this.sessionSubject.next(session);
     }
-
-    // Load upgrade prompts
-    this.loadUpgradePrompts();
   }
 
   /**
@@ -266,183 +250,6 @@ export class SessionHumanService {
   }
 
   // =========================================================================
-  // Activity Tracking
-  // =========================================================================
-
-  /**
-   * Record a content view.
-   */
-  recordContentView(nodeId: string): void {
-    this.recordActivity({
-      timestamp: new Date().toISOString(),
-      type: 'view',
-      resourceId: nodeId,
-      resourceType: 'content',
-    });
-    this.incrementStat('nodesViewed');
-  }
-
-  /**
-   * Record an affinity change.
-   */
-  recordAffinityChange(nodeId: string, value: number): void {
-    this.recordActivity({
-      timestamp: new Date().toISOString(),
-      type: 'affinity',
-      resourceId: nodeId,
-      resourceType: 'content',
-      metadata: { value },
-    });
-
-    // Trigger upgrade prompt on first affinity
-    const session = this.sessionSubject.value;
-    if (session?.stats.nodesWithAffinity === 0 && value > 0) {
-      this.triggerUpgradePrompt('first-affinity');
-    }
-
-    if (value > 0) {
-      this.incrementStat('nodesWithAffinity');
-    }
-  }
-
-  /**
-   * Record path started.
-   */
-  recordPathStarted(pathId: string): void {
-    this.recordActivity({
-      timestamp: new Date().toISOString(),
-      type: 'path-start',
-      resourceId: pathId,
-      resourceType: 'path',
-    });
-    this.incrementStat('pathsStarted');
-
-    // Trigger upgrade prompt on first path
-    const session = this.sessionSubject.value;
-    if (session?.stats.pathsStarted === 1) {
-      this.triggerUpgradePrompt('path-started');
-    }
-  }
-
-  /**
-   * Record step completed.
-   */
-  recordStepCompleted(pathId: string, stepIndex: number): void {
-    this.recordActivity({
-      timestamp: new Date().toISOString(),
-      type: 'step-complete',
-      resourceId: pathId,
-      resourceType: 'step',
-      metadata: { stepIndex },
-    });
-    this.incrementStat('stepsCompleted');
-  }
-
-  /**
-   * Record path completed.
-   */
-  recordPathCompleted(pathId: string): void {
-    this.recordActivity({
-      timestamp: new Date().toISOString(),
-      type: 'path-complete',
-      resourceId: pathId,
-      resourceType: 'path',
-    });
-    this.incrementStat('pathsCompleted');
-    this.triggerUpgradePrompt('path-completed');
-  }
-
-  /**
-   * Record exploration activity.
-   */
-  recordExploration(nodeId: string): void {
-    this.recordActivity({
-      timestamp: new Date().toISOString(),
-      type: 'explore',
-      resourceId: nodeId,
-      resourceType: 'content',
-    });
-  }
-
-  /**
-   * Record notes saved.
-   */
-  recordNotesSaved(_pathId: string, _stepIndex: number): void {
-    this.triggerUpgradePrompt('notes-saved');
-  }
-
-  /**
-   * Record generic activity.
-   */
-  private recordActivity(activity: SessionActivity): void {
-    const session = this.sessionSubject.value;
-    if (!session) return;
-
-    const key = `lamad-session-${session.sessionId}-activities`;
-    let activities: SessionActivity[] = [];
-
-    try {
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        activities = JSON.parse(stored) as SessionActivity[];
-      }
-    } catch {
-      activities = [];
-    }
-
-    activities.push(activity);
-
-    // Trim to limit
-    if (activities.length > this.ACTIVITY_LIMIT) {
-      activities = activities.slice(-this.ACTIVITY_LIMIT);
-    }
-
-    try {
-      localStorage.setItem(key, JSON.stringify(activities));
-    } catch (err) {
-      // localStorage quota exceeded - handle gracefully by prompting user to upgrade
-      // This is intentional: we catch quota errors and trigger upgrade flow rather than losing data
-      if (err instanceof Error && err.message.includes('QuotaExceededError')) {
-        this.triggerUpgradePrompt(this.PROGRESS_AT_RISK);
-      }
-    }
-
-    // Update last active
-    this.touch();
-  }
-
-  /**
-   * Increment a stat counter.
-   */
-  private incrementStat(stat: keyof SessionStats): void {
-    const session = this.sessionSubject.value;
-    if (session && typeof session.stats[stat] === 'number') {
-      session.stats[stat]++;
-      this.saveSession(session);
-      this.sessionSubject.next({ ...session });
-    }
-  }
-
-  /**
-   * Get activity history.
-   */
-  getActivityHistory(): SessionActivity[] {
-    const session = this.sessionSubject.value;
-    if (!session) return [];
-
-    const key = `lamad-session-${session.sessionId}-activities`;
-    try {
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        return JSON.parse(stored) as SessionActivity[];
-      }
-    } catch {
-      // Ignore
-    }
-    return [];
-  }
-
-  // =========================================================================
   // Path Progress (Session-scoped)
   // =========================================================================
 
@@ -475,12 +282,8 @@ export class SessionHumanService {
     const key = `lamad-session-${session.sessionId}-progress-${progress.pathId}`;
     try {
       localStorage.setItem(key, JSON.stringify(progress));
-    } catch (err) {
-      // localStorage quota exceeded - handle gracefully by prompting user to upgrade
-      // This is intentional: we catch quota errors and trigger upgrade flow rather than losing data
-      if (err instanceof Error && err.message.includes('QuotaExceededError')) {
-        this.triggerUpgradePrompt(this.PROGRESS_AT_RISK);
-      }
+    } catch {
+      // localStorage quota exceeded — caller should prompt upgrade via substrate view
     }
 
     this.touch();
@@ -528,149 +331,64 @@ export class SessionHumanService {
   }
 
   // =========================================================================
-  // Upgrade Prompts
+  // Upgrade Prompts (thin dismissal shim — content driven by substrate)
   // =========================================================================
 
   /**
-   * Trigger an upgrade prompt.
-   */
-  triggerUpgradePrompt(trigger: UpgradeTrigger): void {
-    const prompts = this.upgradePromptsSubject.value;
-
-    // Don't show if already dismissed
-    const existing = prompts.find(p => p.trigger === trigger);
-    if (existing?.dismissed) return;
-
-    const prompt = this.createUpgradePrompt(trigger);
-    if (prompt) {
-      // Remove existing prompt for this trigger
-      const filtered = prompts.filter(p => p.trigger !== trigger);
-      filtered.push(prompt);
-      this.upgradePromptsSubject.next(filtered);
-      this.saveUpgradePrompts(filtered);
-    }
-  }
-
-  /**
-   * Dismiss an upgrade prompt.
+   * Dismiss an upgrade prompt by its id.
+   * The active prompt list is now served from the substrate via
+   * GET /api/v1/identity/{agentId}/upgrade-prompts. This shim records
+   * the dismissal in localStorage so the UI can suppress re-display
+   * until the next session.
    */
   dismissUpgradePrompt(promptId: string): void {
-    const prompts = this.upgradePromptsSubject.value;
-    const prompt = prompts.find(p => p.id === promptId);
-    if (prompt) {
-      prompt.dismissed = true;
-      prompt.dismissedAt = new Date().toISOString();
-      this.upgradePromptsSubject.next([...prompts]);
-      this.saveUpgradePrompts(prompts);
+    try {
+      const key = 'lamad-dismissed-prompts';
+      const stored = localStorage.getItem(key);
+      const dismissed: string[] = stored ? (JSON.parse(stored) as string[]) : [];
+      if (!dismissed.includes(promptId)) {
+        dismissed.push(promptId);
+        localStorage.setItem(key, JSON.stringify(dismissed));
+      }
+    } catch {
+      // Ignore — dismissal is best-effort UI state
     }
   }
 
   /**
-   * Get active (non-dismissed) upgrade prompts.
+   * Return prompt IDs dismissed in this browser.
+   * Consumers filter the substrate UpgradePromptView.activePrompts against this list.
+   */
+  getDismissedPromptIds(): string[] {
+    try {
+      const stored = localStorage.getItem('lamad-dismissed-prompts');
+      return stored ? (JSON.parse(stored) as string[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get active (non-dismissed) upgrade prompts from a substrate-provided list.
+   * @deprecated Use the substrate UpgradePromptView directly via
+   * GET /api/v1/identity/{agentId}/upgrade-prompts and filter against
+   * getDismissedPromptIds(). This shim bridges callers until they migrate.
    */
   getActiveUpgradePrompts(): HolochainUpgradePrompt[] {
-    return this.upgradePromptsSubject.value.filter(p => !p.dismissed);
+    // M-AGGR-1: prompt content is now substrate-driven. Return empty so existing
+    // callers see no locally-managed prompts; they should migrate to the route.
+    return [];
   }
 
   /**
-   * Create upgrade prompt content.
+   * Trigger an upgrade prompt.
+   * @deprecated Activity signals now flow via EconomicEvents to the Rust
+   * substrate. The substrate derives UpgradePromptView from those events.
+   * This stub is retained for call-site compatibility; it is a no-op.
    */
-  private createUpgradePrompt(trigger: UpgradeTrigger): HolochainUpgradePrompt | null {
-    const id = `prompt-${trigger}-${Date.now()}`;
-
-    switch (trigger) {
-      case 'first-affinity':
-        return {
-          id,
-          trigger,
-          title: 'Save Your Progress',
-          message:
-            "You're building a personal knowledge map! Install the Elohim app to save it permanently.",
-          benefits: [
-            'Your progress syncs across devices',
-            'Join a network of learners',
-            'Never lose your journey',
-          ],
-          dismissed: false,
-        };
-
-      case 'path-started':
-        return {
-          id,
-          trigger,
-          title: "You've Started a Journey",
-          message:
-            'Your learning path is stored in your browser. Install Elohim to make it permanent.',
-          benefits: [
-            'Resume from any device',
-            'Get updates to your paths',
-            'Connect with fellow travelers',
-          ],
-          dismissed: false,
-        };
-
-      case 'path-completed':
-        return {
-          id,
-          trigger,
-          title: 'Congratulations!',
-          message: 'You completed a learning path! Install Elohim to earn verifiable credentials.',
-          benefits: [
-            'Earn attestations for your achievement',
-            'Share your credentials',
-            'Discover advanced paths',
-          ],
-          dismissed: false,
-        };
-
-      case 'notes-saved':
-        return {
-          id,
-          trigger,
-          title: 'Your Notes Are Valuable',
-          message: 'Personal notes enrich your learning. Install Elohim to keep them safe.',
-          benefits: ['Notes stored securely', 'Searchable across all content', 'Export anytime'],
-          dismissed: false,
-        };
-
-      case 'return-visit':
-        return {
-          id,
-          trigger,
-          title: 'Welcome Back!',
-          message: 'Good to see you again. Install Elohim to never worry about losing progress.',
-          benefits: ['Automatic progress backup', 'Sync between devices', 'Join the community'],
-          dismissed: false,
-        };
-
-      case this.PROGRESS_AT_RISK:
-        return {
-          id,
-          trigger,
-          title: 'Storage Running Low',
-          message:
-            'Your browser storage is filling up. Install Elohim to safely store your progress.',
-          benefits: ['Unlimited progress storage', 'Automatic backups', 'Secure and private'],
-          dismissed: false,
-        };
-
-      case 'network-feature':
-        return {
-          id,
-          trigger,
-          title: 'Network Feature',
-          message: 'This feature requires joining the Elohim network.',
-          benefits: [
-            'Connect with other learners',
-            'Share and receive content',
-            'Participate in governance',
-          ],
-          dismissed: false,
-        };
-
-      default:
-        return null;
-    }
+  onGatedContentAccess(_contentId: string, _contentTitle?: string): void {
+    // M-AGGR-1: substrate-driven. Callers should emit a lamad EconomicEvent
+    // and read UpgradePromptView from the substrate route.
   }
 
   // =========================================================================
@@ -828,6 +546,9 @@ export class SessionHumanService {
   /**
    * Prepare migration package for Holochain.
    * Called when human installs Holochain app.
+   *
+   * M-AGGR-1: activities are no longer collected client-side; the substrate
+   * derives session stats from EconomicEvents. activities is always [] here.
    */
   prepareMigration(): SessionMigration | null {
     const session = this.sessionSubject.value;
@@ -851,7 +572,8 @@ export class SessionHumanService {
       migratedAt: new Date().toISOString(),
       affinity,
       pathProgress: this.getAllPathProgress(),
-      activities: this.getActivityHistory(),
+      // Activity history is now substrate-derived (EconomicEvents).
+      activities: [],
       status: 'pending',
     };
   }
@@ -923,7 +645,6 @@ export class SessionHumanService {
       }
     } catch (err) {
       // Session parse failure is non-critical - falls back to null for visitor mode
-      // This can happen if localStorage is corrupted or quota exceeded
       if (err instanceof Error) {
         console.warn(
           '[SessionHumanService] Failed to parse session from localStorage:',
@@ -941,46 +662,8 @@ export class SessionHumanService {
   private saveSession(session: SessionHuman): void {
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session));
-    } catch (err) {
-      // localStorage write failure is non-critical
-      // This can happen if localStorage is disabled or quota exceeded
-      // User can continue with temporary session until upgrade
-      if (err instanceof Error && err.message.includes('QuotaExceededError')) {
-        this.triggerUpgradePrompt(this.SESSION_AT_RISK);
-      }
-    }
-  }
-
-  /**
-   * Load upgrade prompts from localStorage.
-   */
-  private loadUpgradePrompts(): void {
-    const session = this.sessionSubject.value;
-    if (!session) return;
-
-    const key = `lamad-session-${session.sessionId}-prompts`;
-    try {
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        this.upgradePromptsSubject.next(JSON.parse(stored) as HolochainUpgradePrompt[]);
-      }
     } catch {
-      // Ignore
-    }
-  }
-
-  /**
-   * Save upgrade prompts to localStorage.
-   */
-  private saveUpgradePrompts(prompts: HolochainUpgradePrompt[]): void {
-    const session = this.sessionSubject.value;
-    if (!session) return;
-
-    const key = `lamad-session-${session.sessionId}-prompts`;
-    try {
-      localStorage.setItem(key, JSON.stringify(prompts));
-    } catch {
-      // Ignore
+      // localStorage write failure is non-critical — session continues in memory
     }
   }
 
@@ -992,7 +675,6 @@ export class SessionHumanService {
     const newSession = this.createNewSession();
     this.saveSession(newSession);
     this.sessionSubject.next(newSession);
-    this.upgradePromptsSubject.next([]);
   }
 
   // =========================================================================
@@ -1089,12 +771,5 @@ export class SessionHumanService {
    */
   canAccessContent(accessMetadata?: ContentAccessMetadata): boolean {
     return this.checkContentAccess(accessMetadata).canAccess;
-  }
-
-  /**
-   * Trigger upgrade prompt when human tries to access gated content.
-   */
-  onGatedContentAccess(_contentId: string, _contentTitle?: string): void {
-    this.triggerUpgradePrompt('network-feature');
   }
 }
