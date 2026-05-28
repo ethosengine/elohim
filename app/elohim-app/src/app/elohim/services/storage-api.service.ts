@@ -676,6 +676,35 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
     );
   }
 
+  /**
+   * Emit a lamad event intent to the substrate (M-REA-1 conductor-first path).
+   *
+   * Calls POST /api/v1/lamad/events. The substrate (elohim-storage) composes
+   * the full EconomicEvent (action, provider, receiver) server-side using
+   * PROTOCOL_EVENT_MAPPINGS. No client-side REA composition required.
+   *
+   * This is the IEconomicEventApi.emitLamadIntent implementation that the
+   * EventService from @elohim/rea-runtime delegates to.
+   */
+  emitLamadIntent(intent: {
+    agentId: string;
+    lamadEventType: string;
+    contentId?: string | null;
+    pathId?: string | null;
+    contributorPresenceId?: string | null;
+    resourceQuantityValue?: number | null;
+    resourceQuantityUnit?: string | null;
+    metadata?: Record<string, unknown> | null;
+    note?: string | null;
+  }): Observable<EconomicEventView> {
+    return this.http
+      .post<EconomicEventView>(`${this.baseUrl}/api/v1/lamad/events`, intent)
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError(error => this.handleError('emitLamadIntent', error))
+      );
+  }
+
   // ==========================================================================
   // Stewardship Allocations
   // ==========================================================================

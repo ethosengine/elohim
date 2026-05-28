@@ -21,8 +21,9 @@ import { BLOB_FETCHER } from '@elohim/service';
 import { HeliaFetchService } from './elohim/services/helia-fetch.service';
 import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
 import { ContentIOModuleWithPlugins } from '@app/lamad/content-io/content-io.module';
-import { ECONOMIC_EVENT_FACTORY } from '@elohim/rea-runtime';
+import { ECONOMIC_EVENT_FACTORY, EVENT_API } from '@elohim/rea-runtime';
 import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
+import { StorageApiService } from './elohim/services/storage-api.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -71,6 +72,11 @@ export const appConfig: ApplicationConfig = {
     // Cross-pillar consumers (lamad signal-harness) inject via @elohim/rea-runtime's
     // ECONOMIC_EVENT_FACTORY token, not the shefa-local one, to avoid @app/shefa imports.
     { provide: ECONOMIC_EVENT_FACTORY, useExisting: EconomicEventsApiService },
+    // M-REA-1: Wire rea-runtime's EVENT_API token to StorageApiService.
+    // The EventService from @elohim/rea-runtime delegates emitEvent() to
+    // eventApi.emitLamadIntent() which calls POST /api/v1/lamad/events —
+    // the conductor-first intent path where the substrate composes REA shape.
+    { provide: EVENT_API, useExisting: StorageApiService },
     // Shefa metrics and custodian selection services
     CustodianCommitmentService,
     PerformanceMetricsService,
