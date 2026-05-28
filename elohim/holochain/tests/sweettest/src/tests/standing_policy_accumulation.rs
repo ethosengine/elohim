@@ -95,7 +95,7 @@ struct FeedbackSignal {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn standing_policy_manifest_with_thresholds_round_trips() -> Result<()> {
-    let ((mut conductor_a, agent_a), (mut conductor_b, agent_b)) =
+    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] =
         two_agent_conductors().await?;
     let network = network_seed(DNA);
 
@@ -183,7 +183,7 @@ async fn standing_policy_manifest_with_thresholds_round_trips() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn feedback_signals_replicate_for_accumulation() -> Result<()> {
-    let ((mut conductor_a, agent_a), (mut conductor_b, agent_b)) =
+    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] =
         two_agent_conductors().await?;
     let network = network_seed(DNA);
 
