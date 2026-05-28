@@ -475,6 +475,13 @@ async fn async_main(
     // When enabled, spawn the holochain conductor as a child process and
     // install the hApp before starting storage services. The manager is held
     // in scope as a lifecycle anchor — Drop kills the conductor on exit.
+    // Step-zero substrate gossip — agent_info publisher and subscriber both
+    // need an `Arc<AdminWebsocket>` that outlives the conductor-ready block.
+    // Populated inside the embedded-conductor branch below; consumed downstream
+    // where p2p_node is constructed and we wire the publisher/subscriber tasks
+    // (gated by ENABLE_CONDUCTOR_AGENT_INFO_GOSSIP).
+    let mut agent_info_admin_ws: Option<Arc<holochain_client::AdminWebsocket>> = None;
+
     let _conductor_manager = if args.embedded_conductor {
         use elohim_storage::conductor::ConductorManager;
         use elohim_storage::happ_manager;
@@ -498,6 +505,13 @@ async fn async_main(
         happ_manager::ensure_happ_installed(&admin_ws, &args.happ_path, &args.app_id).await?;
 
         info!("Embedded conductor ready, hApp installed");
+
+        // Capture an Arc<AdminWebsocket> for downstream use by the step-zero
+        // substrate agent_info publisher + subscriber (wired below when the
+        // feature flag is on). AdminWebsocket is Clone (its internal state is
+        // refcounted), so this clone is cheap.
+        agent_info_admin_ws = Some(Arc::new(admin_ws.clone()));
+
         Some(manager)
     } else {
         None
@@ -881,6 +895,58 @@ async fn async_main(
             info!("  Announce addresses: {}", args.announce_addrs.join(", "));
         }
         info!("  Protocols: /elohim/shard/1.0.0, /elohim/storage-sync/1.0.0, /elohim/epr/1.0.0, /elohim/id/1.0.0");
+
+        // Step-zero substrate gossip — wire conductor agent_info propagation
+        // across the libp2p mesh so each pod's conductor peer cache survives
+        // the Phase 1 doorway-A / doorway-B signal partition. Behind
+        // ENABLE_CONDUCTOR_AGENT_INFO_GOSSIP so initial rollout can enable
+        // matthew + adam first, verify metrics, then expand cluster-wide.
+        //
+        // Both publisher and subscriber are spawned here (after p2p_node is
+        // constructed so the publisher has a command_sender to the swarm).
+        // JoinHandles are intentionally let-bound to keep the tasks alive
+        // until shutdown_tx fires; tokio tasks survive handle drop, the
+        // bindings just keep the handles in scope for the lifetime of main().
+        let enable_agent_info_gossip = std::env::var("ENABLE_CONDUCTOR_AGENT_INFO_GOSSIP")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+        if enable_agent_info_gossip {
+            if let Some(admin_ws_arc) = agent_info_admin_ws.clone() {
+                use elohim_storage::p2p::conductor_agent_info_gossip::{
+                    spawn_agent_info_publisher, spawn_agent_info_subscriber_worker,
+                    ConductorAgentInfo, SubscriberConfig,
+                };
+                let cfg = SubscriberConfig::from_env();
+                let (ai_tx, ai_rx) = tokio::sync::mpsc::channel::<ConductorAgentInfo>(cfg.queue_capacity);
+                p2p_node.set_agent_info_inbound_tx(ai_tx);
+                let _subscriber_task = spawn_agent_info_subscriber_worker(
+                    admin_ws_arc.clone(),
+                    ai_rx,
+                    cfg,
+                    shutdown_tx.subscribe(),
+                );
+                let _publisher_task = spawn_agent_info_publisher(
+                    admin_ws_arc,
+                    p2p_node.handle().command_sender(),
+                    std::time::Duration::from_secs(60),
+                    shutdown_tx.subscribe(),
+                );
+                info!(
+                    target: "elohim_storage::agent_info",
+                    "step-zero substrate agent_info gossip ENABLED (feature flag on)"
+                );
+            } else {
+                warn!(
+                    target: "elohim_storage::agent_info",
+                    "ENABLE_CONDUCTOR_AGENT_INFO_GOSSIP=true but no embedded conductor — skipping"
+                );
+            }
+        } else {
+            info!(
+                target: "elohim_storage::agent_info",
+                "step-zero substrate agent_info gossip disabled (feature flag off)"
+            );
+        }
 
         Some(p2p_node)
     } else if args.enable_p2p
