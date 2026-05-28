@@ -4483,3 +4483,128 @@ fn content_engagement_stats_view_rejects_missing_required_fields() {
 fn content_engagement_stats_schema_loads() {
     let _ = load_schema("views/content-engagement-stats-view.schema.json");
 }
+
+// ── M-AGGR-2: SourceChainEntryView ──────────────────────────────
+
+/// Build a minimal valid SourceChainEntryView JSON.
+fn minimal_source_chain_entry() -> serde_json::Value {
+    serde_json::json!({
+        "actionHash": "uhCkkABCDEFGHIJKLMNOP",
+        "entryHash": "uhCEkABCDEFGHIJKLMNOP",
+        "authorAgent": "uhCAkABCDEFGHIJKLMNOP",
+        "entryType": "Create:App(0)",
+        "contentJson": null,
+        "prevActionHash": null,
+        "sequence": 0,
+        "timestamp": "1748000000000000"
+    })
+}
+
+#[test]
+fn source_chain_entry_view_schema_loads() {
+    let schema = load_schema("views/source-chain-entry-view.schema.json");
+    assert_source_of_truth_declared(&schema, "source-chain-entry-view");
+}
+
+#[test]
+fn source_chain_entry_view_minimal_valid() {
+    let instance = minimal_source_chain_entry();
+    validate_against_schema("views/source-chain-entry-view.schema.json", &instance);
+}
+
+#[test]
+fn source_chain_entry_view_with_content_json() {
+    let mut instance = minimal_source_chain_entry();
+    instance["contentJson"] = serde_json::json!(r#"{"id":"human-1","displayName":"Alice"}"#);
+    instance["prevActionHash"] = serde_json::json!("uhCkkPREVACTIONHASH");
+    instance["sequence"] = serde_json::json!(3u32);
+    instance["entryType"] = serde_json::json!("Create:App(1)");
+    validate_against_schema("views/source-chain-entry-view.schema.json", &instance);
+}
+
+#[test]
+fn source_chain_entry_view_requires_action_hash() {
+    let schema = load_schema("views/source-chain-entry-view.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut instance = minimal_source_chain_entry();
+    instance.as_object_mut().unwrap().remove("actionHash");
+    assert!(
+        validator.iter_errors(&instance).next().is_some(),
+        "Schema should require 'actionHash'"
+    );
+}
+
+#[test]
+fn source_chain_entry_view_requires_sequence() {
+    let schema = load_schema("views/source-chain-entry-view.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut instance = minimal_source_chain_entry();
+    instance.as_object_mut().unwrap().remove("sequence");
+    assert!(
+        validator.iter_errors(&instance).next().is_some(),
+        "Schema should require 'sequence'"
+    );
+}
+
+// ── M-AGGR-2: EntryLinkView ────────────────────────────────────
+
+/// Build a minimal valid EntryLinkView JSON.
+fn minimal_entry_link() -> serde_json::Value {
+    serde_json::json!({
+        "linkHash": "uhCkkLINKHASH",
+        "baseHash": "uhCkkBASEHASH",
+        "targetHash": "uhCkkTARGETHASH",
+        "linkType": "0",
+        "tag": null,
+        "authorAgent": "uhCAkABCDEFGHIJKLMNOP",
+        "timestamp": "1748000000000000",
+        "deleted": false,
+        "deletedAt": null
+    })
+}
+
+#[test]
+fn entry_link_view_schema_loads() {
+    let schema = load_schema("views/entry-link-view.schema.json");
+    assert_source_of_truth_declared(&schema, "entry-link-view");
+}
+
+#[test]
+fn entry_link_view_minimal_valid() {
+    let instance = minimal_entry_link();
+    validate_against_schema("views/entry-link-view.schema.json", &instance);
+}
+
+#[test]
+fn entry_link_view_with_tag_and_deletion() {
+    let mut instance = minimal_entry_link();
+    instance["tag"] = serde_json::json!("dGFnYnl0ZXM="); // base64("tagbytes")
+    instance["deleted"] = serde_json::json!(true);
+    instance["deletedAt"] = serde_json::json!("1748001000000000");
+    instance["linkType"] = serde_json::json!("5");
+    validate_against_schema("views/entry-link-view.schema.json", &instance);
+}
+
+#[test]
+fn entry_link_view_requires_link_hash() {
+    let schema = load_schema("views/entry-link-view.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut instance = minimal_entry_link();
+    instance.as_object_mut().unwrap().remove("linkHash");
+    assert!(
+        validator.iter_errors(&instance).next().is_some(),
+        "Schema should require 'linkHash'"
+    );
+}
+
+#[test]
+fn entry_link_view_requires_deleted() {
+    let schema = load_schema("views/entry-link-view.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut instance = minimal_entry_link();
+    instance.as_object_mut().unwrap().remove("deleted");
+    assert!(
+        validator.iter_errors(&instance).next().is_some(),
+        "Schema should require 'deleted'"
+    );
+}

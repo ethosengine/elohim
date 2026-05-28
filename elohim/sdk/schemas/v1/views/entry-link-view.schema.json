@@ -10,7 +10,8 @@
     "targetHash",
     "linkType",
     "authorAgent",
-    "timestamp"
+    "timestamp",
+    "deleted"
   ],
   "additionalProperties": false,
   "properties": {
