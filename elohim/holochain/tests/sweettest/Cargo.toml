@@ -93,6 +93,11 @@ path = "src/tests/rea_commitment_replication.rs"
 name = "lamad_intent_event"
 path = "src/tests/lamad_intent_event.rs"
 
+# M-POLICY-1: standing-policy Manifest + FeedbackSignal → AccumulationStatus seatbelt
+[[test]]
+name = "standing_policy_accumulation"
+path = "src/tests/standing_policy_accumulation.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
