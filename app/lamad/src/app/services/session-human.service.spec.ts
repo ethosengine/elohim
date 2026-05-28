@@ -1,13 +1,16 @@
 import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { SessionHumanService } from '@elohim/identity';
-import {
-  SessionHuman,
-  SessionActivity,
-  SessionPathProgress,
-  HolochainUpgradePrompt,
-} from '@elohim/identity';
+import { SessionHuman, SessionPathProgress } from '@elohim/identity';
 
+/**
+ * SessionHumanService spec (lamad pillar) — post M-AGGR-1 slimming.
+ *
+ * Tests the @elohim/identity library copy of SessionHumanService.
+ * Deleted: Activity Tracking describe block (record* methods removed).
+ * Deleted: Upgrade Prompts tests that relied on triggerUpgradePrompt.
+ * Added: M-AGGR-1 dismissal shim tests.
+ */
 describe('SessionHumanService', () => {
   let service: SessionHumanService;
   let localStorageMock: { [key: string]: string };
@@ -177,29 +180,10 @@ describe('SessionHumanService', () => {
       expect(session?.locale).toBe('es_ES');
     });
 
-    it('should trim locale', () => {
-      service.setLocale('  en_US  ');
-      const session = service.getSession();
-      expect(session?.locale).toBe('en_US');
-    });
-
-    it('should clear locale when empty', () => {
-      service.setLocale('en_US');
-      service.setLocale('');
-      const session = service.getSession();
-      expect(session?.locale).toBeUndefined();
-    });
-
     it('should set interests', () => {
       service.setInterests(['faith', 'technology', 'ethics']);
       const session = service.getSession();
       expect(session?.interests).toEqual(['faith', 'technology', 'ethics']);
-    });
-
-    it('should trim interests', () => {
-      service.setInterests(['  faith  ', '  tech  ']);
-      const session = service.getSession();
-      expect(session?.interests).toEqual(['faith', 'tech']);
     });
 
     it('should filter empty interests', () => {
@@ -208,88 +192,10 @@ describe('SessionHumanService', () => {
       expect(session?.interests).toEqual(['faith', 'ethics']);
     });
 
-    it('should clear interests when all empty', () => {
-      service.setInterests(['faith']);
-      service.setInterests(['', '  ']);
-      const session = service.getSession();
-      expect(session?.interests).toBeUndefined();
-    });
-
     it('should get storage key prefix', () => {
       const prefix = service.getStorageKeyPrefix();
       expect(prefix).toContain('lamad-session-');
       expect(prefix).toContain(service.getSessionId());
-    });
-  });
-
-  describe('Activity Tracking', () => {
-    it('should record content view', () => {
-      service.recordContentView('node-1');
-      const session = service.getSession();
-      expect(session?.stats.nodesViewed).toBe(1);
-
-      const activities = service.getActivityHistory();
-      expect(activities.length).toBe(1);
-      expect(activities[0].type).toBe('view');
-      expect(activities[0].resourceId).toBe('node-1');
-    });
-
-    it('should record affinity change', () => {
-      service.recordAffinityChange('node-1', 0.5);
-      const session = service.getSession();
-      expect(session?.stats.nodesWithAffinity).toBe(1);
-
-      const activities = service.getActivityHistory();
-      expect(activities.length).toBe(1);
-      expect(activities[0].type).toBe('affinity');
-      expect(activities[0].metadata?.['value']).toBe(0.5);
-    });
-
-    it('should record path started', () => {
-      service.recordPathStarted('path-1');
-      const session = service.getSession();
-      expect(session?.stats.pathsStarted).toBe(1);
-
-      const activities = service.getActivityHistory();
-      expect(activities.length).toBe(1);
-      expect(activities[0].type).toBe('path-start');
-    });
-
-    it('should record step completed', () => {
-      service.recordStepCompleted('path-1', 2);
-      const session = service.getSession();
-      expect(session?.stats.stepsCompleted).toBe(1);
-
-      const activities = service.getActivityHistory();
-      expect(activities[0].metadata?.['stepIndex']).toBe(2);
-    });
-
-    it('should record path completed', () => {
-      service.recordPathCompleted('path-1');
-      const session = service.getSession();
-      expect(session?.stats.pathsCompleted).toBe(1);
-    });
-
-    it('should record exploration', () => {
-      service.recordExploration('node-1');
-      const activities = service.getActivityHistory();
-      expect(activities[0].type).toBe('explore');
-    });
-
-    it('should limit activity history to ACTIVITY_LIMIT', () => {
-      // Record more than limit
-      for (let i = 0; i < 1100; i++) {
-        service.recordContentView(`node-${i}`);
-      }
-
-      const activities = service.getActivityHistory();
-      expect(activities.length).toBe(1000);
-    });
-
-    it('should return empty array if no activities', () => {
-      service.resetSession();
-      const activities = service.getActivityHistory();
-      expect(activities).toEqual([]);
     });
   });
 
@@ -356,63 +262,32 @@ describe('SessionHumanService', () => {
     });
   });
 
-  describe('Upgrade Prompts', () => {
-    it('should trigger upgrade prompt on first affinity', () => {
-      service.recordAffinityChange('node-1', 0.5);
-      const prompts = service.getActiveUpgradePrompts();
-      expect(prompts.length).toBeGreaterThan(0);
-      expect(prompts[0].trigger).toBe('first-affinity');
+  describe('Upgrade Prompts (M-AGGR-1 substrate-driven)', () => {
+    it('should return empty from getActiveUpgradePrompts', () => {
+      // M-AGGR-1: prompts are now substrate-derived via UpgradePromptView.
+      expect(service.getActiveUpgradePrompts()).toEqual([]);
     });
 
-    it('should trigger upgrade prompt on path started', () => {
-      service.recordPathStarted('path-1');
-      const prompts = service.getActiveUpgradePrompts();
-      const pathPrompt = prompts.find(p => p.trigger === 'path-started');
-      expect(pathPrompt).toBeTruthy();
+    it('should record dismissal in localStorage', () => {
+      service.dismissUpgradePrompt('prompt-first-affinity');
+      const dismissed = service.getDismissedPromptIds();
+      expect(dismissed).toContain('prompt-first-affinity');
     });
 
-    it('should trigger upgrade prompt on path completed', () => {
-      service.recordPathCompleted('path-1');
-      const prompts = service.getActiveUpgradePrompts();
-      const completePrompt = prompts.find(p => p.trigger === 'path-completed');
-      expect(completePrompt).toBeTruthy();
+    it('should not duplicate dismissed ids', () => {
+      service.dismissUpgradePrompt('prompt-1');
+      service.dismissUpgradePrompt('prompt-1');
+      const dismissed = service.getDismissedPromptIds();
+      expect(dismissed.filter(id => id === 'prompt-1').length).toBe(1);
     });
 
-    it('should trigger upgrade prompt on notes saved', () => {
-      service.recordNotesSaved('path-1', 1);
-      const prompts = service.getActiveUpgradePrompts();
-      const notesPrompt = prompts.find(p => p.trigger === 'notes-saved');
-      expect(notesPrompt).toBeTruthy();
-    });
-
-    it('should dismiss upgrade prompt', () => {
-      service.recordAffinityChange('node-1', 0.5);
-      const prompts = service.getActiveUpgradePrompts();
-      const promptId = prompts[0].id;
-
-      service.dismissUpgradePrompt(promptId);
-      const activePrompts = service.getActiveUpgradePrompts();
-      expect(activePrompts.length).toBe(0);
-    });
-
-    it('should not show dismissed prompts again', () => {
-      service.recordAffinityChange('node-1', 0.5);
-      const prompts = service.getActiveUpgradePrompts();
-      const promptId = prompts[0].id;
-
-      service.dismissUpgradePrompt(promptId);
-      service.triggerUpgradePrompt('first-affinity');
-
-      const activePrompts = service.getActiveUpgradePrompts();
-      expect(activePrompts.length).toBe(0);
+    it('onGatedContentAccess should not throw (stub, M-AGGR-1)', () => {
+      expect(() => service.onGatedContentAccess('content-1', 'Test Content')).not.toThrow();
     });
   });
 
   describe('Migration', () => {
-    it('should prepare migration package', () => {
-      service.recordContentView('node-1');
-      service.recordAffinityChange('node-1', 0.5);
-
+    it('should prepare migration package with empty activities (M-AGGR-1)', () => {
       const progress: SessionPathProgress = {
         pathId: 'path-1',
         currentStepIndex: 2,
@@ -428,7 +303,8 @@ describe('SessionHumanService', () => {
       expect(migration).toBeTruthy();
       expect(migration?.sessionId).toBeTruthy();
       expect(migration?.status).toBe('pending');
-      expect(migration?.activities.length).toBeGreaterThan(0);
+      // M-AGGR-1: activities are substrate-derived; always [] in migration package
+      expect(migration?.activities).toEqual([]);
       expect(migration?.pathProgress.length).toBe(1);
     });
 
@@ -491,20 +367,11 @@ describe('SessionHumanService', () => {
         })
       ).toBe(false);
     });
-
-    it('should trigger upgrade prompt on gated content access', () => {
-      service.onGatedContentAccess('content-1', 'Test Content');
-      const prompts = service.getActiveUpgradePrompts();
-      const networkPrompt = prompts.find(p => p.trigger === 'network-feature');
-      expect(networkPrompt).toBeTruthy();
-    });
   });
 
   describe('Session Reset', () => {
     it('should reset session', () => {
-      service.recordContentView('node-1');
       service.resetSession();
-
       const session = service.getSession();
       expect(session?.stats.nodesViewed).toBe(0);
       expect(service.getActiveUpgradePrompts().length).toBe(0);

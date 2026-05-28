@@ -254,13 +254,7 @@ export class AgentService implements OnDestroy {
 
         this.progressCache.set(pathId, progress);
 
-        // Record activity in session
-        if (this.sessionHumanService) {
-          if (isNewPath) {
-            this.sessionHumanService.recordPathStarted(pathId);
-          }
-          this.sessionHumanService.recordStepCompleted(pathId, stepIndex);
-        }
+        // M-AGGR-1: path/step tracking now flows via EconomicEvents to the substrate.
 
         // Track content completion globally if resourceId provided
         if (resourceId) {
@@ -324,10 +318,7 @@ export class AgentService implements OnDestroy {
 
         this.progressCache.set(pathId, progress);
 
-        // Record notes saved in session (triggers upgrade prompt)
-        if (this.sessionHumanService) {
-          this.sessionHumanService.recordNotesSaved(pathId, stepIndex);
-        }
+        // M-AGGR-1: notes-saved tracking now flows via EconomicEvents to the substrate.
 
         return this.dataLoader.saveAgentProgress(progress);
       })

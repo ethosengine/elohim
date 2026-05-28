@@ -370,8 +370,7 @@ export class ContentMasteryService {
       });
     }
 
-    // Record activity in session
-    this.sessionHuman.recordContentView(contentId);
+    // M-AGGR-1: content-view tracking now flows via EconomicEvents to the substrate.
   }
 
   /**

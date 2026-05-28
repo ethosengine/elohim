@@ -305,7 +305,8 @@ export class ContextAssemblyService {
 
   private assembleThreadContext(threadId?: string): ThreadContextLayer {
     const pathCtx = this.pathContextService.currentContext;
-    const activities = this.sessionHumanService.getActivityHistory();
+    // M-AGGR-1: activity history is now substrate-derived (EconomicEvents →
+    // SessionHumanView projection). Session context provides no local history.
 
     return {
       pathContext: pathCtx
@@ -317,11 +318,7 @@ export class ContextAssemblyService {
           }
         : undefined,
       threadId,
-      sessionActions: activities.slice(-20).map(a => ({
-        actionType: a.type,
-        contentType: a.metadata?.['contentType'] as string | undefined,
-        timestamp: a.timestamp,
-      })),
+      sessionActions: [],
     };
   }
 

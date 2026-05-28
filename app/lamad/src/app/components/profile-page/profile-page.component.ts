@@ -185,8 +185,9 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     // Load path progress
     this.pathProgressList = this.sessionHumanService.getAllPathProgress();
 
-    // Load activity history
-    this.activityHistory = this.sessionHumanService.getActivityHistory();
+    // M-AGGR-1: activity history is now substrate-derived. Local session
+    // history is empty; the substrate projection is the source of truth.
+    this.activityHistory = [];
     this.applyActivityFilter();
 
     // Subscribe to mastery stats
@@ -267,7 +268,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
 
     // Refresh data when switching tabs
     if (tab === 'timeline') {
-      this.activityHistory = this.sessionHumanService.getActivityHistory();
+      // M-AGGR-1: activity history is now substrate-derived; local session is empty.
+      this.activityHistory = [];
       this.applyActivityFilter();
     } else if (tab === 'paths') {
       this.pathProgressList = this.sessionHumanService.getAllPathProgress();

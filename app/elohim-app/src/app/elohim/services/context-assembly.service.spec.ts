@@ -157,14 +157,7 @@ const buildParentContent = () =>
     flags: [],
   });
 
-const buildActivity = (overrides: Record<string, unknown> = {}) => ({
-  type: 'view' as const,
-  resourceId: 'r-1',
-  resourceType: 'content' as const,
-  metadata: { contentType: 'concept' },
-  timestamp: new Date().toISOString(),
-  ...overrides,
-});
+// M-AGGR-1: buildActivity helper removed — activity history is substrate-derived.
 
 // ============================================================================
 // Tests
@@ -233,9 +226,8 @@ describe('ContextAssemblyService', () => {
     };
 
     mockSessionHumanService = {
-      getActivityHistory: vi.fn(),
+      // M-AGGR-1: getActivityHistory removed; thread context now uses empty sessionActions
     };
-    mockSessionHumanService.getActivityHistory.mockReturnValue([buildActivity()]);
 
     TestBed.configureTestingModule({
       providers: [
@@ -311,14 +303,10 @@ describe('ContextAssemblyService', () => {
       tick(5000);
     }));
 
-    it('should limit session actions to last 20', fakeAsync(() => {
-      const activities = Array.from({ length: 30 }, (_, i) =>
-        buildActivity({ resourceId: `r-${i}`, timestamp: new Date(Date.now() + i).toISOString() })
-      );
-      mockSessionHumanService.getActivityHistory.mockReturnValue(activities);
-
+    it('should return empty sessionActions (M-AGGR-1: activity history is substrate-derived)', fakeAsync(() => {
+      // M-AGGR-1: getActivityHistory removed; sessionActions is always [].
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
-        expect(result.createContext.threadContext.sessionActions.length).toBe(20);
+        expect(result.createContext.threadContext.sessionActions).toEqual([]);
       });
       tick(5000);
     }));

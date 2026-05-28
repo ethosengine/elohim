@@ -12,7 +12,7 @@ import { Injectable, OnDestroy, inject } from '@angular/core';
 
 import { map, takeUntil } from 'rxjs/operators';
 
-import { BehaviorSubject, Observable, Subject } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, of } from 'rxjs';
 
 import {
   BannerNotice,
@@ -43,10 +43,18 @@ export class UpgradeBannerProvider implements BannerNoticeProvider, OnDestroy {
   private readonly bannerService = inject(BannerService);
 
   constructor() {
-    // Subscribe to upgrade prompts and map to BannerNotices
-    this.sessionHumanService.upgradePrompts$
+    // M-AGGR-1: upgrade prompts are now driven by the substrate projection at
+    // GET /api/v1/identity/{agentId}/upgrade-prompts (UpgradePromptView).
+    // TODO(rust-migration): wire an Observable from the storage client that
+    // polls/streams the UpgradePromptView and feeds mapPromptToNotice here.
+    // Until that route is consumed as an Observable, notices remain empty.
+    of([])
       .pipe(
-        map(prompts => prompts.filter(p => !p.dismissed).map(p => this.mapPromptToNotice(p))),
+        map(prompts =>
+          (prompts as HolochainUpgradePrompt[])
+            .filter(p => !p.dismissed)
+            .map(p => this.mapPromptToNotice(p))
+        ),
         takeUntil(this.destroy$)
       )
       .subscribe(notices => this.noticesSubject.next(notices));
