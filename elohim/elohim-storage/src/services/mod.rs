@@ -68,6 +68,7 @@ pub mod provenance_service;
 pub mod rate_history;
 pub mod rea_commitment_service;
 pub mod reach_earning;
+pub mod replicates_dwelling_validator;
 pub mod reciprocity_view;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
