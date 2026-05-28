@@ -12,6 +12,38 @@
       "target_kinds": ["agent", "content", "attestation"],
       "evidence_required": false,
       "standing_impact_allowed": ["advisory"]
+    },
+    "rate-limit-exceeded": {
+      "description": "Subject exceeded the rate-per-hour bound of a delegates-compute Commitment. Emitted by the substrate-side bounds_validator when validate() returns RateLimitExceeded.",
+      "target_kinds": ["agent"],
+      "evidence_required": true,
+      "standing_impact_allowed": ["consequential"],
+      "debit_weight": 5,
+      "decay_days": 30
+    },
+    "bad-custody": {
+      "description": "Subject violated key-custody discipline — e.g., used a revoked or rotation-stale Commitment, or signed with a non-recipient key. Heaviest weight in the bounds-validator violation set.",
+      "target_kinds": ["agent"],
+      "evidence_required": true,
+      "standing_impact_allowed": ["consequential"],
+      "debit_weight": 20,
+      "decay_days": 90
+    },
+    "reach-escalation-pending": {
+      "description": "Subject attempted a reach above the active project-epr commitment's expected_reach. Soft-warn per §3 of the Z.D substrate-correct deploy spec; serving pauses until operator-steward acknowledgement.",
+      "target_kinds": ["agent", "content"],
+      "evidence_required": true,
+      "standing_impact_allowed": ["advisory"],
+      "debit_weight": 3,
+      "decay_days": 14
+    },
+    "compute-breach": {
+      "description": "Substrate-detected breach of a compute-class Commitment — e.g., excessive resource consumption, attempted scope expansion. Reserved for future per-instance compute-bound validators (Sprint 5a-e).",
+      "target_kinds": ["agent"],
+      "evidence_required": true,
+      "standing_impact_allowed": ["consequential"],
+      "debit_weight": 10,
+      "decay_days": 60
     }
   },
   "observation_kinds": []

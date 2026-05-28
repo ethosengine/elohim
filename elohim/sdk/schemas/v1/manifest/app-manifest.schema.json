@@ -66,6 +66,16 @@
           "standing_impact_allowed": {
             "type": "array",
             "items": { "type": "string", "enum": ["advisory", "consequential", "binding"] }
+          },
+          "debit_weight": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Weighted contribution this signal makes to a subject's negative standing when projected via standing_projector. 0 = advisory-only (no standing impact). See genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md Task 7."
+          },
+          "decay_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of days over which the debit weight decays to zero. Standing projector uses this to time-window signal evidence."
           }
         },
         "additionalProperties": false

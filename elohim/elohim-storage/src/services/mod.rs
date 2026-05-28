@@ -81,6 +81,7 @@ pub mod routing;
 pub mod schemaref_resolver;
 pub mod sealed_against_self;
 pub mod sidecar_engine;
+pub mod signal_weight_registry;
 pub mod sla_service;
 pub mod spatial;
 pub mod spatial_capacity;
