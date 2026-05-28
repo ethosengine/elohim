@@ -1,18 +1,28 @@
 //! Identity API controller
 //!
-//! Routes: `/api/v1/identity/register`, `/api/v1/identity/me`
+//! Routes:
+//!   POST /api/v1/identity/register
+//!   GET  /api/v1/identity/me
+//!   PUT  /api/v1/identity/me
+//!   GET  /api/v1/identity/{agentId}/session          → SessionHumanView (M-AGGR-1)
+//!   GET  /api/v1/identity/{agentId}/upgrade-prompts  → UpgradePromptView (M-AGGR-1)
 //!
 //! The "me" endpoints resolve the current human via the `X-Agent-Id` header,
 //! which doorway injects after JWT validation. In Tauri/direct mode the app
 //! sends the same header. If the header is absent, the active local session's
 //! agent_pub_key is used as a fallback.
+//!
+//! The {agentId} endpoints serve per-agent projections. The agentId is the
+//! agent's pubkey (same format as X-Agent-Id). The caller must supply their
+//! own agentId in the path; cross-agent projection reads are not scope-checked
+//! at this layer (policy is enforced at the doorway JWT/auth boundary).
 
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response};
 
 use crate::db::humans::{CreateHumanInput, UpdateHumanInput};
-use crate::db::{humans, AppContext, DbPool};
+use crate::db::{humans, session_human_view, upgrade_prompt_view, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::response;
 use crate::views::{CreateHumanInputView, HumanView, UpdateHumanInputView};
@@ -24,13 +34,33 @@ use super::{get_conn, parse_body};
 // ---------------------------------------------------------------------------
 
 /// Dispatch `/api/v1/identity/*` requests.
+///
+/// Pattern matching order matters — more-specific `/{agentId}/session` and
+/// `/{agentId}/upgrade-prompts` patterns are matched before the catch-all.
 pub async fn handle(
     req: Request<Incoming>,
     method: Method,
     resource_path: &str,
     pool: &DbPool,
-    _ctx: &AppContext,
+    ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    // Dispatch {agentId}/session and {agentId}/upgrade-prompts BEFORE the
+    // fixed /register and /me routes to avoid false prefix matches.
+    if method == Method::GET {
+        if let Some(agent_id) = resource_path
+            .strip_suffix("/session")
+            .and_then(|p| p.strip_prefix('/'))
+        {
+            return get_agent_session(agent_id, pool, ctx).await;
+        }
+        if let Some(agent_id) = resource_path
+            .strip_suffix("/upgrade-prompts")
+            .and_then(|p| p.strip_prefix('/'))
+        {
+            return get_agent_upgrade_prompts(agent_id, pool, ctx).await;
+        }
+    }
+
     match (method, resource_path) {
         (Method::POST, "/register") => register_human(req, pool).await,
         (Method::GET, "/me") => get_me(req, pool).await,
@@ -155,6 +185,56 @@ async fn update_me(
 
     let updated = humans::update_human(&mut conn, &human_id, input)?;
     Ok(response::ok(&HumanView::from(updated)))
+}
+
+// ---------------------------------------------------------------------------
+// M-AGGR-1: Per-agent session + upgrade-prompt projection routes
+// ---------------------------------------------------------------------------
+
+/// GET /api/v1/identity/{agentId}/session
+///
+/// Returns the SessionHumanView projection for the specified agent.
+/// The projection is derived from the EconomicEvent stream filtered by
+/// lamadEventType and aggregated per-agent. If no events have been recorded
+/// yet for this agent, returns a zero-count view.
+///
+/// Source of truth: economic_events projection table (Category C operational).
+async fn get_agent_session(
+    agent_id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let h_app_id = &ctx.h_app_id;
+
+    // Recompute on read — this is cheap (count aggregations on an indexed table)
+    // and ensures the caller always gets a fresh projection without a separate
+    // signal trigger requirement.
+    let view = session_human_view::project_session_human_view(&mut conn, agent_id, h_app_id)?;
+    Ok(response::ok(&view))
+}
+
+/// GET /api/v1/identity/{agentId}/upgrade-prompts
+///
+/// Returns the UpgradePromptView projection for the specified agent.
+/// The projection is derived from the SessionHumanView × onboarding Manifest.
+/// If no onboarding Manifest has been authored yet, active_prompts is empty.
+///
+/// Source of truth: session_human_view + manifests tables (Category C operational).
+async fn get_agent_upgrade_prompts(
+    agent_id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let h_app_id = &ctx.h_app_id;
+
+    // Compute the SessionHumanView first (source for trigger evaluation).
+    let session = session_human_view::project_session_human_view(&mut conn, agent_id, h_app_id)?;
+    // Then derive upgrade prompts from the session + onboarding Manifest.
+    let view =
+        upgrade_prompt_view::project_upgrade_prompt_view(&mut conn, agent_id, h_app_id, &session)?;
+    Ok(response::ok(&view))
 }
 
 // ---------------------------------------------------------------------------
