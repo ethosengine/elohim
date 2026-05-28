@@ -61,6 +61,7 @@ pub mod knowledge_service;
 pub mod manifest_registry;
 pub mod mastery_depth;
 pub mod mutuality_audit_service;
+pub mod peer_capacity_service;
 pub mod peer_diversity; // Phase 4 T8 — archetype-mix diversity helper
 pub mod peer_selection;
 pub mod peer_topology_view;
