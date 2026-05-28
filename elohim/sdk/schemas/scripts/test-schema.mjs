@@ -337,6 +337,227 @@ async function main() {
     );
   }
 
+  // Test: manifest fixtures validate per stagedIntents + graduation rules (Task 4 — spec §11.1)
+  {
+    const manifestSchemaPath = resolve(__dirname, '../v1/manifest/app-manifest.schema.json');
+    const manifestSchema = await loadJson(manifestSchemaPath);
+
+    // Register the enums referenced by the manifest schema so $refs resolve.
+    // AJV resolves "../enums/foo.schema.json" against the manifest's $id
+    // (epr:schema:manifest:app-manifest), which produces "epr:enums/foo.schema.json".
+    // We register under that resolved URI AND under the $id for robustness.
+    const fixtureAjv = new Ajv2020({ strict: false, allErrors: true });
+
+    const lifecycleSchemaPath = resolve(__dirname, '../v1/enums/session-lifecycle-state.schema.json');
+    const lifecycleSchema = await loadJson(lifecycleSchemaPath);
+    fixtureAjv.addSchema(lifecycleSchema, 'epr:enums/session-lifecycle-state.schema.json');
+
+    const instrumentSchema = await loadJson(
+      resolve(__dirname, '../v1/enums/instrument-archetype.schema.json')
+    );
+    fixtureAjv.addSchema(instrumentSchema, 'epr:enums/instrument-archetype.schema.json');
+
+    const polaritySchema = await loadJson(
+      resolve(__dirname, '../v1/enums/observation-polarity.schema.json')
+    );
+    fixtureAjv.addSchema(polaritySchema, 'epr:enums/observation-polarity.schema.json');
+
+    const substrateSignalSchema = await loadJson(
+      resolve(__dirname, '../v1/enums/substrate-signal.schema.json')
+    );
+    fixtureAjv.addSchema(substrateSignalSchema, 'epr:enums/substrate-signal.schema.json');
+
+    const eprKindSchema = await loadJson(
+      resolve(__dirname, '../v1/enums/epr-kind.schema.json')
+    );
+    fixtureAjv.addSchema(eprKindSchema, 'epr:enums/epr-kind.schema.json');
+
+    const pillarProjectionSchema = await loadJson(
+      resolve(__dirname, '../v1/manifest/pillar-projection.schema.json')
+    );
+    fixtureAjv.addSchema(pillarProjectionSchema, 'epr:pillar-projection.schema.json');
+
+    const observationKindSchema = await loadJson(
+      resolve(__dirname, '../v1/manifest/observation-kind.schema.json')
+    );
+    fixtureAjv.addSchema(observationKindSchema, 'epr:observation-kind.schema.json');
+
+    const validate = fixtureAjv.compile(manifestSchema);
+
+    // ThreeLegCoupling-conforming fixture. Schema requires value, governance, and claims;
+    // GovernanceLeg requires defaultReach, minimumReach, governanceModel;
+    // ValueFlowEvent requires action; ClaimDeclaration requires asserts/contradictedBy/validityHorizon.
+    const couplingFixture = {
+      knowledge: { relationships: { REFERENCES: ['concept'] } },
+      value: { onConsume: { action: 'use', resourceConformsTo: 'test', recognition: 'test' } },
+      governance: {
+        defaultReach: 'commons',
+        minimumReach: 'community',
+        governanceModel: 'steward-consent',
+        signalTypes: ['test-signal']
+      },
+      claims: [
+        { asserts: 'test-claim', contradictedBy: 'test-contradiction', validityHorizon: 'P90D', leg: 'value' }
+      ]
+    };
+
+    // Vocabulary requires contentTypes (minProperties: 1) and observations (minProperties: 1).
+    // Build a shared baseManifest with one valid content type and the two observations referenced
+    // by the coupling fixture's claims.
+    const baseObservations = {
+      'test-claim': {
+        description: 'Positive observation referenced by the fixture claim.',
+        instrument: 'retention-check',
+        polarity: 'positive'
+      },
+      'test-contradiction': {
+        description: 'Negative observation referenced by the fixture claim.',
+        instrument: 'retention-check',
+        polarity: 'negative'
+      }
+    };
+
+    const baseContentTypes = {
+      'test-content-type': {
+        description: 'Fixture content type satisfying ThreeLegCoupling.',
+        coupling: couplingFixture
+      }
+    };
+
+    const buildBaseManifest = () => ({
+      id: 'manifest-test-fixture',
+      name: 'test-fixture',
+      version: '1.0.0',
+      vocabulary: {
+        contentTypes: { ...baseContentTypes },
+        observations: { ...baseObservations }
+      }
+    });
+
+    // Assertion 1: manifest with stagedIntents + graduation validates clean
+    const fixtureWithStaged = buildBaseManifest();
+    fixtureWithStaged.vocabulary.stagedIntents = {
+      'staged-test-intent': {
+        description: 'Test staged intent for schema validation.',
+        intentSchema: { $ref: './schemas/staged-test-intent.schema.json' },
+        graduatesTo: 'TestEntry',
+        actionableFrom: ['OauthIdentified', 'PeerNativeMember'],
+        resolutionMode: 'deterministic',
+        coupling: couplingFixture
+      }
+    };
+    fixtureWithStaged.graduation = {
+      deterministicCeremony: 'test::DeterministicCeremony'
+    };
+    const ok1 = validate(fixtureWithStaged);
+    if (!ok1) {
+      console.error('Assertion 1 errors:', JSON.stringify(validate.errors, null, 2));
+    }
+    assert(
+      ok1,
+      'Manifest with stagedIntents + graduation validates clean (Task 4 §11.1 assertion 1)'
+    );
+
+    // Assertion 2: manifest without stagedIntents validates clean (backward compat)
+    const fixtureBaseline = buildBaseManifest();
+    const ok2 = validate(fixtureBaseline);
+    if (!ok2) {
+      console.error('Assertion 2 errors:', JSON.stringify(validate.errors, null, 2));
+    }
+    assert(
+      ok2,
+      'Manifest without stagedIntents validates clean (Task 4 §11.1 assertion 2 — backward compatibility)'
+    );
+
+    // Assertion 3: manifest with stagedIntents but missing top-level graduation fails
+    const fixtureMissingGraduation = buildBaseManifest();
+    fixtureMissingGraduation.vocabulary.stagedIntents = {
+      'staged-test-intent': {
+        description: 'Test staged intent.',
+        intentSchema: { $ref: './schemas/staged-test-intent.schema.json' },
+        graduatesTo: 'TestEntry',
+        actionableFrom: ['OauthIdentified'],
+        resolutionMode: 'deterministic',
+        coupling: couplingFixture
+      }
+    };
+    assert(
+      !validate(fixtureMissingGraduation),
+      'Manifest with non-empty stagedIntents but missing graduation fails (Task 4 §11.1 assertion 3 — dependentSchemas conditional)'
+    );
+
+    // Assertion 4: stagedIntents entry missing graduatesTo fails
+    const fixtureMissingGraduatesTo = buildBaseManifest();
+    fixtureMissingGraduatesTo.vocabulary.stagedIntents = {
+      'staged-test-intent': {
+        description: 'Test staged intent missing graduatesTo.',
+        intentSchema: { $ref: './schemas/staged-test-intent.schema.json' },
+        actionableFrom: ['OauthIdentified'],
+        resolutionMode: 'deterministic',
+        coupling: couplingFixture
+      }
+    };
+    fixtureMissingGraduatesTo.graduation = { deterministicCeremony: 'test::DeterministicCeremony' };
+    assert(
+      !validate(fixtureMissingGraduatesTo),
+      'stagedIntents entry missing graduatesTo fails validation (Task 4 §11.1 assertion 4)'
+    );
+
+    // Assertion 5: actionableFrom with invalid lifecycle value fails
+    const fixtureInvalidLifecycle = buildBaseManifest();
+    fixtureInvalidLifecycle.vocabulary.stagedIntents = {
+      'staged-test-intent': {
+        description: 'Test staged intent with invalid actionableFrom.',
+        intentSchema: { $ref: './schemas/staged-test-intent.schema.json' },
+        graduatesTo: 'TestEntry',
+        actionableFrom: ['NotAValidLifecycleValue'],
+        resolutionMode: 'deterministic',
+        coupling: couplingFixture
+      }
+    };
+    fixtureInvalidLifecycle.graduation = { deterministicCeremony: 'test::DeterministicCeremony' };
+    assert(
+      !validate(fixtureInvalidLifecycle),
+      'actionableFrom array with invalid lifecycle value fails validation (Task 4 §11.1 assertion 5)'
+    );
+
+    // Assertion 6: graduation.deterministicCeremony empty string fails
+    const fixtureEmptyCeremony = buildBaseManifest();
+    fixtureEmptyCeremony.vocabulary.stagedIntents = {
+      'staged-test-intent': {
+        description: 'Test staged intent.',
+        intentSchema: { $ref: './schemas/staged-test-intent.schema.json' },
+        graduatesTo: 'TestEntry',
+        actionableFrom: ['OauthIdentified'],
+        resolutionMode: 'deterministic',
+        coupling: couplingFixture
+      }
+    };
+    fixtureEmptyCeremony.graduation = { deterministicCeremony: '' };
+    assert(
+      !validate(fixtureEmptyCeremony),
+      'graduation.deterministicCeremony empty string fails validation (Task 4 §11.1 assertion 6)'
+    );
+
+    // Assertion 7: resolutionMode outside enum fails
+    const fixtureInvalidResolution = buildBaseManifest();
+    fixtureInvalidResolution.vocabulary.stagedIntents = {
+      'staged-test-intent': {
+        description: 'Test staged intent.',
+        intentSchema: { $ref: './schemas/staged-test-intent.schema.json' },
+        graduatesTo: 'TestEntry',
+        actionableFrom: ['OauthIdentified'],
+        resolutionMode: 'instantaneous',
+        coupling: couplingFixture
+      }
+    };
+    fixtureInvalidResolution.graduation = { deterministicCeremony: 'test::DeterministicCeremony' };
+    assert(
+      !validate(fixtureInvalidResolution),
+      'resolutionMode outside the enum (deterministic | negotiated | either) fails validation (Task 4 §11.1 assertion 7)'
+    );
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }
