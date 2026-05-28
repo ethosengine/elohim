@@ -54,25 +54,21 @@ import {
 // FeedbackMechanismGatewayComponent + GraduatedFeedbackComponent + ReactionBarComponent
 // from @app/qahal are retained because the Lit equivalents in elohim-core
 // (<elohim-feedback-mechanism-gateway>, <elohim-graduated-feedback>, <elohim-reaction-bar>)
-// are stateless primitives, while the Angular components encapsulate ~1650 lines of
-// stateful orchestration that does not have a legitimate client-side home: API calls to
-// governance-api, REA economic-event creation via recognition-api, submission flow,
-// mediation/reaction aggregation. Under the thin-client discipline + substrate-as-steward
-// principle, that work belongs on the backend (a doorway route or zome coordinator),
-// not in any Angular component in any pillar. The Lit swap is trivially clean ONCE the
-// backend migration lands; until then these three Angular components host the orchestration.
+// are stateless primitives, while the Angular components still host submission flow,
+// mediation/reaction aggregation, and governance-signal recording via GovernanceApiService.
 //
-// Slice 2.2b closure (commit 625d02a0f, 2026-05-28) migrated 2/3 of the contributing
-// helper services to @elohim/service (MechanismSelectionService) and then to the Rust
-// substrate (SignalAccumulationService retired by M-POLICY-1 — server-side AccumulationStatus
-// projection now served by GET /api/v1/governance/{type}/{id}/accumulation via GovernanceApiService).
-// GovernanceRecognitionService stays in @app/qahal for now because its RecognitionApiService
-// chain is part of the orchestration that should move backend, not into a library.
+// Slice 2.2b CLOSED (M-POLICY-1 + M-POLICY-2 + M-REA-3, 2026-05-28):
+//   - M-POLICY-1: SignalAccumulationService retired → GET /api/v1/governance/{type}/{id}/accumulation
+//   - M-POLICY-2: MechanismSelectionService retired → GET /api/v1/governance/{type}/{id}/mechanism
+//   - M-REA-3: GovernanceRecognitionService retired → POST /api/v1/mishpat/recognition/participation
+//     Substrate reads recognition_weight_by_level from standing-policy Manifest.
+//     RecognitionApiService.distribute() deleted (was only caller).
 //
-// EXIT: open a backend-migration ticket for `POST /api/v1/governance/feedback`
-// (or equivalent doorway/zome surface) that owns the REA event creation + signal
-// aggregation + mediation. When that lands, content-viewer captures the Lit element's
-// submit event, POSTs to doorway, and renders the returned view. These three imports retire.
+// All three remaining @app/qahal imports below are retained for the submission-flow
+// and governance-signal aggregation orchestration which M-POLICY-1/2/M-REA-3 did
+// not cover (those belong to a future governance-feedback-backend ticket).
+// The Lit swap (Wave D) is now trivially clean — no substrate-policy logic remains
+// in these components; only legitimate UX + sense-and-respond code remains.
 import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import {
   FeedbackContext,

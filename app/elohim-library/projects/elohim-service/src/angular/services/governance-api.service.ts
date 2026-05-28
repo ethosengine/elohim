@@ -529,6 +529,30 @@ export class GovernanceApiService implements IGovernance {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // M-REA-3: Substrate-side governance recognition participation
+  //
+  // Replaces client-side GovernanceRecognitionService.recordParticipation() +
+  // the WEIGHT_BY_LEVEL constant (F-REA-3 + F-POLICY-3). The substrate reads
+  // the recognition_weight_by_level from the standing-policy Manifest and
+  // composes the EconomicEvent. No client-side weight arithmetic.
+  // Route: POST /api/v1/mishpat/recognition/participation
+  // ---------------------------------------------------------------------------
+
+  async postParticipation(intent: {
+    entityType: string;
+    entityId: string;
+    humanId: string;
+    mechanismLevel: number;
+    participationType: 'reaction' | 'graduated-feedback' | 'vote' | 'block';
+  }): Promise<void> {
+    await firstValueFrom(
+      this.http
+        .post('/api/v1/mishpat/recognition/participation', intent)
+        .pipe(catchError(() => of(null)))
+    );
+  }
+
   async getProxyVotes(proposalId: string): Promise<RankedVoteView[]> {
     return firstValueFrom(
       this.http

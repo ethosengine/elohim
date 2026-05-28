@@ -37,6 +37,7 @@ pub mod hazards;
 pub mod identity;
 pub mod lamad;
 pub mod mastery;
+pub mod mishpat_recognition;
 pub mod network_posture;
 pub mod node_shape;
 pub mod observations;
@@ -173,6 +174,12 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("mastery") {
         let resource_path = sub_path.strip_prefix("mastery").unwrap_or("");
         mastery::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("mishpat/recognition") {
+        // M-REA-3: POST /api/v1/mishpat/recognition/participation
+        // Governance-participation EconomicEvent via standing-policy weight lookup.
+        // Must precede any future "mishpat" umbrella prefix to avoid collision.
+        let resource_path = sub_path.strip_prefix("mishpat/recognition").unwrap_or("");
+        mishpat_recognition::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("flow-planning") {
         let resource_path = sub_path.strip_prefix("flow-planning").unwrap_or("");
         flow_planning::handle(req, method, resource_path, &pool, &app_ctx).await

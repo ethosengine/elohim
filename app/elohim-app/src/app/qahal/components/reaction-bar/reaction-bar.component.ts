@@ -17,7 +17,9 @@ import {
   MediatedReaction,
   DEFAULT_REACTION_CONSTRAINTS,
 } from '@app/lamad/models/feedback-profile.model';
-import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
+// GovernanceRecognitionService retired by M-REA-3: participation now POSTs to
+// POST /api/v1/mishpat/recognition/participation via GovernanceApiService.postParticipation().
+// The substrate reads recognition_weight_by_level from the standing-policy Manifest.
 
 import type { RecordSignalInputView, GovernanceSignalView } from '@elohim/storage-client/generated';
 
@@ -280,7 +282,6 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
 
   private readonly signalService = inject(GovernanceSignalService);
   private readonly governanceApi = inject(GovernanceApiService);
-  private readonly governanceRecognition = inject(GovernanceRecognitionService);
 
   private static readonly CURRENT_USER_ID = 'current-user';
 
@@ -358,9 +359,10 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
       // API failure is non-blocking; local signal is already recorded
     });
 
-    // Generate REA economic event for governance participation
-    this.governanceRecognition
-      .recordParticipation({
+    // Generate REA economic event for governance participation (M-REA-3: substrate-side)
+    // Weight is resolved from standing-policy Manifest by the substrate.
+    this.governanceApi
+      .postParticipation({
         entityType: this.entityType(),
         entityId: this.resolvedEntityId,
         humanId: ReactionBarComponent.CURRENT_USER_ID,
