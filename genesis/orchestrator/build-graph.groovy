@@ -826,6 +826,17 @@ def walkBuildGraph(List changedFiles) {
         echo "Manual-only steps with changes (not auto-triggered): ${manualStaleSteps.join(', ')}"
     }
 
+    def pipelineRegistry = [:]
+    graph.pipelines.each { name, manifest ->
+        pipelineRegistry[name] = [
+            jenkinsPath: manifest.jenkinsPath,
+            manualOnly: manifest.manualOnly == true,
+            triggersGenesis: manifest.triggersGenesis == true,
+            cascades: manifest.cascades == null ? true : (manifest.cascades == true),
+            dependsOn: manifest.dependsOn ?: [],
+        ]
+    }
+
     return [
         graph: graph,
         staleMap: staleMap,
@@ -833,7 +844,8 @@ def walkBuildGraph(List changedFiles) {
         levels: levels,
         pipelineSteps: pipelineSteps,
         buildProcessHashes: buildProcessHashes,
-        previousState: buildState
+        previousState: buildState,
+        pipelineRegistry: pipelineRegistry
     ]
 }
 
