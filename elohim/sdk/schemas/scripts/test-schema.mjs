@@ -214,6 +214,34 @@ async function main() {
     'ContentView accepts null for nullable fields',
   );
 
+  // Test: SessionLifecycleState enum schema
+  {
+    const enumPath = resolve(__dirname, '../v1/enums/session-lifecycle-state.schema.json');
+    let lifecycleSchema;
+    try {
+      lifecycleSchema = await loadJson(enumPath);
+    } catch {
+      lifecycleSchema = null;
+    }
+    assert(
+      lifecycleSchema !== null,
+      'SessionLifecycleState enum schema exists at v1/enums/session-lifecycle-state.schema.json'
+    );
+    assert(
+      lifecycleSchema?.title === 'SessionLifecycleState',
+      'SessionLifecycleState enum schema declares title: "SessionLifecycleState"'
+    );
+    assert(
+      Array.isArray(lifecycleSchema?.enum) &&
+        lifecycleSchema.enum.length === 4 &&
+        lifecycleSchema.enum.includes('Anonymous') &&
+        lifecycleSchema.enum.includes('OauthIdentified') &&
+        lifecycleSchema.enum.includes('PeerNativeSampling') &&
+        lifecycleSchema.enum.includes('PeerNativeMember'),
+      'SessionLifecycleState enum contains all four lifecycle values'
+    );
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }

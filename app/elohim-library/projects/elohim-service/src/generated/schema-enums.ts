@@ -334,6 +334,21 @@ export const ALL_REACH_LEVELS = [
 export const REACH_LEVELS = ALL_REACH_LEVELS;
 export type Reach = (typeof ALL_REACH_LEVELS)[number];
 
+export const CORE_SESSION_LIFECYCLE_STATES = [
+  'Anonymous',
+  'OauthIdentified',
+  'PeerNativeSampling',
+  'PeerNativeMember',
+] as const;
+export const ALL_SESSION_LIFECYCLE_STATES = [
+  'Anonymous',
+  'OauthIdentified',
+  'PeerNativeSampling',
+  'PeerNativeMember',
+] as const;
+export const SESSION_LIFECYCLE_STATES = ALL_SESSION_LIFECYCLE_STATES;
+export type SessionLifecycleState = (typeof ALL_SESSION_LIFECYCLE_STATES)[number];
+
 export const CORE_STEP_TYPES = ['content', 'path', 'external', 'checkpoint', 'reflection'] as const;
 export const ALL_STEP_TYPES = [
   'content',
