@@ -74,6 +74,10 @@ name = "attention_tending"
 path = "src/tests/attention_tending.rs"
 
 [[test]]
+name = "attention_tending_via_route"
+path = "src/tests/attention_tending_via_route.rs"
+
+[[test]]
 name = "attestation_coordinator"
 path = "src/tests/attestation_coordinator.rs"
 
