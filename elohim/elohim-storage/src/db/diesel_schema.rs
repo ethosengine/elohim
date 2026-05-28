@@ -190,6 +190,11 @@ diesel::table! {
         at_location -> Nullable<Text>,
         verified_at -> Nullable<Text>,
         scope_collab_cid -> Nullable<Text>,
+        // REA compute-commitment back-reference (migration 2026-05-28-050000).
+        // Nullable for backward compat; populated for events emitted under a
+        // Mishpat::Commitment (compute-class action `delegates-compute`).
+        // Used by DieselRateHistory for sliding-window rate queries.
+        bounded_by -> Nullable<Text>,
     }
 }
 
