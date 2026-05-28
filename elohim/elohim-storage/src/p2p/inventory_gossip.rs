@@ -128,9 +128,17 @@ impl BlobInventoryDelta {
     }
 }
 
-/// Sha256 hex shape check: 64 lowercase hex chars (defensive structural rule).
+/// Sha256 wire shape check: canonical `sha256-<64 lowercase hex>` per
+/// `elohim-storage/CLAUDE.md` ("Wire-level identifiers — `sha256-{hex}` —
+/// keep their existing names"). Every producer in the crate emits this
+/// shape (BlobStore::store → list_hashes → StoreAdapter::current_hashes);
+/// this verifier matches.
 fn is_blob_hash_shaped(s: &str) -> bool {
-    s.len() == 64 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    s.strip_prefix("sha256-")
+        .is_some_and(|hex| {
+            hex.len() == 64
+                && hex.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+        })
 }
 
 #[cfg(test)]
@@ -140,7 +148,6 @@ mod tests {
     /// Canonical wire-format hash fixture — matches `BlobStore::store`
     /// output. Production producer always emits this prefix; the verifier
     /// enforces it. Do NOT replace with bare hex.
-    #[cfg(test)]
     fn sha256_wire(byte: char) -> String {
         format!("sha256-{}", std::iter::repeat(byte).take(64).collect::<String>())
     }
@@ -205,6 +212,36 @@ mod tests {
     fn snapshot_verify_rejects_malformed_hash() {
         let mut s = sample_snapshot();
         s.hashes.push("notahex!".to_string());
+        assert!(matches!(
+            s.verify_structural(),
+            Err(VerifyError::InvalidHashFormat(_))
+        ));
+    }
+
+    #[test]
+    fn snapshot_verify_rejects_bare_hex_without_prefix() {
+        let mut s = sample_snapshot();
+        s.hashes.push("a".repeat(64));  // missing sha256- prefix
+        assert!(matches!(
+            s.verify_structural(),
+            Err(VerifyError::InvalidHashFormat(_))
+        ));
+    }
+
+    #[test]
+    fn snapshot_verify_rejects_wrong_prefix() {
+        let mut s = sample_snapshot();
+        s.hashes.push(format!("sha512-{}", "a".repeat(64)));
+        assert!(matches!(
+            s.verify_structural(),
+            Err(VerifyError::InvalidHashFormat(_))
+        ));
+    }
+
+    #[test]
+    fn snapshot_verify_rejects_wrong_hex_length() {
+        let mut s = sample_snapshot();
+        s.hashes.push(format!("sha256-{}", "a".repeat(32)));  // 32 instead of 64
         assert!(matches!(
             s.verify_structural(),
             Err(VerifyError::InvalidHashFormat(_))
