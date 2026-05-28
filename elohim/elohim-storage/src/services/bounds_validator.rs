@@ -383,4 +383,135 @@ mod tests {
         let result = validate(&sample_event(), &fetcher, &rate).await;
         assert!(matches!(result, Ok(())));
     }
+
+    #[tokio::test]
+    async fn validate_rejects_commitment_not_found() {
+        let fetcher = MockCommitmentFetcher::new(); // empty
+        let rate = MockRateHistory::new();
+        let result = validate(&sample_event(), &fetcher, &rate).await;
+        assert!(matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::CommitmentNotFound,
+                ..
+            })
+        ));
+    }
+
+    #[tokio::test]
+    async fn validate_rejects_revoked_commitment() {
+        let mut c = sample_active_commitment();
+        c.revoked_at = Some("2026-05-15T00:00:00Z".into());
+        let fetcher = MockCommitmentFetcher::new();
+        fetcher.seed(&c.cid.clone(), c);
+        let rate = MockRateHistory::new();
+        let result = validate(&sample_event(), &fetcher, &rate).await;
+        assert!(matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::CommitmentRevoked,
+                ..
+            })
+        ));
+    }
+
+    #[tokio::test]
+    async fn validate_rejects_inactive_window() {
+        let mut c = sample_active_commitment();
+        c.valid_until = "2026-05-15T00:00:00Z".into(); // event is 2026-05-28
+        let fetcher = MockCommitmentFetcher::new();
+        fetcher.seed(&c.cid.clone(), c);
+        let rate = MockRateHistory::new();
+        let result = validate(&sample_event(), &fetcher, &rate).await;
+        assert!(matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::CommitmentInactive,
+                ..
+            })
+        ));
+    }
+
+    #[tokio::test]
+    async fn validate_rejects_out_of_scope_action() {
+        let mut c = sample_active_commitment();
+        c.scope = "serve-url-projection".into(); // event.action is republish-epr
+        let fetcher = MockCommitmentFetcher::new();
+        fetcher.seed(&c.cid.clone(), c);
+        let rate = MockRateHistory::new();
+        let result = validate(&sample_event(), &fetcher, &rate).await;
+        assert!(matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::ScopeNotIncluded,
+                ..
+            })
+        ));
+    }
+
+    #[tokio::test]
+    async fn validate_rejects_reach_ceiling_exceeded() {
+        // Plan spec note: the plan used reach="public" with ceiling="commons" which
+        // would PASS (public rank 6 <= commons rank 7). Corrected: use ceiling="community"
+        // (rank 5) so that event reach="public" (rank 6) genuinely exceeds it.
+        let mut e = sample_event();
+        e.reach = "public".into(); // rank 6
+        let mut c = sample_active_commitment();
+        c.bounds = serde_json::json!({
+            "epr_scope": ["epr:lamad-spa"],
+            "reach_ceiling": "community", // rank 5 — public(6) > community(5) → violation
+            "rate_per_hour": 30,
+            "rotation_ttl_days": 90
+        });
+        let fetcher = MockCommitmentFetcher::new();
+        fetcher.seed(&c.cid.clone(), c);
+        let rate = MockRateHistory::new();
+        let result = validate(&e, &fetcher, &rate).await;
+        assert!(matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::ReachCeilingExceeded,
+                ..
+            })
+        ));
+    }
+
+    #[tokio::test]
+    async fn validate_rejects_rate_limit_exceeded() {
+        let fetcher = MockCommitmentFetcher::new();
+        fetcher.seed("commitment-cid-abc", sample_active_commitment());
+        let rate = MockRateHistory::new();
+        rate.seed("commitment-cid-abc", "2026-05-28T12:00:00Z", 30); // rate_per_hour limit
+        let result = validate(&sample_event(), &fetcher, &rate).await;
+        assert!(matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::RateLimitExceeded,
+                ..
+            })
+        ));
+    }
+
+    #[tokio::test]
+    async fn validate_rejects_key_rotation_stale() {
+        let mut c = sample_active_commitment();
+        c.valid_from = "2026-01-01T00:00:00Z".into(); // 148 days before signed_at
+        c.bounds = serde_json::json!({
+            "epr_scope": ["epr:lamad-spa"],
+            "reach_ceiling": "commons",
+            "rate_per_hour": 30,
+            "rotation_ttl_days": 90 // exceeded: 148 > 90
+        });
+        let fetcher = MockCommitmentFetcher::new();
+        fetcher.seed(&c.cid.clone(), c);
+        let rate = MockRateHistory::new();
+        let result = validate(&sample_event(), &fetcher, &rate).await;
+        assert!(matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::KeyRotationStale,
+                ..
+            })
+        ));
+    }
 }
