@@ -914,7 +914,7 @@ pub struct SessionHumanView {
 }
 
 /// Single active upgrade prompt — derived from onboarding Manifest + SessionHumanView.
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct UpgradePromptItem {
