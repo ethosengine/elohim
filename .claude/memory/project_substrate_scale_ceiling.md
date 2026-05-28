@@ -3,6 +3,8 @@ name: Substrate scales by federated Tier 3 nodes, not hyperscale
 description: Substrate is designed for ~100M Tier 3 nodes carrying billions of humans (most via hub-and-spoke, custodial keys, hosted accounts). Per-node load bounded by trust-network membership; doorway absorbs web2 mass-readership; substrate-level care is what enables honest entry-tier participation, not a side-effect for hardware owners.
 type: project
 originSessionId: 909de5de-3db0-4c88-af4b-12f47dd2762c
+cites:
+  - genesis/docs/content/elohim-protocol/hardware-spec.md
 ---
 The substrate is **not** designed to handle FB/YT-shape hyperscale load. It's designed for a federated topology where Tier 3 family nodes (per `genesis/docs/content/elohim-protocol/hardware-spec.md`) are the substrate participants. Closest analogy: email or Mastodon's federation layer — but each "instance" is a household, church basement, or community-center Tier 3 serving its trust-network members deeply, not one operator serving thousands shallowly.
 

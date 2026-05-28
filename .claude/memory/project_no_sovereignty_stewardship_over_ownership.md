@@ -3,6 +3,8 @@ name: No sovereignty, no ownership — stewardship and agency instead
 description: Foundational elohim principle — no component is sovereign; ownership/sovereignty vocabulary is rejected; use steward, stewardship, contributor, agency, authored, authority
 type: project
 originSessionId: b2c4fbee-2183-475a-8cde-b245fa745bc4
+cites:
+  - genesis/docs/architecture/stewardship-over-sovereignty.md
 ---
 **Canon (in-tree, authoritative):** `genesis/docs/architecture/stewardship-over-sovereignty.md`
 

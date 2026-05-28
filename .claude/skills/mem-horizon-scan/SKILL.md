@@ -1,6 +1,6 @@
 ---
 name: mem-horizon-scan
-description: Quarterly horizon-scan of the LLM-memory landscape for the cartographer's future-projection role. WebFetches canonical sources at .claude/horizon-scan-sources.md to surface what's emerging externally that might change how our memory team operates. Use when "run a horizon scan", "check the state of LLM memory practice", or when the latest scan in .claude/memory-kit/horizon-scans/ is >90 days old. Auto-triggered by cartographer at memory-ceremony Wave 1 when stale.
+description: Quarterly horizon-scan of the LLM-memory landscape for the cartographer's future-projection role. WebFetches canonical sources at .claude/horizon-scan-sources.md to surface what's emerging externally that might change how our memory team operates. Use when "run a horizon scan", "check the state of LLM memory practice", or when the latest scan in .claude/memory-kit/horizon-scans/ is >90 days old. Auto-triggered by cartographer at the start of a memory-ceremony (or any /converge) when stale.
 ---
 
 # /mem-horizon-scan — Quarterly external-state check for the memory team
@@ -10,7 +10,7 @@ The memory team's three temporal-perspective agents (librarian/historian/cartogr
 **When to invoke**:
 - Cadence: every ~90 days. The latest report at `.claude/memory-kit/horizon-scans/` has a `next_recommended_scan` field; trigger when current date ≥ that field.
 - Operator: when "is anything new in the memory space?" or before a major refactor that might be solved cleaner elsewhere.
-- Auto: cartographer's Wave 1 freshness check at memory-ceremony invocation — if latest report is missing or stale, dispatch this skill before Wave 1 surface.
+- Auto: cartographer's freshness check at memory-ceremony or `/converge` invocation — if latest report is missing or stale, dispatch this skill before producing its synthesis.
 
 **Owner**: cartographer (Opus tier, future-projection role). The scan needs judgment about what's signal vs vendor noise.
 
@@ -80,7 +80,7 @@ Breaking changes in MemPalace, MCP, Claude Code that affect our toolkit. Highest
 [reproducible audit trail]
 ```
 
-6. **Surface the summary into the active ceremony** if one is running. The cartographer's Wave 1 output prepends the report's "Summary" section as "Horizon delta since [prior_scan]". The chronicle entry written at Wave 6 includes a one-line pointer with date + summary one-liner.
+6. **Surface the summary into the active ceremony** if one is running. The cartographer prepends the report's "Summary" section as "Horizon delta since [prior_scan]". The chronicle entry written at the ceremony's Phase 4c includes a one-line pointer with date + summary one-liner.
 
 7. **Update MEMORY.md** with a one-line index entry pointing to the latest scan (replaces prior — only the latest needs an index entry; the others are archived chronologically).
 
@@ -101,6 +101,6 @@ Single dated report + chronicle pointer + MEMORY.md index update. Don't write mo
 - `.claude/agents/cartographer.md` — cartographer agent (horizon-scan responsibility section)
 - `.claude/horizon-scan-sources.md` — canonical sources
 - `.claude/memory-kit/horizon-scans/` — dated reports
-- `.claude/skills/memory-ceremony/SKILL.md` — Wave 1 invokes this skill via freshness check
+- `.claude/skills/memory-ceremony/SKILL.md` — the ceremony's freshness check may invoke this skill
 - `.claude/scripts/memory-kit/LIFECYCLE.md` — what the scan is comparing our state against
 - `genesis/data/timeline/CONVENTIONS.md` — chronicle frontmatter (pointer field convention)

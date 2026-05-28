@@ -3,6 +3,8 @@ name: resilience-epic-landed-2026-05-18
 description: The resilience epic chapter (`genesis/docs/content/elohim-protocol/resilience/README.md`) landed across a multi-commit session on 2026-05-18. 9 parts, ~80-row LIVE/DESIGNED/GAP matrix, 15-item leverage-ordered roadmap. The chapter is foundational — the other epics (lamad, qahal, shefa, imagodei) rest on it. Two human witnesses: Gertrude (recovery surface) + Sheila Wray Gregoire (impersonation-resistance surface).
 metadata:
   type: project
+cites:
+  - genesis/docs/content/elohim-protocol/resilience/README.md
 ---
 
 The resilience epic landed in a single multi-turn session on 2026-05-18, building from a deployments-reshuffle (gertrude on shem; matthew/jessica/james on household; terrance moved to shem) into the foundational chapter the other epics rest on.

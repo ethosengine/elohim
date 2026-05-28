@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 0deb6177-e250-4b18-9ca2-dd7a2b971a5d
+cites:
+  - genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md
 ---
 
 # The dissolution principle + sensemaking collectives as the primary domain of the elohim

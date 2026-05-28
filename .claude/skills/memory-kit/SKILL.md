@@ -1,6 +1,6 @@
 ---
 name: memory-kit
-description: Librarian-solo hygiene-sweep toolkit and cadence. Provides seven deterministic tools (cleanup, path-update, dedupe-memory, memory-review, claude-md-audit, skill-audit, agent-audit) plus a PreToolUse injector and PostToolUse drift accumulators for byte-budget enforcement, archive-ratio tracking, and dead-citation hygiene. Read-only by default; mutations are operator-gated. Sibling to /memory-ceremony (which is the four-lens substrate-currency rewrite ceremony). Use this when you want byte-budget enforcement, an audit-numbers pass, or to chain a few hygiene tools ad-hoc.
+description: Librarian-solo hygiene-sweep toolkit and cadence. Provides eight deterministic tools (cleanup, path-update, dedupe-memory, memory-review, claude-md-audit, skill-audit, agent-audit, memory-coherence-audit) plus a PreToolUse injector and PostToolUse drift accumulators for byte-budget enforcement, archive-ratio tracking, dead-citation hygiene, and in-flight memory↔code coherence. Read-only by default; mutations are operator-gated. Sibling to /memory-ceremony (which is the four-lens substrate-currency rewrite ceremony). Use this when you want byte-budget enforcement, an audit-numbers pass, or to chain a few hygiene tools ad-hoc.
 ---
 
 # Memory Kit — Hygiene-Sweep Cadence (Librarian-Solo)
@@ -43,7 +43,7 @@ The frame, after Pawel Huryn's article ("How I Finally Sorted My Claude Code Mem
 - **Archive destination** (cleanup only): `.claude/archive/<YYYY-MM-DD>/<original-relative-path>`. Mirrors repo structure so trajectory stays walkable backward.
 - **Skill entry point**: this single skill, deferred-loaded. **Not always-active** — pull out periodically.
 
-## The Seven Tools
+## The Eight Tools
 
 ### 1. `cleanup` — archive stale specs/plans/memory
 
@@ -101,7 +101,7 @@ Read-only diagnostic. Reports:
 
 **Boundary**: read-only. Does not propose mutations; surfaces "is the memory layer healthy?" rather than "what should change?". Operator acts on findings via direct MEMORY.md edits or by running `cleanup-scan.py`.
 
-### 5. `claude-md-review` — signal-triggered CLAUDE.md ceremony
+### 5. `claude-md-audit` — signal-triggered CLAUDE.md ceremony
 
 ```bash
 python3 .claude/scripts/memory-kit/claude-md-audit.py [--threshold 3.0] [--no-reset]
@@ -167,6 +167,40 @@ Scans `.claude/skills/*/SKILL.md`. Three issue classes: vague descriptions (too 
 
 **Boundary**: read-only diagnostic. Doesn't rewrite descriptions or merge skills.
 
+### 8. `memory-coherence-audit` — keep memory current with the code it cites
+
+```bash
+python3 .claude/scripts/memory-kit/memory-coherence-audit.py             # audit + rebuild cites-index
+git diff --name-only origin/dev | \
+  python3 .claude/scripts/memory-kit/memory-coherence-audit.py --changed -   # what changed re-opens which memory
+```
+
+Memory used to be the one substrate lacking edge-invalidation on source change: a memory entry that said "see `path_service.rs`" had no machine-walkable link, so when the code moved the lesson silently went stale. This tool closes that edge — it is the reconciliation-controller pattern (the build-graph's `graph-walker.mjs`, `sync-check.py`) applied to memory.
+
+**The `cites:` convention (capture-time discipline)**: a memory entry may declare an optional top-level `cites:` frontmatter list of repo-relative paths or globs whose change should re-open it — the memory-side mirror of a story's `feature:`/`anchors_epics:`:
+
+```yaml
+---
+name: project_rea_compute_commitment_primitive
+description: ...
+metadata:
+  type: project
+cites:
+  - genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - elohim/holochain/dna/mishpat/**
+---
+```
+
+When you write or revise a memory entry that leans on specific code, specs, or `.feature` scenarios, add them to `cites:`. Rollout is organic — seed entries already carry it; the audit's `CITE-CANDIDATE` finding nominates entries that have code paths in their body but no `cites:` yet. See `.claude/memory/project_memory_cites_edge.md`.
+
+**Modes**:
+- *audit* (default): verifies every `cites:` path still resolves (`DEAD-CITE`), nominates `CITE-CANDIDATE`s, and rebuilds `.claude/memory-kit/cites-index.json` (the index the in-flight hook reads). Report at `.claude/memory-kit/<date>/memory-coherence-audit.{json,md}`.
+- *changed-files* (`--changed -` from stdin, or `--since <git-ref>`): glob-matches a changed-file list against every entry's `cites:` and emits `STALE-CANDIDATE` — "entry X cites Y which just changed; re-verify." `graph-walker.mjs`'s walk shape applied to memory nodes; usable from a husky pre-push consumer.
+
+**Boundary**: read-only over memory; the only writes are the derived report + cites-index (single-writer projection). Never edits a memory entry's lesson — it surfaces which lessons to re-verify; the librarian/operator decides.
+
+Design: `genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md`.
+
 ## The Hooks
 
 ### PreToolUse Memory Hook
@@ -179,7 +213,11 @@ Scans `.claude/skills/*/SKILL.md`. Three issue classes: vague descriptions (too 
 
 ### PostToolUse Drift-Signal Hook
 
-`.claude/hooks/claude-md-drift-signal.py` (matcher: `Edit|Write`, timeout 2s) accumulates drift signal for `claude-md-review` (section 5). Best-effort: never blocks the tool call. See section 5 for the layered-compute design.
+`.claude/hooks/claude-md-drift-signal.py` (matcher: `Edit|Write`, timeout 2s) accumulates drift signal for `claude-md-audit` (section 5). Best-effort: never blocks the tool call. See section 5 for the layered-compute design.
+
+### PostToolUse Memory-Coherence Signal Hook
+
+`.claude/hooks/memory-coherence-signal.py` (matcher: `Edit|Write`, timeout 2s) is the in-flight accumulator for `memory-coherence-audit` (section 8). When an edited file matches a memory entry's `cites:` glob (via the cached `.claude/memory-kit/cites-index.json`), it bumps that entry's counter in `.claude/memory-kit/memory-coherence-drift.json`. The librarian surfaces accumulated counts during `/hygiene-sweep` ("N entries cite code that changed since last verified") and resets them. Best-effort; never blocks. If the index doesn't exist yet, the hook is dormant until the first `memory-coherence-audit.py` run builds it.
 
 ## Shared Helpers (`_lib/`)
 
@@ -221,6 +259,7 @@ This kit's primary periodic role. Librarian-solo (no four-agent ceremony, no ope
 6. Mark `- [x] Accept` on cleanup and path-update entries you approve
 7. Run apply scripts: `cleanup-apply.py` → `path-update-apply.py`
 8. `genesis/scripts/memory-balance.sh` — log Surface:Archive ratio + budget deltas
+9. `python3 .claude/scripts/memory-kit/memory-coherence-audit.py` — rebuild the cites-index and surface entries whose cited code changed (the in-flight hook accumulates these into `memory-coherence-drift.json` between sweeps; surface and reset)
 
 **Monthly deeper sweep (add to the weekly)**:
 - `python3 .claude/scripts/memory-kit/dedupe-memory-scan.py --threshold 0.30`
@@ -245,7 +284,7 @@ This kit's primary periodic role. Librarian-solo (no four-agent ceremony, no ope
 - **Read-only by default.** The most common interaction is "scan → review → close" without any modification. Modification is the exception.
 - **Trajectory-preserving.** Archived items keep their original relative path under a dated directory. Walking history backward stays possible.
 - **Bounded scope.** Covers MEMORY.md + topic files + skill metadata. Not code, not test files, not CI artifacts. Plans/sprint-results moved to dev-dashboard. Converge moved to its own skill.
-- **Single skill entry point.** This skill. Five tools. One hook. Deferred-loaded. Periodic invocation.
+- **Single skill entry point.** This skill. Eight tools. Three hooks. Deferred-loaded. Periodic invocation.
 
 ## What This Kit Is NOT
 

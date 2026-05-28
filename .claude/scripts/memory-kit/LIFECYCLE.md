@@ -129,9 +129,10 @@ Triggers (any of):
 Floor: monthly if no signal fires. Ceiling: biweekly upper bound (cartographer rec — don't over-run).
 
 **Variants**:
+- **Hygiene-sweep** (librarian-solo): byte-budget + archive-ratio + dead-citation hygiene. Audit-number cadence. See `.claude/skills/memory-kit/SKILL.md`.
+- **Substrate-currency ceremony** (all four agents, four phases): population-wide drift triage → four-lens deep-read on 1-2 picked surfaces → storyteller-pen rewrite → apply + coherence-verify. See `.claude/skills/memory-ceremony/SKILL.md`.
 - **Pre-shift readiness check**: lightweight (librarian + storyteller-disposition only)
-- **Full pass**: all four agents, six waves, balance-sheet capture at Wave 0 + Wave 6
-- **After substantive refactors** that affect palace embeddings: re-mine wing(s) + full pass
+- **After substantive refactors** that affect palace embeddings: re-mine wing(s) + a full hygiene-sweep
 
 ## The memorialize-vs-archive discriminator (added 2026-05-14)
 
@@ -153,7 +154,7 @@ When the named graduation story exists at `status: draft` (not yet `canonical`),
 - Held in working memory (not yet archived)
 - Auto-promoted to `graduate` when operator flips the story to `status: canonical`
 
-Routing per Wave 2 storyteller decision:
+Routing per the storyteller's disposition decision:
 - Story exists & canonical: **graduate** (librarian archives at next cleanup)
 - Story exists & draft: **graduate-pending** (waits on operator-canonical)
 - No story exists: **needs-new-story** (cartographer ranks "write story of X" as backlog Objective)
@@ -188,7 +189,7 @@ sourced_from:
   historian_precedents: [...]
 ```
 
-Each array MAY be empty if explicitly justified with an inline rationale comment (e.g., `devices: []  # pure governance narrative; no devices touched`). Empty arrays without comments are flagged by the librarian's story-currency audit (Wave 1 hygiene component).
+Each array MAY be empty if explicitly justified with an inline rationale comment (e.g., `devices: []  # pure governance narrative; no devices touched`). Empty arrays without comments are flagged by the librarian's story-currency audit (hygiene-sweep component).
 
 ### Coverage data as substrate (not prescription)
 
@@ -201,26 +202,26 @@ The librarian's `story-coverage-audit.py` script computes neutral coverage data:
 - per-canonical-story sourcing-completeness flags
 - `dangling_feature_references` — canonical stories whose `feature:` triple does not resolve to a file on disk
 
-The audit exposes data. It does not prescribe action. Each lens (storyteller, cartographer, historian, librarian) reads the same numbers and reaches its own conclusion per its own judgment in the context of the cycle's other signals. There is no fixed threshold that pre-determines when an agent should shift behavior; convergence (or divergence) across lenses on what the numbers mean is itself signal for the operator at Wave 4.
+The audit exposes data. It does not prescribe action. Each lens (storyteller, cartographer, historian, librarian) reads the same numbers and reaches its own conclusion per its own judgment in the context of the cycle's other signals. There is no fixed threshold that pre-determines when an agent should shift behavior; convergence (or divergence) across lenses on what the numbers mean is itself signal for the operator.
 
 ### Data flow — end-to-end
 
 ```
-story-coverage-audit.py (Wave 1 prologue, every ceremony)
+story-coverage-audit.py (runs in every hygiene-sweep)
         │
         │  regenerates .claude/memory-kit/story-coverage-audit.json
         ▼
-librarian Wave 1 dispatch — surfaces the numbers as neutral data
+librarian surfaces the numbers as neutral data in the hygiene-sweep output
         │
         ▼
-cartographer Wave 1 + Wave 3, storyteller Wave 2 — each reads the same data
+cartographer (during /converge) + storyteller (during disposition triage) — each reads the same data
         │
         │  each lens interprets per its own judgment in the cycle's context
         ▼
-Wave 3 synthesis — cartographer recommends a /shift Objective based on full substrate
+/converge synthesis — cartographer recommends a /shift Objective based on full substrate
         │
         ▼
-Wave 4 operator review — question set is derived from what lenses actually surfaced
+operator review — picks from the ranked next-actions menu
         │
         │  operator decides → /shift dispatch with pre-authored Objective (whatever it is)
         ▼
@@ -361,15 +362,15 @@ regression  <  unknown  <  undelivered  <  pending  <  envisioned  <  backlog
 - PostToolUse Edit on any `.claude/shifts/*-deliver-*/**` artifact → increment delivery-drift counter (this is the load-bearing trigger — `/deliver` finished an iteration)
 - PostToolUse Edit on any `*.feature` or `genesis/data/stories/*.md` → smaller increment (linkage substrate changed)
 - Operator-invoked via `/memory-kit delivery-poll`
-- Floor: Wave 1 of every memory-ceremony
+- Floor: every hygiene-sweep
 
 **Output discipline**: only surface stories/backlog where `delivery_status` changed since last poll, OR where graduation-delivery-gap (canonical + `< active.latest-stable`) is detected. No-change is silent.
 
-## Dimensions with stasis targets (added Round 4)
+## Health dimensions the hygiene-sweep tracks
 
-This is the canonical table cartographer consults at Wave 3 to draft the stasis implementation plan. Each dimension has a measurable substrate signal, an aspirational target, and named resolution agents. Wave 6 dispatches against this table; the chronicle records the achievement per dimension.
+These are the measurable substrate signals the librarian's `/hygiene-sweep` surfaces each pass. Each has a deterministic audit source, an aspirational target (a floor we keep advancing toward, not a per-cycle SLA), and the agent(s) who own resolving it. The hygiene-sweep reports where each dimension stands; the operator and owning agent decide what to act on.
 
-The stasis-progress invariant: every cycle must advance each non-deferred dimension by at least 20% of its outstanding drift (`current → current - 0.2 × (current - target)`), or explicitly mark it `deferred-with-rationale`. Silent demotion to baseline-noise (the Run #3 failure mode) is no longer acceptable.
+There is no mandatory per-cycle quota — the 20%-floor / stasis-implementation-plan invariant was retired along with the six-wave ceremony. The substrate-currency `/memory-ceremony` is measured by rewrites delivered and the coherence-verify verdict, not by dimensions advanced (see `.claude/skills/memory-ceremony/SKILL.md`).
 
 | Dimension | Source | Target | Resolution agent(s) |
 |---|---|---|---|
@@ -386,11 +387,9 @@ The stasis-progress invariant: every cycle must advance each non-deferred dimens
 
 ### Notes on this table
 
-- **Operator-tunable**: cartographer can propose additions or removals (e.g., a new dimension surfaces in retrospective; a dimension proves to be noise and gets retired). Changes go through operator approval at Wave 4 of the ceremony that proposes them.
-- **Targets are aspirational floors, not hard SLAs**: a target of 0 means "we keep advancing toward 0 until we reach it"; it does not mean "must reach 0 this cycle." The 20%-floor governs per-cycle pace.
-- **Resolution agent owns the dimension end-to-end**: they propose the action at Wave 3 (via cartographer's plan), execute it at Wave 6, and report the achievement back into the chronicle table. If a dimension straddles agents (e.g., Surface:Archive ratio depends on both storyteller graduations and librarian archive), the cartographer names the primary agent and lists the co-agent in the proposed action.
-- **The deferred-with-rationale option**: when a dimension's 20% genuinely can't advance this cycle (substrate dependency, blocked-by-upstream-work, effort-tier=large, out-of-cycle ownership), cartographer marks it `deferred-with-rationale` and chronicle records WHY. This prevents the silent-demotion failure mode while preserving agent agency. Valid deferral patterns are enumerated in `.claude/agents/cartographer.md` "Stasis implementation plan" section.
-- **For very-small counts (1-3)**: "advance = touch at least 1" is an acceptable 20%-floor interpretation. Exact arithmetic on tiny counts produces misleading thresholds; the spirit is "make at least one meaningful move on this dimension or explain why not."
+- **Operator-tunable**: the librarian or cartographer can propose additions or removals (e.g., a new dimension surfaces in retrospective; a dimension proves to be noise and gets retired). Changes go through operator approval.
+- **Targets are aspirational floors, not hard SLAs**: a target of 0 means "we keep advancing toward 0 until we reach it"; it does not mean "must reach 0 this cycle."
+- **Resolution agent owns the dimension end-to-end**: they surface it in the hygiene-sweep, propose the fix, and (with operator approval) execute it. If a dimension straddles agents (e.g., Surface:Archive ratio depends on both storyteller graduations and librarian archive), name the primary agent and list the co-agent in the proposed action.
 
 ### Why these dimensions and not others
 
@@ -403,7 +402,7 @@ Dimensions explicitly **not** included (and why):
 - **MemPalace drawer count growth** — embedding accumulation is expected and bounded by source-file count, not a drift metric
 - **Backlog entry count** — quantity is not a quality signal; cartographer ranks by vision×readiness, not by drainage rate
 - **Chronicle entry count** — append-only; growth is intentional
-- **Number of Wave 5 retrospective signals captured** — exploratory output; not a drift metric
+- **Number of ceremony-retrospective signals captured** — exploratory output; not a drift metric
 
 If a candidate dimension fails these three properties, it doesn't belong here; it belongs in the broader audit substrate where lenses interpret it per cycle.
 
@@ -418,4 +417,4 @@ If a candidate dimension fails these three properties, it doesn't belong here; i
 - `.claude/agents/{librarian,historian,storyteller,cartographer}.md` — each agent's role in this lifecycle
 - `genesis/data/stories/CONVENTIONS.md` — stories tier schema
 - `genesis/data/timeline/CONVENTIONS.md` — timeline tier schema (chronicle + roadmap + backlog)
-- `.claude/skills/memory-ceremony/SKILL.md` — Wave 3 stasis-plan template + Wave 6 execution flow
+- `.claude/skills/memory-ceremony/SKILL.md` — the four-phase substrate-currency ceremony flow

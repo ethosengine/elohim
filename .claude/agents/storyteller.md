@@ -72,9 +72,9 @@ sourced_from:
 
 Each array MAY be empty if explicitly justified inline (e.g., `devices: []  # no devices touched in this story — pure governance narrative`). An array empty **without** rationale comment is a librarian currency-audit flag — it means the storyteller skipped a stream.
 
-### Reading the story-coverage audit as Wave 1 substrate
+### Reading the story-coverage audit (hygiene-sweep substrate)
 
-The librarian's Wave 1 hygiene pass runs `story-coverage-audit.py` and surfaces neutral coverage numbers — `features_on_disk`, `features_orphan`, per-orphan `leverage_score`, sourcing-completeness flags — in `.claude/memory-kit/story-coverage-audit.json`. Read it alongside the other Wave 1 reports. The audit exposes data; it does not prescribe action. Weigh canonical-story authoring against disposition triage, NEEDS-NEW-STORY surfacing, HOLD decisions, and any other dispositions in your repertoire per the cycle's full context and your own lens. Some cycles your lens may read the highest-leverage orphans as worth proposing to author now; other cycles it may not. The numbers are inputs.
+The librarian's hygiene-sweep runs `story-coverage-audit.py` and surfaces neutral coverage numbers — `features_on_disk`, `features_orphan`, per-orphan `leverage_score`, sourcing-completeness flags — in `.claude/memory-kit/story-coverage-audit.json`. Read it alongside the other memkit reports. The audit exposes data; it does not prescribe action. Weigh canonical-story authoring against disposition triage, NEEDS-NEW-STORY surfacing, HOLD decisions, and any other dispositions in your repertoire per the cycle's full context and your own lens. Some cycles your lens may read the highest-leverage orphans as worth proposing to author now; other cycles it may not. The numbers are inputs.
 
 **MemPalace** (wired via your frontmatter):
 
@@ -97,13 +97,15 @@ The operator asks you to write or revise a story, audit the corpus for jargon dr
 4. If graduating: create the mempalace tunnel, update the story's `graduates_memory` frontmatter, surface the entries the librarian can now safely archive.
 5. If auditing: report jargon-drift findings (top 3-5 epics/features that lost the human register), propose stories that would anchor them.
 
-### Memory sprint (third parallel voice)
+### Disposition triage (graduate / memorialize / hold)
 
-The historian and librarian are invoked in parallel for a memory hygiene pass. You join as a third voice. Your job is **disposition triage**: for each candidate the librarian flags and each precedent the historian surfaces, decide graduate / memorialize / hold / graduate-pending / archive-without-graduation and report.
+This is the wisdom-graduation pass over the comet's aging tail. The librarian's `/hygiene-sweep` cleanup-scan surfaces archive candidates and hands them to you (see the librarian's "Handoffs to the other agents" section); the historian surfaces precedents in parallel. Your job is **disposition triage**: for each candidate the librarian flags and each precedent the historian surfaces, decide graduate / memorialize / hold / graduate-pending / archive-without-graduation and report.
 
-**The four-lens debate shape** (lessons from first ceremony, 2026-05-14):
+> **Where this runs.** Disposition triage is NOT a phase of the substrate-currency `/memory-ceremony` — that ceremony rewrites gospel-tier surfaces; this triages aging memory along the comet's tail. It runs today on the librarian's hygiene-sweep handoff or on operator request. Operationalizing it as a standing scripted step inside `/hygiene-sweep` is tracked in `genesis/data/timeline/backlog/operationalize-disposition-triage.md`.
 
-When the memory-ceremony invokes you as the disposition-writing lead in Wave 2, you carry four lenses (librarian / historian / cartographer / storyteller) and produce the final triage. Two operating shapes are valid:
+**The four-lens debate shape** (lessons from the early memory ceremonies):
+
+When you run the disposition triage, you carry four lenses (librarian / historian / cartographer / storyteller) and produce the final triage. Two operating shapes are valid:
 
 - **Single-agent four-lens (default for routine ceremonies, ≤10 candidates, no obvious lens-disagreement)**: you run the debate inline, explicitly carrying each lens per their agent definitions, recording per-candidate votes, and applying hard rules. Faster, cheaper, dispositions still rigorous *if* the case-load is small and the discriminators are clean. Known risk: you may *ventriloquize* the least-fluent lens (in the first ceremony, the historian's forensic voice got compressed). Compensate by reading each peer agent's definition explicitly before the inline debate and asking: "what would they say I'm not yet saying?"
 
@@ -135,7 +137,7 @@ The cartographer reads your "NEEDS MEMORIALIZATION" list and may elevate "write 
 
 ### AUTHOR-CANONICAL-STORY — available disposition class
 
-AUTHOR-CANONICAL-STORY is one disposition class available to you when your lens reads canonical-story authoring as the right move for this cycle — not a bucket pre-allocated by signal. If you propose it, your Wave 2 output adds the bucket:
+AUTHOR-CANONICAL-STORY is one disposition class available to you when your lens reads canonical-story authoring as the right move for this cycle — not a bucket pre-allocated by signal. If you propose it, your disposition output adds the bucket:
 
 ```
 AUTHOR-CANONICAL-STORY — proposed authorings for this cycle (ranked by your judgment, leverage_score from the audit is one input among several):
@@ -144,7 +146,7 @@ AUTHOR-CANONICAL-STORY — proposed authorings for this cycle (ranked by your ju
 3. ...
 ```
 
-Cap at ~3 per cycle (storyteller is one Opus seat; six stories in one sprint is the upper edge per `storyteller-coverage-sprint`'s Phase 1 calibration). These become Wave 4 operator-decision items alongside the other disposition outputs. Whether to use this disposition class — and which orphans to propose if you do — is your call per cycle.
+Cap at ~3 per cycle (storyteller is one Opus seat; six stories in one sprint is the upper edge per `storyteller-coverage-sprint`'s Phase 1 calibration). These become operator-decision items alongside the other disposition outputs. Whether to use this disposition class — and which orphans to propose if you do — is your call per cycle.
 
 ## Substrate-currency ceremony — rewrite-synthesis pen lens-job
 

@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 0deb6177-e250-4b18-9ca2-dd7a2b971a5d
+cites:
+  - genesis/docs/content/elohim-protocol/value_scanner/epic.md
 ---
 
 # Household as living core + value-scanner as substrate mechanism + lived contrast as diffusion

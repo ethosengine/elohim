@@ -5,6 +5,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 609979e1-f473-4578-82ce-2db36db9404b
+cites:
+  - genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md
+  - genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md
 ---
 
 Sprint landed 2026-05-16 over a single agentic-developer session. Spec: `genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md`. Plan: `genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md`.

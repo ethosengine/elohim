@@ -3,6 +3,8 @@ name: Graduated recovery authority — community can always make it right
 description: Recovery in the Elohim Protocol must never permit absolute lockout; authority graduates from intimate circle through qahal governance to global elohim witness; crypto is optional hardening, never the sole path
 type: project
 originSessionId: a00556ea-66be-405a-985e-1a7a309d43a8
+cites:
+  - genesis/docs/architecture/cradle-to-grave-capability-gradient.md
 ---
 **Canon (in-tree, authoritative):** `genesis/docs/architecture/cradle-to-grave-capability-gradient.md` §3.
 

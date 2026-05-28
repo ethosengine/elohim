@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 0c3107ea-a896-4db5-ae15-c9e1d7921552
+cites:
+  - genesis/docs/architecture/rea-compute-commitment-primitive.md
 ---
 
 **Canon (in-tree, authoritative):** `genesis/docs/architecture/rea-compute-commitment-primitive.md`

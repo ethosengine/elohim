@@ -19,7 +19,7 @@ All three are Opus-tier subagents. The mechanical work (running scripts, parsing
 
 A fourth subagent — the **storyteller** ([`.claude/agents/storyteller.md`](../../agents/storyteller.md)) — operates orthogonally to the three temporal perspectives. They don't tend a slice of time; they decide which memory artifacts graduate to canonical story, which are memorialized in deep archive (Isildur's-diary tier), and which are held for later. They own [`genesis/data/stories/`](../../../genesis/data/stories/) as the catalog of canonical human stories that compose with humans, devices, epics, and Gherkin scenarios. See [`project_forgetting_as_design.md`](../../memory/project_forgetting_as_design.md) for the principle.
 
-In memory sprints, the storyteller joins as a third parallel voice alongside historian and librarian, producing a graduate/memorialize/hold disposition triage that the cartographer can fold into the next-actions menu.
+During disposition triage (the librarian's hygiene-sweep hands archive candidates to the storyteller — see the storyteller agent's "Disposition triage" section), the storyteller produces a graduate/memorialize/hold decision that the cartographer can fold into the next-actions menu.
 
 ## Architecture
 
@@ -34,11 +34,13 @@ scripts (this dir)  cleanup-{scan,apply}.py              ← archive stale specs
                     memory-review.py                     ← MEMORY.md size/drift/growth/types
                     skill-audit.py                       ← always-loaded skill descriptions
                     claude-md-audit.py                   ← CLAUDE.md drift + fit + missing + opted-out
+                    memory-coherence-audit.py            ← memory↔code cites: edge; DEAD-CITE/CITE-CANDIDATE; builds cites-index
                     _lib/                                ← shared helpers (paths, store, frontmatter, drift_score)
 
 hooks               .claude/hooks/pre-tool-memory.py     ← PreToolUse * — injects MEMORY.md across subagents
                     .claude/hooks/claude-md-drift-signal.py     ← PostToolUse Edit/Write — counters
                     .claude/hooks/claude-md-structural-signal.py ← PostToolUse Bash — mv/cp/rm signal
+                    .claude/hooks/memory-coherence-signal.py    ← PostToolUse Edit/Write — bumps a memory entry when edited code matches its cites:
 
 skills              .claude/skills/memory-kit/SKILL.md   ← user-facing toolkit doc
                     .claude/skills/converge/SKILL.md     ← future-projection synthesis

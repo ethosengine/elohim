@@ -20,6 +20,7 @@
 - [Wisdom resolves into epics](project_wisdom_resolves_into_epics.md) — memory's destination is story-compaction; epics are wisdom substrate.
 - [Historian — pattern-aware un-archive](project_historian_pattern_surface_agent.md) — inverse of cleanup; surfaces archived patterns as risk/precedent; `surface` primitive.
 - [Memory in repo + signal-driven + opt-out + _lib](project_memory_in_repo_two_tier.md) — .claude/memory/ git-tracked; accumulator+ceremony not cadence; pure-stdlib helpers ≥3 callers; .no-claude.md preserves decisions (see _signal_driven_audit_ceremonies / _shared_lib_pattern / _no_claude_md_opt_out_pattern).
+- [Memory cites: edge — in-flight coherence](project_memory_cites_edge.md) — entries declare cites: to the code/spec/scenario they depend on; memory-coherence-audit + PostToolUse hook re-open them when sources change; reconciliation-controller applied to memory.
 - [P1 — storage as reconciliation controller](project_principle_p1_reconciliation_controller.md) — DHT=manifest, libp2p=k8s controller; eager reconcile.
 - [Orchestrator predictive build-graph](project_orchestrator_predictive_vision.md) — predict pre-push, reconcile post-run; strategy.mjs + preview.mjs.
 - [Seed whoever is ready](project_seed_whoever_is_ready.md) — per-peer seeding; partial-cluster = steady state; no all-or-nothing.

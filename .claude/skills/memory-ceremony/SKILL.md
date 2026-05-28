@@ -19,6 +19,27 @@ This skill orchestrates the four-agent memory team (librarian, historian, cartog
 - `.claude/skills/memory-kit/SKILL.md` — `/hygiene-sweep` (byte-budget + archive-ratio cadence; separate from this ceremony)
 - `genesis/data/timeline/CONVENTIONS.md` — chronicle schema
 
+## Execution modes — conversational (default) or dynamic workflow
+
+The phases below define the ceremony's *content* regardless of how it's executed. Two modes:
+
+- **Conversational (default, 1-2 surfaces).** The orchestrator dispatches each phase via Task, holding the lens reports in its own context and surfacing the Phase 3 rewrites to the operator gate inline. Right for the standard small cycle.
+
+- **Dynamic workflow (3+ surfaces, or when you want the orchestration codified and rerunnable).** Phases 2-3 are a textbook fan-out + synthesis — per picked surface: librarian-prologue → three lenses in parallel → storyteller-pen. Run them as a dynamic workflow (`Workflow` tool) so the lens reports live in **script variables instead of the orchestrator's context**. That is what lets you pick more than two surfaces: the 1-2 cap is partly a context-budget limit, not only an attention one (see the "Picking too many surfaces" footgun). Pipeline shape, one item per picked surface:
+
+  ```
+  pipeline(pickedSurfaces,
+    s   => agent(prologue,      {agentType: 'librarian',   phase: '2a', model: 'opus'}),
+    fac => parallel([                                          // phase 2b, after prologue
+             agent(missing-citations, {agentType: 'historian',    phase: '2b'}),
+             agent(coverage-gaps,     {agentType: 'cartographer', phase: '2b'}),
+             agent(narrative-lens,    {agentType: 'storyteller',  phase: '2b'})]),
+    len => agent(compose-rewrite, {agentType: 'storyteller', phase: '3-compose'}))
+  // returns paste-ready rewrites + diff-rationales
+  ```
+
+  `opts.agentType` invokes the real memory-team agents (so each keeps its MemPalace MCP grants and lens-job definition); `opts.model` honors the tier discipline (`[[project_agentic_loop_economics]]`). **The workflow stops before the Phase 3 operator gate** — workflows take no mid-run input, so it returns the rewrites and the operator gates each one in conversation (approve / revise / decline). Phase 4 (apply + coherence-verify) then runs inline or as a second workflow, with Phase 4b's fresh-context coherence check as the adversarial-verify stage (never one of the four lenses). Only launch a workflow when the operator has opted in — it spawns many agents.
+
 ## Phase 1 — Population-wide triage (~2 min)
 
 Run the substrate-currency audit. Cheap, deterministic, idempotent:
@@ -178,7 +199,7 @@ If the operator asks for byte-budget hygiene, invoke `/hygiene-sweep`. If they a
 - **Storyteller over-running the 15-min cap**: if a rewrite genuinely needs >15 min, return what you have plus a two-cycle-rewrite note. Don't blow the cap silently — the next cycle picks up the remainder.
 - **RED verdict paper-over**: tempting to close ceremony despite RED because "we already rewrote it." Don't. RED means the cross-substrate impact was missed; the value of the verdict is precisely that it catches what the four-lens missed. Resolve before chronicle.
 - **Audit-number-as-success conflation**: substrate-currency-audit numbers go down when surfaces are rewritten well, but that's a side-effect. The measure is coherence-verify verdict + operator's "yes this matches today's substrate" approval. Number-watching is `/hygiene-sweep`'s job.
-- **Picking too many surfaces**: 1-2 per cycle. Three is the upper edge; four guarantees one will be under-served. The audit's ranked list survives across cycles — there is always more.
+- **Picking too many surfaces**: in conversational mode, 1-2 per cycle — three is the upper edge, four guarantees one will be under-served, because the lens reports compete for the orchestrator's context. The dynamic-workflow execution mode (see "Execution modes") keeps those reports in script variables, relaxing the *context-budget* half of the cap — you can pipeline the top ~5 drifted surfaces in one run. The *attention* half still applies at the operator gate: review the returned rewrites in batches, not all at once. The audit's ranked list survives across cycles regardless — there is always more.
 
 ## Related
 

@@ -3,6 +3,8 @@ name: Tiered quilt stewardship spec + delivery master landed (2026-05-11)
 description: 8-wave portfolio for the missing storage-tier layer; composes on Plan 1, absorbs Plans 2-5; dogfooded on MinIO+sccache substrate; ZERO new DHT entry types (reuses Commitment+Attestation with discriminators); pre-Wave-0 cleanup absorbs Attestation dedupe + lamad_event_type rename
 type: project
 originSessionId: 96fee2e2-0f17-4f94-b422-d351bc13ee2f
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
 ---
 **Spec:** `genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md` (960 lines, 11 sections)
 **Delivery master:** `genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md` (718 lines, 8 waves + parallel tracks)

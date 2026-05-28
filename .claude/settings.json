@@ -98,6 +98,11 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-coherence-signal.py\"",
+            "timeout": 2000
+          },
+          {
+            "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/sync-check.py\"",
             "timeout": 5000
           },
