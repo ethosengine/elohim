@@ -145,6 +145,9 @@ const INTERFACE_FILES = [
   { src: 'views/mechanism-selection.ts', dest: 'mechanism-selection.ts' },
   // M-AGGR-3: ContentEngagementStats projection (Category C operational — EconomicEvent stream filtered by content_id + lamadEventType)
   { src: 'views/content-engagement-stats-view.ts', dest: 'content-engagement-stats-view.ts' },
+  // M-AGGR-2: Holochain source-chain cutover — Category B agent-scoped (imagodei DNA source chain)
+  { src: 'views/source-chain-entry-view.ts', dest: 'source-chain-entry-view.ts' },
+  { src: 'views/entry-link-view.ts', dest: 'entry-link-view.ts' },
 ];
 
 /**
