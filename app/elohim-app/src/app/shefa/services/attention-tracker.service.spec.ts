@@ -1,25 +1,24 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
-
-import { AttentionTendingApiService } from '@elohim/rea-runtime';
 
 import { AttentionTrackerService } from './attention-tracker.service';
 
 describe('AttentionTrackerService', () => {
   let service: AttentionTrackerService;
-  let attentionApiSpy: { postTending: ReturnType<typeof vi.fn> };
+  let httpSpy: { post: ReturnType<typeof vi.fn> };
 
-  const MOCK_ACK = { accepted: true, actionHash: 'abc123' } as any;
+  const MOCK_ACK = { accepted: true };
 
   beforeEach(() => {
-    attentionApiSpy = {
-      postTending: vi.fn().mockReturnValue(of(MOCK_ACK)),
+    httpSpy = {
+      post: vi.fn().mockReturnValue(of(MOCK_ACK)),
     };
 
     TestBed.configureTestingModule({
       providers: [
         AttentionTrackerService,
-        { provide: AttentionTendingApiService, useValue: attentionApiSpy },
+        { provide: HttpClient, useValue: httpSpy },
       ],
     });
     service = TestBed.inject(AttentionTrackerService);
@@ -30,18 +29,19 @@ describe('AttentionTrackerService', () => {
       service.trackContentView('concept-trust');
       service.trackContentLeave('concept-trust');
 
-      expect(attentionApiSpy.postTending).toHaveBeenCalledOnce();
-      const callArg = attentionApiSpy.postTending.mock.calls[0][0];
-      expect(callArg.classification).toBe('values-forward');
-      expect(callArg.filterSubjectJson).toContain('concept-trust');
-      expect(callArg.elapsedMs).toBeGreaterThanOrEqual(0);
-      expect(callArg.ttlSeconds).toBeGreaterThanOrEqual(3600);
-      expect(JSON.parse(callArg.contextJson).pillar).toBe('shefa');
+      expect(httpSpy.post).toHaveBeenCalledOnce();
+      const [url, body] = httpSpy.post.mock.calls[0];
+      expect(url).toBe('/api/v1/attention/tending');
+      expect(body.classification).toBe('values-forward');
+      expect(JSON.parse(body.filterSubjectJson).contentId).toBe('concept-trust');
+      expect(body.elapsedMs).toBeGreaterThanOrEqual(0);
+      expect(body.ttlSeconds).toBeGreaterThanOrEqual(3600);
+      expect(JSON.parse(body.contextJson).pillar).toBe('shefa');
     });
 
     it('does NOT post if trackContentLeave called without trackContentView', () => {
       service.trackContentLeave('concept-trust');
-      expect(attentionApiSpy.postTending).not.toHaveBeenCalled();
+      expect(httpSpy.post).not.toHaveBeenCalled();
     });
 
     it('clears mount time after trackContentLeave (no double-send)', () => {
@@ -49,7 +49,7 @@ describe('AttentionTrackerService', () => {
       service.trackContentLeave('concept-trust');
       service.trackContentLeave('concept-trust');
 
-      expect(attentionApiSpy.postTending).toHaveBeenCalledOnce();
+      expect(httpSpy.post).toHaveBeenCalledOnce();
     });
 
     it('tracks separate content nodes independently', () => {
@@ -58,10 +58,10 @@ describe('AttentionTrackerService', () => {
       service.trackContentLeave('concept-trust');
       service.trackContentLeave('concept-governance');
 
-      expect(attentionApiSpy.postTending).toHaveBeenCalledTimes(2);
-      const calls = attentionApiSpy.postTending.mock.calls;
-      expect(JSON.parse(calls[0][0].filterSubjectJson).contentId).toBe('concept-trust');
-      expect(JSON.parse(calls[1][0].filterSubjectJson).contentId).toBe('concept-governance');
+      expect(httpSpy.post).toHaveBeenCalledTimes(2);
+      const calls = httpSpy.post.mock.calls;
+      expect(JSON.parse(calls[0][1].filterSubjectJson).contentId).toBe('concept-trust');
+      expect(JSON.parse(calls[1][1].filterSubjectJson).contentId).toBe('concept-governance');
     });
 
     it('second trackContentView for same content does not overwrite mount time', () => {
@@ -69,7 +69,7 @@ describe('AttentionTrackerService', () => {
       service.trackContentView('concept-trust'); // re-mount without leave — ignored
       service.trackContentLeave('concept-trust');
 
-      expect(attentionApiSpy.postTending).toHaveBeenCalledOnce();
+      expect(httpSpy.post).toHaveBeenCalledOnce();
     });
   });
 
@@ -79,7 +79,7 @@ describe('AttentionTrackerService', () => {
       service.ngOnDestroy();
 
       service.trackContentLeave('concept-trust');
-      expect(attentionApiSpy.postTending).not.toHaveBeenCalled();
+      expect(httpSpy.post).not.toHaveBeenCalled();
     });
   });
 });

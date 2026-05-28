@@ -1,14 +1,23 @@
 // Retired: DWELL_THRESHOLD_MS, sessionViewed Set, pendingTimers, EventService dependency (M-REA-2).
 // Substrate policy (tending-policy Manifest) qualifies dwell; deduplication via re-tend.
+import { HttpClient } from '@angular/common/http';
 import { Injectable, OnDestroy, inject } from '@angular/core';
 
 import { Subscription } from 'rxjs';
 
-import { AttentionTendingApiService } from '@elohim/rea-runtime';
+/** Wire shape for POST /api/v1/attention/tending — mirrors AttentionTendingIntent in @elohim/rea-runtime. */
+interface AttentionTendingIntent {
+  filterSubjectJson: string;
+  classification: 'values-forward' | 'fatigue' | 'scope-mismatch' | 'safety';
+  reason?: string;
+  ttlSeconds: number;
+  contextJson: string;
+  elapsedMs: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AttentionTrackerService implements OnDestroy {
-  private readonly attentionApi = inject(AttentionTendingApiService);
+  private readonly http = inject(HttpClient);
 
   /** Mount timestamps keyed by content ID (set on trackContentView). */
   private readonly mountedAt = new Map<string, number>();
@@ -30,19 +39,19 @@ export class AttentionTrackerService implements OnDestroy {
    */
   trackContentLeave(contentId: string): void {
     const mountTime = this.mountedAt.get(contentId);
-    if (mountTime == null) return;
+    if (mountTime === undefined) return;
 
     this.mountedAt.delete(contentId);
 
     const elapsedMs = Date.now() - mountTime;
-    const sub = this.attentionApi
-      .postTending({
+    const sub = this.http
+      .post<{ accepted: boolean }>('/api/v1/attention/tending', {
         filterSubjectJson: JSON.stringify({ contentId }),
         classification: 'values-forward',
         ttlSeconds: 3600,
         contextJson: JSON.stringify({ pillar: 'shefa' }),
         elapsedMs,
-      })
+      } satisfies AttentionTendingIntent)
       .subscribe();
     this.subscriptions.push(sub);
   }
