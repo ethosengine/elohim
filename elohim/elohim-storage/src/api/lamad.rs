@@ -33,6 +33,9 @@ use hyper::{body::Incoming, Method, Request, Response};
 use serde::{Deserialize, Serialize};
 use tracing;
 
+use crate::db::content_engagement_stats::{
+    fetch_content_engagement_stats, project_content_engagement_stats,
+};
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::hc_client_registry::HcClientRegistry;
@@ -56,6 +59,15 @@ pub async fn handle(
     match (&method, path) {
         // POST /api/v1/lamad/events — intent-driven EconomicEvent creation
         (&Method::POST, "events") => handle_emit_event(req, pool, ctx, hc_registry).await,
+
+        // GET /api/v1/lamad/content/{contentId}/engagement
+        (&Method::GET, p) if p.starts_with("content/") && p.ends_with("/engagement") => {
+            let content_id = p
+                .strip_prefix("content/")
+                .and_then(|s| s.strip_suffix("/engagement"))
+                .unwrap_or("");
+            handle_get_engagement(content_id, pool, ctx).await
+        }
 
         _ => Ok(response::not_found(&format!(
             "Unknown lamad route: {} /api/v1/lamad/{}",
@@ -232,6 +244,42 @@ async fn handle_emit_event(
     Ok(from_create_result(EconomicEventService::create_event(
         &mut conn, ctx, input,
     )))
+}
+
+/// GET /api/v1/lamad/content/{contentId}/engagement
+///
+/// Returns `ContentEngagementStatsView` for the given contentId.  If the
+/// projection row does not yet exist (no qualifying EconomicEvents have been
+/// recorded), the handler eagerly computes it (returning zero counts) and
+/// writes the row so subsequent reads are fast.
+///
+/// The projection is the source of record for engagement counts — clients
+/// MUST NOT count EconomicEvents client-side (that is the F-AGGR-3 smell
+/// this route retires).
+async fn handle_get_engagement(
+    content_id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    if content_id.is_empty() {
+        return Ok(response::bad_request("contentId must not be empty"));
+    }
+
+    let mut conn = get_conn(pool)?;
+
+    // Try the cached projection first; compute on miss.
+    let view = match fetch_content_engagement_stats(&mut conn, content_id, &ctx.h_app_id)? {
+        Some(v) => v,
+        None => {
+            // No events yet — compute (returns zero counts) and persist.
+            project_content_engagement_stats(&mut conn, content_id, &ctx.h_app_id)?
+        }
+    };
+
+    Ok(crate::services::response::json_response(
+        hyper::StatusCode::OK,
+        &view,
+    ))
 }
 
 /// Compose a `CreateEconomicEventInputView` from a `LamadEventIntentView`

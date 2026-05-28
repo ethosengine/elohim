@@ -8651,6 +8651,16 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
+        // GET /api/v1/lamad/content/{contentId}/engagement — M-AGGR-3
+        // Returns ContentEngagementStatsView (Category C projection of EconomicEvent
+        // stream filtered by content_id + lamadEventType IN content-view|content-complete).
+        // Retires F-AGGR-3: countContentViews/countContentCompletions client-side counting.
+        .route(
+            Route::get("/api/v1/lamad/content/{contentId}/engagement")
+                .handler("get_content_engagement_stats")
+                .cache_ttl(30)
+                .build(),
+        )
         // =====================================================================
         // /api/v1/stewardship — Stewardship allocations and policy
         // =====================================================================
