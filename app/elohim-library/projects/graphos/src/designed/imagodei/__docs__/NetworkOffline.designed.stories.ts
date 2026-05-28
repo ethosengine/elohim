@@ -161,19 +161,6 @@ const unreachableResolution: AuthorityResolution = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function injectAuthority(shellId: string, resolution: AuthorityResolution) {
-  setTimeout(() => {
-    const shell = document.getElementById(shellId);
-    if (shell && '_setAuthority' in shell) {
-      (shell as unknown as { _setAuthority: (r: AuthorityResolution) => void })._setAuthority(resolution);
-    }
-  }, 0);
-}
-
-// ---------------------------------------------------------------------------
 // Meta
 // ---------------------------------------------------------------------------
 
@@ -236,10 +223,9 @@ export const Default: Story = {
     `,
   ],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="offline-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${unreachableResolution}
       >
         <!-- Trust-indicator dimmed via wrapper opacity -->
         <div slot="header" style="
@@ -328,8 +314,6 @@ export const Default: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('offline-shell', unreachableResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -369,10 +353,9 @@ export const Dark: Story = {
     `,
   ],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="offline-shell-dark"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${unreachableResolution}
       >
         <div slot="header" style="
           ${TRUST_TOKENS_OFFLINE_DARK}
@@ -457,8 +440,6 @@ export const Dark: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('offline-shell-dark', unreachableResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -496,10 +477,9 @@ export const RetryAvailable: Story = {
     `,
   ],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="offline-retry-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${unreachableResolution}
       >
         <div slot="header" style="
           ${TRUST_TOKENS_OFFLINE_LIGHT}
@@ -583,8 +563,6 @@ export const RetryAvailable: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('offline-retry-shell', unreachableResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -643,10 +621,9 @@ export const PeerConductorOffline: Story = {
       --elohim-trust-padding-inline: 0.625rem;
     `;
 
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="offline-peer-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${peerOfflineResolution}
       >
         <div slot="header" style="
           ${peerTrustOfflineTokens}
@@ -729,8 +706,6 @@ export const PeerConductorOffline: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('offline-peer-shell', peerOfflineResolution);
-    return el;
   },
   parameters: {
     docs: {

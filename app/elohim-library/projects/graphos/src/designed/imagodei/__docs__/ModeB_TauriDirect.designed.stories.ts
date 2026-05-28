@@ -188,17 +188,8 @@ const tauriDirectResolution: AuthorityResolution = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Decorators
 // ---------------------------------------------------------------------------
-
-function injectAuthority(shellId: string, resolution: AuthorityResolution) {
-  setTimeout(() => {
-    const shell = document.getElementById(shellId);
-    if (shell && '_setAuthority' in shell) {
-      (shell as unknown as { _setAuthority: (r: AuthorityResolution) => void })._setAuthority(resolution);
-    }
-  }, 0);
-}
 
 function lightDecorator(story: () => unknown) {
   return html`
@@ -284,10 +275,9 @@ export const Default: Story = {
   name: 'Default (Tauri direct)',
   decorators: [lightDecorator],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="mode-b-tauri-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${tauriDirectResolution}
         step="login"
       >
         <elohim-imagodei-trust-indicator
@@ -337,8 +327,6 @@ export const Default: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('mode-b-tauri-shell', tauriDirectResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -362,10 +350,9 @@ export const Dark: Story = {
   name: 'Dark (constellation)',
   decorators: [darkDecorator],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="mode-b-tauri-shell-dark"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${tauriDirectResolution}
         step="login"
       >
         <elohim-imagodei-trust-indicator
@@ -387,8 +374,6 @@ export const Dark: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('mode-b-tauri-shell-dark', tauriDirectResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -533,10 +518,9 @@ export const Hebrew: Story = {
     `,
   ],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="mode-b-tauri-shell-he"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${tauriDirectResolution}
         step="login"
       >
         <elohim-imagodei-trust-indicator
@@ -555,8 +539,6 @@ export const Hebrew: Story = {
         <span slot="footer">Running on this device &middot; commons</span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('mode-b-tauri-shell-he', tauriDirectResolution);
-    return el;
   },
   parameters: {
     docs: {

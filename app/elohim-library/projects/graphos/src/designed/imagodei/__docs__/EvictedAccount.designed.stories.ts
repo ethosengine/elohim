@@ -175,17 +175,8 @@ const evictedResolution: AuthorityResolution = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Decorators
 // ---------------------------------------------------------------------------
-
-function injectAuthority(shellId: string, resolution: AuthorityResolution) {
-  setTimeout(() => {
-    const shell = document.getElementById(shellId);
-    if (shell && '_setAuthority' in shell) {
-      (shell as unknown as { _setAuthority: (r: AuthorityResolution) => void })._setAuthority(resolution);
-    }
-  }, 0);
-}
 
 function lightDecorator(story: () => unknown) {
   return html`
@@ -269,10 +260,9 @@ export const Default: Story = {
   name: 'Default (eviction)',
   decorators: [lightDecorator],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="evicted-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${evictedResolution}
       >
         <elohim-imagodei-trust-indicator
           slot="header"
@@ -357,8 +347,6 @@ export const Default: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('evicted-shell', evictedResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -393,10 +381,9 @@ export const Dark: Story = {
       font-family: 'Source Serif 4', Georgia, serif;
     `;
 
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="evicted-shell-dark"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${evictedResolution}
       >
         <elohim-imagodei-trust-indicator
           slot="header"
@@ -472,8 +459,6 @@ export const Dark: Story = {
         </span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('evicted-shell-dark', evictedResolution);
-    return el;
   },
   parameters: {
     docs: {
@@ -496,10 +481,9 @@ export const RecoveryInProgress: Story = {
   name: 'RecoveryInProgress',
   decorators: [lightDecorator],
   render: () => {
-    const el = html`
+    return html`
       <elohim-imagodei-portal-shell
-        id="evicted-recovery-shell"
-        authority-endpoint="/nonexistent-url-story-safe"
+        .authority=${evictedResolution}
       >
         <elohim-imagodei-trust-indicator
           slot="header"
@@ -546,8 +530,6 @@ export const RecoveryInProgress: Story = {
         <span slot="footer">commons stewardship</span>
       </elohim-imagodei-portal-shell>
     `;
-    injectAuthority('evicted-recovery-shell', evictedResolution);
-    return el;
   },
   parameters: {
     docs: {
