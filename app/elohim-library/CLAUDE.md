@@ -242,8 +242,56 @@ The two stories live in different directories with different titles. They cover 
 
 ---
 
+## Library scope — thin-client discipline
+
+Both Library A and Library B exist to **demonstrate UI primitives**. The pattern library, the fixtures it ships, and the services exposed from `@elohim/service` / `@elohim/identity` / `@elohim/rea-runtime` are all scoped to legitimate client-side concerns:
+
+1. **UX** — what the user sees, how it looks, how it behaves
+2. **Accessibility** — keyboard, screen reader, focus, contrast, motion preferences
+3. **Sense-and-respond** — reacting to substrate-provided state, emitting user-intent signals
+
+That is the legitimate scope. Code that crosses out of it does not belong in `app/elohim-library/` (and does not belong in `app/elohim-elements/` either — see `app/elohim-elements/CLAUDE.md`).
+
+### Anti-patterns to flag (in services, in story fixtures, in pattern compositions)
+
+If you find any of the following being added to a library service, a pattern story, or proposed for migration INTO this library, **stop**. It is a substrate concern, not a client concern, and the substrate-correct home is the backend (doorway route handler, zome coordinator function, or storage projection layer):
+
+| Anti-pattern | Substrate-correct home |
+|---|---|
+| **HTTP / zome-call orchestration** that aggregates across multiple substrate entries | Storage projection (`elohim-storage/src/views.rs`); the library service receives a single ts-rs view |
+| **REA economic-event creation** (signing, validating, projecting `EconomicEvent` / `Commitment` / `FeedbackSignal`) | Mishpat / elohim zome coordinator function; doorway route emits the projection; library service receives the resulting view |
+| **Signal-aggregation arithmetic across many entries** (computing consensus strength, controversy thresholds, settled-state derivation across all participants) | Storage projection. Library service consumes the aggregate view, doesn't compute it. (Per-row helper functions that derive a status flag from one already-aggregated view are fine — see Slice 2.2b `SignalAccumulationService`.) |
+| **Submission-flow orchestration** (multi-step transactions, retry policy, error reconciliation, idempotency) | Doorway route owns the transaction; library service exposes the route's HTTP surface; the consumer renders submit / busy / success / error states from a single observable |
+| **Mediation / consent / governance authority logic** | Zome coordinator function (the substrate has standing to enforce); library service exposes the view |
+| **Recognition / standing / mastery wiring** (weight computation, affinity distribution, attestation recording) | REA primitive in `mishpat::Commitment`; library service exposes the view |
+| **Cache invalidation across multiple substrate views** beyond simple per-view caching | `elohim-storage` cache layer publishes invalidation signals; library service subscribes |
+| **Cross-pillar transaction coordination** (one user action that has to update multiple pillars atomically) | Doorway route owns the orchestration; library service exposes one observable per pillar view |
+
+Pure helpers — functions that derive a status flag from one already-supplied view, or interpret a string-union, or compute a UI-shape from a substrate-shape — ARE legitimate. The line is between **interpreting one view** (client-OK) and **orchestrating across substrate** (backend-only).
+
+### Why this discipline matters
+
+The substrate ([stewardship-over-sovereignty](../../genesis/docs/architecture/stewardship-over-sovereignty.md) §3) is the steward. When orchestration moves client-side, the client begins to own responsibilities the substrate should hold — and that breaks:
+
+- **Cross-host consistency** — three client instances compute the same aggregation three different ways
+- **Offline correctness** — client orchestration assumes connectivity; substrate-mediated flows degrade gracefully
+- **Auditability** — REA events created client-side bypass the substrate's notarization story
+- **Multi-client uniformity** — every consumer (`elohim-app`, Tauri desktop, doorway projection, third-party) renders the same elements; if elements/library services own orchestration, every client re-implements it
+
+The five libraries (`@elohim/service`, `elohim-core`, `@elohim/storage-client`, `@elohim/identity`, `@elohim/rea-runtime`) are Category C (operational) per [elohim-sdk](../../genesis/docs/architecture/elohim-sdk.md) §1. They hold no source-of-truth state. Anything that LOOKS like state-owning code on the client is a sign the substrate owes a new route or zome function — not a sign the library needs a thicker service.
+
+### When you find this
+
+You don't fix it by thickening a library service. You don't fix it by inlining the orchestration into a consuming pillar. You open a backend-migration ticket naming the substrate-correct destination (doorway route name, zome function signature, projection view name), and you leave the existing Angular orchestration in place until the backend lands. The Slice 2.2b deferral (the three `@app/qahal` Angular components retained in `content-viewer.component.ts`) is the worked example. See [pillar-bundle-split runbook §6.14](../../genesis/docs/architecture/pillar-bundle-split-runbook.md#614--client-side-stateful-orchestrator-anti-pattern-smell-to-fix) for the canon shape.
+
+---
+
 ## Cross-references
 
+- Element-substrate gospel (scope discipline): `app/elohim-elements/CLAUDE.md`
+- SDK boundary canon: `genesis/docs/architecture/elohim-sdk.md`
+- Pillar-bundle-split runbook (includes §6.14 backend-migration anti-pattern): `genesis/docs/architecture/pillar-bundle-split-runbook.md`
+- Substrate principle: `genesis/docs/architecture/stewardship-over-sovereignty.md`
 - Capability Profile primitive spec: `genesis/docs/superpowers/specs/2026-05-20-capability-profile-element-contract-design.md`
 - Brand design spec: `genesis/graphos/elohim-protocol-design-spec.md`
 - Protocol vocabulary register: `genesis/graphos/vocabulary.md`
