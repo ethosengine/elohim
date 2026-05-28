@@ -18,6 +18,9 @@ export { REAActions, LamadEventTypes } from './lib/rea-action-types';
 export type { ProtocolEventType, EventREAMapping } from './lib/protocol-event-types';
 export { ProtocolEventTypes, PROTOCOL_EVENT_MAPPINGS, PROTOCOL_UNITS } from './lib/protocol-event-types';
 
+// LamadEventIntent — intent wire shape for POST /api/v1/lamad/events (M-REA-1)
+export type { LamadEventIntent } from './lib/lamad-event-intent.types';
+
 // EventService — hREA EconomicEvent service
 export { EventService, EVENT_API } from './lib/event.service';
 export type {

@@ -4,25 +4,23 @@
  * Migrated to @elohim/rea-runtime from @app/shefa/services/event.service
  * as part of Wave 2 Slice 2.4 of the cross-pillar import cleanup sprint.
  *
- * This service provides high-level operations for hREA economic events:
- * - Recording content interactions (views, completions, assessments)
- * - Recording path progress events
- * - Querying events for analytics
+ * ## M-REA-1: emitEvent primary API
  *
- * NOTE: This service uses the elohim-storage SQLite backend via the injected
- * IEconomicEventApi token. The concrete StorageApiService implementation is
- * provided by elohim-app at DI root level.
+ * `emitEvent(intent)` is the single canonical entry point. Callers pass a
+ * `LamadEventIntent` discriminated union; the substrate (elohim-storage
+ * `POST /api/v1/lamad/events`) composes the full EconomicEvent
+ * (action, provider, receiver) using PROTOCOL_EVENT_MAPPINGS. No client-side
+ * REA composition needed.
+ *
+ * The `record*` methods below delegate to `emitEvent` and are kept only for
+ * backwards compatibility. New call sites MUST use `emitEvent` directly.
  *
  * ValueFlows/hREA Action Types:
  * - 'use': Consuming a resource (e.g., viewing content)
  * - 'produce': Creating value (e.g., completing an assessment)
  * - 'transfer': Moving between agents (e.g., recognition transfer)
  * - 'cite': Attribution/citation
- * - 'appreciate': Recognition/appreciation
- *
- * TODO(slice-2.1): When StorageApiService migrates to @elohim/service, update
- * the concrete provider registration in elohim-app's DI root to point to the
- * new import path. The EVENT_API token itself needs no change.
+ * - 'raise': Recognition/appreciation (used by recognition-given)
  */
 
 import { Injectable, InjectionToken, inject } from '@angular/core';
@@ -31,9 +29,13 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import type { EconomicEventView } from '@elohim/storage-client/generated';
+// LamadEventIntent: local re-declaration that stays in sync with the
+// canonical generated file in elohim-service/src/generated/lamad-event-intent.ts.
+// Source of truth: elohim/sdk/schemas/v1/intents/lamad-event-intent.schema.json
+// TODO(post-M-REA-1): add @elohim/service tsconfig path alias + import from there.
+import type { LamadEventIntent } from './lamad-event-intent.types';
 
 import { type LamadEventType, LamadEventTypes, REAActions } from './rea-action-types';
-import { type ProtocolEventType, PROTOCOL_EVENT_MAPPINGS } from './protocol-event-types';
 
 export { LamadEventTypes, REAActions };
 export type { LamadEventType };
@@ -43,8 +45,9 @@ export type { LamadEventType };
 // =============================================================================
 
 /**
- * Input shape for creating an economic event.
- * Matches the StorageApiService.createEconomicEvent parameter.
+ * Input shape for creating an economic event via the legacy direct-REA path.
+ * Kept for StorageApiService backwards compatibility.
+ * New code uses `emitLamadIntent` instead.
  */
 export interface CreateEconomicEventParams {
   action: string;
@@ -60,7 +63,6 @@ export interface CreateEconomicEventParams {
 
 /**
  * Query parameters for fetching economic events.
- * Matches the StorageApiService.getEconomicEvents parameter.
  */
 export interface EconomicEventQuery {
   agentId?: string;
@@ -75,8 +77,17 @@ export interface EconomicEventQuery {
  *
  * StorageApiService in elohim-app implements this interface. Libraries
  * inject this token; elohim-app provides the concrete implementation.
+ *
+ * `emitLamadIntent` calls `POST /api/v1/lamad/events` — the M-REA-1
+ * conductor-first path where the substrate composes the REA shape.
+ *
+ * `createEconomicEvent` calls `POST /api/v1/economic-events` — kept for
+ * backwards compatibility with existing callers that still build REA params
+ * client-side. M-REA-2 will retire this path once all callers migrate to
+ * `emitLamadIntent`.
  */
 export interface IEconomicEventApi {
+  emitLamadIntent(intent: LamadEventIntent): Observable<EconomicEventView>;
   createEconomicEvent(params: CreateEconomicEventParams): Observable<EconomicEventView>;
   getEconomicEvents(query: EconomicEventQuery): Observable<EconomicEventView[]>;
 }
@@ -110,66 +121,77 @@ export class EventService {
   private readonly eventApi = inject(EVENT_API);
 
   // ===========================================================================
-  // Protocol-Level Content Interaction
+  // Primary API — M-REA-1
+  // ===========================================================================
+
+  /**
+   * Emit a lamad event intent to the substrate.
+   *
+   * The substrate (`POST /api/v1/lamad/events`) composes the full EconomicEvent
+   * (action, provider, receiver) from the intent using PROTOCOL_EVENT_MAPPINGS.
+   * No client-side REA composition required.
+   *
+   * This is the single canonical call site for all new code.
+   *
+   * @example
+   * ```ts
+   * eventService.emitEvent({
+   *   agentId: session.agentId,
+   *   lamadEventType: 'content-view',
+   *   contentId: content.id,
+   * }).subscribe();
+   * ```
+   */
+  emitEvent(intent: LamadEventIntent): Observable<EconomicEventView> {
+    return this.eventApi.emitLamadIntent(intent);
+  }
+
+  // ===========================================================================
+  // Deprecated — kept for backwards compatibility, delegate to emitEvent
   // ===========================================================================
 
   /**
    * Record a content interaction as a protocol-level REA event.
    *
-   * This is the generic protocol primitive. A "view" is an attention resource
-   * event. A "complete" is an achievement resource event. The interaction type
-   * determines the REA action and resource mapping.
+   * @deprecated Use emitEvent({ agentId, lamadEventType: interactionType, contentId }) instead.
    */
   recordContentInteraction(
     agentId: string,
     contentId: string,
-    interactionType: ProtocolEventType
+    interactionType: LamadEventType
   ): Observable<EconomicEventView> {
-    const mapping = PROTOCOL_EVENT_MAPPINGS[interactionType];
-    return this.eventApi.createEconomicEvent({
-      action: mapping.action,
-      provider: agentId,
-      receiver: contentId,
-      lamadEventType: interactionType,
-      contentId,
-    });
+    // LamadEventType is a superset of the schema intent types; the deprecated
+    // method accepts the wider type for backwards compat. The substrate validates.
+    return this.emitEvent({ agentId, lamadEventType: interactionType as LamadEventIntent['lamadEventType'], contentId });
   }
 
-  // ===========================================================================
-  // Content Interaction Events (deprecated — use recordContentInteraction)
-  // ===========================================================================
-
   /**
-   * @deprecated Use recordContentInteraction(agentId, contentId, 'content-view') instead.
+   * @deprecated Use emitEvent({ agentId, lamadEventType: 'content-view', contentId }) instead.
    */
   recordContentView(agentId: string, contentId: string): Observable<EconomicEventView> {
-    return this.recordContentInteraction(agentId, contentId, 'content-view');
+    return this.emitEvent({ agentId, lamadEventType: 'content-view', contentId });
   }
 
   /**
-   * @deprecated Use recordContentInteraction(agentId, contentId, 'content-complete') instead.
+   * @deprecated Use emitEvent({ agentId, lamadEventType: 'content-complete', contentId }) instead.
    */
   recordContentComplete(agentId: string, contentId: string): Observable<EconomicEventView> {
-    return this.recordContentInteraction(agentId, contentId, 'content-complete');
+    return this.emitEvent({ agentId, lamadEventType: 'content-complete', contentId });
   }
-
-  // ===========================================================================
-  // Path Progress Events
-  // ===========================================================================
 
   /**
    * Record path step completion.
+   *
+   * @deprecated Use emitEvent({ agentId, lamadEventType: 'path-step-complete', pathId, metadata: { stepId } }) instead.
    */
   recordStepComplete(
     agentId: string,
     pathId: string,
     stepId: string
   ): Observable<EconomicEventView> {
-    return this.eventApi.createEconomicEvent({
-      action: REAActions.PRODUCE,
-      provider: agentId,
-      receiver: agentId,
-      lamadEventType: LamadEventTypes.PATH_STEP_COMPLETE,
+    return this.emitEvent({
+      agentId,
+      lamadEventType: 'path-step-complete',
       pathId,
       metadata: { stepId },
     });
@@ -177,34 +199,26 @@ export class EventService {
 
   /**
    * Record path completion.
+   *
+   * @deprecated Use emitEvent({ agentId, lamadEventType: 'path-complete', pathId }) instead.
    */
   recordPathComplete(agentId: string, pathId: string): Observable<EconomicEventView> {
-    return this.eventApi.createEconomicEvent({
-      action: REAActions.PRODUCE,
-      provider: agentId,
-      receiver: agentId,
-      lamadEventType: LamadEventTypes.PATH_COMPLETE,
-      pathId,
-    });
+    return this.emitEvent({ agentId, lamadEventType: 'path-complete', pathId });
   }
-
-  // ===========================================================================
-  // Assessment Events
-  // ===========================================================================
 
   /**
    * Record assessment start.
+   *
+   * @deprecated Use emitEvent({ agentId, lamadEventType: 'assessment-start', contentId, metadata: { assessmentId } }) instead.
    */
   recordAssessmentStart(
     agentId: string,
     contentId: string,
     assessmentId: string
   ): Observable<EconomicEventView> {
-    return this.eventApi.createEconomicEvent({
-      action: REAActions.USE,
-      provider: agentId,
-      receiver: contentId,
-      lamadEventType: LamadEventTypes.ASSESSMENT_START,
+    return this.emitEvent({
+      agentId,
+      lamadEventType: 'assessment-start',
       contentId,
       metadata: { assessmentId },
     });
@@ -212,6 +226,8 @@ export class EventService {
 
   /**
    * Record assessment completion.
+   *
+   * @deprecated Use emitEvent({ agentId, lamadEventType: 'assessment-complete', contentId, metadata: { assessmentId, score } }) instead.
    */
   recordAssessmentComplete(
     agentId: string,
@@ -219,11 +235,9 @@ export class EventService {
     assessmentId: string,
     score?: number
   ): Observable<EconomicEventView> {
-    return this.eventApi.createEconomicEvent({
-      action: REAActions.PRODUCE,
-      provider: agentId,
-      receiver: agentId,
-      lamadEventType: LamadEventTypes.ASSESSMENT_COMPLETE,
+    return this.emitEvent({
+      agentId,
+      lamadEventType: 'assessment-complete',
       contentId,
       metadata: { assessmentId, score },
     });
@@ -231,6 +245,8 @@ export class EventService {
 
   /**
    * Record quiz submission.
+   *
+   * @deprecated Use emitEvent({ agentId, lamadEventType: 'quiz-submit', contentId, metadata: { quizId, correct, score } }) instead.
    */
   recordQuizSubmit(
     agentId: string,
@@ -239,22 +255,18 @@ export class EventService {
     correct: boolean,
     score?: number
   ): Observable<EconomicEventView> {
-    return this.eventApi.createEconomicEvent({
-      action: REAActions.PRODUCE,
-      provider: agentId,
-      receiver: agentId,
-      lamadEventType: LamadEventTypes.QUIZ_SUBMIT,
+    return this.emitEvent({
+      agentId,
+      lamadEventType: 'quiz-submit',
       contentId,
       metadata: { quizId, correct, score },
     });
   }
 
-  // ===========================================================================
-  // Recognition Events
-  // ===========================================================================
-
   /**
    * Record recognition given to a contributor.
+   *
+   * @deprecated Use emitEvent({ agentId, lamadEventType: 'recognition-given', contentId, contributorPresenceId, resourceQuantityValue: amount, resourceQuantityUnit: 'recognition' }) instead.
    */
   recordRecognitionGiven(
     fromAgentId: string,
@@ -262,19 +274,18 @@ export class EventService {
     contentId: string,
     amount = 1
   ): Observable<EconomicEventView> {
-    return this.eventApi.createEconomicEvent({
-      action: REAActions.APPRECIATE,
-      provider: fromAgentId,
-      receiver: toPresenceId,
-      lamadEventType: LamadEventTypes.RECOGNITION_GIVEN,
+    return this.emitEvent({
+      agentId: fromAgentId,
+      lamadEventType: 'recognition-given',
       contentId,
       contributorPresenceId: toPresenceId,
-      resourceQuantity: { value: amount, unit: 'recognition' },
+      resourceQuantityValue: amount,
+      resourceQuantityUnit: 'recognition',
     });
   }
 
   // ===========================================================================
-  // Query Methods
+  // Query Methods (unchanged)
   // ===========================================================================
 
   /**
@@ -313,7 +324,7 @@ export class EventService {
   }
 
   // ===========================================================================
-  // Analytics Helpers
+  // Analytics Helpers (unchanged)
   // ===========================================================================
 
   /**
