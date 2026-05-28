@@ -71,6 +71,7 @@ pub mod reciprocity_view;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
 pub mod relationship_service;
+pub mod republish_epr_validator;
 pub mod resilience; // C2 — hub projection for /api/v1/resilience/{id}/hub
 pub mod resource_nature;
 pub mod resource_service;
