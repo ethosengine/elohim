@@ -635,6 +635,37 @@ fn validate_commitment_entry(commitment: &Commitment) -> ExternResult<ValidateCa
             "Commitment.signed_at must be non-empty".into(),
         ));
     }
+    // Sprint 3: replicates-dwelling defense-in-depth.
+    // Coordinator does full schema validation; integrity catches direct-source-chain bypass.
+    if commitment.action == "replicates-dwelling" {
+        let meta = commitment.payload_json.trim();
+        if meta.is_empty() || !meta.starts_with('{') {
+            return Ok(ValidateCallbackResult::Invalid(
+                "replicates-dwelling requires payload_json as a JSON object".into(),
+            ));
+        }
+        // Recipient must be non-empty (anonymous replication forbidden).
+        if !meta.contains("recipient_dwelling_hub_id") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "replicates-dwelling requires recipient_dwelling_hub_id field".into(),
+            ));
+        }
+        if meta.contains("\"recipient_dwelling_hub_id\":\"\"") || meta.contains("\"recipient_dwelling_hub_id\": \"\"") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "replicates-dwelling recipient_dwelling_hub_id must be non-empty".into(),
+            ));
+        }
+        // Provider role must be one of the two enum values (substring check).
+        let has_steward_mutual = meta.contains("\"provider_role\":\"steward_mutual\"")
+            || meta.contains("\"provider_role\": \"steward_mutual\"");
+        let has_collective_steward = meta.contains("\"provider_role\":\"collective_steward\"")
+            || meta.contains("\"provider_role\": \"collective_steward\"");
+        if !has_steward_mutual && !has_collective_steward {
+            return Ok(ValidateCallbackResult::Invalid(
+                "replicates-dwelling provider_role must be steward_mutual or collective_steward".into(),
+            ));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -737,5 +768,53 @@ mod tests {
             decoded.indemnification_actions_json,
             o.indemnification_actions_json
         );
+    }
+
+    // =========================================================================
+    // replicates-dwelling Commitment tests (Sprint 3)
+    // =========================================================================
+
+    #[test]
+    fn replicates_dwelling_well_formed_accepted() {
+        let event = Commitment {
+            action: "replicates-dwelling".into(),
+            payload_json: r#"{"action":"replicates-dwelling","provider_dwelling_hub_id":"hub:A","recipient_dwelling_hub_id":"hub:B","provider_role":"steward_mutual","capacity_bytes":1}"#.into(),
+            signed_at: "2026-05-28T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn replicates_dwelling_empty_recipient_rejected() {
+        let event = Commitment {
+            action: "replicates-dwelling".into(),
+            payload_json: r#"{"action":"replicates-dwelling","provider_dwelling_hub_id":"hub:A","recipient_dwelling_hub_id":"","provider_role":"steward_mutual"}"#.into(),
+            signed_at: "2026-05-28T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn replicates_dwelling_missing_recipient_rejected() {
+        let event = Commitment {
+            action: "replicates-dwelling".into(),
+            payload_json: r#"{"action":"replicates-dwelling","provider_dwelling_hub_id":"hub:A","provider_role":"steward_mutual"}"#.into(),
+            signed_at: "2026-05-28T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn replicates_dwelling_unknown_role_rejected() {
+        let event = Commitment {
+            action: "replicates-dwelling".into(),
+            payload_json: r#"{"action":"replicates-dwelling","provider_dwelling_hub_id":"hub:A","recipient_dwelling_hub_id":"hub:B","provider_role":"totally-bogus"}"#.into(),
+            signed_at: "2026-05-28T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }
