@@ -267,7 +267,7 @@ def resolveHumanAssignments(String strategy, String customAssignments) {
             // (healthy) but are also gated — accepted simplification per plan
             // Q-A (default A2). When shem replacement lands, restoring those
             // entries here is part of the un-suspend workflow.
-            def fullDistribution = [adam: 'alpha', matthew: 'alpha', jessica: 'alpha', pete: 'staging', timothy: 'staging', frank: 'prod']
+            def fullDistribution = [adam: 'alpha', matthew: 'alpha', jessica: 'alpha', james: 'alpha', pete: 'staging', frank: 'prod']
             assignments = fullDistribution.findAll { name, _env -> registry.any { it.name == name } }
             break
         case 'custom':
@@ -300,8 +300,28 @@ def resolveHumanAssignments(String strategy, String customAssignments) {
 def getEnvConfig() {
     return [
         alpha: [
+            // Single-doorway fallback bootstrap/signal — used by deployHumanManifest
+            // when an env doesn't declare per-doorway sub-maps. Points at doorway-A
+            // (the on-prem doorway) so anything pre-federation keeps the historical
+            // behavior; alpha's per-human routing rule overrides this for both
+            // family-three and remote personas via doorwayA/doorwayB below.
             bootstrapUrl: 'https://doorway-alpha.elohim.host/bootstrap',
             signalUrl: 'wss://signal.doorway-alpha.elohim.host',
+            // Per-human primary doorway routing (alpha only — staging/prod still
+            // run single-doorway envs and use the fallback pair above). Selection
+            // rule lives in deployHumanManifest: humanConfig.nodeTypes containing
+            // 'remote' → doorwayB (shem apex, elohim.host); else → doorwayA
+            // (on-prem, doorway-alpha.elohim.host). Hostnames MUST match the
+            // doorway manifests' ingress declarations (alpha.yaml + alpha-b.yaml)
+            // — change in lockstep with those files if either side moves.
+            doorwayA: [
+                bootstrapUrl: 'https://doorway-alpha.elohim.host/bootstrap',
+                signalUrl: 'wss://signal.doorway-alpha.elohim.host',
+            ],
+            doorwayB: [
+                bootstrapUrl: 'https://elohim.host/bootstrap',
+                signalUrl: 'wss://signal.elohim.host',
+            ],
             doorwayManifest: 'genesis/orchestrator/manifests/doorway/alpha.yaml',
             envFile: 'genesis/orchestrator/environments/alpha.env',
             infraManifests: ['genesis/orchestrator/manifests/infra/alpha-mongodb.yaml', 'genesis/orchestrator/manifests/infra/alpha-nats.yaml'],
@@ -552,6 +572,26 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // deploys outside us-central — at that point, move to deployments.json.
     def region = 'us-central'
 
+    // Per-human primary doorway selection. When the env declares doorwayA +
+    // doorwayB sub-maps (alpha today), route based on nodeTypes containing
+    // 'remote': shem-side personas → doorwayB (elohim.host / signal.elohim.host),
+    // on-prem family-three → doorwayA (doorway-alpha.elohim.host /
+    // signal.doorway-alpha.elohim.host). Single-doorway envs (staging, prod)
+    // fall back to envConfig.bootstrapUrl/signalUrl. This is the single-primary
+    // shape — multi-registration / DNS failover deferred pending the federation
+    // audit (see genesis/docs/superpowers/sprints/2026-05-27-federation-wiring-audit.md
+    // and memory project_multi_doorway_human_registration). The genesis pair
+    // (matthew on-prem, adam shem) end up co-located with their respective
+    // doorway, which removes the cross-WireGuard signaling hop the previous
+    // single-doorway-for-everyone shape forced.
+    def primaryDoorway
+    if (envConfig.doorwayA && envConfig.doorwayB) {
+        def isRemote = (humanConfig.nodeTypes ?: []).contains('remote')
+        primaryDoorway = isRemote ? envConfig.doorwayB : envConfig.doorwayA
+    } else {
+        primaryDoorway = [bootstrapUrl: envConfig.bootstrapUrl, signalUrl: envConfig.signalUrl]
+    }
+
     def sedArgs = [
         // Image tag placeholders
         "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
@@ -567,8 +607,8 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|ENV_PLACEHOLDER|${humanConfig.env}|g",
         "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
         "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",
-        "s|BOOTSTRAP_URL_PLACEHOLDER|${envConfig.bootstrapUrl}|g",
-        "s|SIGNAL_URL_PLACEHOLDER|${envConfig.signalUrl}|g",
+        "s|BOOTSTRAP_URL_PLACEHOLDER|${primaryDoorway.bootstrapUrl}|g",
+        "s|SIGNAL_URL_PLACEHOLDER|${primaryDoorway.signalUrl}|g",
         "s|P2P_BOOTSTRAP_NODES_PLACEHOLDER|${p2pNodes}|g",
         // Node-local storage class — P2P dataplane owns replication, not k8s.
         "s|STORAGE_CLASS_PLACEHOLDER|openebs-hostpath|g",
@@ -926,7 +966,7 @@ spec:
         )
         string(
             name: 'HUMAN_ASSIGNMENTS',
-            defaultValue: 'matthew:alpha,jessica:alpha,pete:alpha,timothy:alpha,frank:alpha',
+            defaultValue: 'matthew:alpha,adam:alpha,jessica:alpha,james:alpha,pete:alpha',
             description: 'name:env pairs. Only used when DEPLOY_STRATEGY=custom.'
         )
         booleanParam(
@@ -1675,7 +1715,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             }
 
                             def strategy = (params.DEPLOY_STRATEGY ?: 'alpha-concentration')
-                            def customAssignments = (params.HUMAN_ASSIGNMENTS ?: 'matthew:alpha,jessica:alpha,pete:alpha,timothy:alpha,frank:alpha')
+                            def customAssignments = (params.HUMAN_ASSIGNMENTS ?: 'matthew:alpha,adam:alpha,jessica:alpha,james:alpha,pete:alpha')
                             def allHumans = resolveHumanAssignments(strategy, customAssignments)
                             def allEnvConfig = getEnvConfig()
 
