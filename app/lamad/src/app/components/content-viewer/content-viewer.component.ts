@@ -50,14 +50,19 @@ import {
   createProfileFromTemplate,
 } from '@app/lamad/models/feedback-profile.model';
 // NOTE: FeedbackMechanismGatewayComponent + GraduatedFeedbackComponent + ReactionBarComponent
-// retained pending L-slice migration of MechanismSelectionService + SignalAccumulationService
-// + GovernanceRecognitionService out of @app/qahal. The Lit equivalents
-// (<elohim-feedback-mechanism-gateway>, <elohim-graduated-feedback>, <elohim-reaction-bar>)
-// require those orchestration services to be relocated to a shared workspace first;
-// otherwise migrating the C-slice import here would force ADDING new L-slice imports
-// from @app/qahal (mechanism-selection, signal-accumulation, governance-recognition)
-// to inline-orchestrate the now-stateless Lit elements — net cross-pillar count goes up.
-// See Slice 2.2b acceptance report for the full picture.
+// retained as the canonical stateful orchestrators for governance feedback UX.
+// The Lit equivalents (<elohim-feedback-mechanism-gateway>, <elohim-graduated-feedback>,
+// <elohim-reaction-bar>) exist in elohim-core as STATELESS primitives that accept
+// pre-computed selection/accumulationStatus props and emit submission events. The ~1650
+// lines of orchestration that today live inside the three @app/qahal Angular components
+// (API calls, form state, submission flow, mediation/recognition wiring) have no library
+// home yet, so swapping content-viewer to the Lit elements would force that orchestration
+// to be inlined here or duplicated into a lamad-local service. Slice 2.2b closure (2026-05-28)
+// migrated 2/3 of the contributing services to @elohim/service (MechanismSelectionService,
+// SignalAccumulationService); GovernanceRecognitionService remains in @app/qahal pending
+// its RecognitionApiService chain. These three component imports are therefore documented
+// composition-root-equivalent imports under the stateful-orchestrator deferral pattern —
+// see genesis/docs/architecture/pillar-bundle-split-runbook.md §6.11 + §6.14.
 import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import {
   FeedbackContext,

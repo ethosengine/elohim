@@ -279,6 +279,28 @@ LAMAD_* tokens (§6.11) and SDK tokens (§6.12) carry narrow interfaces that mir
 
 Source: cross-pillar import cleanup sprint Slice 2.3 residual report (commit `3247740d9`); the lamadIdentityGuard intentionally omitted the imagodei guard's settle-wait loop, captured as a known limitation.
 
+### §6.14 — Stateful-orchestrator deferral (component-import edge case)
+
+The composition-root pattern (§6.11) and token-bridge (§6.12) work cleanly for SERVICE imports. They don't apply cleanly to ANGULAR COMPONENT imports — components are imported by class for template registration; you can't `useExisting` a component the way you can a service.
+
+When a cross-pillar Angular component encapsulates substantial stateful orchestration (API calls, form state, submission flow, mediation/recognition wiring) AND the protocol's blank-slate Lit equivalent in `elohim-core` is stateless (accepting computed state as `@property` and emitting events), the orchestration has nowhere to migrate to until either (a) it relocates to a library service, or (b) the consuming pillar's lamad-local service surface inlines it.
+
+**Pattern:** when this situation arises, the component imports are documented as **stateful-orchestrator deferrals**. The deferral comment in the consuming component names:
+
+1. The Angular component imports being retained
+2. The blank-slate Lit equivalents that exist
+3. The size of the orchestration logic that would need to move to swap to Lit
+4. Which contributing services HAVE already migrated and which remain (per §6.12 token-bridge candidates)
+5. Pointer to this section + §6.11 for the canon justification
+
+**Worked example:** Slice 2.2b of the cross-pillar import cleanup sprint surfaced this pattern. `app/lamad/src/app/components/content-viewer/content-viewer.component.ts` retains imports of `FeedbackMechanismGatewayComponent`, `GraduatedFeedbackComponent`, and `ReactionBarComponent` from `@app/qahal`. The Slice 2.2b closure (commit `625d02a0f`) migrated `MechanismSelectionService` and `SignalAccumulationService` to `@elohim/service` (clean — type-only or library-only deps); `GovernanceRecognitionService` remains in `@app/qahal` pending its `RecognitionApiService` chain. The Lit elements (`<elohim-reaction-bar>`, `<elohim-graduated-feedback>`, `<elohim-feedback-mechanism-gateway>`) are stateless primitives. Swapping content-viewer to them would force ~1650 lines of orchestration to be inlined into content-viewer or duplicated into a lamad-local service. The deferral comment in content-viewer.component.ts L52-67 names this and points here.
+
+**Exit path:** stateful-orchestrator deferrals close when EITHER:
+- A library service emerges that wraps the orchestration (the Lit elements stay stateless; the new service does the API + form-state work; consumers compose service + Lit elements directly). This is the cleaner long-term outcome.
+- The pillar's lamad-local service surface absorbs the orchestration (the consuming bundle takes ownership). Acceptable when the orchestration is genuinely consumer-specific rather than cross-cutting.
+
+Source: cross-pillar import cleanup sprint Slice 2.2b closure (commit `625d02a0f`, 2026-05-28); operator's "thorough job carry on" directive uncovered the size of the orchestration migration.
+
 ---
 
 ## §7 — Worked Example: The Lamad Split
