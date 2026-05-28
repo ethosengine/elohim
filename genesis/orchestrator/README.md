@@ -20,35 +20,45 @@ GitHub Webhook → Orchestrator → Analyze Changesets → Trigger Pipelines →
 
 ## Pipeline Configuration
 
-```groovy
-PIPELINES = [
-    'elohim-holochain': [
-        changePatterns: ['holochain/dna/', 'holochain/holochain-cache-core/'],
-        dependsOn: [],
-        triggersGenesis: true
-    ],
-    'elohim-edge': [
-        changePatterns: ['doorway/', 'doorway-app/', 'holochain/edgenode/', 'holochain/manifests/'],
-        dependsOn: ['elohim-holochain'],
-        triggersGenesis: true
-    ],
-    'elohim': [
-        changePatterns: ['elohim-app/', 'elohim-library/', 'VERSION'],
-        dependsOn: ['elohim-holochain'],
-        triggersGenesis: true
-    ],
-    'elohim-genesis': [
-        changePatterns: ['genesis/'],
-        dependsOn: ['elohim-holochain', 'elohim-edge', 'elohim'],
-        triggersGenesis: false
-    ],
-    'elohim-steward': [
-        changePatterns: ['steward/'],
-        dependsOn: ['elohim-holochain'],
-        manualOnly: true
-    ]
-]
+Each pipeline declares its metadata in a `build-manifest.json` file. The orchestrator uses `graph-walker.mjs` to walk these manifests and build a dependency graph.
+
+### Example: `elohim/holochain/build-manifest.json`
+
+```json
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-holochain",
+  "jenkinsPath": "Jenkinsfile",
+  "manualOnly": false,
+  "triggersGenesis": true,
+  "cascades": true,
+  "dependsOn": [],
+  "changePatterns": [
+    "holochain/dna/",
+    "holochain/holochain-cache-core/"
+  ],
+  "steps": {
+    "build": { "stage": "Build", "step": "cargo build" },
+    "test": { "stage": "Test", "step": "cargo test" }
+  },
+  "gate": {
+    "metric": "testCoverage",
+    "minimum": 75
+  },
+  "deployment": {
+    "environments": ["alpha", "staging", "prod"]
+  }
+}
 ```
+
+### How to Add a New Pipeline
+
+1. Create `<project>/build-manifest.json` with `pipeline`, `jenkinsPath`, `changePatterns`, `dependsOn`, and other metadata
+2. Ensure the Jenkinsfile at `jenkinsPath` exists and validates `UpstreamCause` or `UserIdCause`
+3. Run `node genesis/orchestrator/scripts/generate-pipeline-list.mjs` to update the Bash-consumable artifact
+4. Commit both files
+
+The orchestrator automatically discovers all manifests at startup.
 
 ## Dependency Graph
 
