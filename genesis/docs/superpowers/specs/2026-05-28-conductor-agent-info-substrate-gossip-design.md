@@ -259,9 +259,13 @@ Each pod publishes every 60s. Each other pod's worker batches into one admin RPC
 
 Cold start runs again. Subscriber immediately receives steady-state heartbeats from the cluster. Publisher restarts on `wait_for_ready`; FIRST publish (publish_now) immediately announces the pod to the cluster.
 
-### The seeder's perspective (unchanged)
+### The seeder's perspective
 
-Hash-mod split across `SEEDER_TARGET_PEERS` as today. Each AccountPackage lands at one primary. Substrate (kitsune2 DHT gossip, now cross-doorway-capable) handles fanout. The "split the payload, let the substrate sync" contract holds end-to-end. No seeder code change.
+The seeder has two write shapes against the substrate, and step-zero substrate gossip closes the cross-doorway sync gap for one in full and for the other only partially:
+
+**Content writes (`seed-accounts.ts`):** hash-mod split across `SEEDER_TARGET_PEERS`. Each AccountPackage lands at one primary peer. Holochain DHT gossip — now cross-doorway-capable — handles fanout. The "split the payload, let the substrate sync" contract holds end-to-end. No seeder code change.
+
+**Projection-commitment writes (`seed-projections.ts`):** single-POST against one `DOORWAY_URL`. Author-side projection path is identical to content (local conductor commits → post-commit → `ProjectionSignal::ReaCommitmentCommitted` → in-process subscriber → `rea_commitments` upsert → SSE `projection.registered` → `EprRouter.replace_all`). DHT gossip still propagates the entry to other clusters' conductors. But because Holochain's `post_commit` fires only on local commits (per `dna/CLAUDE.md` gospel), remote peers' `rea_projection` signal subscriber never observes the entry, the remote `rea_commitments` table stays empty, and the remote doorway's `EprRouter` never learns about the projection. Step-zero substrate gossip is **necessary** for cross-doorway projection availability (no DHT propagation without it) but **not sufficient** — see "Sibling Federation Gaps" in the implementation plan for the concurrent work (F1: receiver-side projection, F2: bi-doorway seeding) that closes the EPR-delivery story end-to-end.
 
 ## Error handling
 

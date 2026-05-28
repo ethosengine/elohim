@@ -1455,3 +1455,19 @@ Plan complete and saved to `genesis/docs/superpowers/plans/2026-05-28-conductor-
 **2. Inline Execution** — Execute tasks in this session using executing-plans, batch execution with checkpoints.
 
 Which approach?
+
+---
+
+## Sibling Federation Gaps (out of scope for this plan; named for the EPR-delivery handoff)
+
+Step-zero substrate gossip closes **cross-cluster DHT propagation** — necessary for any cross-doorway delivery story to work. It does NOT close the following concurrent gaps that the doorway-A / doorway-B EPR-delivery story also needs once Wave 3 bundle-split (`ce945bdfd`) lands on dev. Track these as sibling backlog items, not as additions to this plan's tasks.
+
+| Gap | What it is | File / evidence | Fix shape (one option) |
+|---|---|---|---|
+| **F1 — Remote-receive projection-commitment visibility** | `project-epr` commitments only project on the LOCAL author. Holochain's `post_commit` fires only on local commits (per `dna/CLAUDE.md` gospel); remote peers receive the DHT entry via gossip but never get a `ProjectionSignal::ReaCommitmentCommitted`, so `rea_commitments` table stays empty on every doorway that didn't author. Result: remote doorway's `EprRouter` has no row → `/lamad` → 404 even after this plan's substrate-gossip lands. | DNA `content_store/src/lib.rs:10613` (post_commit iterates `committed_actions` — local only); `elohim-storage/src/rea_projection.rs:336-361`; `elohim-storage/src/services/rea_commitment_service.rs:62,106,177,214` (only emit-sites for `StorageEvent::ProjectionRegistered`) | Seeder dual-POST (POST each projection to BOTH doorways; content-addressed `id` collapses duplicates via 409) **OR** DHT-poll projector that `get_links`-walks `project-epr` anchors scoped to `doorwayId=self` every N seconds and upserts newly-seen commitments + emits SSE. |
+| **F2 — Jenkins seeds ONE doorway** | `Seed Projections` stage seeds only `RESOLVED_DOORWAY_HOST` (one doorway per branch family — `doorway-alpha.elohim.host` on dev/feat/claude; `doorway.elohim.host` on main). Default spec set declares projections for BOTH doorways but all land in one storage's `rea_commitments`. | `genesis/Jenkinsfile:355` (`def doorwayHost = env.RESOLVED_DOORWAY_HOST`); `genesis/seeder/src/seed-projections.ts:206-214` (default set is bi-doorway) | Loop the seeder invocation across both doorway hosts in the same stage. ~5-line Jenkinsfile change. Required if F1's chosen fix is dual-POST; redundant-but-harmless if F1's chosen fix is the DHT-poll projector. |
+| **F4 — Bundle blob reachability cross-doorway** | Even with EPR projections live on both doorways, the lamad bundle's blob chunks served by doorway-B's storage must already be in doorway-B's pantry. Per `project_inventory_exchange_not_byte_replication`, inventory gossip is in place but byte replication is partial. | self-healing-p2p-dataplane spec (Plans 1+2+3) | Out of this plan's scope but adjacent — flag for tracking. |
+
+EPR delivery cross-doorway requires the union of: **this plan** (substrate-gossip propagates entries cross-cluster) + **F1** (remote storage actually projects them) + **F2** (both doorways are seeded as authors, if F1=dual-POST) + **F4** (the blobs reach the remote doorway). Substrate-gossip unblocks the others; it does not close them.
+
+The HyperCard endpoint (`GET /api/v1/epr/{id}`) and any read-through atom resolution work as a side effect of this plan closing (no additional federation work needed — the existing conductor `get(entry_hash)` path resolves once DHT propagation is live).
