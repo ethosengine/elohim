@@ -27,6 +27,40 @@ This plan converts spec §1–§11 into substrate-first tickets, sequenced so an
 
 ---
 
+## §1.4 — Upstream-surface verification audit (2026-05-28)
+
+Before any ticket dispatches, the plan's upstream assumptions were verified against `dev`. Findings below; per-finding actions are folded into the ticket bodies that depended on them.
+
+### Verified ✓
+
+| Assumption | Where | Status |
+|---|---|---|
+| `LamadEventIntent` JSON wire schema exists | `elohim/sdk/schemas/v1/intents/lamad-event-intent.schema.json` | ✓ Landed. Carries `agentId` + `lamadEventType` discriminant + ~30 enum values (content-view, mastery, stewardship-begin, etc.). B-PILLAR-SHEFA's `StagedEconomicEventIntent` is byte-identical modulo title. |
+| M-REA-1 doorway route `POST /api/v1/lamad/events` | Doorway storage-proxy + route-registry pattern; referenced from `app/elohim-library/projects/elohim-rea-runtime/src/lib/event.service.ts:11+81+130` | ✓ Landed. Route lives in the generic storage-proxy registry, not a dedicated file. `EventService.emitEvent(intent)` is the canonical client entry. B-PILLAR-SHEFA's graduation replays through this existing route. |
+| `MANIFEST_KINDS` constant + whitelist mechanism | `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/manifest.rs:37` + validation check at line 96 | ✓ Landed. Whitelist-as-constant pattern confirmed. B-APPRAISE Phase 2's `"graduation-record"` kind addition is a one-line append. |
+| The 4 deferred consumer line counts | path-negotiation 691 / content-mastery 766 / mastery-stats 465 / human-consent 555 / LocalSourceChainService 605 | ✓ Unchanged since plan-write. B-CONSUMERS scope is stable. |
+| `HolochainSourceChainService` read-path coverage | `app/elohim-library/projects/elohim-service/src/angular/services/holochain-source-chain.service.ts` (81 lines) | ✓ Adequate. Exposes `getEntries(agentId)` + `getLinks(agentId)` + `filterByType(entries, label)` — the three surfaces the 4 ex-consumers need for member-state reads. |
+| `WisdomInvocationInput` + `WisdomInvocationResponse` schemas | `elohim/sdk/schemas/v1/inputs/wisdom-invocation-input.schema.json` + `.../views/wisdom-invocation-response.schema.json` | ✓ Landed. Wire format for elohim-agent appraisal already canonical. |
+| `ElohimAgentService` + `invoke_wisdom` + `WisdomPhase` stub-as-default | `elohim/elohim-agent/elohim-agent-service/src/wisdom.rs` + `service.rs` + `capability/types.rs` | ✓ Landed and rich. Phase-observed-from-outcome rule (DevContext stub vs ElohimActive real-LLM) means the bridge can ship appraisal surface with stub responses today and flip to real inference without code changes. **Critical for Q7 refinement — see §6.** |
+| `ElohimCapability` enum (28 capability variants across content, knowledge map, care, governance, path, family, feedback profile, place, reach negotiation) | `elohim/elohim-agent/elohim-agent-service/src/capability/types.rs` | ✓ Landed. The substrate already names which capabilities elohim agents bring to appraisal work; bridge composes with this taxonomy, doesn't invent a parallel one. |
+| Capability Profile spec canonizes `appStandings` + Sub-project #4 deferral | `genesis/docs/superpowers/specs/2026-05-20-capability-profile-element-contract-design.md:376` + line 683 | ✓ Confirmed. The user's Q15 reframing maps cleanly to Sub-project #4 (the spec's existing forward-reference). **Critical for Q15 refinement — see §6.** |
+
+### Drift discovered ✗
+
+| Assumption | Reality | Action taken |
+|---|---|---|
+| `@elohim/identity` is a stable landing target for `VisitorSessionService` | The library's `public-api.ts` has a `PENDING` block: `identity.model`, `profile.model`, `profile.service`, `identity.service`, `identity.guard` are all blocked on Slice 2.1 (L-slice) deps (`agency.model`, `@app/elohim/models/{agent,json-ld,open-graph}`, out-of-scope imagodei services). Only `content-access.model`, `session-human.model`, `session-human.service`, `attestations.model` are LANDED. | **B-DOORWAY Step 3d constraint added:** `VisitorSessionService` MUST NOT inherit deps on the PENDING modules. It composes against `session-human.service` (LANDED) only. `LifecycleAwareReachGuard` similarly avoids `identity.guard` until that lands. Documented in §1.6 below. |
+| The bridge needs its own `AppraisalAgent` trait | The substrate already has `ElohimAgentService` + `invoke_wisdom` + `WisdomInvocationInput/Response` schemas + `ElohimCapability` taxonomy + phase-observed-from-outcome stub flow | **B-APPRAISE ticket rewritten:** drop the proposed `AppraisalAgent` trait; compose against existing `ElohimAgentService.invoke_wisdom`. The bridge work becomes batch-extending the wisdom-invocation input to carry the staged-intent pool as a batch, NOT inventing a parallel appraisal surface. See §6 Q7. |
+| Q15 framing = "extend the standings axis with pre-member lifecycle values" | The Capability Profile spec splits Standings into **protocol-core (HARD-enforced)** + **app-declared (SOFT-enforced)** and has a canonical deferral (Sub-project #4) for the app-manifest `appStandings` schema. The user's reframing is sharper: elohim-core declares its capability cells; app-manifest declares appStandings + capability-resolution rules; visitor's resolved profile on arrival determines rendering; missing-cell feedback flows back to the app-EPR. | **Q15 reframed in §6 below:** the bridge's lifecycle values become **protocol-core Standings** (anonymous / oauth-identified / peer-native-sampling / peer-native-member). App-manifest's appStandings schema work stays where the canon already places it: Sub-project #4 of the Capability Profile spec. Missing-cell-as-EPR-feedback is the broader vision; not for this sprint. |
+
+### Inherited dependencies confirmed
+
+- M-REA-2 landed (`AttentionTracker` slimmed to ~30 lines, posts to native `/attention/tending` route per commit `e61b89668`). B-CONSUMERS doesn't touch attention-shaped writes — confirmed clean.
+- M-REA-3 landed (mishpat `create_recognition_event_from_participation` coordinator + `/api/v1/mishpat/recognition/participation` route per commits `e1c0ac873` + `d27d92098`). B-PILLAR-MISHPAT's rejection-only surface doesn't compete with M-REA-3's substrate work.
+- `elohim-agent-sdk` exists as a TypeScript package (`elohim/elohim-agent/elohim-agent-sdk/` with `Dockerfile` + `src/` + `package.json`). Long-term, the bridge's appraisal surface could surface through this SDK; v1 work goes through doorway HTTP routes per the existing `EventService` pattern.
+
+---
+
 ## §1.5 — P2P Design Gate (mandatory before tickets)
 
 Every entity the bridge introduces was walked through `.claude/skills/p2p-design-gate/SKILL.md`. The headline result confirms the spec's substrate framing: **the bridge introduces NO new DHT entry types**. Tentative state is not notary state by definition — it is operational projection. Canonical state appears at graduation time and uses existing entry types in the destination pillars.
@@ -89,7 +123,7 @@ Per the SDK canon §4 placement principle: *"Is it auth / session / profile / id
 
 | Symbol | Home | Justification |
 |---|---|---|
-| `VisitorSessionService` (Angular) | `@elohim/identity` (`app/elohim-library/projects/elohim-identity/`) | Identity lifecycle primitive; siblings to `SessionHumanService`. Per cradle-to-grave §6 "knows the human's standing across life stages" — pre-member is the new pre-stage; same library carries it. |
+| `VisitorSessionService` (Angular) | `@elohim/identity` (`app/elohim-library/projects/elohim-identity/`) | Identity lifecycle primitive; siblings to `SessionHumanService`. Per cradle-to-grave §6 "knows the human's standing across life stages" — pre-member is the new pre-stage; same library carries it. **Verification audit constraint (§1.4):** the library's `public-api.ts` has a PENDING block — `identity.model`, `profile.model`, `profile.service`, `identity.service`, `identity.guard` are blocked on L-slice deps (`agency.model`, out-of-scope imagodei services). `VisitorSessionService` MUST compose against `session-human.service` (LANDED) only; it does not import any PENDING module. `LifecycleAwareReachGuard` similarly avoids `identity.guard` until that lands. |
 | `SessionLifecycle`, `StagedIntent` envelope, `GraduationOffer`, `GraduationManifest` (TS types) | `@elohim/storage-client` (`elohim/sdk/storage-client-ts/src/generated/`) via the JSON-schema codegen path | Wire shapes; the same generated-types pipeline that distributes view types per `INTERFACE_FILES` in `codegen-ts.mjs`. Per SDK canon §3.3 "snake_case never crosses the boundary"; bridge codegen follows the same rule. |
 | Pillar-specific staged intents (`StagedMasteryIntent`, `StagedConsentIntent`, etc.) | `@elohim/storage-client` generated; pillar-bundle-local DI wrappers | Generated wire types live in storage-client; the Angular service that stages a specific pillar's intent lives in that pillar's bundle (lamad consumer in `app/lamad/src/app/services/`; imagodei consumer in `app/elohim-app/src/app/elohim/services/`). |
 | `LifecycleAwareReachGuard` (route guard) | `@elohim/identity` | New route-guard primitive that gates Angular routes by lifecycle state (e.g., a route allowed for OauthIdentified+; an Anonymous visitor sees a graduation prompt). Sibling to `identityGuard`. |
@@ -608,41 +642,63 @@ Add the `graduation` top-level section declaring `deterministicCeremony: "lamad:
 
 ---
 
-### Ticket B-APPRAISE: Elohim inference surface for negotiated graduation (v1 = deterministic-only; negotiated upgrade gated)
+### Ticket B-APPRAISE: Compose graduation with existing elohim-agent wisdom-invocation substrate (v1 deterministic; batch upgrade in Phase 2)
 
-**Spec section:** §4 (negotiated resolution + appraisal), §8 Q7 (which elohim appraises) — DEFERRED per `DO NOT RESOLVE`.
+**Spec section:** §4 (negotiated resolution + appraisal). **Refined per verification audit §1.4** — the substrate already has the appraisal primitives; this ticket composes against them rather than introducing a parallel surface.
 
-**Step 3a — Two-phase landing:**
+**Substrate primitives this ticket composes against (verified in §1.4):**
+- `elohim/elohim-agent/elohim-agent-service/src/wisdom.rs` — `invoke_wisdom` async surface; `WisdomInvocationInput { constitution_cid, framing_cid, context_keys, context_json, event_summary }`; `WisdomInvocationResponse { decision, phase, reasoning, side_effects }` where decision is `Allow | Decline | Escalate | Verdict | NeedDeeper`.
+- `WisdomPhase` — phase-observed-from-outcome: `DevContext` (stub fallback when no LLM backend) vs `ElohimActive` (real inference). Bridge ships with `DevContext` responses out of the box; flips to `ElohimActive` the moment any operator wires `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`.
+- `ElohimCapability` enum (28 variants) — taxonomy the bridge references for "which capabilities does this appraisal exercise."
+- `elohim/sdk/schemas/v1/inputs/wisdom-invocation-input.schema.json` + `.../views/wisdom-invocation-response.schema.json` — canonical wire formats.
 
-**Phase 1 (v1):** Land the `GraduationOffer` / `NegotiatedResolution` types from B-CRATE in active use, but with `negotiated_resolutions` always empty. Every staged intent classifies as `DeterministicResolution`. The bridge ships a usable graduation path without any inference dependency. The Half-Price Books offer is a strict 1:1 mapping; refusal still works; partial-accept still works.
+**Step 3a — Phase 1 (deterministic-only, no substrate change):**
 
-**Phase 2 (v1.5, gated on operator design pass for §8 Q7):** Introduce a single-elohim appraisal trait `AppraisalAgent` with `appraise(intent, target_context_signals) -> AppraisalResult` async surface. Wire one of the three §8 Q7 options:
-- (a) Participant's home-elohim (familiar; consented profile)
-- (b) Target context's commons-elohim (per `project_commons_elohim_co_steward`)
-- (c) Neutral counsel elohim (per `project_elohim_as_counsel`)
+Land `GraduationOffer` / `NegotiatedResolution` types from B-CRATE with `negotiated_resolutions` always empty. Every staged intent classifies as `DeterministicResolution`. The Half-Price Books offer is a strict 1:1 mapping; refusal works; partial-accept works. No wisdom invocation in Phase 1. Bridge ships a usable graduation path with zero new appraisal substrate.
 
-For v1.5, the smallest-reasonable-default is **(a) home-elohim only**. Three-elohim ceremony (home + commons + neutral) deferred behind a §6 operator decision.
+**Step 3a-bis — Phase 2 (batch + rich-context wisdom-invocation extension):**
+
+Extend the existing wisdom-invocation surface to handle BATCH input rather than a single event. Concretely:
+- Extend `wisdom-invocation-input.schema.json` with optional `staged_intent_batch` field (array of staged-intent envelopes) + optional `session_context` field (lifecycle + sampling-cache snapshot + consented participant signals). Existing single-event invocations continue to validate (additive change).
+- Regenerate Rust types via `cargo test export_bindings`; existing `invoke_wisdom` callers compile unchanged.
+- Bridge composes the `WisdomInvocationInput` at graduation time:
+  - `constitution_cid` resolves from the target context's manifest-declared constitution
+  - `framing_cid` resolves from the per-pillar `graduation` declaration (per §1.7) — pillar-specific framing CIDs let each pillar control how appraisal is framed
+  - `context_keys` enumerates the rich-context dimensions the bridge populates (lifecycle, sampling cache, participant profile slice, target-context standing-curve, prior sponsor witnesses for qahal-membership intents, etc.)
+  - `context_json` is the serialized subset
+  - `event_summary` is a deterministic human-readable summary of the batch
+  - `staged_intent_batch` is the full session pool (NEW field)
+  - `session_context` is the lifecycle + cache snapshot (NEW field)
+- Bridge calls `ElohimAgentService.invoke_wisdom(input)` (existing surface).
+- Bridge maps `WisdomDecision` into the `GraduationOffer`'s deterministic / negotiated / rejected / discarded split per spec §4 algorithm.
+- `WisdomPhase` propagates onto `GraduationOffer::elohim_appraisal_notes` so the participant sees whether the appraisal came from stub (DevContext) or real inference (ElohimActive). The participant always knows what shape of authority they're refusing or accepting.
+
+**No new `AppraisalAgent` trait. No parallel substrate.** The bridge becomes another caller of `invoke_wisdom`, alongside existing callers (constitutional gate; content review; recognition; etc.).
+
+**Step 3a-tris — Per-pillar elohim-role manifest declaration (per Q7 deferral):**
+
+The app-manifest's `graduation` section (per §1.7) carries a `framingCid` field — the per-pillar wisdom-framing identifier. Which elohim runs the appraisal (Q7 — DEFERRED, not resolved this sprint) is determined by how that framing CID is composed at the pillar's discretion. Lamad might use its home-elohim; qahal might use a commons-co-steward framing; a third-party pillar might use a custom elohim with capabilities the substrate's taxonomy hasn't seen. The bridge doesn't choose; the manifest declares; the wisdom-invocation substrate routes.
 
 **Step 3b — Optional appraisal-record manifest:**
 
-When the participant accepts the offer, the bridge OPTIONALLY notarizes the appraisal as a `Manifest{kind: "graduation-record"}` entry on the graduating identity's source chain (private). This requires whitelisting `"graduation-record"` in `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/manifest.rs:MANIFEST_KINDS` and extending the manifest payload schema with `manifest-payloads/graduation-record.schema.json`.
+When the participant accepts the offer, the bridge OPTIONALLY notarizes the appraisal as a `Manifest{kind: "graduation-record"}` entry on the graduating identity's source chain (private). The kind whitelist landed in B-MANIFEST. Payload schema lands here: `elohim/sdk/schemas/v1/manifest-payloads/graduation-record.schema.json` (carries `wisdom_invocation_id`, `decision`, `phase`, `reasoning` summary — enough for the participant to audit). The `appraisal_record: Option<EntryHash>` field on `GraduationManifest` populates with the ActionHash; opt-in per graduation event (default: opt-in per §6 Q8).
 
-The `appraisal_record: Option<EntryHash>` field on `GraduationManifest` populates with the ActionHash when notarization is requested; participant opts in per graduation event (default: opt-in is the smallest-reasonable-default — explicit auditability).
-
-**Step 3c — HTTP surface unchanged.** The graduation routes from B-DOORWAY already expose `GraduationOffer` / `GraduationManifest`; Phase 1 returns offers with empty `negotiated_resolutions`; Phase 2 returns populated ones.
+**Step 3c — HTTP surface unchanged.** Graduation routes from B-DOORWAY already expose `GraduationOffer` / `GraduationManifest`; Phase 1 returns offers with empty `negotiated_resolutions`; Phase 2 returns populated ones plus `WisdomPhase` annotation.
 
 **Schema artifacts:**
-- `elohim/sdk/schemas/v1/intents/session-bridge/appraisal-result.schema.json` (Phase 2)
-- `elohim/sdk/schemas/v1/manifest-payloads/graduation-record.schema.json` (Phase 2)
+- Phase 2: `wisdom-invocation-input.schema.json` extension (batch fields) — DELTA to existing schema, not a new file
+- Phase 2: `elohim/sdk/schemas/v1/manifest-payloads/graduation-record.schema.json` (new)
 
 **Acceptance:**
-1. Phase 1 lands with deterministic-only graduation flowing end-to-end across the existing B-DOORWAY routes; participant can accept, refuse, partial-accept.
-2. Phase 2 (gated): a single appraisal agent (home-elohim) produces `NegotiatedResolution` entries for the qahal-membership flow (the most appraisal-relevant pillar); other pillars stay deterministic in Phase 2 unless the operator extends the gate.
-3. The `Manifest{kind: "graduation-record"}` entry validates against the new payload schema; sweettest verifies the entry round-trips through the DHT.
+1. Phase 1 lands with deterministic-only graduation flowing end-to-end; participant can accept, refuse, partial-accept; no wisdom invocation surface touched.
+2. Phase 2 lands the wisdom-invocation-input batch extension; the bridge composes batch + rich context; calls existing `invoke_wisdom`; maps `WisdomDecision` to `GraduationOffer` shape.
+3. Phase 2 ships with `WisdomPhase::DevContext` stub responses out of the box; integration test confirms an `ANTHROPIC_API_KEY` env flips to `WisdomPhase::ElohimActive` without code change.
+4. The `Manifest{kind: "graduation-record"}` entry validates against the new payload schema; sweettest verifies the entry round-trips through the DHT.
+5. No new `AppraisalAgent` trait introduced; no parallel substrate (review against §1.4 verification finding).
 
-**Dependencies:** Phase 1 has no dependencies beyond B-CRATE + B-DOORWAY. Phase 2 dependent on §6 Q7 operator decision.
+**Dependencies:** Phase 1 has no dependencies beyond B-CRATE + B-DOORWAY. Phase 2 depends on B-MANIFEST (kind whitelist) + the per-pillar manifest `framingCid` declarations from Wave C.
 
-**Commits expected:** ~2 (Phase 1 land; Phase 2 land if/when unblocked).
+**Commits expected:** ~2 (Phase 1 land; Phase 2 wisdom-invocation extension + bridge compose + graduation-record payload schema).
 
 ---
 
@@ -899,10 +955,12 @@ The spec §8 holds 11 open questions. This plan ships smallest-reasonable defaul
 
 ### From the appraisal/negotiation framing in spec §4 (Q7–Q11)
 
-**Q7 — Which elohim appraises (home / commons-co-steward / neutral / all three)?**
-- *Operator decision:* which of the three elohim categories runs the appraisal, or whether all three participate (three-elohim ceremony).
-- *v1 default:* **(a) participant's home-elohim only** (single-elohim path). The home-elohim is the only one with consented participant profile, so this is the lowest-friction starting point. Commons-elohim + neutral counsel deferred behind explicit operator design pass — both have substantial substrate implications (cross-substrate elohim invocation surface; consent + reach gates between elohim).
-- *Implementation surface:* `AppraisalAgent` trait in B-APPRAISE Phase 2 takes a single agent; multi-agent ceremony adds a `MultiAgentAppraisal` trait later.
+**Q7 — Which elohim appraises (REFRAMED per operator guidance + verification audit).**
+- *Operator guidance (2026-05-28):* Which elohim appraises is **context-dependent**. An elohim-agent with an app-manifest role does the appraisal — could be custom per pillar, but still bridges context from the visitor's session into the target context. The bridge's job is **not** to choose the appraiser; it's to iterate the elohim gate so it handles **batch** input and **rich-context** gathering from the staged-intent pool, with the actual inference call stubbed for now.
+- *Verification (§1.4):* The substrate ALREADY has the appraisal primitives — `ElohimAgentService` + `invoke_wisdom` + `WisdomInvocationInput/Response` + `ElohimCapability` enum + the phase-observed-from-outcome stub-as-default rule (`WisdomPhase::DevContext` when no LLM is wired; `WisdomPhase::ElohimActive` when one is). The bridge does NOT introduce its own `AppraisalAgent` trait. It composes against the existing wisdom-invocation surface.
+- *v1 default (refined):* B-APPRAISE Phase 1 stays deterministic-only (no wisdom invocation). B-APPRAISE Phase 2 **extends the existing `WisdomInvocationInput` to accept batch input** — a `staged_intent_pool` field carrying the full session's staged intents instead of a single event. The `context_keys` + `context_json` fields already exist on the schema; the bridge populates them with the visitor's session lifecycle + the target context's standing-curve + the consented participant context. The inference call returns `WisdomPhase::DevContext` stub responses out of the box; the moment any operator wires an LLM backend (ANTHROPIC_API_KEY / OPENAI_API_KEY env), `WisdomPhase::ElohimActive` flips on with zero code change.
+- *Which elohim is the appraiser (deferred — operator decision NOT being resolved):* the app-manifest declares the role of the elohim-agent that runs appraisal for THAT pillar (potentially custom). The bridge looks up the manifest-declared elohim role at graduation time and invokes through the existing service. Three-elohim ceremony (home + commons + neutral, per `project_elohim_councils_capture_apex`) is one possible configuration; the substrate doesn't preclude it. The choice belongs to each pillar's manifest, not the bridge.
+- *Implementation surface (refined):* B-APPRAISE Phase 2 = (a) extend `wisdom-invocation-input.schema.json` with optional `staged_intent_batch` field; (b) Rust types regenerate from schema; (c) bridge's graduation flow composes the batch from the session pool + rich context, calls `invoke_wisdom`, maps the `WisdomDecision` (Allow / Decline / Escalate / Verdict / NeedDeeper) into the `GraduationOffer`'s deterministic / negotiated split. No new trait. No new substrate.
 
 **Q8 — Appraisal auditability and reproducibility.**
 - *Operator decision:* whether appraisals are reproducible, notarized, comparable.
@@ -943,10 +1001,16 @@ These surfaced during the gate analysis above and are NOT in the spec §8 list. 
 - *v1 default:* third-party pillars only land if the runtime operator (doorway / steward / hub) deliberately adds the pillar crate to their Cargo dependencies AND invokes the pillar's `register_<pillar>_ceremonies` at composition root. This is a hard-coded compile-time + composition-root authorization gate. Manifest-signing / stewardship-attestation / qahal-witness authorization is deferred.
 - *Operator decision needed:* what does federation-shaped pillar authorization look like when third-party pillars want to ship without operator-side recompilation? Probably a `Manifest{kind:"pillar-authorization"}` entry that vouches for a pillar's staged-intent contract; needs design work.
 
-**Q15 — Capability Profile standings-axis extension.**
-- *Background:* §1.9 proposes the pre-member lifecycle values (Anonymous, OauthIdentified, PeerNativeSampling, PeerNativeMember-zero-standing) extend the existing `standings` axis of the Capability Profile rather than adding a new dimension. This is the smallest-correct extension to the canon but requires updating the Capability Profile spec.
-- *v1 default:* the spec extension lands as part of the spec follow-up; until then, elohim-core elements that need lifecycle-aware rendering use a pillar-bundle-local `lifecycle` input property and bind ad hoc. Library A default stories pick up the patterns conventionally but not from the formal profile.
-- *Operator decision needed:* should the lifecycle values be a new sub-axis under `standings`, OR a separate top-level axis? §1.9 recommends sub-axis (less invasive); a new axis would make lifecycle rendering more orthogonal. Worth a quick capability-profile-spec design pass.
+**Q15 — Capability surface for lifecycle-aware rendering (REFRAMED per operator guidance + verification audit).**
+- *Operator guidance (2026-05-28):* elohim-core should have its OWN capability levels (intrinsic — the element knows what cells it can render in). The app-manifest should provide PLACEHOLDERS to consider the user's capabilities for that kind of rendering — so a visitor gets a UX that matches their capability grant **on arrival**. If the app-manifest does not implement the necessary surfaces for accessibility, that becomes feedback to the app-EPR that might force implementation of the missing surface capabilities. **This is how elohim-core creates interfaces for implementation in compliant app-manifests.** Not for this sprint, but it's the model.
+- *Verification (§1.4):* The Capability Profile spec ALREADY canonizes this model. §5 splits Standings into:
+  - **§5.1 Protocol-core Standings (HARD-enforced)** — `pilot`, `contributor`, `steward`, `elohim-support`. If declared required and not held, the element refuses to render via `<elohim-standing-refused>` slot.
+  - **§5.2 App-declared Standings (SOFT-enforced)** — declared in app-manifest under `appStandings`. If required and not held, element renders `<elohim-standing-placeholder>` (graceful degradation; not load-bearing for protocol).
+  - **Sub-project #4 (spec line 683, DEFERRED in the spec itself)** — *"Full app-manifest schema for `appStandings` (required/optional, descriptions, defaults, placeholder copy)."* This is exactly the substrate the operator's reframing describes. The deferral is canon; the bridge doesn't pre-empt it.
+- *v1 default (refined):* the bridge contributes the four lifecycle values as **protocol-core Standings** (anonymous / oauth-identified / peer-native-sampling / peer-native-member). These join the existing core Standings list (pilot / contributor / steward / elohim-support) at the §5.1 tier, HARD-enforced via `<elohim-standing-refused>`. The bridge's `SessionLifecycle` resolves to exactly one of these Standings at any moment; the Capability Profile carries it; elements declaring lifecycle-required cells get refused or rendered per the existing element-contract pattern.
+- *What this sprint does NOT touch:* the app-manifest `appStandings` schema (Sub-project #4 of the Capability Profile spec). Pillars adopt that schema on the spec's timeline, not the bridge's. The bridge's pre-member Standings are protocol-core, so they work even without `appStandings` being formalized.
+- *What this sprint enables for future work:* missing-cell-as-EPR-feedback flow — when an element declares a cell it can render in and the app-manifest's capability resolution can't deliver the visitor to that cell on arrival, a FeedbackSignal entry against the app-EPR records the gap. Future pillar implementations of the missing surface capability close the loop. Tracked here so it doesn't get lost; substrate work goes through the Capability Profile spec's Sub-project #4 + feedback-information-flows design.
+- *Implementation surface (this sprint):* a one-paragraph follow-up patch to the Capability Profile spec §5.1 adding the four lifecycle Standings to the protocol-core enumeration. No structural change. No element-contract churn. Captured as a doc PR alongside the B-CRATE landing.
 
 **Q16 — Cradle-to-grave canon extension.**
 - *Background:* §1.9 names the pre-stage gradient (visitor → oauth-identified → peer-native-sampling → peer-native-member) as the substrate's "approach to the cradle" surface. The existing cradle-to-grave canon §2 doesn't name it.
