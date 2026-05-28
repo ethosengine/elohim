@@ -30,6 +30,7 @@ pub mod cluster_view;
 pub mod bounds_validator;
 pub mod commitment_fetcher;
 pub mod conductor_writes; // 2026-05-26-substrate-rea-replication-fix — facade for HTTP→conductor zome calls
+pub mod constitutional_ratio_registry;
 pub mod connectivity; // Phase 4 T6 — libp2p connected-peers snapshot helper
 pub mod content_service;
 pub mod device_capacity; // Phase 4 T7 — available bytes helper
