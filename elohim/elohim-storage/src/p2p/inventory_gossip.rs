@@ -24,6 +24,59 @@ use serde::{Deserialize, Serialize};
 /// per the storage-vocabulary memory pin.
 pub const INVENTORY_TOPIC: &str = "elohim/inventory/blob";
 
+/// Canonical wire-format blob address. Wraps a `sha256-<64-lower-hex>`
+/// string and constructor-validates the shape. Once a `BlobAddress`
+/// exists, every downstream consumer can rely on the format without
+/// re-checking.
+///
+/// ## Stage trajectory
+/// This is Stage-1 substrate placeholder. The destination is Stage-4 of
+/// the REA-compute-substrate roadmap, where hosting becomes a
+/// `Mishpat::Commitment` with `action="serve-url-projection"` and
+/// `BlobAddress` becomes the address type referenced in the Commitment's
+/// scope field. The newtype survives the graduation unchanged.
+///
+/// See `genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct BlobAddress(String);
+
+impl BlobAddress {
+    /// Construct from a canonical wire string. Returns Err if the shape
+    /// is not `sha256-<64 lowercase hex>`.
+    pub fn new(s: impl Into<String>) -> Result<Self, VerifyError> {
+        let s = s.into();
+        if is_blob_hash_shaped(&s) {
+            Ok(Self(s))
+        } else {
+            Err(VerifyError::InvalidHashFormat(s))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for BlobAddress {
+    type Error = VerifyError;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Self::new(s)
+    }
+}
+
+impl From<BlobAddress> for String {
+    fn from(b: BlobAddress) -> Self {
+        b.0
+    }
+}
+
+impl std::fmt::Display for BlobAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 /// Periodic full-state snapshot. Replaces the receiver's per-peer entries
 /// with the snapshot's set. Accepted regardless of sequence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -61,6 +114,17 @@ pub enum VerifyError {
     EmptySignature,
     EmptyDelta,
     InvalidHashFormat(String),
+}
+
+impl std::fmt::Display for VerifyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VerifyError::EmptyPeerId => write!(f, "peer ID cannot be empty"),
+            VerifyError::EmptySignature => write!(f, "signature cannot be empty"),
+            VerifyError::EmptyDelta => write!(f, "delta must contain at least one add or remove"),
+            VerifyError::InvalidHashFormat(s) => write!(f, "invalid blob hash format: {}", s),
+        }
+    }
 }
 
 impl BlobInventorySnapshot {
@@ -274,5 +338,34 @@ mod tests {
     #[test]
     fn topic_constant_matches_spec() {
         assert_eq!(INVENTORY_TOPIC, "elohim/inventory/blob");
+    }
+
+    #[test]
+    fn blob_address_accepts_canonical_wire() {
+        let addr = BlobAddress::new(sha256_wire('a')).unwrap();
+        assert_eq!(addr.as_str(), sha256_wire('a'));
+    }
+
+    #[test]
+    fn blob_address_rejects_bare_hex() {
+        assert!(matches!(
+            BlobAddress::new("a".repeat(64)),
+            Err(VerifyError::InvalidHashFormat(_))
+        ));
+    }
+
+    #[test]
+    fn blob_address_round_trips_via_serde() {
+        let addr = BlobAddress::new(sha256_wire('b')).unwrap();
+        let json = serde_json::to_string(&addr).unwrap();
+        let decoded: BlobAddress = serde_json::from_str(&json).unwrap();
+        assert_eq!(addr, decoded);
+    }
+
+    #[test]
+    fn blob_address_deserialize_rejects_invalid_shape() {
+        let json = "\"not-a-hash\"";
+        let result: Result<BlobAddress, _> = serde_json::from_str(json);
+        assert!(result.is_err());
     }
 }
