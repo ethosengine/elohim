@@ -25,6 +25,7 @@ import { ResilienceService as LibResilienceService } from '@elohim/service/publi
 import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { vi, Mock } from 'vitest';
 import { AttentionTrackerService, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
+import { GovernanceApiService } from '@elohim/service';
 
 describe('ContentViewerComponent', () => {
   let component: ContentViewerComponent;
@@ -41,6 +42,7 @@ describe('ContentViewerComponent', () => {
   let routerSpy: any;
   let stewardshipServiceSpy: any;
   let householdResilienceServiceSpy: any;
+  let governanceApiSpy: any;
   let affinityChangesSubject: Subject<any>;
   let pathContextSubject: Subject<any>;
 
@@ -157,6 +159,38 @@ describe('ContentViewerComponent', () => {
       })),
     };
 
+    // Wave D: mock the substrate views that the Lit primitives receive.
+    // getMechanismSelection/getAccumulationStatus replace the old orchestration services.
+    const governanceApiSpyObj = {
+      getMechanismSelection: vi.fn().mockResolvedValue({
+        entityType: 'content',
+        entityId: 'test-content-1',
+        level: 1,
+        mechanism: 'reactions',
+        renderTarget: 'angular',
+        contextMenuOnly: false,
+        allowReactions: true,
+        allowGraduatedFeedback: false,
+        activeProposalId: null,
+        activeProposalMechanism: null,
+        policyManifestCid: null,
+        computedAt: new Date().toISOString(),
+      }),
+      getAccumulationStatus: vi.fn().mockResolvedValue({
+        entityType: 'content',
+        entityId: 'test-content-1',
+        totalSignals: 0,
+        uniqueParticipants: 0,
+        consensusStrength: 0,
+        status: 'pending',
+        readyForSensemaking: false,
+        controversyDetected: false,
+        settled: false,
+        policyManifestCid: null,
+        computedAt: new Date().toISOString(),
+      }),
+    };
+
     const libResilienceSpyObj = {
       getSnapshot: vi.fn().mockReturnValue(of({
         contentId: 'test-content-1',
@@ -198,6 +232,7 @@ describe('ContentViewerComponent', () => {
         { provide: LibResilienceService, useValue: libResilienceSpyObj },
         { provide: SignalHarnessService, useValue: { onRendererComplete: vi.fn().mockResolvedValue(undefined) } },
         { provide: AttentionTrackerService, useValue: { trackContentView: vi.fn(), trackContentLeave: vi.fn(), getSessionViewedIds: vi.fn().mockReturnValue(new Set()) } },
+        { provide: GovernanceApiService, useValue: governanceApiSpyObj },
         { provide: EVENT_API, useValue: { createEconomicEvent: vi.fn().mockReturnValue(of(null)), getEconomicEvents: vi.fn().mockReturnValue(of([])) } },
         { provide: AGENT_CONTEXT, useValue: { getCurrentAgentId: vi.fn().mockReturnValue('test-agent-id') } },
         {
@@ -242,6 +277,7 @@ describe('ContentViewerComponent', () => {
     routerSpy = TestBed.inject(Router);
     stewardshipServiceSpy = TestBed.inject(StewardshipAllocationService);
     householdResilienceServiceSpy = TestBed.inject(HouseholdResilienceService);
+    governanceApiSpy = TestBed.inject(GovernanceApiService);
     vi.spyOn(routerSpy, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(ContentViewerComponent);
@@ -1021,6 +1057,44 @@ describe('ContentViewerComponent', () => {
       tick();
 
       expect(component.canEditContent).toBe(false);
+    }));
+  });
+
+  describe('Wave D — governance substrate views bound to Lit primitives', () => {
+    it('fetches mechanism selection and accumulation status when content loads', fakeAsync(async () => {
+      fixture.detectChanges();
+      tick();
+      // Allow the async loadGovernanceViews() promise to resolve
+      await fixture.whenStable();
+
+      expect(governanceApiSpy.getMechanismSelection).toHaveBeenCalledWith('content', 'test-content-1');
+      expect(governanceApiSpy.getAccumulationStatus).toHaveBeenCalledWith('content', 'test-content-1');
+    }));
+
+    it('stores mechanism selection and accumulation status on component after load', fakeAsync(async () => {
+      fixture.detectChanges();
+      tick();
+      await fixture.whenStable();
+
+      expect(component.mechanismSelection).toEqual({ level: 1, renderTarget: 'angular' });
+      expect(component.accumulationStatus).toEqual({
+        readyForSensemaking: false,
+        controversyDetected: false,
+        settled: false,
+      });
+    }));
+
+    it('degrades gracefully when governance API fails', fakeAsync(async () => {
+      governanceApiSpy.getMechanismSelection.mockRejectedValue(new Error('Network error'));
+      governanceApiSpy.getAccumulationStatus.mockRejectedValue(new Error('Network error'));
+
+      fixture.detectChanges();
+      tick();
+      await fixture.whenStable();
+
+      expect(component.mechanismSelection).toBeNull();
+      expect(component.accumulationStatus).toBeNull();
+      expect(component.isLoadingGovernanceViews).toBe(false);
     }));
   });
 
