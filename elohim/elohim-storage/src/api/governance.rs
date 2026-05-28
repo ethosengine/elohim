@@ -1306,6 +1306,49 @@ pub async fn handle(
             Ok(response::created(&views))
         }
 
+        // =====================================================================
+        // M-POLICY-1: AccumulationStatus projection
+        // GET /api/v1/governance/{entityType}/{entityId}/accumulation
+        //
+        // Returns AccumulationStatusView derived from FeedbackSignal ×
+        // Manifest(kind: standing-policy). Recomputes on every call so the
+        // response reflects any newly-arrived signals; a future cache layer
+        // may serve the pre-computed row from accumulation_status table
+        // instead (see fetch_accumulation_status).
+        // =====================================================================
+        (&Method::GET, path) if path.ends_with("/accumulation") => {
+            // Path shape: /{entityType}/{entityId}/accumulation
+            // Strip leading '/' + trailing '/accumulation' to extract segments.
+            let inner = path
+                .trim_start_matches('/')
+                .trim_end_matches("/accumulation");
+            // inner = "{entityType}/{entityId}"
+            let mut parts = inner.splitn(2, '/');
+            let entity_type = match parts.next() {
+                Some(s) if !s.is_empty() => s,
+                _ => {
+                    return Ok(response::bad_request(
+                        "Path must be /{entityType}/{entityId}/accumulation",
+                    ))
+                }
+            };
+            let entity_id = match parts.next() {
+                Some(s) if !s.is_empty() => s,
+                _ => {
+                    return Ok(response::bad_request(
+                        "Path must be /{entityType}/{entityId}/accumulation",
+                    ))
+                }
+            };
+            let mut conn = get_conn(pool)?;
+            let view = crate::db::accumulation_status::project_accumulation_status(
+                &mut conn,
+                entity_type,
+                entity_id,
+            )?;
+            Ok(response::ok(&view))
+        }
+
         _ => Ok(response::not_found(&format!(
             "Unknown governance route: {} {}",
             method, resource_path
