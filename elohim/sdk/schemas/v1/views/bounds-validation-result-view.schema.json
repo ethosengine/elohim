@@ -13,6 +13,7 @@
       "type": ["object", "null"],
       "description": "Populated iff pass=false. Names the first violation encountered.",
       "required": ["kind", "summary"],
+      "additionalProperties": false,
       "properties": {
         "kind": {
           "type": "string",

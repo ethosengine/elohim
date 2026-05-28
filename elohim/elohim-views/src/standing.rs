@@ -16,6 +16,7 @@ pub struct StandingScoreView {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "PascalCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub enum StandingScoreTier {
     Unknown,
