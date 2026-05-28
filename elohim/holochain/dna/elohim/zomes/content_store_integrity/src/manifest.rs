@@ -269,7 +269,21 @@ mod tests {
     fn graduation_record_is_whitelisted() {
         assert!(
             MANIFEST_KINDS.contains(&"graduation-record"),
-            "MANIFEST_KINDS must include \"graduation-record\" for B-APPRAISE Phase 2 to author appraisal records. See genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md §4 and the parent implementation plan §1.5 Design Constraint 2."
+            "MANIFEST_KINDS must include \"graduation-record\" for B-APPRAISE Phase 2 to author appraisal records. \
+             See genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md §3.2 \
+             (notarizeAppraisal field) and \
+             genesis/docs/superpowers/plans/2026-05-28-session-bridge-implementation.md §1.5 Design Constraint 2."
+        );
+    }
+
+    #[test]
+    fn graduation_record_without_floor_accepted() {
+        // graduation-record is not a policy kind; it should validate without a floor sub-object.
+        // Mirrors onboarding_without_floor_accepted — same principle.
+        let m = make_manifest("graduation-record", None, r#"{"appraisedAt":"2026-05-28"}"#, 1);
+        assert!(
+            m.validate().is_ok(),
+            "graduation-record manifests must not require a floor sub-object"
         );
     }
 
