@@ -353,7 +353,8 @@
           "required": ["$ref"],
           "properties": {
             "$ref": { "type": "string", "minLength": 1 }
-          }
+          },
+          "additionalProperties": false
         },
         "graduatesTo": {
           "type": "string",
@@ -395,8 +396,9 @@
         },
         "framingCid": {
           "type": "string",
+          "pattern": "^epr:",
           "minLength": 1,
-          "description": "Optional. The wisdom-invocation framing CID the bridge composes when invoking appraisal. Per session-bridge implementation plan §6 Q7 — pillar declares which elohim role appraises via the framing CID it composes."
+          "description": "Optional. The wisdom-invocation framing CID the bridge composes when invoking appraisal. Per session-bridge implementation plan §6 Q7 — pillar declares which elohim role appraises via the framing CID it composes. Lightweight pattern guard matches the EPR-CID prefix convention from spec §8 examples (epr:<pillar>:<framing-name>-v<n>); a fuller CIDv1 validator may replace this when the shared EPR-CID schema lands."
         },
         "appraisalAgent": {
           "type": "string",

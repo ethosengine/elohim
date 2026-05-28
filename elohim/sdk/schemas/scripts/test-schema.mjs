@@ -273,6 +273,24 @@ async function main() {
     );
   }
 
+  // Test: Task 2 review fixes — intentSchema closed shape + framingCid pattern guard
+  {
+    const manifestSchemaPath = resolve(__dirname, '../v1/manifest/app-manifest.schema.json');
+    const manifestSchema = await loadJson(manifestSchemaPath);
+
+    const intentSchemaDef = manifestSchema.$defs?.StagedIntentDeclaration?.properties?.intentSchema;
+    assert(
+      intentSchemaDef?.additionalProperties === false,
+      'StagedIntentDeclaration.intentSchema declares additionalProperties: false (closed shape)'
+    );
+
+    const framingCidDef = manifestSchema.$defs?.GraduationPolicy?.properties?.framingCid;
+    assert(
+      typeof framingCidDef?.pattern === 'string' && framingCidDef.pattern.includes('epr:'),
+      'GraduationPolicy.framingCid declares an EPR-CID pattern guard'
+    );
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }
