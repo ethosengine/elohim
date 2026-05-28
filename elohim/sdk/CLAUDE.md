@@ -44,7 +44,7 @@ The protocol owns the **envelope** (wire shape, enums, generic metadata bag). Th
 Two codegen paths:
 
 ```bash
-# Protocol types (enums, wire types) → 3 distribution locations
+# Protocol types (enums, wire types) → 5 distribution locations
 pnpm run schema:codegen:ts
 
 # App domain types (metadata, body, coupling map) → 2 distribution locations

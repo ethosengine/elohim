@@ -50,13 +50,17 @@ This runs `scripts/codegen-ts.mjs` which:
 
 1. **Generates interfaces** from `inputs/` and `views/` schemas via `json-schema-to-typescript`
 2. **Generates enum constants** from `enums/` schemas with `_dna` metadata → `CORE_*`, `ALL_*`, backward-compat alias, `Type` alias
-3. **Distributes** identical files to three locations:
+3. **Distributes** identical files to five locations (see `GENERATED_OUTPUT_DIRS` in `codegen-ts.mjs`):
 
 | Location | Consumer |
 |----------|----------|
 | `genesis/seeder/src/generated/` | Seeder |
 | `app/elohim-app/src/app/generated/` | Angular app |
 | `app/elohim-library/projects/elohim-service/src/generated/` | Shared library |
+| `doorway/doorway-app/src/app/generated/` | Doorway operator dashboard (added Phase 2 L5 for `DoorwayDashboardView` consumers) |
+| `app/lamad/src/generated/` | Lamad SPA bundle (added 2026-05-25 in the pillar-EPR decomposition) |
+
+Plus a pre-distribution barrel at `elohim/sdk/schemas/generated-ts/index.ts` that re-exports every generated input/view/enum module — read-canon for any consumer that wants the full surface in one import.
 
 ### What Gets Distributed
 
