@@ -26,6 +26,7 @@ pub mod contributors;
 pub mod custodians;
 pub mod dashboard;
 pub mod diagnostics_bounds;
+pub mod diagnostics_mutuality;
 pub mod economic_events;
 pub mod epr;
 pub mod exchange;
@@ -35,6 +36,7 @@ pub mod governance;
 pub mod governance_actions;
 pub mod graph_views;
 pub mod hazards;
+pub mod hub_capacity;
 pub mod identity;
 pub mod lamad;
 pub mod mastery;
@@ -42,6 +44,7 @@ pub mod mishpat_recognition;
 pub mod network_posture;
 pub mod node_shape;
 pub mod observations;
+pub mod peer_capacity;
 pub mod peer_statuses;
 pub mod peer_topology;
 pub mod placement_gaps;
@@ -425,6 +428,32 @@ pub async fn handle_api_request(
         // Routes register unconditionally — handlers return 501 when the feature is off.
         let resource_path = sub_path.strip_prefix("graph").unwrap_or("");
         graph_views::handle(req, method, resource_path, graph_engine_ref).await
+    } else if sub_path.starts_with("peer/") {
+        // Sprint 3 T17: GET /api/v1/peer/{peer_cid}/capacity
+        // "peer/" (with slash) is distinct from "peer-statuses" and "peer-topology" (hyphened).
+        let after = sub_path.strip_prefix("peer/").unwrap_or("");
+        if let Some(peer_cid) = after.strip_suffix("/capacity") {
+            peer_capacity::handle(req, method, peer_cid, &pool).await
+        } else {
+            Ok(response::not_found(&format!(
+                "Unknown API route: /api/v1/{}",
+                sub_path
+            )))
+        }
+    } else if sub_path.starts_with("hub/") {
+        // Sprint 3 T17: GET /api/v1/hub/{hub_id}/capacity
+        let after = sub_path.strip_prefix("hub/").unwrap_or("");
+        if let Some(hub_id) = after.strip_suffix("/capacity") {
+            hub_capacity::handle(req, method, hub_id, &pool).await
+        } else {
+            Ok(response::not_found(&format!(
+                "Unknown API route: /api/v1/{}",
+                sub_path
+            )))
+        }
+    } else if sub_path == "diagnostics/mutuality-audit" {
+        // Sprint 3 T17: GET /api/v1/diagnostics/mutuality-audit?hub={hub_id}
+        diagnostics_mutuality::handle(req, method, &pool).await
     } else {
         Ok(response::not_found(&format!(
             "Unknown API route: /api/v1/{}",
