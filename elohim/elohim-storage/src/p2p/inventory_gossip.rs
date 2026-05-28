@@ -208,7 +208,7 @@ mod tests {
     fn sha256_wire(byte: char) -> String {
         format!(
             "sha256-{}",
-            std::iter::repeat(byte).take(64).collect::<String>()
+            std::iter::repeat_n(byte, 64).collect::<String>()
         )
     }
 

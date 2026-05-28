@@ -121,7 +121,7 @@ mod tests {
     fn sha256_wire(byte: char) -> String {
         format!(
             "sha256-{}",
-            std::iter::repeat(byte).take(64).collect::<String>()
+            std::iter::repeat_n(byte, 64).collect::<String>()
         )
     }
 
@@ -215,6 +215,50 @@ mod tests {
         assert_eq!(resolved_cadence(Some("tablet"), None), Some(60));
         assert_eq!(resolved_cadence(Some("nod"), None), Some(60));
     }
+
+    /// Sprint 0 Task 0.5: producer-to-verifier round-trip from real BlobStore.
+    ///
+    /// Proves the full produce→encode→decode→verify pipeline works end-to-end
+    /// for VALID data: uses real `BlobStore` to write blobs, lists them via
+    /// `list_hashes`, wraps as `BlobAddress` instances, builds a snapshot,
+    /// MessagePack-round-trips, and asserts `verify_structural() == Ok(())`.
+    ///
+    /// After this test, producer/verifier wire-format drift becomes impossible
+    /// to land green.
+    #[tokio::test]
+    async fn snapshot_built_from_real_blobstore_decodes_with_valid_addresses() {
+        use crate::blob_store::BlobStore;
+        use crate::p2p::inventory_gossip::BlobInventorySnapshot;
+
+        let temp = tempfile::TempDir::new().unwrap();
+        let store = BlobStore::new(temp.path()).await.unwrap();
+        store.store(b"payload-a").await.unwrap();
+        store.store(b"payload-b").await.unwrap();
+
+        let hashes: Vec<BlobAddress> = store
+            .list_hashes()
+            .unwrap()
+            .into_iter()
+            .map(|s| {
+                BlobAddress::new(s).expect("BlobStore::list_hashes returns canonical wire format")
+            })
+            .collect();
+        assert_eq!(hashes.len(), 2, "two blobs stored, two hashes listed");
+
+        let inv = StaticInventory::new(hashes);
+        let alloc = SequenceAllocator::new(0);
+        let snapshot = build_snapshot("12D3KooWtest", &inv, &alloc, 1);
+
+        // Round-trip through MessagePack — the wire path real gossip takes.
+        let bytes = snapshot.to_bytes().unwrap();
+        let decoded = BlobInventorySnapshot::from_bytes(&bytes).unwrap();
+        assert_eq!(decoded.hashes.len(), 2);
+        assert_eq!(
+            decoded.verify_structural(),
+            Ok(()),
+            "real-BlobStore snapshot must pass structural verify"
+        );
+    }
 }
 
 /// Filesystem-vs-gossip parity report.
@@ -280,7 +324,7 @@ mod parity_tests {
     fn sha256_wire(byte: char) -> String {
         format!(
             "sha256-{}",
-            std::iter::repeat(byte).take(64).collect::<String>()
+            std::iter::repeat_n(byte, 64).collect::<String>()
         )
     }
 
