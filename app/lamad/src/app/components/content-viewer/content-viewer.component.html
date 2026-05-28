@@ -277,25 +277,23 @@
         <div class="feedback-section" *ngIf="showFeedbackSection && node">
           <h2 class="feedback-section-title">📣 Share Your Feedback</h2>
 
-          <!-- Reaction Bar (Low Friction) -->
+          <!-- Reaction Bar (Low Friction) — Lit primitive, Wave D -->
           <div class="reaction-section">
-            <app-reaction-bar
-              [contentId]="node.id"
-              [allowedReactions]="allowedReactions"
-              [constraints]="feedbackProfile?.emotionalReactionConstraints"
-              [contentType]="mapContentTypeToProfileType(node.contentType)"
-              [showCounts]="true"
-            ></app-reaction-bar>
+            <elohim-reaction-bar
+              [attr.entity-type]="'content'"
+              [attr.entity-id]="node.id"
+              [attr.show-counts]="true"
+            ></elohim-reaction-bar>
           </div>
 
-          <!-- Graduated Feedback (Medium Friction) -->
+          <!-- Graduated Feedback (Medium Friction) — Lit primitive, Wave D -->
           <div class="graduated-section">
-            <app-graduated-feedback
-              [contentId]="node.id"
-              [context]="feedbackContext"
-              [requiresReasoning]="false"
-              [showAggregates]="true"
-            ></app-graduated-feedback>
+            <elohim-graduated-feedback
+              [attr.entity-type]="'content'"
+              [attr.entity-id]="node.id"
+              [attr.context]="feedbackContext"
+              [attr.show-aggregates]="true"
+            ></elohim-graduated-feedback>
           </div>
 
           <!-- Signal Summary -->
@@ -342,12 +340,13 @@
           </div>
         </div>
 
-        <!-- Feedback Mechanism Gateway (governance at the point of content) -->
-        <qahal-feedback-mechanism-gateway
+        <!-- Feedback Mechanism Gateway (governance at the point of content) — Lit primitive, Wave D -->
+        <!-- .selection and .accumulationStatus wired in wireGovernanceLitElements() -->
+        <elohim-feedback-mechanism-gateway
           *ngIf="node"
-          [entityType]="'content'"
-          [entityId]="node.id"
-        ></qahal-feedback-mechanism-gateway>
+          [attr.entity-type]="'content'"
+          [attr.entity-id]="node.id"
+        ></elohim-feedback-mechanism-gateway>
 
         <!-- Appears in Paths (Wikipedia-style back-links) -->
         <div *ngIf="containingPaths.length > 0 || loadingPaths" class="paths-section">

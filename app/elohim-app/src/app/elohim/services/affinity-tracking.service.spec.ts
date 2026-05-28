@@ -50,8 +50,7 @@ describe('AffinityTrackingService', () => {
     mockSessionHumanService = {
       getAffinityStorageKey: vi.fn(),
       getSessionId: vi.fn(),
-      recordAffinityChange: vi.fn(),
-      recordContentView: vi.fn(),
+      // M-AGGR-1: recordAffinityChange and recordContentView removed from service
       session$: sessionObservable,
     };
     mockSessionHumanService.getAffinityStorageKey.mockReturnValue('test-session-key');
@@ -207,10 +206,10 @@ describe('AffinityTrackingService', () => {
       expect(typeof change!.timestamp).toBe('string');
     });
 
-    it('should record affinity change via session service', () => {
+    it('should update affinity value without calling session service (M-AGGR-1)', () => {
+      // M-AGGR-1: recordAffinityChange removed; tracking now flows via EconomicEvents.
       service.setAffinity('node-1', 0.6);
-
-      expect(mockSessionHumanService.recordAffinityChange).toHaveBeenCalledWith('node-1', 0.6);
+      expect(service.getAffinity('node-1')).toBe(0.6);
     });
 
     it('should update lastUpdated timestamp', async () => {
@@ -289,10 +288,9 @@ describe('AffinityTrackingService', () => {
       expect(() => service.trackView('node-1')).not.toThrow();
     });
 
-    it('should record content view via session service', () => {
-      service.trackView('node-1');
-
-      expect(mockSessionHumanService.recordContentView).toHaveBeenCalledWith('node-1');
+    it('should track view without calling session service (M-AGGR-1)', () => {
+      // M-AGGR-1: recordContentView removed; tracking now flows via EconomicEvents.
+      expect(() => service.trackView('node-1')).not.toThrow();
     });
 
     it('should increment affinity if below threshold', () => {
@@ -570,10 +568,10 @@ describe('AffinityTrackingService', () => {
       expect(mockSessionHumanService.getAffinityStorageKey).toHaveBeenCalled();
     });
 
-    it('should record affinity change with session service', () => {
+    it('should update affinity value correctly (M-AGGR-1: session recording removed)', () => {
+      // M-AGGR-1: recordAffinityChange removed; tracking now flows via EconomicEvents.
       service.setAffinity('node-1', 0.5);
-
-      expect(mockSessionHumanService.recordAffinityChange).toHaveBeenCalledWith('node-1', 0.5);
+      expect(service.getAffinity('node-1')).toBe(0.5);
     });
 
     it('should handle optional session service gracefully', () => {

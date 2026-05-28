@@ -18,6 +18,7 @@
 //! See `genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md` for the
 //! migration history.
 
+pub mod bounds;
 pub mod element_registry;
 pub mod epr;
 pub mod imagodei;
@@ -28,6 +29,7 @@ pub mod projection;
 pub mod qahal;
 pub mod shared;
 pub mod shefa;
+pub mod standing;
 
 // Re-export all domain types at the crate root for convenience
 pub use epr::*;

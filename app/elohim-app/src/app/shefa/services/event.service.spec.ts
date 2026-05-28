@@ -321,26 +321,9 @@ describe('EventService', () => {
   });
 
   describe('Analytics Helpers', () => {
-    describe('countEventsForContent', () => {
-      it('should have countEventsForContent method', () => {
-        expect(service.countEventsForContent).toBeDefined();
-        expect(typeof service.countEventsForContent).toBe('function');
-      });
-    });
-
-    describe('getViewCount', () => {
-      it('should have getViewCount method', () => {
-        expect(service.getViewCount).toBeDefined();
-        expect(typeof service.getViewCount).toBe('function');
-      });
-    });
-
-    describe('getCompletionCount', () => {
-      it('should have getCompletionCount method', () => {
-        expect(service.getCompletionCount).toBeDefined();
-        expect(typeof service.getCompletionCount).toBe('function');
-      });
-    });
+    // M-AGGR-3: countEventsForContent, getViewCount, getCompletionCount retired.
+    // Callers should use StorageClientService.getContentEngagement(contentId)
+    // which reads GET /api/v1/lamad/content/{contentId}/engagement.
 
     describe('hasViewed', () => {
       it('should have hasViewed method', () => {

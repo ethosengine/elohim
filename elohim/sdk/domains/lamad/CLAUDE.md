@@ -38,11 +38,11 @@ elohim/sdk/domains/lamad/
 
 ## Generated Output
 
-`codegen.mjs` produces identical files to TWO locations:
+`codegen.mjs` produces identical files to TWO locations (see `OUTPUT_DIRS` in `scripts/codegen.mjs`):
 
 | Location | Consumer |
 |----------|----------|
-| `app/elohim-app/src/app/lamad/generated/` | Angular app (import via `@app/lamad/generated/`) |
+| `app/lamad/src/app/generated/` | Lamad SPA bundle (import via `@app/lamad/generated/` — moved here in the 2026-05-25 pillar-EPR decomposition; was previously `app/elohim-app/src/app/lamad/generated/`) |
 | `genesis/seeder/src/generated/` | Seeder (import via `./generated/`) |
 
 Generated files:
@@ -55,7 +55,7 @@ Generated files:
 | `coupling-map.ts` | `LAMAD_COUPLING_MAP` — value flows and governance signals per content type |
 | `manifest-types.ts` | Content type lists, renderer map, signal map |
 
-Protocol-level generated files (from `elohim/sdk/schemas/scripts/codegen-ts.mjs`) are ALSO distributed to these locations:
+Protocol-level generated files (from `elohim/sdk/schemas/scripts/codegen-ts.mjs`) are distributed to FIVE locations including `app/lamad/src/generated/` — see `elohim/sdk/schemas/CLAUDE.md` for the full distribution table. Examples of what lands at each lamad target:
 
 | File | Contents |
 |------|----------|

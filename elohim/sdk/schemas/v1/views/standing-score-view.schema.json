@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view/standing-score",
+  "title": "StandingScoreView",
+  "description": "Wire shape for GET /api/v1/standing/{agent_cid}?evaluator={evaluator_cid}. Returns the StandingScore tier (Floor/Low/Neutral/High/Trusted) for the (evaluator, subject) pair, plus recent FeedbackSignal evidence summary. Source of truth: local SQLite operational projection (standing_view table); recomputable from FeedbackSignal subgraph (Holochain DHT) via standing_projector.",
+  "type": "object",
+  "required": ["evaluator_cid", "subject_cid", "score", "recent_breaches", "computed_at"],
+  "additionalProperties": false,
+  "properties": {
+    "evaluator_cid": { "type": "string", "minLength": 1 },
+    "subject_cid": { "type": "string", "minLength": 1 },
+    "score": { "type": "string", "enum": ["Unknown", "Floor", "Low", "Neutral", "High", "Trusted"], "description": "The 5-tier StandingScore enum (Unknown if cold-start)." },
+    "debit_weight_sum": { "type": "integer", "description": "Sum of weighted FeedbackSignal debits applied to this score within the window." },
+    "recent_breaches": {
+      "type": "array",
+      "description": "Up to N most recent debit-class signals shaping this score.",
+      "items": {
+        "type": "object",
+        "required": ["signal_kind", "emitted_at", "weight"],
+        "additionalProperties": false,
+        "properties": {
+          "signal_kind": { "type": "string" },
+          "emitted_at": { "type": "string" },
+          "weight": { "type": "integer" },
+          "evidence_summary": { "type": "string" }
+        }
+      }
+    },
+    "computed_at": { "type": "string", "description": "ISO 8601 timestamp when this score was last projected." }
+  }
+}

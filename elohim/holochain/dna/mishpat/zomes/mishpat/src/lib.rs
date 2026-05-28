@@ -3,6 +3,10 @@ use mishpat_integrity::*;
 
 // Bootstrap-steward pattern (mishpat copy; reference lives in imagodei).
 pub mod bootstrap_steward;
+
+// Commitment coordinator — REA compute delegation primitive (Z.D deploy flow).
+pub mod commitments;
+pub use commitments::{CommitmentOutput, CreateCommitmentInput};
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
     DnaProperties,

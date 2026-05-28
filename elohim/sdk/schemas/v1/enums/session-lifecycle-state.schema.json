@@ -1,0 +1,20 @@
+{
+  "$id": "epr:schema:enum:session-lifecycle-state",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SessionLifecycleState",
+  "description": "Pre-canonical participation lifecycle state managed by the session-bridge primitive. Operational vocabulary — not DHT-notarized; not held in any zome. Carried by the Capability Profile as a protocol-core Standing per the Capability Profile spec §5.1. See session-bridge spec (2026-05-28-session-bridge-design.md) §1 for the four-state lifecycle model.",
+  "type": "string",
+  "enum": ["Anonymous", "OauthIdentified", "PeerNativeSampling", "PeerNativeMember"],
+  "_tiers": {
+    "core": {
+      "values": ["Anonymous", "OauthIdentified", "PeerNativeSampling", "PeerNativeMember"],
+      "rationale": "All four lifecycle states are protocol-core; no app-tier extensions. The session-bridge primitive is the substrate-level owner of these values."
+    }
+  },
+  "_dna": {
+    "constant": "SESSION_LIFECYCLE_STATES",
+    "zome": null,
+    "tier": "core",
+    "rationale": "Operational vocabulary — bridge state, not DHT-notarized state. No zome owns these as entries."
+  }
+}

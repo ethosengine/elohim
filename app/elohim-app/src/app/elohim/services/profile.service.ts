@@ -15,7 +15,7 @@ import {
   CurrentFocus,
   DevelopedCapability,
   TimelineEvent,
-  TimelineEventType,
+  // TimelineEventType removed (M-AGGR-1): activityToTimelineEvent deleted
   ContentEngagement,
   NoteWithContext,
   ResumePoint,
@@ -23,7 +23,7 @@ import {
   PathsOverview,
   ProfileSummaryCompact,
 } from '@app/imagodei/models/profile.model';
-import { SessionPathProgress, SessionActivity } from '@elohim/identity';
+import { SessionPathProgress } from '@elohim/identity';
 import { SessionHumanService } from '@elohim/identity';
 import { PathService } from '@app/lamad/services/path.service';
 
@@ -255,88 +255,19 @@ export class ProfileService {
    * Get chronological timeline of significant learning events.
    * These are transformation points, not just activity logs.
    */
-  getTimeline(limit = 50): Observable<TimelineEvent[]> {
-    const activities = this.sessionHumanService?.getActivityHistory() ?? [];
-
-    // Transform activities into timeline events
-    const events: TimelineEvent[] = activities
-      .map(activity => this.activityToTimelineEvent(activity))
-      .filter((e): e is TimelineEvent => e !== null)
-      .slice(-limit)
-      .reverse(); // Most recent first
+  getTimeline(_limit = 50): Observable<TimelineEvent[]> {
+    // M-AGGR-1: activity history is now substrate-derived (EconomicEvents →
+    // SessionHumanView projection). Timeline from local session is no longer
+    // available; the substrate route is the source of truth.
+    // TODO(rust-migration): fetch timeline events from GET /api/v1/identity/{agentId}/session
+    const events: TimelineEvent[] = [];
 
     return of(events);
   }
 
-  /**
-   * Convert a session activity to a timeline event.
-   * Only significant activities become events.
-   */
-  private activityToTimelineEvent(activity: SessionActivity): TimelineEvent | null {
-    const timestamp = activity.timestamp;
-    const resourceId = activity.resourceId;
-
-    switch (activity.type) {
-      case 'path-start':
-        return {
-          id: `${activity.type}-${resourceId}-${timestamp}`,
-          type: 'journey_started' as TimelineEventType,
-          timestamp,
-          title: 'Started a new learning journey',
-          resourceId,
-          resourceType: 'path',
-          significance: 'milestone',
-        };
-
-      case 'path-complete':
-        return {
-          id: `${activity.type}-${resourceId}-${timestamp}`,
-          type: 'journey_completed' as TimelineEventType,
-          timestamp,
-          title: 'Completed a learning journey',
-          resourceId,
-          resourceType: 'path',
-          significance: 'milestone',
-        };
-
-      case 'step-complete':
-        return {
-          id: `${activity.type}-${resourceId}-${timestamp}`,
-          type: 'step_completed' as TimelineEventType,
-          timestamp,
-          title: 'Completed a step',
-          description: `Step ${activity.metadata?.['stepIndex']}`,
-          resourceId,
-          resourceType: 'path',
-          significance: 'progress',
-        };
-
-      case 'affinity': {
-        // Only create event for meaningful affinity (> 0.5)
-        const affinityValue = activity.metadata?.['value'];
-        if (typeof affinityValue === 'number' && affinityValue > 0.5) {
-          return {
-            id: `${activity.type}-${resourceId}-${timestamp}`,
-            type: 'meaningful_encounter' as TimelineEventType,
-            timestamp,
-            title: 'Found resonant content',
-            resourceId,
-            resourceType: 'content',
-            significance: 'progress',
-          };
-        }
-        return null;
-      }
-
-      case 'view':
-        // First view is significant
-        // (Would need to check if it's actually first view)
-        return null;
-
-      default:
-        return null;
-    }
-  }
+  // activityToTimelineEvent removed (M-AGGR-1): activity history is now
+  // substrate-derived via SessionHumanView EconomicEvent projection.
+  // TODO(rust-migration): rebuild timeline from GET /api/v1/identity/{agentId}/session
 
   // =========================================================================
   // Content Engagement (imagodei-synthesis)

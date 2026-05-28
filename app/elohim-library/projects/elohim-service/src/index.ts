@@ -156,7 +156,12 @@ export type {
   StreamingVariant,
   StreamingManifest,
 } from './angular/services/doorway-client.service';
+/** @deprecated M-AGGR-2: migrate read paths to HolochainSourceChainService. Write paths migrate in M-REA-1 + M-AGGR-1. */
 export { LocalSourceChainService } from './angular/services/local-source-chain.service';
+// M-AGGR-2: Holochain source-chain cutover. Thin HTTP read wrapper around
+// GET /api/v1/source-chain/{agentId}/entries and /links. Replaces the
+// localStorage simulation once write-path consumers migrate in M-REA-1 + M-AGGR-1.
+export { HolochainSourceChainService } from './angular/services/holochain-source-chain.service';
 
 // Utils
 export * from './angular/utils/access-control.helper';

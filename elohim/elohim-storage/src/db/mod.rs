@@ -25,7 +25,11 @@ pub mod models;
 
 // Diesel modules for graph relationships and domain models
 pub mod accumulation_status;
+pub mod content_engagement_stats;
 pub mod mechanism_selection;
+// M-AGGR-1: session + upgrade-prompt projections (Category C, EconomicEvent × HumanProgress × onboarding Manifest)
+pub mod session_human_view;
+pub mod upgrade_prompt_view;
 pub mod agreements;
 pub mod collectives;
 pub mod comments;
@@ -166,6 +170,8 @@ use tracing::info;
 
 use crate::error::StorageError;
 pub use context::AppContext;
+// Re-export so api/* modules can use `crate::db::SqliteConnection` directly.
+pub use diesel::sqlite::SqliteConnection;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 

@@ -44,7 +44,7 @@ describe('ProfileService', () => {
     const sessionHumanSpy = {
       getSession: vi.fn(),
       getAllPathProgress: vi.fn(),
-      getActivityHistory: vi.fn(),
+      // M-AGGR-1: getActivityHistory removed; timeline is now substrate-derived
     };
 
     TestBed.configureTestingModule({
@@ -240,10 +240,9 @@ describe('ProfileService', () => {
       expect(typeof service.getTimeline).toBe('function');
     });
 
-    it('should return observable of timeline events array', () =>
+    it('should return observable of timeline events array (M-AGGR-1: always empty)', () =>
       new Promise<void>(done => {
-        sessionHumanServiceMock.getActivityHistory.mockReturnValue([]);
-
+        // M-AGGR-1: getActivityHistory removed; timeline is substrate-derived.
         service.getTimeline().subscribe({
           next: result => {
             expect(Array.isArray(result)).toBe(true);
@@ -255,8 +254,7 @@ describe('ProfileService', () => {
 
     it('should accept optional limit parameter', () =>
       new Promise<void>(done => {
-        sessionHumanServiceMock.getActivityHistory.mockReturnValue([]);
-
+        // M-AGGR-1: getActivityHistory removed; timeline is substrate-derived.
         service.getTimeline(10).subscribe({
           next: result => {
             expect(result).toBeDefined();
@@ -266,10 +264,9 @@ describe('ProfileService', () => {
         });
       }));
 
-    it('should return empty array with no activities', () =>
+    it('should return empty array (M-AGGR-1: substrate-derived timeline)', () =>
       new Promise<void>(done => {
-        sessionHumanServiceMock.getActivityHistory.mockReturnValue([]);
-
+        // M-AGGR-1: getActivityHistory removed; timeline always returns [].
         service.getTimeline().subscribe({
           next: result => {
             expect(result).toEqual([]);
@@ -468,9 +465,8 @@ describe('ProfileService', () => {
       expect(result.subscribe).toBeDefined();
     });
 
-    it('getTimeline should return observable', () => {
-      sessionHumanServiceMock.getActivityHistory.mockReturnValue([]);
-
+    it('getTimeline should return observable (M-AGGR-1: substrate-derived)', () => {
+      // M-AGGR-1: getActivityHistory removed; no mock setup needed.
       const result = service.getTimeline();
 
       expect(result.subscribe).toBeDefined();

@@ -25,6 +25,7 @@ pub mod compute;
 pub mod contributors;
 pub mod custodians;
 pub mod dashboard;
+pub mod diagnostics_bounds;
 pub mod economic_events;
 pub mod epr;
 pub mod exchange;
@@ -37,6 +38,7 @@ pub mod hazards;
 pub mod identity;
 pub mod lamad;
 pub mod mastery;
+pub mod mishpat_recognition;
 pub mod network_posture;
 pub mod node_shape;
 pub mod observations;
@@ -58,6 +60,7 @@ pub mod risk;
 pub mod routing;
 pub mod schedules;
 pub mod signal_emit;
+pub mod source_chain;
 pub mod spatial;
 pub mod standing;
 pub mod steward;
@@ -173,6 +176,12 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("mastery") {
         let resource_path = sub_path.strip_prefix("mastery").unwrap_or("");
         mastery::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("mishpat/recognition") {
+        // M-REA-3: POST /api/v1/mishpat/recognition/participation
+        // Governance-participation EconomicEvent via standing-policy weight lookup.
+        // Must precede any future "mishpat" umbrella prefix to avoid collision.
+        let resource_path = sub_path.strip_prefix("mishpat/recognition").unwrap_or("");
+        mishpat_recognition::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("flow-planning") {
         let resource_path = sub_path.strip_prefix("flow-planning").unwrap_or("");
         flow_planning::handle(req, method, resource_path, &pool, &app_ctx).await
@@ -336,6 +345,22 @@ pub async fn handle_api_request(
         // M-REA-1: intent-driven EconomicEvent composition — POST /api/v1/lamad/events
         let resource_path = sub_path.strip_prefix("lamad").unwrap_or("");
         lamad::handle(
+            req,
+            method,
+            resource_path,
+            &pool,
+            &app_ctx,
+            hc_registry.as_ref(),
+        )
+        .await
+    } else if sub_path.starts_with("source-chain") {
+        // M-AGGR-2: Holochain source-chain cutover.
+        // GET /api/v1/source-chain/{agentId}/entries → Vec<SourceChainEntryView>
+        // GET /api/v1/source-chain/{agentId}/links   → Vec<EntryLinkView>
+        // Proxies to imagodei DNA coordinator via hc_registry.imagodei.
+        // No projection table — Category B agent-scoped private source chain.
+        let resource_path = sub_path.strip_prefix("source-chain").unwrap_or("");
+        source_chain::handle(
             req,
             method,
             resource_path,

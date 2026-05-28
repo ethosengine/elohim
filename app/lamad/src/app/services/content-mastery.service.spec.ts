@@ -70,7 +70,7 @@ describe('ContentMasteryService', () => {
     sessionHumanService = {
       getSession: vi.fn(),
       getSessionId: vi.fn(),
-      recordContentView: vi.fn(),
+      // M-AGGR-1: recordContentView removed; tracking now flows via EconomicEvents
       session$: sessionSubject.asObservable(),
     };
     sessionHumanService.getSession.mockReturnValue(createMockSession());
@@ -196,9 +196,9 @@ describe('ContentMasteryService', () => {
         });
       }));
 
-    it('should record activity with session human service', () => {
-      service.recordView(TEST_CONTENT_ID);
-      expect(sessionHumanService.recordContentView).toHaveBeenCalledWith(TEST_CONTENT_ID);
+    it('should record view without calling session service (M-AGGR-1)', () => {
+      // M-AGGR-1: recordContentView removed; tracking now flows via EconomicEvents.
+      expect(() => service.recordView(TEST_CONTENT_ID)).not.toThrow();
     });
   });
 

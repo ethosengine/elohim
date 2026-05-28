@@ -244,6 +244,41 @@ pub struct ChallengeOutcome {
 pub const CHALLENGE_VERDICTS: [&str; 3] = ["upheld", "dismissed", "superseded"];
 
 // =============================================================================
+// Commitment — REA compute delegation primitive (Z.D substrate-correct deploy)
+// =============================================================================
+//
+// A bounded delegation of compute or action authority notarized on the Mishpat
+// DHT. The `action` field is the discriminator (e.g., "delegates-compute",
+// "acknowledges-reach-change"). `payload_json` carries the action-specific
+// schema content validated by the coordinator; integrity performs defense-in-
+// depth structural checks only.
+//
+// Source of truth: this DHT entry type. Operational projection lives in
+// elohim-storage's `rea_commitments` SQLite table (post-commit signal).
+//
+// Ref: genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md §1
+//      gospel-tier memory: project_rea_compute_commitment_primitive.md
+
+/// Commitment — REA commitment notarizing a bounded delegation of compute or
+/// action authority. Used by the Z.D substrate-correct deploy flow per
+/// genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md §1.
+///
+/// The `action` field is the discriminator (e.g., "delegates-compute",
+/// "acknowledges-reach-change"). `payload_json` carries the action-specific
+/// schema content (validated by the coordinator before `create_entry`; the
+/// integrity layer does defense-in-depth parse checks).
+///
+/// Source of truth: this DHT entry type. Operational projection lives in
+/// elohim-storage's `rea_commitments` SQLite table (post-commit signal).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Commitment {
+    pub action: String,
+    pub payload_json: String,
+    pub signed_at: String,
+}
+
+// =============================================================================
 // Anchor Entry (for link indexing)
 // =============================================================================
 
@@ -282,6 +317,7 @@ pub enum EntryTypes {
     Place(Place),
     StringAnchor(StringAnchor),
     ChallengeOutcome(ChallengeOutcome), // Stage C: Challenge/Proposal/GovernanceReaction/ProposalVote/StatementVote/GateDecisionAttestation/GateDecisionChallenge moved to elohim DNA
+    Commitment(Commitment),             // Z.D substrate-correct deploy: REA compute delegation primitive
 }
 
 // ============================================================
@@ -390,11 +426,21 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
         EntryTypes::Place(place) => validate_place(place),
         EntryTypes::StringAnchor(_) => Ok(ValidateCallbackResult::Valid),
         EntryTypes::ChallengeOutcome(outcome) => validate_challenge_outcome(outcome),
+        EntryTypes::Commitment(commitment) => validate_commitment_entry(commitment),
     }
 }
 
 fn validate_update_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
-    validate_create_entry(app_entry)
+    match app_entry {
+        // Commitments are immutable — they are REA notarizations of a point-in-time
+        // delegation. An update would silently alter the notarized record without
+        // revoking the original, which breaks the audit trail.
+        EntryTypes::Commitment(_) => Ok(ValidateCallbackResult::Invalid(
+            "Commitment entries are immutable; create a new Commitment to supersede".into(),
+        )),
+        // All other types delegate to create-time validation.
+        _ => validate_create_entry(app_entry),
+    }
 }
 
 fn validate_precedent(precedent: &Precedent) -> ExternResult<ValidateCallbackResult> {
@@ -557,6 +603,36 @@ fn validate_challenge_outcome(outcome: &ChallengeOutcome) -> ExternResult<Valida
     if !trimmed.starts_with('{') {
         return Ok(ValidateCallbackResult::Invalid(
             "ChallengeOutcome reasoning_json must be a JSON object".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_commitment_entry(commitment: &Commitment) -> ExternResult<ValidateCallbackResult> {
+    if commitment.action.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Commitment.action must be non-empty".into(),
+        ));
+    }
+    if commitment.payload_json.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Commitment.payload_json must be non-empty".into(),
+        ));
+    }
+    // Defense-in-depth: payload_json must look like a JSON object.
+    // Full serde_json::from_str is not available at runtime in the integrity zome
+    // (serde_json is dev-only here — WASM size budget). The coordinator performs
+    // the full schema-specific validation; integrity only confirms the bytes are
+    // at minimum a JSON object (same pattern as validate_challenge_outcome).
+    let trimmed = commitment.payload_json.trim();
+    if !trimmed.starts_with('{') {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Commitment.payload_json must be a JSON object".into(),
+        ));
+    }
+    if commitment.signed_at.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Commitment.signed_at must be non-empty".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)

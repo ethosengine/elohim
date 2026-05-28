@@ -145,6 +145,15 @@ const INTERFACE_FILES = [
   { src: 'views/mechanism-selection.ts', dest: 'mechanism-selection.ts' },
   // M-AGGR-3: ContentEngagementStats projection (Category C operational — EconomicEvent stream filtered by content_id + lamadEventType)
   { src: 'views/content-engagement-stats-view.ts', dest: 'content-engagement-stats-view.ts' },
+  // Sprint 2 Task 1: BoundsValidationResult + StandingScore view schemas
+  { src: 'views/bounds-validation-result-view.ts', dest: 'bounds-validation-result-view.ts' },
+  { src: 'views/standing-score-view.ts', dest: 'standing-score-view.ts' },
+  // M-AGGR-2: Holochain source-chain cutover — Category B agent-scoped (imagodei DNA source chain)
+  { src: 'views/source-chain-entry-view.ts', dest: 'source-chain-entry-view.ts' },
+  { src: 'views/entry-link-view.ts', dest: 'entry-link-view.ts' },
+  // M-AGGR-1: SessionHumanView + UpgradePromptView projections (Category C operational — EconomicEvent × HumanProgress × onboarding Manifest)
+  { src: 'views/session-human-view.ts', dest: 'session-human-view.ts' },
+  { src: 'views/upgrade-prompt-view.ts', dest: 'upgrade-prompt-view.ts' },
 ];
 
 /**

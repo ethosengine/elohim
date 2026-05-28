@@ -27,6 +27,8 @@ pub mod behavioral_trust;
 pub mod boot_registration;
 pub mod bootstrap_manifests;
 pub mod cluster_view;
+pub mod bounds_validator;
+pub mod commitment_fetcher;
 pub mod conductor_writes; // 2026-05-26-substrate-rea-replication-fix — facade for HTTP→conductor zome calls
 pub mod connectivity; // Phase 4 T6 — libp2p connected-peers snapshot helper
 pub mod content_service;
@@ -62,12 +64,14 @@ pub mod peer_selection;
 pub mod peer_topology_view;
 pub mod presence_service;
 pub mod provenance_service;
+pub mod rate_history;
 pub mod rea_commitment_service;
 pub mod reach_earning;
 pub mod reciprocity_view;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
 pub mod relationship_service;
+pub mod republish_epr_validator;
 pub mod resilience; // C2 — hub projection for /api/v1/resilience/{id}/hub
 pub mod resource_nature;
 pub mod resource_service;
@@ -78,6 +82,7 @@ pub mod routing;
 pub mod schemaref_resolver;
 pub mod sealed_against_self;
 pub mod sidecar_engine;
+pub mod signal_weight_registry;
 pub mod sla_service;
 pub mod spatial;
 pub mod spatial_capacity;

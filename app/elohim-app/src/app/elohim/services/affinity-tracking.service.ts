@@ -126,10 +126,8 @@ export class AffinityTrackingService implements OnDestroy {
       timestamp: new Date().toISOString(),
     });
 
-    // Notify session service of affinity change
-    if (this.sessionHumanService) {
-      this.sessionHumanService.recordAffinityChange(nodeId, clampedValue);
-    }
+    // M-AGGR-1: affinity-change tracking now flows via EconomicEvents to the
+    // substrate. No local session recording needed here.
   }
 
   /**
@@ -148,11 +146,7 @@ export class AffinityTrackingService implements OnDestroy {
    * @param nodeId The node ID
    */
   trackView(nodeId: string): void {
-    // Always record the view in session
-    if (this.sessionHumanService) {
-      this.sessionHumanService.recordContentView(nodeId);
-    }
-
+    // M-AGGR-1: view tracking now flows via EconomicEvents to the substrate.
     const current = this.getAffinity(nodeId);
     if (current < this.AUTO_INCREMENT_THRESHOLD) {
       this.setAffinity(nodeId, this.AUTO_INCREMENT_DELTA);

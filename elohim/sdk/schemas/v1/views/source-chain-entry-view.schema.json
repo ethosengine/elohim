@@ -1,0 +1,50 @@
+{
+  "$id": "epr:schema:view:source-chain-entry",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SourceChainEntryView",
+  "description": "Source of truth: Holochain agent source chain in imagodei DNA (Agent-Scoped, Category B). Entries are private to the authoring agent's source chain; they are never gossiped to the DHT. This view is read via the `query_my_source_chain` coordinator function and served by GET /api/v1/source-chain/{agentId}/entries.",
+  "type": "object",
+  "required": [
+    "actionHash",
+    "entryHash",
+    "authorAgent",
+    "entryType",
+    "sequence",
+    "timestamp"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "actionHash": {
+      "type": "string",
+      "description": "Hex-encoded ActionHash from the Holochain source chain record header."
+    },
+    "entryHash": {
+      "type": "string",
+      "description": "Hex-encoded EntryHash (hash of the serialized entry content)."
+    },
+    "authorAgent": {
+      "type": "string",
+      "description": "Hex-encoded AgentPubKey that authored this entry."
+    },
+    "entryType": {
+      "type": "string",
+      "description": "Entry type discriminator as a string (e.g. 'Human', 'ContributorPresence', 'ContentMastery'). Derived from the record's action entry_type."
+    },
+    "contentJson": {
+      "type": ["string", "null"],
+      "description": "JSON-serialized entry content. Null for App entries that cannot be decoded to a known type, or for system entries (Dna, AgentValidationPkg, InitZomesComplete)."
+    },
+    "prevActionHash": {
+      "type": ["string", "null"],
+      "description": "Hex-encoded ActionHash of the previous action in the chain. Null for the genesis record."
+    },
+    "sequence": {
+      "type": "integer",
+      "description": "Zero-based sequence number of this record in the agent's source chain."
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when this entry was committed to the source chain."
+    }
+  }
+}

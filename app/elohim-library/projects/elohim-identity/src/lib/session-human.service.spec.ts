@@ -1,14 +1,19 @@
 import { vi } from 'vitest';
 /**
- * Session Human Service Tests
+ * Session Human Service Tests (post M-AGGR-1 slimming)
  *
  * Migrated from @app/imagodei/services/session-human.service.spec to
  * @elohim/identity as part of Slice 2.3 cross-pillar import cleanup.
+ *
+ * M-AGGR-1: removed 'activity tracking' describe block (record* methods deleted).
+ * M-AGGR-1: removed upgrade prompt trigger tests (triggerUpgradePrompt deleted).
+ * M-AGGR-1: removed getActivityHistory tests (method deleted).
+ * Added: dismissal shim tests for getDismissedPromptIds / dismissUpgradePrompt.
  */
 
 import { TestBed } from '@angular/core/testing';
 import { SessionHumanService } from './session-human.service';
-import { SessionHuman, SessionActivity, SessionPathProgress } from './session-human.model';
+import { SessionHuman, SessionPathProgress } from './session-human.model';
 
 describe('SessionHumanService', () => {
   let service: SessionHumanService;
@@ -152,43 +157,6 @@ describe('SessionHumanService', () => {
     });
   });
 
-  describe('activity tracking', () => {
-    it('should record content view', () => {
-      service.recordContentView('node-123');
-      expect(service.getSession()?.stats.nodesViewed).toBe(1);
-    });
-
-    it('should record affinity change', () => {
-      service.recordAffinityChange('node-123', 0.8);
-      expect(service.getSession()?.stats.nodesWithAffinity).toBe(1);
-    });
-
-    it('should record path started', () => {
-      service.recordPathStarted('path-123');
-      expect(service.getSession()?.stats.pathsStarted).toBe(1);
-    });
-
-    it('should record step completed', () => {
-      service.recordStepCompleted('path-123', 0);
-      expect(service.getSession()?.stats.stepsCompleted).toBe(1);
-    });
-
-    it('should record path completed', () => {
-      service.recordPathCompleted('path-123');
-      expect(service.getSession()?.stats.pathsCompleted).toBe(1);
-    });
-
-    it('should get activity history', () => {
-      service.recordContentView('node-1');
-      service.recordContentView('node-2');
-
-      const history = service.getActivityHistory();
-      expect(history.length).toBe(2);
-      expect(history[0].resourceId).toBe('node-1');
-      expect(history[1].resourceId).toBe('node-2');
-    });
-  });
-
   describe('path progress', () => {
     it('should save and retrieve path progress', () => {
       const progress: SessionPathProgress = {
@@ -214,9 +182,6 @@ describe('SessionHumanService', () => {
     });
 
     it('should get all path progress', () => {
-      // Note: getAllPathProgress() iterates over localStorage.length which
-      // can't be mocked in browser tests. Instead, verify savePathProgress
-      // stores items and getPathProgress retrieves them individually.
       service.savePathProgress({
         pathId: 'path-1',
         currentStepIndex: 0,
@@ -237,7 +202,6 @@ describe('SessionHumanService', () => {
         lastActivityAt: new Date().toISOString(),
       });
 
-      // Verify both paths were saved and can be retrieved
       const progress1 = service.getPathProgress('path-1');
       const progress2 = service.getPathProgress('path-2');
       expect(progress1).not.toBeNull();
@@ -247,51 +211,27 @@ describe('SessionHumanService', () => {
     });
   });
 
-  describe('upgrade prompts', () => {
-    it('should trigger upgrade prompt', () => {
-      service.triggerUpgradePrompt('first-affinity');
-
-      const prompts = service.getActiveUpgradePrompts();
-      expect(prompts.length).toBe(1);
-      expect(prompts[0].trigger).toBe('first-affinity');
+  describe('upgrade prompts (M-AGGR-1 substrate-driven)', () => {
+    it('should return empty from getActiveUpgradePrompts', () => {
+      // M-AGGR-1: prompts are now substrate-derived via UpgradePromptView projection.
+      expect(service.getActiveUpgradePrompts()).toEqual([]);
     });
 
-    it('should not duplicate prompts for same trigger', () => {
-      service.triggerUpgradePrompt('first-affinity');
-      service.triggerUpgradePrompt('first-affinity');
-
-      const prompts = service.getActiveUpgradePrompts();
-      expect(prompts.length).toBe(1);
+    it('should record dismissal in localStorage', () => {
+      service.dismissUpgradePrompt('prompt-first-affinity');
+      const dismissed = service.getDismissedPromptIds();
+      expect(dismissed).toContain('prompt-first-affinity');
     });
 
-    it('should dismiss upgrade prompt', () => {
-      service.triggerUpgradePrompt('first-affinity');
-      const prompts = service.getActiveUpgradePrompts();
-      expect(prompts.length).toBe(1);
-
-      service.dismissUpgradePrompt(prompts[0].id);
-
-      const activePrompts = service.getActiveUpgradePrompts();
-      expect(activePrompts.length).toBe(0);
+    it('should not duplicate dismissed ids', () => {
+      service.dismissUpgradePrompt('prompt-1');
+      service.dismissUpgradePrompt('prompt-1');
+      const dismissed = service.getDismissedPromptIds();
+      expect(dismissed.filter(id => id === 'prompt-1').length).toBe(1);
     });
 
-    it('should create prompt for different triggers', () => {
-      const triggers = [
-        'first-affinity',
-        'path-started',
-        'path-completed',
-        'notes-saved',
-        'return-visit',
-        'progress-at-risk',
-        'network-feature',
-      ] as const;
-
-      for (const trigger of triggers) {
-        service.resetSession();
-        service.triggerUpgradePrompt(trigger);
-        const prompts = service.getActiveUpgradePrompts();
-        expect(prompts.length).toBeGreaterThan(0);
-      }
+    it('onGatedContentAccess should not throw (stub, M-AGGR-1)', () => {
+      expect(() => service.onGatedContentAccess('content-1', 'Test Content')).not.toThrow();
     });
   });
 
@@ -373,15 +313,14 @@ describe('SessionHumanService', () => {
   });
 
   describe('migration', () => {
-    it('should prepare migration package', () => {
-      service.recordContentView('node-1');
-      service.recordPathStarted('path-1');
-
+    it('should prepare migration package with empty activities (M-AGGR-1)', () => {
       const migration = service.prepareMigration();
 
       expect(migration).not.toBeNull();
       expect(migration?.sessionId).toBe(service.getSessionId());
       expect(migration?.status).toBe('pending');
+      // M-AGGR-1: activities are substrate-derived; always [] in migration package
+      expect(migration?.activities).toEqual([]);
     });
 
     it('should mark as migrated', () => {
@@ -393,7 +332,6 @@ describe('SessionHumanService', () => {
     });
 
     it('should clear after migration', () => {
-      service.recordContentView('node-1');
       service.clearAfterMigration();
 
       expect(service.getSession()).toBeNull();
@@ -477,7 +415,6 @@ describe('SessionHumanService', () => {
     it('should update lastActiveAt', () => {
       const before = service.getSession()?.lastActiveAt;
 
-      // Wait a tiny bit to ensure different timestamp
       setTimeout(() => {
         service.touch();
         const after = service.getSession()?.lastActiveAt;
@@ -489,7 +426,6 @@ describe('SessionHumanService', () => {
   describe('resetSession', () => {
     it('should create fresh session', () => {
       service.setDisplayName('Custom Name');
-      service.recordContentView('node-1');
       const oldId = service.getSessionId();
 
       service.resetSession();

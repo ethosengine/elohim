@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view/bounds-validation-result",
+  "title": "BoundsValidationResultView",
+  "description": "Wire shape for POST /api/v1/diagnostics/validate-bounds. Reports whether a given EconomicEvent passes bounds validation against the Commitment named by its bounded_by field. Source of truth: pure function output; no persisted entity. Walks bounded_by -> Commitment (Holochain DHT) -> checks {active, scope-includes-event, reach-ceiling-respected, rate-not-exceeded, key-rotation-current, revoked?}.",
+  "type": "object",
+  "required": ["pass", "commitment_cid", "checks"],
+  "additionalProperties": false,
+  "properties": {
+    "pass": { "type": "boolean", "description": "True iff all bounds checks passed." },
+    "commitment_cid": { "type": "string", "minLength": 1, "description": "CID of the Commitment that was walked." },
+    "violation": {
+      "type": ["object", "null"],
+      "description": "Populated iff pass=false. Names the first violation encountered.",
+      "required": ["kind", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["commitment_inactive", "scope_not_included", "reach_ceiling_exceeded", "rate_limit_exceeded", "key_rotation_stale", "commitment_revoked", "commitment_not_found"]
+        },
+        "summary": { "type": "string", "description": "Human-readable explanation including any relevant numeric bounds." }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "description": "Per-check status. All true iff pass=true; first false short-circuits and populates violation.",
+      "required": ["commitment_found", "active", "scope_includes_event", "reach_ceiling_ok", "rate_within_limit", "key_rotation_current", "not_revoked"],
+      "additionalProperties": false,
+      "properties": {
+        "commitment_found": { "type": "boolean" },
+        "active": { "type": "boolean" },
+        "scope_includes_event": { "type": "boolean" },
+        "reach_ceiling_ok": { "type": "boolean" },
+        "rate_within_limit": { "type": "boolean" },
+        "key_rotation_current": { "type": "boolean" },
+        "not_revoked": { "type": "boolean" }
+      }
+    }
+  }
+}

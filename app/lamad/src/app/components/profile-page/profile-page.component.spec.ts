@@ -57,10 +57,9 @@ describe('ProfilePageComponent', () => {
     sessionHumanSpy = {
       session$: mockSession$,
       getAllPathProgress: vi.fn(),
-      getActivityHistory: vi.fn(),
+      // M-AGGR-1: getActivityHistory removed; activity history is substrate-derived
     };
     sessionHumanSpy.getAllPathProgress.mockReturnValue([]);
-    sessionHumanSpy.getActivityHistory.mockReturnValue([]);
 
     masteryServiceSpy = {
       getMasteryStats: vi.fn(),
@@ -164,9 +163,11 @@ describe('ProfilePageComponent', () => {
       expect(component.activeTab).toBe('timeline');
     });
 
-    it('should refresh activity history when switching to timeline', () => {
+    it('should set empty activityHistory when switching to timeline (M-AGGR-1)', () => {
+      // M-AGGR-1: getActivityHistory removed; timeline is substrate-derived.
       component.setActiveTab('timeline');
-      expect(sessionHumanSpy.getActivityHistory).toHaveBeenCalled();
+      expect(component.activeTab).toBe('timeline');
+      expect(component.activityHistory).toEqual([]);
     });
 
     it('should refresh path progress when switching to paths', () => {

@@ -153,6 +153,77 @@ pub fn deserialize_score(s: &str) -> Option<StandingScore> {
 }
 
 // ============================================================================
+// Extension-signal projection (Sprint 2 Task 8)
+// ============================================================================
+
+/// Project a substrate-detected extension signal (e.g., `rate-limit-exceeded`,
+/// `bad-custody`, `reach-escalation-pending`) into the standing_view projection.
+///
+/// # Relationship to [`project_signal`]
+///
+/// [`project_signal`] is the canonical path for the typed [`FeedbackSignal`]
+/// (SignalKind enum variants: Squelch, Correction, Retraction, Quarantine, Vouch).
+/// Its debit weights are read from the [`DebitWeightPolicy`] trait, which is
+/// itself driven by the standing-policy manifest via [`ManifestDebitWeightPolicy`].
+///
+/// This function is the parallel path for **string-named** extension signal_kinds
+/// declared in the elohim domain manifest's `signalKinds` map.  Extension signals
+/// are emitted by per-instance validators (Sprint 1's `republish_epr_validator`,
+/// Sprints 3 and 5a-e instances) when a bounds violation is detected.  The weight
+/// is read from [`crate::services::signal_weight_registry::weight_for`], which is
+/// lazy-loaded from the elohim domain manifest at first call.
+///
+/// The `SignalKind` enum and `FeedbackSignal` struct are **not modified** by this
+/// path — they are wire-format types with downstream consumers that must remain
+/// stable.
+///
+/// # Graceful degradation
+///
+/// When the signal_kind has no registered weight (not declared in the manifest,
+/// or the manifest could not be loaded), the function applies weight 0 — no
+/// standing impact — and logs a [`tracing::warn!`].  This ensures that a
+/// not-yet-registered new signal_kind never panics or returns an error; the
+/// standing_view row is still written so the signal timestamp is recorded.
+pub fn project_extension_signal(
+    conn: &mut SqliteConnection,
+    evaluator: &[u8],
+    subject: &[u8],
+    signal_kind: &str,
+    manifest_cid: &str,
+) -> Result<StandingScore, ProjectorError> {
+    let weight = match crate::services::signal_weight_registry::weight_for(signal_kind) {
+        Some(w) => w.debit_weight,
+        None => {
+            tracing::warn!(
+                target: "elohim_storage::standing_projector",
+                signal_kind = %signal_kind,
+                "no weight registered in elohim manifest for extension signal_kind; applying 0 (no standing impact)"
+            );
+            0
+        }
+    };
+
+    let now = Utc::now().to_rfc3339();
+    let existing = fetch(conn, evaluator, subject)?;
+    let new_sum = existing.as_ref().map(|r| r.debit_weight_sum).unwrap_or(0) + weight;
+    let new_score = score_for_debit_sum(new_sum);
+
+    upsert(
+        conn,
+        &StandingViewRow {
+            evaluator_pubkey: evaluator.to_vec(),
+            subject_pubkey: subject.to_vec(),
+            score: serialize_score(new_score),
+            debit_weight_sum: new_sum,
+            last_signal_at: now,
+            manifest_cid: manifest_cid.to_string(),
+        },
+    )?;
+
+    Ok(new_score)
+}
+
+// ============================================================================
 // ManifestDebitWeightPolicy
 // ============================================================================
 

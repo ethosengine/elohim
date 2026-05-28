@@ -107,6 +107,32 @@ pub struct EprPublishInput {
     pub envelope: EprEnvelopeView,
     /// Hex-encoded payload bytes.
     pub payload: String,
+    /// Optional republish-epr EconomicEvent. Required when the publish is a
+    /// substrate-correct re-deploy; absent for direct envelope writes.
+    #[serde(default)]
+    pub event: Option<RepublishEprEventView>,
+}
+
+/// Optional EconomicEvent payload accompanying a substrate-correct republish.
+///
+/// Per Z.D spec §2 (genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md):
+/// when CI re-deploys an EPR bundle, it emits a `republish-epr` EconomicEvent
+/// bounded by a `delegates-compute` Commitment. The substrate validator walks
+/// `bounded_by` → Commitment and rejects out-of-bounds events.
+///
+/// Field shape matches `elohim/sdk/schemas/v1/economic-events/republish-epr.schema.json`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RepublishEprEventView {
+    pub action: String,
+    pub performer: String,
+    pub bounded_by: String,
+    pub target: String,
+    pub supersedes: Option<String>,
+    /// Inline payload object with {blob_cid, epr_kind, reach, bundle_path?}.
+    pub payload: JsonVal,
+    pub signed_at: String,
 }
 
 /// Wire view for the providers endpoint.

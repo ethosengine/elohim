@@ -1,98 +1,65 @@
+// Retired: DWELL_THRESHOLD_MS, sessionViewed Set, pendingTimers, EventService dependency (M-REA-2).
+// Substrate policy (tending-policy Manifest) qualifies dwell; deduplication via re-tend.
+import { HttpClient } from '@angular/common/http';
 import { Injectable, OnDestroy, inject } from '@angular/core';
 
 import { Subscription } from 'rxjs';
 
-import { AgentService } from '@app/elohim/services/agent.service';
+/** Wire shape for POST /api/v1/attention/tending — mirrors AttentionTendingIntent in @elohim/rea-runtime. */
+interface AttentionTendingIntent {
+  filterSubjectJson: string;
+  classification: 'values-forward' | 'fatigue' | 'scope-mismatch' | 'safety';
+  reason?: string;
+  ttlSeconds: number;
+  contextJson: string;
+  elapsedMs: number;
+}
 
-import { EventService } from './event.service';
-
-/** Minimum milliseconds on content before recording a view event. */
-const DWELL_THRESHOLD_MS = 3000;
-
-/**
- * AttentionTrackerService — Records content attention as economic events.
- *
- * Orchestrates dwell-time qualification, per-session deduplication,
- * and delegates to EventService for the actual REA event creation.
- * This replaces Google Analytics with protocol-native attention tracking.
- */
 @Injectable({ providedIn: 'root' })
 export class AttentionTrackerService implements OnDestroy {
-  private readonly eventService = inject(EventService);
-  private readonly agentService = inject(AgentService);
+  private readonly http = inject(HttpClient);
 
-  /** Content IDs that have had a qualified view in this session. */
-  private readonly sessionViewed = new Set<string>();
-
-  /** Pending dwell timers keyed by content ID. */
-  private readonly pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Mount timestamps keyed by content ID (set on trackContentView). */
+  private readonly mountedAt = new Map<string, number>();
 
   /** Active subscriptions for cleanup. */
   private readonly subscriptions: Subscription[] = [];
 
-  /**
-   * Start tracking a content view. After DWELL_THRESHOLD_MS, records
-   * a content-view economic event (unless already viewed this session).
-   */
+  /** Record that the agent mounted a content node. */
   trackContentView(contentId: string): void {
-    // Already viewed this session — skip
-    if (this.sessionViewed.has(contentId)) return;
-
-    // Cancel any existing timer for this content
-    this.cancelTimer(contentId);
-
-    // Start dwell timer
-    const timer = setTimeout(() => {
-      this.recordQualifiedView(contentId);
-      this.pendingTimers.delete(contentId);
-    }, DWELL_THRESHOLD_MS);
-
-    this.pendingTimers.set(contentId, timer);
+    if (!this.mountedAt.has(contentId)) {
+      this.mountedAt.set(contentId, Date.now());
+    }
   }
 
   /**
-   * Stop tracking a content view. Cancels the dwell timer if the
-   * threshold hasn't been met yet.
+   * Record that the agent left a content node.
+   * Sends elapsed time to POST /api/v1/attention/tending. The route evaluates
+   * dwell qualification against the tending-policy Manifest (substrate policy).
    */
   trackContentLeave(contentId: string): void {
-    this.cancelTimer(contentId);
-  }
+    const mountTime = this.mountedAt.get(contentId);
+    if (mountTime === undefined) return;
 
-  /**
-   * Returns the set of content IDs viewed this session (qualified views only).
-   */
-  getSessionViewedIds(): ReadonlySet<string> {
-    return this.sessionViewed;
-  }
+    this.mountedAt.delete(contentId);
 
-  ngOnDestroy(): void {
-    // Clear all pending timers
-    for (const timer of this.pendingTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.pendingTimers.clear();
-
-    // Clean up subscriptions
-    for (const sub of this.subscriptions) {
-      sub.unsubscribe();
-    }
-  }
-
-  private recordQualifiedView(contentId: string): void {
-    this.sessionViewed.add(contentId);
-
-    const agentId = this.agentService.getCurrentAgentId();
-    const sub = this.eventService
-      .recordContentInteraction(agentId, contentId, 'content-view')
+    const elapsedMs = Date.now() - mountTime;
+    const sub = this.http
+      .post<{ accepted: boolean }>('/api/v1/attention/tending', {
+        filterSubjectJson: JSON.stringify({ contentId }),
+        classification: 'values-forward',
+        ttlSeconds: 3600,
+        contextJson: JSON.stringify({ pillar: 'shefa' }),
+        elapsedMs,
+      } satisfies AttentionTendingIntent)
       .subscribe();
     this.subscriptions.push(sub);
   }
 
-  private cancelTimer(contentId: string): void {
-    const existing = this.pendingTimers.get(contentId);
-    if (existing) {
-      clearTimeout(existing);
-      this.pendingTimers.delete(contentId);
+  ngOnDestroy(): void {
+    this.mountedAt.clear();
+    for (const sub of this.subscriptions) {
+      sub.unsubscribe();
     }
   }
 }

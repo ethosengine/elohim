@@ -1,24 +1,28 @@
 import { TestBed } from '@angular/core/testing';
 
-import { BehaviorSubject, firstValueFrom } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 
 import { BannerService } from '@app/elohim/services/banner.service';
-import { HolochainUpgradePrompt } from '../../models/session-human.model';
 import { SessionHumanService } from '../session-human.service';
 import { UpgradeBannerProvider } from './upgrade-banner.provider';
 import { vi, Mock } from 'vitest';
 
+/**
+ * M-AGGR-1: UpgradeBannerProvider now derives prompts from the substrate
+ * projection at GET /api/v1/identity/{agentId}/upgrade-prompts (UpgradePromptView).
+ * The local upgradePrompts$ subject has been removed from SessionHumanService.
+ *
+ * Until the substrate Observable is wired, the provider emits empty notices.
+ * These tests verify structure, registration, and dismissal behaviour.
+ */
 describe('UpgradeBannerProvider', () => {
   let provider: UpgradeBannerProvider;
   let mockBannerService: any;
-  let upgradePromptsSubject: BehaviorSubject<HolochainUpgradePrompt[]>;
 
   beforeEach(() => {
-    upgradePromptsSubject = new BehaviorSubject<HolochainUpgradePrompt[]>([]);
-
     const mockSessionHumanService = {
       dismissUpgradePrompt: vi.fn(),
-      upgradePrompts$: upgradePromptsSubject.asObservable(),
+      getDismissedPromptIds: vi.fn().mockReturnValue([]),
     };
 
     mockBannerService = {
@@ -49,71 +53,9 @@ describe('UpgradeBannerProvider', () => {
     expect(provider.providerId).toBe('upgrade-banner');
   });
 
-  it('should map upgrade prompts to banner notices', async () => {
-    const prompt: HolochainUpgradePrompt = {
-      id: 'prompt-1',
-      trigger: 'first-affinity',
-      title: 'Save Your Progress',
-      message: 'Join the network to keep your data',
-      benefits: ['Permanent storage'],
-      dismissed: false,
-    };
-
-    upgradePromptsSubject.next([prompt]);
-
+  it('should emit empty notices until substrate observable is wired (M-AGGR-1)', async () => {
     const notices = await firstValueFrom(provider.notices$);
-    expect(notices.length).toBe(1);
-    expect(notices[0].id).toBe('prompt-1');
-    expect(notices[0].title).toBe('Save Your Progress');
-    expect(notices[0].severity).toBe('info');
-    expect(notices[0].priority).toBe('agent');
-    expect(notices[0].contexts).toEqual(['global']);
-    expect(notices[0].actions?.length).toBe(1);
-    expect(notices[0].actions?.[0].id).toBe('learn-more');
-  });
-
-  it('should map progress-at-risk prompts with higher urgency', async () => {
-    const prompt: HolochainUpgradePrompt = {
-      id: 'urgent-1',
-      trigger: 'progress-at-risk',
-      title: 'Storage Almost Full',
-      message: 'Your progress may be lost',
-      benefits: [],
-      dismissed: false,
-    };
-
-    upgradePromptsSubject.next([prompt]);
-
-    const notices = await firstValueFrom(provider.notices$);
-    expect(notices[0].severity).toBe('warning');
-    expect(notices[0].priority).toBe('system');
-  });
-
-  it('should filter out dismissed prompts', async () => {
-    const prompts: HolochainUpgradePrompt[] = [
-      {
-        id: 'active',
-        trigger: 'first-affinity',
-        title: 'Active',
-        message: '',
-        benefits: [],
-        dismissed: false,
-      },
-      {
-        id: 'dismissed',
-        trigger: 'path-started',
-        title: 'Dismissed',
-        message: '',
-        benefits: [],
-        dismissed: true,
-      },
-    ];
-
-    upgradePromptsSubject.next(prompts);
-
-    const notices = await firstValueFrom(provider.notices$);
-    expect(notices.length).toBe(1);
-    expect(notices[0].id).toBe('active');
+    expect(notices).toEqual([]);
   });
 
   it('should delegate dismissNotice to SessionHumanService', () => {

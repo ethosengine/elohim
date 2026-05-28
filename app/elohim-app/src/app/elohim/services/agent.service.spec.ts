@@ -28,9 +28,7 @@ describe('AgentService', () => {
       getSessionId: vi.fn(),
       getAccessLevel: vi.fn(),
       checkContentAccess: vi.fn(),
-      recordPathStarted: vi.fn(),
-      recordStepCompleted: vi.fn(),
-      recordNotesSaved: vi.fn(),
+      // M-AGGR-1: recordPathStarted, recordStepCompleted, recordNotesSaved removed
     };
 
     Object.defineProperty(mockSessionService, 'session$', {
@@ -422,24 +420,24 @@ describe('AgentService', () => {
         });
       }));
 
-    it('should record path started for new paths', () =>
+    it('should complete step for new path without session recording (M-AGGR-1)', () =>
       new Promise<void>(done => {
+        // M-AGGR-1: recordPathStarted removed; tracking now flows via EconomicEvents.
         mockDataLoader.getLocalProgress.mockReturnValue(null);
         mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
         service.completeStep('new-path', 0).subscribe(() => {
-          expect(mockSessionService.recordPathStarted).toHaveBeenCalledWith('new-path');
           done();
         });
       }));
 
-    it('should record step completed in session', () =>
+    it('should complete step without session recording (M-AGGR-1)', () =>
       new Promise<void>(done => {
+        // M-AGGR-1: recordStepCompleted removed; tracking now flows via EconomicEvents.
         mockDataLoader.getLocalProgress.mockReturnValue(null);
         mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
         service.completeStep('path-1', 0).subscribe(() => {
-          expect(mockSessionService.recordStepCompleted).toHaveBeenCalledWith('path-1', 0);
           done();
         });
       }));
@@ -564,13 +562,13 @@ describe('AgentService', () => {
         });
       }));
 
-    it('should record notes saved in session', () =>
+    it('should save step notes without session recording (M-AGGR-1)', () =>
       new Promise<void>(done => {
+        // M-AGGR-1: recordNotesSaved removed; tracking now flows via EconomicEvents.
         mockDataLoader.getLocalProgress.mockReturnValue(null);
         mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
         service.saveStepNotes('path-1', 0, 'Notes').subscribe(() => {
-          expect(mockSessionService.recordNotesSaved).toHaveBeenCalledWith('path-1', 0);
           done();
         });
       }));

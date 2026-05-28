@@ -10,7 +10,8 @@ import {
   GraduatedFeedbackInput,
   FeedbackStats,
 } from '@app/elohim/services/governance-signal.service';
-import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
+// GovernanceRecognitionService retired by M-REA-3: participation now POSTs to
+// POST /api/v1/mishpat/recognition/participation via GovernanceApiService.postParticipation().
 
 import type { RecordSignalInputView, GovernanceSignalView } from '@elohim/storage-client/generated';
 
@@ -377,7 +378,6 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
 
   private readonly signalService = inject(GovernanceSignalService);
   private readonly governanceApi = inject(GovernanceApiService);
-  private readonly governanceRecognition = inject(GovernanceRecognitionService);
 
   private static readonly CURRENT_USER_ID = 'current-user';
 
@@ -505,11 +505,12 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
       // API failure is non-blocking; local signal is already recorded
     });
 
-    // Generate REA economic event for governance participation
-    // Block positions (index 0 on proposal scale) use 'block' participation type
+    // Generate REA economic event for governance participation (M-REA-3: substrate-side)
+    // Block positions (index 0 on proposal scale) use 'block' participation type.
+    // Weight is resolved from standing-policy Manifest by the substrate.
     const isBlock = this.context() === 'proposal' && positionData.index === 0;
-    this.governanceRecognition
-      .recordParticipation({
+    this.governanceApi
+      .postParticipation({
         entityType: this.entityType(),
         entityId: this.resolvedEntityId,
         humanId: GraduatedFeedbackComponent.CURRENT_USER_ID,

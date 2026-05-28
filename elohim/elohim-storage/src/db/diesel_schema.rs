@@ -190,6 +190,11 @@ diesel::table! {
         at_location -> Nullable<Text>,
         verified_at -> Nullable<Text>,
         scope_collab_cid -> Nullable<Text>,
+        // REA compute-commitment back-reference (migration 2026-05-28-050000).
+        // Nullable for backward compat; populated for events emitted under a
+        // Mishpat::Commitment (compute-class action `delegates-compute`).
+        // Used by DieselRateHistory for sliding-window rate queries.
+        bounded_by -> Nullable<Text>,
     }
 }
 
@@ -1660,6 +1665,48 @@ diesel::table! {
 
 // Source of truth: derived projection of FeedbackSignal × Manifest(kind: standing-policy).
 // Reconstructable from FeedbackSignal + manifests tables at any time.
+// Migration: 2026-05-28-020000_content_engagement_stats
+diesel::table! {
+    content_engagement_stats (content_id, h_app_id) {
+        content_id      -> Text,
+        h_app_id        -> Text,
+        views           -> Integer,
+        completions     -> Integer,
+        unique_viewers  -> Integer,
+        completion_rate -> Double,
+        computed_at     -> Text,
+    }
+}
+
+// Source of truth: derived projection of EconomicEvent stream × HumanProgress per agent.
+// Reconstructable from economic_events table filtered by provider + lamadEventType.
+// Migration: 2026-05-28-030000_session_human_view
+diesel::table! {
+    session_human_view (agent_id, h_app_id) {
+        agent_id            -> Text,
+        h_app_id            -> Text,
+        nodes_viewed        -> BigInt,
+        nodes_with_affinity -> BigInt,
+        paths_started       -> BigInt,
+        paths_completed     -> BigInt,
+        steps_completed     -> BigInt,
+        journey_started_at  -> Nullable<Text>,
+        computed_at         -> Text,
+    }
+}
+
+// Source of truth: derived projection of SessionHumanView × Manifest{kind:'onboarding'}.
+// active_prompts_json: JSON array of UpgradePromptItem objects.
+// Migration: 2026-05-28-040000_upgrade_prompt_view
+diesel::table! {
+    upgrade_prompt_view (agent_id, h_app_id) {
+        agent_id              -> Text,
+        h_app_id              -> Text,
+        active_prompts_json   -> Text,
+        computed_at           -> Text,
+    }
+}
+
 // Migration: 2026-05-28-000000_accumulation_status
 diesel::table! {
     accumulation_status (entity_type, entity_id) {
@@ -1679,6 +1726,7 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     accumulation_status,
+    content_engagement_stats,
     access_grants,
     agreements,
     attestations,
@@ -1769,6 +1817,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_decay_events,
     token_mint_events,
     token_transfers,
+    session_human_view,
     translation_observations,
+    upgrade_prompt_view,
     votes,
 );

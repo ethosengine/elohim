@@ -5,6 +5,26 @@
   "description": "Protocol-level schema for app manifests. An app manifest is an EPR (content-addressed, stewarded, governed) that declares an app's content types, formats, renderers, relationships, and signals. The protocol validates the SHAPE of manifests (three-leg coupling, substrate signal mapping); apps validate their own vocabulary.\n\nManifest values MAY be inlined or referenced via { \"$ref\": \"./relative/path.json\" } pointers — the schema validator and the codegen loader both inline references during load. The recommended convention is to keep the shell manifest under 300 LOC and split each concern (contentTypes, signalKinds, projections, graph, etc.) into its own file under a sibling `manifest/` directory. See elohim/sdk/domains/lamad/ for the canonical example.",
   "type": "object",
   "required": ["id", "name", "version", "vocabulary"],
+  "dependentSchemas": {
+    "vocabulary": {
+      "if": {
+        "properties": {
+          "vocabulary": {
+            "properties": {
+              "stagedIntents": {
+                "type": "object",
+                "minProperties": 1
+              }
+            },
+            "required": ["stagedIntents"]
+          }
+        }
+      },
+      "then": {
+        "required": ["graduation"]
+      }
+    }
+  },
   "properties": {
     "id": {
       "type": "string",
@@ -66,10 +86,24 @@
           "standing_impact_allowed": {
             "type": "array",
             "items": { "type": "string", "enum": ["advisory", "consequential", "binding"] }
+          },
+          "debit_weight": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Weighted contribution this signal makes to a subject's negative standing when projected via standing_projector. 0 = advisory-only (no standing impact). See genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md Task 7."
+          },
+          "decay_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of days over which the debit weight decays to zero. Standing projector uses this to time-window signal evidence."
           }
         },
         "additionalProperties": false
       }
+    },
+    "graduation": {
+      "$ref": "#/$defs/GraduationPolicy",
+      "description": "Optional. Per-pillar graduation policy. Required IF vocabulary.stagedIntents is non-empty (see dependentSchemas). Permitted (but inert) when vocabulary.stagedIntents is absent — useful for forward-compatibility where a pillar declares graduation readiness before staged-intent vocabulary lands."
     },
     "graph": {
       "type": "object",
@@ -189,6 +223,14 @@
             "$ref": "#/$defs/ObservationDeclaration"
           },
           "minProperties": 1
+        },
+        "stagedIntents": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Optional. Per-pillar staged-intent vocabulary. Each entry declares an intent shape the session-bridge holds pre-canonically and replays into a canonical entry at graduation. Spec: 2026-05-28-app-manifest-staged-intents-design.md §2. Pillars without tentative-participation surfaces omit this section. If declared, must contain at least one entry — empty {} is not a meaningful declaration.",
+          "additionalProperties": {
+            "$ref": "#/$defs/StagedIntentDeclaration"
+          }
         }
       },
       "additionalProperties": false
@@ -322,6 +364,83 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "StagedIntentDeclaration": {
+      "title": "StagedIntentDeclaration",
+      "description": "Per-pillar staged-intent declaration. The session-bridge holds intents matching this declaration pre-canonically and replays them into the named canonical entry at graduation. Spec: 2026-05-28-app-manifest-staged-intents-design.md §2.",
+      "type": "object",
+      "required": ["description", "intentSchema", "graduatesTo", "actionableFrom", "resolutionMode", "coupling"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable. What this intent represents pre-canonically."
+        },
+        "intentSchema": {
+          "type": "object",
+          "description": "JSON Schema $ref to the intent payload schema in the pillar's domain schemas/ directory.",
+          "required": ["$ref"],
+          "properties": {
+            "$ref": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "graduatesTo": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Names the canonical entry type the intent replays into at graduation. Runtime lookup key — validation does not verify the entry type exists."
+        },
+        "actionableFrom": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "../enums/session-lifecycle-state.schema.json" },
+          "description": "Which lifecycle states the intent is actionable from. Bridge's is_actionable() predicate reads this directly."
+        },
+        "resolutionMode": {
+          "type": "string",
+          "enum": ["deterministic", "negotiated", "either"],
+          "description": "How graduation resolves: deterministic = 1:1 mapping; negotiated = wisdom-invocation appraisal; either = try deterministic, fall back to negotiated."
+        },
+        "coupling": {
+          "$ref": "#/$defs/ThreeLegCoupling"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GraduationPolicy": {
+      "title": "GraduationPolicy",
+      "description": "Per-pillar graduation policy. Names runtime registry lookup keys, the wisdom-invocation framing CID, the appraisal agent hint, and the notarization mode. Spec: 2026-05-28-app-manifest-staged-intents-design.md §3.",
+      "type": "object",
+      "required": ["deterministicCeremony"],
+      "properties": {
+        "deterministicCeremony": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Runtime registry lookup key for the deterministic GraduationCeremony impl. Convention: <pillar>::<CeremonyName>."
+        },
+        "negotiatedCeremony": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional. Runtime registry lookup key for the negotiated ceremony. Absence means the pillar supports only deterministic resolutions."
+        },
+        "framingCid": {
+          "type": "string",
+          "pattern": "^epr:",
+          "minLength": 1,
+          "description": "Optional. The wisdom-invocation framing CID the bridge composes when invoking appraisal. Per session-bridge implementation plan §6 Q7 — pillar declares which elohim role appraises via the framing CID it composes. Lightweight pattern guard matches the EPR-CID prefix convention from spec §8 examples (epr:<pillar>:<framing-name>-v<n>); a fuller CIDv1 validator may replace this when the shared EPR-CID schema lands."
+        },
+        "appraisalAgent": {
+          "type": "string",
+          "enum": ["home-elohim", "commons-elohim", "neutral-counsel", "custom"],
+          "description": "Optional. Convenience hint for runtime composition. Default per session-bridge implementation plan §6 Q7 v1 is home-elohim."
+        },
+        "notarizeAppraisal": {
+          "type": "string",
+          "enum": ["always", "on-request", "never"],
+          "description": "Optional. Default: on-request. Whether the bridge authors a Manifest{kind: 'graduation-record'} entry per graduation."
         }
       },
       "additionalProperties": false

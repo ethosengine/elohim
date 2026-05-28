@@ -886,6 +886,27 @@ impl HttpServer {
                 self.handle_inventory_parity().await
             }
 
+            // Bounds-validator diagnostic — Sprint 2 Task 6. Runs the substrate-wide
+            // bounds_validator::validate against a caller-supplied EconomicEvent payload
+            // + the production CommitmentFetcher / RateHistory. Returns
+            // BoundsValidationResultView per the schema. Matched before the /api/v1/ catch-all.
+            (Method::POST, "/api/v1/diagnostics/validate-bounds") => {
+                if let Some(ref pool) = self.db_pool {
+                    let hc_lamad = self.hc_registry.as_ref().and_then(|r| r.lamad.clone());
+                    crate::api::diagnostics_bounds::handle(
+                        req,
+                        Method::POST,
+                        pool,
+                        hc_lamad.as_ref(),
+                    )
+                    .await
+                } else {
+                    Ok(response::service_unavailable(
+                        "Database pool not configured — /api/v1/diagnostics/validate-bounds unavailable",
+                    ))
+                }
+            }
+
             // Signal-emit endpoint — composes EPR Envelope, signs via conductor,
             // ingests. Matched before the /api/v1/ catch-all so the manifest
             // registry + signing client are injected directly from HttpServer
@@ -8649,6 +8670,16 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::post("/api/v1/lamad/events")
                 .handler("emit_lamad_event")
                 .auth_required()
+                .build(),
+        )
+        // GET /api/v1/lamad/content/{contentId}/engagement — M-AGGR-3
+        // Returns ContentEngagementStatsView (Category C projection of EconomicEvent
+        // stream filtered by content_id + lamadEventType IN content-view|content-complete).
+        // Retires F-AGGR-3: countContentViews/countContentCompletions client-side counting.
+        .route(
+            Route::get("/api/v1/lamad/content/{contentId}/engagement")
+                .handler("get_content_engagement_stats")
+                .cache_ttl(30)
                 .build(),
         )
         // =====================================================================

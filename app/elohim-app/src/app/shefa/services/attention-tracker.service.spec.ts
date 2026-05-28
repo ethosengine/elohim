@@ -1,109 +1,85 @@
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
+import { HttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
-import { vi } from 'vitest';
 
 import { AttentionTrackerService } from './attention-tracker.service';
-import { EventService } from './event.service';
-import { AgentService } from '@app/elohim/services/agent.service';
 
 describe('AttentionTrackerService', () => {
   let service: AttentionTrackerService;
-  let eventServiceMock: Record<string, ReturnType<typeof vi.fn>>;
-  let agentServiceMock: Record<string, ReturnType<typeof vi.fn>>;
+  let httpSpy: { post: ReturnType<typeof vi.fn> };
 
-  const MOCK_AGENT_ID = 'agent-maya-123';
-  const MOCK_EVENT = { id: 'evt-1' } as any;
+  const MOCK_ACK = { accepted: true };
 
   beforeEach(() => {
-    eventServiceMock = {
-      recordContentInteraction: vi.fn().mockReturnValue(of(MOCK_EVENT)),
-      recordContentView: vi.fn().mockReturnValue(of(MOCK_EVENT)),
-      recordContentComplete: vi.fn().mockReturnValue(of(MOCK_EVENT)),
-      hasViewed: vi.fn().mockReturnValue(of(false)),
-      getViewCount: vi.fn().mockReturnValue(of(0)),
-      getCompletionCount: vi.fn().mockReturnValue(of(0)),
-    };
-    agentServiceMock = {
-      getCurrentAgentId: vi.fn().mockReturnValue(MOCK_AGENT_ID),
+    httpSpy = {
+      post: vi.fn().mockReturnValue(of(MOCK_ACK)),
     };
 
     TestBed.configureTestingModule({
       providers: [
         AttentionTrackerService,
-        { provide: EventService, useValue: eventServiceMock },
-        { provide: AgentService, useValue: agentServiceMock },
+        { provide: HttpClient, useValue: httpSpy },
       ],
     });
     service = TestBed.inject(AttentionTrackerService);
   });
 
-  describe('trackContentView', () => {
-    it('records a view event after dwell threshold', fakeAsync(() => {
+  describe('trackContentView + trackContentLeave', () => {
+    it('posts to attention/tending on leave with elapsed time', () => {
       service.trackContentView('concept-trust');
-      tick(3000);
       service.trackContentLeave('concept-trust');
 
-      expect(eventServiceMock['recordContentInteraction']).toHaveBeenCalledWith(
-        MOCK_AGENT_ID,
-        'concept-trust',
-        'content-view',
-      );
-    }));
-
-    it('does NOT record a view event for bounce (under threshold)', fakeAsync(() => {
-      service.trackContentView('concept-trust');
-      tick(2000);
-      service.trackContentLeave('concept-trust');
-
-      expect(eventServiceMock['recordContentInteraction']).not.toHaveBeenCalled();
-    }));
-
-    it('deduplicates views within same session', fakeAsync(() => {
-      service.trackContentView('concept-trust');
-      tick(3000);
-      service.trackContentLeave('concept-trust');
-
-      service.trackContentView('concept-trust');
-      tick(3000);
-      service.trackContentLeave('concept-trust');
-
-      expect(eventServiceMock['recordContentInteraction']).toHaveBeenCalledTimes(1);
-    }));
-
-    it('records separate events for different content', fakeAsync(() => {
-      service.trackContentView('concept-trust');
-      tick(3000);
-      service.trackContentLeave('concept-trust');
-
-      service.trackContentView('concept-governance');
-      tick(3000);
-      service.trackContentLeave('concept-governance');
-
-      expect(eventServiceMock['recordContentInteraction']).toHaveBeenCalledTimes(2);
-    }));
-
-    it('records the view event at threshold time, not on leave', fakeAsync(() => {
-      service.trackContentView('concept-trust');
-      tick(3000);
-
-      // Event fires at threshold, before leave
-      expect(eventServiceMock['recordContentInteraction']).toHaveBeenCalledTimes(1);
-
-      service.trackContentLeave('concept-trust');
-    }));
-  });
-
-  describe('getSessionViewedIds', () => {
-    it('returns empty set initially', () => {
-      expect(service.getSessionViewedIds().size).toBe(0);
+      expect(httpSpy.post).toHaveBeenCalledOnce();
+      const [url, body] = httpSpy.post.mock.calls[0];
+      expect(url).toBe('/api/v1/attention/tending');
+      expect(body.classification).toBe('values-forward');
+      expect(JSON.parse(body.filterSubjectJson).contentId).toBe('concept-trust');
+      expect(body.elapsedMs).toBeGreaterThanOrEqual(0);
+      expect(body.ttlSeconds).toBeGreaterThanOrEqual(3600);
+      expect(JSON.parse(body.contextJson).pillar).toBe('shefa');
     });
 
-    it('includes content IDs after qualified views', fakeAsync(() => {
+    it('does NOT post if trackContentLeave called without trackContentView', () => {
+      service.trackContentLeave('concept-trust');
+      expect(httpSpy.post).not.toHaveBeenCalled();
+    });
+
+    it('clears mount time after trackContentLeave (no double-send)', () => {
       service.trackContentView('concept-trust');
-      tick(3000);
+      service.trackContentLeave('concept-trust');
       service.trackContentLeave('concept-trust');
 
-      expect(service.getSessionViewedIds().has('concept-trust')).toBe(true);
-    }));
+      expect(httpSpy.post).toHaveBeenCalledOnce();
+    });
+
+    it('tracks separate content nodes independently', () => {
+      service.trackContentView('concept-trust');
+      service.trackContentView('concept-governance');
+      service.trackContentLeave('concept-trust');
+      service.trackContentLeave('concept-governance');
+
+      expect(httpSpy.post).toHaveBeenCalledTimes(2);
+      const calls = httpSpy.post.mock.calls;
+      expect(JSON.parse(calls[0][1].filterSubjectJson).contentId).toBe('concept-trust');
+      expect(JSON.parse(calls[1][1].filterSubjectJson).contentId).toBe('concept-governance');
+    });
+
+    it('second trackContentView for same content does not overwrite mount time', () => {
+      service.trackContentView('concept-trust');
+      service.trackContentView('concept-trust'); // re-mount without leave — ignored
+      service.trackContentLeave('concept-trust');
+
+      expect(httpSpy.post).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('ngOnDestroy', () => {
+    it('clears mount times on destroy', () => {
+      service.trackContentView('concept-trust');
+      service.ngOnDestroy();
+
+      service.trackContentLeave('concept-trust');
+      expect(httpSpy.post).not.toHaveBeenCalled();
+    });
   });
 });

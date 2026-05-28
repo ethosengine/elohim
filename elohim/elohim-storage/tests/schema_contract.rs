@@ -1179,6 +1179,11 @@ fn view_schemas_declare_source_of_truth() {
         // M-POLICY-2: MechanismSelection view + pillar-projection payload schemas
         "views/mechanism-selection.schema.json",
         "manifest-payloads/pillar-projection.schema.json",
+        // M-AGGR-3: ContentEngagementStats projection (Category C operational — EconomicEvent stream)
+        "views/content-engagement-stats-view.schema.json",
+        // Sprint 2 Task 1: BoundsValidationResult + StandingScore views
+        "views/bounds-validation-result-view.schema.json",
+        "views/standing-score-view.schema.json",
     ];
 
     for schema_name in &view_schemas {
@@ -4383,4 +4388,666 @@ fn standing_policy_with_weight_levels_only_validates() {
         }
     });
     validate_against_schema("manifest-payloads/standing-policy.schema.json", &payload);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M-AGGR-3: ContentEngagementStatsView schema tests
+// Source of truth: derived projection of EconomicEvent stream filtered by
+// (content_id, lamadEventType IN ['content-view', 'content-complete']).
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn minimal_content_engagement_stats() -> serde_json::Value {
+    serde_json::json!({
+        "contentId": "concept-foundations-1",
+        "views": 42,
+        "completions": 17,
+        "uniqueViewers": 38,
+        "completionRate": 0.405,
+        "computedAt": "2026-05-28T12:00:00Z"
+    })
+}
+
+#[test]
+fn content_engagement_stats_view_minimal_validates() {
+    validate_against_schema(
+        "views/content-engagement-stats-view.schema.json",
+        &minimal_content_engagement_stats(),
+    );
+}
+
+#[test]
+fn content_engagement_stats_view_zero_counts_validates() {
+    let zero = serde_json::json!({
+        "contentId": "new-content-no-views",
+        "views": 0,
+        "completions": 0,
+        "uniqueViewers": 0,
+        "completionRate": 0.0,
+        "computedAt": "2026-05-28T10:00:00Z"
+    });
+    validate_against_schema("views/content-engagement-stats-view.schema.json", &zero);
+}
+
+#[test]
+fn content_engagement_stats_view_full_completion_validates() {
+    // Every viewer also completed — 100% rate
+    let full = serde_json::json!({
+        "contentId": "lesson-mastery-complete",
+        "views": 10,
+        "completions": 10,
+        "uniqueViewers": 10,
+        "completionRate": 1.0,
+        "computedAt": "2026-05-28T14:00:00Z"
+    });
+    validate_against_schema("views/content-engagement-stats-view.schema.json", &full);
+}
+
+#[test]
+fn content_engagement_stats_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/content-engagement-stats-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("content-engagement-stats schema should compile");
+
+    // Missing views
+    let no_views = {
+        let mut v = minimal_content_engagement_stats();
+        v.as_object_mut().unwrap().remove("views");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_views).next().is_some(),
+        "Schema should require 'views'"
+    );
+
+    // Missing contentId
+    let no_content_id = {
+        let mut v = minimal_content_engagement_stats();
+        v.as_object_mut().unwrap().remove("contentId");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_content_id).next().is_some(),
+        "Schema should require 'contentId'"
+    );
+
+    // Missing completionRate
+    let no_rate = {
+        let mut v = minimal_content_engagement_stats();
+        v.as_object_mut().unwrap().remove("completionRate");
+        v
+    };
+    assert!(
+        validator.iter_errors(&no_rate).next().is_some(),
+        "Schema should require 'completionRate'"
+    );
+}
+
+#[test]
+fn content_engagement_stats_schema_loads() {
+    let _ = load_schema("views/content-engagement-stats-view.schema.json");
+}
+
+// ── M-AGGR-2: SourceChainEntryView ──────────────────────────────
+
+/// Build a minimal valid SourceChainEntryView JSON.
+fn minimal_source_chain_entry() -> serde_json::Value {
+    serde_json::json!({
+        "actionHash": "uhCkkABCDEFGHIJKLMNOP",
+        "entryHash": "uhCEkABCDEFGHIJKLMNOP",
+        "authorAgent": "uhCAkABCDEFGHIJKLMNOP",
+        "entryType": "Create:App(0)",
+        "contentJson": null,
+        "prevActionHash": null,
+        "sequence": 0,
+        "timestamp": "1748000000000000"
+    })
+}
+
+#[test]
+fn source_chain_entry_view_schema_loads() {
+    let schema = load_schema("views/source-chain-entry-view.schema.json");
+    assert_source_of_truth_declared(&schema, "source-chain-entry-view");
+}
+
+#[test]
+fn source_chain_entry_view_minimal_valid() {
+    let instance = minimal_source_chain_entry();
+    validate_against_schema("views/source-chain-entry-view.schema.json", &instance);
+}
+
+#[test]
+fn source_chain_entry_view_with_content_json() {
+    let mut instance = minimal_source_chain_entry();
+    instance["contentJson"] = serde_json::json!(r#"{"id":"human-1","displayName":"Alice"}"#);
+    instance["prevActionHash"] = serde_json::json!("uhCkkPREVACTIONHASH");
+    instance["sequence"] = serde_json::json!(3u32);
+    instance["entryType"] = serde_json::json!("Create:App(1)");
+    validate_against_schema("views/source-chain-entry-view.schema.json", &instance);
+}
+
+#[test]
+fn source_chain_entry_view_requires_action_hash() {
+    let schema = load_schema("views/source-chain-entry-view.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut instance = minimal_source_chain_entry();
+    instance.as_object_mut().unwrap().remove("actionHash");
+    assert!(
+        validator.iter_errors(&instance).next().is_some(),
+        "Schema should require 'actionHash'"
+    );
+}
+
+#[test]
+fn source_chain_entry_view_requires_sequence() {
+    let schema = load_schema("views/source-chain-entry-view.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut instance = minimal_source_chain_entry();
+    instance.as_object_mut().unwrap().remove("sequence");
+    assert!(
+        validator.iter_errors(&instance).next().is_some(),
+        "Schema should require 'sequence'"
+    );
+}
+
+// ── M-AGGR-2: EntryLinkView ────────────────────────────────────
+
+/// Build a minimal valid EntryLinkView JSON.
+fn minimal_entry_link() -> serde_json::Value {
+    serde_json::json!({
+        "linkHash": "uhCkkLINKHASH",
+        "baseHash": "uhCkkBASEHASH",
+        "targetHash": "uhCkkTARGETHASH",
+        "linkType": "0",
+        "tag": null,
+        "authorAgent": "uhCAkABCDEFGHIJKLMNOP",
+        "timestamp": "1748000000000000",
+        "deleted": false,
+        "deletedAt": null
+    })
+}
+
+#[test]
+fn entry_link_view_schema_loads() {
+    let schema = load_schema("views/entry-link-view.schema.json");
+    assert_source_of_truth_declared(&schema, "entry-link-view");
+}
+
+#[test]
+fn entry_link_view_minimal_valid() {
+    let instance = minimal_entry_link();
+    validate_against_schema("views/entry-link-view.schema.json", &instance);
+}
+
+#[test]
+fn entry_link_view_with_tag_and_deletion() {
+    let mut instance = minimal_entry_link();
+    instance["tag"] = serde_json::json!("dGFnYnl0ZXM="); // base64("tagbytes")
+    instance["deleted"] = serde_json::json!(true);
+    instance["deletedAt"] = serde_json::json!("1748001000000000");
+    instance["linkType"] = serde_json::json!("5");
+    validate_against_schema("views/entry-link-view.schema.json", &instance);
+}
+
+#[test]
+fn entry_link_view_requires_link_hash() {
+    let schema = load_schema("views/entry-link-view.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut instance = minimal_entry_link();
+    instance.as_object_mut().unwrap().remove("linkHash");
+    assert!(
+        validator.iter_errors(&instance).next().is_some(),
+        "Schema should require 'linkHash'"
+    );
+}
+
+#[test]
+fn entry_link_view_requires_deleted() {
+    let schema = load_schema("views/entry-link-view.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut instance = minimal_entry_link();
+    instance.as_object_mut().unwrap().remove("deleted");
+    assert!(
+        validator.iter_errors(&instance).next().is_some(),
+        "Schema should require 'deleted'"
+    );
+}
+
+// ── M-AGGR-1: SessionHumanView ──────────────────────────────────
+
+/// Build a minimal valid SessionHumanView JSON instance.
+fn minimal_session_human() -> serde_json::Value {
+    serde_json::json!({
+        "agentId": "uhCAkABCDEFGHIJKLMNOP1234567890",
+        "hAppId": "lamad",
+        "nodesViewed": 0,
+        "nodesWithAffinity": 0,
+        "pathsStarted": 0,
+        "pathsCompleted": 0,
+        "stepsCompleted": 0,
+        "computedAt": "2026-05-28T12:00:00Z"
+    })
+}
+
+#[test]
+fn session_human_view_minimal_validates() {
+    validate_against_schema("views/session-human-view.schema.json", &minimal_session_human());
+}
+
+#[test]
+fn session_human_view_with_journey_validates() {
+    let mut v = minimal_session_human();
+    v["journeyStartedAt"] = serde_json::json!("2026-01-15T08:30:00Z");
+    v["nodesViewed"] = serde_json::json!(12_i64);
+    v["pathsStarted"] = serde_json::json!(3_i64);
+    v["stepsCompleted"] = serde_json::json!(47_i64);
+    validate_against_schema("views/session-human-view.schema.json", &v);
+}
+
+#[test]
+fn session_human_view_null_journey_validates() {
+    let mut v = minimal_session_human();
+    v["journeyStartedAt"] = serde_json::json!(null);
+    validate_against_schema("views/session-human-view.schema.json", &v);
+}
+
+#[test]
+fn session_human_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/session-human-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("session-human-view schema should compile");
+
+    for field in &["agentId", "hAppId", "nodesViewed", "nodesWithAffinity", "pathsStarted", "pathsCompleted", "stepsCompleted", "computedAt"] {
+        let mut v = minimal_session_human();
+        v.as_object_mut().unwrap().remove(*field);
+        assert!(
+            validator.iter_errors(&v).next().is_some(),
+            "Schema should require '{field}'"
+        );
+    }
+}
+
+#[test]
+fn session_human_view_schema_declares_source_of_truth() {
+    let schema = load_schema("views/session-human-view.schema.json");
+    assert_source_of_truth_declared(&schema, "session-human-view");
+}
+
+// ── M-AGGR-1: UpgradePromptView ─────────────────────────────────
+
+/// Build a minimal valid UpgradePromptView JSON instance (empty active prompts).
+fn minimal_upgrade_prompt() -> serde_json::Value {
+    serde_json::json!({
+        "agentId": "uhCAkABCDEFGHIJKLMNOP1234567890",
+        "hAppId": "lamad",
+        "activePrompts": [],
+        "computedAt": "2026-05-28T12:00:00Z"
+    })
+}
+
+#[test]
+fn upgrade_prompt_view_minimal_validates() {
+    validate_against_schema(
+        "views/upgrade-prompt-view.schema.json",
+        &minimal_upgrade_prompt(),
+    );
+}
+
+#[test]
+fn upgrade_prompt_view_with_prompts_validates() {
+    let v = serde_json::json!({
+        "agentId": "uhCAkABCDEFGHIJKLMNOP1234567890",
+        "hAppId": "lamad",
+        "activePrompts": [
+            {
+                "promptId": "first-affinity",
+                "trigger": "contributor-presence",
+                "title": "Save Your Progress",
+                "message": "You're building a personal knowledge map!",
+                "benefits": [
+                    "Your progress syncs across devices",
+                    "Join a network of learners"
+                ]
+            },
+            {
+                "promptId": "path-started",
+                "trigger": "path-started",
+                "title": "You've Started a Journey",
+                "message": "Your learning path is stored in your browser.",
+                "benefits": ["Resume from any device"]
+            }
+        ],
+        "computedAt": "2026-05-28T14:30:00Z"
+    });
+    validate_against_schema("views/upgrade-prompt-view.schema.json", &v);
+}
+
+#[test]
+fn upgrade_prompt_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/upgrade-prompt-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("upgrade-prompt-view schema should compile");
+
+    for field in &["agentId", "hAppId", "activePrompts", "computedAt"] {
+        let mut v = minimal_upgrade_prompt();
+        v.as_object_mut().unwrap().remove(*field);
+        assert!(
+            validator.iter_errors(&v).next().is_some(),
+            "Schema should require '{field}'"
+        );
+    }
+}
+
+#[test]
+fn upgrade_prompt_view_schema_declares_source_of_truth() {
+    let schema = load_schema("views/upgrade-prompt-view.schema.json");
+    assert_source_of_truth_declared(&schema, "upgrade-prompt-view");
+}
+
+// ── M-AGGR-1: OnboardingManifestPayload ─────────────────────────
+
+/// Build a minimal valid onboarding manifest payload instance.
+fn minimal_onboarding_payload() -> serde_json::Value {
+    serde_json::json!({
+        "prompts": []
+    })
+}
+
+#[test]
+fn onboarding_manifest_payload_minimal_validates() {
+    validate_against_schema(
+        "manifest-payloads/onboarding.schema.json",
+        &minimal_onboarding_payload(),
+    );
+}
+
+#[test]
+fn onboarding_manifest_payload_with_prompts_validates() {
+    let v = serde_json::json!({
+        "prompts": [
+            {
+                "promptId": "first-affinity",
+                "trigger": "contributor-presence",
+                "triggerCondition": {
+                    "field": "nodesWithAffinity",
+                    "operator": "gte",
+                    "threshold": 1
+                },
+                "title": "Save Your Progress",
+                "message": "You're building a personal knowledge map! Install the Elohim app to save it permanently.",
+                "benefits": [
+                    "Your progress syncs across devices",
+                    "Join a network of learners",
+                    "Never lose your journey"
+                ]
+            },
+            {
+                "promptId": "path-started",
+                "trigger": "path-started",
+                "triggerCondition": {
+                    "field": "pathsStarted",
+                    "operator": "gte",
+                    "threshold": 1
+                },
+                "title": "You've Started a Journey",
+                "message": "Your learning path is stored in your browser.",
+                "benefits": ["Resume from any device", "Get updates to your paths"]
+            },
+            {
+                "promptId": "return-visit",
+                "trigger": "return-visit",
+                "triggerCondition": {
+                    "field": "nodesViewed",
+                    "operator": "always",
+                    "threshold": 0
+                },
+                "title": "Welcome Back!",
+                "message": "Good to see you again.",
+                "benefits": ["Automatic progress backup"]
+            }
+        ]
+    });
+    validate_against_schema("manifest-payloads/onboarding.schema.json", &v);
+}
+
+#[test]
+fn onboarding_manifest_payload_rejects_missing_prompts() {
+    let schema = load_schema("manifest-payloads/onboarding.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("onboarding manifest-payload schema should compile");
+
+    // Missing prompts array entirely
+    let no_prompts = serde_json::json!({});
+    assert!(
+        validator.iter_errors(&no_prompts).next().is_some(),
+        "Schema should require 'prompts'"
+    );
+}
+
+// =============================================================================
+// Sprint 2 Task 1: BoundsValidationResultView schema contract tests
+//
+// Ticket: Sprint 2 Task 1 — View schemas + ts-rs Rust structs
+// Source: genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md §1
+//
+// Validates bounds-validation-result-view.schema.json against realistic
+// instances covering the pass and fail (violation) branches. This view is
+// the wire shape for POST /api/v1/diagnostics/validate-bounds; source of
+// truth is pure function output — no persisted entity.
+// =============================================================================
+
+#[test]
+fn bounds_validation_result_passing_validates() {
+    // All checks pass — violation is absent (null).
+    let passing = serde_json::json!({
+        "pass": true,
+        "commitment_cid": "uhCEkSomeCommitmentCid",
+        "violation": null,
+        "checks": {
+            "commitment_found": true,
+            "active": true,
+            "scope_includes_event": true,
+            "reach_ceiling_ok": true,
+            "rate_within_limit": true,
+            "key_rotation_current": true,
+            "not_revoked": true
+        }
+    });
+    validate_against_schema(
+        "views/bounds-validation-result-view.schema.json",
+        &passing,
+    );
+}
+
+#[test]
+fn bounds_validation_result_failing_with_violation_validates() {
+    // Validation fails — violation present, checks short-circuit.
+    let failing = serde_json::json!({
+        "pass": false,
+        "commitment_cid": "uhCEkAnotherCommitmentCid",
+        "violation": {
+            "kind": "reach_ceiling_exceeded",
+            "summary": "EconomicEvent reach (Trusted) exceeds Commitment ceiling (High)."
+        },
+        "checks": {
+            "commitment_found": true,
+            "active": true,
+            "scope_includes_event": true,
+            "reach_ceiling_ok": false,
+            "rate_within_limit": false,
+            "key_rotation_current": false,
+            "not_revoked": false
+        }
+    });
+    validate_against_schema(
+        "views/bounds-validation-result-view.schema.json",
+        &failing,
+    );
+}
+
+#[test]
+fn bounds_validation_result_all_violation_kinds_valid() {
+    // Every ViolationKind enum value must be accepted by the schema.
+    for kind in &[
+        "commitment_inactive",
+        "scope_not_included",
+        "reach_ceiling_exceeded",
+        "rate_limit_exceeded",
+        "key_rotation_stale",
+        "commitment_revoked",
+        "commitment_not_found",
+    ] {
+        let instance = serde_json::json!({
+            "pass": false,
+            "commitment_cid": "uhCEkCid",
+            "violation": {
+                "kind": kind,
+                "summary": format!("Violated: {}", kind)
+            },
+            "checks": {
+                "commitment_found": true,
+                "active": false,
+                "scope_includes_event": false,
+                "reach_ceiling_ok": false,
+                "rate_within_limit": false,
+                "key_rotation_current": false,
+                "not_revoked": false
+            }
+        });
+        validate_against_schema(
+            "views/bounds-validation-result-view.schema.json",
+            &instance,
+        );
+    }
+}
+
+#[test]
+fn bounds_validation_result_rejects_missing_required_fields() {
+    let schema = load_schema("views/bounds-validation-result-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("bounds-validation-result-view schema should compile");
+
+    // Missing checks
+    let no_checks = serde_json::json!({
+        "pass": true,
+        "commitment_cid": "uhCEkCid"
+    });
+    assert!(
+        validator.iter_errors(&no_checks).next().is_some(),
+        "Schema should require 'checks'"
+    );
+
+    // Missing commitment_cid
+    let no_cid = serde_json::json!({
+        "pass": true,
+        "checks": {
+            "commitment_found": true,
+            "active": true,
+            "scope_includes_event": true,
+            "reach_ceiling_ok": true,
+            "rate_within_limit": true,
+            "key_rotation_current": true,
+            "not_revoked": true
+        }
+    });
+    assert!(
+        validator.iter_errors(&no_cid).next().is_some(),
+        "Schema should require 'commitment_cid'"
+    );
+}
+
+// =============================================================================
+// Sprint 2 Task 1: StandingScoreView schema contract tests
+//
+// Ticket: Sprint 2 Task 1 — View schemas + ts-rs Rust structs
+// Source: genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md §1
+//
+// Validates standing-score-view.schema.json against realistic instances.
+// This view is the wire shape for GET /api/v1/standing/{agent_cid}; source
+// of truth is the local SQLite operational projection (standing_view table),
+// recomputable from the FeedbackSignal subgraph (Holochain DHT).
+// =============================================================================
+
+#[test]
+fn standing_score_view_neutral_no_breaches_validates() {
+    // Cold-start or clean slate — Neutral with empty breach list.
+    let neutral = serde_json::json!({
+        "evaluator_cid": "uhCAkEvaluatorAgent",
+        "subject_cid": "uhCAkSubjectAgent",
+        "score": "Neutral",
+        "recent_breaches": [],
+        "computed_at": "2026-05-28T10:00:00Z"
+    });
+    validate_against_schema("views/standing-score-view.schema.json", &neutral);
+}
+
+#[test]
+fn standing_score_view_floor_with_breaches_validates() {
+    // Subject is at Floor standing with recent breach evidence.
+    let floor = serde_json::json!({
+        "evaluator_cid": "uhCAkEvaluatorAgent",
+        "subject_cid": "uhCAkFloorSubject",
+        "score": "Floor",
+        "debit_weight_sum": 42,
+        "recent_breaches": [
+            {
+                "signal_kind": "compute:capacity-breach",
+                "emitted_at": "2026-05-27T08:30:00Z",
+                "weight": 20,
+                "evidence_summary": "Node reported capacity at 3% for 6h window."
+            },
+            {
+                "signal_kind": "compute:replication-shortfall",
+                "emitted_at": "2026-05-26T14:00:00Z",
+                "weight": 22
+            }
+        ],
+        "computed_at": "2026-05-28T10:05:00Z"
+    });
+    validate_against_schema("views/standing-score-view.schema.json", &floor);
+}
+
+#[test]
+fn standing_score_view_all_tiers_valid() {
+    // Every StandingScoreTier value must be accepted.
+    for tier in &["Unknown", "Floor", "Low", "Neutral", "High", "Trusted"] {
+        let instance = serde_json::json!({
+            "evaluator_cid": "uhCAkEvaluatorAgent",
+            "subject_cid": "uhCAkSubjectAgent",
+            "score": tier,
+            "recent_breaches": [],
+            "computed_at": "2026-05-28T10:00:00Z"
+        });
+        validate_against_schema("views/standing-score-view.schema.json", &instance);
+    }
+}
+
+#[test]
+fn standing_score_view_rejects_missing_required_fields() {
+    let schema = load_schema("views/standing-score-view.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("standing-score-view schema should compile");
+
+    // Missing score
+    let no_score = serde_json::json!({
+        "evaluator_cid": "uhCAkEval",
+        "subject_cid": "uhCAkSubject",
+        "recent_breaches": [],
+        "computed_at": "2026-05-28T10:00:00Z"
+    });
+    assert!(
+        validator.iter_errors(&no_score).next().is_some(),
+        "Schema should require 'score'"
+    );
+
+    // Missing computed_at
+    let no_timestamp = serde_json::json!({
+        "evaluator_cid": "uhCAkEval",
+        "subject_cid": "uhCAkSubject",
+        "score": "Neutral",
+        "recent_breaches": []
+    });
+    assert!(
+        validator.iter_errors(&no_timestamp).next().is_some(),
+        "Schema should require 'computed_at'"
+    );
 }

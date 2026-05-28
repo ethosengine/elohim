@@ -28,7 +28,10 @@ export { ELOHIM_ENV } from './env/elohim-env';
 export * from './angular/models/source-chain.model';
 
 export { DoorwayClientService } from './angular/services/doorway-client.service';
+/** @deprecated M-AGGR-2: migrate read paths to HolochainSourceChainService. Write paths migrate in M-REA-1 + M-AGGR-1. */
 export { LocalSourceChainService } from './angular/services/local-source-chain.service';
+// M-AGGR-2: Holochain source-chain cutover — thin HTTP read wrapper.
+export { HolochainSourceChainService } from './angular/services/holochain-source-chain.service';
 export type {
   VerifyBlobRequest,
   VerifyBlobResponse,

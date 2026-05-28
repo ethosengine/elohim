@@ -14,10 +14,15 @@ import { EventService, EVENT_API, LamadEventTypes, REAActions } from './event.se
 
 describe('EventService', () => {
   let service: EventService;
-  let eventApiMock: { createEconomicEvent: ReturnType<typeof vi.fn>; getEconomicEvents: ReturnType<typeof vi.fn> };
+  let eventApiMock: {
+    emitLamadIntent: ReturnType<typeof vi.fn>;
+    createEconomicEvent: ReturnType<typeof vi.fn>;
+    getEconomicEvents: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     eventApiMock = {
+      emitLamadIntent: vi.fn(),
       createEconomicEvent: vi.fn(),
       getEconomicEvents: vi.fn(),
     };
@@ -102,13 +107,13 @@ describe('EventService', () => {
         expect(typeof service.recordContentView).toBe('function');
       });
 
-      it('should call eventApi.createEconomicEvent', () => {
+      it('should call eventApi.emitLamadIntent (M-REA-1 path)', () => {
         const agentId = 'agent-1';
         const contentId = 'content-1';
 
         service.recordContentView(agentId, contentId);
 
-        expect(eventApiMock.createEconomicEvent).toHaveBeenCalled();
+        expect(eventApiMock.emitLamadIntent).toHaveBeenCalled();
       });
     });
 
@@ -118,13 +123,13 @@ describe('EventService', () => {
         expect(typeof service.recordContentComplete).toBe('function');
       });
 
-      it('should call eventApi.createEconomicEvent', () => {
+      it('should call eventApi.emitLamadIntent (M-REA-1 path)', () => {
         const agentId = 'agent-1';
         const contentId = 'content-1';
 
         service.recordContentComplete(agentId, contentId);
 
-        expect(eventApiMock.createEconomicEvent).toHaveBeenCalled();
+        expect(eventApiMock.emitLamadIntent).toHaveBeenCalled();
       });
     });
   });
@@ -136,14 +141,14 @@ describe('EventService', () => {
         expect(typeof service.recordStepComplete).toBe('function');
       });
 
-      it('should call eventApi.createEconomicEvent', () => {
+      it('should call eventApi.emitLamadIntent (M-REA-1 path)', () => {
         const agentId = 'agent-1';
         const pathId = 'path-1';
         const stepId = 'step-1';
 
         service.recordStepComplete(agentId, pathId, stepId);
 
-        expect(eventApiMock.createEconomicEvent).toHaveBeenCalled();
+        expect(eventApiMock.emitLamadIntent).toHaveBeenCalled();
       });
     });
 
@@ -153,13 +158,13 @@ describe('EventService', () => {
         expect(typeof service.recordPathComplete).toBe('function');
       });
 
-      it('should call eventApi.createEconomicEvent', () => {
+      it('should call eventApi.emitLamadIntent (M-REA-1 path)', () => {
         const agentId = 'agent-1';
         const pathId = 'path-1';
 
         service.recordPathComplete(agentId, pathId);
 
-        expect(eventApiMock.createEconomicEvent).toHaveBeenCalled();
+        expect(eventApiMock.emitLamadIntent).toHaveBeenCalled();
       });
     });
   });
@@ -171,14 +176,14 @@ describe('EventService', () => {
         expect(typeof service.recordAssessmentStart).toBe('function');
       });
 
-      it('should call eventApi.createEconomicEvent', () => {
+      it('should call eventApi.emitLamadIntent (M-REA-1 path)', () => {
         const agentId = 'agent-1';
         const contentId = 'content-1';
         const assessmentId = 'assessment-1';
 
         service.recordAssessmentStart(agentId, contentId, assessmentId);
 
-        expect(eventApiMock.createEconomicEvent).toHaveBeenCalled();
+        expect(eventApiMock.emitLamadIntent).toHaveBeenCalled();
       });
     });
 
@@ -188,14 +193,14 @@ describe('EventService', () => {
         expect(typeof service.recordAssessmentComplete).toBe('function');
       });
 
-      it('should call eventApi.createEconomicEvent', () => {
+      it('should call eventApi.emitLamadIntent (M-REA-1 path)', () => {
         const agentId = 'agent-1';
         const contentId = 'content-1';
         const assessmentId = 'assessment-1';
 
         service.recordAssessmentComplete(agentId, contentId, assessmentId);
 
-        expect(eventApiMock.createEconomicEvent).toHaveBeenCalled();
+        expect(eventApiMock.emitLamadIntent).toHaveBeenCalled();
       });
     });
 
@@ -205,14 +210,14 @@ describe('EventService', () => {
         expect(typeof service.recordQuizSubmit).toBe('function');
       });
 
-      it('should call eventApi.createEconomicEvent', () => {
+      it('should call eventApi.emitLamadIntent (M-REA-1 path)', () => {
         const agentId = 'agent-1';
         const contentId = 'content-1';
         const quizId = 'quiz-1';
 
         service.recordQuizSubmit(agentId, contentId, quizId, true);
 
-        expect(eventApiMock.createEconomicEvent).toHaveBeenCalled();
+        expect(eventApiMock.emitLamadIntent).toHaveBeenCalled();
       });
     });
   });
@@ -224,17 +229,17 @@ describe('EventService', () => {
         expect(typeof service.recordRecognitionGiven).toBe('function');
       });
 
-      it('should call eventApi.createEconomicEvent', () => {
+      it('should call eventApi.emitLamadIntent (M-REA-1 path)', () => {
         const fromAgentId = 'agent-1';
         const toPresenceId = 'presence-1';
         const contentId = 'content-1';
 
         service.recordRecognitionGiven(fromAgentId, toPresenceId, contentId);
 
-        expect(eventApiMock.createEconomicEvent).toHaveBeenCalled();
+        expect(eventApiMock.emitLamadIntent).toHaveBeenCalled();
       });
 
-      it('should call eventApi.createEconomicEvent with amount parameter', () => {
+      it('should call eventApi.emitLamadIntent with amount parameter (M-REA-1 path)', () => {
         const fromAgentId = 'agent-1';
         const toPresenceId = 'presence-1';
         const contentId = 'content-1';
@@ -242,7 +247,7 @@ describe('EventService', () => {
 
         service.recordRecognitionGiven(fromAgentId, toPresenceId, contentId, amount);
 
-        expect(eventApiMock.createEconomicEvent).toHaveBeenCalled();
+        expect(eventApiMock.emitLamadIntent).toHaveBeenCalled();
       });
     });
   });
@@ -323,26 +328,9 @@ describe('EventService', () => {
   });
 
   describe('Analytics Helpers', () => {
-    describe('countEventsForContent', () => {
-      it('should have countEventsForContent method', () => {
-        expect(service.countEventsForContent).toBeDefined();
-        expect(typeof service.countEventsForContent).toBe('function');
-      });
-    });
-
-    describe('getViewCount', () => {
-      it('should have getViewCount method', () => {
-        expect(service.getViewCount).toBeDefined();
-        expect(typeof service.getViewCount).toBe('function');
-      });
-    });
-
-    describe('getCompletionCount', () => {
-      it('should have getCompletionCount method', () => {
-        expect(service.getCompletionCount).toBeDefined();
-        expect(typeof service.getCompletionCount).toBe('function');
-      });
-    });
+    // M-AGGR-3: countEventsForContent, getViewCount, getCompletionCount retired.
+    // Callers should use ContentApiService.getContentEngagement(contentId)
+    // which reads GET /api/v1/lamad/content/{contentId}/engagement.
 
     describe('hasViewed', () => {
       it('should have hasViewed method', () => {
@@ -360,33 +348,34 @@ describe('EventService', () => {
   });
 
   describe('recordContentInteraction', () => {
-    it('should record an interaction with the specified event type', () => {
+    it('should record an interaction via emitLamadIntent (M-REA-1 path)', () => {
       const agentId = 'agent-1';
       const contentId = 'content-1';
 
       service.recordContentInteraction(agentId, contentId, 'content-view');
 
-      expect(eventApiMock.createEconomicEvent).toHaveBeenCalledWith(
+      // M-REA-1: deprecated recordContentInteraction delegates to emitEvent →
+      // emitLamadIntent. The substrate composes REA shape (action/provider/receiver).
+      expect(eventApiMock.emitLamadIntent).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'use',
-          provider: agentId,
-          receiver: contentId,
+          agentId,
           lamadEventType: 'content-view',
           contentId,
         }),
       );
     });
 
-    it('should record content-complete interaction', () => {
+    it('should emit content-complete via emitLamadIntent', () => {
       const agentId = 'agent-1';
       const contentId = 'content-1';
 
       service.recordContentInteraction(agentId, contentId, 'content-complete');
 
-      expect(eventApiMock.createEconomicEvent).toHaveBeenCalledWith(
+      expect(eventApiMock.emitLamadIntent).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'produce',
+          agentId,
           lamadEventType: 'content-complete',
+          contentId,
         }),
       );
     });

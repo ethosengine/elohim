@@ -4278,6 +4278,11 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
         // always-create-new-entries (snapshot-per-window) rather than update.
         EntryTypes::CollectiveFilterPattern(pattern) => adapt_validation(pattern.validate()),
 
+        // EconomicEvent: defense-in-depth integrity check (republish-epr anonymous-publish rule).
+        // The coordinator zome performs the full schema check; this layer catches violations
+        // that bypass the coordinator (direct source-chain writes, future code paths).
+        EntryTypes::EconomicEvent(event) => validate_economic_event(event),
+
         // Other entry types: accept for now (can add validation incrementally)
         _ => Ok(ValidateCallbackResult::Valid),
     }
@@ -4338,6 +4343,163 @@ fn validate_content_succession(
     }
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate EconomicEvent — defense-in-depth integrity check.
+///
+/// Per Z.D substrate-correct deploy spec (§7.4 anonymous-publish-forbidden):
+/// every `republish-epr` action MUST carry a non-empty `bounded_by` field in
+/// its metadata_json. The coordinator zome does the full schema check before
+/// commit (see content_store/src/republish_epr.rs); this integrity layer
+/// catches violations that bypass the coordinator (direct source-chain writes,
+/// future code paths, etc.) and prevents DHT propagation.
+///
+/// Validation is deterministic: only structural checks on the metadata_json
+/// string (no IO, no time, no link traversal). Uses a starts-with-`{` +
+/// substring heuristic rather than full JSON parsing, mirroring the pattern
+/// in mishpat_integrity::validate_commitment_entry (serde_json is dev-only
+/// in integrity zomes for WASM size budget).
+fn validate_economic_event(event: &EconomicEvent) -> ExternResult<ValidateCallbackResult> {
+    if event.action.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "EconomicEvent.action must be non-empty".into(),
+        ));
+    }
+
+    if event.action == "republish-epr" {
+        // metadata_json must be present and look like a JSON object containing
+        // a non-empty bounded_by field.
+        let meta = event.metadata_json.trim();
+        if meta.is_empty() || !meta.starts_with('{') {
+            return Ok(ValidateCallbackResult::Invalid(
+                "republish-epr EconomicEvent requires metadata_json carrying a JSON object".into(),
+            ));
+        }
+        // Look for "bounded_by"<whitespace>:<whitespace>"<non-empty>". The
+        // heuristic: find the substring "bounded_by", then look for a non-empty
+        // string value following the colon. Reject obvious negatives:
+        //   - missing "bounded_by" key
+        //   - "bounded_by":""  (empty string value)
+        //   - "bounded_by":null
+        if !meta.contains("bounded_by") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "republish-epr requires bounded_by field in metadata_json (anonymous publish forbidden)".into(),
+            ));
+        }
+        // Empty/null/missing-value detection. We look for the cluster pattern
+        // "bounded_by"<colon-or-spaces>(""|null) and reject. This catches the
+        // obvious anonymous-publish attempts; the coordinator's full schema
+        // check is the primary defense.
+        if meta.contains("\"bounded_by\":\"\"") || meta.contains("\"bounded_by\": \"\"") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "republish-epr bounded_by must be non-empty (anonymous publish forbidden)".into(),
+            ));
+        }
+        if meta.contains("\"bounded_by\":null") || meta.contains("\"bounded_by\": null") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "republish-epr bounded_by must not be null (anonymous publish forbidden)".into(),
+            ));
+        }
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod economic_event_validation_tests {
+    use super::*;
+
+    fn ev(action: &str, metadata_json: &str) -> EconomicEvent {
+        EconomicEvent {
+            id: "evt-1".into(),
+            action: action.into(),
+            provider: "agent:p".into(),
+            receiver: "agent:r".into(),
+            resource_conforms_to: None,
+            resource_inventoried_as: None,
+            to_resource_inventoried_as: None,
+            resource_classified_as_json: "[]".into(),
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: "2026-05-28T12:00:00Z".into(),
+            has_duration: None,
+            input_of: None,
+            output_of: None,
+            fulfills_json: "[]".into(),
+            realization_of: None,
+            satisfies_json: "[]".into(),
+            in_scope_of_json: "[]".into(),
+            note: None,
+            state: "completed".into(),
+            triggered_by: None,
+            at_location: None,
+            image: None,
+            lamad_event_type: None,
+            metadata_json: metadata_json.into(),
+            created_at: "2026-05-28T12:00:00Z".into(),
+        }
+    }
+
+    #[test]
+    fn empty_action_rejected() {
+        let event = ev("", "{}");
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn non_republish_action_accepted() {
+        let event = ev("work", "{}");
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn republish_epr_well_formed_accepted() {
+        let event = ev(
+            "republish-epr",
+            r#"{"action":"republish-epr","bounded_by":"comm-cid-abc","target":"epr-head"}"#,
+        );
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn republish_epr_empty_metadata_rejected() {
+        let event = ev("republish-epr", "");
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn republish_epr_missing_bounded_by_rejected() {
+        let event = ev("republish-epr", r#"{"action":"republish-epr","target":"epr-head"}"#);
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn republish_epr_empty_bounded_by_rejected() {
+        let event = ev("republish-epr", r#"{"bounded_by":"","target":"x"}"#);
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn republish_epr_null_bounded_by_rejected() {
+        let event = ev("republish-epr", r#"{"bounded_by":null,"target":"x"}"#);
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn republish_epr_non_object_metadata_rejected() {
+        let event = ev("republish-epr", "not even json");
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
 }
 
 /// Validate entry update operations

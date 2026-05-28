@@ -97,6 +97,11 @@ path = "src/tests/rea_commitment_replication.rs"
 name = "lamad_intent_event"
 path = "src/tests/lamad_intent_event.rs"
 
+# M-REA-3: recognition-participation intent → weighted EconomicEvent seatbelt
+[[test]]
+name = "recognition_participation_via_route"
+path = "src/tests/recognition_participation_via_route.rs"
+
 # M-POLICY-1: standing-policy Manifest + FeedbackSignal → AccumulationStatus seatbelt
 [[test]]
 name = "standing_policy_accumulation"
@@ -106,6 +111,21 @@ path = "src/tests/standing_policy_accumulation.rs"
 [[test]]
 name = "pillar_projection_mechanism"
 path = "src/tests/pillar_projection_mechanism.rs"
+
+# M-AGGR-3: EconomicEvent stream → ContentEngagementStats projection seatbelt
+[[test]]
+name = "content_engagement_via_route"
+path = "src/tests/content_engagement_via_route.rs"
+
+# M-AGGR-2: Holochain source-chain cutover — coordinator wire shape + camelCase seatbelt
+[[test]]
+name = "source_chain_via_route"
+path = "src/tests/source_chain_via_route.rs"
+
+# M-AGGR-1: EconomicEvent substrate → SessionHumanView + UpgradePromptView seatbelt
+[[test]]
+name = "session_human_via_route"
+path = "src/tests/session_human_via_route.rs"
 
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.

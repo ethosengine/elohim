@@ -337,6 +337,7 @@ pub fn record_event(
         at_location: input.at_location.as_deref(),
         verified_at: None,
         scope_collab_cid: input.scope_collab_cid.as_deref(),
+        bounded_by: None,
     };
 
     diesel::insert_into(economic_events::table)
@@ -668,6 +669,7 @@ pub fn upsert_with_anchor(
             at_location: input.at_location.as_deref(),
             verified_at: None,
             scope_collab_cid: input.scope_collab_cid.as_deref(),
+            bounded_by: None,
         };
 
         diesel::insert_into(economic_events::table)

@@ -795,3 +795,156 @@ pub struct RemovePortalHostOutputView {
     /// this as a presence check.
     pub deleted: bool,
 }
+
+// ---------------------------------------------------------------------------
+// M-AGGR-2: Holochain source-chain cutover
+//
+// Source of truth: Holochain agent source chain in imagodei DNA (Category B,
+// Agent-Scoped). Entries and links are private to the authoring agent's source
+// chain and are never gossiped to the DHT. These views are served by:
+//   GET /api/v1/source-chain/{agentId}/entries → Vec<SourceChainEntryView>
+//   GET /api/v1/source-chain/{agentId}/links   → Vec<EntryLinkView>
+// ---------------------------------------------------------------------------
+
+/// Wire view of a single record on an agent's Holochain source chain.
+///
+/// Projected from the agent's imagodei DNA source chain by the
+/// `query_my_source_chain` coordinator. `content_json` is null for system
+/// entries (Dna, AgentValidationPkg, InitZomesComplete) or entries whose
+/// type cannot be decoded.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SourceChainEntryView {
+    /// Hex-encoded ActionHash from the source-chain record header.
+    pub action_hash: String,
+    /// Hex-encoded EntryHash (hash of the serialized entry content).
+    /// Empty string for system records that carry no entry.
+    pub entry_hash: String,
+    /// Hex-encoded AgentPubKey that authored this entry.
+    pub author_agent: String,
+    /// Entry type discriminator (e.g. "Human", "ContributorPresence").
+    /// Derived from the record action's `entry_type` field.
+    pub entry_type: String,
+    /// JSON-serialized entry content. Null for system records or entries
+    /// whose type cannot be decoded to a known schema.
+    pub content_json: Option<String>,
+    /// Hex-encoded ActionHash of the preceding action in the chain.
+    /// None for the genesis record.
+    pub prev_action_hash: Option<String>,
+    /// Zero-based position of this record in the agent's source chain.
+    pub sequence: u32,
+    /// ISO-8601 timestamp when this entry was committed to the source chain.
+    pub timestamp: String,
+}
+
+/// Wire view of a single link authored by the agent on its Holochain source chain.
+///
+/// Projected from the imagodei DNA source chain by the
+/// `query_my_source_chain_links` coordinator. Both create-link and
+/// delete-link actions are reflected: `deleted = true` and `deleted_at`
+/// are set when a matching delete-link action appears in the chain.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct EntryLinkView {
+    /// Hex-encoded ActionHash of the create-link action on the source chain.
+    pub link_hash: String,
+    /// Hex-encoded AnyLinkableHash base of the link.
+    pub base_hash: String,
+    /// Hex-encoded AnyLinkableHash target of the link.
+    pub target_hash: String,
+    /// Link type discriminator as a string (derived from the action's
+    /// `link_type` field via the imagodei LinkTypes enum).
+    pub link_type: String,
+    /// Hex-encoded tag bytes; None when the link was created without a tag.
+    pub tag: Option<String>,
+    /// Hex-encoded AgentPubKey that authored this link.
+    pub author_agent: String,
+    /// ISO-8601 timestamp when this link was created.
+    pub timestamp: String,
+    /// True when a delete-link action for this link hash appears in the chain.
+    pub deleted: bool,
+    /// ISO-8601 timestamp of the delete-link action; None when not deleted.
+    pub deleted_at: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// M-AGGR-1: SessionHumanView + UpgradePromptView projections
+//
+// Source of truth: derived projection of EconomicEvent stream × HumanProgress
+// per agent (Category C operational). Computed on Signal::EconomicEventCreated
+// and Signal::ManifestUpdated{kind:"onboarding"}. Reconstructable from
+// EconomicEvent entries in the elohim DNA content_store zome.
+//
+// Routes:
+//   GET /api/v1/identity/{agentId}/session          → SessionHumanView
+//   GET /api/v1/identity/{agentId}/upgrade-prompts  → UpgradePromptView
+// ---------------------------------------------------------------------------
+
+/// Per-agent session state — aggregated counts from the EconomicEvent stream.
+///
+/// Source of truth: EconomicEvent projection table filtered by agent (provider
+/// field) and lamadEventType. journeyStartedAt joined from HumanProgress.
+/// This is a Category C operational projection — it carries no dht_anchor_hash
+/// of its own. Provenance can be verified by querying the economic_events table
+/// directly for the agent's events.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SessionHumanView {
+    /// AgentPubKey of the human whose session state this projects.
+    pub agent_id: String,
+    /// hApp identifier scoping this projection.
+    pub h_app_id: String,
+    /// Count of EconomicEvent entries with lamadEventType='content-view' for this agent.
+    pub nodes_viewed: i64,
+    /// Count of EconomicEvent entries with lamadEventType='contributor-presence' for this agent.
+    pub nodes_with_affinity: i64,
+    /// Count of EconomicEvent entries with lamadEventType='path-started' for this agent.
+    pub paths_started: i64,
+    /// Count of EconomicEvent entries with lamadEventType='path-completed' for this agent.
+    pub paths_completed: i64,
+    /// Count of EconomicEvent entries with lamadEventType='step-completed' for this agent.
+    pub steps_completed: i64,
+    /// ISO-8601 timestamp of the agent's first EconomicEvent; None if no events yet.
+    pub journey_started_at: Option<String>,
+    /// ISO-8601 timestamp when this projection was last computed.
+    pub computed_at: String,
+}
+
+/// Single active upgrade prompt — derived from onboarding Manifest + SessionHumanView.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpgradePromptItem {
+    /// Stable identifier declared in the onboarding Manifest payload.
+    pub prompt_id: String,
+    /// The lamadEventType or session condition that activated this prompt.
+    pub trigger: String,
+    /// Short display title.
+    pub title: String,
+    /// Human-readable message.
+    pub message: String,
+    /// Bullet-point benefits list.
+    pub benefits: Vec<String>,
+}
+
+/// Per-agent upgrade prompt projection.
+///
+/// Source of truth: SessionHumanView × Manifest{kind:"onboarding"} payload.
+/// Category C operational — reconstructable by re-evaluating the Manifest
+/// trigger conditions against the current SessionHumanView at any time.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpgradePromptView {
+    /// AgentPubKey of the human whose prompts this projects.
+    pub agent_id: String,
+    /// hApp identifier scoping this projection.
+    pub h_app_id: String,
+    /// Ordered list of currently-active upgrade prompts.
+    pub active_prompts: Vec<UpgradePromptItem>,
+    /// ISO-8601 timestamp when this projection was last computed.
+    pub computed_at: String,
+}

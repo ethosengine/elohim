@@ -1,0 +1,55 @@
+{
+  "$id": "epr:schema:view:entry-link",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EntryLinkView",
+  "description": "Source of truth: Holochain agent source chain in imagodei DNA (Agent-Scoped, Category B). Links are authored by the agent and live on its source chain. This view is read via the `query_my_source_chain_links` coordinator function and served by GET /api/v1/source-chain/{agentId}/links.",
+  "type": "object",
+  "required": [
+    "linkHash",
+    "baseHash",
+    "targetHash",
+    "linkType",
+    "authorAgent",
+    "timestamp",
+    "deleted"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "linkHash": {
+      "type": "string",
+      "description": "Hex-encoded ActionHash of the create-link action on the source chain."
+    },
+    "baseHash": {
+      "type": "string",
+      "description": "Hex-encoded hash of the base of the link (AnyLinkableHash)."
+    },
+    "targetHash": {
+      "type": "string",
+      "description": "Hex-encoded hash of the target of the link (AnyLinkableHash)."
+    },
+    "linkType": {
+      "type": "string",
+      "description": "Link type discriminator as a string derived from the link_type field of the CreateLink action."
+    },
+    "tag": {
+      "type": ["string", "null"],
+      "description": "Optional serialized tag bytes, hex-encoded. Null when the link was created without a tag."
+    },
+    "authorAgent": {
+      "type": "string",
+      "description": "Hex-encoded AgentPubKey that authored this link."
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when this link was created on the source chain."
+    },
+    "deleted": {
+      "type": "boolean",
+      "description": "True when a delete-link action for this link hash appears later in the source chain."
+    },
+    "deletedAt": {
+      "type": ["string", "null"],
+      "description": "ISO-8601 timestamp of the delete-link action. Null when not deleted."
+    }
+  }
+}
