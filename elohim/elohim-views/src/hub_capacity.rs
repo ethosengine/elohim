@@ -1,7 +1,12 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::infrastructure::HubKind;
+// Re-export the canonical HubKind (defined in `infrastructure`) so downstream
+// consumers can import it as `elohim_views::hub_capacity::HubKind`. We reuse the
+// existing enum rather than redeclaring — a second definition would clobber the
+// generated `HubKind.ts` and strip its doc annotations. Variants + snake_case
+// serde already match the hub-capacity-view schema enum.
+pub use crate::infrastructure::HubKind;
 use crate::peer_capacity::{ActuallyHeldView, PledgesView};
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
