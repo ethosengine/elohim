@@ -32,7 +32,7 @@ use elohim_sweettest::common::{
     conductors::{load_dna, two_agent_conductors},
     fixtures::network_seed,
 };
-use holochain::sweettest::await_consistency;
+use holochain::sweettest::{await_consistency, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -113,12 +113,7 @@ async fn standing_policy_manifest_with_thresholds_round_trips() -> Result<()> {
     let cell_b = app_b.cells().first().expect("cell b installed").clone();
 
     // Exchange peer info so conductors can discover each other on the DHT.
-    conductor_a
-        .exchange_peer_info([conductor_b.to_kitsune()])
-        .await;
-    conductor_b
-        .exchange_peer_info([conductor_a.to_kitsune()])
-        .await;
+    SweetConductor::exchange_peer_info([&conductor_a, &conductor_b]).await;
 
     // Payload: full standing-policy with floor + accumulation_thresholds.
     let payload = serde_json::json!({
@@ -152,7 +147,9 @@ async fn standing_policy_manifest_with_thresholds_round_trips() -> Result<()> {
         .await;
 
     // After consistency, Agent B reads it back.
-    await_consistency(30, [&cell_a, &cell_b]).await?;
+    await_consistency(30, [&cell_a, &cell_b])
+        .await
+        .expect("DHT consistency must converge for standing-policy Manifest round-trip");
 
     let fetched: Option<Manifest> = conductor_b
         .call(&cell_b.zome(ZOME), "get_manifest", action_hash)
@@ -200,12 +197,7 @@ async fn feedback_signals_replicate_for_accumulation() -> Result<()> {
     let cell_a = app_a.cells().first().expect("cell a installed").clone();
     let cell_b = app_b.cells().first().expect("cell b installed").clone();
 
-    conductor_a
-        .exchange_peer_info([conductor_b.to_kitsune()])
-        .await;
-    conductor_b
-        .exchange_peer_info([conductor_a.to_kitsune()])
-        .await;
+    SweetConductor::exchange_peer_info([&conductor_a, &conductor_b]).await;
 
     // Target CID representing a "content" entity.
     let target_cid = "bafyreia-test-content-accumulation-001".to_string();
@@ -255,7 +247,9 @@ async fn feedback_signals_replicate_for_accumulation() -> Result<()> {
     }
 
     // After consistency, Agent B can fetch each signal entry.
-    await_consistency(30, [&cell_a, &cell_b]).await?;
+    await_consistency(30, [&cell_a, &cell_b])
+        .await
+        .expect("DHT consistency must converge for feedback-signal replication");
 
     for action_hash in action_hashes {
         let record = conductor_b
