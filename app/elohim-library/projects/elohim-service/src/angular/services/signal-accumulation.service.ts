@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-import { GovernanceApiService } from '@elohim/service';
+import { GovernanceApiService } from './governance-api.service';
 
 export interface AccumulationStatus {
   totalSignals: number;

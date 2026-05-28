@@ -22,16 +22,13 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { GovernanceApiService } from '@elohim/service';
-
 import {
+  GovernanceApiService,
   MechanismSelectionService,
   type MechanismSelection,
-} from '../../services/mechanism-selection.service';
-import {
   SignalAccumulationService,
   type AccumulationStatus,
-} from '../../services/signal-accumulation.service';
+} from '@elohim/service';
 import {
   ContextMenuOnlyComponent,
   type ContextMenuAction,

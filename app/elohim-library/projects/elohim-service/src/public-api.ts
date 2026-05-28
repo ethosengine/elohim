@@ -37,3 +37,12 @@ export type {
   StreamingVariant,
   StreamingManifest,
 } from './angular/services/doorway-client.service';
+
+// Governance feedback orchestration services (migrated from @app/qahal/services
+// in Slice 2.2b deferral closure — these are cross-cutting governance
+// primitives consumed wherever the elohim-core feedback Lit elements need to
+// be orchestrated).
+export { MechanismSelectionService } from './angular/services/mechanism-selection.service';
+export type { MechanismSelection } from './angular/services/mechanism-selection.service';
+export { SignalAccumulationService } from './angular/services/signal-accumulation.service';
+export type { AccumulationStatus } from './angular/services/signal-accumulation.service';

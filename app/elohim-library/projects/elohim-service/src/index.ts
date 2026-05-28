@@ -141,6 +141,13 @@ export * from './angular/models/source-chain.model';
 // Services
 export { GovernanceApiService } from './angular/services/governance-api.service';
 export { DoorwayClientService } from './angular/services/doorway-client.service';
+// Governance feedback orchestration services (migrated from @app/qahal/services
+// in Slice 2.2b deferral closure — cross-cutting governance primitives
+// consumed wherever feedback mechanism orchestration is needed).
+export { MechanismSelectionService } from './angular/services/mechanism-selection.service';
+export type { MechanismSelection } from './angular/services/mechanism-selection.service';
+export { SignalAccumulationService } from './angular/services/signal-accumulation.service';
+export type { AccumulationStatus } from './angular/services/signal-accumulation.service';
 export type {
   VerifyBlobRequest,
   VerifyBlobResponse,
