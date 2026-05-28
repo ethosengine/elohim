@@ -140,6 +140,16 @@ async fn run_subscriber(
 
     info!(url = %url, "storage_events_subscriber: connected; tailing events");
 
+    // Initial re-sync on every (re)connect. The boot-time fetch (main.rs) is a
+    // one-shot; without this, a projection.{registered,revoked} emitted while
+    // this subscriber was disconnected — e.g. during the storage pod cycle in
+    // the genesis Seed Projections stage — is missed, and reconnect only
+    // resumes tailing FUTURE events. The EprRouter would then stay stale until
+    // the next doorway reboot, leaving / and /lamad 404ing after a successful
+    // seed. Re-syncing here makes the subscriber self-healing: any missed
+    // projection event is recovered on the next reconnect.
+    sync_router_from_storage(storage_base_url, doorway_id, epr_router, http, "connect").await;
+
     let mut byte_stream = response.bytes_stream();
     let mut line_buffer = String::new();
     let mut current_event_type: Option<String> = None;
@@ -186,6 +196,40 @@ async fn run_subscriber(
 
     // Stream closed without error — let the outer loop reconnect.
     Ok(())
+}
+
+/// Re-fetch the full active project-epr set from storage and atomically replace
+/// the EprRouter table. Used both on (re)connect (initial sync — closes the
+/// missed-event gap) and on every `projection.{registered,revoked}` event. The
+/// event payload carries only a `commitment_id`, not the full projection, so a
+/// full re-fetch is required either way. In MVP (≤4 projections) this is cheap.
+///
+/// Non-fatal: on fetch error the router state is left unchanged rather than
+/// cleared, so a transient storage blip never blanks live routing.
+async fn sync_router_from_storage(
+    storage_base_url: &str,
+    doorway_id: &str,
+    epr_router: &EprRouter,
+    http: &reqwest::Client,
+    cause: &str,
+) {
+    match fetch_projections_from_storage(storage_base_url, doorway_id, http).await {
+        Ok(projections) => {
+            let count = projections.len();
+            epr_router.replace_all(projections);
+            info!(
+                cause,
+                count, "storage_events_subscriber: EprRouter re-synced from storage"
+            );
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                cause,
+                "storage_events_subscriber: EprRouter re-sync failed; router state unchanged"
+            );
+        }
+    }
 }
 
 /// Dispatch one parsed SSE event to the right cache-invalidation or router-refresh primitive.
@@ -236,29 +280,8 @@ async fn handle_event(
         }
 
         "projection.registered" | "projection.revoked" => {
-            // Re-fetch the full set of active project-epr commitments and
-            // atomically replace the router state. The event payload carries
-            // only a commitment_id, not the full projection content — a
-            // full re-fetch is required. In MVP (≤4 projections) this is cheap.
-            match fetch_projections_from_storage(storage_base_url, doorway_id, http).await {
-                Ok(projections) => {
-                    let count = projections.len();
-                    epr_router.replace_all(projections);
-                    info!(
-                        event = %event_type,
-                        count,
-                        "storage_events_subscriber: EprRouter refreshed after projection event"
-                    );
-                }
-                Err(e) => {
-                    warn!(
-                        error = %e,
-                        event = %event_type,
-                        "storage_events_subscriber: failed to refresh EprRouter after projection event; \
-                         router state unchanged"
-                    );
-                }
-            }
+            sync_router_from_storage(storage_base_url, doorway_id, epr_router, http, event_type)
+                .await;
         }
 
         _ => {
@@ -336,5 +359,88 @@ mod tests {
                 "projection.registered" | "projection.revoked"
             ));
         }
+    }
+
+    /// Build a single canned /lamad projection for mock storage responses.
+    fn lamad_projection_fixture() -> Vec<elohim_views::projection::EprProjectionView> {
+        use elohim_views::projection::{EprProjectionView, ProjectionMode};
+        vec![EprProjectionView {
+            commitment_id: "test-commitment".into(),
+            epr_id: "lamad-spa".into(),
+            doorway_id: "doorway:test".into(),
+            url_path: "/lamad".into(),
+            mode: ProjectionMode::Cached,
+            reach: "commons".into(),
+            base_href: "/lamad/".into(),
+            entry_file: "index.html".into(),
+            redirects_from: vec![],
+            preview_epr_ref: None,
+            gate_hints: vec![],
+            dead_end: false,
+            steward_direct_endpoint: None,
+            seeded_at: "2026-05-28T00:00:00Z".into(),
+            seeded_by: "test".into(),
+        }]
+    }
+
+    /// THE missed-event-gap regression test (RC1).
+    ///
+    /// Proves that `run_subscriber` populates the EprRouter from an on-connect
+    /// re-sync *without ever receiving a projection.registered event*. Before
+    /// the fix the router was only populated by the boot one-shot or a live
+    /// event; an event emitted while the subscriber was disconnected (e.g. the
+    /// storage pod cycle during genesis Seed Projections) was missed and the
+    /// router stayed empty until a doorway reboot — leaving / and /lamad 404ing.
+    #[tokio::test]
+    async fn run_subscriber_resyncs_router_on_connect_without_any_event() {
+        use wiremock::matchers::{method, path, query_param};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+
+        // SSE endpoint: an empty, immediately-closing stream. run_subscriber
+        // does its on-connect sync, then the stream closes → returns Ok. No
+        // projection.{registered,revoked} event is ever delivered.
+        Mock::given(method("GET"))
+            .and(path("/api/v1/events"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "text/event-stream")
+                    .set_body_string(""),
+            )
+            .mount(&server)
+            .await;
+
+        // The active project-epr set storage would return on re-fetch.
+        Mock::given(method("GET"))
+            .and(path("/db/rea_commitments"))
+            .and(query_param("action", "project-epr"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(lamad_projection_fixture()))
+            .mount(&server)
+            .await;
+
+        let router = EprRouter::new();
+        let http = reqwest::Client::new();
+
+        // Precondition: empty router — the missed-event state.
+        assert!(router.dispatch("/lamad").is_none());
+
+        let events_url = format!("{}/api/v1/events", server.uri());
+        let result = run_subscriber(
+            &events_url,
+            &server.uri(),
+            "doorway:test",
+            None,
+            &router,
+            &http,
+        )
+        .await;
+        assert!(result.is_ok(), "subscriber should end cleanly: {result:?}");
+
+        // The router resolves /lamad purely from the on-connect re-sync.
+        let hit = router
+            .dispatch("/lamad")
+            .expect("router must be populated by on-connect re-sync (no event was sent)");
+        assert_eq!(hit.epr_id, "lamad-spa");
     }
 }
