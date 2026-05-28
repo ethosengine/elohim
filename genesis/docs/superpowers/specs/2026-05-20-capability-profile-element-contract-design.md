@@ -366,6 +366,8 @@ Declared by the protocol; every conformant runtime understands them.
 
 **Enforcement:** if an element declares a protocol Standing as required and the profile doesn't carry it, the element **refuses to render** — it emits a `<elohim-standing-refused>` slot with the required Standing name. The surrounding chrome (provided by the shell) decides what to render in its place.
 
+**Pre-canonical lifecycle Standings (2026-05-28 extension).** The session-bridge primitive (`genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md`) introduces four additional protocol-core Standings — `Anonymous`, `OauthIdentified`, `PeerNativeSampling`, `PeerNativeMember` — representing pre-canonical participation lifecycle. Source of truth: `elohim/sdk/schemas/v1/enums/session-lifecycle-state.schema.json`. These are HARD-enforced via the same `<elohim-standing-refused>` slot pattern as the other protocol-core Standings. An element declaring lifecycle-required cells (e.g., a member-only graduation-status panel that should not render to an anonymous visitor) names the required lifecycle Standing in its `capabilityContract.standings.required` and the substrate refuses rendering at any incompatible lifecycle. The session-bridge resolves the participant's current lifecycle into exactly one of these four Standings; the Capability Profile carries it; downstream rendering follows the existing element-contract pattern.
+
 ### 5.2 App-declared Standings (SOFT-enforced)
 
 Apps may extend the role surface via their manifest:
