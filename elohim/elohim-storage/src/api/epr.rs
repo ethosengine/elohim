@@ -609,6 +609,70 @@ async fn put_epr(
     // Used for local-origin dedup in the T19 FeedbackSignal fan-out below.
     let envelope_signer = input.envelope.proof.signer.clone();
 
+    // Z.D substrate-correct validation (Sprint 1 Task 7): if a republish-epr
+    // EconomicEvent accompanies the envelope, validate bounds before persisting.
+    if let Some(event_view) = &input.event {
+        if event_view.action == "republish-epr" {
+            // Serialize the event view to JSON for the validator (which works on
+            // serde_json::Value to match the schema-driven validator surface).
+            let event_json = serde_json::to_value(event_view)
+                .map_err(|e| StorageError::InvalidInput(format!("serialize event: {e}")))?;
+
+            // Derive the EPR identity for scope checking. Prefer the envelope's
+            // coupling.knowledge field (the EPR's stable knowledge-side identity);
+            // fall back to the envelope CID (which changes per republish, but the
+            // bounds_validator can still scope-check it if the Commitment uses
+            // wildcard "*" or includes this specific CID).
+            let target_epr_id = input
+                .envelope
+                .coupling
+                .knowledge
+                .as_deref()
+                .unwrap_or(&input.envelope.cid)
+                .to_string();
+
+            // Build the substrate fetcher + rate-history wrappers from the
+            // available dependencies. Same inline-construction pattern as
+            // api/diagnostics_bounds.rs (S2.T6).
+            let hc_lamad: Option<Arc<crate::hc_client::HcClient>> = None;
+            // TODO(Sprint 1 / Task post-T7): inject hc_lamad from the route caller
+            // signature once HcClientRegistry is accessible here. Until then the
+            // ConductorCommitmentFetcher will always report ConductorUnreachable,
+            // which is the substrate-correct behavior for republish-epr without
+            // an authorizing Commitment (rejects every Z.D deploy until the
+            // mishpat::get_commitment wiring lands).
+            match hc_lamad {
+                Some(hc_client) => {
+                    let fetcher =
+                        crate::services::commitment_fetcher::ConductorCommitmentFetcher {
+                            hc_client,
+                        };
+                    let rate =
+                        crate::services::rate_history::DieselRateHistory { pool: pool.clone() };
+                    let result =
+                        crate::services::republish_epr_validator::validate_republish_epr(
+                            &event_json,
+                            &fetcher,
+                            &rate,
+                            &target_epr_id,
+                        )
+                        .await;
+                    if let Err(e) = result {
+                        return Ok(response::bad_request(&format!(
+                            "republish-epr validation failed: {e}"
+                        )));
+                    }
+                }
+                None => {
+                    // Substrate-correct: refuse the deploy until the conductor bridge is up.
+                    return Ok(response::service_unavailable(
+                        "republish-epr validator unavailable — HcClient bridge not yet wired (Sprint 1)",
+                    ));
+                }
+            }
+        }
+    }
+
     // Decode payload bytes once; shared by Epr construction and fan-out decode.
     let raw_payload = hex::decode(&input.payload)
         .map_err(|e| StorageError::InvalidInput(format!("bad payload hex: {e}")))?;
