@@ -1637,6 +1637,27 @@ diesel::table! {
 }
 
 // M-POLICY-1: AccumulationStatus projection (Category C operational).
+// Source of truth: derived projection of GovernanceState × Content.contentType
+// × Proposal? × Manifest(kind: pillar-projection, pillar: qahal).
+// Reconstructable from governance_states + content + proposals + manifests at any time.
+// Migration: 2026-05-28-010000_mechanism_selection
+diesel::table! {
+    mechanism_selection (entity_type, entity_id) {
+        entity_type               -> Text,
+        entity_id                 -> Text,
+        level                     -> Integer,
+        mechanism                 -> Text,
+        render_target             -> Text,
+        context_menu_only         -> Integer,
+        allow_reactions           -> Integer,
+        allow_graduated_feedback  -> Integer,
+        active_proposal_id        -> Nullable<Text>,
+        active_proposal_mechanism -> Nullable<Text>,
+        policy_manifest_cid       -> Nullable<Text>,
+        computed_at               -> Text,
+    }
+}
+
 // Source of truth: derived projection of FeedbackSignal × Manifest(kind: standing-policy).
 // Reconstructable from FeedbackSignal + manifests tables at any time.
 // Migration: 2026-05-28-000000_accumulation_status
@@ -1699,6 +1720,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     knowledge_maps,
     local_sessions,
     manifests,
+    mechanism_selection,
     node_stewardship,
     audit_observations,
     observation_entries,
