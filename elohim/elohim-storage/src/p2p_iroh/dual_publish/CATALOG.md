@@ -11,7 +11,7 @@ MUST publish and both sides receive byte-identical MessagePack payloads.
 
 ---
 
-## Publisher Sites (12 total)
+## Publisher Sites (13 total)
 
 | # | Topic | Producer call site | Wire payload type | `to_bytes` flavor |
 |---|---|---|---|---|
@@ -21,6 +21,7 @@ MUST publish and both sides receive byte-identical MessagePack payloads.
 | 4 | `recovery.revocation` | `P2PCommand::PublishRecoveryRevocation` arm — `src/p2p/mod.rs:2427-2453` (publish at `:2430`) | `RecoveryRevocationMessage` (`src/p2p/recovery_revocation.rs`) | `to_vec_named` |
 | 5 | `elohim/<pillar>/<reach>[/coll]` (reach-scoped) | `P2PCommand::PublishEprAnnounce` arm — `src/p2p/mod.rs:2493-2509` (publish at `:2495`) | MessagePack-encoded CID (`Vec<u8>`, opaque) | caller-encoded |
 | 6 | `/elohim/feedback-signal/{target_cid}` | `P2PCommand::GossipPublish` arm — `src/p2p/mod.rs:2589-2605` (publish at `:2591`) | `FeedbackSignal` (`src/p2p/feedback_signal.rs`) | `to_vec_named` |
+| 13 | `elohim/conductor/agent-info/v1` | `P2PCommand::PublishConductorAgentInfo` arm — `src/p2p/mod.rs` (added Task 4 of conductor-agent-info-substrate-gossip plan) | `ConductorAgentInfo` (`src/p2p/conductor_agent_info_gossip.rs`) | `to_vec_named` |
 
 ## Producer Call Chains (upstream senders filling the command queue)
 
@@ -32,6 +33,7 @@ MUST publish and both sides receive byte-identical MessagePack payloads.
 | 10 | `services::epr_store::FederatedEprStore::put` (D.3 fanout) | `PublishEprAnnounce` | `src/services/epr_store.rs:487` |
 | 11 | `LibP2PGossipPublisher::publish` (adapter for `flood_feedback`) | `GossipPublish` | `src/p2p/adapters.rs:88-103` |
 | 12 | `crate::api::epr::put_epr` calls `flood_feedback` which calls `LibP2PGossipPublisher` | `GossipPublish` | `src/api/epr.rs:719-735` |
+| 13 | `spawn_agent_info_publisher` heartbeat tick / publish-now on cold start | `PublishConductorAgentInfo` | `src/p2p/conductor_agent_info_gossip.rs` (`publish_once`) |
 
 ## Subscriber-Only Topics (no publisher today)
 

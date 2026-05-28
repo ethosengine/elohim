@@ -51,6 +51,15 @@ pub const TOPIC_IDENTITY_BINDING: &str =
 /// subscribers should use. See spec §3.7 integrity-exception.
 pub const TOPIC_INTEGRITY_REVOCATION: &str = "elohim/integrity/revocation";
 
+/// Step-zero conductor agent-info gossip topic — re-export alias for the
+/// canonical constant in `p2p::conductor_agent_info_gossip`. Use this from
+/// the unified topics surface; the source-of-truth constant stays in the
+/// gossip module.
+///
+/// See `genesis/docs/superpowers/specs/2026-05-28-conductor-agent-info-substrate-gossip-design.md`.
+pub const TOPIC_CONDUCTOR_AGENT_INFO: &str =
+    crate::p2p::conductor_agent_info_gossip::CONDUCTOR_AGENT_INFO_TOPIC;
+
 /// Well-known integrity topics — always subscribed at startup regardless of
 /// any per-pillar or reach-scoped subscription gating.
 ///
