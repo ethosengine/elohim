@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { StandaloneResolver, type ConsentContext } from './services/standalone-resolver';
+import type { AuthorityResolution } from 'elohim-imagodei';
 
 type PortalMode = 'login' | 'consent';
 type PortalStep = 'resolve' | 'login' | 'consent' | 'callback';
@@ -21,7 +22,7 @@ type PortalStep = 'resolve' | 'login' | 'consent' | 'callback';
   template: `
     <main>
       <h1 class="visually-hidden">Elohim Portal</h1>
-      <elohim-imagodei-portal-shell #shell [attr.step]="step()">
+      <elohim-imagodei-portal-shell #shell [attr.step]="step()" [authority]="authority()">
 
         <ng-container *ngIf="mode() === 'login' && step() === 'resolve'">
           <elohim-imagodei-federated-resolver
@@ -88,12 +89,19 @@ export class AppComponent implements OnInit, AfterViewInit {
   consentCtx = signal<ConsentContext | null>(null);
   errorMessage = signal<string>('');
 
+  /** Pre-fetched authority resolution from `GET /auth/me`. Null until fetch completes. */
+  authority = signal<AuthorityResolution | null>(null);
+
   /** The federated-resolver Lit element — receives the resolveIdentifier callback. */
   @ViewChild('resolver') resolverRef?: ElementRef<HTMLElement>;
   /** The login-card Lit element — receives setError calls on auth failure. */
   @ViewChild('loginCard') loginCardRef?: ElementRef<HTMLElement>;
 
   async ngOnInit(): Promise<void> {
+    // Pre-fetch authority so the shell receives it as a property (not via its own fetch).
+    // Failure is non-fatal — shell renders placeholder chrome and emits authority-needed.
+    void this._prefetchAuthority();
+
     const params = new URLSearchParams(window.location.search);
     const isConsent = params.has('client_id') && params.has('claims');
 
@@ -111,6 +119,26 @@ export class AppComponent implements OnInit, AfterViewInit {
       } catch (e) {
         this.errorMessage.set(e instanceof Error ? e.message : 'consent preparation failed');
       }
+    }
+  }
+
+  private async _prefetchAuthority(): Promise<void> {
+    try {
+      const resp = await fetch('/auth/me', { credentials: 'include' });
+      if (!resp.ok) return;
+      const data = (await resp.json()) as Record<string, unknown>;
+      const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};
+      this.authority.set({
+        trustMode: (data['trustMode'] as AuthorityResolution['trustMode'] | undefined) ?? 'doorway-host',
+        authority: {
+          label: (authorityData['label'] as string | undefined) ?? '',
+          id: authorityData['id'] as string | undefined,
+        },
+        flywheelHint: data['flywheelHint'] as boolean | undefined,
+        attestors: data['attestors'] as AuthorityResolution['attestors'] | undefined,
+      });
+    } catch {
+      // Network error — leave authority null; shell will emit authority-needed.
     }
   }
 

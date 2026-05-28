@@ -29,6 +29,7 @@ import {
   inject,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import type { AuthorityResolution } from 'elohim-imagodei';
 
 import { AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
 import { parseFederatedIdentifier, resolveGatewayToDoorwayUrl } from '../../models/doorway.model';
@@ -60,6 +61,9 @@ export class LoginComponent implements OnInit, AfterViewInit {
 
   // Exposed to template for the remember-key attribute binding
   readonly authIdentifierKey = AUTH_IDENTIFIER_KEY;
+
+  /** Pre-fetched authority resolution from `/auth/me`. Null until the fetch completes. */
+  authority: AuthorityResolution | null = null;
 
   step: Step = 'resolve';
   identifier = '';
@@ -95,6 +99,31 @@ export class LoginComponent implements OnInit, AfterViewInit {
       if (stored) this.identifier = stored;
     } catch {
       // localStorage unavailable — degrade silently
+    }
+
+    // Pre-fetch authority from doorway so the shell element receives it as a
+    // property rather than fetching itself. Failure is non-fatal — the shell
+    // renders with placeholder chrome and emits authority-needed.
+    void this._prefetchAuthority();
+  }
+
+  private async _prefetchAuthority(): Promise<void> {
+    try {
+      const resp = await fetch('/auth/me', { credentials: 'include' });
+      if (!resp.ok) return;
+      const data = (await resp.json()) as Record<string, unknown>;
+      const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};
+      this.authority = {
+        trustMode: (data['trustMode'] as AuthorityResolution['trustMode'] | undefined) ?? 'doorway-host',
+        authority: {
+          label: (authorityData['label'] as string | undefined) ?? '',
+          id: authorityData['id'] as string | undefined,
+        },
+        flywheelHint: data['flywheelHint'] as boolean | undefined,
+        attestors: data['attestors'] as AuthorityResolution['attestors'] | undefined,
+      };
+    } catch {
+      // Network error — leave authority null; shell will emit authority-needed.
     }
   }
 
