@@ -53,6 +53,7 @@ import {
 // Substrate views pre-fetched and bound to Lit primitives — see M-POLICY-1/2 + M-REA-3.
 import type {
   AccumulationStatus,
+  FeedbackContext,
   MechanismSelection,
 } from 'elohim-core';
 import { GovernanceApiService } from '@elohim/service';
@@ -149,7 +150,7 @@ export class ContentViewerComponent
   feedbackProfile: FeedbackProfile | null = null;
   aggregatedSignals: LamadAggregatedSignals | null = null;
   allowedReactions: EmotionalReactionType[] = [];
-  feedbackContext: 'accuracy' | 'usefulness' | 'proposal' | 'clarity' | 'relevance' = 'usefulness';
+  feedbackContext: FeedbackContext = 'usefulness';
   showFeedbackSection = true;
 
   // Governance substrate views — pre-fetched and bound to Lit primitives (Wave D / M-POLICY-1+2)
