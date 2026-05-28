@@ -38,10 +38,8 @@ export type {
   StreamingManifest,
 } from './angular/services/doorway-client.service';
 
-// Governance feedback orchestration services (migrated from @app/qahal/services
-// in Slice 2.2b deferral closure — these are cross-cutting governance
-// primitives consumed wherever the elohim-core feedback Lit elements need to
-// be orchestrated).
-export { MechanismSelectionService } from './angular/services/mechanism-selection.service';
-export type { MechanismSelection } from './angular/services/mechanism-selection.service';
+// MechanismSelectionService retired by M-POLICY-2: use GovernanceApiService.getMechanismSelection().
+// The substrate computes mechanism selection from GovernanceState × Content.contentType ×
+// Proposal? × Manifest{kind:"pillar-projection", pillar:"qahal"} payload_json.
+// MechanismSelectionView (from @elohim/storage-client/generated) is the wire type.
 // SignalAccumulationService retired by M-POLICY-1: use GovernanceApiService.getAccumulationStatus().

@@ -141,11 +141,10 @@ export * from './angular/models/source-chain.model';
 // Services
 export { GovernanceApiService } from './angular/services/governance-api.service';
 export { DoorwayClientService } from './angular/services/doorway-client.service';
-// Governance feedback orchestration services (migrated from @app/qahal/services
-// in Slice 2.2b deferral closure — cross-cutting governance primitives
-// consumed wherever feedback mechanism orchestration is needed).
-export { MechanismSelectionService } from './angular/services/mechanism-selection.service';
-export type { MechanismSelection } from './angular/services/mechanism-selection.service';
+// MechanismSelectionService retired by M-POLICY-2: use GovernanceApiService.getMechanismSelection().
+// The substrate computes mechanism selection from GovernanceState × Content.contentType ×
+// Proposal? × Manifest{kind:"pillar-projection", pillar:"qahal"} payload_json.
+// Wire type: MechanismSelectionView from @elohim/storage-client/generated.
 // SignalAccumulationService retired by M-POLICY-1: use GovernanceApiService.getAccumulationStatus()
 // which reads the server-side AccumulationStatus projection derived from
 // FeedbackSignal × Manifest(kind: standing-policy).

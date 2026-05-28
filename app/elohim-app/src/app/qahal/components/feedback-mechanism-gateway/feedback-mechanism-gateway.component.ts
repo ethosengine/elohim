@@ -1,19 +1,24 @@
 /**
  * FeedbackMechanismGatewayComponent - Core Governance Gateway Shell
  *
- * Orchestrating component that loads governance state, calls
- * MechanismSelectionService, and renders the appropriate sub-component
- * based on renderTarget (angular for levels 0-2, psephos for levels 3-7).
+ * Orchestrating component that loads governance state from the server-side
+ * MechanismSelection projection (M-POLICY-2) and renders the appropriate
+ * sub-component based on renderTarget (angular for levels 0-2, psephos for
+ * levels 3-7).
  *
  * This is the single entry point for all governance feedback UI on any entity.
  * Host components only need to provide entityType and entityId — the gateway
  * handles mechanism selection, loading state, and routing to the correct renderer.
+ *
+ * The mechanism selection logic lives in the Rust substrate (GovernanceApiService
+ * .getMechanismSelection). No client-side ladder constants — the server derives
+ * the level from GovernanceState × Content.contentType × Proposal? ×
+ * pillar-projection Manifest.
  */
 
 import {
   Component,
   ElementRef,
-  computed,
   effect,
   inject,
   input,
@@ -24,10 +29,8 @@ import { Router } from '@angular/router';
 
 import {
   GovernanceApiService,
-  MechanismSelectionService,
-  type MechanismSelection,
 } from '@elohim/service';
-import type { AccumulationStatusView } from '@elohim/storage-client';
+import type { AccumulationStatusView, MechanismSelectionView } from '@elohim/storage-client';
 import {
   ContextMenuOnlyComponent,
   type ContextMenuAction,
@@ -38,7 +41,7 @@ import { GraduatedFeedbackComponent } from '../graduated-feedback/graduated-feed
 import { PsephosBallotWrapperComponent } from '../psephos-ballot-wrapper/psephos-ballot-wrapper.component';
 import { ReactionBarComponent } from '../reaction-bar/reaction-bar.component';
 
-import type { ChallengeView, GovernanceStateView, ProposalView } from '@elohim/storage-client';
+import type { ChallengeView, ProposalView } from '@elohim/storage-client';
 
 @Component({
   selector: 'qahal-feedback-mechanism-gateway',
@@ -101,9 +104,9 @@ import type { ChallengeView, GovernanceStateView, ProposalView } from '@elohim/s
         }
       }
 
-      @if (sel.renderTarget === 'psephos' && sel.activeProposal) {
+      @if (sel.renderTarget === 'psephos' && activeProposal()) {
         <qahal-psephos-ballot-wrapper
-          [proposal]="sel.activeProposal"
+          [proposal]="activeProposal()!"
           [mechanism]="sel.mechanism"
           (ballotSubmitted)="onBallotSubmitted($event)"
         />
@@ -279,7 +282,6 @@ export class FeedbackMechanismGatewayComponent {
 
   private readonly router = inject(Router);
   private readonly governanceApi = inject(GovernanceApiService);
-  private readonly mechanismSelection = inject(MechanismSelectionService);
 
   /** Reference to the native <dialog> element when the challenge form is open. */
   readonly challengeDialog = viewChild<ElementRef<HTMLDialogElement>>('challengeDialog');
@@ -287,27 +289,25 @@ export class FeedbackMechanismGatewayComponent {
   /** Whether the inline challenge form is currently shown. */
   readonly showChallengeForm = signal(false);
 
-  /** Loaded governance state for this entity. */
-  private readonly governanceState = signal<GovernanceStateView | null>(null);
+  /**
+   * Server-side mechanism selection (M-POLICY-2).
+   * Replaces the client-side MechanismSelectionService.selectMechanism() call.
+   * Null while loading; populated from GovernanceApiService.getMechanismSelection().
+   */
+  readonly selection = signal<MechanismSelectionView | null>(null);
 
-  /** Active proposal for this entity (if any). */
-  private readonly activeProposal = signal<ProposalView | undefined>(undefined);
+  /**
+   * Active proposal for the psephos ballot wrapper.
+   * The MechanismSelectionView carries activeProposalId (string); the full
+   * ProposalView is fetched separately for the ballot wrapper's template binding.
+   */
+  readonly activeProposal = signal<ProposalView | undefined>(undefined);
 
   /** Accumulation status from server-side projection (M-POLICY-1). */
   readonly accumulationStatus = signal<AccumulationStatusView | null>(null);
 
   /** Whether governance data has been loaded (distinguishes null-state from not-yet-loaded). */
   private readonly loaded = signal(false);
-
-  /** The resolved mechanism selection, null while loading. */
-  readonly selection = computed<MechanismSelection | null>(() => {
-    if (!this.loaded()) return null;
-    return this.mechanismSelection.selectMechanism(
-      this.governanceState(),
-      this.contentType(),
-      this.activeProposal()
-    );
-  });
 
   constructor() {
     // React to input changes and reload governance data
@@ -394,13 +394,20 @@ export class FeedbackMechanismGatewayComponent {
   private async loadGovernanceData(entityType: string, entityId: string): Promise<void> {
     this.loaded.set(false);
 
-    const [state, proposals, accumulation] = await Promise.all([
-      this.governanceApi.getGovernanceState(entityType, entityId),
+    // M-POLICY-2: getMechanismSelection() replaces the three-argument
+    // selectMechanism(governanceState, contentType, activeProposal) call.
+    // The substrate joins GovernanceState × Content.contentType × Proposal? ×
+    // pillar-projection Manifest to produce the level + flags. We still fetch
+    // the active proposals list so the psephos ballot wrapper has the full
+    // ProposalView for its template binding (MechanismSelectionView carries
+    // activeProposalId as a string only).
+    const [mechanismView, proposals, accumulation] = await Promise.all([
+      this.governanceApi.getMechanismSelection(entityType, entityId),
       this.governanceApi.queryProposals(entityId, 'active'),
       this.governanceApi.getAccumulationStatus(entityType, entityId),
     ]);
 
-    this.governanceState.set(state);
+    this.selection.set(mechanismView);
     this.activeProposal.set(proposals.length > 0 ? proposals[0] : undefined);
     this.accumulationStatus.set(accumulation);
     this.loaded.set(true);

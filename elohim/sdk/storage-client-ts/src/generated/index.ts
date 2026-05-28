@@ -168,6 +168,7 @@ export * from "./JsonValue";
 export * from "./LocalSession";
 export * from "./LocalSessionView";
 export * from "./MeasureView";
+export * from "./MechanismSelectionView";
 export * from "./MetricHistoryView";
 export * from "./MonitoringRulesInput";
 export * from "./NodeRecommendationView";

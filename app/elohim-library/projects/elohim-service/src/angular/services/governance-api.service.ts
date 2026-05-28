@@ -42,6 +42,8 @@ import type {
   UpdateDispositionInputView,
   // M-POLICY-1: server-side AccumulationStatus projection
   AccumulationStatusView,
+  // M-POLICY-2: server-side MechanismSelection projection
+  MechanismSelectionView,
 } from '@elohim/storage-client/generated';
 
 @Injectable({ providedIn: 'root' })
@@ -302,6 +304,43 @@ export class GovernanceApiService implements IGovernance {
           `/api/v1/governance/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/accumulation`,
         )
         .pipe(catchError(() => of(emptyStatus))),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // M-POLICY-2: Server-side MechanismSelection projection
+  //
+  // Replaces the client-side MechanismSelectionService.selectMechanism().
+  // The substrate computes the ladder level by joining GovernanceState ×
+  // Content.contentType × active Proposal? with the mechanism_ladder declared
+  // in the pillar-projection Manifest. No client-side switch statement.
+  // Route: GET /api/v1/governance/{entityType}/{entityId}/mechanism
+  // ---------------------------------------------------------------------------
+
+  async getMechanismSelection(
+    entityType: string,
+    entityId: string,
+  ): Promise<MechanismSelectionView> {
+    const defaultSelection: MechanismSelectionView = {
+      entityType,
+      entityId,
+      level: 1,
+      mechanism: 'reactions',
+      renderTarget: 'angular',
+      contextMenuOnly: false,
+      allowReactions: true,
+      allowGraduatedFeedback: false,
+      activeProposalId: null,
+      activeProposalMechanism: null,
+      policyManifestCid: null,
+      computedAt: new Date().toISOString(),
+    };
+    return firstValueFrom(
+      this.http
+        .get<MechanismSelectionView>(
+          `/api/v1/governance/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/mechanism`,
+        )
+        .pipe(catchError(() => of(defaultSelection))),
     );
   }
 
