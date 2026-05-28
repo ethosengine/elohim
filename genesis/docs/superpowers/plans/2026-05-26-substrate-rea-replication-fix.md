@@ -1268,3 +1268,28 @@ The FeaturePromise at `.claude/deliver/feature-promise-epr-app-delivery.json` be
 **Sprint result:** [genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md](../sprints/2026-05-27-substrate-rea-task10-result.md) carries the full pipeline log quotes and probe outputs.
 
 *Task 10 close-out written 2026-05-27 by Opus 4.7 under Matthew's direction during the shift dispatched against orchestrator #1069.*
+
+---
+
+## Verifier-fix close-out — Sprint 0 of REA-compute-substrate roadmap (2026-05-28)
+
+The substrate-rea sprint's Task 10 close-out captured the symptom: `WARN elohim_storage::inventory: Inventory snapshot failed structural verify — dropped … error=InvalidHashFormat("sha256-…")` on every healthy cluster peer. Root cause was a wire-format mismatch in `elohim/elohim-storage/src/p2p/inventory_gossip.rs` `is_blob_hash_shaped`: the predicate required bare 64-hex while every producer in the crate emitted canonical `sha256-<64-hex>` per `elohim-storage/CLAUDE.md`. Latent ~26 days, exercised end-to-end by substrate-rea's multi-peer alpha cluster.
+
+**Fix landed in six commits on `sprint/cross-pillar-cleanup`:**
+
+| SHA | Layer | What |
+|-----|-------|------|
+| `c5d6dd827` | tests | Fixtures use canonical wire shape (RED) |
+| `d21e0bc0c` | predicate | Verifier accepts `sha256-<hex>` (GREEN) |
+| `680a5c0f2` | type system | `BlobAddress` newtype constructor-validates wire shape |
+| `a04c07982` | error type | `VerifyError` uses `thiserror::Error` (gets `std::error::Error` for free) |
+| `702b0cb05` | producer→consumer | Thread `BlobAddress` through `BlobInventorySnapshot.hashes`, `BlobInventoryDelta.{added,removed}`, `LocalInventory`, `StaticInventory`, `StoreAdapter`, p2p/mod.rs receive arm, 4 integration test files |
+| `6f66ffeb5` | regression seatbelt | Producer-↔-verifier round-trip from real `BlobStore` — makes future drift impossible to land green |
+
+**Bug-class closed at two layers:** (1) the predicate now matches the producer's output (immediate fix), and (2) the `BlobAddress` newtype with `#[serde(try_from = "String")]` makes producer-↔-verifier drift unrepresentable at the type level (Stage-2 hardening — survives all subsequent architectural graduations of the REA-compute-substrate roadmap).
+
+**Cluster-verification deferred:** the push-and-re-probe step (Task 0.7 of the roadmap) is rolled up with other work in flight. When the roll-up lands on `dev`, `project_generous_probes_pattern`'s floor-restoration gate becomes unblocked.
+
+**Sibling-bug audit:** `IdentityBindingGossip::verify_structural` has no hash-shape predicate — only non-empty checks on `agent_cid`, `valid_from`, `binding_action_hash`, `signature`. No sibling bugs found in the crate.
+
+**Sprint 0 closes Sprint 0 of the larger roadmap.** See `genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md` for Sprints 1-8 covering Z.D substrate-correct deploy, bounds validator + standing aggregator, hosting graduation, and the five other rows of the REA compute-commitment gospel-tier generalization table.

@@ -1,6 +1,6 @@
 ---
 name: feedback-structural-verify-canonical-wire-shape
-description: "Structural-verify tests must use canonical wire-format string shapes, not synthetic constructor shapes. Otherwise tests pass while the production verifier rejects every real message."
+description: "Structural-verify tests must use canonical wire-format string shapes, not synthetic constructor shapes. Otherwise tests pass while the production verifier rejects every real message.; fixed in c5d6dd827..6f66ffeb5 (Sprint 0 of REA-compute-substrate roadmap, 2026-05-28)"
 metadata: 
   node_type: memory
   type: feedback
@@ -17,3 +17,9 @@ Structural-verify tests must use the canonical wire-format string shape, not syn
 3. When the wire format is documented in a `CLAUDE.md` ("`sha256-{hex}` keeps its existing name"), cross-reference that doc in the test fixture comments so the next person knows the format isn't optional.
 
 Related: [[project_quilt_pantry_vocabulary]] (canonical storage vocab); [[project_three_layer_truth_model]] (libp2p vs DHT vs doorway boundaries — verifiers live at libp2p layer, must match libp2p wire format).
+
+**Status (2026-05-28):** Fixed across Sprint 0 of the REA-compute-substrate roadmap (`c5d6dd827`..`6f66ffeb5`). The predicate accepts canonical `sha256-<hex>` wire format AND the `BlobAddress` newtype now makes producer-↔-verifier drift unrepresentable at the type level. See `[[project_canonical_wire_shape_newtype_pattern]]` for the generalized pattern this incident produced.
+
+**Sibling-verifier audit:** none. `IdentityBindingGossip::verify_structural` (the only other gossip verifier in the crate) has no hash-shape predicate — only non-empty checks.
+
+**Roll-up status:** code-complete on `sprint/cross-pillar-cleanup`; cluster re-probe deferred to roll-up with other in-flight work.
