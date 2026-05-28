@@ -4,14 +4,14 @@
  * Proves the element works as a blank-slate primitive: no brand tokens bound,
  * CSS system colors as defaults, override surface honest.
  *
- * The portal-shell is the wizard's outer wrapper for the peer OAuth portal. It
- * discovers trustMode on mount via authorityEndpoint, propagates it to slotted
- * children, and renders persistent chrome (trust-indicator + attestor-row by
- * default). The `primary` slot receives the active step element.
+ * The portal-shell is the wizard's outer wrapper for the peer OAuth portal.
+ * Authority is host-provided — the element does NOT fetch. Hosts pre-fetch
+ * `/auth/me` (the doorway endpoint) and bind the result to the `authority`
+ * property. Stories bind `authority` directly as a fixture to demonstrate
+ * the host-pre-fetch contract and each rendering state.
  *
- * IMPORTANT: Stories set `authority-endpoint` to a non-existent path so the
- * element never fires a real HTTP request. The _setAuthority test seam is used
- * via a ref callback to inject authority state directly where needed.
+ * IMPORTANT: No story may issue a real HTTP request. Authority is always
+ * provided via the `.authority` property binding.
  */
 
 import type { Meta, StoryObj } from '@storybook/web-components';
@@ -21,7 +21,7 @@ import 'elohim-imagodei/register';
 import type { AuthorityResolution } from 'elohim-imagodei';
 
 // ---------------------------------------------------------------------------
-// Authority fixture
+// Authority fixtures — realistic protocol vocabulary, no invented identity
 // ---------------------------------------------------------------------------
 
 const doorwayResolution: AuthorityResolution = {
@@ -56,12 +56,15 @@ const meta: Meta = {
         component: `
 \`<elohim-imagodei-portal-shell>\` — wizard outer wrapper for the peer OAuth portal.
 
-Discovers \`trustMode\` on mount via \`authorityEndpoint\` (default \`/auth/me\`); propagates it
-to slotted children; renders persistent chrome (trust-indicator + attestor-row in the \`header\`
-slot). The active step element slots via \`primary\`.
+**Authority is host-provided.** The element does NOT fetch. Hosts pre-fetch \`/auth/me\`
+(the doorway endpoint) and bind the result to the \`authority\` property. When \`authority\`
+is null, the element emits \`authority-needed\` giving the host a signal to fetch and bind.
 
-**Override surface:** bound via \`--elohim-portal-*\` CSS custom properties with CSS system color
-defaults (\`Canvas\`, \`CanvasText\`).
+Renders persistent chrome (trust-indicator + attestor-row in the \`header\` slot).
+The active step element slots via \`primary\`.
+
+**Override surface:** bound via \`--elohim-portal-*\` CSS custom properties with CSS system
+color defaults (\`Canvas\`, \`CanvasText\`).
         `.trim(),
       },
     },
@@ -80,7 +83,7 @@ export const Unstyled: Story = {
   decorators: [story => html`<div style="all: initial; display: block; height: 100vh;">${story()}</div>`],
   render: () => html`
     <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
+      .authority=${doorwayResolution}
     >
       <p slot="primary">Primary slot content.</p>
       <p slot="footer">Protocol · Privacy · Help</p>
@@ -89,7 +92,7 @@ export const Unstyled: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Wrapped in `style="all: initial;"`. Shell renders with Canvas/CanvasText defaults — no brand tokens.',
+        story: 'Wrapped in `style="all: initial;"`. Shell renders with Canvas/CanvasText defaults — no brand tokens. Authority provided directly via `.authority` property (host-pre-fetch pattern).',
       },
     },
   },
@@ -121,7 +124,7 @@ export const CustomTheme: Story = {
   ],
   render: () => html`
     <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
+      .authority=${peerResolution}
     >
       <p slot="primary" style="margin:0;">Primary step content in custom theme.</p>
       <p slot="footer" style="margin:0;">Custom theme footer · Help</p>
@@ -130,7 +133,7 @@ export const CustomTheme: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Override-surface proof: GitHub-dark palette via `--elohim-portal-*` properties. Demonstrates the CSS override surface is honest.',
+        story: 'Override-surface proof: GitHub-dark palette via `--elohim-portal-*` properties. Demonstrates the CSS override surface is honest. Authority (peer-conductor) bound via `.authority` property.',
       },
     },
   },
@@ -141,16 +144,14 @@ export const CustomTheme: Story = {
 // ---------------------------------------------------------------------------
 
 export const EmptyShell: Story = {
-  name: 'EmptyShell',
+  name: 'EmptyShell (authority: null — loading state)',
   render: () => html`
-    <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
-    ></elohim-imagodei-portal-shell>
+    <elohim-imagodei-portal-shell></elohim-imagodei-portal-shell>
   `,
   parameters: {
     docs: {
       description: {
-        story: 'Empty shell with no slotted children and no authority resolved. Shows default chrome with empty trust-indicator and attestor-row placeholder.',
+        story: 'Shell with `authority` null (not yet provided). Renders placeholder chrome and emits `authority-needed`. In real use the host responds to that event and binds authority.',
       },
     },
   },
@@ -160,7 +161,7 @@ export const WithLoginCard: Story = {
   name: 'WithLoginCard',
   render: () => html`
     <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
+      .authority=${doorwayResolution}
       step="login"
     >
       <elohim-imagodei-login-card
@@ -174,7 +175,7 @@ export const WithLoginCard: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Login step: `elohim-imagodei-login-card` slotted into the `primary` slot. The shell provides outer chrome; the card provides the credential form.',
+        story: 'Login step: `elohim-imagodei-login-card` slotted into the `primary` slot. Authority pre-provided by host (doorway-host mode with flywheel hint). The shell provides outer chrome; the card provides the credential form.',
       },
     },
   },
@@ -184,7 +185,7 @@ export const WithConsentCard: Story = {
   name: 'WithConsentCard',
   render: () => html`
     <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
+      .authority=${doorwayResolution}
       step="consent"
     >
       <elohim-imagodei-consent-card
@@ -202,7 +203,7 @@ export const WithConsentCard: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Consent step: `elohim-imagodei-consent-card` slotted into `primary`. Graphos Designer (the lamad pattern library) requesting displayName (required) + qahal.standing (optional).',
+        story: 'Consent step: `elohim-imagodei-consent-card` slotted into `primary`. Graphos Designer (the lamad pattern library) requesting displayName (required) + qahal.standing (optional). Authority pre-provided by host.',
       },
     },
   },
@@ -212,7 +213,7 @@ export const ErrorBoundary: Story = {
   name: 'ErrorBoundary',
   render: () => html`
     <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
+      .authority=${doorwayResolution}
     >
       <p slot="primary">Login step content.</p>
       <div slot="error-region" role="alert">
@@ -232,35 +233,23 @@ export const ErrorBoundary: Story = {
 };
 
 // ---------------------------------------------------------------------------
-// Trust-mode variants
+// Trust-mode variants — authority bound directly via property
 // ---------------------------------------------------------------------------
 
 export const DoorwayHostAuthority: Story = {
   name: 'DoorwayHostAuthority',
-  render: () => {
-    const el = html`
-      <elohim-imagodei-portal-shell
-        authority-endpoint="/nonexistent-url-story-safe"
-        flywheel-hint
-        id="shell-doorway"
-      >
-        <p slot="primary">Shell with doorway-host authority injected via _setAuthority.</p>
-        <span slot="footer">Hosted via alpha.elohim.host · Flywheel available</span>
-      </elohim-imagodei-portal-shell>
-    `;
-    // Inject authority after render via macrotask to use the test seam.
-    setTimeout(() => {
-      const shell = document.getElementById('shell-doorway');
-      if (shell && '_setAuthority' in shell) {
-        (shell as unknown as { _setAuthority: (r: AuthorityResolution) => void })._setAuthority(doorwayResolution);
-      }
-    }, 0);
-    return el;
-  },
+  render: () => html`
+    <elohim-imagodei-portal-shell
+      .authority=${doorwayResolution}
+    >
+      <p slot="primary">Shell with doorway-host authority bound via .authority property.</p>
+      <span slot="footer">Hosted via alpha.elohim.host · Flywheel available</span>
+    </elohim-imagodei-portal-shell>
+  `,
   parameters: {
     docs: {
       description: {
-        story: 'Doorway-host authority injected via the `_setAuthority` test seam. Trust-indicator shows ⌂ alpha.elohim.host with flywheel hint. Three attestors shown.',
+        story: 'Doorway-host authority bound directly via `.authority` property — the correct host-pre-fetch pattern. Trust-indicator shows doorway-host mode with flywheel hint. Three attestors shown.',
       },
     },
   },
@@ -268,28 +257,18 @@ export const DoorwayHostAuthority: Story = {
 
 export const PeerConductorAuthority: Story = {
   name: 'PeerConductorAuthority',
-  render: () => {
-    const el = html`
-      <elohim-imagodei-portal-shell
-        authority-endpoint="/nonexistent-url-story-safe"
-        id="shell-peer"
-      >
-        <p slot="primary">Shell with peer-conductor authority injected via _setAuthority.</p>
-        <span slot="footer">Your conductor on this device · Help</span>
-      </elohim-imagodei-portal-shell>
-    `;
-    setTimeout(() => {
-      const shell = document.getElementById('shell-peer');
-      if (shell && '_setAuthority' in shell) {
-        (shell as unknown as { _setAuthority: (r: AuthorityResolution) => void })._setAuthority(peerResolution);
-      }
-    }, 0);
-    return el;
-  },
+  render: () => html`
+    <elohim-imagodei-portal-shell
+      .authority=${peerResolution}
+    >
+      <p slot="primary">Shell with peer-conductor authority bound via .authority property.</p>
+      <span slot="footer">Your conductor on this device · Help</span>
+    </elohim-imagodei-portal-shell>
+  `,
   parameters: {
     docs: {
       description: {
-        story: 'Peer-conductor authority injected via `_setAuthority`. Trust-indicator shows ◇ "your conductor on this device". One attestor shown.',
+        story: 'Peer-conductor authority bound directly via `.authority` property. Trust-indicator shows peer-conductor mode. One attestor shown.',
       },
     },
   },
@@ -310,7 +289,7 @@ export const Dark: Story = {
   ],
   render: () => html`
     <elohim-imagodei-portal-shell
-      authority-endpoint="/nonexistent-url-story-safe"
+      .authority=${doorwayResolution}
     >
       <p slot="primary">Primary step content — dark theme.</p>
       <span slot="footer">Protocol · Privacy</span>
@@ -319,7 +298,37 @@ export const Dark: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Dark theme canary: Canvas/CanvasText system colors adapt; panel-bg color-mix adjusts.',
+        story: 'Dark theme canary: Canvas/CanvasText system colors adapt; panel-bg color-mix adjusts. Authority pre-provided.',
+      },
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// RTL canary (he locale)
+// ---------------------------------------------------------------------------
+
+export const RTL: Story = {
+  name: 'RTL (he locale canary)',
+  decorators: [
+    story => html`
+      <div dir="rtl" lang="he" style="height: 100vh;">
+        ${story()}
+      </div>
+    `,
+  ],
+  render: () => html`
+    <elohim-imagodei-portal-shell
+      .authority=${doorwayResolution}
+    >
+      <p slot="primary">תוכן שלב ראשי — בדיקת RTL.</p>
+      <span slot="footer">פרוטוקול · פרטיות · עזרה</span>
+    </elohim-imagodei-portal-shell>
+  `,
+  parameters: {
+    docs: {
+      description: {
+        story: 'RTL locale canary (he). Shell layout uses logical properties; the frame centres correctly in right-to-left document flow.',
       },
     },
   },
