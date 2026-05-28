@@ -31,7 +31,7 @@ use elohim_sweettest::common::{
     conductors::{load_dna, two_agent_conductors},
     fixtures::network_seed,
 };
-use holochain::sweettest::await_consistency;
+use holochain::sweettest::{await_consistency, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -124,12 +124,17 @@ async fn session_events_and_onboarding_manifest_round_trip() -> Result<()> {
     let cell_b = app_b.cells().first().expect("cell b installed").clone();
 
     // Exchange peer info so conductors can discover each other on the DHT.
-    conductor_a
-        .exchange_peer_info([conductor_b.to_kitsune()])
-        .await;
-    conductor_b
-        .exchange_peer_info([conductor_a.to_kitsune()])
-        .await;
+    // HC 0.6 pattern: static SweetConductor::exchange_peer_info([&ca, &cb]) in a
+    // retry loop (the old instance-method + to_kitsune() form was removed in 0.6).
+    // Mirrors rea_commitment_replication.rs / qahal_collab_t0_test.rs — see memory
+    // _sweettest_cross_agent_consistency.
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&conductor_a, &conductor_b]).await {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
 
     let agent_id = format!("{}", agent_a);
     let content_id = "concept-elohim-intro".to_string();
@@ -254,7 +259,11 @@ async fn session_events_and_onboarding_manifest_round_trip() -> Result<()> {
         .await;
 
     // Wait for DHT consistency before Agent B asserts.
-    await_consistency(10, [&cell_a, &cell_b]).await?;
+    // await_consistency returns Result<_, String>; String isn't StdError, so map
+    // into anyhow before `?` (mirrors rea_commitment_replication.rs).
+    await_consistency(10, [&cell_a, &cell_b])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
 
     // 6. Agent B reads the content-view EconomicEvent by its action hash.
     let event_b: Option<EconomicEvent> = conductor_b
