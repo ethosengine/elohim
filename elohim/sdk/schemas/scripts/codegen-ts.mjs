@@ -156,6 +156,9 @@ const INTERFACE_FILES = [
   { src: 'views/upgrade-prompt-view.ts', dest: 'upgrade-prompt-view.ts' },
   // Sprint 3: mutual storage replication — dwelling-hub commitment payload
   { src: 'commitments/replicates-dwelling.ts', dest: 'replicates-dwelling.ts' },
+  // Sprint 3: per-peer and hub storage capacity projections (Category C operational)
+  { src: 'views/peer-capacity-view.ts', dest: 'peer-capacity-view.ts' },
+  { src: 'views/hub-capacity-view.ts', dest: 'hub-capacity-view.ts' },
 ];
 
 /**

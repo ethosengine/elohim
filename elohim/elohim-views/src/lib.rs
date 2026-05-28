@@ -21,10 +21,12 @@
 pub mod bounds;
 pub mod element_registry;
 pub mod epr;
+pub mod hub_capacity;
 pub mod imagodei;
 pub mod infrastructure;
 pub mod inputs;
 pub mod lamad;
+pub mod peer_capacity;
 pub mod projection;
 pub mod qahal;
 pub mod replicates_dwelling;

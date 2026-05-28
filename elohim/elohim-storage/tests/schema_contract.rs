@@ -1185,6 +1185,9 @@ fn view_schemas_declare_source_of_truth() {
         // Sprint 2 Task 1: BoundsValidationResult + StandingScore views
         "views/bounds-validation-result-view.schema.json",
         "views/standing-score-view.schema.json",
+        // Sprint 3: per-peer and hub storage capacity projections
+        "views/peer-capacity-view.schema.json",
+        "views/hub-capacity-view.schema.json",
     ];
 
     for schema_name in &view_schemas {
@@ -5131,4 +5134,41 @@ fn replicates_dwelling_rejects_unknown_provider_role() {
         !errors.is_empty(),
         "Schema must reject unknown provider_role 'totally-bogus'"
     );
+}
+
+// =============================================================================
+// Sprint 3: PeerCapacityView + HubCapacityView schema contract tests
+//
+// Source of truth: computed projection from infrastructure:system-sample
+// (raw capacity), Mishpat::Commitment entries (pledges), peer_blob_inventory
+// (actually held). Operational Category C — no persisted entity; recomputable.
+// =============================================================================
+
+#[test]
+fn peer_capacity_view_minimal_validates() {
+    let payload = serde_json::json!({
+        "peerCid": "peer:abc",
+        "computedAt": "2026-05-28T12:00:00Z",
+        "totalRawBytes": 100_000_000_000u64,
+        "pledges": {"dwellingBytes": 0, "collectiveBytes": 0, "commonsBytes": 0, "totalPledgedBytes": 0},
+        "actuallyHeld": {"uniqueShardBytes": 0, "freeBytesRemaining": 100_000_000_000u64, "fragmentationEstimate": 0.0},
+        "ratioCompliance": {
+            "effectiveRatios": {"commonsPct": 20, "dwellingPct": 40, "collectivePct": 25, "freePct": 15, "manifestCid": "bafkrei-x"},
+            "currentRatios": {"commonsPct": 0, "dwellingPct": 0, "collectivePct": 0, "freePct": 100},
+            "compliantWithDonut": false,
+            "violations": []
+        }
+    });
+    validate_against_schema("views/peer-capacity-view.schema.json", &payload);
+}
+
+#[test]
+fn hub_capacity_view_dwelling_kind_validates() {
+    let payload = serde_json::json!({
+        "hubId": "hub:family-smiths",
+        "hubKind": "dwelling",
+        "memberDeviceCount": 2,
+        "capacity": null
+    });
+    validate_against_schema("views/hub-capacity-view.schema.json", &payload);
 }

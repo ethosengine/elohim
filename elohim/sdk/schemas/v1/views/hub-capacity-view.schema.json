@@ -1,0 +1,25 @@
+{
+  "$id": "epr:schema:view/hub-capacity",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HubCapacityView",
+  "description": "Hub-level storage-capacity aggregate. Sums per-device PeerCapacityView across all devices belonging to a hub. Hub is a *role* (per project_hub_archetype_abstraction); substrate stays kind-agnostic. Source of truth: hub-membership graph (notarized humans.household_id projection OR collective_participations) + per-device PeerCapacityView. Operational Category C — reconstructed per request; not persisted.",
+  "type": "object",
+  "required": ["hubId", "hubKind", "memberDeviceCount", "capacity"],
+  "additionalProperties": false,
+  "properties": {
+    "hubId":             { "type": "string" },
+    "hubKind":           { "type": "string", "enum": ["dwelling", "collective", "computed"] },
+    "displayLabel":      { "type": ["string", "null"] },
+    "memberDeviceCount": { "type": "integer", "minimum": 0 },
+    "capacity": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["totalRawBytes", "pledges", "actuallyHeld"],
+          "description": "Aggregate across all member devices. Null when no devices have a current sample."
+        }
+      ]
+    }
+  }
+}
