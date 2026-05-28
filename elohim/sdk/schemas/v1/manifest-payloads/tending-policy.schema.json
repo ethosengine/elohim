@@ -1,0 +1,47 @@
+{
+  "$id": "epr:schema:manifest-payload:tending-policy",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TendingPolicyPayload",
+  "description": "Source of truth: this schema IS the authoritative shape for Manifest{kind: 'tending-policy'} payload_json. Authored as a DHT Manifest entry via create_manifest (existing coordinator). The substrate reads this payload to qualify attention-tending writes and feed the T16 CollectiveFilterPattern aggregation. Category A (Notarized) via existing Manifest entry type. No new DHT entry type needed.",
+  "type": "object",
+  "required": ["floor"],
+  "additionalProperties": true,
+  "properties": {
+    "floor": {
+      "$ref": "epr:schema:manifest:tending-policy-floor",
+      "description": "Constitutional tending-immune floor — classes that attention-tending filters may never silence. Must contain all five tending-immune classes. Mirrors TENDING_IMMUNE_CLASSES in content_store_integrity/src/manifest.rs."
+    },
+    "dwell_qualification_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Minimum elapsed time in milliseconds before an attention-tending entry is considered a qualified view. The substrate enforces this at coordinator time (create_attention_tending). Client sends elapsed_ms; the coordinator compares against this policy value. Default: 3000. Retiring F-POLICY-4 client constant DWELL_THRESHOLD_MS = 3000.",
+      "default": 3000
+    },
+    "min_ttl_seconds": {
+      "type": "integer",
+      "minimum": 3600,
+      "description": "Minimum TTL in seconds for AttentionTending entries. The integrity zome already enforces a hard floor of 3600 (1 hour); this policy field may set a higher collective minimum. Default: 3600.",
+      "default": 3600
+    },
+    "allowed_classifications": {
+      "type": "array",
+      "description": "Permitted classification values for AttentionTending entries in this collective context. When omitted, all classifications are permitted. Items must match the enum defined in the integrity zome.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "values-forward",
+          "fatigue",
+          "scope-mismatch",
+          "safety"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "collective_k_threshold": {
+      "type": "integer",
+      "minimum": 2,
+      "description": "Minimum agent count (k) required before T16 emits a CollectiveFilterPattern aggregate. Ensures k-anonymity — individual attention signals are never published. Default: 5.",
+      "default": 5
+    }
+  }
+}

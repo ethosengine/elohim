@@ -1,0 +1,46 @@
+{
+  "$id": "epr:schema:intent:attention-tending",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AttentionTendingIntent",
+  "description": "Source of truth: wire shape for POST /api/v1/attention/tending request body. Aligns with CreateAttentionTendingInput Rust struct in elohim/holochain/dna/elohim/zomes/content_store/src/attention_tending.rs. The substrate derives signer_pubkey from agent_info() — the client never supplies it. Entity classification: Category B (Agent-Scoped, private source chain) — AttentionTending entries are Visibility::Private and never gossiped to DHT. The create_attention_tending coordinator already exists; this is the HTTP intent wire shape only.",
+  "type": "object",
+  "required": ["filterSubjectJson", "classification", "ttlSeconds", "contextJson", "elapsedMs"],
+  "additionalProperties": false,
+  "properties": {
+    "filterSubjectJson": {
+      "type": "string",
+      "description": "JSON-encoded FilterSubject. Must be syntactically valid JSON; the coordinator gates on parse failure. Identifies the content node, path, or agent whose reach the tending applies to.",
+      "minLength": 2
+    },
+    "classification": {
+      "type": "string",
+      "enum": [
+        "values-forward",
+        "fatigue",
+        "scope-mismatch",
+        "safety"
+      ],
+      "description": "Attention classification — why the agent's attention tended toward or away from this subject. Must match one of the values validated by the integrity zome."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional human-readable reason. Surfaced to the agent's own elohim for reflection; never shared cross-agent.",
+      "minLength": 1
+    },
+    "ttlSeconds": {
+      "type": "integer",
+      "minimum": 3600,
+      "description": "Time-to-live in seconds. Minimum 3600 (1 hour) enforced by the integrity zome floor. The tending-policy Manifest may declare a higher minimum via min_ttl_seconds."
+    },
+    "contextJson": {
+      "type": "string",
+      "description": "JSON-encoded ContextScope. Must be syntactically valid JSON. Describes the context in which attention occurred (e.g., which pillar surface, session phase, collective context).",
+      "minLength": 2
+    },
+    "elapsedMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Elapsed time in milliseconds that the agent spent on the subject before this tending was recorded. The proxy route compares this against the tending-policy Manifest's dwell_qualification_ms before calling the coordinator. Replaces the client-side DWELL_THRESHOLD_MS = 3000 constant (F-POLICY-4 retirement)."
+    }
+  }
+}
