@@ -21,8 +21,22 @@ use crate::error::StorageError;
 // Query Types
 // ============================================================================
 
-/// Input for creating an REA commitment
+/// Input for creating an REA commitment.
+///
+/// `rename_all = "camelCase"` is REQUIRED: this struct is the direct
+/// `parse_body` target for `POST /api/v1/commitments` (see
+/// `api/rea_commitments.rs`), and HTTP bodies cross the boundary in camelCase
+/// (per the storage CLAUDE.md boundary rule). Without it, camelCase keys like
+/// `inScopeOf` / `metadataJson` silently fail to match the snake_case fields and
+/// drop to `None` — which left `in_scope_of` null on every project-epr
+/// projection, so `find_active_projections` (filters on `in_scope_of LIKE
+/// 'doorway:X|%'`) matched nothing and `/lamad` 404'd even with projections
+/// present. Single-word fields (action/provider/receiver/note) were unaffected,
+/// which masked the bug. The seed's value shapes (string `inScopeOf`, string
+/// `metadataJson`) already match this struct's `Option<String>` fields; only the
+/// key casing was wrong.
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateReaCommitmentInput {
     #[serde(default)]
     pub id: Option<String>,
