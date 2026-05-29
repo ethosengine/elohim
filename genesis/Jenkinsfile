@@ -694,8 +694,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             sh """#!/bin/bash
                                 set -euo pipefail
                                 echo "Waiting for ${human.service}..."
-                                kubectl wait --for=condition=Ready pod/${human.service}-0 -n ${human.namespace} --timeout=120s
-                                echo "   ✅ ${human.service} ready"
+                                kubectl wait --for=condition=Ready pod/${human.service}-0 -n ${human.namespace} --timeout=600s
+                                echo "   ✅ ${human.service} ready (600s: embedded-HC cold start, see #1055)"
                             """
                         }
 

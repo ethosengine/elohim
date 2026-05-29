@@ -228,6 +228,16 @@ spec:
               value: "ws://localhost:4445"
             - name: HOLOCHAIN_APP_ID
               value: "elohim"
+            # Gate for happ_manager DNA-content drift auto-reinstall. The
+            # conductor data dir is a persistent PVC, so an installed app keeps
+            # its OLD DNA across restarts/resets even when the bundle's DNA
+            # changes (same roles → not "stale"). With this set true, the
+            # embedded conductor reinstalls when bundle DNA ≠ installed DNA.
+            # Rendered per-env by deployHumanManifest: true for alpha/staging
+            # (ephemeral, re-seeded), false for prod (DNA upgrades need
+            # migration/lineage, not a blind reinstall).
+            - name: ALLOW_DNA_REINSTALL
+              value: "ALLOW_DNA_REINSTALL_PLACEHOLDER"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB

@@ -60,13 +60,38 @@ pub async fn ensure_happ_installed(
             "App already installed"
         );
 
-        if is_stale(app_info) {
-            warn!(app_id = app_id, "Stale hApp detected — reinstalling");
+        // DNA-content drift: the conductor data dir is a persistent PVC, so an
+        // already-installed app survives pod restarts AND storage resets (which
+        // only wipe content.db, not /var/local/lib/holochain). When the bundled
+        // DNA changes but role STRUCTURE stays the same (e.g. an integrity-zome
+        // fix → new DNA hash, same roles), `is_stale` reads "not stale" and the
+        // conductor keeps the OLD DNA forever — exactly how the Gap-F fix sat
+        // built-but-undeployed. Drift detection forces a reinstall in that case.
+        //
+        // GATED behind ALLOW_DNA_REINSTALL: a reinstall mints a new agent key /
+        // cell — fine for ephemeral re-seeded envs (alpha/dev), NOT the prod
+        // upgrade path (which needs DNA migration/lineage). Prod leaves the flag
+        // unset → no probe runs, no behavior change.
+        let allow_reinstall = std::env::var("ALLOW_DNA_REINSTALL")
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        let drifted =
+            allow_reinstall && has_dna_drift(admin_ws, app_info, happ_path, app_id).await;
+
+        if is_stale(app_info) || drifted {
+            if drifted {
+                warn!(
+                    app_id = app_id,
+                    "DNA content drift vs bundle (ALLOW_DNA_REINSTALL=true) — reinstalling"
+                );
+            } else {
+                warn!(app_id = app_id, "Stale hApp detected — reinstalling");
+            }
             admin_ws
                 .uninstall_app(app_id.to_string(), false)
                 .await
                 .map_err(|e| anyhow::anyhow!("uninstall_app failed: {e}"))?;
-            info!(app_id = app_id, "Stale hApp removed");
+            info!(app_id = app_id, "Old hApp removed");
             install_fresh(admin_ws, happ_path, app_id).await?;
         } else if matches!(app_info.status, AppStatus::Disabled(_)) {
             info!(app_id = app_id, "Enabling disabled app");
@@ -110,6 +135,110 @@ fn is_stale(app_info: &holochain_client::AppInfo) -> bool {
     }
 
     false
+}
+
+/// Map role → DNA hash (as a string) for the provisioned cell of each role in
+/// an AppInfo. Only provisioned cells carry the role's canonical DNA hash.
+fn provisioned_dna_hashes(
+    app_info: &holochain_client::AppInfo,
+) -> std::collections::BTreeMap<String, String> {
+    let mut out = std::collections::BTreeMap::new();
+    for (role, cells) in &app_info.cell_info {
+        for cell in cells {
+            if let CellInfo::Provisioned(p) = cell {
+                out.insert(role.clone(), p.cell_id.dna_hash().to_string());
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// Detect whether the installed hApp's DNA content has drifted from the bundle
+/// on disk. Computes the bundle's per-role DNA hashes by installing it under a
+/// throwaway app id (NOT enabled → no network join), reading the cell DNA
+/// hashes, then uninstalling. A DNA hash is derived from DNA content + modifiers
+/// and is agent-independent, so the probe's hashes equal what a fresh main
+/// install of this bundle would produce.
+///
+/// Defensive: any failure (probe install/uninstall error) returns `false`
+/// (treat as no-drift) so a probe problem never blocks startup — worst case is
+/// the prior behavior (keep the installed hApp).
+async fn has_dna_drift(
+    admin_ws: &AdminWebsocket,
+    app_info: &holochain_client::AppInfo,
+    happ_path: &Path,
+    app_id: &str,
+) -> bool {
+    let installed = provisioned_dna_hashes(app_info);
+    let probe_id = format!("{app_id}-version-probe");
+
+    // Clean any leftover probe from a prior interrupted run.
+    if let Ok(apps) = admin_ws.list_apps(None).await {
+        if apps.iter().any(|a| a.installed_app_id == probe_id) {
+            let _ = admin_ws.uninstall_app(probe_id.clone(), true).await;
+        }
+    }
+
+    let bundle = match probe_bundle_hashes(admin_ws, happ_path, &probe_id).await {
+        Ok(h) => h,
+        Err(e) => {
+            warn!(error = %e, "DNA-drift probe failed (non-fatal) — keeping installed hApp");
+            return false;
+        }
+    };
+
+    for (role, bundle_hash) in &bundle {
+        if let Some(installed_hash) = installed.get(role) {
+            if installed_hash != bundle_hash {
+                warn!(
+                    role = role,
+                    installed = installed_hash,
+                    bundle = bundle_hash,
+                    "DNA drift detected for role"
+                );
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Install the bundle under a throwaway app id (without enabling), read its
+/// per-role provisioned DNA hashes, then uninstall the probe.
+async fn probe_bundle_hashes(
+    admin_ws: &AdminWebsocket,
+    happ_path: &Path,
+    probe_id: &str,
+) -> anyhow::Result<std::collections::BTreeMap<String, String>> {
+    let agent_key = admin_ws
+        .generate_agent_pub_key()
+        .await
+        .map_err(|e| anyhow::anyhow!("probe generate_agent_pub_key failed: {e}"))?;
+
+    let payload = InstallAppPayload {
+        source: AppBundleSource::Path(happ_path.to_path_buf()),
+        agent_key: Some(agent_key),
+        installed_app_id: Some(probe_id.to_string()),
+        roles_settings: None,
+        network_seed: None,
+        ignore_genesis_failure: false,
+    };
+
+    // Intentionally NOT enabled — install registers the cells (giving DNA
+    // hashes) without joining any network.
+    let probe_info = admin_ws
+        .install_app(payload)
+        .await
+        .map_err(|e| anyhow::anyhow!("probe install_app failed: {e}"))?;
+
+    let hashes = provisioned_dna_hashes(&probe_info);
+
+    if let Err(e) = admin_ws.uninstall_app(probe_id.to_string(), true).await {
+        warn!(error = %e, "failed to clean up version-probe app (non-fatal)");
+    }
+
+    Ok(hashes)
 }
 
 /// Install the hApp from disk and enable it.
