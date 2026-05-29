@@ -112,10 +112,10 @@ impl ReaCommitmentService {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
 
-        Err(StorageError::Internal(format!(
+        Err(StorageError::Timeout(format!(
             "REA commitment {} written via conductor but projection did not \
-             land in local SQL within 1s — check the rea_projection signal \
-             subscriber and the post-commit signal pipeline",
+             land in local SQL within 1s — retryable (transient post-commit latency); \
+             if persistent, check the rea_projection subscriber + post-commit signal pipeline",
             id
         )))
     }
@@ -222,9 +222,9 @@ impl ReaCommitmentService {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
 
-        Err(StorageError::Internal(format!(
+        Err(StorageError::Timeout(format!(
             "REA commitment {} state update written via conductor but \
-             projection did not reflect state={} within 1s",
+             projection did not reflect state={} within 1s — retryable (transient)",
             id, update.state
         )))
     }

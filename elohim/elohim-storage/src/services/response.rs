@@ -130,6 +130,9 @@ pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
         StorageError::Json(e) => (StatusCode::BAD_REQUEST, format!("JSON error: {}", e)),
         StorageError::Connection(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg.clone()),
         StorageError::Timeout(msg) => (StatusCode::GATEWAY_TIMEOUT, msg.clone()),
+        // Conductor unavailable (e.g. lamad bridge not yet connected) is a transient
+        // readiness failure, not a hard error — 503 so seeders/clients can retry.
+        StorageError::Conductor(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg.clone()),
         _ => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
 
