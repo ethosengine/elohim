@@ -437,6 +437,38 @@ Reach has drifted into three forms in the past; the canonical taxonomy lives at 
 **Never: Author `delivery_status` or temporal-state fields from gospel-tier prompts**
 Agent prompts and skill prompts describe stable architecture. Sprint progress, phase counts, "currently"/"as of [date]" phrasing belongs in memory entries and chronicles, which link forward. See [[feedback_agent_prompts_no_process_status]].
 
+## Canonical Implementation Patterns (read before any dispatch)
+
+These are the load-bearing patterns that make a dispatch land compiler-ready and merge-safe. They are the inverse of the failure modes memory has logged — internalize them before touching code.
+
+### Wire-format evolution (gossip / request-response MessagePack)
+
+Extend an existing wire message **additively**: new fields are `#[serde(default)] Option<T>` (or `#[serde(default)] Vec<T>`), never required. `rmp_serde::to_vec_named` is map-keyed, so an old peer that omits the key decodes it to the default, and a new field a new peer emits is ignored by an old peer's `from_slice` (the structs must NOT be `deny_unknown_fields`). Additive changes need **no topic/protocol-version bump**. Canonical precedent: `p2p/shamir_transport.rs` `ShamirShareResponse.error_reason`.
+
+- Keep any field used for serde **type-disambiguation** REQUIRED. The inventory receive arm distinguishes snapshot vs delta by presence of `hashes` vs `added`/`removed`; adding `#[serde(default)]` to a discriminating field silently breaks that. New optional fields are safe; defaulting a discriminator is not.
+- Hints/metadata attached to a content-addressed item (sha256/CID) ride a **parallel optional field**, never a change to the address newtype's wire shape — a newtype with `#[serde(into="String", try_from="String")]` serializes as a bare string and cannot grow fields.
+- Every wire change ships with a round-trip test AND an **old↔new compat test** (decode old-format bytes on the new struct, and new-format bytes on a struct lacking the field). The wire is the hardest thing to change later — get the shape right once.
+
+### Read-side projection services use inline diesel; the ReconcileController owns WRITES
+
+The "never reach into Diesel from a service" rule (above) governs projection **writes** (post-commit landing → signal → dispatcher → projector → controller). **Read-side** projection services read inline and that is correct: `use crate::db::diesel_schema::<table>::dsl as t;` then `t::table.filter(...).select(...).load(conn).map_err(|e| StorageError::Database(e.to_string()))?`, taking `&mut SqliteConnection`. Mirror `cluster_view::compose_totals` and `reciprocity_view::aggregate_stewarded_bytes_by_peer`. Sum bytes in Rust over loaded rows for an exact `u64` — `resource_quantity_value` is `f32` (lossy above ~16 MB; never accumulate byte counts through it). Don't reuse a generic list helper (`list_commitments`) when you need a different filter; write the focused query. Pledge/recipient/role data on a `replicates-dwelling` commitment lives in `metadata_json` (`ReplicatesDwellingPayload`), not in columns.
+
+### Correct-but-dormant projection (never wire a guaranteed no-op)
+
+Implement a reader/projection **correctly even when its upstream producer does not exist yet** — it returns 0/empty until the producer lands, which is honest and unblocks the consuming UI/aggregator the moment data arrives. Document the producer gap in the module doc. But do NOT wire a **consumer** into a hot path (e.g. a prioritizer into the gossip receive arm) when its required input is structurally always absent — that is a no-op that burns work and reads as "done." Land the consumer only once its input can be populated.
+
+### Cargo target-pool discipline (shared-tree, multi-agent safe)
+
+Set `CARGO_TARGET_DIR` to this worktree's family slot before any cargo command — run `cargo-pool key` in the crate dir, or read it from the session preflight (e.g. `/projects/.cargo-target-pool/family/<branch-family>/<crate-slug>/dev`). **Never run concurrent `cargo build/test/clippy` against the same slot** — concurrent cargo corrupts the shared target dir; serialize your own builds and assume parallel agents exist. Keep `RUSTFLAGS='--cfg getrandom_backend="custom"'` for elohim-storage + DNA zomes; `RUSTFLAGS=""` for doorway + steward/node. A killed build is safe (incremental artifacts persist and resume); only concurrency corrupts. See [[feedback_multi_agent_pvc_pacing]].
+
+### Shared-tree git discipline (operators commit alongside you)
+
+Stage **only** the files you changed: `git add <explicit paths>` — never `git add -A`/`.`. **Never `git stash`, `git checkout <ref>`, or `git reset`** — the working tree is shared and carries the operator's uncommitted work (often an in-flight `cargo fmt` sweep across dozens of files). To answer "was this here before me?" use `git show HEAD:<file>` or `git log`, never stash. Expect interleaved operator commits between your edits. If you run `cargo fmt -p <crate>`, it may reformat committed-clean files beyond your change — leave those unstaged (they blend into the operator's fmt sweep) and stage only your functional file; never bundle unrelated files into your commit. See [[feedback_subagent_no_git_stash]], [[feedback_subagent_scope_guardrails]], [[feedback_commit_attribution_parallel_agent_leak]].
+
+### Verification gate before claiming done
+
+`cargo fmt` + `clippy -D warnings` + the **full crate lib test** (not just the touched module — your reader feeds aggregators and routes). Per-crate green ≠ workspace green: a cross-crate `impl From<>` move or a ts-rs-anchored type change needs `cargo build --workspace` + a before/after `rg '^impl From<'` count (silent-drop guard). Sweep callers crate-wide (`rg <fn_name>`, including `tests/`) on any signature change. When clippy reports warnings, isolate yours from pre-existing/operator ones — fix yours, report theirs, don't clobber theirs. See [[feedback_signature_changes_grep_callers]], [[feedback_subagent_silent_impl_drops]], [[feedback_cascade_halt_masks_failures]].
+
 ## Doorway Gateway (Web2 Bridge)
 
 ### Component Structure
