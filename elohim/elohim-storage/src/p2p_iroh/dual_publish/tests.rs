@@ -122,6 +122,7 @@ fn all_wire_types_byte_parity_across_transports() {
     let snapshot = BlobInventorySnapshot {
         peer_id: "peer-abc".to_string(),
         hashes: vec![BlobAddress::new(format!("sha256-{}", "0".repeat(64))).unwrap()],
+        hints: vec![],
         sequence: 1,
         snapshot_at: 1_700_000_000_000_000,
         signature: vec![0u8; 1],

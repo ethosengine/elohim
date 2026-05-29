@@ -78,6 +78,28 @@ impl std::fmt::Display for BlobAddress {
     }
 }
 
+/// Optional per-blob enrichment carried alongside `hashes`/`added`. Advisory
+/// transport metadata (Category C) — never authority. Sparse: present only when
+/// the broadcaster can populate a field. Keyed by `address`. Additive +
+/// backward-compatible (`#[serde(default)]` + `to_vec_named`): old peers omit
+/// the key entirely; new peers receiving old-format messages decode it to `[]`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlobHint {
+    pub address: BlobAddress,
+    /// Collective CID of the blob's owning hub.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipient_hub_id: Option<String>,
+    /// `content_format` of the EPR this blob belongs to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epr_kind: Option<String>,
+    /// Uncompressed byte size of the blob.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_bytes: Option<u64>,
+    /// Tiered-quilt storage class: `drawn`, `stocked-warm`, `stocked`, or `shelved`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tier: Option<String>,
+}
+
 /// Periodic full-state snapshot. Replaces the receiver's per-peer entries
 /// with the snapshot's set. Accepted regardless of sequence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -88,6 +110,10 @@ pub struct BlobInventorySnapshot {
     /// `sha256-<64 lowercase hex>` address; malformed strings are rejected at
     /// deserialize time by `BlobAddress`'s `TryFrom<String>` impl.
     pub hashes: Vec<BlobAddress>,
+    /// Optional per-blob hints. Sparse; broadcasters emit empty until Wave 2+
+    /// populates them. Additive and backward-compatible: old peers omit the key.
+    #[serde(default)]
+    pub hints: Vec<BlobHint>,
     /// Microseconds since epoch — when the snapshot was computed.
     pub snapshot_at: i64,
     /// Per-peer monotonic counter. Snapshots advance the receiver's high-watermark.
@@ -106,6 +132,10 @@ pub struct BlobInventoryDelta {
     /// Hashes removed from this peer's inventory. Each entry is a validated
     /// `sha256-<64 lowercase hex>` address.
     pub removed: Vec<BlobAddress>,
+    /// Optional per-blob hints for added entries. Sparse; broadcasters emit
+    /// empty until Wave 2+ populates them. Additive and backward-compatible.
+    #[serde(default)]
+    pub hints: Vec<BlobHint>,
     /// Microseconds since epoch — when the delta was emitted.
     pub emitted_at: i64,
     /// Per-peer monotonic counter. Receivers gap-detect on `expected_next` mismatch.
@@ -219,6 +249,7 @@ mod tests {
                 BlobAddress::new(sha256_wire('a')).unwrap(),
                 BlobAddress::new(sha256_wire('b')).unwrap(),
             ],
+            hints: vec![],
             snapshot_at: 1_700_000_000_000_000,
             sequence: 42,
             signature: vec![0x00],
@@ -230,6 +261,7 @@ mod tests {
             peer_id: "12D3KooWtest1".to_string(),
             added: vec![BlobAddress::new(sha256_wire('c')).unwrap()],
             removed: vec![BlobAddress::new(sha256_wire('a')).unwrap()],
+            hints: vec![],
             emitted_at: 1_700_000_001_000_000,
             sequence: 43,
             signature: vec![0x00],
@@ -332,6 +364,116 @@ mod tests {
     #[test]
     fn topic_constant_matches_spec() {
         assert_eq!(INVENTORY_TOPIC, "elohim/inventory/blob");
+    }
+
+    // -----------------------------------------------------------------------
+    // Wave 1 compat tests: BlobHint additive wire-format
+    // -----------------------------------------------------------------------
+
+    /// Test-only twin that mirrors the PRE-hints wire shape of
+    /// `BlobInventorySnapshot`. Used to prove an old-peer message (no `hints`
+    /// key) decodes correctly on the new struct. No `rename_all` — matching
+    /// `BlobInventorySnapshot`'s serde config exactly, so the emitted map keys
+    /// are byte-identical to a real old-peer snapshot.
+    #[derive(Serialize)]
+    struct LegacySnapshot {
+        peer_id: String,
+        hashes: Vec<BlobAddress>,
+        snapshot_at: i64,
+        sequence: u64,
+        signature: Vec<u8>,
+    }
+
+    /// A snapshot with a populated `BlobHint` round-trips through MessagePack
+    /// without loss.
+    #[test]
+    fn snapshot_round_trips_with_hints() {
+        let addr = BlobAddress::new(sha256_wire('a')).unwrap();
+        let snap = BlobInventorySnapshot {
+            peer_id: "peer:A".into(),
+            hashes: vec![addr.clone()],
+            hints: vec![BlobHint {
+                address: addr,
+                recipient_hub_id: Some("collective:abc".into()),
+                epr_kind: Some("content".into()),
+                size_bytes: Some(4096),
+                tier: Some("stocked".into()),
+            }],
+            snapshot_at: 1,
+            sequence: 1,
+            signature: vec![0x00],
+        };
+        let bytes = snap.to_bytes().unwrap();
+        let back = BlobInventorySnapshot::from_bytes(&bytes).unwrap();
+        assert_eq!(back, snap);
+    }
+
+    /// A message encoded by an OLD peer (no `hints` key in the map) decodes
+    /// on the new struct with `hints == []` and the existing fields preserved.
+    /// This is the backward-compat guarantee: new code can receive old-format
+    /// messages without error.
+    #[test]
+    fn snapshot_without_hints_key_decodes_to_empty() {
+        let legacy = LegacySnapshot {
+            peer_id: "peer:A".into(),
+            hashes: vec![BlobAddress::new(sha256_wire('a')).unwrap()],
+            snapshot_at: 1,
+            sequence: 1,
+            signature: vec![0x00],
+        };
+        let bytes = rmp_serde::to_vec_named(&legacy).unwrap();
+        let back = BlobInventorySnapshot::from_bytes(&bytes).unwrap();
+        assert!(back.hints.is_empty());
+        assert_eq!(back.hashes.len(), 1);
+    }
+
+    /// Adding `hints` to the wire must not collapse the snapshot-vs-delta
+    /// disambiguation: a delta (no `hashes` key) still fails to decode as a
+    /// snapshot, and succeeds as a delta — even when `hints` is non-empty.
+    #[test]
+    fn hints_do_not_break_snapshot_delta_disambiguation() {
+        let delta = BlobInventoryDelta {
+            peer_id: "peer:A".into(),
+            added: vec![BlobAddress::new(sha256_wire('b')).unwrap()],
+            removed: vec![],
+            hints: vec![BlobHint {
+                address: BlobAddress::new(sha256_wire('b')).unwrap(),
+                recipient_hub_id: None,
+                epr_kind: None,
+                size_bytes: None,
+                tier: None,
+            }],
+            emitted_at: 1,
+            sequence: 2,
+            signature: vec![0x01],
+        };
+        let bytes = delta.to_bytes().unwrap();
+        // Delta bytes must NOT decode as a snapshot (missing required `hashes`).
+        assert!(BlobInventorySnapshot::from_bytes(&bytes).is_err());
+        // Delta bytes MUST decode as a delta.
+        assert!(BlobInventoryDelta::from_bytes(&bytes).is_ok());
+
+        // Symmetric direction (regression guard): a snapshot (no `added`/`removed`)
+        // must NOT decode as a delta, and MUST decode as a snapshot — even with
+        // non-empty hints. Guards against `added`/`removed` being accidentally
+        // defaulted in the future, which would collapse the disambiguation.
+        let snap = BlobInventorySnapshot {
+            peer_id: "peer:A".into(),
+            hashes: vec![BlobAddress::new(sha256_wire('b')).unwrap()],
+            hints: vec![BlobHint {
+                address: BlobAddress::new(sha256_wire('b')).unwrap(),
+                recipient_hub_id: None,
+                epr_kind: None,
+                size_bytes: None,
+                tier: None,
+            }],
+            snapshot_at: 1,
+            sequence: 2,
+            signature: vec![0x01],
+        };
+        let snap_bytes = snap.to_bytes().unwrap();
+        assert!(BlobInventoryDelta::from_bytes(&snap_bytes).is_err());
+        assert!(BlobInventorySnapshot::from_bytes(&snap_bytes).is_ok());
     }
 
     #[test]

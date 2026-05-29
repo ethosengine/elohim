@@ -76,6 +76,7 @@ pub fn build_snapshot<I: LocalInventory>(
     BlobInventorySnapshot {
         peer_id: peer_id.to_string(),
         hashes: inventory.current_hashes(),
+        hints: Vec::new(),
         snapshot_at: now_micros,
         sequence: seq.next(),
         signature: vec![0x00], // Stage 1 structural non-empty
@@ -94,6 +95,7 @@ pub fn build_delta(
         peer_id: peer_id.to_string(),
         added,
         removed,
+        hints: Vec::new(),
         emitted_at: now_micros,
         sequence: seq.next(),
         signature: vec![0x00], // Stage 1 structural non-empty
