@@ -207,10 +207,19 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for SqlitePragma
         // import-handler drain) alongside HTTP request handlers and bulk content
         // seeding, so we need WAL + a timeout long enough to absorb the worst
         // overlap window without surfacing SQLITE_BUSY to clients.
+        //
+        // ORDER IS LOAD-BEARING: busy_timeout MUST be set first.
+        // r2d2 establishes connections concurrently during pool warm-up. Setting
+        // journal_mode = WAL acquires a write lock on the database file. If
+        // busy_timeout is still at SQLite's default of 0 when that lock is
+        // contested, the second concurrent on_acquire returns SQLITE_BUSY
+        // immediately instead of waiting, causing pool initialisation to fail and
+        // the process to exit (crashloop). Setting busy_timeout first means every
+        // subsequent lock-needing pragma will wait up to 30 s rather than error.
         for pragma in [
+            "PRAGMA busy_timeout = 30000",
             "PRAGMA journal_mode = WAL",
             "PRAGMA synchronous = NORMAL",
-            "PRAGMA busy_timeout = 30000",
         ] {
             diesel::sql_query(pragma)
                 .execute(conn)
@@ -304,4 +313,144 @@ impl AppScopedDb {
 // Re-export Diesel types
 pub mod diesel_types {
     pub use super::content_diesel::{BulkResult, ContentQuery, CreateContentInput};
+}
+
+// ============================================================================
+// Regression tests — SqlitePragmas ordering
+// ============================================================================
+//
+// These tests live here (not in tests/) so they compile against the lib
+// binary, which already supplies the getrandom custom backend symbol.
+// Integration test binaries would fail to link because tempfile pulls in
+// getrandom as a transitive dep without that symbol defined.
+
+#[cfg(test)]
+mod pragma_order_tests {
+    use super::{CustomizeConnection, SqliteConnection, SqlitePragmas};
+    use diesel::prelude::*;
+
+    /// Read-back helper: returns the current `busy_timeout` PRAGMA value for
+    /// a connection using the `pragma_busy_timeout` virtual table.
+    fn read_busy_timeout(conn: &mut SqliteConnection) -> i32 {
+        #[derive(diesel::QueryableByName)]
+        struct Row {
+            #[diesel(sql_type = diesel::sql_types::Integer)]
+            timeout: i32,
+        }
+        diesel::sql_query("SELECT timeout AS timeout FROM pragma_busy_timeout")
+            .get_result::<Row>(conn)
+            .expect("reading PRAGMA busy_timeout via virtual table")
+            .timeout
+    }
+
+    /// After `SqlitePragmas::on_acquire` the connection must report
+    /// `busy_timeout = 30000`. Single-threaded; cannot be flaky.
+    #[test]
+    fn busy_timeout_is_30000_after_on_acquire() {
+        let tmp = tempfile::NamedTempFile::new().expect("tempfile");
+        let path = tmp.path().to_str().unwrap();
+
+        let mut conn = SqliteConnection::establish(path).expect("open connection");
+        SqlitePragmas
+            .on_acquire(&mut conn)
+            .expect("on_acquire should succeed on an uncontested DB");
+
+        let timeout = read_busy_timeout(&mut conn);
+        assert_eq!(
+            timeout, 30000,
+            "busy_timeout must be 30000 after on_acquire; got {}",
+            timeout
+        );
+    }
+
+    /// Second `on_acquire` on an already-WAL DB must succeed without any
+    /// lock contention. In production, the FIRST pool connection promotes
+    /// the DB to WAL; every subsequent connection calls `journal_mode = WAL`
+    /// and gets back "wal" (a no-op) without needing a write lock. This test
+    /// verifies that the full `on_acquire` sequence succeeds for both the
+    /// first (WAL promotion) and second (no-op check) connections, and that
+    /// both report `busy_timeout = 30000` afterward.
+    #[test]
+    fn on_acquire_succeeds_for_both_first_and_second_pool_connection() {
+        let tmp = tempfile::NamedTempFile::new().expect("tempfile");
+        let path = tmp.path().to_str().unwrap();
+
+        // First connection: promotes the DB to WAL mode.
+        let mut conn_a = SqliteConnection::establish(path).expect("open first connection");
+        SqlitePragmas
+            .on_acquire(&mut conn_a)
+            .expect("on_acquire must succeed for the first (WAL-promoting) connection");
+
+        // Second connection: DB is already in WAL mode; `journal_mode = WAL`
+        // returns the current mode without acquiring a write lock.
+        let mut conn_b = SqliteConnection::establish(path).expect("open second connection");
+        SqlitePragmas
+            .on_acquire(&mut conn_b)
+            .expect("on_acquire must succeed for the second (already-WAL) connection");
+
+        // Both connections must report busy_timeout = 30000.
+        assert_eq!(
+            read_busy_timeout(&mut conn_a),
+            30000,
+            "first connection: busy_timeout must be 30000 after on_acquire"
+        );
+        assert_eq!(
+            read_busy_timeout(&mut conn_b),
+            30000,
+            "second connection: busy_timeout must be 30000 after on_acquire"
+        );
+    }
+
+    /// `journal_mode = WAL` FIRST (old broken order): with `busy_timeout`
+    /// still at 0, a connection that loses the write-lock race returns
+    /// `SQLITE_BUSY` immediately.
+    ///
+    /// This test is a deterministic proof of the original defect.
+    /// It MUST observe an error — passing would mean the defect isn't
+    /// reproducible in this environment.
+    #[test]
+    fn old_order_wal_fails_immediately_under_write_lock() {
+        let tmp = tempfile::NamedTempFile::new().expect("tempfile");
+        let path = tmp.path().to_str().unwrap();
+
+        // Prime the file.
+        {
+            let mut init = SqliteConnection::establish(path).expect("open init connection");
+            diesel::sql_query("CREATE TABLE IF NOT EXISTS _init (x INTEGER)")
+                .execute(&mut init)
+                .expect("create init table");
+        }
+
+        // Victim: busy_timeout = 0 (old order — not yet set before WAL attempt).
+        let mut victim = SqliteConnection::establish(path).expect("open victim connection");
+        diesel::sql_query("PRAGMA busy_timeout = 0")
+            .execute(&mut victim)
+            .expect("set busy_timeout = 0 on victim");
+
+        // Blocker: hold the write lock.
+        let mut blocker = SqliteConnection::establish(path).expect("open blocker connection");
+        diesel::sql_query("PRAGMA busy_timeout = 0")
+            .execute(&mut blocker)
+            .expect("set busy_timeout = 0 on blocker");
+        diesel::sql_query("BEGIN IMMEDIATE")
+            .execute(&mut blocker)
+            .expect("BEGIN IMMEDIATE on blocker");
+
+        // WAL promotion with busy_timeout = 0 and the write lock held.
+        // Must fail immediately (SQLITE_BUSY).
+        let result = diesel::sql_query("PRAGMA journal_mode = WAL").execute(&mut victim);
+
+        // `_blocker` still alive — lock still held — so this must be an error.
+        assert!(
+            result.is_err(),
+            "OLD ORDER proof: journal_mode = WAL must fail with SQLITE_BUSY \
+             when busy_timeout = 0 and a write lock is held. If this passes \
+             the test environment does not reproduce WAL write-lock contention. \
+             Got Ok({})",
+            result.unwrap()
+        );
+
+        // Explicit drop for clarity — lock released here.
+        drop(blocker);
+    }
 }
