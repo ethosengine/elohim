@@ -100,6 +100,9 @@ components:
           value: /projects/.sonarqube-mcp
         - name: SONARQUBE_URL
           value: "https://sonarqube.ethosengine.com"
+        # Observability MCP (Grafana: metrics/logs/traces); internal SSE, no credentials needed
+        - name: OBSERVABILITY_MCP_URL
+          value: "http://observability-mcp.observability.svc.cluster.local:8000/sse"
         # GH_TOKEN injected via K8s secret auto-mount annotations
         # Chrome for Angular testing
         - name: CHROME_BIN
