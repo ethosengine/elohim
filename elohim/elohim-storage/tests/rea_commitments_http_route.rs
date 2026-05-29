@@ -153,30 +153,23 @@ async fn http_get_db_rea_commitments_returns_200_with_projection() {
         std::str::from_utf8(&resp.body)
     );
 
-    let body: serde_json::Value =
-        serde_json::from_slice(&resp.body).expect("response body must be valid JSON");
-
-    let items = body["items"]
-        .as_array()
-        .expect("response must have 'items' array");
+    // Deserialize EXACTLY as the doorway EprRouter does
+    // (doorway-service epr_router.rs::fetch_projections_from_storage):
+    //   let projections: Vec<EprProjectionView> = response.json().await?;
+    // This is the real contract — a {items,count} wrapper would fail this parse and
+    // leave the router empty. Asserting the bare-array shape guards that regression.
+    let views: Vec<EprProjectionView> = serde_json::from_slice(&resp.body).expect(
+        "response body must deserialize as a bare Vec<EprProjectionView> — the doorway contract",
+    );
 
     assert_eq!(
-        items.len(),
+        views.len(),
         1,
         "must return exactly one projection, got {}",
-        items.len()
+        views.len()
     );
-
-    assert_eq!(
-        items[0]["urlPath"].as_str().unwrap_or(""),
-        "/lamad",
-        "urlPath must match seeded value"
-    );
-    assert_eq!(
-        items[0]["eprId"].as_str().unwrap_or(""),
-        "lamad-spa",
-        "eprId must be lamad-spa"
-    );
+    assert_eq!(views[0].url_path, "/lamad", "url_path must match seeded value");
+    assert_eq!(views[0].epr_id, "lamad-spa", "epr_id must be lamad-spa");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

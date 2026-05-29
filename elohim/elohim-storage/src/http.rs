@@ -8228,10 +8228,12 @@ impl HttpServer {
         }
         let mut conn = self.get_diesel_conn()?;
         let views = db::rea_commitments::find_active_projections(&mut conn, ctx, doorway_id)?;
-        Ok(response::ok(&serde_json::json!({
-            "items": views,
-            "count": views.len(),
-        })))
+        // Return a BARE JSON array — the sole consumer is the doorway EprRouter
+        // (doorway-service epr_router.rs::fetch_projections_from_storage), which
+        // deserializes the body directly as `Vec<EprProjectionView>`. The {items,count}
+        // wrapper used by other /db list routes would fail that deserialize and leave
+        // the router empty. Do not wrap.
+        Ok(response::ok(&views))
     }
 
     /// Expose the db pool for integration test assertions on
