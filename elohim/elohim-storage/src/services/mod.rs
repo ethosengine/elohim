@@ -76,6 +76,7 @@ pub mod reciprocity_view;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
 pub mod relationship_service;
+pub mod replicates_dwelling_service;
 pub mod replicates_dwelling_validator;
 pub mod replication_prioritizer;
 pub mod republish_epr_validator;

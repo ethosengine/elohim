@@ -31,10 +31,152 @@ pub enum ValidationError {
 /// Computed by peer_capacity_service before calling this validator.
 #[derive(Debug, Clone, Default)]
 pub struct ProviderPledgedState {
-    pub total_raw_bytes:        u64,
+    pub total_raw_bytes: u64,
     pub pledged_dwelling_bytes: u64,
     pub pledged_collective_bytes: u64,
-    pub pledged_commons_bytes:    u64,
+    pub pledged_commons_bytes: u64,
+}
+
+/// Validate a `replicates-dwelling` payload at **commitment-author time**.
+///
+/// Runs schema check + collective_steward guard + donut check. Does NOT run
+/// the substrate `bounds_validator` (that is an event-time gate: it checks
+/// whether an economic EVENT is covered by an already-notarized commitment;
+/// at author time the commitment does not yet exist in the conductor, so
+/// `CommitmentNotFound` would always fire).
+///
+/// Use this from the commitment writer (storage-direct path). Use
+/// `validate_replicates_dwelling` from event-time enforcement paths.
+pub fn validate_for_creation(
+    event_payload: &serde_json::Value,
+    provider_state: &ProviderPledgedState,
+) -> Result<(), ValidationError> {
+    validate_payload_schema(event_payload)?;
+
+    let provider_role = event_payload["provider_role"].as_str().unwrap_or("");
+    if provider_role == "collective_steward" {
+        return Err(ValidationError::CollectiveStewardModeNotYetSupported);
+    }
+
+    donut_check(event_payload, provider_state)?;
+    Ok(())
+}
+
+/// Validate a typed [`ReplicatesDwellingPayload`] at commitment-author time.
+///
+/// Equivalent to [`validate_for_creation`] but accepts the typed struct
+/// directly — avoids a JSON round-trip via `serde_json::Value` (which would
+/// produce camelCase keys incompatible with the snake_case validator).
+///
+/// Use this from the commitment writer (`replicates_dwelling_service`).
+pub fn validate_typed_for_creation(
+    payload: &elohim_views::replicates_dwelling::ReplicatesDwellingPayload,
+    provider_state: &ProviderPledgedState,
+) -> Result<(), ValidationError> {
+    use elohim_views::replicates_dwelling::ProviderRole;
+
+    // 1. Structural checks on the typed fields.
+    if payload.action != "replicates-dwelling" {
+        return Err(ValidationError::Schema(
+            "action must be 'replicates-dwelling'".into(),
+        ));
+    }
+    if payload.provider_dwelling_hub_id.is_empty() {
+        return Err(ValidationError::Schema(
+            "provider_dwelling_hub_id must not be empty".into(),
+        ));
+    }
+    if payload.recipient_dwelling_hub_id.is_empty() {
+        return Err(ValidationError::Schema(
+            "recipient_dwelling_hub_id must not be empty".into(),
+        ));
+    }
+    if payload.capacity_bytes == 0 {
+        return Err(ValidationError::Schema("capacity_bytes must be > 0".into()));
+    }
+    if payload.valid_from.is_empty() || payload.valid_until.is_empty() {
+        return Err(ValidationError::Schema(
+            "valid_from and valid_until must not be empty".into(),
+        ));
+    }
+
+    // 2. Collective_steward mode reserved this sprint.
+    if payload.provider_role == ProviderRole::CollectiveSteward {
+        return Err(ValidationError::CollectiveStewardModeNotYetSupported);
+    }
+
+    // 3. Donut check via ratio_attestation fields.
+    let provenance = constitutional_ratio_registry::effective_ratios();
+    let effective = provenance.ratios;
+    let manifest_cid = provenance.manifest_cid;
+    let att = &payload.ratio_attestation;
+
+    // (a) Sum-to-100
+    let sum = att.commons_pct as u16
+        + att.dwelling_pct as u16
+        + att.collective_pct as u16
+        + att.free_pct as u16;
+    if sum != 100 {
+        return Err(ValidationError::ConstitutionalRatio(format!(
+            "ratio_attestation pct sum {sum} != 100"
+        )));
+    }
+
+    // (b) Attested values must match effective ratios.
+    if att.commons_pct != effective.commons_pct {
+        return Err(ValidationError::ConstitutionalRatio(format!(
+            "attested commons_pct {} != effective {} (manifest {})",
+            att.commons_pct, effective.commons_pct, manifest_cid
+        )));
+    }
+    if att.dwelling_pct != effective.dwelling_pct {
+        return Err(ValidationError::ConstitutionalRatio(format!(
+            "attested dwelling_pct {} != effective {}",
+            att.dwelling_pct, effective.dwelling_pct
+        )));
+    }
+    if att.collective_pct != effective.collective_pct {
+        return Err(ValidationError::ConstitutionalRatio(format!(
+            "attested collective_pct {} != effective {}",
+            att.collective_pct, effective.collective_pct
+        )));
+    }
+    if att.free_pct != effective.free_pct {
+        return Err(ValidationError::ConstitutionalRatio(format!(
+            "attested free_pct {} != effective {}",
+            att.free_pct, effective.free_pct
+        )));
+    }
+
+    // (c) Ceiling check: new dwelling pledge must not push above effective ceiling.
+    let total = provider_state.total_raw_bytes.max(1);
+    let new_dwelling = provider_state.pledged_dwelling_bytes + payload.capacity_bytes;
+    let new_dwelling_pct = ((new_dwelling as u128 * 100) / total as u128) as u64;
+    if new_dwelling_pct as u8 > effective.dwelling_pct {
+        return Err(ValidationError::ConstitutionalRatio(format!(
+            "adding {} would push dwelling_pct to {}, above effective ceiling {}",
+            payload.capacity_bytes, new_dwelling_pct, effective.dwelling_pct
+        )));
+    }
+
+    // (d) Floor check via declaration.
+    if att.commons_pct < constitutional_ratio_registry::COMMONS_MIN_FLOOR_PCT {
+        return Err(ValidationError::ConstitutionalRatio(format!(
+            "attested commons_pct {} below DNA floor {}",
+            att.commons_pct,
+            constitutional_ratio_registry::COMMONS_MIN_FLOOR_PCT
+        )));
+    }
+
+    // (e) Provenance match.
+    if att.effective_ratio_cid != manifest_cid {
+        return Err(ValidationError::ConstitutionalRatio(format!(
+            "ratio_attestation effective_ratio_cid {} != current manifest {}",
+            att.effective_ratio_cid, manifest_cid
+        )));
+    }
+
+    Ok(())
 }
 
 pub async fn validate_replicates_dwelling<F: CommitmentFetcher, R: RateHistory>(
@@ -65,10 +207,17 @@ pub async fn validate_replicates_dwelling<F: CommitmentFetcher, R: RateHistory>(
 
 fn validate_payload_schema(payload: &serde_json::Value) -> Result<(), ValidationError> {
     let required = [
-        "action", "provider_dwelling_hub_id", "recipient_dwelling_hub_id",
-        "provider_role", "capacity_bytes", "scope_filter",
-        "valid_from", "valid_until", "grace_period_days",
-        "rotation_ttl_days", "ratio_attestation",
+        "action",
+        "provider_dwelling_hub_id",
+        "recipient_dwelling_hub_id",
+        "provider_role",
+        "capacity_bytes",
+        "scope_filter",
+        "valid_from",
+        "valid_until",
+        "grace_period_days",
+        "rotation_ttl_days",
+        "ratio_attestation",
     ];
     for field in required {
         if payload.get(field).is_none() {
@@ -76,16 +225,25 @@ fn validate_payload_schema(payload: &serde_json::Value) -> Result<(), Validation
         }
     }
     if payload["action"] != "replicates-dwelling" {
-        return Err(ValidationError::Schema("action must be 'replicates-dwelling'".into()));
+        return Err(ValidationError::Schema(
+            "action must be 'replicates-dwelling'".into(),
+        ));
     }
     let provider_role = payload["provider_role"].as_str().unwrap_or("");
     if provider_role != "steward_mutual" && provider_role != "collective_steward" {
-        return Err(ValidationError::Schema(format!("unknown provider_role: {provider_role}")));
+        return Err(ValidationError::Schema(format!(
+            "unknown provider_role: {provider_role}"
+        )));
     }
     if provider_role == "collective_steward" {
-        let via = payload.get("via_collective_hub_id").and_then(|v| v.as_str()).unwrap_or("");
+        let via = payload
+            .get("via_collective_hub_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         if via.is_empty() {
-            return Err(ValidationError::Schema("collective_steward requires via_collective_hub_id".into()));
+            return Err(ValidationError::Schema(
+                "collective_steward requires via_collective_hub_id".into(),
+            ));
         }
     }
     Ok(())
@@ -100,7 +258,8 @@ fn donut_check(
     let manifest_cid = provenance.manifest_cid;
 
     let capacity_bytes = payload["capacity_bytes"].as_u64().unwrap_or(0);
-    let attestation = payload.get("ratio_attestation")
+    let attestation = payload
+        .get("ratio_attestation")
         .ok_or_else(|| ValidationError::ConstitutionalRatio("missing ratio_attestation".into()))?;
     let attested_commons = attestation["commons_pct"].as_u64().unwrap_or(0) as u8;
     let attested_dwelling = attestation["dwelling_pct"].as_u64().unwrap_or(0) as u8;
@@ -109,9 +268,14 @@ fn donut_check(
     let attested_cid = attestation["effective_ratio_cid"].as_str().unwrap_or("");
 
     // (a) Sum-to-100
-    let sum = attested_commons as u16 + attested_dwelling as u16 + attested_collective as u16 + attested_free as u16;
+    let sum = attested_commons as u16
+        + attested_dwelling as u16
+        + attested_collective as u16
+        + attested_free as u16;
     if sum != 100 {
-        return Err(ValidationError::ConstitutionalRatio(format!("ratio_attestation pct sum {sum} != 100")));
+        return Err(ValidationError::ConstitutionalRatio(format!(
+            "ratio_attestation pct sum {sum} != 100"
+        )));
     }
 
     // (b) Attested values must match clamped effective_ratios (declaration matches manifest)
@@ -172,11 +336,24 @@ fn donut_check(
 fn project_to_event_for_validation(payload: &serde_json::Value) -> EventForValidation {
     EventForValidation {
         action: payload["action"].as_str().unwrap_or("").to_string(),
-        performer: payload["provider_dwelling_hub_id"].as_str().unwrap_or("").to_string(),
-        bounded_by: payload["recipient_dwelling_hub_id"].as_str().unwrap_or("").to_string(),
-        target_epr_id: payload["recipient_dwelling_hub_id"].as_str().unwrap_or("").to_string(),
+        performer: payload["provider_dwelling_hub_id"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        bounded_by: payload["recipient_dwelling_hub_id"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        target_epr_id: payload["recipient_dwelling_hub_id"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
         reach: "household".into(),
-        signed_at: payload.get("signed_at").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        signed_at: payload
+            .get("signed_at")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
     }
 }
 
@@ -230,7 +407,9 @@ mod tests {
         let rate = MockRateHistory::new();
         let result = validate_replicates_dwelling(&payload, &fetcher, &rate, &fresh_state()).await;
         match result {
-            Err(ValidationError::Bounds(b)) => assert_eq!(b.kind, ViolationKind::CommitmentNotFound),
+            Err(ValidationError::Bounds(b)) => {
+                assert_eq!(b.kind, ViolationKind::CommitmentNotFound)
+            }
             other => panic!("expected Bounds(CommitmentNotFound), got {other:?}"),
         }
     }
@@ -242,18 +421,24 @@ mod tests {
         let fetcher = MockCommitmentFetcher::new();
         let rate = MockRateHistory::new();
         let result = validate_replicates_dwelling(&payload, &fetcher, &rate, &fresh_state()).await;
-        assert!(matches!(result, Err(ValidationError::CollectiveStewardModeNotYetSupported)));
+        assert!(matches!(
+            result,
+            Err(ValidationError::CollectiveStewardModeNotYetSupported)
+        ));
     }
 
     #[tokio::test]
     async fn ratio_attestation_below_floor_rejected() {
         let mut payload = well_formed_payload("steward_mutual", 30_000_000_000);
-        payload["ratio_attestation"]["commons_pct"] = serde_json::json!(5);  // below 10 floor
-        payload["ratio_attestation"]["free_pct"] = serde_json::json!(30);    // make sum=100
+        payload["ratio_attestation"]["commons_pct"] = serde_json::json!(5); // below 10 floor
+        payload["ratio_attestation"]["free_pct"] = serde_json::json!(30); // make sum=100
         let fetcher = MockCommitmentFetcher::new();
         let rate = MockRateHistory::new();
         let result = validate_replicates_dwelling(&payload, &fetcher, &rate, &fresh_state()).await;
-        assert!(matches!(result, Err(ValidationError::ConstitutionalRatio(_))));
+        assert!(matches!(
+            result,
+            Err(ValidationError::ConstitutionalRatio(_))
+        ));
     }
 
     #[tokio::test]
@@ -265,7 +450,10 @@ mod tests {
         let fetcher = MockCommitmentFetcher::new();
         let rate = MockRateHistory::new();
         let result = validate_replicates_dwelling(&payload, &fetcher, &rate, &state).await;
-        assert!(matches!(result, Err(ValidationError::ConstitutionalRatio(_))));
+        assert!(matches!(
+            result,
+            Err(ValidationError::ConstitutionalRatio(_))
+        ));
     }
 
     #[tokio::test]
