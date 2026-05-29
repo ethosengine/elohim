@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use crate::db::{self, content_diesel, context::AppContext, DbPool};
+use crate::db::content_diesel::ContentProjectionPatch;
 use crate::error::StorageError;
 use crate::generated_enums::{ALL_CONTENT_FORMATS, ALL_CONTENT_TYPES, ALL_REACH_LEVELS};
 use crate::hc_client::HcClient;
@@ -277,7 +278,7 @@ impl ContentService {
         // The DNA target field is `blob_cid`. View carries `blob_hash`.
         let new_blob_cid = view.blob_hash.clone();
 
-        if existing.content.dht_anchor_hash.is_none() {
+        let output_bytes = if existing.content.dht_anchor_hash.is_none() {
             // Lazy-migration bootstrap: publish the full entry, applying patch
             // on top of the existing SQL row's data. Fields not patched fall
             // through to the existing row's values.
@@ -322,7 +323,7 @@ impl ContentService {
                 content_size_bytes: existing.content.content_size_bytes.map(|n| n as u64),
                 content_hash: existing.content.blob_hash.clone(),
             };
-            conductor_writes::call_create_content(hc, &bootstrap).await?;
+            conductor_writes::call_create_content(hc, &bootstrap).await?
         } else {
             // Standard update: only patched fields cross the wire.
             let patch = lamad_types::UpdateContentInput {
@@ -339,31 +340,62 @@ impl ContentService {
                 description: view.description.clone(),
                 metadata_json: merged_metadata_json.clone(),
             };
-            conductor_writes::call_update_content(hc, &patch).await?;
-        }
+            conductor_writes::call_update_content(hc, &patch).await?
+        };
 
-        // Wait for the projection to land. The post-commit signal subscriber
-        // (wired in Task 6.5) routes ContentCommitted → upsert_with_anchor →
-        // SQL row; in-process delivery is tens of ms. Cap at 1s to bound
-        // pathological cases.
-        for _ in 0..20 {
+        // Eagerly project the SQL row from the zome output (Gap-F fix).
+        //
+        //    The conductor returned successfully and gave us the committed
+        //    Content entry + ActionHash. We project synchronously here using
+        //    the same upsert_with_anchor the signal handler calls, with the
+        //    same field mapping (ContentEntry → ContentProjectionPatch).
+        //    This is idempotent with the async signal: both derive the same
+        //    patch fields from the same committed entry, so a later signal
+        //    arrival produces the same SQL row.
+        //
+        //    action_hash string form: holo_hash ActionHash Display → "uhCkk…"
+        //    base32 form, identical to what the signal carries.
+        let output = rmp_serde::from_slice::<lamad_types::ContentOutput>(&output_bytes)
+            .map_err(|e| {
+                StorageError::Internal(format!(
+                    "conductor returned success for content write but output \
+                     could not be decoded as ContentOutput: {e}"
+                ))
+            })?;
+        let action_hash_str = format!("{}", output.action_hash);
+        let oc = &output.content;
+        let size_i32 = oc
+            .content_size_bytes
+            .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+        let patch = ContentProjectionPatch {
+            blob_cid: oc.blob_cid.clone(),
+            content_size_bytes: size_i32,
+            title: Some(oc.title.clone()),
+            description: Some(oc.description.clone()),
+            content_type: Some(oc.content_type.clone()),
+            content_format: Some(oc.content_format.clone()),
+            reach: Some(oc.reach.clone()),
+            metadata_json: Some(oc.metadata_json.clone()),
+        };
+        {
             let mut conn = self.conn()?;
-            if let Some(updated) =
-                content_diesel::get_content_with_tags(&mut conn, &self.ctx, id, false)?
-            {
-                if updated.content.dht_anchor_hash.is_some() {
-                    self.events
-                        .emit(StorageEvent::ContentUpdated { id: id.to_string() });
-                    return Ok(updated);
-                }
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            content_diesel::upsert_with_anchor(&mut conn, &self.ctx, id, patch, &action_hash_str)?;
         }
 
-        Err(StorageError::Internal(format!(
-            "content {id} written via conductor but projection did not land within 1s — \
-             check rea_projection signal pipeline (subscribe_rea_projection_signals in main.rs)"
-        )))
+        let updated = {
+            let mut conn = self.conn()?;
+            content_diesel::get_content_with_tags(&mut conn, &self.ctx, id, false)?
+                .ok_or_else(|| {
+                    StorageError::Internal(format!(
+                        "content {id} projection written but row missing on re-read — \
+                         this should not happen; check upsert_with_anchor for id"
+                    ))
+                })?
+        };
+
+        self.events
+            .emit(StorageEvent::ContentUpdated { id: id.to_string() });
+        Ok(updated)
     }
 
     /// Delete content by ID

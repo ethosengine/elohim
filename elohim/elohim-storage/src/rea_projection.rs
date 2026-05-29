@@ -278,7 +278,11 @@ pub struct EconomicEventEntry {
 /// string or invalid JSON → empty Vec. Used for the `_json` resource and
 /// scope fields. Drops empty entries so downstream code can treat `is_empty`
 /// as "no value".
-fn parse_json_strings(raw: Option<&str>) -> Vec<String> {
+///
+/// Public so the eager-projection path in the service layer can share the
+/// same logic without duplicating it (Gap-F fix — see
+/// `services/rea_commitment_service.rs` and `services/content_service.rs`).
+pub fn parse_json_strings(raw: Option<&str>) -> Vec<String> {
     let s = match raw {
         Some(s) if !s.is_empty() => s,
         _ => return Vec::new(),
@@ -290,7 +294,10 @@ fn parse_json_strings(raw: Option<&str>) -> Vec<String> {
 /// Storage's CreateReaCommitmentInput stores resource_classified_as and
 /// in_scope_of as single-value `Option<String>` columns; downstream readers
 /// can reconstruct multi-value via the DHT entry if needed.
-fn first_or_none(v: Vec<String>) -> Option<String> {
+///
+/// Public so the eager-projection path in the service layer can share the
+/// same logic (Gap-F fix).
+pub fn first_or_none(v: Vec<String>) -> Option<String> {
     v.into_iter().find(|s| !s.is_empty())
 }
 
