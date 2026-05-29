@@ -78,8 +78,9 @@ use holochain_types::signal::Signal;
 
 use crate::db::DbPool;
 use crate::reconcile::signal_stream::{
-    AgentPeerBindingSignal, AttestationKind, DeviceArchetype, DnaSignal, DnaSignalStream,
-    KeyRotationSignal, RevocationAttestationSignal, SignalCursor, SignalStreamError,
+    AgentPeerBindingSignal, AttestationKind, CollectiveProjectedSignal, DeviceArchetype, DnaSignal,
+    DnaSignalStream, KeyRotationSignal, MembershipProjectedSignal, RevocationAttestationSignal,
+    SignalCursor, SignalStreamError,
 };
 use crate::signals::{ImagodeiSignal, RecoveryV2Signal};
 
@@ -261,6 +262,54 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
                 binding_action_hash: action_hash,
                 superseded_by,
                 emitted_at,
+            }))
+        }
+
+        // Wave 2 T5: project a Collective DHT entry into the `collectives` table.
+        //
+        // The canonical Collective CID is `collective:{action_hash}`. The
+        // `governance_layer` default for live collectives is "community" —
+        // household-ness (governance_layer = "family") is steward/seed-set via
+        // `CreateCollectiveInput`, never DNA-derived. The DNA Collective entry
+        // carries no `governance_layer` field; stewards set it post-coherence.
+        ImagodeiSignal::CollectiveCommitted {
+            action_hash,
+            collective,
+            ..
+        } => {
+            let collective_cid = format!("collective:{action_hash}");
+            Some(DnaSignal::CollectiveProjected(CollectiveProjectedSignal {
+                collective_cid: collective_cid.clone(),
+                action_hash,
+                display_name: collective.display_name,
+                founder_agent_cid: collective.founder_agent_cid,
+                anchor_agreement_cid: collective.anchor_agreement_cid,
+            }))
+        }
+
+        // Wave 2 T5: project a Membership DHT entry into `collective_participations`.
+        //
+        // The idempotency key is `dht_anchor_hash = action_hash`.
+        // `human_id` = `member_cid` (the canonical member_cid doubles as
+        // human_id for live agent members; NOT NULL constraint satisfied).
+        // `departed_at` is set when `withdrawn_at_block_height.is_some()`.
+        ImagodeiSignal::MembershipCommitted {
+            action_hash,
+            membership,
+            ..
+        } => {
+            let departed_at = if membership.withdrawn_at_block_height.is_some() {
+                Some(Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string())
+            } else {
+                None
+            };
+            Some(DnaSignal::MembershipProjected(MembershipProjectedSignal {
+                action_hash,
+                collective_cid: membership.collective_cid,
+                member_cid: membership.member_cid,
+                member_kind: membership.member_kind.as_db_str().to_string(),
+                role_context: membership.role.as_db_str().to_string(),
+                departed_at,
             }))
         }
 
@@ -956,5 +1005,199 @@ mod tests {
         assert_eq!(parse_device_archetype("desktop"), DeviceArchetype::Desktop);
         assert_eq!(parse_device_archetype("mobile"), DeviceArchetype::Mobile);
         assert_eq!(parse_device_archetype("steward"), DeviceArchetype::Steward);
+    }
+
+    // -----------------------------------------------------------------------
+    // Wave 2 T5: CollectiveCommitted → DnaSignal::CollectiveProjected
+    // -----------------------------------------------------------------------
+
+    fn collective_committed_value() -> serde_json::Value {
+        // ImagodeiSignal uses `tag = "type", content = "payload"`.
+        serde_json::json!({
+            "type": "CollectiveCommitted",
+            "payload": {
+                "action_hash": "uhCkkCollectiveActionHash0001",
+                "entry_hash": "uhCEkCollectiveEntryHash0001",
+                "collective": {
+                    "founder_agent_cid": "agent:uhCAkFounderPubKey0001",
+                    "charter": "Our shared purpose",
+                    "display_name": "Dowell Family",
+                    "created_at_block_height": 42u64,
+                    "salt": "deadbeefdeadbeefdeadbeefdeadbeef",
+                    "anchor_agreement_cid": null
+                },
+                "author": "uhCAkFounderPubKey0001"
+            }
+        })
+    }
+
+    fn membership_committed_value_active() -> serde_json::Value {
+        serde_json::json!({
+            "type": "MembershipCommitted",
+            "payload": {
+                "action_hash": "uhCkkMembershipActionHash0001",
+                "entry_hash": "uhCEkMembershipEntryHash0001",
+                "membership": {
+                    "member_cid": "agent:uhCAkAlicePubKey0001",
+                    "member_kind": "Person",
+                    "collective_cid": "collective:uhCkkCollectiveActionHash0001",
+                    "role": "Contributor",
+                    "sponsor_cid": null,
+                    "joined_at_block_height": 43u64,
+                    "withdrawn_at_block_height": null
+                },
+                "author": "uhCAkAlicePubKey0001"
+            }
+        })
+    }
+
+    fn membership_committed_value_withdrawn() -> serde_json::Value {
+        serde_json::json!({
+            "type": "MembershipCommitted",
+            "payload": {
+                "action_hash": "uhCkkMembershipActionHash0002",
+                "entry_hash": "uhCEkMembershipEntryHash0002",
+                "membership": {
+                    "member_cid": "agent:uhCAkAlicePubKey0001",
+                    "member_kind": "Person",
+                    "collective_cid": "collective:uhCkkCollectiveActionHash0001",
+                    "role": "Contributor",
+                    "sponsor_cid": null,
+                    "joined_at_block_height": 43u64,
+                    "withdrawn_at_block_height": 99u64
+                },
+                "author": "uhCAkAlicePubKey0001"
+            }
+        })
+    }
+
+    /// T5: CollectiveCommitted translates to DnaSignal::CollectiveProjected with
+    /// the canonical collective_cid = `collective:{action_hash}`.
+    #[test]
+    fn translates_collective_committed() {
+        let bytes = to_msgpack(&collective_committed_value());
+        let dns = try_decode_and_translate(&bytes, None).expect("should translate");
+        match dns {
+            DnaSignal::CollectiveProjected(sig) => {
+                assert_eq!(sig.action_hash, "uhCkkCollectiveActionHash0001");
+                assert_eq!(
+                    sig.collective_cid, "collective:uhCkkCollectiveActionHash0001",
+                    "collective_cid must be collective:{{action_hash}}"
+                );
+                assert_eq!(sig.display_name, "Dowell Family");
+                assert_eq!(sig.founder_agent_cid, "agent:uhCAkFounderPubKey0001");
+                assert!(sig.anchor_agreement_cid.is_none());
+            }
+            other => panic!("expected CollectiveProjected, got {other:?}"),
+        }
+    }
+
+    /// T5: active MembershipCommitted translates to DnaSignal::MembershipProjected
+    /// with departed_at = None.
+    #[test]
+    fn translates_membership_committed_active() {
+        let bytes = to_msgpack(&membership_committed_value_active());
+        let dns = try_decode_and_translate(&bytes, None).expect("should translate");
+        match dns {
+            DnaSignal::MembershipProjected(sig) => {
+                assert_eq!(sig.action_hash, "uhCkkMembershipActionHash0001");
+                assert_eq!(
+                    sig.collective_cid,
+                    "collective:uhCkkCollectiveActionHash0001"
+                );
+                assert_eq!(sig.member_cid, "agent:uhCAkAlicePubKey0001");
+                assert_eq!(sig.member_kind, "person");
+                assert_eq!(sig.role_context, "contributor");
+                assert!(
+                    sig.departed_at.is_none(),
+                    "active membership must have departed_at = None"
+                );
+            }
+            other => panic!("expected MembershipProjected, got {other:?}"),
+        }
+    }
+
+    /// T5: withdrawn MembershipCommitted translates to DnaSignal::MembershipProjected
+    /// with departed_at set to an ISO 8601 string.
+    #[test]
+    fn translates_membership_committed_withdrawn() {
+        let bytes = to_msgpack(&membership_committed_value_withdrawn());
+        let dns = try_decode_and_translate(&bytes, None).expect("should translate");
+        match dns {
+            DnaSignal::MembershipProjected(sig) => {
+                assert_eq!(sig.action_hash, "uhCkkMembershipActionHash0002");
+                assert!(
+                    sig.departed_at.is_some(),
+                    "withdrawn membership must have departed_at set"
+                );
+                // Verify the departed_at value looks like an ISO 8601 timestamp.
+                let ts = sig.departed_at.unwrap();
+                assert!(ts.contains('T'), "departed_at must be ISO 8601: {ts}");
+            }
+            other => panic!("expected MembershipProjected, got {other:?}"),
+        }
+    }
+
+    /// T5: MemberKind::Collective maps to member_kind = "collective".
+    #[test]
+    fn translates_membership_committed_collective_member_kind() {
+        let value = serde_json::json!({
+            "type": "MembershipCommitted",
+            "payload": {
+                "action_hash": "uhCkkMembershipActionHash0003",
+                "entry_hash": "uhCEkMembershipEntryHash0003",
+                "membership": {
+                    "member_cid": "collective:uhCkkSubCollectiveHash",
+                    "member_kind": "Collective",
+                    "collective_cid": "collective:uhCkkCollectiveActionHash0001",
+                    "role": "Steward",
+                    "sponsor_cid": "founder",
+                    "joined_at_block_height": 50u64,
+                    "withdrawn_at_block_height": null
+                },
+                "author": "uhCAkSomeAgentKey"
+            }
+        });
+        let bytes = to_msgpack(&value);
+        let dns = try_decode_and_translate(&bytes, None).expect("should translate");
+        match dns {
+            DnaSignal::MembershipProjected(sig) => {
+                assert_eq!(sig.member_kind, "collective");
+                assert_eq!(sig.role_context, "steward");
+                assert!(sig.departed_at.is_none());
+            }
+            other => panic!("expected MembershipProjected, got {other:?}"),
+        }
+    }
+
+    /// T5: ElohimAgent member kind maps to "elohim_agent".
+    #[test]
+    fn translates_membership_committed_elohim_agent_member_kind() {
+        let value = serde_json::json!({
+            "type": "MembershipCommitted",
+            "payload": {
+                "action_hash": "uhCkkMembershipActionHash0004",
+                "entry_hash": "uhCEkMembershipEntryHash0004",
+                "membership": {
+                    "member_cid": "agent:uhCAkElohimAgentKey",
+                    "member_kind": "ElohimAgent",
+                    "collective_cid": "collective:uhCkkCollectiveActionHash0001",
+                    "role": "Observer",
+                    "sponsor_cid": null,
+                    "joined_at_block_height": 55u64,
+                    "withdrawn_at_block_height": null
+                },
+                "author": "uhCAkElohimAgentKey"
+            }
+        });
+        let bytes = to_msgpack(&value);
+        let dns = try_decode_and_translate(&bytes, None).expect("should translate");
+        match dns {
+            DnaSignal::MembershipProjected(sig) => {
+                assert_eq!(sig.member_kind, "elohim_agent");
+                assert_eq!(sig.role_context, "observer");
+            }
+            other => panic!("expected MembershipProjected, got {other:?}"),
+        }
     }
 }

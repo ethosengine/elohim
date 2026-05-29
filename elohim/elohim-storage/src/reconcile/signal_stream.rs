@@ -22,6 +22,8 @@
 //! | *(future create_agent_peer_binding)* | `DnaSignal::AgentPeerBinding` |
 //! | `PortalHostCreated`              | `DnaSignal::PortalHostCreated`   |
 //! | `PortalHostRemoved`              | `DnaSignal::PortalHostRemoved`   |
+//! | `CollectiveCommitted`            | `DnaSignal::CollectiveProjected` |
+//! | `MembershipCommitted`            | `DnaSignal::MembershipProjected` |
 //!
 //! The storage-internal shape is deliberately decoupled from the DNA-side enum
 //! to keep the controller's interface stable across DNA evolution.
@@ -301,6 +303,60 @@ pub enum DnaSignal {
     PortalHostCreated(PortalHostCreatedSignal),
     /// A portal host (doorway registration) has been removed from the DHT.
     PortalHostRemoved(PortalHostRemovedSignal),
+    /// A `Collective` DHT entry has been committed (Wave 2 T5 — prioritizer epic).
+    ///
+    /// Drives `ReconcileController::on_collective_projected` which upserts the
+    /// `collectives` row with `collective_cid = collective:{action_hash}`.
+    CollectiveProjected(CollectiveProjectedSignal),
+    /// A `Membership` DHT entry has been committed (Wave 2 T5 — prioritizer epic).
+    ///
+    /// Drives `ReconcileController::on_membership_projected` which upserts a
+    /// `collective_participations` row keyed by `dht_anchor_hash`.
+    MembershipProjected(MembershipProjectedSignal),
+}
+
+// ---------------------------------------------------------------------------
+// CollectiveProjectedSignal + MembershipProjectedSignal
+// ---------------------------------------------------------------------------
+
+/// Payload for `DnaSignal::CollectiveProjected`.
+///
+/// Carries enough information to upsert a `collectives` row with the canonical
+/// `collective_cid = collective:{action_hash}` without a round-trip to the
+/// conductor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CollectiveProjectedSignal {
+    /// ActionHash (base64) of the `Collective` DHT entry.
+    pub action_hash: String,
+    /// Canonical Collective CID: `collective:{action_hash}`.
+    pub collective_cid: String,
+    /// Display name from the Collective entry.
+    pub display_name: String,
+    /// Founder agent CID (the creating agent).
+    pub founder_agent_cid: String,
+    /// Present when this Collective was instantiated from a `CollabAgreement`.
+    pub anchor_agreement_cid: Option<String>,
+}
+
+/// Payload for `DnaSignal::MembershipProjected`.
+///
+/// Carries enough information to upsert a `collective_participations` row
+/// without a round-trip to the conductor. Idempotency key: `dht_anchor_hash`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MembershipProjectedSignal {
+    /// ActionHash (base64) of the `Membership` DHT entry.  Used as
+    /// `dht_anchor_hash` in `collective_participations`.
+    pub action_hash: String,
+    /// Canonical Collective CID: `collective:{collective_action_hash}`.
+    pub collective_cid: String,
+    /// Canonical member CID (`agent:{pubkey}` or `collective:{hash}`).
+    pub member_cid: String,
+    /// Storage `member_kind` string: `"person"` | `"collective"` | `"elohim_agent"`.
+    pub member_kind: String,
+    /// Storage `role_context` string: `"steward"` | `"contributor"` | `"observer"`.
+    pub role_context: String,
+    /// ISO 8601 string when `withdrawn_at_block_height` was set; `None` if active.
+    pub departed_at: Option<String>,
 }
 
 // ---------------------------------------------------------------------------

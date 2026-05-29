@@ -846,6 +846,115 @@ pub enum ImagodeiSignal {
         action_hash: String,
         binding: AgentPeerBindingPayload,
     },
+    /// Emitted by the imagodei coordinator `post_commit` when a `Collective`
+    /// entry is committed (Wave 2 T4 — prioritizer epic).
+    ///
+    /// Consumed by `translate_imagodei` → `DnaSignal::CollectiveProjected` →
+    /// `ReconcileController::on_collective_projected` → upsert `collectives`
+    /// row with `collective_cid` = `collective:{action_hash}`.
+    ///
+    /// Ordering guarantee: the DNA emits `CollectiveCommitted` before
+    /// `MembershipCommitted` in the same batch so the storage projector can
+    /// upsert the Collective row before its memberships arrive.
+    CollectiveCommitted {
+        action_hash: String,
+        entry_hash: String,
+        collective: CollectivePayload,
+        author: String,
+    },
+    /// Emitted by the imagodei coordinator `post_commit` when a `Membership`
+    /// entry is committed (Wave 2 T4 — prioritizer epic).
+    ///
+    /// Consumed by `translate_imagodei` → `DnaSignal::MembershipProjected` →
+    /// `ReconcileController::on_membership_projected` → upsert
+    /// `collective_participations` keyed by `dht_anchor_hash = action_hash`.
+    MembershipCommitted {
+        action_hash: String,
+        entry_hash: String,
+        membership: MembershipPayload,
+        author: String,
+    },
+}
+
+// =============================================================================
+// CollectivePayload / MembershipPayload
+// =============================================================================
+//
+// Storage-side mirrors of the imagodei integrity `Collective` and `Membership`
+// entry structs. Field names and types must match the DNA exactly — serde
+// deserialises the signal payload over the wire and a name mismatch silently
+// drops the signal.
+//
+// DNA source of truth: `imagodei_integrity::qahal`
+// (`elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/qahal.rs`).
+
+/// Mirror of `imagodei_integrity::Collective`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollectivePayload {
+    pub founder_agent_cid: String,
+    pub charter: String,
+    pub display_name: String,
+    pub created_at_block_height: u64,
+    pub salt: String,
+    /// Non-null when this Collective was instantiated from a `CollabAgreement`.
+    #[serde(default)]
+    pub anchor_agreement_cid: Option<String>,
+}
+
+/// Mirror of `imagodei_integrity::MemberKind`.
+///
+/// Serializes as the enum variant name (e.g. `"Person"`, `"Collective"`,
+/// `"ElohimAgent"`) matching the HDK `#[derive(Serialize, Deserialize)]` default.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum MemberKindPayload {
+    Person,
+    Collective,
+    ElohimAgent,
+}
+
+impl MemberKindPayload {
+    /// Map to the storage `member_kind` string used in `collective_participations`.
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            MemberKindPayload::Person => "person",
+            MemberKindPayload::Collective => "collective",
+            MemberKindPayload::ElohimAgent => "elohim_agent",
+        }
+    }
+}
+
+/// Mirror of `imagodei_integrity::MembershipRole`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum MembershipRolePayload {
+    Steward,
+    Contributor,
+    Observer,
+}
+
+impl MembershipRolePayload {
+    /// Map to the storage `role_context` string.
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            MembershipRolePayload::Steward => "steward",
+            MembershipRolePayload::Contributor => "contributor",
+            MembershipRolePayload::Observer => "observer",
+        }
+    }
+}
+
+/// Mirror of `imagodei_integrity::Membership`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MembershipPayload {
+    pub member_cid: String,
+    pub member_kind: MemberKindPayload,
+    pub collective_cid: String,
+    pub role: MembershipRolePayload,
+    #[serde(default)]
+    pub sponsor_cid: Option<String>,
+    pub joined_at_block_height: u64,
+    /// Set when the membership has been cleanly withdrawn.
+    #[serde(default)]
+    pub withdrawn_at_block_height: Option<u64>,
 }
 
 // =============================================================================

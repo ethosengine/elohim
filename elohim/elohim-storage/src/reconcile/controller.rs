@@ -40,8 +40,9 @@ use crate::projector::ManifestRegistry;
 use crate::reconcile::portal_host_handlers;
 use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
 use crate::reconcile::signal_stream::{
-    AgentPeerBindingSignal, DnaSignal, DnaSignalStream, KeyRevocationSignal, KeyRotationSignal,
-    PortalHostCreatedSignal, PortalHostRemovedSignal, RevocationAttestationSignal,
+    AgentPeerBindingSignal, CollectiveProjectedSignal, DnaSignal, DnaSignalStream,
+    KeyRevocationSignal, KeyRotationSignal, MembershipProjectedSignal, PortalHostCreatedSignal,
+    PortalHostRemovedSignal, RevocationAttestationSignal,
 };
 use crate::reconcile::sweep::sweep_on_revocation;
 
@@ -279,6 +280,16 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                 debug!(host_url = %p.host_url, "dispatching PortalHostRemoved signal");
                 self.observed_kinds.push("portalHostRemoved".into());
                 self.on_portal_host_removed(p).await
+            }
+            DnaSignal::CollectiveProjected(c) => {
+                debug!(collective_cid = %c.collective_cid, "dispatching CollectiveProjected signal");
+                self.observed_kinds.push("collectiveProjected".into());
+                self.on_collective_projected(c).await
+            }
+            DnaSignal::MembershipProjected(m) => {
+                debug!(collective_cid = %m.collective_cid, member_cid = %m.member_cid, "dispatching MembershipProjected signal");
+                self.observed_kinds.push("membershipProjected".into());
+                self.on_membership_projected(m).await
             }
         }
     }
@@ -661,6 +672,266 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         signal: PortalHostRemovedSignal,
     ) -> Result<(), ReconcileError> {
         portal_host_handlers::on_portal_host_removed(&self.db_pool, signal)
+    }
+
+    /// Wave 2 T5: upsert a `collectives` row from a `CollectiveCommitted`
+    /// imagodei DNA signal.
+    ///
+    /// The canonical Collective CID (`collective:{action_hash}`) is written to
+    /// the `collective_cid` column.  The `id` is set to `collective_cid` so
+    /// live DHT-created collectives are reachable by their CID before a steward
+    /// assigns a human-readable slug.  The `governance_layer` defaults to
+    /// `"community"` — household-ness (`"family"`) is steward/seed-set and
+    /// is never DNA-derived.  The `reach` defaults to `"community"` likewise.
+    ///
+    /// If no DB pool is wired (test stub constructed via `new()`), logs at
+    /// debug level and returns `Ok(())`.
+    async fn on_collective_projected(
+        &mut self,
+        signal: CollectiveProjectedSignal,
+    ) -> Result<(), ReconcileError> {
+        use crate::db::collectives::{create_collective, CreateCollectiveInput};
+        use crate::db::context::AppContext;
+
+        let pool = match self.db_pool.as_ref() {
+            Some(p) => p,
+            None => {
+                debug!(
+                    collective_cid = %signal.collective_cid,
+                    "on_collective_projected: no db_pool wired — projection write skipped"
+                );
+                return Ok(());
+            }
+        };
+
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(
+                    collective_cid = %signal.collective_cid,
+                    error = %e,
+                    "on_collective_projected: db pool checkout failed — projection write skipped"
+                );
+                return Ok(());
+            }
+        };
+
+        // Use the app_id from the pool's context; for signal projections the
+        // canonical h_app_id is "lamad" (the elohim protocol app). Callers that
+        // need a different scope should extend this with a configurable field.
+        let ctx = AppContext::new("lamad");
+        let input = CreateCollectiveInput {
+            id: signal.collective_cid.clone(),
+            name: signal.display_name.clone(),
+            description: None,
+            governance_layer: crate::db::models::governance_layers::COMMUNITY.to_string(),
+            constitutional_parent_id: None,
+            reach: "community".to_string(),
+            metadata_json: None,
+            created_by: Some(signal.founder_agent_cid.clone()),
+            // collective_cid is set to the canonical CID so the resolver can
+            // find the row both by id and by collective_cid.
+        };
+
+        // create_collective is an upsert (idempotent on id).  After the upsert
+        // we also stamp the collective_cid column so the Wave-2 resolver can
+        // locate rows by canonical CID.
+        match create_collective(&mut conn, &ctx, &input) {
+            Ok(_) => {
+                // Stamp collective_cid + slug on the freshly created row.
+                use crate::db::diesel_schema::collectives;
+                use diesel::prelude::*;
+                let _ = diesel::update(
+                    collectives::table
+                        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                        .filter(collectives::id.eq(&signal.collective_cid)),
+                )
+                .set((
+                    collectives::collective_cid.eq(Some(&signal.collective_cid)),
+                    // slug left NULL; steward sets it post-coherence.
+                ))
+                .execute(&mut conn)
+                .map_err(|e| {
+                    warn!(
+                        collective_cid = %signal.collective_cid,
+                        error = %e,
+                        "on_collective_projected: collective_cid stamp failed (non-fatal)"
+                    );
+                });
+                debug!(
+                    collective_cid = %signal.collective_cid,
+                    display_name = %signal.display_name,
+                    "collectives row upserted from DHT signal"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    collective_cid = %signal.collective_cid,
+                    error = %e,
+                    "on_collective_projected: create_collective upsert failed"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Wave 2 T5: upsert a `collective_participations` row from a
+    /// `MembershipCommitted` imagodei DNA signal.
+    ///
+    /// Idempotency key: `dht_anchor_hash = action_hash`.  Re-delivered signals
+    /// update the existing row rather than inserting a duplicate.
+    ///
+    /// `human_id` = `member_cid`: the canonical member_cid doubles as
+    /// `human_id` for live agent members (satisfying the NOT NULL constraint).
+    ///
+    /// `collective_id` is resolved to the `collectives.id` for `collective_cid`
+    /// if the row exists; if absent (race between Collective + Membership
+    /// commits), falls back to `collective_cid` so the row is not lost.
+    ///
+    /// If no DB pool is wired (test stub constructed via `new()`), logs at
+    /// debug level and returns `Ok(())`.
+    async fn on_membership_projected(
+        &mut self,
+        signal: MembershipProjectedSignal,
+    ) -> Result<(), ReconcileError> {
+        use crate::db::context::AppContext;
+        use crate::db::diesel_schema::{collective_participations, collectives};
+        use diesel::prelude::*;
+
+        let pool = match self.db_pool.as_ref() {
+            Some(p) => p,
+            None => {
+                debug!(
+                    member_cid = %signal.member_cid,
+                    collective_cid = %signal.collective_cid,
+                    "on_membership_projected: no db_pool wired — projection write skipped"
+                );
+                return Ok(());
+            }
+        };
+
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(
+                    member_cid = %signal.member_cid,
+                    error = %e,
+                    "on_membership_projected: db pool checkout failed — projection write skipped"
+                );
+                return Ok(());
+            }
+        };
+
+        let ctx = AppContext::new("lamad");
+
+        // Resolve collective_id: prefer the collectives row whose collective_cid
+        // matches.  If absent (Collective arrives after Membership in a race),
+        // use the collective_cid as the id directly so the row is not lost.
+        let collective_id: String = collectives::table
+            .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+            .filter(collectives::collective_cid.eq(&signal.collective_cid))
+            .select(collectives::id)
+            .first::<String>(&mut conn)
+            .unwrap_or_else(|_| signal.collective_cid.clone());
+
+        // Check for an existing row keyed by dht_anchor_hash to decide
+        // insert vs update.
+        let existing_id: Option<String> = collective_participations::table
+            .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
+            .filter(collective_participations::dht_anchor_hash.eq(Some(&signal.action_hash)))
+            .select(collective_participations::id)
+            .first::<String>(&mut conn)
+            .optional()
+            .unwrap_or(None);
+
+        if let Some(existing_id) = existing_id {
+            // Re-delivery: update the mutable fields.
+            let _ = diesel::update(
+                collective_participations::table
+                    .filter(collective_participations::id.eq(&existing_id)),
+            )
+            .set((
+                collective_participations::member_cid.eq(Some(&signal.member_cid)),
+                collective_participations::member_kind.eq(&signal.member_kind),
+                collective_participations::role_context.eq(Some(&signal.role_context)),
+                collective_participations::departed_at.eq(signal.departed_at.as_deref()),
+                collective_participations::updated_at
+                    .eq(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+            ))
+            .execute(&mut conn)
+            .map_err(|e| {
+                warn!(
+                    member_cid = %signal.member_cid,
+                    dht_anchor_hash = %signal.action_hash,
+                    error = %e,
+                    "on_membership_projected: update of existing row failed (non-fatal)"
+                );
+            });
+            debug!(
+                member_cid = %signal.member_cid,
+                dht_anchor_hash = %signal.action_hash,
+                "collective_participations row updated on re-delivery"
+            );
+        } else {
+            // First delivery: insert.
+            use crate::db::collectives::{create_participation, CreateParticipationInput};
+            use crate::db::models::intimacy_levels;
+
+            let input = CreateParticipationInput {
+                id: None, // auto-generated
+                collective_id: collective_id.clone(),
+                // human_id = member_cid (canonical member_cid doubles as human_id
+                // for live agent members; satisfies NOT NULL constraint).
+                human_id: signal.member_cid.clone(),
+                intimacy_level: intimacy_levels::RECOGNITION.to_string(),
+                role_context: Some(signal.role_context.clone()),
+                governance_weight: 1.0,
+                consent_state: crate::db::models::consent_states::CONSENTED.to_string(),
+                metadata_json: None,
+            };
+
+            match create_participation(&mut conn, &ctx, &input) {
+                Ok(row) => {
+                    // Stamp the DHT-derived columns that create_participation
+                    // does not accept as input fields.
+                    let _ = diesel::update(
+                        collective_participations::table
+                            .filter(collective_participations::id.eq(&row.id)),
+                    )
+                    .set((
+                        collective_participations::member_cid.eq(Some(&signal.member_cid)),
+                        collective_participations::member_kind.eq(&signal.member_kind),
+                        collective_participations::dht_anchor_hash.eq(Some(&signal.action_hash)),
+                        collective_participations::departed_at.eq(signal.departed_at.as_deref()),
+                    ))
+                    .execute(&mut conn)
+                    .map_err(|e| {
+                        warn!(
+                            member_cid = %signal.member_cid,
+                            error = %e,
+                            "on_membership_projected: DHT-column stamp failed (non-fatal)"
+                        );
+                    });
+                    debug!(
+                        member_cid = %signal.member_cid,
+                        collective_id = %collective_id,
+                        dht_anchor_hash = %signal.action_hash,
+                        "collective_participations row inserted from DHT signal"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        member_cid = %signal.member_cid,
+                        collective_id = %collective_id,
+                        error = %e,
+                        "on_membership_projected: create_participation failed"
+                    );
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -1407,5 +1678,280 @@ mod tests {
             .await
             .expect("run_one_pass must not error");
         assert_eq!(controller.observed_kinds(), &["keyRevocation"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Wave 2 T5: CollectiveProjected + MembershipProjected projector tests
+    //
+    // End-to-end: signal → translate → controller → Diesel → assertion.
+    // Tests use test_pool() (full migrations applied, in-memory SQLite).
+    // -----------------------------------------------------------------------
+
+    use crate::reconcile::signal_stream::{CollectiveProjectedSignal, MembershipProjectedSignal};
+
+    /// T5-a: CollectiveCommitted signal upserts a `collectives` row with the
+    /// canonical collective_cid set.
+    #[tokio::test]
+    async fn t5_collective_committed_projects_collectives_row() {
+        use crate::db::diesel_schema::collectives;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        let signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCollective0001".to_string(),
+            collective_cid: "collective:uhCkkCollective0001".to_string(),
+            display_name: "Wave 2 Test Collective".to_string(),
+            founder_agent_cid: "agent:uhCAkFounder0001".to_string(),
+            anchor_agreement_cid: None,
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::CollectiveProjected(
+            signal.clone(),
+        )]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+        controller
+            .run_one_pass()
+            .await
+            .expect("run_one_pass must not error");
+        assert_eq!(controller.observed_kinds(), &["collectiveProjected"]);
+
+        // Verify the row landed in the DB.
+        let mut conn = pool.get().expect("conn");
+        let row: Option<(String, Option<String>)> = collectives::table
+            .filter(collectives::id.eq("collective:uhCkkCollective0001"))
+            .select((collectives::name, collectives::collective_cid))
+            .first(&mut conn)
+            .optional()
+            .expect("query");
+
+        let (name, cid) = row.expect("collectives row must exist after CollectiveProjected signal");
+        assert_eq!(name, "Wave 2 Test Collective");
+        assert_eq!(
+            cid.as_deref(),
+            Some("collective:uhCkkCollective0001"),
+            "collective_cid must be stamped on the row"
+        );
+    }
+
+    /// T5-b: CollectiveCommitted is idempotent — re-delivery does not duplicate.
+    #[tokio::test]
+    async fn t5_collective_committed_is_idempotent() {
+        use crate::db::diesel_schema::collectives;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        let signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCollective0002".to_string(),
+            collective_cid: "collective:uhCkkCollective0002".to_string(),
+            display_name: "Idempotent Collective".to_string(),
+            founder_agent_cid: "agent:uhCAkFounder0002".to_string(),
+            anchor_agreement_cid: None,
+        };
+
+        // Send the same signal twice.
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(signal.clone()),
+            DnaSignal::CollectiveProjected(signal),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+        controller.run_one_pass().await.expect("first pass");
+        controller.run_one_pass().await.expect("second pass");
+
+        // Exactly one row.
+        let mut conn = pool.get().expect("conn");
+        let count: i64 = collectives::table
+            .filter(collectives::id.eq("collective:uhCkkCollective0002"))
+            .count()
+            .get_result(&mut conn)
+            .expect("count");
+        assert_eq!(
+            count, 1,
+            "re-delivery must not duplicate the collectives row"
+        );
+    }
+
+    /// T5-c: MembershipCommitted projects a `collective_participations` row with
+    /// the correct member_cid, member_kind, dht_anchor_hash.
+    #[tokio::test]
+    async fn t5_membership_committed_projects_participation_row() {
+        use crate::db::diesel_schema::collective_participations;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        // First land the Collective row so the FK and resolver work.
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCollective0010".to_string(),
+            collective_cid: "collective:uhCkkCollective0010".to_string(),
+            display_name: "Membership Test Collective".to_string(),
+            founder_agent_cid: "agent:uhCAkFounder0010".to_string(),
+            anchor_agreement_cid: None,
+        };
+
+        let mem_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembership0010".to_string(),
+            collective_cid: "collective:uhCkkCollective0010".to_string(),
+            member_cid: "agent:uhCAkAlice0010".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: None,
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(mem_signal),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+        controller.run_one_pass().await.expect("collective pass");
+        controller.run_one_pass().await.expect("membership pass");
+
+        // Verify the participation row.
+        let mut conn = pool.get().expect("conn");
+        let rows: Vec<(Option<String>, String, Option<String>, Option<String>)> =
+            collective_participations::table
+                .filter(collective_participations::dht_anchor_hash.eq(Some("uhCkkMembership0010")))
+                .select((
+                    collective_participations::member_cid,
+                    collective_participations::member_kind,
+                    collective_participations::role_context,
+                    collective_participations::departed_at,
+                ))
+                .load(&mut conn)
+                .expect("query");
+
+        assert_eq!(rows.len(), 1, "exactly one participation row");
+        let (member_cid, member_kind, role_context, departed_at) = &rows[0];
+        assert_eq!(
+            member_cid.as_deref(),
+            Some("agent:uhCAkAlice0010"),
+            "member_cid round-trips"
+        );
+        assert_eq!(member_kind, "person");
+        assert_eq!(role_context.as_deref(), Some("contributor"));
+        assert!(departed_at.is_none(), "active member has no departed_at");
+    }
+
+    /// T5-d: MembershipCommitted re-delivery does not duplicate the row.
+    #[tokio::test]
+    async fn t5_membership_committed_redelivery_does_not_duplicate() {
+        use crate::db::diesel_schema::collective_participations;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        // Collective first so the row can be resolved.
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCollective0020".to_string(),
+            collective_cid: "collective:uhCkkCollective0020".to_string(),
+            display_name: "Redelivery Test Collective".to_string(),
+            founder_agent_cid: "agent:uhCAkFounder0020".to_string(),
+            anchor_agreement_cid: None,
+        };
+
+        let mem_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembership0020".to_string(),
+            collective_cid: "collective:uhCkkCollective0020".to_string(),
+            member_cid: "agent:uhCAkBob0020".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "steward".to_string(),
+            departed_at: None,
+        };
+
+        // Deliver Collective once + Membership twice.
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(mem_signal.clone()),
+            DnaSignal::MembershipProjected(mem_signal),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+        controller.run_one_pass().await.expect("collective pass");
+        controller.run_one_pass().await.expect("membership first");
+        controller
+            .run_one_pass()
+            .await
+            .expect("membership redelivery");
+
+        let mut conn = pool.get().expect("conn");
+        let count: i64 = collective_participations::table
+            .filter(collective_participations::dht_anchor_hash.eq(Some("uhCkkMembership0020")))
+            .count()
+            .get_result(&mut conn)
+            .expect("count");
+        assert_eq!(
+            count, 1,
+            "re-delivery must not duplicate the participation row"
+        );
+    }
+
+    /// T5-e: withdrawn MembershipCommitted sets departed_at on the row.
+    #[tokio::test]
+    async fn t5_withdrawn_membership_sets_departed_at() {
+        use crate::db::diesel_schema::collective_participations;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCollective0030".to_string(),
+            collective_cid: "collective:uhCkkCollective0030".to_string(),
+            display_name: "Withdrawal Test Collective".to_string(),
+            founder_agent_cid: "agent:uhCAkFounder0030".to_string(),
+            anchor_agreement_cid: None,
+        };
+
+        let mem_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembership0030".to_string(),
+            collective_cid: "collective:uhCkkCollective0030".to_string(),
+            member_cid: "agent:uhCAkCarol0030".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "observer".to_string(),
+            departed_at: Some("2026-05-29T12:00:00Z".to_string()),
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(mem_signal),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+        controller.run_one_pass().await.expect("collective pass");
+        controller.run_one_pass().await.expect("membership pass");
+
+        let mut conn = pool.get().expect("conn");
+        let departed: Option<Option<String>> = collective_participations::table
+            .filter(collective_participations::dht_anchor_hash.eq(Some("uhCkkMembership0030")))
+            .select(collective_participations::departed_at)
+            .first(&mut conn)
+            .optional()
+            .expect("query");
+
+        let departed_at = departed
+            .expect("row must exist")
+            .expect("departed_at must be set");
+        assert!(
+            departed_at.contains("2026"),
+            "departed_at should contain the timestamp year: {departed_at}"
+        );
     }
 }
