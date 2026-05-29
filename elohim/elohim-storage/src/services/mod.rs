@@ -26,12 +26,12 @@ pub mod back_prop;
 pub mod behavioral_trust;
 pub mod boot_registration;
 pub mod bootstrap_manifests;
-pub mod cluster_view;
 pub mod bounds_validator;
+pub mod cluster_view;
 pub mod commitment_fetcher;
 pub mod conductor_writes; // 2026-05-26-substrate-rea-replication-fix — facade for HTTP→conductor zome calls
-pub mod constitutional_ratio_registry;
 pub mod connectivity; // Phase 4 T6 — libp2p connected-peers snapshot helper
+pub mod constitutional_ratio_registry;
 pub mod content_service;
 pub mod device_capacity; // Phase 4 T7 — available bytes helper
 pub mod disposition_service;
@@ -51,10 +51,11 @@ pub mod floor_protections;
 pub mod gossip_flood;
 pub mod governance_health;
 pub mod hazard;
-pub mod hub_capacity_service;
 pub mod holochain_humans_replayer;
 pub mod household_backfill;
 pub mod household_resilience;
+pub mod hub_capacity_service;
+pub mod hub_resolver; // Wave 2 T2 — agent→hub resolver (CID-canonical, slug-alias, seed-compatible)
 pub mod imagodei_lookup; // Phase 4 T5 — display name resolver
 pub mod inference_engine;
 pub mod inference_router;
@@ -71,12 +72,12 @@ pub mod provenance_service;
 pub mod rate_history;
 pub mod rea_commitment_service;
 pub mod reach_earning;
-pub mod replicates_dwelling_validator;
-pub mod replication_prioritizer;
 pub mod reciprocity_view;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
 pub mod relationship_service;
+pub mod replicates_dwelling_validator;
+pub mod replication_prioritizer;
 pub mod republish_epr_validator;
 pub mod resilience; // C2 — hub projection for /api/v1/resilience/{id}/hub
 pub mod resource_nature;

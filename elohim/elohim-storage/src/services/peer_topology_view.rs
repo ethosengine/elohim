@@ -270,16 +270,23 @@ fn compute_resilience_cliffs(
 
         if replica_peers.len() == 1 {
             let sole_peer = &replica_peers[0];
-            // Resolve to household_id via peer_identity_bindings → humans.
-            // Fall back to peer_id if no binding found.
-            let household_id: String = bind::peer_identity_bindings
+            // Step 1: peer_id → agent_cid via peer_identity_bindings.
+            let agent_cid_str: String = bind::peer_identity_bindings
                 .filter(bind::peer_id.eq(sole_peer))
                 .filter(bind::superseded_by.is_null())
                 .select(bind::agent_cid)
                 .first::<String>(conn)
                 .unwrap_or_else(|_| sole_peer.clone());
 
-            *cliff_map.entry(household_id).or_insert(0) += 1;
+            // Step 2: agent_cid → owning hub via Wave-2 T2 hub resolver.
+            // Falls back to agent_cid when no household row is found (correct-but-dormant:
+            // returns agent_cid until T5 projector populates household rows from DHT).
+            let hub_id: String =
+                crate::services::hub_resolver::resolve_owning_hub(conn, &agent_cid_str)
+                    .unwrap_or(None)
+                    .unwrap_or_else(|| agent_cid_str.clone());
+
+            *cliff_map.entry(hub_id).or_insert(0) += 1;
         }
     }
 
