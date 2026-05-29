@@ -108,7 +108,7 @@ describe('SessionHumanService', () => {
       expect(restored?.sessionId).toBe('session-existing-123');
       expect(restored?.displayName).toBe('Restored User');
       expect(restored?.stats.nodesViewed).toBe(10);
-      expect(restored?.stats.sessionCount).toBe(4); // Incremented
+      expect(restored?.stats.sessionCount).toBe(3); // M-AGGR-1: sessionCount is no longer incremented on restore; stat is substrate-derived
     });
   });
 
@@ -211,9 +211,11 @@ describe('SessionHumanService', () => {
   });
 
   describe('upgrade prompts (M-AGGR-1 substrate-driven)', () => {
-    it('should return empty from getActiveUpgradePrompts (substrate-driven)', () => {
-      // M-AGGR-1: prompts are now substrate-derived. Local list is always empty.
-      expect(service.getActiveUpgradePrompts()).toEqual([]);
+    it('should not expose getActiveUpgradePrompts (method removed, prompts are substrate-derived)', () => {
+      // M-AGGR-1: getActiveUpgradePrompts() was deleted; active prompts come from
+      // GET /api/v1/identity/{agentId}/upgrade-prompts (UpgradePromptView).
+      // The service retains only the dismissal shim so the UI can suppress already-seen prompts.
+      expect((service as any).getActiveUpgradePrompts).toBeUndefined();
     });
 
     it('should record dismissal in localStorage', () => {

@@ -261,10 +261,10 @@ describe('ContextAssemblyService', () => {
   // =========================================================================
 
   describe('thread context layer', () => {
-    it('should include session actions from activity history', fakeAsync(() => {
+    it('should include empty sessionActions (M-AGGR-1: activity history is substrate-derived)', fakeAsync(() => {
+      // M-AGGR-1: getActivityHistory removed; sessionActions is always [].
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
-        expect(result.createContext.threadContext.sessionActions.length).toBeGreaterThan(0);
-        expect(result.createContext.threadContext.sessionActions[0].actionType).toBe('view');
+        expect(result.createContext.threadContext.sessionActions).toEqual([]);
       });
       tick(5000);
     }));

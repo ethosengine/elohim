@@ -7,7 +7,6 @@ import {
   ReactionCounts,
 } from '@app/elohim/services/governance-signal.service';
 import { GovernanceApiService } from '@elohim/service';
-import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
 import {
   EmotionalReactionType,
   EmotionalReactionConstraints,
@@ -24,7 +23,6 @@ describe('ReactionBarComponent', () => {
   let fixture: ComponentFixture<ReactionBarComponent>;
   let mockSignalService: any;
   let mockGovernanceApi: any;
-  let mockGovernanceRecognition: any;
   let signalChanges$: Subject<any>;
 
   const mockReactionCounts: ReactionCounts = {
@@ -57,10 +55,7 @@ describe('ReactionBarComponent', () => {
     mockGovernanceApi = {
       recordSignal: vi.fn().mockResolvedValue(undefined),
       getSignals: vi.fn().mockResolvedValue([]),
-    };
-
-    mockGovernanceRecognition = {
-      recordParticipation: vi.fn().mockResolvedValue(undefined),
+      postParticipation: vi.fn().mockResolvedValue(undefined),
     };
 
     await TestBed.configureTestingModule({
@@ -68,7 +63,6 @@ describe('ReactionBarComponent', () => {
       providers: [
         { provide: GovernanceSignalService, useValue: mockSignalService },
         { provide: GovernanceApiService, useValue: mockGovernanceApi },
-        { provide: GovernanceRecognitionService, useValue: mockGovernanceRecognition },
       ],
     }).compileComponents();
 

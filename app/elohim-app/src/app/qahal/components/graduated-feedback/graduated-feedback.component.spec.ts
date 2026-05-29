@@ -8,7 +8,6 @@ import {
   FeedbackStats,
 } from '@app/elohim/services/governance-signal.service';
 import { GovernanceApiService } from '@elohim/service';
-import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
 
 import { GraduatedFeedbackComponent, FeedbackContext } from './graduated-feedback.component';
 import { vi } from 'vitest';
@@ -18,7 +17,6 @@ describe('GraduatedFeedbackComponent', () => {
   let fixture: ComponentFixture<GraduatedFeedbackComponent>;
   let mockSignalService: any;
   let mockGovernanceApi: any;
-  let mockGovernanceRecognition: any;
   let signalChanges$: Subject<any>;
 
   const mockStats: FeedbackStats = {
@@ -48,10 +46,7 @@ describe('GraduatedFeedbackComponent', () => {
     mockGovernanceApi = {
       recordSignal: vi.fn().mockResolvedValue(undefined),
       getSignals: vi.fn().mockResolvedValue([]),
-    };
-
-    mockGovernanceRecognition = {
-      recordParticipation: vi.fn().mockResolvedValue(undefined),
+      postParticipation: vi.fn().mockResolvedValue(undefined),
     };
 
     await TestBed.configureTestingModule({
@@ -59,7 +54,6 @@ describe('GraduatedFeedbackComponent', () => {
       providers: [
         { provide: GovernanceSignalService, useValue: mockSignalService },
         { provide: GovernanceApiService, useValue: mockGovernanceApi },
-        { provide: GovernanceRecognitionService, useValue: mockGovernanceRecognition },
       ],
     }).compileComponents();
 
