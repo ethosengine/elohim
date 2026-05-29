@@ -554,6 +554,13 @@ pub struct P2PNode {
     /// `conductor_agent_info_gossip::spawn_agent_info_subscriber_worker`.
     agent_info_inbound_tx:
         Option<mpsc::Sender<crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo>>,
+    /// Wave 3: bounds the number of concurrently in-flight commitment-driven
+    /// blob fetches spawned from the inventory gossip receive arm. Sized at
+    /// `fetch_blob_parallelism * 4` (same as `RaceFetchKicker`). Drop-on-saturation
+    /// (try_acquire) prevents fetch storms on dense gossip. Shared across the
+    /// snapshot + delta arms so saturation from one does not allow an unbounded
+    /// second arm.
+    commitment_fetch_semaphore: Arc<tokio::sync::Semaphore>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -1603,6 +1610,9 @@ impl P2PNode {
                 command_tx.clone(),
             ));
 
+        // Wave 3: size the commitment-fetch semaphore before `config` is moved into Self.
+        let commitment_fetch_concurrency = config.fetch_blob_parallelism.max(1) * 4;
+
         Ok(Self {
             identity,
             config,
@@ -1665,6 +1675,12 @@ impl P2PNode {
             gossip_publisher: default_gossip_publisher,
             sealing_keys: None,
             agent_info_inbound_tx: None,
+            // Wave 3: commitment-driven fetch semaphore. Sized at parallelism * 4
+            // matching RaceFetchKicker (12 with default parallelism=3). Built once at
+            // node construction; cloned (Arc) into each spawned task in the receive arm.
+            commitment_fetch_semaphore: Arc::new(tokio::sync::Semaphore::new(
+                commitment_fetch_concurrency,
+            )),
         })
     }
 
@@ -2280,7 +2296,7 @@ impl P2PNode {
     /// arrival — broadcasting empty during a transient I/O blip would
     /// corrupt every remote peer's projection of our custody.
     async fn broadcast_inventory_snapshot(&self) {
-        use crate::p2p::inventory_broadcaster::{build_snapshot, StaticInventory};
+        use crate::p2p::inventory_broadcaster::{build_snapshot, gather_hints, StaticInventory};
         use crate::p2p::inventory_gossip::INVENTORY_TOPIC;
 
         // Fetch hashes directly so I/O failure can skip the tick. Must happen
@@ -2330,7 +2346,25 @@ impl P2PNode {
         let local_peer_id = self.peer_id().to_string();
         let now_micros = chrono::Utc::now().timestamp_micros();
 
-        let snapshot = build_snapshot(&local_peer_id, &inventory, &self.inventory_seq, now_micros);
+        // Wave 3: gather per-blob hints from the content projection. Failures
+        // are non-fatal (gather_hints logs internally and returns empty vec).
+        let hints = if let Some(pool) = self.db_pool.as_ref() {
+            use crate::p2p::inventory_broadcaster::LocalInventory as _;
+            match pool.get() {
+                Ok(mut conn) => gather_hints(&mut conn, &inventory.current_hashes()),
+                Err(_) => vec![],
+            }
+        } else {
+            vec![]
+        };
+
+        let snapshot = build_snapshot(
+            &local_peer_id,
+            &inventory,
+            &self.inventory_seq,
+            now_micros,
+            hints,
+        );
         // Convert BlobAddress vec to String vec for the parity-diagnostic record.
         // The last_gossiped field and set_last_gossiped_inventory use Vec<String>
         // (a separate concern from the wire types); this is the single conversion site.
@@ -2378,6 +2412,175 @@ impl P2PNode {
             sequence = snapshot_sequence,
             "T22: published inventory snapshot via DualGossipPublisher"
         );
+    }
+
+    /// Wave 3: score advertised blobs against local active `replicates-dwelling`
+    /// commitments and enqueue HIGH-priority blobs for bounded fetch.
+    ///
+    /// Called once per inventory message (snapshot or delta) — active commitments
+    /// are queried ONCE here and used to score all hashes in the message.
+    ///
+    /// Anti-storm: uses `try_acquire_owned` on `commitment_fetch_semaphore` to
+    /// drop fetches when the concurrency limit is saturated. The next gossip tick
+    /// will retry. Does not block the receive arm (inline sync diesel + spawn).
+    ///
+    /// The `gap_queue` (content-level replication seam) is deliberately NOT used —
+    /// commitment-driven blob fetch is a separate seam at the blob layer.
+    fn score_and_enqueue_snapshot(
+        &self,
+        conn: &mut diesel::SqliteConnection,
+        source_peer_id: &str,
+        hints: &[crate::p2p::inventory_gossip::BlobHint],
+        hashes: &[String],
+    ) {
+        use crate::p2p::blob_fetch::{finalize_fetch_success, race_fetch, FetchOutcome};
+        use crate::p2p::inventory_gossip::BlobHint;
+        use crate::services::replication_prioritizer::{
+            active_commitments_for_provider, score_advertised_blob, AdvertisedBlob, FetchPriority,
+        };
+        use std::collections::HashMap;
+
+        let Some(self_cid) = self.config.self_cid.as_deref() else {
+            return; // No identity — cannot match commitments
+        };
+
+        // Load active commitments once per message.
+        let commitments = match active_commitments_for_provider(conn, self_cid) {
+            Ok(c) => c,
+            Err(e) => {
+                debug!(
+                    target: "elohim_storage::inventory",
+                    error = %e,
+                    "score_and_enqueue: failed to load active commitments; skipping"
+                );
+                return;
+            }
+        };
+
+        if commitments.is_empty() {
+            return; // Fast path: no commitments → nothing to score
+        }
+
+        // Build hint map keyed by blob_hash string (O(1) lookup per hash).
+        let hint_map: HashMap<&str, &BlobHint> =
+            hints.iter().map(|h| (h.address.as_str(), h)).collect();
+
+        let fresh_after = chrono::Utc::now()
+            .checked_sub_signed(chrono::Duration::seconds(
+                self.config.inventory_freshness_seconds as i64,
+            ))
+            .unwrap_or_else(chrono::Utc::now)
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string();
+
+        for hash in hashes {
+            let hint = hint_map.get(hash.as_str());
+            let advertised = AdvertisedBlob {
+                blob_cid: hash.clone(),
+                source_peer_cid: source_peer_id.to_string(),
+                blob_size_bytes: hint.and_then(|h| h.size_bytes),
+                recipient_hub_id_hint: hint.and_then(|h| h.recipient_hub_id.clone()),
+                epr_kind_hint: hint.and_then(|h| h.epr_kind.clone()),
+            };
+
+            if score_advertised_blob(&advertised, &commitments) != FetchPriority::High {
+                continue;
+            }
+
+            // Drop-on-saturation: anti-fetch-storm guard.
+            let permit = match self.commitment_fetch_semaphore.clone().try_acquire_owned() {
+                Ok(p) => p,
+                Err(_) => {
+                    debug!(
+                        target: "elohim_storage::inventory",
+                        hash = %hash,
+                        "Wave3: commitment fetch semaphore saturated — dropping; next gossip tick retries"
+                    );
+                    continue;
+                }
+            };
+
+            let Some(pool) = self.db_pool.clone() else {
+                continue; // No pool — cannot finalize
+            };
+
+            let cmd_tx = self.command_tx.clone();
+            let blob_store = self.blob_store.clone();
+            let peer_metrics = self.peer_metrics.clone();
+            let self_cid_owned = self_cid.to_string();
+            let hash_owned = hash.clone();
+            let parallelism = self.config.fetch_blob_parallelism.max(1);
+            let timeout =
+                std::time::Duration::from_secs(self.config.fetch_blob_timeout_seconds.max(1));
+            // Clone fresh_after per-task so the String is not moved.
+            let fresh_after_owned = fresh_after.clone();
+
+            tokio::spawn(async move {
+                // Hold permit for lifetime of the task — releases on drop.
+                let _permit = permit;
+
+                // Resolve candidates from peer_blob_inventory.
+                let candidates = {
+                    match pool.get() {
+                        Ok(mut c) => crate::db::peer_blob_inventory::lookup_hosts(
+                            &mut c,
+                            &hash_owned,
+                            &fresh_after_owned,
+                        )
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|r| r.peer_id)
+                        .collect::<Vec<_>>(),
+                        Err(_) => return,
+                    }
+                };
+
+                // Filter to connected peers at task start.
+                let connected_set: std::collections::HashSet<String> = peer_metrics
+                    .iter()
+                    .filter_map(|e| {
+                        if e.value().is_connected {
+                            Some(e.key().clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                let is_connected = move |peer: &str| connected_set.contains(peer);
+
+                let outcome = race_fetch(
+                    &hash_owned,
+                    candidates,
+                    &cmd_tx,
+                    is_connected,
+                    parallelism,
+                    timeout,
+                )
+                .await;
+
+                if let FetchOutcome::Hit { bytes, source_peer } = outcome {
+                    if let Ok(mut c) = pool.get() {
+                        if let Err(e) = finalize_fetch_success(
+                            &mut c,
+                            &hash_owned,
+                            &source_peer,
+                            &bytes,
+                            &self_cid_owned,
+                            &blob_store,
+                        )
+                        .await
+                        {
+                            warn!(
+                                target: "elohim_storage::inventory",
+                                hash = %hash_owned,
+                                error = %e,
+                                "Wave3: finalize_fetch_success failed"
+                            );
+                        }
+                    }
+                }
+            });
+        }
     }
 
     /// T22 review fix #3: write the parity-tracking record from the P2PNode
@@ -5236,14 +5439,28 @@ impl P2PNode {
                                                 snapshot.sequence as i64,
                                                 &when,
                                             ) {
-                                                Ok(()) => debug!(
-                                                    target: "elohim_storage::inventory",
-                                                    from = %propagation_source,
-                                                    peer_id = %snapshot.peer_id,
-                                                    count = snapshot.hashes.len(),
-                                                    sequence = snapshot.sequence,
-                                                    "Inventory snapshot applied"
-                                                ),
+                                                Ok(()) => {
+                                                    debug!(
+                                                        target: "elohim_storage::inventory",
+                                                        from = %propagation_source,
+                                                        peer_id = %snapshot.peer_id,
+                                                        count = snapshot.hashes.len(),
+                                                        sequence = snapshot.sequence,
+                                                        "Inventory snapshot applied"
+                                                    );
+                                                    // Wave 3: commitment-driven fetch.
+                                                    // Score each advertised blob against our
+                                                    // active replicates-dwelling commitments;
+                                                    // enqueue HIGH-priority blobs for fetch.
+                                                    // Active commitments are loaded ONCE per
+                                                    // inventory message (not per hash).
+                                                    self.score_and_enqueue_snapshot(
+                                                        &mut conn,
+                                                        &snapshot.peer_id,
+                                                        &snapshot.hints,
+                                                        &hashes_str,
+                                                    );
+                                                }
                                                 Err(e) => warn!(
                                                     target: "elohim_storage::inventory",
                                                     from = %propagation_source,
@@ -5304,6 +5521,17 @@ impl P2PNode {
                                                         removed = delta.removed.len(),
                                                         "Inventory delta applied"
                                                     );
+                                                    // Wave 3: commitment-driven fetch for added hashes.
+                                                    // Score each added hash against our active commitments;
+                                                    // enqueue HIGH-priority blobs for fetch.
+                                                    if !delta.added.is_empty() {
+                                                        self.score_and_enqueue_snapshot(
+                                                            &mut conn,
+                                                            &delta.peer_id,
+                                                            &delta.hints,
+                                                            &added_str,
+                                                        );
+                                                    }
                                                 }
                                                 Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Replay) => {
                                                     debug!(

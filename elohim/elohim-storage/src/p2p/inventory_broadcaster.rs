@@ -10,8 +10,23 @@
 //!
 //! Source of truth for "what blobs do I host": the local blob store; the
 //! enumeration is delegated to `LocalInventory` so it can be mocked in tests.
+//!
+//! ## Wave 3: gather_hints
+//!
+//! `gather_hints(conn, hashes)` enriches a set of local blob hashes with
+//! per-blob metadata derived from the `content` projection:
+//! - `epr_kind`: `content_format` of the EPR owning the blob.
+//! - `size_bytes`: `content_size_bytes` (uncompressed).
+//! - `recipient_hub_id`: author's owning hub via `hub_resolver::resolve_owning_hub`.
+//! - `tier`: left `None` (TierController is a separate epic).
+//!
+//! Hints are sparse: a hint is only emitted when at least one field is populated.
+//! The join is inline Diesel (read-side) over the `content` projection; no
+//! ReconcileController writes are performed here.
 
-use crate::p2p::inventory_gossip::{BlobAddress, BlobInventoryDelta, BlobInventorySnapshot};
+use crate::p2p::inventory_gossip::{
+    BlobAddress, BlobHint, BlobInventoryDelta, BlobInventorySnapshot,
+};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -66,36 +81,136 @@ impl SequenceAllocator {
     }
 }
 
-/// Build a snapshot for the given peer id with the given inventory.
+/// Gather per-blob hints for the given set of hashes.
+///
+/// For each hash, joins the `content` projection on `blob_hash` to derive:
+/// - `epr_kind`: `content_format` (advisory content class).
+/// - `size_bytes`: `content_size_bytes` (uncompressed byte count).
+/// - `recipient_hub_id`: the author's owning hub via `hub_resolver::resolve_owning_hub`,
+///   which returns the canonical `collective:{hash}` CID when available, else the slug.
+/// - `tier`: `None` — TierController is a separate epic.
+///
+/// A hint is emitted only when at least one field is populated (sparse).
+/// This is a read-side inline Diesel query — no writes, no ReconcileController.
+///
+/// # Errors
+///
+/// Database errors are logged at `warn` level and the affected hint is dropped.
+/// An empty `Vec` is always valid (hints are advisory; absence does not block gossip).
+pub fn gather_hints(conn: &mut diesel::SqliteConnection, hashes: &[BlobAddress]) -> Vec<BlobHint> {
+    use crate::db::diesel_schema::content::dsl as ct;
+    use crate::services::hub_resolver;
+    use diesel::prelude::*;
+
+    if hashes.is_empty() {
+        return Vec::new();
+    }
+
+    // Collect hash strings for the IN query.
+    let hash_strs: Vec<&str> = hashes.iter().map(|a| a.as_str()).collect();
+
+    // One query for all matching content rows — avoids N+1.
+    let rows: Vec<(String, String, Option<i32>, Option<String>)> = match ct::content
+        .filter(ct::blob_hash.eq_any(&hash_strs))
+        .select((
+            ct::blob_hash.assume_not_null(),
+            ct::content_format,
+            ct::content_size_bytes,
+            ct::created_by,
+        ))
+        .load::<(String, String, Option<i32>, Option<String>)>(conn)
+    {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(
+                target: "elohim_storage::inventory",
+                error = %e,
+                "gather_hints: content join failed; emitting empty hints"
+            );
+            return Vec::new();
+        }
+    };
+
+    let mut hints = Vec::with_capacity(rows.len());
+    for (blob_hash, content_format, size_bytes, created_by) in rows {
+        let Ok(address) = BlobAddress::new(blob_hash.clone()) else {
+            continue;
+        };
+
+        // Derive recipient_hub_id from author → hub chain.
+        // Failures are non-fatal: hint is still emitted without recipient_hub_id.
+        let recipient_hub_id: Option<String> = created_by.as_deref().and_then(|agent_cid| {
+            match hub_resolver::resolve_owning_hub(conn, agent_cid) {
+                Ok(opt) => opt,
+                Err(e) => {
+                    tracing::warn!(
+                        target: "elohim_storage::inventory",
+                        error = %e,
+                        agent_cid = %agent_cid,
+                        blob_hash = %blob_hash,
+                        "gather_hints: resolve_owning_hub failed; hint emitted without recipient_hub_id"
+                    );
+                    None
+                }
+            }
+        });
+
+        let epr_kind = Some(content_format);
+        let size: Option<u64> = size_bytes.map(|s| s.max(0) as u64);
+
+        // Sparse: skip hint if nothing useful is populated.
+        if epr_kind.is_none() && size.is_none() && recipient_hub_id.is_none() {
+            continue;
+        }
+
+        hints.push(BlobHint {
+            address,
+            recipient_hub_id,
+            epr_kind,
+            size_bytes: size,
+            tier: None, // TierController is a separate epic
+        });
+    }
+    hints
+}
+
+/// Build a snapshot for the given peer id with the given inventory and optional hints.
+///
+/// Wave 3: `hints` are gathered by the caller via `gather_hints(conn, &hashes)`
+/// before construction so the DB call can be skipped on I/O failure.
 pub fn build_snapshot<I: LocalInventory>(
     peer_id: &str,
     inventory: &I,
     seq: &SequenceAllocator,
     now_micros: i64,
+    hints: Vec<BlobHint>,
 ) -> BlobInventorySnapshot {
     BlobInventorySnapshot {
         peer_id: peer_id.to_string(),
         hashes: inventory.current_hashes(),
-        hints: Vec::new(),
+        hints,
         snapshot_at: now_micros,
         sequence: seq.next(),
         signature: vec![0x00], // Stage 1 structural non-empty
     }
 }
 
-/// Build a delta for the given add/remove batch.
+/// Build a delta for the given add/remove batch and optional hints.
+///
+/// Wave 3: `hints` are gathered by the caller via `gather_hints(conn, &added_hashes)`.
 pub fn build_delta(
     peer_id: &str,
     added: Vec<BlobAddress>,
     removed: Vec<BlobAddress>,
     seq: &SequenceAllocator,
     now_micros: i64,
+    hints: Vec<BlobHint>,
 ) -> BlobInventoryDelta {
     BlobInventoryDelta {
         peer_id: peer_id.to_string(),
         added,
         removed,
-        hints: Vec::new(),
+        hints,
         emitted_at: now_micros,
         sequence: seq.next(),
         signature: vec![0x00], // Stage 1 structural non-empty
@@ -150,12 +265,13 @@ mod tests {
             BlobAddress::new(sha256_wire('b')).unwrap(),
         ]);
         let alloc = SequenceAllocator::new(10);
-        let snapshot = build_snapshot("12D3KooWtest", &inv, &alloc, 1_700_000_000_000_000);
+        let snapshot = build_snapshot("12D3KooWtest", &inv, &alloc, 1_700_000_000_000_000, vec![]);
 
         assert_eq!(snapshot.peer_id, "12D3KooWtest");
         assert_eq!(snapshot.hashes.len(), 2);
         assert_eq!(snapshot.sequence, 11);
         assert_eq!(snapshot.signature, vec![0x00]);
+        assert!(snapshot.hints.is_empty(), "no hints provided → empty");
     }
 
     #[test]
@@ -167,11 +283,13 @@ mod tests {
             vec![BlobAddress::new(sha256_wire('b')).unwrap()],
             &alloc,
             1_700_000_001_000_000,
+            vec![],
         );
 
         assert_eq!(delta.added.len(), 1);
         assert_eq!(delta.removed.len(), 1);
         assert_eq!(delta.sequence, 1);
+        assert!(delta.hints.is_empty(), "no hints provided → empty");
     }
 
     #[test]
@@ -205,6 +323,182 @@ mod tests {
         let inv = StaticInventory::new(vec![addr_a.clone(), addr_b.clone()]);
         let hashes = inv.current_hashes();
         assert_eq!(hashes, vec![addr_a, addr_b]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Wave 3: gather_hints unit tests
+    // -----------------------------------------------------------------------
+
+    fn test_db_pool() -> crate::db::DbPool {
+        use crate::db::{run_migrations, DbPool};
+        use diesel::r2d2::{ConnectionManager, Pool};
+        use diesel::SqliteConnection;
+        let url = format!(
+            "file:broadcaster_hints_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool: DbPool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        run_migrations(&pool).expect("migrations");
+        pool
+    }
+
+    fn seed_content_with_blob(
+        conn: &mut diesel::SqliteConnection,
+        blob_hash: &str,
+        content_format: &str,
+        size_bytes: Option<i32>,
+        created_by: Option<&str>,
+    ) {
+        use crate::db::diesel_schema::content::dsl as ct;
+        use diesel::prelude::*;
+        diesel::insert_into(ct::content)
+            .values((
+                ct::id.eq(format!("content-{blob_hash}")),
+                ct::h_app_id.eq("test-app"),
+                ct::title.eq("test"),
+                ct::content_type.eq("Concept"),
+                ct::content_format.eq(content_format),
+                ct::blob_hash.eq(blob_hash),
+                ct::content_size_bytes.eq(size_bytes),
+                ct::created_by.eq(created_by),
+                ct::reach.eq("commons"),
+                ct::validation_status.eq("valid"),
+                ct::created_at.eq("2026-01-01T00:00:00Z"),
+                ct::updated_at.eq("2026-01-01T00:00:00Z"),
+            ))
+            .execute(conn)
+            .expect("seed content");
+    }
+
+    /// Wave 3 T3-1: `gather_hints` returns an empty vec when no content rows match.
+    #[test]
+    fn gather_hints_empty_when_no_content_match() {
+        let pool = test_db_pool();
+        let mut conn = pool.get().expect("conn");
+        // Use 'f' — valid lowercase hex char not used in other gather_hints tests.
+        let addr = BlobAddress::new(sha256_wire('f')).unwrap();
+        let hints = gather_hints(&mut conn, &[addr]);
+        assert!(hints.is_empty(), "no matching content → no hints");
+    }
+
+    /// Wave 3 T3-2: `gather_hints` populates epr_kind and size_bytes when content exists.
+    #[test]
+    fn gather_hints_populates_epr_kind_and_size() {
+        let pool = test_db_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let hash = sha256_wire('a');
+        seed_content_with_blob(&mut conn, &hash, "sophia-quiz-json", Some(8192), None);
+
+        let addr = BlobAddress::new(hash.clone()).unwrap();
+        let hints = gather_hints(&mut conn, &[addr]);
+
+        assert_eq!(hints.len(), 1);
+        let h = &hints[0];
+        assert_eq!(h.epr_kind.as_deref(), Some("sophia-quiz-json"));
+        assert_eq!(h.size_bytes, Some(8192));
+        assert!(h.recipient_hub_id.is_none(), "no author → no hub");
+        assert!(
+            h.tier.is_none(),
+            "tier always None (TierController deferred)"
+        );
+    }
+
+    /// Wave 3 T3-3: `gather_hints` populates `recipient_hub_id` via hub_resolver
+    /// when the author has a household collective.
+    #[test]
+    fn gather_hints_populates_recipient_hub_id() {
+        use crate::db::collectives::{create_collective, CreateCollectiveInput};
+        use crate::db::context::AppContext;
+        use crate::db::humans::CreateHumanInput;
+        use diesel::prelude::*;
+
+        let pool = test_db_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let app_ctx = AppContext::new("test-app");
+
+        // Seed collective
+        create_collective(
+            &mut conn,
+            &app_ctx,
+            &CreateCollectiveInput {
+                id: "family-hints".to_string(),
+                name: "Hints Collective".to_string(),
+                description: None,
+                governance_layer: "family".to_string(),
+                constitutional_parent_id: None,
+                reach: "private".to_string(),
+                metadata_json: None,
+                created_by: None,
+            },
+        )
+        .expect("seed collective");
+
+        // Set collective_cid
+        {
+            use crate::db::diesel_schema::collectives;
+            diesel::update(
+                collectives::table
+                    .filter(collectives::h_app_id.eq("test-app"))
+                    .filter(collectives::id.eq("family-hints")),
+            )
+            .set(collectives::collective_cid.eq(Some("collective:uhCkkHintsTest001")))
+            .execute(&mut conn)
+            .expect("set collective_cid");
+        }
+
+        // Seed human with household_id
+        crate::db::humans::create_human(
+            &mut conn,
+            CreateHumanInput {
+                id: "agent:uhCAkHintsAuthor001".to_string(),
+                agent_pub_key: None,
+                display_name: "Hints Author".to_string(),
+                bio: None,
+                affinities: "[]".to_string(),
+                profile_reach: "commons".to_string(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: "test-app".to_string(),
+                household_id: Some("family-hints".to_string()),
+            },
+        )
+        .expect("seed human");
+
+        let hash = sha256_wire('b');
+        seed_content_with_blob(
+            &mut conn,
+            &hash,
+            "markdown",
+            Some(4096),
+            Some("agent:uhCAkHintsAuthor001"),
+        );
+
+        let addr = BlobAddress::new(hash).unwrap();
+        let hints = gather_hints(&mut conn, &[addr]);
+
+        assert_eq!(hints.len(), 1);
+        let h = &hints[0];
+        assert_eq!(
+            h.recipient_hub_id.as_deref(),
+            Some("collective:uhCkkHintsTest001"),
+            "recipient_hub_id resolved via hub_resolver"
+        );
+        assert_eq!(h.epr_kind.as_deref(), Some("markdown"));
+        assert_eq!(h.size_bytes, Some(4096));
+    }
+
+    /// Wave 3 T3-4: `gather_hints` with an empty hash slice returns empty immediately.
+    #[test]
+    fn gather_hints_returns_empty_for_no_hashes() {
+        let pool = test_db_pool();
+        let mut conn = pool.get().expect("conn");
+        let hints = gather_hints(&mut conn, &[]);
+        assert!(hints.is_empty());
     }
 
     /// T22 review fix #4: unknown archetype strings (typos, future archetypes
@@ -249,7 +543,7 @@ mod tests {
 
         let inv = StaticInventory::new(hashes);
         let alloc = SequenceAllocator::new(0);
-        let snapshot = build_snapshot("12D3KooWtest", &inv, &alloc, 1);
+        let snapshot = build_snapshot("12D3KooWtest", &inv, &alloc, 1, vec![]);
 
         // Round-trip through MessagePack — the wire path real gossip takes.
         let bytes = snapshot.to_bytes().unwrap();
