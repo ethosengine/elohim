@@ -136,6 +136,9 @@ fn insert_collective_participation(
         governance_weight: 1.0,
         consent_state: "active",
         metadata_json: None,
+        member_cid: None,
+        member_kind: "person",
+        dht_anchor_hash: None,
     };
     use elohim_storage::db::diesel_schema::collective_participations;
     diesel::replace_into(collective_participations::table)

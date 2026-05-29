@@ -36,6 +36,10 @@ export interface EprPublishInput {
    * Hex-encoded payload bytes
    */
   payload: string;
+  /**
+   * Optional republish-epr EconomicEvent (camelCase RepublishEprEventView in elohim/elohim-views/src/epr.rs). Null/absent for direct envelope writes; present for substrate-correct re-deploys, where it is strictly validated downstream by the DHT economic-event schema (economic-events/republish-epr.schema.json, snake_case) and the substrate bounds validator. Declared here only so this camelCase input envelope accepts the field under additionalProperties:false.
+   */
+  event?: Record<string, unknown> | null;
 }
 /**
  * Source of truth: EPR atom (self-notarized via content-address + Ed25519). Wire-string projection of Envelope for HTTP consumers. CIDs are CIDv1 base32 strings. Category A — notarized via content-derived CID + signer proof.
