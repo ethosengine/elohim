@@ -193,6 +193,8 @@ pub fn create_collective(
             reach: &input.reach,
             metadata_json: input.metadata_json.as_deref(),
             created_by: input.created_by.as_deref(),
+            collective_cid: None,
+            slug: None,
         };
 
         diesel::insert_into(collectives::table)
@@ -329,6 +331,9 @@ pub fn create_participation(
         governance_weight: input.governance_weight,
         consent_state: &input.consent_state,
         metadata_json: input.metadata_json.as_deref(),
+        member_cid: None,
+        member_kind: "person",
+        dht_anchor_hash: None,
     };
 
     diesel::insert_into(collective_participations::table)
@@ -420,4 +425,163 @@ pub fn collective_count(
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{run_migrations, DbPool};
+    use diesel::r2d2::{ConnectionManager, Pool};
+
+    fn test_pool() -> DbPool {
+        let url = format!(
+            "file:collectives_db_test_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        run_migrations(&pool).expect("migrations");
+        pool
+    }
+
+    fn make_ctx() -> AppContext {
+        AppContext::new("test-app")
+    }
+
+    /// Wave 2 T1: new columns collective_cid + slug are persisted and readable on collectives.
+    #[test]
+    fn hub_identity_cid_slug_roundtrip() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        let input = CreateCollectiveInput {
+            id: "family-dowell".to_string(),
+            name: "Dowell Family".to_string(),
+            description: None,
+            governance_layer: "family".to_string(),
+            constitutional_parent_id: None,
+            reach: "private".to_string(),
+            metadata_json: None,
+            created_by: None,
+        };
+
+        // Insert via the existing upsert path (collective_cid + slug default to None)
+        let collective = create_collective(&mut conn, &ctx, &input).expect("create");
+        assert_eq!(collective.id, "family-dowell");
+        assert!(
+            collective.collective_cid.is_none(),
+            "collective_cid NULL pre-coherence"
+        );
+        assert!(collective.slug.is_none(), "slug NULL when not set");
+
+        // Directly write the new columns via diesel to prove they are writable + readable
+        diesel::update(
+            collectives::table
+                .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                .filter(collectives::id.eq("family-dowell")),
+        )
+        .set((
+            collectives::collective_cid.eq(Some("collective:uhCkkTestActionHash0001")),
+            collectives::slug.eq(Some("family-dowell")),
+        ))
+        .execute(&mut conn)
+        .expect("update cid+slug");
+
+        let updated = get_collective(&mut conn, &ctx, "family-dowell")
+            .expect("get")
+            .expect("Some");
+
+        assert_eq!(
+            updated.collective_cid.as_deref(),
+            Some("collective:uhCkkTestActionHash0001"),
+            "collective_cid round-trips"
+        );
+        assert_eq!(
+            updated.slug.as_deref(),
+            Some("family-dowell"),
+            "slug round-trips"
+        );
+    }
+
+    /// Wave 2 T1: new columns member_cid + member_kind + dht_anchor_hash are persisted and
+    /// readable on collective_participations.
+    #[test]
+    fn hub_membership_cid_columns_roundtrip() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        // Seed the parent collective first (FK constraint)
+        let collective_input = CreateCollectiveInput {
+            id: "family-dowell".to_string(),
+            name: "Dowell Family".to_string(),
+            description: None,
+            governance_layer: "family".to_string(),
+            constitutional_parent_id: None,
+            reach: "private".to_string(),
+            metadata_json: None,
+            created_by: None,
+        };
+        create_collective(&mut conn, &ctx, &collective_input).expect("create collective");
+
+        // Create participation — new columns arrive as None/"person" defaults
+        let part_input = CreateParticipationInput {
+            id: Some("part-001".to_string()),
+            collective_id: "family-dowell".to_string(),
+            human_id: "human-alice".to_string(),
+            intimacy_level: "recognition".to_string(),
+            role_context: None,
+            governance_weight: 1.0,
+            consent_state: "consented".to_string(),
+            metadata_json: None,
+        };
+        let part =
+            create_participation(&mut conn, &ctx, &part_input).expect("create participation");
+
+        assert_eq!(
+            part.member_kind, "person",
+            "member_kind defaults to 'person'"
+        );
+        assert!(part.member_cid.is_none(), "member_cid NULL pre-coherence");
+        assert!(
+            part.dht_anchor_hash.is_none(),
+            "dht_anchor_hash NULL pre-coherence"
+        );
+
+        // Directly write the new columns to prove they are writable + readable
+        diesel::update(
+            collective_participations::table.filter(collective_participations::id.eq("part-001")),
+        )
+        .set((
+            collective_participations::member_cid.eq(Some("agent:uhCAkAlicePubKey0001")),
+            collective_participations::member_kind.eq("person"),
+            collective_participations::dht_anchor_hash.eq(Some("uhCkkMembershipActionHash0001")),
+        ))
+        .execute(&mut conn)
+        .expect("update member cols");
+
+        let updated: CollectiveParticipation = collective_participations::table
+            .filter(collective_participations::id.eq("part-001"))
+            .first(&mut conn)
+            .expect("fetch updated");
+
+        assert_eq!(
+            updated.member_cid.as_deref(),
+            Some("agent:uhCAkAlicePubKey0001"),
+            "member_cid round-trips"
+        );
+        assert_eq!(updated.member_kind, "person", "member_kind round-trips");
+        assert_eq!(
+            updated.dht_anchor_hash.as_deref(),
+            Some("uhCkkMembershipActionHash0001"),
+            "dht_anchor_hash round-trips"
+        );
+    }
 }

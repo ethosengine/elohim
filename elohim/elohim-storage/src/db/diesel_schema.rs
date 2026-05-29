@@ -39,6 +39,8 @@ diesel::table! {
         updated_at -> Text,
         dissolved_at -> Nullable<Text>,
         region -> Nullable<Text>,
+        collective_cid -> Nullable<Text>,
+        slug -> Nullable<Text>,
     }
 }
 
@@ -56,6 +58,9 @@ diesel::table! {
         joined_at -> Text,
         updated_at -> Text,
         departed_at -> Nullable<Text>,
+        member_cid -> Nullable<Text>,
+        member_kind -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 

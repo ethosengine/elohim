@@ -3,4 +3,17 @@
 /**
  * Collective participation row from SELECT query
  */
-export type CollectiveParticipation = { id: string, h_app_id: string, collective_id: string, human_id: string, intimacy_level: string, role_context: string | null, governance_weight: number, consent_state: string, metadata_json: string | null, joined_at: string, updated_at: string, departed_at: string | null, };
+export type CollectiveParticipation = { id: string, h_app_id: string, collective_id: string, human_id: string, intimacy_level: string, role_context: string | null, governance_weight: number, consent_state: string, metadata_json: string | null, joined_at: string, updated_at: string, departed_at: string | null, 
+/**
+ * Canonical CID of the member: `agent:{pubkey}` for persons, `collective:{hash}` for collectives.
+ * Nullable; existing slug-keyed seed rows keep `human_id` and leave this NULL pre-coherence.
+ */
+member_cid: string | null, 
+/**
+ * Kind of member: `'person'` (default) or `'collective'`.
+ */
+member_kind: string, 
+/**
+ * DHT anchor hash linking this row to the notarized Membership entry. Nullable pre-coherence.
+ */
+dht_anchor_hash: string | null, };

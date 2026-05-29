@@ -18,14 +18,14 @@ use super::diesel_schema::{
     contributor_presences, custodian_metrics, custodian_shares, device_policies, discussions,
     economic_events, enum_registry, governance_dispositions, governance_signals, governance_states,
     hazards, human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
-    local_sessions, mutuality_audit_log, node_stewardship, observation_diversity_summary, observation_entries,
-    observation_sessions, observations, peer_blob_inventory, peer_identity_bindings,
-    peer_inventory_cursor, placement_gaps, places, portal_hosts, precedents, premium_gates,
-    proposal_options, proposals, ranked_votes, rea_commitments, recovery_requests,
-    recovery_witnesses, relationships, responsibility_demand_configs, revocation_votes,
-    risk_alerts, schedules, shard_locations, shard_manifests, spatial_contexts, statement_votes,
-    statements, steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
-    token_decay_events, token_mint_events, token_transfers, votes,
+    local_sessions, mutuality_audit_log, node_stewardship, observation_diversity_summary,
+    observation_entries, observation_sessions, observations, peer_blob_inventory,
+    peer_identity_bindings, peer_inventory_cursor, placement_gaps, places, portal_hosts,
+    precedents, premium_gates, proposal_options, proposals, ranked_votes, rea_commitments,
+    recovery_requests, recovery_witnesses, relationships, responsibility_demand_configs,
+    revocation_votes, risk_alerts, schedules, shard_locations, shard_manifests, spatial_contexts,
+    statement_votes, statements, steward_credentials, stewarded_nodes, stewardship_allocations,
+    token_balances, token_decay_events, token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -1106,6 +1106,10 @@ pub struct Collective {
     pub updated_at: String,
     pub dissolved_at: Option<String>,
     pub region: Option<String>,
+    /// Canonical CID: `collective:{action_hash}`. Nullable pre-coherence (NULL = not yet notarized).
+    pub collective_cid: Option<String>,
+    /// Steward-configurable human alias (e.g. `family-dowell`). NULL ⇒ fall back to `id`.
+    pub slug: Option<String>,
 }
 
 /// New collective for INSERT
@@ -1121,6 +1125,10 @@ pub struct NewCollective<'a> {
     pub reach: &'a str,
     pub metadata_json: Option<&'a str>,
     pub created_by: Option<&'a str>,
+    /// Canonical CID: `collective:{action_hash}`. None pre-coherence.
+    pub collective_cid: Option<&'a str>,
+    /// Steward-configurable human alias. None ⇒ fall back to `id`.
+    pub slug: Option<&'a str>,
 }
 
 // ============================================================================
@@ -1145,6 +1153,13 @@ pub struct CollectiveParticipation {
     pub joined_at: String,
     pub updated_at: String,
     pub departed_at: Option<String>,
+    /// Canonical CID of the member: `agent:{pubkey}` for persons, `collective:{hash}` for collectives.
+    /// Nullable; existing slug-keyed seed rows keep `human_id` and leave this NULL pre-coherence.
+    pub member_cid: Option<String>,
+    /// Kind of member: `'person'` (default) or `'collective'`.
+    pub member_kind: String,
+    /// DHT anchor hash linking this row to the notarized Membership entry. Nullable pre-coherence.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New collective participation for INSERT
@@ -1160,6 +1175,12 @@ pub struct NewCollectiveParticipation<'a> {
     pub governance_weight: f32,
     pub consent_state: &'a str,
     pub metadata_json: Option<&'a str>,
+    /// Canonical CID of the member. None pre-coherence; seed inserts leave this NULL.
+    pub member_cid: Option<&'a str>,
+    /// Kind of member. Defaults to `'person'` at the DB level; None here uses the column default.
+    pub member_kind: &'a str,
+    /// DHT anchor hash for the notarized Membership entry. None pre-coherence.
+    pub dht_anchor_hash: Option<&'a str>,
 }
 
 // ============================================================================
