@@ -42,8 +42,18 @@ async fn main() -> anyhow::Result<()> {
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| format!("doorway={log_level},info").into()),
         )
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().json())
         .init();
+
+    // Structured commit-bearing startup line — the Jenkins build <-> Loki log join key.
+    // ci-investigator filters a pod's logs, reads `commit`, and joins to the build via getBuildScm.
+    let build_info = elohim_compute::BuildInfo::new("elohim-doorway");
+    info!(
+        version = %build_info.version,
+        commit = %build_info.commit,
+        build_time = %build_info.build_time,
+        "doorway starting"
+    );
 
     // Validate configuration
     if let Err(e) = args.validate() {

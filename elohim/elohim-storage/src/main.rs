@@ -233,12 +233,23 @@ struct Args {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Initialize tracing BEFORE creating runtimes
+    // Initialize tracing BEFORE creating runtimes.
+    // JSON output so Grafana Loki can `| json`-extract message/level/target/fields.
     tracing_subscriber::fmt()
+        .json()
         .with_env_filter(
             EnvFilter::from_default_env().add_directive("elohim_storage=info".parse()?),
         )
         .init();
+
+    // Structured commit-bearing startup line — the Jenkins build <-> Loki log join key.
+    let build_info = elohim_compute::BuildInfo::new("elohim-storage");
+    tracing::info!(
+        version = %build_info.version,
+        commit = %build_info.commit,
+        build_time = %build_info.build_time,
+        "elohim-storage starting"
+    );
 
     // Create dedicated server runtime - small, always responsive for HTTP/WebSocket
     let server_rt = tokio::runtime::Builder::new_multi_thread()
@@ -917,7 +928,8 @@ async fn async_main(
                     ConductorAgentInfo, SubscriberConfig,
                 };
                 let cfg = SubscriberConfig::from_env();
-                let (ai_tx, ai_rx) = tokio::sync::mpsc::channel::<ConductorAgentInfo>(cfg.queue_capacity);
+                let (ai_tx, ai_rx) =
+                    tokio::sync::mpsc::channel::<ConductorAgentInfo>(cfg.queue_capacity);
                 p2p_node.set_agent_info_inbound_tx(ai_tx);
                 let _subscriber_task = spawn_agent_info_subscriber_worker(
                     admin_ws_arc.clone(),
