@@ -189,6 +189,32 @@ pub enum ImagodeiSignal {
         action_hash: ActionHash,
         binding: AgentPeerBinding,
     },
+    /// Emitted by `post_commit` when a `Collective` entry is committed
+    /// (Wave 2 T4 — prioritizer epic).
+    ///
+    /// Consumed by elohim-storage `translate_imagodei` (T5) to project
+    /// into `collectives` + upsert the `collective_cid` canonical column.
+    /// Ordering guarantee: `CollectiveCommitted` is emitted before
+    /// `MembershipCommitted` in the same batch so the storage projector
+    /// can upsert the Collective row first.
+    CollectiveCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        collective: Collective,
+        author: AgentPubKey,
+    },
+    /// Emitted by `post_commit` when a `Membership` entry is committed
+    /// (Wave 2 T4 — prioritizer epic).
+    ///
+    /// Consumed by elohim-storage `translate_imagodei` (T5) to upsert
+    /// `collective_participations` keyed by `dht_anchor_hash`, writing
+    /// `member_cid`, `member_kind`, and `collective_cid`.
+    MembershipCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        membership: Membership,
+        author: AgentPubKey,
+    },
 }
 
 // =============================================================================
@@ -272,6 +298,32 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 action_hash,
                 entry_hash,
                 relationship,
+                author,
+            })?;
+        } else if let Some(collective) = record
+            .entry()
+            .to_app_option::<Collective>()
+            .ok()
+            .flatten()
+        {
+            // Emit CollectiveCommitted BEFORE MembershipCommitted so the storage
+            // projector (T5) can upsert the Collective row before its memberships.
+            emit_signal(ImagodeiSignal::CollectiveCommitted {
+                action_hash,
+                entry_hash,
+                collective,
+                author,
+            })?;
+        } else if let Some(membership) = record
+            .entry()
+            .to_app_option::<Membership>()
+            .ok()
+            .flatten()
+        {
+            emit_signal(ImagodeiSignal::MembershipCommitted {
+                action_hash,
+                entry_hash,
+                membership,
                 author,
             })?;
         }
