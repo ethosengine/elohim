@@ -8,6 +8,10 @@
   "additionalProperties": false,
   "properties": {
     "envelope": { "$ref": "../views/epr-envelope-view.schema.json" },
-    "payload": { "type": "string", "description": "Hex-encoded payload bytes" }
+    "payload": { "type": "string", "description": "Hex-encoded payload bytes" },
+    "event": {
+      "type": ["object", "null"],
+      "description": "Optional republish-epr EconomicEvent (camelCase RepublishEprEventView in elohim/elohim-views/src/epr.rs). Null/absent for direct envelope writes; present for substrate-correct re-deploys, where it is strictly validated downstream by the DHT economic-event schema (economic-events/republish-epr.schema.json, snake_case) and the substrate bounds validator. Declared here only so this camelCase input envelope accepts the field under additionalProperties:false."
+    }
   }
 }

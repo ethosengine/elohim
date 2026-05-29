@@ -24,4 +24,13 @@ verified_at: string | null,
  * events it spawned) with their source Collab.  Settlement events carry the
  * Collab CID in their `metadata_json` extensions block.
  */
-scope_collab_cid: string | null, };
+scope_collab_cid: string | null, 
+/**
+ * CID of the Mishpat::Commitment that bounds this event (compute-class only).
+ *
+ * Populated by callers emitting events under a `delegates-compute` commitment.
+ * NULL for events not bound to a commitment (care-class events, legacy events).
+ * Used by `DieselRateHistory` for sliding-window rate queries.
+ * Migration: 2026-05-28-050000_economic_events_add_bounded_by.
+ */
+bounded_by: string | null, };

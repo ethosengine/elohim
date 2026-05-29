@@ -42,7 +42,19 @@ fn load_ref_map() -> HashMap<String, Value> {
     let base = schema_dir();
     let mut refs = HashMap::new();
 
-    for subdir in &["enums", "views", "manifests", "objects", "manifest-payloads"] {
+    // NB: both "manifests" (plural — bootstrap payloads) and "manifest" (singular —
+    // floor/policy schemas like tending-policy-floor, standing-policy-floor) must be
+    // scanned. The singular dir holds the `epr:schema:manifest:*` $id targets that
+    // manifest-payloads schemas $ref; omitting it leaves those refs unresolved and the
+    // jsonschema compile fails with "Unknown scheme epr".
+    for subdir in &[
+        "enums",
+        "views",
+        "manifests",
+        "manifest",
+        "objects",
+        "manifest-payloads",
+    ] {
         let dir = base.join(subdir);
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
