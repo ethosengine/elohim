@@ -1069,7 +1069,17 @@ VEOF
                         if (credUsed) {
                             echo "stageSpaBlobs auth: using credential '${credUsed}'"
                         } else {
-                            echo "stageSpaBlobs auth: WARN — neither storage-api-key-admin nor doorway-admin-bootstrap-key credential visible at this job's scope. Continuing with PUT-only path (PATCH+verify skipped)."
+                            // RC2 hardening (2026-05-28): fail loud instead of
+                            // silently degrading to PUT-only. Without the admin
+                            // credential, stageSpaBlobs can upload blob bytes but
+                            // CANNOT PATCH the blobHash onto the content rows —
+                            // so db/content/lamad-spa keeps no blobHash and
+                            // /apps/lamad-spa/ 404s, leaving /lamad dark while the
+                            // build reports green. That silent drift is exactly
+                            // what spa-blob-deploy-drift documented. A blocked
+                            // deploy with an actionable message beats a green deploy
+                            // that doesn't serve.
+                            error("stageSpaBlobs auth: neither 'storage-api-key-admin' nor 'doorway-admin-bootstrap-key' is visible at this job's credential scope. The blobHash PATCH (db/content/{slug}) cannot run without it, which leaves lamad-spa blobless and /lamad 404ing. Provision one of these credentials at the App job/folder scope, then re-run. (To intentionally ship a no-content deploy, remove this guard deliberately.)")
                         }
                         // Two pillar-EPR bundles, two content rows (Task B21).
                         // Order matters only insofar as elohim-app must build

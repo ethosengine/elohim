@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-28",
+  "cites": {
+    "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md": [
+      "project_dissolution_principle_sensemaking_collectives"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md": [
+      "project_elohim_agent_sense_respond_architecture"
+    ],
+    "genesis/docs/architecture/cradle-to-grave-capability-gradient.md": [
+      "project_graduated_recovery_authority"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md": [
+      "project_graph_native_substrate_landed_2026_05_16"
+    ],
+    "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md": [
+      "project_graph_native_substrate_landed_2026_05_16"
+    ],
+    "genesis/docs/content/elohim-protocol/value_scanner/epic.md": [
+      "project_household_living_core_lived_contrast_diffusion"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md": [
+      "project_memory_cites_edge"
+    ],
+    ".claude/scripts/memory-kit/memory-coherence-audit.py": [
+      "project_memory_cites_edge"
+    ],
+    ".claude/hooks/memory-coherence-signal.py": [
+      "project_memory_cites_edge"
+    ],
+    "genesis/docs/architecture/stewardship-over-sovereignty.md": [
+      "project_no_sovereignty_stewardship_over_ownership"
+    ],
+    "genesis/docs/architecture/rea-compute-commitment-primitive.md": [
+      "project_rea_compute_commitment_primitive"
+    ],
+    "genesis/docs/content/elohim-protocol/resilience/README.md": [
+      "project_resilience_epic_landed_2026_05_18"
+    ],
+    "genesis/docs/content/elohim-protocol/hardware-spec.md": [
+      "project_substrate_scale_ceiling"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md": [
+      "project_tiered_quilt_spec_landed_2026_05_11"
+    ]
+  }
+}
