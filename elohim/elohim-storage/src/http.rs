@@ -3162,6 +3162,16 @@ impl HttpServer {
             return self.handle_dht_entry(req, method, entry_hash).await;
         }
 
+        // GET /db/rea_commitments?action=project-epr&doorwayId={id}
+        // Serves the EprRouter source for doorway: fetches all active project-epr
+        // commitments for a given doorway from local SQL. The doorway calls this on
+        // startup to populate its route table via replace_all(). Without this arm the
+        // request falls through to "Unknown database endpoint" (404) and /lamad + /
+        // return 404 on every doorway even when the commitments exist in SQL.
+        if resource_path == "rea_commitments" {
+            return self.handle_db_rea_commitments(req, method, &app_ctx).await;
+        }
+
         Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .header(header::CONTENT_TYPE, "application/json")
@@ -3187,6 +3197,43 @@ impl HttpServer {
             .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
         let scoped = db::AppScopedDb::new(pool.clone(), &app_ctx.h_app_id);
         Ok(response::from_result(scoped.stats()))
+    }
+
+    /// GET /db/rea_commitments?action=project-epr&doorwayId={id}
+    ///
+    /// Returns all active project-epr `EprProjectionView`s for the given doorway
+    /// from local SQL.  The doorway's EprRouter calls this on startup to populate
+    /// its `replace_all()` route table.  Accepts only `action=project-epr`; any
+    /// other action value is a 400 because no other action produces projectable
+    /// URL paths.
+    async fn handle_db_rea_commitments(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        #[derive(serde::Deserialize, Default)]
+        #[serde(rename_all = "camelCase")]
+        struct ReaCommitmentsQuery {
+            action: Option<String>,
+            doorway_id: Option<String>,
+        }
+
+        let params: ReaCommitmentsQuery = req
+            .uri()
+            .query()
+            .and_then(|q| serde_urlencoded::from_str(q).ok())
+            .unwrap_or_default();
+
+        let action = params.action.as_deref().unwrap_or("").to_string();
+        let doorway_id = params.doorway_id.as_deref().unwrap_or("").to_string();
+
+        self.handle_db_rea_commitments_inner(&action, &doorway_id, ctx)
+            .await
     }
 
     /// GET /db/content - List content, POST /db/content - Create content
@@ -8128,6 +8175,65 @@ impl HttpServer {
         }
     }
 
+    /// Drive `GET /db/rea_commitments?action={action}&doorwayId={doorway_id}` directly.
+    ///
+    /// Not guarded by `#[cfg(test)]` — integration test binaries in `tests/` compile
+    /// the library without `cfg(test)` set (only the binary itself carries that flag).
+    pub async fn test_get_db_rea_commitments(
+        &self,
+        action: &str,
+        doorway_id: &str,
+    ) -> HttpTestResponse {
+        let app_ctx = db::AppContext::default_lamad();
+
+        match self
+            .handle_db_rea_commitments_inner(action, doorway_id, &app_ctx)
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+
+    /// Inner handler: validate params and call find_active_projections.
+    ///
+    /// Extracted so both `handle_db_rea_commitments` (which parses query params from
+    /// Request<Incoming>) and `test_get_db_rea_commitments` (which takes pre-parsed
+    /// params) can share the same logic without constructing a full HTTP request.
+    async fn handle_db_rea_commitments_inner(
+        &self,
+        action: &str,
+        doorway_id: &str,
+        ctx: &db::AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if action != "project-epr" {
+            return Ok(response::error_response(StorageError::InvalidInput(
+                "GET /db/rea_commitments requires action=project-epr".into(),
+            )));
+        }
+        if doorway_id.is_empty() {
+            return Ok(response::error_response(StorageError::InvalidInput(
+                "GET /db/rea_commitments requires doorwayId".into(),
+            )));
+        }
+        let mut conn = self.get_diesel_conn()?;
+        let views = db::rea_commitments::find_active_projections(&mut conn, ctx, doorway_id)?;
+        Ok(response::ok(&serde_json::json!({
+            "items": views,
+            "count": views.len(),
+        })))
+    }
+
     /// Expose the db pool for integration test assertions on
     /// `peer_blob_inventory` rows written by dual-write.
     /// Not guarded by `#[cfg(test)]` — see note above.
@@ -10020,6 +10126,16 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::get("/db/challenge-outcomes/{cid}")
                 .handler("get_challenge_outcome")
                 .auth_required()
+                .build(),
+        )
+        // ── REA commitments projection query (EprRouter source) ─────────────────
+        .route(
+            Route::get("/db/rea_commitments")
+                .handler("list_epr_projection_commitments")
+                .description(
+                    "List project-epr projection commitments for a doorway (EprRouter source)",
+                )
+                .cache_ttl(30)
                 .build(),
         )
         // ── Conductor-bridge routes (Phase 10 HTTP pipes, Phase 11 full queries) ──
