@@ -25,9 +25,7 @@ use crate::hc_client::HcClient;
 use crate::services::bounds_validator::{validate, BoundsViolation, EventForValidation};
 use crate::services::commitment_fetcher::ConductorCommitmentFetcher;
 use crate::services::rate_history::DieselRateHistory;
-use elohim_views::bounds::{
-    BoundsChecksView, BoundsValidationResultView, BoundsViolationView,
-};
+use elohim_views::bounds::{BoundsChecksView, BoundsValidationResultView, BoundsViolationView};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -135,8 +133,8 @@ pub async fn handle(
 }
 
 fn ok_json<T: serde::Serialize>(value: &T) -> Result<Response<Full<Bytes>>, StorageError> {
-    let body = serde_json::to_vec(value)
-        .map_err(|e| StorageError::Internal(format!("serialize: {e}")))?;
+    let body =
+        serde_json::to_vec(value).map_err(|e| StorageError::Internal(format!("serialize: {e}")))?;
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(hyper::header::CONTENT_TYPE, "application/json")

@@ -28,8 +28,6 @@ pub mod accumulation_status;
 pub mod content_engagement_stats;
 pub mod mechanism_selection;
 // M-AGGR-1: session + upgrade-prompt projections (Category C, EconomicEvent × HumanProgress × onboarding Manifest)
-pub mod session_human_view;
-pub mod upgrade_prompt_view;
 pub mod agreements;
 pub mod collectives;
 pub mod comments;
@@ -50,9 +48,11 @@ pub mod rea_commitments;
 pub mod relationships_diesel;
 pub mod risk_alerts;
 pub mod schedules;
+pub mod session_human_view;
 pub mod spatial_contexts;
 pub mod steward_affinity;
 pub mod stewardship_allocations;
+pub mod upgrade_prompt_view;
 
 // Governance tables (v7)
 pub mod governance;

@@ -3676,8 +3676,8 @@ fn accumulation_status_view_pending_validates() {
 #[test]
 fn accumulation_status_view_rejects_missing_required_fields() {
     let schema = load_schema("views/accumulation-status.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("accumulation-status schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("accumulation-status schema should compile");
 
     // Missing status
     let no_status = {
@@ -3716,8 +3716,8 @@ fn accumulation_status_view_rejects_missing_required_fields() {
 #[test]
 fn accumulation_status_view_rejects_unknown_status_value() {
     let schema = load_schema("views/accumulation-status.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("accumulation-status schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("accumulation-status schema should compile");
 
     let mut bad = minimal_accumulation_status();
     *bad.get_mut("status").unwrap() = serde_json::json!("stalemate");
@@ -3730,14 +3730,11 @@ fn accumulation_status_view_rejects_unknown_status_value() {
 #[test]
 fn accumulation_status_schema_declares_source_of_truth() {
     let path = schema_dir().join("views/accumulation-status.schema.json");
-    let content = fs::read_to_string(&path)
-        .expect("views/accumulation-status.schema.json must exist");
+    let content =
+        fs::read_to_string(&path).expect("views/accumulation-status.schema.json must exist");
     let schema_value: Value = serde_json::from_str(&content)
         .expect("views/accumulation-status.schema.json must be valid JSON");
-    assert_source_of_truth_declared(
-        &schema_value,
-        "views/accumulation-status.schema.json",
-    );
+    assert_source_of_truth_declared(&schema_value, "views/accumulation-status.schema.json");
 }
 
 #[test]
@@ -3783,8 +3780,8 @@ fn standing_policy_payload_without_thresholds_validates() {
 #[test]
 fn standing_policy_payload_rejects_missing_floor() {
     let schema = load_schema("manifest-payloads/standing-policy.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("standing-policy payload schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("standing-policy payload schema should compile");
 
     let no_floor = serde_json::json!({
         "accumulation_thresholds": {
@@ -3908,8 +3905,8 @@ fn mechanism_selection_view_level_zero_validates() {
 #[test]
 fn mechanism_selection_view_rejects_missing_required_fields() {
     let schema = load_schema("views/mechanism-selection.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("mechanism-selection schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("mechanism-selection schema should compile");
 
     // Missing level
     let no_level = {
@@ -3948,8 +3945,8 @@ fn mechanism_selection_view_rejects_missing_required_fields() {
 #[test]
 fn mechanism_selection_view_rejects_invalid_render_target() {
     let schema = load_schema("views/mechanism-selection.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("mechanism-selection schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("mechanism-selection schema should compile");
 
     let mut bad = minimal_mechanism_selection();
     *bad.get_mut("renderTarget").unwrap() = serde_json::json!("holochain");
@@ -3962,14 +3959,11 @@ fn mechanism_selection_view_rejects_invalid_render_target() {
 #[test]
 fn mechanism_selection_view_schema_declares_source_of_truth() {
     let path = schema_dir().join("views/mechanism-selection.schema.json");
-    let content = fs::read_to_string(&path)
-        .expect("views/mechanism-selection.schema.json must exist");
+    let content =
+        fs::read_to_string(&path).expect("views/mechanism-selection.schema.json must exist");
     let schema_value: Value = serde_json::from_str(&content)
         .expect("views/mechanism-selection.schema.json must be valid JSON");
-    assert_source_of_truth_declared(
-        &schema_value,
-        "views/mechanism-selection.schema.json",
-    );
+    assert_source_of_truth_declared(&schema_value, "views/mechanism-selection.schema.json");
 }
 
 #[test]
@@ -4043,19 +4037,32 @@ fn tending_floor_json() -> Value {
 #[test]
 fn tending_policy_payload_minimal_validates() {
     // floor is the only required field; all other fields are optional.
-    validate_against_schema("manifest-payloads/tending-policy.schema.json", &tending_floor_json());
+    validate_against_schema(
+        "manifest-payloads/tending-policy.schema.json",
+        &tending_floor_json(),
+    );
 }
 
 #[test]
 fn tending_policy_payload_with_dwell_qualification_validates() {
     // A complete tending-policy payload with all optional fields populated.
     let mut payload = tending_floor_json();
-    payload.as_object_mut().unwrap().insert("dwell_qualification_ms".to_string(), serde_json::json!(5000));
-    payload.as_object_mut().unwrap().insert("min_ttl_seconds".to_string(), serde_json::json!(7200));
-    payload.as_object_mut().unwrap().insert("collective_k_threshold".to_string(), serde_json::json!(10));
-    payload.as_object_mut().unwrap().insert("allowed_classifications".to_string(), serde_json::json!([
-        "values-forward", "fatigue"
-    ]));
+    payload.as_object_mut().unwrap().insert(
+        "dwell_qualification_ms".to_string(),
+        serde_json::json!(5000),
+    );
+    payload
+        .as_object_mut()
+        .unwrap()
+        .insert("min_ttl_seconds".to_string(), serde_json::json!(7200));
+    payload
+        .as_object_mut()
+        .unwrap()
+        .insert("collective_k_threshold".to_string(), serde_json::json!(10));
+    payload.as_object_mut().unwrap().insert(
+        "allowed_classifications".to_string(),
+        serde_json::json!(["values-forward", "fatigue"]),
+    );
     validate_against_schema("manifest-payloads/tending-policy.schema.json", &payload);
 }
 
@@ -4064,8 +4071,8 @@ fn tending_policy_payload_rejects_missing_floor() {
     // floor sub-object is required — the integrity zome enforces this at create time.
     let no_floor = serde_json::json!({ "dwell_qualification_ms": 3000 });
     let schema = load_schema("manifest-payloads/tending-policy.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("tending-policy schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("tending-policy schema should compile");
     assert!(
         validator.iter_errors(&no_floor).next().is_some(),
         "tending-policy payload must require the floor sub-object"
@@ -4075,8 +4082,8 @@ fn tending_policy_payload_rejects_missing_floor() {
 #[test]
 fn tending_policy_payload_schema_declares_source_of_truth() {
     let path = schema_dir().join("manifest-payloads/tending-policy.schema.json");
-    let content = fs::read_to_string(&path)
-        .expect("manifest-payloads/tending-policy.schema.json must exist");
+    let content =
+        fs::read_to_string(&path).expect("manifest-payloads/tending-policy.schema.json must exist");
     let schema_value: Value = serde_json::from_str(&content)
         .expect("manifest-payloads/tending-policy.schema.json must be valid JSON");
     assert_source_of_truth_declared(
@@ -4122,8 +4129,8 @@ fn attention_tending_intent_with_reason_validates() {
 #[test]
 fn attention_tending_intent_rejects_missing_required_fields() {
     let schema = load_schema("intents/attention-tending-intent.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("attention-tending-intent schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("attention-tending-intent schema should compile");
 
     // Missing filterSubjectJson
     let no_filter = serde_json::json!({
@@ -4166,8 +4173,8 @@ fn attention_tending_intent_rejects_missing_required_fields() {
 #[test]
 fn attention_tending_intent_rejects_invalid_classification() {
     let schema = load_schema("intents/attention-tending-intent.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("attention-tending-intent schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("attention-tending-intent schema should compile");
 
     let bad_class = serde_json::json!({
         "filterSubjectJson": r#"{"contentId":"abc"}"#,
@@ -4185,8 +4192,8 @@ fn attention_tending_intent_rejects_invalid_classification() {
 #[test]
 fn attention_tending_intent_schema_declares_source_of_truth() {
     let path = schema_dir().join("intents/attention-tending-intent.schema.json");
-    let content = fs::read_to_string(&path)
-        .expect("intents/attention-tending-intent.schema.json must exist");
+    let content =
+        fs::read_to_string(&path).expect("intents/attention-tending-intent.schema.json must exist");
     let schema_value: Value = serde_json::from_str(&content)
         .expect("intents/attention-tending-intent.schema.json must be valid JSON");
     assert_source_of_truth_declared(
@@ -4478,8 +4485,8 @@ fn content_engagement_stats_view_full_completion_validates() {
 #[test]
 fn content_engagement_stats_view_rejects_missing_required_fields() {
     let schema = load_schema("views/content-engagement-stats-view.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("content-engagement-stats schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("content-engagement-stats schema should compile");
 
     // Missing views
     let no_views = {
@@ -4663,7 +4670,10 @@ fn minimal_session_human() -> serde_json::Value {
 
 #[test]
 fn session_human_view_minimal_validates() {
-    validate_against_schema("views/session-human-view.schema.json", &minimal_session_human());
+    validate_against_schema(
+        "views/session-human-view.schema.json",
+        &minimal_session_human(),
+    );
 }
 
 #[test]
@@ -4686,10 +4696,19 @@ fn session_human_view_null_journey_validates() {
 #[test]
 fn session_human_view_rejects_missing_required_fields() {
     let schema = load_schema("views/session-human-view.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("session-human-view schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("session-human-view schema should compile");
 
-    for field in &["agentId", "hAppId", "nodesViewed", "nodesWithAffinity", "pathsStarted", "pathsCompleted", "stepsCompleted", "computedAt"] {
+    for field in &[
+        "agentId",
+        "hAppId",
+        "nodesViewed",
+        "nodesWithAffinity",
+        "pathsStarted",
+        "pathsCompleted",
+        "stepsCompleted",
+        "computedAt",
+    ] {
         let mut v = minimal_session_human();
         v.as_object_mut().unwrap().remove(*field);
         assert!(
@@ -4757,8 +4776,8 @@ fn upgrade_prompt_view_with_prompts_validates() {
 #[test]
 fn upgrade_prompt_view_rejects_missing_required_fields() {
     let schema = load_schema("views/upgrade-prompt-view.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("upgrade-prompt-view schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("upgrade-prompt-view schema should compile");
 
     for field in &["agentId", "hAppId", "activePrompts", "computedAt"] {
         let mut v = minimal_upgrade_prompt();
@@ -4885,10 +4904,7 @@ fn bounds_validation_result_passing_validates() {
             "not_revoked": true
         }
     });
-    validate_against_schema(
-        "views/bounds-validation-result-view.schema.json",
-        &passing,
-    );
+    validate_against_schema("views/bounds-validation-result-view.schema.json", &passing);
 }
 
 #[test]
@@ -4911,10 +4927,7 @@ fn bounds_validation_result_failing_with_violation_validates() {
             "not_revoked": false
         }
     });
-    validate_against_schema(
-        "views/bounds-validation-result-view.schema.json",
-        &failing,
-    );
+    validate_against_schema("views/bounds-validation-result-view.schema.json", &failing);
 }
 
 #[test]
@@ -4946,10 +4959,7 @@ fn bounds_validation_result_all_violation_kinds_valid() {
                 "not_revoked": false
             }
         });
-        validate_against_schema(
-            "views/bounds-validation-result-view.schema.json",
-            &instance,
-        );
+        validate_against_schema("views/bounds-validation-result-view.schema.json", &instance);
     }
 }
 
@@ -5057,8 +5067,8 @@ fn standing_score_view_all_tiers_valid() {
 #[test]
 fn standing_score_view_rejects_missing_required_fields() {
     let schema = load_schema("views/standing-score-view.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("standing-score-view schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("standing-score-view schema should compile");
 
     // Missing score
     let no_score = serde_json::json!({

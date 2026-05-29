@@ -36,8 +36,12 @@ use elohim_views::MechanismSelectionView;
 // ---------------------------------------------------------------------------
 
 const DEFAULT_SETTLED_STATES: &[&str] = &["constitutional", "settled"];
-const DEFAULT_FEEDBACK_INVITING_TYPES: &[&str] =
-    &["discussion", "proposal-draft", "request-for-comment", "reflection"];
+const DEFAULT_FEEDBACK_INVITING_TYPES: &[&str] = &[
+    "discussion",
+    "proposal-draft",
+    "request-for-comment",
+    "reflection",
+];
 const DEFAULT_LEVEL_NO_PROPOSAL: i32 = 1; // reactions only
 
 /// Default mechanism level for a given votingMechanism string.
@@ -323,12 +327,14 @@ pub fn project_mechanism_selection(
         .filter(proposals::status.ne("withdrawn"))
         .filter(proposals::status.ne("superseded"))
         .filter(proposals::status.ne("closed"))
-        .select((proposals::id, proposals::voting_mechanism, proposals::status))
+        .select((
+            proposals::id,
+            proposals::voting_mechanism,
+            proposals::status,
+        ))
         .first::<(String, String, String)>(conn)
         .optional()
-        .map_err(|e| {
-            StorageError::Database(format!("mechanism_selection proposal load: {e}"))
-        })?
+        .map_err(|e| StorageError::Database(format!("mechanism_selection proposal load: {e}")))?
         .map(|(id, voting_mechanism, status)| ProposalSlim {
             id,
             voting_mechanism,
@@ -396,7 +402,11 @@ pub fn project_mechanism_selection(
 
     // Rule 4: Default level (usually 1 = reactions only)
     let level = ladder.default_level_no_proposal;
-    let mechanism = if level <= 1 { "reactions" } else { "graduated-feedback" };
+    let mechanism = if level <= 1 {
+        "reactions"
+    } else {
+        "graduated-feedback"
+    };
     upsert_and_return(
         conn,
         entity_type,
@@ -489,9 +499,7 @@ pub fn fetch_mechanism_selection(
         .first::<MechanismSelectionRow>(conn)
         .optional()
         .map(|opt| opt.map(MechanismSelectionView::from))
-        .map_err(|e| {
-            StorageError::Database(format!("mechanism_selection fetch: {e}"))
-        })
+        .map_err(|e| StorageError::Database(format!("mechanism_selection fetch: {e}")))
 }
 
 /// Recompute mechanism_selection for ALL (entity_type, entity_id) pairs in the table.
@@ -531,7 +539,9 @@ mod tests {
     fn default_ladder_has_two_settled_states() {
         let ladder = MechanismLadder::default();
         assert!(
-            ladder.settled_states.contains(&"constitutional".to_string()),
+            ladder
+                .settled_states
+                .contains(&"constitutional".to_string()),
             "constitutional must be a settled state"
         );
         assert!(
@@ -564,18 +574,18 @@ mod tests {
         // Mirrors FEEDBACK_CONTENT_TYPES from mechanism-selection.service.ts:
         //   discussion, proposal-draft, request-for-comment, reflection
         let ladder = MechanismLadder::default();
-        assert!(ladder.feedback_inviting_types.contains(&"discussion".to_string()));
-        assert!(
-            ladder
-                .feedback_inviting_types
-                .contains(&"proposal-draft".to_string())
-        );
-        assert!(
-            ladder
-                .feedback_inviting_types
-                .contains(&"request-for-comment".to_string())
-        );
-        assert!(ladder.feedback_inviting_types.contains(&"reflection".to_string()));
+        assert!(ladder
+            .feedback_inviting_types
+            .contains(&"discussion".to_string()));
+        assert!(ladder
+            .feedback_inviting_types
+            .contains(&"proposal-draft".to_string()));
+        assert!(ladder
+            .feedback_inviting_types
+            .contains(&"request-for-comment".to_string()));
+        assert!(ladder
+            .feedback_inviting_types
+            .contains(&"reflection".to_string()));
         assert_eq!(
             ladder.feedback_inviting_types.len(),
             4,
@@ -610,11 +620,9 @@ mod tests {
         assert_eq!(ladder.settled_states.len(), 3);
         assert!(ladder.settled_states.contains(&"archived".to_string()));
         assert_eq!(ladder.mechanism_level_map["custom-mechanism"], 7);
-        assert!(
-            ladder
-                .feedback_inviting_types
-                .contains(&"custom-type".to_string())
-        );
+        assert!(ladder
+            .feedback_inviting_types
+            .contains(&"custom-type".to_string()));
         assert_eq!(ladder.default_level_no_proposal, 2);
     }
 

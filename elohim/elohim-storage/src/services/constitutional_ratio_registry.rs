@@ -52,10 +52,18 @@ struct RawConstitutionalRatios {
     free_pct: u8,
 }
 
-fn default_commons() -> u8 { 20 }
-fn default_dwelling() -> u8 { 40 }
-fn default_collective() -> u8 { 25 }
-fn default_free() -> u8 { 15 }
+fn default_commons() -> u8 {
+    20
+}
+fn default_dwelling() -> u8 {
+    40
+}
+fn default_collective() -> u8 {
+    25
+}
+fn default_free() -> u8 {
+    15
+}
 
 #[derive(Deserialize)]
 struct ElohimManifest {
@@ -71,7 +79,10 @@ pub fn effective_ratios() -> EffectiveRatiosWithProvenance {
 
 fn load_from_manifest() -> EffectiveRatiosWithProvenance {
     let manifest_path = std::env::var("ELOHIM_MANIFEST_PATH").unwrap_or_else(|_| {
-        format!("{}/../sdk/domains/elohim/manifest.json", env!("CARGO_MANIFEST_DIR"))
+        format!(
+            "{}/../sdk/domains/elohim/manifest.json",
+            env!("CARGO_MANIFEST_DIR")
+        )
     });
     let manifest_cid = compute_manifest_cid(&manifest_path);
     let raw = match std::fs::read(&manifest_path) {
@@ -83,21 +94,37 @@ fn load_from_manifest() -> EffectiveRatiosWithProvenance {
             };
         }
     };
-    let parsed: ElohimManifest = serde_json::from_slice(&raw).unwrap_or(ElohimManifest { constitutional_ratios: None });
-    let raw = parsed.constitutional_ratios.unwrap_or(RawConstitutionalRatios {
-        commons_pct: default_commons(),
-        dwelling_pct: default_dwelling(),
-        collective_pct: default_collective(),
-        free_pct: default_free(),
+    let parsed: ElohimManifest = serde_json::from_slice(&raw).unwrap_or(ElohimManifest {
+        constitutional_ratios: None,
     });
-    let commons  = raw.commons_pct.clamp(COMMONS_MIN_FLOOR_PCT,  COMMONS_MAX_CEILING_PCT);
-    let dwelling = raw.dwelling_pct.clamp(DWELLING_MIN_FLOOR_PCT, DWELLING_MAX_CEILING_PCT);
-    let free     = raw.free_pct.clamp(FREE_MIN_FLOOR_PCT,     FREE_MAX_CEILING_PCT);
+    let raw = parsed
+        .constitutional_ratios
+        .unwrap_or(RawConstitutionalRatios {
+            commons_pct: default_commons(),
+            dwelling_pct: default_dwelling(),
+            collective_pct: default_collective(),
+            free_pct: default_free(),
+        });
+    let commons = raw
+        .commons_pct
+        .clamp(COMMONS_MIN_FLOOR_PCT, COMMONS_MAX_CEILING_PCT);
+    let dwelling = raw
+        .dwelling_pct
+        .clamp(DWELLING_MIN_FLOOR_PCT, DWELLING_MAX_CEILING_PCT);
+    let free = raw.free_pct.clamp(FREE_MIN_FLOOR_PCT, FREE_MAX_CEILING_PCT);
     // collective is the residual to make percentages sum to 100; if manifest's
     // collective_pct disagrees, the residual wins (substrate-correct).
-    let collective = 100u8.saturating_sub(commons).saturating_sub(dwelling).saturating_sub(free);
+    let collective = 100u8
+        .saturating_sub(commons)
+        .saturating_sub(dwelling)
+        .saturating_sub(free);
     EffectiveRatiosWithProvenance {
-        ratios: EffectiveRatios { commons_pct: commons, dwelling_pct: dwelling, collective_pct: collective, free_pct: free },
+        ratios: EffectiveRatios {
+            commons_pct: commons,
+            dwelling_pct: dwelling,
+            collective_pct: collective,
+            free_pct: free,
+        },
         manifest_cid,
     }
 }
@@ -125,7 +152,10 @@ mod tests {
     fn effective_ratios_sums_to_100() {
         let r = effective_ratios().ratios;
         assert_eq!(
-            r.commons_pct as u16 + r.dwelling_pct as u16 + r.collective_pct as u16 + r.free_pct as u16,
+            r.commons_pct as u16
+                + r.dwelling_pct as u16
+                + r.collective_pct as u16
+                + r.free_pct as u16,
             100u16
         );
     }
@@ -133,9 +163,11 @@ mod tests {
     #[test]
     fn effective_ratios_within_dna_walls() {
         let r = effective_ratios().ratios;
-        assert!(r.commons_pct  >= COMMONS_MIN_FLOOR_PCT  && r.commons_pct  <= COMMONS_MAX_CEILING_PCT);
-        assert!(r.dwelling_pct >= DWELLING_MIN_FLOOR_PCT && r.dwelling_pct <= DWELLING_MAX_CEILING_PCT);
-        assert!(r.free_pct     >= FREE_MIN_FLOOR_PCT     && r.free_pct     <= FREE_MAX_CEILING_PCT);
+        assert!(r.commons_pct >= COMMONS_MIN_FLOOR_PCT && r.commons_pct <= COMMONS_MAX_CEILING_PCT);
+        assert!(
+            r.dwelling_pct >= DWELLING_MIN_FLOOR_PCT && r.dwelling_pct <= DWELLING_MAX_CEILING_PCT
+        );
+        assert!(r.free_pct >= FREE_MIN_FLOOR_PCT && r.free_pct <= FREE_MAX_CEILING_PCT);
     }
 
     #[test]

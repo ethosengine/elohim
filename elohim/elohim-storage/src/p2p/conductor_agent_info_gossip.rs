@@ -148,8 +148,7 @@ pub async fn publish_once(
             // base64-encode the agent_pub_key bytes for substring match against
             // the JSON. kitsune2 v2 serializes pubkeys as base64 strings.
             use base64::Engine;
-            base64::engine::general_purpose::URL_SAFE_NO_PAD
-                .encode(cid.agent_pubkey().get_raw_39())
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(cid.agent_pubkey().get_raw_39())
         })
         .collect();
 
@@ -462,7 +461,11 @@ mod tests {
         // Bound of 512 covers real kitsune2 agent_info (~400-600 bytes typical) with
         // some slack for unusual cases — but tight enough to catch runaway field
         // additions in future revisions.
-        assert!(bytes.len() < 512, "payload should fit in 512B; got {} bytes", bytes.len());
+        assert!(
+            bytes.len() < 512,
+            "payload should fit in 512B; got {} bytes",
+            bytes.len()
+        );
     }
 
     #[test]
@@ -552,8 +555,16 @@ mod tests {
         lim.acquire(10).await;
         lim.acquire(10).await;
         let elapsed = start.elapsed().as_millis();
-        assert!(elapsed >= 900, "burst should take ≥900ms; got {}ms", elapsed);
-        assert!(elapsed < 1500, "burst shouldn't take >1.5s; got {}ms", elapsed);
+        assert!(
+            elapsed >= 900,
+            "burst should take ≥900ms; got {}ms",
+            elapsed
+        );
+        assert!(
+            elapsed < 1500,
+            "burst shouldn't take >1.5s; got {}ms",
+            elapsed
+        );
     }
 
     #[test]

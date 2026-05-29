@@ -15,8 +15,8 @@
 //! ```
 
 pub mod account;
-pub mod attention;
 pub mod agreements;
+pub mod attention;
 pub mod attestations;
 pub mod blob;
 pub mod cluster;

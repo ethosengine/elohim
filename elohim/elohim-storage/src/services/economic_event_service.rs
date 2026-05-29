@@ -190,11 +190,13 @@ impl EconomicEventService {
             (&event.lamad_event_type, &event.content_id)
         {
             if matches!(lamad_type.as_str(), "content-view" | "content-complete") {
-                if let Err(e) = crate::db::content_engagement_stats::project_content_engagement_stats(
-                    conn,
-                    content_id,
-                    &ctx.h_app_id,
-                ) {
+                if let Err(e) =
+                    crate::db::content_engagement_stats::project_content_engagement_stats(
+                        conn,
+                        content_id,
+                        &ctx.h_app_id,
+                    )
+                {
                     warn!(
                         target = "economic_event_service",
                         error = %e,

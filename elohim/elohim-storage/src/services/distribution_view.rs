@@ -472,7 +472,7 @@ fn load_replica_peers_full(
             hop_hint: None,
             household_id: None,
             region_tier: None,
-            shards_held: None,    // T15: computed
+            shards_held: None,        // T15: computed
             shards_by_encoding: None, // T15: computed
         });
     }

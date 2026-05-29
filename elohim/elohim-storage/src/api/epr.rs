@@ -643,20 +643,18 @@ async fn put_epr(
             // mishpat::get_commitment wiring lands).
             match hc_lamad {
                 Some(hc_client) => {
-                    let fetcher =
-                        crate::services::commitment_fetcher::ConductorCommitmentFetcher {
-                            hc_client,
-                        };
+                    let fetcher = crate::services::commitment_fetcher::ConductorCommitmentFetcher {
+                        hc_client,
+                    };
                     let rate =
                         crate::services::rate_history::DieselRateHistory { pool: pool.clone() };
-                    let result =
-                        crate::services::republish_epr_validator::validate_republish_epr(
-                            &event_json,
-                            &fetcher,
-                            &rate,
-                            &target_epr_id,
-                        )
-                        .await;
+                    let result = crate::services::republish_epr_validator::validate_republish_epr(
+                        &event_json,
+                        &fetcher,
+                        &rate,
+                        &target_epr_id,
+                    )
+                    .await;
                     if let Err(e) = result {
                         return Ok(response::bad_request(&format!(
                             "republish-epr validation failed: {e}"

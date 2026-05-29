@@ -106,15 +106,13 @@ fn bad_custody_signal_higher_weight() {
     let target = subj("bad-custody");
 
     // ONE bad-custody (weight 20) → Floor (since 20 ≥ 8 threshold).
-    let score = project_extension_signal(
-        &mut conn,
-        &evaluator,
-        &target,
-        "bad-custody",
-        "mfst",
-    )
-    .expect("bad-custody signal");
-    assert_eq!(score, StandingScore::Floor, "bad-custody weight=20 should reach Floor");
+    let score = project_extension_signal(&mut conn, &evaluator, &target, "bad-custody", "mfst")
+        .expect("bad-custody signal");
+    assert_eq!(
+        score,
+        StandingScore::Floor,
+        "bad-custody weight=20 should reach Floor"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +138,11 @@ fn reach_escalation_pending_signal_debits_lightly() {
         "mfst",
     )
     .expect("reach-escalation-pending signal");
-    assert_eq!(score, StandingScore::Low, "reach-escalation-pending weight=3 should be Low");
+    assert_eq!(
+        score,
+        StandingScore::Low,
+        "reach-escalation-pending weight=3 should be Low"
+    );
 }
 
 // ---------------------------------------------------------------------------

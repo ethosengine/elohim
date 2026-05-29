@@ -121,7 +121,9 @@ impl MutualityAuditService {
             let sig = signaled_at.clone();
             let swept_iso = now.to_rfc3339();
             tokio::task::spawn_blocking(move || -> Result<(), StorageError> {
-                let mut conn = pool.get().map_err(|e| StorageError::Database(e.to_string()))?;
+                let mut conn = pool
+                    .get()
+                    .map_err(|e| StorageError::Database(e.to_string()))?;
                 mutuality_audit_log::insert(
                     &mut conn,
                     &NewMutualityAuditLogRow {

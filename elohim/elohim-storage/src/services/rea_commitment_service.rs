@@ -144,8 +144,12 @@ impl ReaCommitmentService {
             note: c.note.clone(),
             metadata_json: Some(c.metadata_json.clone()),
         };
-        let commitment =
-            rea_commitments::upsert_with_anchor(conn, ctx, projection_input, Some(&action_hash_str))?;
+        let commitment = rea_commitments::upsert_with_anchor(
+            conn,
+            ctx,
+            projection_input,
+            Some(&action_hash_str),
+        )?;
 
         if let Some(bus) = events {
             bus.emit(StorageEvent::ProjectionRegistered {
@@ -408,8 +412,7 @@ mod tests {
         };
 
         let bytes = rmp_serde::to_vec_named(&original).expect("encode Content");
-        let decoded: lamad_types::Content =
-            rmp_serde::from_slice(&bytes).expect("decode Content");
+        let decoded: lamad_types::Content = rmp_serde::from_slice(&bytes).expect("decode Content");
 
         assert_eq!(decoded.id, original.id);
         assert_eq!(decoded.blob_cid, original.blob_cid);
@@ -455,8 +458,7 @@ mod tests {
         };
 
         // Mirror the mapping from create_via_conductor
-        let classified =
-            first_or_none(parse_json_strings(Some(&c.resource_classified_as_json)));
+        let classified = first_or_none(parse_json_strings(Some(&c.resource_classified_as_json)));
         let in_scope_of = first_or_none(parse_json_strings(Some(&c.in_scope_of_json)));
         let input = CreateReaCommitmentInput {
             id: Some(c.id.clone()),
@@ -492,7 +494,6 @@ mod tests {
         assert_eq!(input.note.as_deref(), Some("test note"));
         assert_eq!(input.medium_of_exchange_id, None);
     }
-
 }
 
 /// Bridge the storage-layer input shape (Option<String> id, single-string

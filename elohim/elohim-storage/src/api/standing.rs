@@ -44,9 +44,7 @@ pub async fn handle(
 
         // GET /api/v1/standing/<agent_cid>?evaluator=<cid>
         // Sprint 2 Task 9: per-evaluator pluralism read projection.
-        (&Method::GET, p) if !p.is_empty() => {
-            get_agent_standing(req, p, pool, ctx).await
-        }
+        (&Method::GET, p) if !p.is_empty() => get_agent_standing(req, p, pool, ctx).await,
 
         (&Method::GET, _) => Ok(response::not_found(
             "agent_cid path segment required: GET /api/v1/standing/<agent_cid>?evaluator=<cid>",
@@ -117,8 +115,7 @@ async fn get_agent_standing(
             };
 
             Ok(StandingScoreView {
-                evaluator_cid: String::from_utf8(evaluator_bytes.clone())
-                    .unwrap_or_default(),
+                evaluator_cid: String::from_utf8(evaluator_bytes.clone()).unwrap_or_default(),
                 subject_cid: String::from_utf8(subject_bytes.clone()).unwrap_or_default(),
                 score: tier,
                 debit_weight_sum: row.as_ref().map(|r| r.debit_weight_sum).unwrap_or(0),
@@ -132,8 +129,7 @@ async fn get_agent_standing(
         .await
         .map_err(|e| StorageError::Internal(e.to_string()))??;
 
-    let body =
-        serde_json::to_vec(&view).map_err(|e| StorageError::Internal(e.to_string()))?;
+    let body = serde_json::to_vec(&view).map_err(|e| StorageError::Internal(e.to_string()))?;
     Ok(Response::builder()
         .status(hyper::StatusCode::OK)
         .header(hyper::header::CONTENT_TYPE, "application/json")

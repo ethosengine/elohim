@@ -94,7 +94,13 @@ fn load_weights_from_manifest() -> HashMap<String, SignalWeight> {
         .into_iter()
         .filter_map(|(name, raw)| {
             let (debit_weight, decay_days) = (raw.debit_weight?, raw.decay_days?);
-            Some((name, SignalWeight { debit_weight, decay_days }))
+            Some((
+                name,
+                SignalWeight {
+                    debit_weight,
+                    decay_days,
+                },
+            ))
         })
         .collect()
 }
@@ -105,8 +111,7 @@ mod tests {
 
     #[test]
     fn registry_returns_weight_for_known_signal() {
-        let w = weight_for("rate-limit-exceeded")
-            .expect("known signal_kind has weight");
+        let w = weight_for("rate-limit-exceeded").expect("known signal_kind has weight");
         assert!(
             w.debit_weight > 0,
             "debit_weight should be positive for rate-limit-exceeded"

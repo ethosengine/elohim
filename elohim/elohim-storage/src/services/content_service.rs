@@ -5,8 +5,8 @@
 
 use std::sync::Arc;
 
-use crate::db::{self, content_diesel, context::AppContext, DbPool};
 use crate::db::content_diesel::ContentProjectionPatch;
+use crate::db::{self, content_diesel, context::AppContext, DbPool};
 use crate::error::StorageError;
 use crate::generated_enums::{ALL_CONTENT_FORMATS, ALL_CONTENT_TYPES, ALL_REACH_LEVELS};
 use crate::hc_client::HcClient;
@@ -355,8 +355,8 @@ impl ContentService {
         //
         //    action_hash string form: holo_hash ActionHash Display → "uhCkk…"
         //    base32 form, identical to what the signal carries.
-        let output = rmp_serde::from_slice::<lamad_types::ContentOutput>(&output_bytes)
-            .map_err(|e| {
+        let output =
+            rmp_serde::from_slice::<lamad_types::ContentOutput>(&output_bytes).map_err(|e| {
                 StorageError::Internal(format!(
                     "conductor returned success for content write but output \
                      could not be decoded as ContentOutput: {e}"
@@ -384,13 +384,14 @@ impl ContentService {
 
         let updated = {
             let mut conn = self.conn()?;
-            content_diesel::get_content_with_tags(&mut conn, &self.ctx, id, false)?
-                .ok_or_else(|| {
+            content_diesel::get_content_with_tags(&mut conn, &self.ctx, id, false)?.ok_or_else(
+                || {
                     StorageError::Internal(format!(
                         "content {id} projection written but row missing on re-read — \
                          this should not happen; check upsert_with_anchor for id"
                     ))
-                })?
+                },
+            )?
         };
 
         self.events

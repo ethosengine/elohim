@@ -7,7 +7,10 @@ use super::diesel_schema::mutuality_audit_log::dsl;
 use super::models::{MutualityAuditLogRow, NewMutualityAuditLogRow};
 use crate::error::StorageError;
 
-pub fn insert(conn: &mut SqliteConnection, row: &NewMutualityAuditLogRow) -> Result<(), StorageError> {
+pub fn insert(
+    conn: &mut SqliteConnection,
+    row: &NewMutualityAuditLogRow,
+) -> Result<(), StorageError> {
     diesel::insert_into(dsl::mutuality_audit_log)
         .values(row)
         .execute(conn)

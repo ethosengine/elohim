@@ -57,5 +57,8 @@ fn seed_projection_camelcase_payload_populates_in_scope_of_and_metadata() {
 
     // Single-word fields were never affected — assert they still work post-rename.
     assert_eq!(input.action, "project-epr");
-    assert_eq!(input.note.as_deref(), Some("Project lamad-spa at /lamad on alpha-elohim-host"));
+    assert_eq!(
+        input.note.as_deref(),
+        Some("Project lamad-spa at /lamad on alpha-elohim-host")
+    );
 }

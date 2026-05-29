@@ -168,7 +168,10 @@ async fn http_get_db_rea_commitments_returns_200_with_projection() {
         "must return exactly one projection, got {}",
         views.len()
     );
-    assert_eq!(views[0].url_path, "/lamad", "url_path must match seeded value");
+    assert_eq!(
+        views[0].url_path, "/lamad",
+        "url_path must match seeded value"
+    );
     assert_eq!(views[0].epr_id, "lamad-spa", "epr_id must be lamad-spa");
 }
 

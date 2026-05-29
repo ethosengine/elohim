@@ -84,7 +84,10 @@ pub async fn ensure_happ_installed(
         // actually differs from the installed DNA (no churn). Reading drift from
         // the local bundle file (has_dna_drift) cannot time out on the conductor.
         let drifted = if force_reinstall {
-            warn!(app_id = app_id, "FORCE_DNA_REINSTALL=true — reinstalling unconditionally (drift probe skipped)");
+            warn!(
+                app_id = app_id,
+                "FORCE_DNA_REINSTALL=true — reinstalling unconditionally (drift probe skipped)"
+            );
             true
         } else if allow_reinstall {
             has_dna_drift(app_info, happ_path).await

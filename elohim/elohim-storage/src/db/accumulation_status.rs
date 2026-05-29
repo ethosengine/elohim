@@ -168,7 +168,10 @@ fn compute_aggregate(
     let signals: Vec<(String, String)> = governance_signals::table
         .filter(governance_signals::entity_type.eq(entity_type))
         .filter(governance_signals::entity_id.eq(entity_id))
-        .select((governance_signals::human_id, governance_signals::signal_value))
+        .select((
+            governance_signals::human_id,
+            governance_signals::signal_value,
+        ))
         .load::<(String, String)>(conn)
         .map_err(|e| StorageError::Database(format!("accumulation_status aggregate: {e}")))?;
 
@@ -273,7 +276,10 @@ pub fn project_accumulation_status(
 
     diesel::insert_into(accumulation_status::table)
         .values(&row)
-        .on_conflict((accumulation_status::entity_type, accumulation_status::entity_id))
+        .on_conflict((
+            accumulation_status::entity_type,
+            accumulation_status::entity_id,
+        ))
         .do_update()
         .set(&row)
         .execute(conn)
@@ -334,7 +340,10 @@ pub fn reproject_all_accumulation_statuses(
 ) -> Result<usize, StorageError> {
     // Collect distinct (entity_type, entity_id) pairs from governance_signals.
     let pairs: Vec<(String, String)> = governance_signals::table
-        .select((governance_signals::entity_type, governance_signals::entity_id))
+        .select((
+            governance_signals::entity_type,
+            governance_signals::entity_id,
+        ))
         .distinct()
         .load::<(String, String)>(conn)
         .map_err(|e| StorageError::Database(format!("accumulation_status pairs load: {e}")))?;

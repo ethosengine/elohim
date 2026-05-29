@@ -87,7 +87,9 @@ pub fn project_content_engagement_stats(
         .filter(economic_events::lamad_event_type.eq(EVENT_CONTENT_VIEW))
         .select(count_star())
         .first::<i64>(conn)
-        .map_err(|e| StorageError::Database(format!("content_engagement_stats views count: {e}")))?;
+        .map_err(|e| {
+            StorageError::Database(format!("content_engagement_stats views count: {e}"))
+        })?;
 
     // 2. Count content-complete events for this content_id.
     let completions: i64 = economic_events::table

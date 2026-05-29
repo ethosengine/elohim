@@ -33,8 +33,6 @@
 //! the `WEIGHT_BY_LEVEL` constant. Callers (`reaction-bar.component.ts`,
 //! `graduated-feedback.component.ts`) POST to this route instead.
 
-use std::sync::Arc;
-
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response};
@@ -161,9 +159,7 @@ pub async fn handle(
 
     match (&method, path) {
         // POST /api/v1/mishpat/recognition/participation
-        (&Method::POST, "participation") => {
-            handle_record_participation(req, pool, ctx).await
-        }
+        (&Method::POST, "participation") => handle_record_participation(req, pool, ctx).await,
         _ => Ok(response::not_found(&format!(
             "Unknown mishpat/recognition route: {} /api/v1/mishpat/recognition/{}",
             method, path

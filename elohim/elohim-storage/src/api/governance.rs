@@ -1363,9 +1363,7 @@ pub async fn handle(
         (&Method::GET, path) if path.ends_with("/mechanism") => {
             // Path shape: /{entityType}/{entityId}/mechanism
             // Strip leading '/' + trailing '/mechanism' to extract segments.
-            let inner = path
-                .trim_start_matches('/')
-                .trim_end_matches("/mechanism");
+            let inner = path.trim_start_matches('/').trim_end_matches("/mechanism");
             // inner = "{entityType}/{entityId}"
             let mut parts = inner.splitn(2, '/');
             let entity_type = match parts.next() {

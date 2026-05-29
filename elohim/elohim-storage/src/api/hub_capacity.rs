@@ -23,7 +23,9 @@ pub async fn handle(
     let hub_id_owned = hub_id.to_string();
     let pool = pool.clone();
     let view = tokio::task::spawn_blocking(move || -> Result<_, StorageError> {
-        let mut conn = pool.get().map_err(|e| StorageError::Database(e.to_string()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Database(e.to_string()))?;
         compute_hub_capacity(&mut conn, &hub_id_owned)
     })
     .await

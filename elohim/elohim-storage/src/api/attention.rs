@@ -238,10 +238,9 @@ async fn handle_post_tending(
             Ok(resp_bytes) => {
                 // The coordinator returns an ActionHash (serialized as bytes).
                 // Decode to a hex string for the HTTP response.
-                let action_hash_hex: String =
-                    rmp_serde::from_slice::<Vec<u8>>(&resp_bytes)
-                        .map(hex::encode)
-                        .unwrap_or_else(|_| "unknown".to_string());
+                let action_hash_hex: String = rmp_serde::from_slice::<Vec<u8>>(&resp_bytes)
+                    .map(hex::encode)
+                    .unwrap_or_else(|_| "unknown".to_string());
 
                 let ack = AttentionTendingAckView {
                     accepted: true,
@@ -269,9 +268,7 @@ async fn handle_post_tending(
     }
 
     // --- No conductor configured (e.g. storage-only test mode) ---
-    tracing::debug!(
-        "no conductor configured for attention tending — returning accepted:false"
-    );
+    tracing::debug!("no conductor configured for attention tending — returning accepted:false");
     let ack = AttentionTendingAckView {
         accepted: false,
         action_hash: None,

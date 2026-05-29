@@ -126,10 +126,7 @@ impl MockRateHistory {
     /// The `_at_iso` parameter is reserved for future time-bucketed mocks;
     /// this impl accumulates the count regardless of the timestamp.
     pub fn seed(&self, cid: &str, _at_iso: &str, count: u32) {
-        self.inner
-            .lock()
-            .unwrap()
-            .insert(cid.to_string(), count);
+        self.inner.lock().unwrap().insert(cid.to_string(), count);
     }
 }
 

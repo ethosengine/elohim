@@ -53,14 +53,23 @@ pub async fn validate_republish_epr<F: CommitmentFetcher, R: RateHistory>(
     // 2. Project to EventForValidation.
     let event = EventForValidation {
         action: event_payload["action"].as_str().unwrap_or("").to_string(),
-        performer: event_payload["performer"].as_str().unwrap_or("").to_string(),
-        bounded_by: event_payload["bounded_by"].as_str().unwrap_or("").to_string(),
+        performer: event_payload["performer"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        bounded_by: event_payload["bounded_by"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
         target_epr_id: target_epr_id.to_string(),
         reach: event_payload["payload"]["reach"]
             .as_str()
             .unwrap_or("")
             .to_string(),
-        signed_at: event_payload["signed_at"].as_str().unwrap_or("").to_string(),
+        signed_at: event_payload["signed_at"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
     };
 
     // 3. Substrate bounds check (delegates to Sprint 2's primitive).
@@ -71,7 +80,14 @@ pub async fn validate_republish_epr<F: CommitmentFetcher, R: RateHistory>(
 }
 
 fn validate_payload_schema(payload: &serde_json::Value) -> Result<(), ValidationError> {
-    let required = ["action", "performer", "bounded_by", "target", "payload", "signed_at"];
+    let required = [
+        "action",
+        "performer",
+        "bounded_by",
+        "target",
+        "payload",
+        "signed_at",
+    ];
     for field in required {
         if payload.get(field).is_none() {
             return Err(ValidationError::Schema(format!("missing field: {field}")));
@@ -159,8 +175,7 @@ mod tests {
         // Instead the schema check fires first.
         let fetcher = MockCommitmentFetcher::new();
         let rate = MockRateHistory::new();
-        let result =
-            validate_republish_epr(&event, &fetcher, &rate, "epr:lamad-spa").await;
+        let result = validate_republish_epr(&event, &fetcher, &rate, "epr:lamad-spa").await;
         assert!(matches!(result, Err(ValidationError::Schema(_))));
     }
 
@@ -184,8 +199,7 @@ mod tests {
         event["bounded_by"] = serde_json::json!("");
         let fetcher = MockCommitmentFetcher::new();
         let rate = MockRateHistory::new();
-        let result =
-            validate_republish_epr(&event, &fetcher, &rate, "epr:lamad-spa").await;
+        let result = validate_republish_epr(&event, &fetcher, &rate, "epr:lamad-spa").await;
         match result {
             Err(ValidationError::Schema(msg)) => {
                 assert!(

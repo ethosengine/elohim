@@ -185,11 +185,9 @@ async fn handle_get_entries(
         .await
     {
         Ok(resp_bytes) => {
-            let zome_entries: Vec<ZomeSourceChainEntry> =
-                rmp_serde::from_slice(&resp_bytes).map_err(|e| {
-                    StorageError::Conductor(format!(
-                        "decode query_my_source_chain response: {e}"
-                    ))
+            let zome_entries: Vec<ZomeSourceChainEntry> = rmp_serde::from_slice(&resp_bytes)
+                .map_err(|e| {
+                    StorageError::Conductor(format!("decode query_my_source_chain response: {e}"))
                 })?;
             let views: Vec<SourceChainEntryView> =
                 zome_entries.into_iter().map(Into::into).collect();

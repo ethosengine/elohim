@@ -42,7 +42,12 @@ fn deploy_svc_commitment(revoked: bool) -> CommitmentRecord {
     }
 }
 
-fn event_against(commitment_cid: &str, action: &str, target: &str, reach: &str) -> EventForValidation {
+fn event_against(
+    commitment_cid: &str,
+    action: &str,
+    target: &str,
+    reach: &str,
+) -> EventForValidation {
     EventForValidation {
         action: action.into(),
         performer: "agent:deploy-svc-matthew".into(),
@@ -61,10 +66,21 @@ async fn adversarial_revocation_race_blocks_immediately() {
     let fetcher = MockCommitmentFetcher::new();
     fetcher.seed("comm-deploy-svc", deploy_svc_commitment(true));
     let rate = MockRateHistory::new();
-    let event = event_against("comm-deploy-svc", "republish-epr", "epr:lamad-spa", "commons");
+    let event = event_against(
+        "comm-deploy-svc",
+        "republish-epr",
+        "epr:lamad-spa",
+        "commons",
+    );
     let result = validate(&event, &fetcher, &rate).await;
     assert!(
-        matches!(result, Err(BoundsViolation { kind: ViolationKind::CommitmentRevoked, .. })),
+        matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::CommitmentRevoked,
+                ..
+            })
+        ),
         "revoked commitment must be rejected; got: {:?}",
         result
     );
@@ -79,10 +95,21 @@ async fn adversarial_forged_bounded_by_pointing_to_unrelated_scope() {
     let fetcher = MockCommitmentFetcher::new();
     fetcher.seed("comm-deploy-svc", c);
     let rate = MockRateHistory::new();
-    let event = event_against("comm-deploy-svc", "republish-epr", "epr:lamad-spa", "commons");
+    let event = event_against(
+        "comm-deploy-svc",
+        "republish-epr",
+        "epr:lamad-spa",
+        "commons",
+    );
     let result = validate(&event, &fetcher, &rate).await;
     assert!(
-        matches!(result, Err(BoundsViolation { kind: ViolationKind::ScopeNotIncluded, .. })),
+        matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::ScopeNotIncluded,
+                ..
+            })
+        ),
         "scope mismatch must be rejected; got: {:?}",
         result
     );
@@ -112,7 +139,12 @@ async fn adversarial_silent_reach_escalation_blocked() {
     let rate = MockRateHistory::new();
 
     // Reach <= ceiling must PASS: private(0) <= community(5)
-    let event = event_against("comm-deploy-svc", "republish-epr", "epr:lamad-spa", "private");
+    let event = event_against(
+        "comm-deploy-svc",
+        "republish-epr",
+        "epr:lamad-spa",
+        "private",
+    );
     let result = validate(&event, &fetcher, &rate).await;
     assert!(
         result.is_ok(),
@@ -121,10 +153,21 @@ async fn adversarial_silent_reach_escalation_blocked() {
     );
 
     // Reach > ceiling must FAIL: public(6) > community(5)
-    let event_up = event_against("comm-deploy-svc", "republish-epr", "epr:lamad-spa", "public");
+    let event_up = event_against(
+        "comm-deploy-svc",
+        "republish-epr",
+        "epr:lamad-spa",
+        "public",
+    );
     let result_up = validate(&event_up, &fetcher, &rate).await;
     assert!(
-        matches!(result_up, Err(BoundsViolation { kind: ViolationKind::ReachCeilingExceeded, .. })),
+        matches!(
+            result_up,
+            Err(BoundsViolation {
+                kind: ViolationKind::ReachCeilingExceeded,
+                ..
+            })
+        ),
         "reach above ceiling must be blocked; got: {:?}",
         result_up
     );
@@ -140,7 +183,12 @@ async fn adversarial_rate_limit_exact_boundary() {
     let fetcher = MockCommitmentFetcher::new();
     fetcher.seed("comm-deploy-svc", deploy_svc_commitment(false));
     let rate = MockRateHistory::new();
-    let event = event_against("comm-deploy-svc", "republish-epr", "epr:lamad-spa", "commons");
+    let event = event_against(
+        "comm-deploy-svc",
+        "republish-epr",
+        "epr:lamad-spa",
+        "commons",
+    );
 
     // 29 events in window → strictly less than limit (30) → must pass
     rate.seed("comm-deploy-svc", "2026-05-28T12:00:00Z", 29);
@@ -155,7 +203,13 @@ async fn adversarial_rate_limit_exact_boundary() {
     rate.seed("comm-deploy-svc", "2026-05-28T12:00:00Z", 30);
     let result_at_limit = validate(&event, &fetcher, &rate).await;
     assert!(
-        matches!(result_at_limit, Err(BoundsViolation { kind: ViolationKind::RateLimitExceeded, .. })),
+        matches!(
+            result_at_limit,
+            Err(BoundsViolation {
+                kind: ViolationKind::RateLimitExceeded,
+                ..
+            })
+        ),
         "30 events (at limit) must fail; got: {:?}",
         result_at_limit
     );
@@ -168,10 +222,21 @@ async fn adversarial_out_of_epr_scope_rejected() {
     let fetcher = MockCommitmentFetcher::new();
     fetcher.seed("comm-deploy-svc", deploy_svc_commitment(false));
     let rate = MockRateHistory::new();
-    let event = event_against("comm-deploy-svc", "republish-epr", "epr:not-in-scope", "commons");
+    let event = event_against(
+        "comm-deploy-svc",
+        "republish-epr",
+        "epr:not-in-scope",
+        "commons",
+    );
     let result = validate(&event, &fetcher, &rate).await;
     assert!(
-        matches!(result, Err(BoundsViolation { kind: ViolationKind::ScopeNotIncluded, .. })),
+        matches!(
+            result,
+            Err(BoundsViolation {
+                kind: ViolationKind::ScopeNotIncluded,
+                ..
+            })
+        ),
         "EPR not in scope must be rejected; got: {:?}",
         result
     );
