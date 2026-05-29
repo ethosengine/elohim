@@ -173,17 +173,21 @@ Requires `macros` + `ed25519` features. Use `with_codec()` not `new()` for reque
 
 ## CI/CD
 
-Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. Pipeline definitions are in `genesis/orchestrator/Jenkinsfile`'s `PIPELINES` map.
+Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. 
 
-| Pipeline | Jenkinsfile | Trigger |
-|----------|-------------|---------|
-| App | `Jenkinsfile` (root) | Auto via orchestrator |
-| Edge | `elohim/holochain/Jenkinsfile` | Auto via orchestrator |
-| DNA (Lamad) | `elohim/holochain/dna/Jenkinsfile` | Auto via orchestrator |
-| DNA (Mishpat) | `elohim/holochain/dna/mishpat/Jenkinsfile` | Auto via orchestrator |
-| Genesis | `genesis/Jenkinsfile` | Auto via orchestrator |
-| Sophia | `sophia/Jenkinsfile` | Auto via orchestrator |
-| Steward | `steward/Jenkinsfile` | Manual only |
+Pipeline metadata is declared in per-project `build-manifest.json` files. The `genesis/orchestrator/graph-walker.mjs` + `build-graph.groovy` walk these manifests to build a dependency graph and determine which pipelines to trigger. `pipeline-registry.mjs` exposes the metadata to JavaScript consumers.
+
+**Force dispatch:** Use commit tag syntax `[build:edge|dna|app|genesis|sophia|steward|all]` to force-dispatch specific pipelines on any trigger type (webhook, timer, manual, replay). Example: `git commit --allow-empty -m "test E2E [build:edge]"`.
+
+| Pipeline | Jenkinsfile | Manifest |
+|----------|-------------|----------|
+| App | `Jenkinsfile` (root) | `app/elohim-app/build-manifest.json` |
+| Edge | `elohim/holochain/Jenkinsfile` | `elohim/holochain/build-manifest.json` |
+| DNA (Lamad) | `elohim/holochain/dna/Jenkinsfile` | `elohim/holochain/dna/build-manifest.json` |
+| DNA (Mishpat) | `elohim/holochain/dna/mishpat/Jenkinsfile` | `elohim/holochain/dna/mishpat/build-manifest.json` |
+| Genesis | `genesis/Jenkinsfile` | `genesis/build-manifest.json` |
+| Sophia | `sophia/Jenkinsfile` | `sophia/build-manifest.json` |
+| Steward | `steward/Jenkinsfile` | `steward/build-manifest.json` |
 
 ## Code Style
 

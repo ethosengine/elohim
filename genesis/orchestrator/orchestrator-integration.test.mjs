@@ -1,0 +1,146 @@
+/**
+ * Orchestrator Integration Tests
+ *
+ * Covers the code that survived the orchestrator-strategy.mjs deletion:
+ *   - parseCiIgnore / matchesCiIgnore / CI_IGNORE_PATTERNS (ci-ignore.mjs)
+ *   - pipeline-list.json drift against pipeline-registry.mjs
+ *
+ * Deleted tests (covered by sibling test files):
+ *   - changeset routing       → graph-walker.test.mjs
+ *   - cascade propagation     → jenkinsfile-cps-scope.test.mjs
+ *   - commit message tags     → commit-tag-parser.test.mjs
+ *   - dependency ordering     → graph-walker.test.mjs (topoSort)
+ *   - real-world scenarios    → graph-walker.test.mjs + manifest tests
+ *   - mirror vs Jenkinsfile   → no JS mirror exists anymore
+ *   - nonManualPipelines      → pipeline-registry.test.mjs
+ *
+ * Run: node --test orchestrator-integration.test.mjs
+ */
+
+import { test, describe } from 'node:test';
+import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  parseCiIgnore,
+  matchesCiIgnore,
+  CI_IGNORE_PATTERNS,
+} from './ci-ignore.mjs';
+import { loadPipelineRegistry } from './pipeline-registry.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, '../..');
+
+// ══════════════════════════════════════════════════════════════════
+// .ci-ignore parser / matcher
+// ══════════════════════════════════════════════════════════════════
+
+describe('parseCiIgnore', () => {
+  test('classifies trailing-slash patterns as prefix', () => {
+    const p = parseCiIgnore('.claude/\n.github/\n');
+    assert.deepEqual(p, [
+      { kind: 'prefix', value: '.claude/' },
+      { kind: 'prefix', value: '.github/' },
+    ]);
+  });
+
+  test('classifies path patterns (containing /) as exact', () => {
+    const p = parseCiIgnore('genesis/orchestrator/Jenkinsfile\n');
+    assert.deepEqual(p, [
+      { kind: 'exact', value: 'genesis/orchestrator/Jenkinsfile' },
+    ]);
+  });
+
+  test('classifies bare names as basename-anywhere', () => {
+    const p = parseCiIgnore('CLAUDE.md\nAGENTS.md\n');
+    assert.deepEqual(p, [
+      { kind: 'basename', value: 'CLAUDE.md' },
+      { kind: 'basename', value: 'AGENTS.md' },
+    ]);
+  });
+
+  test('strips comments and blank lines', () => {
+    const p = parseCiIgnore('# header\n\n.claude/  # trailing\n\nCLAUDE.md\n');
+    assert.deepEqual(p, [
+      { kind: 'prefix', value: '.claude/' },
+      { kind: 'basename', value: 'CLAUDE.md' },
+    ]);
+  });
+});
+
+describe('matchesCiIgnore', () => {
+  const patterns = [
+    { kind: 'prefix', value: '.claude/' },
+    { kind: 'exact', value: 'genesis/orchestrator/Jenkinsfile' },
+    { kind: 'basename', value: 'CLAUDE.md' },
+  ];
+
+  test('prefix matches files inside the subtree', () => {
+    assert.equal(matchesCiIgnore('.claude/memory/CLAUDE.md', patterns), true);
+    assert.equal(matchesCiIgnore('.claude/agents/foo.md', patterns), true);
+  });
+
+  test('exact matches only the precise path', () => {
+    assert.equal(matchesCiIgnore('genesis/orchestrator/Jenkinsfile', patterns), true);
+    // A different Jenkinsfile (owned by another pipeline) must not be skipped.
+    assert.equal(matchesCiIgnore('elohim/holochain/dna/Jenkinsfile', patterns), false);
+  });
+
+  test('basename matches anywhere in the tree', () => {
+    assert.equal(matchesCiIgnore('CLAUDE.md', patterns), true);
+    assert.equal(matchesCiIgnore('app/elohim-app/CLAUDE.md', patterns), true);
+    assert.equal(matchesCiIgnore('app/elohim-app/src/app/elohim/adapters/CLAUDE.md', patterns), true);
+  });
+
+  test('returns false for non-matching files', () => {
+    assert.equal(matchesCiIgnore('app/elohim-app/src/main.ts', patterns), false);
+    assert.equal(matchesCiIgnore('CLAUDE.txt', patterns), false);
+    assert.equal(matchesCiIgnore('not-claude.md', patterns), false);
+  });
+});
+
+describe('CI_IGNORE_PATTERNS (loaded from repo-root .ci-ignore)', () => {
+  test('includes the agent-instruction basenames', () => {
+    const basenames = CI_IGNORE_PATTERNS
+      .filter(p => p.kind === 'basename')
+      .map(p => p.value);
+    assert.ok(basenames.includes('CLAUDE.md'), '.ci-ignore must list CLAUDE.md');
+    assert.ok(basenames.includes('AGENTS.md'), '.ci-ignore must list AGENTS.md');
+    assert.ok(basenames.includes('GEMINI.md'), '.ci-ignore must list GEMINI.md');
+  });
+
+  test('includes the .claude/ subtree', () => {
+    const prefixes = CI_IGNORE_PATTERNS
+      .filter(p => p.kind === 'prefix')
+      .map(p => p.value);
+    assert.ok(prefixes.includes('.claude/'), '.ci-ignore must list .claude/');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// pipeline-list.json drift
+// ══════════════════════════════════════════════════════════════════
+
+describe('pipeline-list.json drift', () => {
+  test('pipeline-list.json matches what generate-pipeline-list.mjs would produce', () => {
+    const registry = loadPipelineRegistry(ROOT);
+    const expected = [...registry.values()]
+      .filter(p => p.jenkinsPath)
+      .map(p => ({
+        name: p.pipeline,
+        manualOnly: p.manualOnly,
+        triggersGenesis: p.triggersGenesis,
+        cascades: p.cascades,
+      }));
+    const actual = JSON.parse(readFileSync(
+      resolve(__dirname, 'pipeline-list.json'), 'utf8'
+    )).pipelines;
+    assert.deepStrictEqual(
+      actual.sort((a, b) => a.name.localeCompare(b.name)),
+      expected.sort((a, b) => a.name.localeCompare(b.name)),
+      'pipeline-list.json is stale — run node scripts/generate-pipeline-list.mjs'
+    );
+  });
+});

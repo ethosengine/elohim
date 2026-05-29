@@ -1,6 +1,12 @@
 {
   "manifestVersion": "1.0",
   "pipeline": "elohim-storybook",
+  "jenkinsPath": "app/elohim-library/Jenkinsfile",
+  "manualOnly": false,
+  "triggersGenesis": false,
+  "cascades": false,
+  "longRunning": true,
+  "dependsOn": [],
   "description": "Elohim Storybook static design surface — build, image, deploy",
   "steps": {
     "build-storybook": {

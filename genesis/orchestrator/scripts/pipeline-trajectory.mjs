@@ -35,8 +35,14 @@
  */
 
 import process from 'node:process';
-import { nonManualPipelines } from '../orchestrator-strategy.mjs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { loadPipelineRegistry, nonManualPipelines } from '../pipeline-registry.mjs';
 import { isSuccess, isFailure, isWasted } from '../pipeline-results.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, '../../..');
+const _registry = loadPipelineRegistry(ROOT);
 
 // Tracks pipelines whose Jenkins job was unreachable (404 / network error).
 // Module-level so renderOnce() can clear it at the start of each tick —
@@ -64,7 +70,7 @@ function argFlag(name) {
 }
 const N = Number(argVal('--builds', '10'));
 const BRANCH = argVal('--branch', 'dev');
-const DEFAULT_PIPELINES = nonManualPipelines().join(',');
+const DEFAULT_PIPELINES = nonManualPipelines(_registry).join(',');
 const PIPELINES = argVal('--pipelines', DEFAULT_PIPELINES).split(',').filter(Boolean);
 const EMIT_JSON = argFlag('--json');
 const COMPUTE_BASELINE_LAG = argFlag('--since-baseline');

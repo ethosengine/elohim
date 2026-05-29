@@ -1,8 +1,12 @@
 {
   "manifestVersion": "1.0",
   "pipeline": "elohim-steward",
-  "description": "Steward desktop app — Tauri + Holochain conductor",
+  "jenkinsPath": "steward/device/Jenkinsfile",
   "manualOnly": true,
+  "triggersGenesis": false,
+  "longRunning": true,
+  "dependsOn": ["elohim-holochain"],
+  "description": "Steward desktop app — Tauri + Holochain conductor",
   "steps": {
     "cargo-build-steward": {
       "description": "Build steward Rust binary and Tauri app (Linux target)",

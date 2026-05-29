@@ -1,6 +1,10 @@
 {
   "manifestVersion": "1.0",
   "pipeline": "elohim",
+  "jenkinsPath": "Jenkinsfile",
+  "manualOnly": false,
+  "triggersGenesis": true,
+  "dependsOn": ["elohim-sophia"],
   "description": "Elohim Angular app — build, service worker, site image",
   "steps": {
     "build-angular": {

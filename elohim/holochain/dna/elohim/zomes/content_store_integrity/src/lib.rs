@@ -250,9 +250,9 @@ pub const REA_ACTIONS: [&str; 25] = [
     // Acceptance
     "accept", // Accept a transfer or commitment (claim presence)
     // Storage-specific actions (elohim-storage protocol)
-    "custody-blob",    // Commit custody of a blob (storage stewardship)
-    "serve-blob",      // Deliver a blob to a requester (projection service delivery)
-    "ack-projection",  // Phase 4 — doorway projector acks successful projection of a blob
+    "custody-blob",   // Commit custody of a blob (storage stewardship)
+    "serve-blob",     // Deliver a blob to a requester (projection service delivery)
+    "ack-projection", // Phase 4 — doorway projector acks successful projection of a blob
     // Infrastructure-stewardship actions (doorway operation)
     // Capability set + scope + succession role carried in Commitment fields per
     // elohim/sdk/schemas/v1/objects/operator-classification.schema.json. The
@@ -1348,6 +1348,15 @@ pub struct Intent {
 /// makes paired give/take commitments cryptographically provable.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
+// Gap F fix: Agreement's fields {id, name?, note?, created_at} are a structural
+// subset of both Commitment (project-epr) and EconomicEvent (republish-epr), and
+// post_commit's ordered to_app_option dispatch tries Agreement BEFORE both. Without
+// strict deserialization a Commitment/EconomicEvent decodes AS an Agreement, the
+// wrong ProjectionSignal is emitted, ReaCommitmentCommitted never fires, and the
+// storage SQL projection never lands (Seed Projections 500s). deny_unknown_fields
+// makes Agreement reject the superset's extra keys so dispatch falls through to the
+// correct branch. Regression guard: post_commit_signal_dispatch_tests.
+#[serde(deny_unknown_fields)]
 pub struct Agreement {
     pub id: String,
     pub name: Option<String>,
@@ -4496,7 +4505,10 @@ mod economic_event_validation_tests {
 
     #[test]
     fn republish_epr_missing_bounded_by_rejected() {
-        let event = ev("republish-epr", r#"{"action":"republish-epr","target":"epr-head"}"#);
+        let event = ev(
+            "republish-epr",
+            r#"{"action":"republish-epr","target":"epr-head"}"#,
+        );
         let result = validate_economic_event(&event).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
@@ -4553,5 +4565,204 @@ fn adapt_validation(result: Result<(), String>) -> ExternResult<ValidateCallback
     match result {
         Ok(()) => Ok(ValidateCallbackResult::Valid),
         Err(reason) => Ok(ValidateCallbackResult::Invalid(reason)),
+    }
+}
+
+#[cfg(test)]
+mod post_commit_signal_dispatch_tests {
+    //! Gap F root-cause reproduction.
+    //!
+    //! post_commit (content_store coordinator lib.rs ~10637-10892) dispatches a
+    //! committed entry to a ProjectionSignal by trying `record.entry()
+    //! .to_app_option::<T>()` for each app entry type IN ORDER, first-match-wins.
+    //! `to_app_option` is just `T::try_from(SerializedBytes)` — no entry-def
+    //! check. With no `#[serde(deny_unknown_fields)]` on any entry struct, a
+    //! later type whose fields are a subset of an earlier type's can be
+    //! mis-decoded as that earlier type. `Commitment` is 23rd of 24 in the
+    //! chain; if any earlier type decodes a project-epr Commitment, post_commit
+    //! emits the WRONG signal and `ReaCommitmentCommitted` never fires — the
+    //! storage projection never lands and Seed Projections 500s.
+    use super::*;
+
+    fn project_epr_commitment() -> Commitment {
+        Commitment {
+            id: "project-epr-98f0d59051751497".into(),
+            action: "project-epr".into(),
+            provider: "agent:matthew".into(),
+            receiver: "agent:matthew".into(),
+            resource_conforms_to: None,
+            resource_inventoried_as: None,
+            resource_classified_as_json: "[]".into(),
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            agreed_in: None,
+            input_of: None,
+            output_of: None,
+            satisfies: None,
+            in_scope_of_json: "[\"doorway:alpha-elohim-host\"]".into(),
+            finished: false,
+            state: "active".into(),
+            note: None,
+            metadata_json: "{}".into(),
+            created_at: "2026-05-28T12:00:00Z".into(),
+            updated_at: "2026-05-28T12:00:00Z".into(),
+        }
+    }
+
+    #[test]
+    fn project_epr_commitment_is_not_misdecoded_as_an_earlier_entry_type() {
+        let commitment = project_epr_commitment();
+        let sb = SerializedBytes::try_from(&commitment).expect("commitment serializes");
+
+        // Every app entry type listed BEFORE Commitment in post_commit's chain.
+        macro_rules! assert_no_match {
+            ($($t:ty),+ $(,)?) => {$(
+                let decoded = <$t>::try_from(sb.clone());
+                assert!(
+                    decoded.is_err(),
+                    "TYPE-CONFUSION: project-epr Commitment wrongly decodes as `{}` — \
+                     post_commit emits that signal and ReaCommitmentCommitted never fires (Gap F)",
+                    stringify!($t),
+                );
+            )+};
+        }
+
+        assert_no_match!(
+            Content,
+            Manifest,
+            FeedbackSignal,
+            LearningPath,
+            PathStep,
+            PathChapter,
+            Relationship,
+            Human,
+            Agent,
+            ContributorPresence,
+            CustodianCommitment,
+            MemberRiskProfile,
+            CoveragePolicy,
+            InsuranceClaim,
+            AdjustmentReasoning,
+            ServiceRequest,
+            ServiceOffer,
+            ServiceMatch,
+            DoorwayRegistration,
+            DoorwayHeartbeat,
+            DoorwayHeartbeatSummary,
+            Agreement,
+        );
+
+        // Sanity: the correct type still decodes.
+        assert!(
+            Commitment::try_from(sb).is_ok(),
+            "Commitment must decode as itself"
+        );
+    }
+
+    fn republish_epr_event() -> EconomicEvent {
+        EconomicEvent {
+            id: "republish-epr-evt-1".into(),
+            action: "republish-epr".into(),
+            provider: "agent:matthew".into(),
+            receiver: "agent:matthew".into(),
+            resource_conforms_to: None,
+            resource_inventoried_as: None,
+            to_resource_inventoried_as: None,
+            resource_classified_as_json: "[]".into(),
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: "2026-05-28T12:00:00Z".into(),
+            has_duration: None,
+            input_of: None,
+            output_of: None,
+            fulfills_json: "[]".into(),
+            realization_of: None,
+            satisfies_json: "[]".into(),
+            in_scope_of_json: "[]".into(),
+            note: None,
+            state: "completed".into(),
+            triggered_by: None,
+            at_location: None,
+            image: None,
+            lamad_event_type: None,
+            metadata_json: r#"{"action":"republish-epr","bounded_by":"comm-cid"}"#.into(),
+            created_at: "2026-05-28T12:00:00Z".into(),
+        }
+    }
+
+    #[test]
+    fn republish_epr_event_is_not_misdecoded_as_an_earlier_entry_type() {
+        let event = republish_epr_event();
+        let sb = SerializedBytes::try_from(&event).expect("event serializes");
+
+        macro_rules! assert_no_match {
+            ($($t:ty),+ $(,)?) => {$(
+                let decoded = <$t>::try_from(sb.clone());
+                assert!(
+                    decoded.is_err(),
+                    "TYPE-CONFUSION: republish-epr EconomicEvent wrongly decodes as `{}` — \
+                     post_commit emits that signal and ReaEconomicEventCommitted never fires (Gap F)",
+                    stringify!($t),
+                );
+            )+};
+        }
+
+        // Every app entry type listed BEFORE EconomicEvent in post_commit's chain
+        // (includes Commitment and Agreement).
+        assert_no_match!(
+            Content,
+            Manifest,
+            FeedbackSignal,
+            LearningPath,
+            PathStep,
+            PathChapter,
+            Relationship,
+            Human,
+            Agent,
+            ContributorPresence,
+            CustodianCommitment,
+            MemberRiskProfile,
+            CoveragePolicy,
+            InsuranceClaim,
+            AdjustmentReasoning,
+            ServiceRequest,
+            ServiceOffer,
+            ServiceMatch,
+            DoorwayRegistration,
+            DoorwayHeartbeat,
+            DoorwayHeartbeatSummary,
+            Agreement,
+            Commitment,
+        );
+
+        assert!(
+            EconomicEvent::try_from(sb).is_ok(),
+            "EconomicEvent must decode as itself"
+        );
+    }
+
+    #[test]
+    fn real_agreement_still_decodes_after_deny_unknown_fields() {
+        // deny_unknown_fields must NOT break legitimate Agreement round-trips.
+        let agreement = Agreement {
+            id: "agr-1".into(),
+            name: Some("Mutual storage pact".into()),
+            note: None,
+            created_at: "2026-05-28T12:00:00Z".into(),
+        };
+        let sb = SerializedBytes::try_from(&agreement).expect("agreement serializes");
+        assert!(
+            Agreement::try_from(sb).is_ok(),
+            "a real Agreement must still decode after deny_unknown_fields"
+        );
     }
 }

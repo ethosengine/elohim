@@ -36,123 +36,6 @@ import groovy.transform.Field
 // Tradeoff: baseline advances optimistically at dispatch (not at completion);
 // if a long pipeline fails silently and no follow-up push lands, baseline
 // stays stale. Visible in the downstream pipeline's own Jenkins view.
-@Field def PIPELINES = [
-    'elohim-holochain': [
-        jenkinsPath: 'elohim/holochain/dna/Jenkinsfile',
-        changePatterns: ['elohim/holochain/dna/', 'elohim/elohim-cache-core/', 'elohim/holochain/rna/', 'VERSION'],
-        artifacts: ['elohim.happ'],
-        dependsOn: [],
-        cascades: true,       // DNA changes auto-trigger Edge redeploy (ensures new hApp bundle is installed)
-        triggersGenesis: true,
-        deploymentCheck: null,  // No deployment, just artifacts
-        longRunning: true       // 55-90min sweettest; bug #5 cascade target
-    ],
-    'elohim-edge': [
-        jenkinsPath: 'elohim/holochain/Jenkinsfile',
-        changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'elohim/elohim-cache-core/', 'crates/', 'genesis/orchestrator/manifests/', 'genesis/orchestrator/environments/', 'genesis/orchestrator/data/', 'VERSION'],
-        artifacts: ['elohim-doorway', 'doorway-app', 'elohim-agent-sdk', 'elohim-edgenode', 'elohim-storage', 'elohim-happ-installer'],
-        dependsOn: ['elohim-holochain'],
-        cascades: false,      // Edge changes don't auto-trigger genesis/app rebuilds
-        triggersGenesis: true,
-        deploymentCheck: [
-            dev: 'https://doorway-alpha.elohim.host/health',
-            staging: 'https://doorway-staging.elohim.host/health',
-            prod: 'https://doorway.elohim.host/health'
-        ]
-        // NOT longRunning despite ~30-60min — elohim-genesis depends on edge
-        // having DEPLOYED before it seeds. Making edge fire-and-forget would
-        // race genesis ahead of deployment. Cascade risk accepted for now;
-        // followup work could move the genesis dispatch barrier inside the
-        // edge pipeline's post-deploy hook instead of orchestrator polling.
-    ],
-    'elohim': [
-        jenkinsPath: 'Jenkinsfile',
-        changePatterns: ['app/elohim-app/', 'app/elohim-library/', 'elohim/sdk/', 'VERSION'],
-        artifacts: ['elohim-app'],
-        // elohim-sophia: rebuild app when sophia UMD bundle changes.
-        // elohim-holochain: app pulls elohim-cache-core WASM image from Harbor
-        // by SHA tag (`1.0.0-dev-<sha>`), which is produced by the DNA pipeline.
-        // Without this dep the two race and app fails with a Harbor "not found"
-        // on every first build after a DNA-affecting commit.
-        dependsOn: ['elohim-sophia', 'elohim-holochain'],
-        triggersGenesis: true,
-        deploymentCheck: [
-            dev: 'https://alpha.elohim.host',
-            staging: 'https://staging.elohim.host',
-            prod: 'https://elohim.host'
-        ]
-        // NOT longRunning — elohim-genesis depends on the app being deployed
-        // before its a2o scenarios run against the SPA. Same rationale as
-        // elohim-edge above.
-    ],
-    'elohim-genesis': [
-        jenkinsPath: 'genesis/Jenkinsfile',
-        changePatterns: ['genesis/', 'data/'],
-        artifacts: [],
-        dependsOn: ['elohim-edge', 'elohim'],
-        triggersGenesis: false,
-        deploymentCheck: null
-    ],
-    'elohim-steward': [
-        jenkinsPath: 'steward/device/Jenkinsfile',
-        changePatterns: ['steward/'],
-        artifacts: ['steward-desktop'],
-        dependsOn: ['elohim-holochain'],
-        manualOnly: true,
-        triggersGenesis: false,
-        deploymentCheck: null,
-        longRunning: true       // Desktop build with cross-target compilation
-    ],
-    'elohim-sophia': [
-        jenkinsPath: 'sophia.Jenkinsfile',
-        changePatterns: ['sophia/'],
-        artifacts: ['sophia-element'],
-        dependsOn: [],
-        cascades: true,        // sophia changes should trigger elohim (app) rebuild
-        triggersGenesis: false,
-        deploymentCheck: null   // Library, not a deployed service
-    ],
-    'elohim-epr': [
-        jenkinsPath: 'elohim/epr/Jenkinsfile',
-        changePatterns: ['elohim/epr/', 'elohim/sdk/epr-ts/'],
-        artifacts: [],
-        dependsOn: [],
-        cascades: false,
-        triggersGenesis: false,
-        deploymentCheck: null   // Codec library, not a deployed service
-    ],
-    'elohim-storybook': [
-        jenkinsPath: 'app/elohim-library/Jenkinsfile',
-        changePatterns: [
-            'app/elohim-library/projects/**',
-            'app/elohim-library/.storybook/**',
-            'app/elohim-library/scripts/**',
-            'app/elohim-library/package.json',
-            'app/elohim-library/tsconfig.storybook.json',
-            'app/elohim-library/angular.json',
-            'app/elohim-library/Jenkinsfile',
-            'app/elohim-library/images/**',
-            'app/elohim-library/build-manifest.json',
-            'genesis/orchestrator/manifests/elohim-storybook/**',
-            // graphos source content (per design-surface-narrative-scaffold spec)
-            'genesis/docs/content/elohim-protocol/**',
-            'genesis/graphos/**',
-            'genesis/a2o/features/**'
-        ],
-        artifacts: ['elohim-storybook'],
-        dependsOn: [],
-        cascades: false,
-        triggersGenesis: false,
-        // No deploymentCheck — storybook is an optional design surface, not a
-        // gating service. Its own pipeline runs Verify Deploy with /index.json
-        // retries; we don't want a missed cert or slow rollout to mark the
-        // entire orchestrator UNSTABLE. propagate:false on triggerPipeline
-        // already isolates build failures; this isolates deploy failures.
-        deploymentCheck: null,
-        longRunning: true       // Angular library build + Storybook gen + deploy
-    ]
-]
-
 // Environment-specific endpoints for version checking.
 // `doorway-alpha-b` is the federation peer of doorway-alpha on apex hostname
 // elohim.host; both back the shared alpha conductor pool — see
@@ -173,11 +56,63 @@ import groovy.transform.Field
 // HELPER FUNCTIONS
 // =============================================================================
 
-// Derive health endpoints from PIPELINES.deploymentCheck — single source of truth
+/**
+ * Look up pipeline metadata from the manifest-derived registry.
+ * Available after runBuildGraph() runs (Determine Build Plan stage).
+ * For Pre-flight + early stages that need metadata before the registry is
+ * populated, falls back to parsing manifests directly via find + readJSON.
+ */
+def getPipelineMetadata(String name) {
+    if (env.PIPELINE_REGISTRY_JSON) {
+        def registry = readJSON(text: env.PIPELINE_REGISTRY_JSON)
+        return registry[name] ?: [:]
+    }
+    // Pre-build-graph fallback: parse manifests directly.
+    def manifestPath = sh(
+        script: "find . -name 'build-manifest.json' -not -path '*/node_modules/*' | xargs grep -l '\"pipeline\": \"${name}\"' | head -1",
+        returnStdout: true
+    ).trim()
+    if (!manifestPath) return [:]
+    def m = readJSON(file: manifestPath)
+    // Build deploymentCheck from deployment.targets.<env>.healthCheck fields.
+    def deploymentCheck = null
+    def targets = m.deployment?.targets
+    if (targets) {
+        deploymentCheck = [:]
+        targets.each { envName, target ->
+            if (target?.healthCheck) {
+                deploymentCheck[envName] = target.healthCheck
+            }
+        }
+        if (deploymentCheck.isEmpty()) {
+            deploymentCheck = null
+        }
+    }
+    return [
+        jenkinsPath:     m.jenkinsPath,
+        manualOnly:      m.manualOnly == true,
+        triggersGenesis: m.triggersGenesis == true,
+        cascades:        m.cascades == null ? true : (m.cascades == true),
+        dependsOn:       m.dependsOn ?: [],
+        longRunning:     m.longRunning == true,
+        deploymentCheck: deploymentCheck,
+    ]
+}
+
+// Derive health endpoints from build-manifest.json deployment.targets.*.healthCheck fields.
 def getHealthEndpoints() {
     def endpoints = [:]
-    PIPELINES.each { name, config ->
-        config.deploymentCheck?.each { env, url -> endpoints["${name}-${env}"] = url }
+    // Read deployment health checks from build-manifest.json files.
+    def manifestPaths = sh(
+        script: "find . -name 'build-manifest.json' -not -path '*/node_modules/*'",
+        returnStdout: true
+    ).trim().split('\n').findAll { it }
+    manifestPaths.each { path ->
+        def m = readJSON(file: path)
+        def alphaCheck = m.deployment?.targets?.alpha?.healthCheck
+        if (m.pipeline && alphaCheck) {
+            endpoints[m.pipeline] = alphaCheck
+        }
     }
     return endpoints
 }
@@ -436,120 +371,6 @@ def analyzeChangeset(storedGlobalBaseline = null) {
 }
 
 /**
- * Determine which pipelines need to run based on changed files.
- * Uses per-pipeline baselines when available to avoid re-triggering
- * pipelines that already built successfully for intermediate changes.
- */
-// DEPRECATED: advisory only, will be removed
-def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
-    // Load CI-only patterns from repo-root .ci-ignore (gitignore-style).
-    // This is the single source of truth — orchestrator-strategy.mjs reads
-    // the same file. No mirror, no drift.
-    //
-    // Pattern shapes:
-    //   trailing '/'     → subtree prefix  (file.startsWith(value))
-    //   contains '/'     → exact path      (file == value)
-    //   no '/'           → basename match  (basename(file) == value)
-    def ciIgnorePatterns = loadCiIgnore()
-    def isCiIgnored = { String file -> matchesCiIgnore(file, ciIgnorePatterns) }
-
-    // Build a reverse index: Jenkinsfile path -> owning pipeline name.
-    // A pipeline's own Jenkinsfile is a trigger for that pipeline only (not for unrelated
-    // pipelines), since the Jenkinsfile IS the source of truth for what that pipeline deploys.
-    def jenkinsfileToPipeline = [:]
-    PIPELINES.each { pname, pconfig ->
-        if (pconfig.jenkinsPath) {
-            jenkinsfileToPipeline[pconfig.jenkinsPath] = pname
-        }
-    }
-
-    def analysis = [:]
-
-    // Cache git diffs per unique baseline commit to avoid redundant calls
-    def cachedDiffs = [:]
-
-    PIPELINES.each { name, config ->
-        def matchedPatterns = []
-        def matchedFiles = []
-        def baselineUsed = 'global'
-
-        // Use per-pipeline baseline if available, otherwise fall back to global changeset
-        def filesToCheck = changedFiles
-        def baseline = pipelineBaselines[name]
-
-        if (baseline) {
-            if (!cachedDiffs.containsKey(baseline)) {
-                try {
-                    def commitExists = sh(
-                        script: "git cat-file -t ${baseline} 2>/dev/null || echo 'missing'",
-                        returnStdout: true
-                    ).trim()
-                    if (commitExists == 'commit') {
-                        cachedDiffs[baseline] = sh(
-                            script: "git diff --name-only ${baseline}..HEAD",
-                            returnStdout: true
-                        ).trim().split('\n').findAll { it }
-                    } else {
-                        cachedDiffs[baseline] = null
-                    }
-                } catch (Exception e) {
-                    echo "WARNING: Could not diff from baseline ${baseline.take(8)}: ${e.message}"
-                    cachedDiffs[baseline] = null
-                }
-            }
-            if (cachedDiffs[baseline] != null) {
-                filesToCheck = cachedDiffs[baseline]
-                baselineUsed = baseline.take(8)
-            }
-        }
-
-        filesToCheck.each { file ->
-            // Skip CI-only files per repo-root .ci-ignore
-            if (isCiIgnored(file)) {
-                return  // skip this file
-            }
-
-            // Pipeline Jenkinsfiles: a file at a pipeline's jenkinsPath triggers that
-            // specific pipeline (and only that pipeline). Any other .Jenkinsfile is skipped.
-            if (file.endsWith('Jenkinsfile')) {
-                def owningPipeline = jenkinsfileToPipeline[file]
-                if (owningPipeline == name) {
-                    if (!matchedPatterns.contains('jenkinsfile')) {
-                        matchedPatterns.add('jenkinsfile')
-                    }
-                    matchedFiles.add(file)
-                }
-                return  // Jenkinsfile handled — don't let it also match changePatterns
-            }
-
-            config.changePatterns.each { pattern ->
-                // Match files inside directory (sophia/foo.ts starts with sophia/)
-                // AND bare submodule pointer changes (sophia == sophia/ minus trailing slash)
-                if (file.startsWith(pattern) || file == pattern.replaceAll('/$', '')) {
-                    if (!matchedPatterns.contains(pattern)) {
-                        matchedPatterns.add(pattern)
-                    }
-                    matchedFiles.add(file)
-                }
-            }
-        }
-
-        analysis[name] = [
-            shouldRun: !config.manualOnly && matchedPatterns.size() > 0,
-            manualOnly: config.manualOnly ?: false,
-            matchedPatterns: matchedPatterns,
-            matchedFileCount: matchedFiles.size(),
-            sampleFiles: matchedFiles.take(5),
-            dependsOn: config.dependsOn ?: [],
-            triggersGenesis: config.triggersGenesis ?: false,
-            baselineUsed: baselineUsed
-        ]
-    }
-
-    return analysis
-}
-
-/**
  * Check deployed version against expected commit
  */
 def checkDeployedVersion(String endpoint, String expectedCommit) {
@@ -580,16 +401,16 @@ def checkHealth(String name, String url) {
 }
 
 /**
- * Order pipelines by dependencies using topological sort
+ * Order pipelines by dependencies using topological sort.
+ * Reads dependency metadata from build-manifest.json via getPipelineMetadata().
  */
-// DEPRECATED: advisory only, will be removed
 def orderByDependencies(pipelineList) {
     def ordered = []
     def remaining = pipelineList.collect()
 
     while (!remaining.isEmpty()) {
         def ready = remaining.find { name ->
-            def deps = PIPELINES[name]?.dependsOn ?: []
+            def deps = getPipelineMetadata(name).dependsOn ?: []
             deps.every { dep ->
                 !remaining.contains(dep) || ordered.contains(dep)
             }
@@ -611,6 +432,7 @@ def orderByDependencies(pipelineList) {
  * Group pipelines into dependency levels for parallel execution.
  * Pipelines in the same level have no dependencies on each other.
  * Genesis is excluded (always runs last after all builds succeed).
+ * Reads dependency metadata from build-manifest.json via getPipelineMetadata().
  */
 def groupByDependencyLevel(pipelineList) {
     def nonGenesis = pipelineList.findAll { it != 'elohim-genesis' }
@@ -620,7 +442,7 @@ def groupByDependencyLevel(pipelineList) {
     while (placed.size() < nonGenesis.size()) {
         def currentLevel = nonGenesis.findAll { name ->
             if (placed.contains(name)) return false
-            def deps = (PIPELINES[name]?.dependsOn ?: [])
+            def deps = getPipelineMetadata(name).dependsOn ?: []
             deps.every { dep -> !nonGenesis.contains(dep) || placed.contains(dep) }
         }
         if (currentLevel.isEmpty()) break
@@ -635,27 +457,30 @@ def groupByDependencyLevel(pipelineList) {
  * If a pipeline is building, auto-include all pipelines that depend on it.
  * Uses fixed-point iteration for transitive propagation.
  * Example: DNA builds → edge auto-includes (dependsOn DNA) → genesis auto-includes (dependsOn edge)
+ * Reads dependency metadata from build-manifest.json via getPipelineMetadata().
  */
-// DEPRECATED: advisory only, will be removed
-def propagateDependencies(pipelines, analysis) {
+def propagateDependencies(pipelines) {
     def added = true
     while (added) {
         added = false
-        PIPELINES.each { name, config ->
-            if (pipelines.contains(name)) return          // already building
-            if (config.manualOnly) return                  // never auto-trigger
+        def allNames = []
+        if (env.PIPELINE_REGISTRY_JSON) {
+            def registry = readJSON(text: env.PIPELINE_REGISTRY_JSON)
+            allNames = registry.keySet().toList()
+        }
+        allNames.each { name ->
+            if (pipelines.contains(name)) return
+            def meta = getPipelineMetadata(name)
+            if (meta.manualOnly) return
 
-            def deps = config.dependsOn ?: []
+            def deps = meta.dependsOn ?: []
             def buildingDep = deps.find { dep ->
                 if (!pipelines.contains(dep)) return false
-                // Sprint 5: respect cascades flag (default true for backward compat)
-                def depConfig = PIPELINES[dep]
-                return (depConfig.cascades == null) ? true : depConfig.cascades
+                def depMeta = getPipelineMetadata(dep)
+                return depMeta.cascades == null ? true : depMeta.cascades
             }
             if (buildingDep) {
                 pipelines.add(name)
-                analysis[name].shouldRun = true
-                analysis[name].matchedPatterns.add("dependency:${buildingDep}")
                 added = true
             }
         }
@@ -761,8 +586,8 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
             // Fire-and-forget (longRunning pipeline) — orchestrator did NOT
             // wait for downstream result. Advance baseline optimistically;
             // outcome is visible in the downstream pipeline's own Jenkins
-            // view. See PIPELINES definition for the cascade-avoidance
-            // rationale (bug #5 of 2026-05-24 sweettest sprint).
+            // view. See build-manifest.json longRunning flag for the
+            // cascade-avoidance rationale (bug #5 of 2026-05-24 sweettest sprint).
             def buildRef = result.buildNumber ? "#${result.buildNumber}" : "(queued)"
             echo "🚀 ${name}: DISPATCHED ${buildRef} — fire-and-forget; baseline advanced optimistically"
             pipelineBaselines[name] = env.GIT_COMMIT_FULL
@@ -791,9 +616,12 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
  * from config.longRunning.
  */
 def triggerPipeline(String name, String branch, Object wait = null, List changedFiles = []) {
-    def config = PIPELINES[name]
+    def config = getPipelineMetadata(name)
+    if (!config.jenkinsPath) {
+        error "Cannot dispatch pipeline '${name}': no jenkinsPath in its build-manifest.json"
+    }
     // Auto-derive wait from longRunning flag unless caller forced it.
-    boolean shouldWait = (wait == null) ? !(config?.longRunning) : (wait as boolean)
+    boolean shouldWait = (wait == null) ? !(config.longRunning) : (wait as boolean)
     String waitMode = shouldWait ? 'wait-for-result' : 'fire-and-forget (longRunning)'
     echo "▶️ Triggering ${name}/${branch} [${waitMode}]..."
 
@@ -802,7 +630,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // Note: local list named `buildParams` to avoid shadowing the pipeline-scope
         // `params` accessor (needed below to forward DEPLOY_ONLY).
         def buildParams = [booleanParam(name: 'FORCE_BUILD', value: true)]
-        if (config?.deploymentCheck) {
+        if (config.deploymentCheck) {
             buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: true))
         }
         // Propagate DEPLOY_ONLY so downstream pipelines (edge especially) skip
@@ -832,7 +660,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // and advance baseline optimistically — if the build later fails,
         // the next push that touches this pipeline's patterns will
         // re-dispatch (failures are visible in the downstream's own
-        // Jenkins view). Tradeoff documented at PIPELINES definition.
+        // Jenkins view). Tradeoff documented at build-manifest.json longRunning flag.
         if (!shouldWait) {
             return [
                 success: true,
@@ -854,7 +682,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         ]
     } catch (Exception e) {
         // Distinguish "Jenkins job not provisioned" from a real build failure.
-        // When a pipeline is registered in PIPELINES (and orchestrator-strategy.mjs)
+        // When a pipeline is registered in build-manifest.json (and orchestrator-strategy.mjs)
         // but its multibranch job has not been created in Jenkins yet — a normal
         // interim state during multi-step pipeline landings — the build(job:…) call
         // throws hudson.AbortException with "No item named <X> found". Treat that
@@ -899,15 +727,8 @@ def autoModeAnalyze() {
     echo "🔍 Analyzing changesets since last build..."
     def changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
 
-    if (!pipelineBaselines && changedFiles.size() > 50) {
-        echo "⚠️ Large changeset (${changedFiles.size()} files) with no per-pipeline baselines"
-        echo "   Building all matching pipelines (baselines will be saved after this run)"
-    }
-
-    def analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
     env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
     env.CHANGED_FILES_COUNT = changedFiles.size().toString()
-    env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
 
     // Group changed files by top-level area for the decision-matrix log.
     def filesByArea = [:]
@@ -923,33 +744,31 @@ def autoModeAnalyze() {
         if (files.size() > 3) echo "      └─ ... and ${files.size() - 3} more"
     }
 
-    def pipelines = analysis.findAll { name, info -> info.shouldRun }.keySet().toList()
-
-    // [build:*] commit-tag overrides
-    if (env.FORCE_BUILD_PIPELINES) {
-        env.FORCE_BUILD_PIPELINES.split(',').each { name ->
-            if (!pipelines.contains(name) && PIPELINES[name]) {
-                pipelines.add(name)
-                analysis[name].shouldRun = true
-                analysis[name].matchedPatterns.add('commit-tag:[build:*]')
-            }
-        }
+    // Build advisory analysis map from manifest-backed metadata.
+    // The build graph (runBuildGraph) is authoritative; this map is used
+    // only for the decision matrix display and pipeline-name enumeration.
+    def allPipelineNames = env.PIPELINE_REGISTRY_JSON
+        ? readJSON(text: env.PIPELINE_REGISTRY_JSON).keySet().toList()
+        : []
+    def analysis = [:]
+    allPipelineNames.each { name ->
+        def meta = getPipelineMetadata(name)
+        analysis[name] = [
+            shouldRun: false,
+            manualOnly: meta.manualOnly ?: false,
+            matchedPatterns: [],
+            matchedFileCount: 0,
+            sampleFiles: [],
+            dependsOn: meta.dependsOn ?: [],
+            triggersGenesis: meta.triggersGenesis ?: false,
+            baselineUsed: 'global'
+        ]
     }
+    env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
 
-    pipelines = propagateDependencies(pipelines, analysis)
-
-    // Genesis auto-include for dev branches when any triggering pipeline builds
-    if (!pipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
-        def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-        def triggeringPipeline = pipelines.find { PIPELINES[it]?.triggersGenesis }
-        if (triggeringPipeline && isDevBranch) {
-            pipelines.add('elohim-genesis')
-            analysis['elohim-genesis'].shouldRun = true
-            analysis['elohim-genesis'].matchedPatterns.add("triggered-by:${triggeringPipeline}")
-        }
-    }
-
-    return [pipelines: pipelines, analysis: analysis, changedFiles: changedFiles]
+    // Return empty pipelines list — graph routing (applyBuildGraphRouting)
+    // is the sole authority for auto mode pipeline selection.
+    return [pipelines: [], analysis: analysis, changedFiles: changedFiles]
 }
 
 /**
@@ -982,16 +801,26 @@ def manualModeAnalyze(String mode) {
             break
     }
 
+    // Build the advisory analysis map from manifest-backed metadata.
+    // In manual mode the build graph hasn't run yet, so derive the name list
+    // from PIPELINE_REGISTRY_JSON (populated by runBuildGraph in auto mode,
+    // or empty in manual mode — callers that need the matrix should ensure
+    // the registry is populated before this runs).
+    def allPipelineNames = env.PIPELINE_REGISTRY_JSON
+        ? readJSON(text: env.PIPELINE_REGISTRY_JSON).keySet().toList()
+        : []
+
     def analysis = [:]
-    PIPELINES.each { name, config ->
+    allPipelineNames.each { name ->
+        def meta = getPipelineMetadata(name)
         analysis[name] = [
             shouldRun: pipelines.contains(name),
-            manualOnly: config.manualOnly ?: false,
+            manualOnly: meta.manualOnly ?: false,
             matchedPatterns: pipelines.contains(name) ? ['manual-mode'] : [],
             matchedFileCount: 0,
             sampleFiles: [],
-            dependsOn: config.dependsOn ?: [],
-            triggersGenesis: config.triggersGenesis ?: false,
+            dependsOn: meta.dependsOn ?: [],
+            triggersGenesis: meta.triggersGenesis ?: false,
             baselineUsed: 'global'
         ]
     }
@@ -1010,17 +839,18 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
     def graphPipelines
     if (mode in ['auto', 'status']) {
         echo '\n=== Build Graph (Primary) ==='
-        def graphResult = runBuildGraph(changedFiles, analysis)
+        def graphResult = runBuildGraph(changedFiles)
         graphPipelines = graphResult.pipelineSteps.keySet().toList()
 
-        // Filter to pipelines that have Jenkins jobs in the PIPELINES map.
-        graphPipelines.removeAll { !PIPELINES.containsKey(it) }
+        // Filter to dispatchable pipelines (have jenkinsPath in their manifest).
+        graphPipelines.removeAll { name -> !getPipelineMetadata(name).jenkinsPath }
 
         // Apply [build:*] commit-message overrides — graph-walker (auth
         // since 2026-04) needs to honor manual retrigger workflow.
         if (env.FORCE_BUILD_PIPELINES) {
             env.FORCE_BUILD_PIPELINES.split(',').each { name ->
-                if (!graphPipelines.contains(name) && PIPELINES[name]) {
+                def meta = getPipelineMetadata(name)
+                if (!graphPipelines.contains(name) && meta.jenkinsPath) {
                     graphPipelines.add(name)
                     echo "🔧 [build:*] force-include applied to graph result: ${name}"
                 }
@@ -1030,7 +860,7 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         // Genesis auto-include for dev branches
         if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
             def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-            def triggeringPipeline = graphPipelines.find { PIPELINES[it]?.triggersGenesis }
+            def triggeringPipeline = graphPipelines.find { getPipelineMetadata(it).triggersGenesis }
             if (triggeringPipeline && isDevBranch) {
                 graphPipelines.add('elohim-genesis')
             }
@@ -1343,8 +1173,10 @@ def printDecisionMatrix(analysis, pipelines) {
 ║                          DEPLOYMENT DECISION MATRIX                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣'''
 
-    PIPELINES.each { name, config ->
+    def allNames = analysis.keySet().toList().sort()
+    allNames.each { name ->
         def info = analysis[name]
+        if (!info) return
         def willRun = pipelines.contains(name)
         def icon = willRun ? '🔨' : (info.manualOnly ? '🔒' : '⏭️')
         def status = willRun ? 'BUILD' : (info.manualOnly ? 'MANUAL' : 'SKIP')
@@ -1400,18 +1232,13 @@ def runBddCoverageGap() {
 /**
  * Run manifest-driven build graph — primary change detection algorithm.
  * Returns the graph result (used to determine which pipelines build).
- * Also runs advisory comparison against legacy PIPELINES analysis.
  */
-def runBuildGraph(List changedFiles, Map pipelinesAnalysis) {
+def runBuildGraph(List changedFiles) {
     def buildGraph = load('genesis/orchestrator/build-graph.groovy')
     def result = buildGraph.walkBuildGraph(changedFiles)
 
     // Per-file routing matrix (always-on visibility, from Task 4)
     echo buildGraph.formatPerFileMatrix(result.graph, result.staleMap, changedFiles)
-
-    // Comparison matrix; advisory only — legacy algorithm is deprecated
-    def comparison = buildGraph.formatComparisonMatrix(pipelinesAnalysis, result.staleMap, result.graph)
-    echo comparison.text
 
     // Save build state with buildProcess hashes for next run, but do NOT
     // advance lastSuccessfulCommit yet — that happens only after Execute
@@ -1420,9 +1247,10 @@ def runBuildGraph(List changedFiles, Map pipelinesAnalysis) {
     def previousCommit = result.previousState?.lastSuccessfulCommit ?: null
     buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, previousCommit, result.previousState)
 
-    // Advisory warning on divergences (legacy algorithm is no longer authoritative)
-    if (comparison.unexpectedDivergences && comparison.unexpectedDivergences.size() > 0) {
-        echo "⚠️  ADVISORY: legacy PIPELINES disagrees with build graph on: ${comparison.unexpectedDivergences.join(', ')}"
+    // Stash registry as JSON env var so all later stages can read pipeline
+    // metadata without re-parsing build-manifest.json files.
+    if (result.pipelineRegistry) {
+        env.PIPELINE_REGISTRY_JSON = writeJSON(returnText: true, json: result.pipelineRegistry)
     }
 
     return result
@@ -1607,56 +1435,57 @@ spec:
 ═══════════════════════════════════════════════════════════════════════════════
                         """
 
-                        // Check for commit message tags (webhook-triggered builds only)
-                        if (env.BUILD_TRIGGER == 'WEBHOOK') {
-                            def commitMsg = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
-                            if (commitMsg =~ /(?i)\[(skip ci|ci skip|no ci)\]/) {
-                                echo "⏭️  [skip ci] detected in commit message — skipping all pipelines"
-                                env.SKIP_CI = 'true'
-                            }
+                        // Read HEAD commit message once. Used for [skip ci], [build:*], and
+                        // (webhook-only) [deploy-only] parsing.
+                        def commitMsg = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
 
-                            // Parse [build:*] tags to force-include pipelines
-                            // Supported: [build:edge], [build:dna], [build:app], [build:genesis], [build:all]
-                            def buildTags = []
-                            def buildTagAliases = [
-                                'edge': 'elohim-edge',
-                                'dna': 'elohim-holochain',
-                                'app': 'elohim',
-                                'genesis': 'elohim-genesis',
-                                'sophia': 'elohim-sophia',
-                                'steward': 'elohim-steward'
-                            ]
-                            def tagMatcher = (commitMsg =~ /(?i)\[build:([a-z,-]+)\]/)
-                            tagMatcher.each { match ->
-                                match[1].split(',').each { tag ->
-                                    tag = tag.trim().toLowerCase()
-                                    if (tag == 'all') {
-                                        buildTags.addAll(PIPELINES.keySet().findAll { !PIPELINES[it].manualOnly })
-                                    } else if (buildTagAliases[tag]) {
-                                        buildTags.add(buildTagAliases[tag])
-                                    } else {
-                                        echo "⚠️  Unknown [build:${tag}] — valid: ${buildTagAliases.keySet().join(', ')}, all"
-                                    }
+                        // [skip ci] — meaningful on every trigger type. Operator who tagged a commit
+                        // with [skip ci] means "do not run CI on this HEAD regardless of how this
+                        // build was kicked off" (timer, replay, webhook).
+                        if (commitMsg =~ /(?i)\[(skip ci|ci skip|no ci)\]/) {
+                            echo "⏭️  [skip ci] detected in commit message — skipping all pipelines"
+                            env.SKIP_CI = 'true'
+                        }
+
+                        // [build:*] tags — meaningful on every trigger type. The tag lives in
+                        // git history; the orchestrator MUST honor it whenever it reads HEAD,
+                        // not only on the first webhook delivery (which may be NOT_BUILT due
+                        // to milestone() supersede — see plan 2026-05-28).
+                        def buildTags = []
+                        def buildTagAliases = [
+                            'edge': 'elohim-edge',
+                            'dna': 'elohim-holochain',
+                            'app': 'elohim',
+                            'genesis': 'elohim-genesis',
+                            'sophia': 'elohim-sophia',
+                            'steward': 'elohim-steward'
+                        ]
+                        def tagMatcher = (commitMsg =~ /(?i)\[build:([a-z,-]+)\]/)
+                        tagMatcher.each { match ->
+                            match[1].split(',').each { tag ->
+                                tag = tag.trim().toLowerCase()
+                                if (tag == 'all') {
+                                    def allNonManual = env.PIPELINE_REGISTRY_JSON
+                                        ? readJSON(text: env.PIPELINE_REGISTRY_JSON).findAll { k, v -> !v.manualOnly }.keySet().toList()
+                                        : []
+                                    buildTags.addAll(allNonManual)
+                                } else if (buildTagAliases[tag]) {
+                                    buildTags.add(buildTagAliases[tag])
+                                } else {
+                                    echo "⚠️  Unknown [build:${tag}] — valid: ${buildTagAliases.keySet().join(', ')}, all"
                                 }
                             }
-                            if (buildTags) {
-                                env.FORCE_BUILD_PIPELINES = buildTags.unique().join(',')
-                                echo "🔧 [build:*] tags detected — force-including: ${env.FORCE_BUILD_PIPELINES}"
-                            }
+                        }
+                        if (buildTags) {
+                            env.FORCE_BUILD_PIPELINES = buildTags.unique().join(',')
+                            echo "🔧 [build:*] tags detected — force-including: ${env.FORCE_BUILD_PIPELINES}"
+                        }
 
-                            // [deploy-only] tag → behave as if operator triggered
-                            // Build with Parameters DEPLOY_ONLY=true. Lets a webhook
-                            // push communicate "I changed manifests/RBAC/Jenkinsfile,
-                            // existing Harbor tags are valid, just redeploy" without
-                            // an operator hand-trigger.
-                            //
-                            // Effect (read by Determine Build Plan + triggerPipeline):
-                            //   - bypasses changeset analysis
-                            //   - dispatches only elohim-edge (+ elohim-genesis if SKIP_GENESIS != true)
-                            //   - propagates DEPLOY_ONLY=true to every downstream pipeline
-                            //
-                            // Operator equivalent for non-webhook runs: Build with
-                            // Parameters → DEPLOY_ONLY=true.
+                        // [deploy-only] — DELIBERATELY webhook-gated. This tag tells the orchestrator
+                        // to bypass changeset analysis and redeploy existing Harbor tags. It is only
+                        // meaningful for fresh pushes that intend a deployment; timer/replay reusing
+                        // the same HEAD must not silently retrigger a deploy.
+                        if (env.BUILD_TRIGGER == 'WEBHOOK') {
                             if (commitMsg =~ /(?i)\[deploy[-_ ]only\]/) {
                                 echo "🚀 [deploy-only] detected in commit message — DEPLOY_ONLY mode (skip builds, redeploy from env-file tags)"
                                 env.DEPLOY_ONLY_FROM_TAG = 'true'
@@ -1919,7 +1748,7 @@ spec:
                                     def name = level[0]
                                     echo "🔨 Building: ${name}"
                                     // wait=null → triggerPipeline auto-derives from
-                                    // PIPELINES[name].longRunning (bug #5 fix).
+                                    // build-manifest.json longRunning flag (bug #5 fix).
                                     def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles)
                                     results[name] = result
                                     recordPipelineResult(name, result, pipelineBaselines)

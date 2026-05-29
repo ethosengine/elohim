@@ -1,6 +1,10 @@
 {
   "manifestVersion": "1.0",
   "pipeline": "elohim-edge",
+  "jenkinsPath": "elohim/holochain/Jenkinsfile",
+  "manualOnly": false,
+  "triggersGenesis": true,
+  "dependsOn": ["elohim-holochain"],
   "description": "Edge services — doorway gateway, storage, conductor, edge image",
   "steps": {
     "cargo-build-doorway": {

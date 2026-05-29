@@ -223,6 +223,12 @@ spec:
               value: "ws://localhost:4445"
             - name: HOLOCHAIN_APP_ID
               value: "elohim"
+            # Hand-rendered manifest (no template sed): set the DNA-drift
+            # auto-reinstall gate directly. adam is alpha (ephemeral, re-seeded)
+            # and the genesis pair with matthew — both MUST land the same DNA
+            # hash or they partition onto different DHTs, so adam needs this too.
+            - name: ALLOW_DNA_REINSTALL
+              value: "true"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB

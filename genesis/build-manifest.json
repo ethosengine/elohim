@@ -1,6 +1,10 @@
 {
   "manifestVersion": "1.0",
   "pipeline": "elohim-genesis",
+  "jenkinsPath": "genesis/Jenkinsfile",
+  "manualOnly": false,
+  "triggersGenesis": false,
+  "dependsOn": ["elohim-edge", "elohim"],
   "description": "Content seeding and validation",
   "steps": {
     "validate-seeds": {

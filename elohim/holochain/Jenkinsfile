@@ -572,6 +572,12 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // deploys outside us-central — at that point, move to deployments.json.
     def region = 'us-central'
 
+    // DNA-content drift auto-reinstall gate (happ_manager). True for ephemeral
+    // re-seeded envs (alpha/staging) so a changed-DNA bundle redeploys onto the
+    // conductor's persistent PVC; false for prod, where DNA upgrades go through
+    // migration/lineage, not a blind reinstall that mints a new agent identity.
+    def allowDnaReinstall = (humanConfig.env == 'prod') ? 'false' : 'true'
+
     // Per-human primary doorway selection. When the env declares doorwayA +
     // doorwayB sub-maps (alpha today), route based on nodeTypes containing
     // 'remote': shem-side personas → doorwayB (elohim.host / signal.elohim.host),
@@ -605,6 +611,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         // Topology placeholders
         "s|NAMESPACE_PLACEHOLDER|${humanConfig.namespace}|g",
         "s|ENV_PLACEHOLDER|${humanConfig.env}|g",
+        "s|ALLOW_DNA_REINSTALL_PLACEHOLDER|${allowDnaReinstall}|g",
         "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
         "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",
         "s|BOOTSTRAP_URL_PLACEHOLDER|${primaryDoorway.bootstrapUrl}|g",

@@ -26,6 +26,31 @@
       "default": false,
       "description": "If true, pipeline is never auto-triggered by the orchestrator"
     },
+    "jenkinsPath": {
+      "type": "string",
+      "description": "Path to the pipeline's Jenkinsfile (relative to repo root). Required for dispatchable pipelines; absent for graph-only pipelines that are never directly dispatched by the orchestrator."
+    },
+    "triggersGenesis": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true and this pipeline builds, elohim-genesis is auto-included on dev branches."
+    },
+    "cascades": {
+      "type": "boolean",
+      "default": true,
+      "description": "If true, dependents of this pipeline auto-build when it builds. Set false for leaf pipelines that produce artifacts consumed only by themselves."
+    },
+    "longRunning": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, the orchestrator fires this pipeline as fire-and-forget (doesn't block waiting for it). Used for pipelines that take >15 minutes."
+    },
+    "dependsOn": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Pipeline names this pipeline depends on for execution ordering."
+    },
     "steps": {
       "type": "object",
       "minProperties": 1,

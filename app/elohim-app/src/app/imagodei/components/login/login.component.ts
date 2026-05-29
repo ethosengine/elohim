@@ -108,8 +108,20 @@ export class LoginComponent implements OnInit, AfterViewInit {
   }
 
   private async _prefetchAuthority(): Promise<void> {
+    // Skip in non-browser environments (Vitest/Node, SSR). Node's native
+    // fetch cannot resolve relative URLs and jsdom's default `about:blank`
+    // origin is `'null'` — both surface as ERR_INVALID_URL.
+    if (
+      typeof window === 'undefined' ||
+      !window.location ||
+      !window.location.origin ||
+      window.location.origin === 'null' ||
+      !window.location.protocol.startsWith('http')
+    ) {
+      return;
+    }
     try {
-      const resp = await fetch('/auth/me', { credentials: 'include' });
+      const resp = await fetch(`${window.location.origin}/auth/me`, { credentials: 'include' });
       if (!resp.ok) return;
       const data = (await resp.json()) as Record<string, unknown>;
       const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};
