@@ -551,36 +551,51 @@ impl HttpServer {
         // marker (dht_anchor_hash or p2p_published_at). If the drain has
         // not run yet, the index will be empty — that is the desired
         // behavior: we must never serve undrained rows to browsers.
-        let query = ContentQuery {
-            content_format: Some("html5-app".to_string()),
-            limit: 100,
-            ..Default::default()
-        };
+        // App-bundle content formats served via /apps/{slug}: legacy
+        // `html5-app` and Angular `spa-bundle` (e.g. lamad-spa). Storage is the
+        // layer that resolves /apps and emits "App not found", so this must stay
+        // in sync with doorway's app_file_cache $in:[html5-app,spa-bundle] fix
+        // (b62c5ff2c) — a spa-bundle-only row (lamad-spa) was 404ing here.
+        const APP_BUNDLE_FORMATS: [&str; 2] = ["html5-app", "spa-bundle"];
 
-        // External slug index — require provenance marker on every row.
-        match db::content_diesel::list_content(&mut conn, &app_ctx, &query, true) {
-            Ok(items) => {
-                let mut index = self.slug_index.write().await;
-                index.clear();
-                for item in items {
-                    if let Some(ref content_body) = item.content.content_body {
-                        if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
-                            if let Some(slug) = obj.get("slug").and_then(|v| v.as_str()) {
-                                let blob_hash = item.content.blob_hash.clone().unwrap_or_default();
-                                if !blob_hash.is_empty() {
-                                    info!(slug = %slug, blob_hash = %blob_hash, "Indexed HTML5 app");
-                                    index.insert(slug.to_string(), blob_hash);
+        let mut index = self.slug_index.write().await;
+        index.clear();
+        for fmt in APP_BUNDLE_FORMATS {
+            let query = ContentQuery {
+                content_format: Some(fmt.to_string()),
+                limit: 100,
+                ..Default::default()
+            };
+            // External slug index — require provenance marker on every row.
+            match db::content_diesel::list_content(&mut conn, &app_ctx, &query, true) {
+                Ok(items) => {
+                    for item in items {
+                        let blob_hash = item.content.blob_hash.clone().unwrap_or_default();
+                        if blob_hash.is_empty() {
+                            continue;
+                        }
+                        // Index by row id (the slug the EPR router requests via
+                        // /apps/{epr_id}) AND by the inner content_body slug, so a
+                        // row whose inner slug differs from its id (lamad-spa's
+                        // inner slug is "lamad") still resolves by either key.
+                        index.insert(item.content.id.clone(), blob_hash.clone());
+                        if let Some(ref content_body) = item.content.content_body {
+                            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body)
+                            {
+                                if let Some(slug) = obj.get("slug").and_then(|v| v.as_str()) {
+                                    index.insert(slug.to_string(), blob_hash.clone());
                                 }
                             }
                         }
+                        info!(id = %item.content.id, blob_hash = %blob_hash, "Indexed app bundle");
                     }
                 }
-                info!(count = index.len(), "Slug index loaded");
-            }
-            Err(e) => {
-                warn!("Failed to load slug index: {}", e);
+                Err(e) => {
+                    warn!(format = fmt, "Failed to load slug index: {}", e);
+                }
             }
         }
+        info!(count = index.len(), "Slug index loaded");
     }
 
     /// Get a connection from the Diesel pool
@@ -4574,26 +4589,42 @@ impl HttpServer {
         let app_ctx = db::AppContext::default_lamad();
         // External HTTP slug resolution — only consider rows that carry a
         // provenance marker (Holochain dht_anchor_hash or libp2p Kad publish).
-        let query = ContentQuery {
-            content_format: Some("html5-app".to_string()),
-            limit: 100,
-            ..Default::default()
-        };
-
-        let items = db::content_diesel::list_content(&mut conn, &app_ctx, &query, true)?;
+        // App-bundle formats served via /apps/{slug}: html5-app + spa-bundle
+        // (kept in sync with load_slug_index + doorway b62c5ff2c).
+        const APP_BUNDLE_FORMATS: [&str; 2] = ["html5-app", "spa-bundle"];
         let mut found_hash = None;
 
-        for item in items {
-            if let Some(ref content_body) = item.content.content_body {
-                if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
-                    if let Some(content_slug) = obj.get("slug").and_then(|v| v.as_str()) {
-                        let hash = item.content.blob_hash.clone().unwrap_or_default();
-                        if !hash.is_empty() {
-                            let mut index = self.slug_index.write().await;
-                            index.insert(content_slug.to_string(), hash.clone());
-                        }
-                        if content_slug == slug {
-                            found_hash = item.content.blob_hash.clone();
+        for fmt in APP_BUNDLE_FORMATS {
+            let query = ContentQuery {
+                content_format: Some(fmt.to_string()),
+                limit: 100,
+                ..Default::default()
+            };
+            let items = db::content_diesel::list_content(&mut conn, &app_ctx, &query, true)?;
+            for item in items {
+                let hash = item.content.blob_hash.clone().unwrap_or_default();
+                if hash.is_empty() {
+                    continue;
+                }
+                // Resolve by row id (the EPR router requests /apps/{epr_id}) AND
+                // by the inner content_body slug, warming the index by both keys.
+                {
+                    let mut index = self.slug_index.write().await;
+                    index.insert(item.content.id.clone(), hash.clone());
+                }
+                if item.content.id == slug {
+                    found_hash = Some(hash.clone());
+                }
+                if let Some(ref content_body) = item.content.content_body {
+                    if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
+                        if let Some(content_slug) = obj.get("slug").and_then(|v| v.as_str()) {
+                            {
+                                let mut index = self.slug_index.write().await;
+                                index.insert(content_slug.to_string(), hash.clone());
+                            }
+                            if content_slug == slug {
+                                found_hash = Some(hash.clone());
+                            }
                         }
                     }
                 }

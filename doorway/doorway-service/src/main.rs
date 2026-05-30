@@ -572,7 +572,20 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_default();
 
         let node_id_str = state.args.node_id.to_string();
-        let doorway_id = state.args.doorway_id.as_deref().unwrap_or(&node_id_str);
+        let doorway_id = match state.args.doorway_id.as_deref() {
+            Some(id) => id,
+            None => {
+                warn!(
+                    node_id = %node_id_str,
+                    "DOORWAY_ID env var is not set — falling back to node UUID. The EPR \
+                     router filters projections by doorway_id (in_scope_of LIKE \
+                     'doorway:{{id}}|'), so it will match ZERO seeded rows and '/' will \
+                     fall through to /threshold while '/lamad' returns 404. Set DOORWAY_ID \
+                     in the deployment manifest (e.g. DOORWAY_ID=alpha-elohim-host)."
+                );
+                node_id_str.as_str()
+            }
+        };
 
         if let Some(ref storage_url) = state.args.storage_url {
             match doorway::projection::fetch_projections_from_storage(
@@ -602,6 +615,66 @@ async fn main() -> anyhow::Result<()> {
         } else {
             info!("STORAGE_URL not configured — EPR router starts empty");
         }
+    }
+
+    // Periodic EPR-router self-heal refresh (operator-free recovery).
+    //
+    // The B12 boot-fetch above is a one-shot with a 10s timeout. If storage is
+    // crashlooping at boot it times out → the router starts empty → '/lamad'
+    // 404s and '/' falls through to /threshold, and it stays that way until a
+    // doorway restart. This task re-fetches every DOORWAY_EPR_REFRESH_SECS
+    // (default 30) and atomically replaces the routing table on success, so the
+    // router self-populates once storage recovers — no kubectl restart needed.
+    // On failure it logs at debug and preserves the last-good table (never
+    // clears the router on transient storage unavailability).
+    if let Some(ref storage_url) = state.args.storage_url {
+        let refresh_secs = std::env::var("DOORWAY_EPR_REFRESH_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(30);
+        let refresh_storage_url = storage_url.clone();
+        let refresh_epr_router = Arc::clone(&state.epr_router);
+        let refresh_node_id = state.args.node_id.to_string();
+        let refresh_doorway_id = state.args.doorway_id.clone().unwrap_or(refresh_node_id);
+        tokio::spawn(async move {
+            let http = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .unwrap_or_default();
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(refresh_secs));
+            // Skip the immediate first tick — the boot-fetch already ran.
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                match doorway::projection::fetch_projections_from_storage(
+                    &refresh_storage_url,
+                    &refresh_doorway_id,
+                    &http,
+                )
+                .await
+                {
+                    Ok(projections) => {
+                        let count = projections.len();
+                        refresh_epr_router.replace_all(projections);
+                        tracing::debug!(
+                            count,
+                            doorway_id = %refresh_doorway_id,
+                            "EPR router periodic refresh: replaced projections"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            error = %e,
+                            "EPR router periodic refresh: storage unreachable; keeping last-good"
+                        );
+                    }
+                }
+            }
+        });
+        info!(
+            interval_secs = refresh_secs,
+            "EPR router periodic self-heal refresh task started"
+        );
     }
 
     // Start zome capability discovery (import configs, cache rules)

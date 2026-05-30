@@ -205,11 +205,11 @@ export function defaultProjectionSeeds(): ProjectionSpec[] {
 
   return [
     landingAt('alpha-elohim-host'),
-    landingAt('elohim-host'),
+    landingAt('apex-elohim-host'),
     lamadAt('alpha-elohim-host'),
-    lamadAt('elohim-host'),
+    lamadAt('apex-elohim-host'),
     imagodeiPortalAt('alpha-elohim-host'),
-    imagodeiPortalAt('elohim-host'),
+    imagodeiPortalAt('apex-elohim-host'),
   ];
 }
 
