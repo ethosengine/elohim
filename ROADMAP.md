@@ -10,6 +10,25 @@ The Elohim Protocol is distributed civilization infrastructure organized around 
 
 ---
 
+## Active Track (2026-05-30): Framework Cleanup — clean, reliable, developer-friendly EPR-apps
+
+After the landing-page delivery exposed how leaky the "build an app on the substrate" path is
+(a 7+ layer cascade to render one doorway, and still incomplete), the next arc hardens the
+**Elohim SDK** (the contract) and the **app-manifest** (how apps conform) so we and third
+parties can build/manifest/seed/project/serve an EPR-app that loads fast on every doorway.
+Five sequenced subagent-driven sprints:
+
+1. **Classify & Map** — canonical boundary map (SDK / core / app-private) + core↔reference-app split decision.
+2. **Reliability: make the apps load** — warm projection cache as the fast path (not the `apps-sw` compressed-zip fallback); fix cache-warming, blob-tier write-on-fetch, EprRouter population, the zip-determinism content-address bug, missing `/wasm/*` assets, and the apex/adam projection leg. Verify by render, not shell.
+3. **Elohim SDK contract + standard app-bootstrap** — SDK owns the bootstrap so apps stop hand-wiring DI (the white-page root cause); resolve the duplicate `ELOHIM_CLIENT` token; migrate reference apps onto it.
+4. **app-manifest + reference-app conformance** — manifest-drive build/seed/project; one EPR-app conforms end-to-end with zero substrate hand-wiring (third-party-readiness proof).
+5. **Pipeline / monorepo split** — elohim-core vs reference-apps (Landing/CMS, Lamad, Shefa, Avodah, Mishpat, Qahal), versioned independently.
+
+Plan: `genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md` ·
+Brief: `genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md`
+
+---
+
 ## Current State (Validated)
 
 This assessment is based on reading the actual source code, not documentation alone.
