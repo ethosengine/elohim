@@ -8,6 +8,7 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser } from 'playwright';
 
@@ -188,4 +189,27 @@ function safeOrigin(url: string): string {
   } catch {
     return '';
   }
+}
+
+async function main(): Promise<void> {
+  let opts: LookOptions;
+  try {
+    opts = parseArgs(process.argv.slice(2));
+  } catch (e) {
+    console.error((e as Error).message);
+    process.exit(2);
+  }
+  const result = await runLook(opts);
+  // Print the two paths the agent reads next.
+  console.log(result.shotPath);
+  console.log(result.capturePath);
+  process.exit(result.ok ? 0 : 1);
+}
+
+// Run only when invoked directly (not when imported by tests).
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(e => {
+    console.error(e instanceof Error ? e.message : String(e));
+    process.exit(2);
+  });
 }
