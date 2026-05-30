@@ -1086,10 +1086,22 @@ VEOF
                         // before lamad (lamad's tsconfig aliases reference
                         // elohim-app codegen) — that ordering is enforced by
                         // the upstream Build stages, not this call.
+                        // Deploy-seed (blob upload + content PATCH) is post-build and
+                        // transient-prone (doorway 503 during cluster churn). The
+                        // orchestrator runs this pipeline wait-for-result at Level 0; a
+                        // FAILURE here aborts the whole dependency graph and blocks
+                        // unrelated downstream pipelines (edge deploy). catchError->UNSTABLE
+                        // keeps the chain alive — the orchestrator treats UNSTABLE as
+                        // success (genesis/orchestrator/Jenkinsfile success-check) and
+                        // continues dispatch. The credential-missing guard above stays a
+                        // hard error (real misconfig, not a transient flake). Mirrors the
+                        // SonarQube + orchestrator post-build catchError precedent.
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                         stageSpaBlobs(doorwayEprUrl, [
                             [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
                             [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
                         ], adminKey)
+                        }
                     }
                 }
             }
