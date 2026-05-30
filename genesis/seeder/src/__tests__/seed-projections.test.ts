@@ -63,7 +63,7 @@ describe('defaultProjectionSeeds', () => {
     expect(portalSeeds.every((s) => s.baseHref === '/auth/portal/')).toBe(true);
     expect(portalSeeds.map((s) => s.doorwayId).sort()).toEqual([
       'alpha-elohim-host',
-      'elohim-host',
+      'apex-elohim-host',
     ]);
   });
 });
