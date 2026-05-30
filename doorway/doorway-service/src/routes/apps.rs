@@ -604,13 +604,28 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
         if let Some(hash) = &blob_hash {
             builder = builder.header("X-Blob-Hash", hash.as_str());
         }
-    } else if storage_resp.is_err() {
-        // Storage unreachable and no projection cache — report degraded
-        return Response::builder()
-            .status(StatusCode::BAD_GATEWAY)
-            .header("Content-Length", "0")
-            .body(Full::new(Bytes::new()))
-            .unwrap();
+    } else {
+        // No doorway projection-cache layer. Storage still serves individual app
+        // files on demand via GET /apps/{slug}/{file} (extracting lazily on first
+        // access), so the RELIABLE delivery is "extracted" (per-file fetch), NOT
+        // the compressed-zip SW fallback whose async extraction races the first
+        // request → white screen (observed on elohim-host-landing). Prefer
+        // extracted whenever storage is reachable; only report degraded when it
+        // is not. (Warm projection-cache fast-path is Sprint 2 — this restores
+        // reliable, if not yet blazing, delivery.)
+        match &storage_resp {
+            Ok(_) => {
+                builder = builder.header("X-Delivery-Mode", "extracted");
+                builder = builder.header("X-Cache-Tier", "storage-ondemand");
+            }
+            Err(_) => {
+                return Response::builder()
+                    .status(StatusCode::BAD_GATEWAY)
+                    .header("Content-Length", "0")
+                    .body(Full::new(Bytes::new()))
+                    .unwrap();
+            }
+        }
     }
 
     builder

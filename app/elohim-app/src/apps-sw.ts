@@ -4,7 +4,11 @@ declare const self: ServiceWorkerGlobalScope;
 
 import JSZip from 'jszip';
 
-const CACHE_NAME = 'apps-v1';
+// Bumped v1→v2 (2026-05-30): the prior cache held a stale index.html keyed to an
+// old bundle hash (zip-non-determinism rotated the blobHash), which referenced new
+// chunk filenames that 404'd → white screen. A new cache name forces fresh fetches
+// against the current bundle. (Deterministic-hash + auto cache-invalidation are Sprint 2.)
+const CACHE_NAME = 'apps-v2';
 
 // ---------------------------------------------------------------------------
 // Lifecycle events

@@ -14,7 +14,7 @@ import {
   provideElohimClient,
   detectClientMode,
 } from '@elohim/service';
-import { ECONOMIC_EVENT_FACTORY } from '@elohim/rea-runtime';
+import { AGENT_CONTEXT, ECONOMIC_EVENT_FACTORY, EVENT_API } from '@elohim/rea-runtime';
 import { environment } from '../environments/environment';
 import { LEARNER_BACKEND } from './interfaces/learner-backend.interface';
 import { LearnerBackendApiService } from './services/learner-backend-api.service';
@@ -52,6 +52,11 @@ import { IdentityService } from '@app/imagodei/services/identity.service';
 import { HeliaFetchService } from '@app/elohim/services/helia-fetch.service';
 import { ContentAttestationApiService } from '@app/elohim/services/content-attestation-api.service';
 import { EconomicEventsApiService } from '@app/shefa/services/economic-events-api.service';
+// Local ELOHIM_CLIENT token used by @app/elohim/services/content.service — aliased to the
+// library token so both consumers resolve to the same instance. The separate local token
+// exists because elohim-app originally had an Angular version mismatch with elohim-library;
+// that mismatch is resolved, but the local token survives in content.service's import path.
+import { ELOHIM_CLIENT as LOCAL_ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
 
 /**
  * Resolve the doorway URL at runtime.
@@ -125,6 +130,22 @@ export const appConfig: ApplicationConfig = {
     // is a thin HTTP client that only injects HttpClient. Satisfies
     // signal-harness.service.ts.
     { provide: ECONOMIC_EVENT_FACTORY, useExisting: EconomicEventsApiService },
+    // EVENT_API — rea-runtime's EventService injects this token. StorageApiService
+    // provides the emitLamadIntent/createEconomicEvent surface (M-REA-1).
+    // content-viewer.component.ts imports EventService from @elohim/rea-runtime
+    // which is providedIn:'root' and injects EVENT_API with a fail-fast factory.
+    { provide: EVENT_API, useExisting: StorageApiService },
+    // AGENT_CONTEXT — rea-runtime's AttentionTrackerService injects this token.
+    // AttentionTrackerService is providedIn:'root' and injected by content-viewer.
+    // AgentService satisfies IAgentContext via getCurrentAgentId().
+    { provide: AGENT_CONTEXT, useExisting: AgentService },
+    // LOCAL_ELOHIM_CLIENT — @app/elohim/services/content.service injects the
+    // elohim-app-local ELOHIM_CLIENT token (not the @elohim/service one).
+    // This alias maps the local token to the library instance so both consumers
+    // resolve to the same ElohimClient without creating a second instance.
+    // The two tokens share the description string 'ElohimClient' but are
+    // distinct object references — useExisting bridges them.
+    { provide: LOCAL_ELOHIM_CLIENT, useExisting: ELOHIM_CLIENT },
     // LEARNER_BACKEND — concrete provider for the lamad-local learner backend token
     // (P-disposition: token + interface live in lamad/interfaces/; elohim-app's token retired)
     { provide: LEARNER_BACKEND, useClass: LearnerBackendApiService },
