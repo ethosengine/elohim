@@ -16,25 +16,25 @@ metadata:
     # 100m mirrors the elohim-doorway-alpha ingress (doorway/alpha.yaml ~L361).
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      # ELOHIM_HOST_LANDING_ROOT_REWRITE — set by raw-viewport-landing-dogfood branch.
-      # Map bare "/" to the elohim-host-landing html5-app bundle entry; everything
-      # else falls through to the doorway's normal routing (SPA fallback, /apps,
-      # /blob, /api/v1, /lamad/*, etc.). Reversal: drop this annotation + restore
-      # the `/` → elohim-site-alpha-service rule below.
-      #
-      # IMPORTANT: use `if ($request_uri = "/")` rather than a nested `location = /`
-      # block. nginx-ingress duplicates `configuration-snippet` into every per-path
-      # location block (one per `paths:` entry below), so a nested `location = /`
-      # would become `location /lamad/concept/ { ... location = / { ... } }` —
-      # invalid nginx ("location \"/\" is outside location \"/lamad/concept/\"")
-      # which silently fails reload and leaves the controller serving last-good
-      # in-memory config. The `if` form evaluates per-request and only matches
-      # when the URI is literally "/", so duplication is a no-op everywhere else.
-      # See memory: nginx_ingress_configuration_snippet_location_trap.
-      if ($request_uri = "/") {
-        return 302 /apps/elohim-host-landing/index.html;
-      }
+    # REMOVED 2026-05-30 (/deliver: the-landing-page-loads). The stale
+    # `configuration-snippet` below 302-redirected bare `GET /` to
+    # `/apps/elohim-host-landing/index.html`. That changed the browser URL, so the
+    # landing SPA's Angular router booted at `/apps/elohim-host-landing` (which has
+    # no route) and rendered its own in-app 404 ("...drifted into uncharted space").
+    # The 200-OK pre-hydration HTML masked it; the bug only shows after hydration.
+    #
+    # The redirect is a ROOT_APP_SLUG-era vestige. The doorway's EPR router now
+    # serves url_path="/" INLINE — verified live:
+    #   GET https://doorway-alpha.elohim.host/  (the doorway's own ingress, no snippet)
+    #   → HTTP 200, x-epr-router: dispatched, 6866b landing index, <base href="/">.
+    # The `path: /` → elohim-doorway-alpha rule below already routes bare `/` to the
+    # doorway, so dropping the snippet lets `/` reach the EPR router and the SPA
+    # router match the home route. Assets (relative to base href "/") resolve via
+    # the root projection's longest-prefix dispatch (e.g. /main-*.js → doorway →
+    # /apps/elohim-host-landing/main-*.js).
+    #
+    # Reversal: restore the `configuration-snippet` annotation block from git
+    # history (this file @ aeec00029) if the EPR-router root-serve regresses.
 spec:
   ingressClassName: public
   rules:
