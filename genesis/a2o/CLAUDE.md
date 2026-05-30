@@ -44,4 +44,5 @@ Conceptual scenarios (in `genesis/docs/`) describe the human experience. Executa
 
 - **Coverage scanner**: `npx tsx scripts/scan-coverage.ts` — compares conceptual vs executable scenario coverage
 - **Step skeleton generator**: `npx tsx scripts/generate-step-skeletons.ts` — stubs for undefined steps
+- **Render & see (`look`)**: `pnpm look <url> [--as <FixtureHuman>] [--doorway <id|url>] [--wait-testid <id>] [--out <slug>] [--viewport WxH]` — renders a surface headless in Che, writes `reports/look/<latest|slug>/{shot.png,capture.json}`, and prints both paths. The fast "glance at the app" loop for agentic iteration; reuses `PlaywrightDevice` capture (console/pageerror/failed-requests). `--as` logs in as a fixture human first. First run needs `pnpm a2o:setup` (installs Chromium to the XDG cache once).
 - **Slash commands**: `/gap-analysis` (sprint planning), `/generate-scenarios` (bulk from gap report), `/close-loop` (per-commit verification)
