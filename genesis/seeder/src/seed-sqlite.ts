@@ -159,6 +159,7 @@ interface ConceptJson {
   content?: string | object;
   contentFormat?: string;
   contentType?: string;
+  reach?: string;           // Authored reach grade (floor — overrides may only raise)
   description?: string;
   summary?: string;
   sourcePath?: string;
@@ -488,15 +489,22 @@ function loadContentFiles(): ConceptJson[] {
 // stewardship, and relationship graphs.
 // ============================================================================
 
-/** Reach levels ordered from most restrictive to most permissive */
+/**
+ * Canonical 8-level reach order, most-restrictive to most-open.
+ * Mirrors elohim/sdk/schemas/v1/enums/reach.schema.json (DNA-notarized).
+ * Legacy keys (invited, local, neighborhood, municipal) are absent; any
+ * surviving references to them elsewhere in this file will coalesce to
+ * REACH_ORDER[key] ?? 0 — non-canonical drift to be reconciled separately.
+ */
 const REACH_ORDER: Record<string, number> = {
   private: 0,
-  invited: 1,
-  local: 2,
-  neighborhood: 3,
-  municipal: 4,
-  commons: 5,
-  public: 6, // Legacy compatibility
+  self: 1,
+  intimate: 2,
+  trusted: 3,
+  familiar: 4,
+  community: 5,
+  public: 6,
+  commons: 7,
 };
 
 /**
@@ -542,25 +550,57 @@ function loadReachOverrides(): Map<string, string> {
 /** Global reach overrides — loaded once if --use-account-packages is set */
 let reachOverrides: Map<string, string> | null = null;
 
-function getReachForContent(contentId: string): Reach {
-  if (!USE_ACCOUNT_PACKAGES) return 'public';
+/**
+ * Resolve the effective reach for a content item.
+ *
+ * Authored reach (from the content JSON) is the floor — the earned grade at
+ * authoring time. Account-package relationship assignments may only RAISE
+ * reach; they can never drag a publicly-authored document down to a more
+ * restrictive level. The most-open candidate across {authoredReach, override}
+ * is selected, using REACH_ORDER rank as the comparator.
+ *
+ * When USE_ACCOUNT_PACKAGES is false the default is 'public' (dev mode).
+ * When enabled the default falls back to 'commons' for ungraded content.
+ */
+function getReachForContent(contentId: string, authoredReach?: string): Reach {
+  const defaultReach: Reach = USE_ACCOUNT_PACKAGES ? 'commons' : 'public';
 
-  if (!reachOverrides) {
-    console.log('Loading reach overrides from account packages...');
-    reachOverrides = loadReachOverrides();
-    console.log(`   Loaded reach for ${reachOverrides.size} content items`);
+  if (USE_ACCOUNT_PACKAGES) {
+    if (!reachOverrides) {
+      console.log('Loading reach overrides from account packages...');
+      reachOverrides = loadReachOverrides();
+      console.log(`   Loaded reach for ${reachOverrides.size} content items`);
 
-    // Show distribution
-    const dist = new Map<string, number>();
-    for (const reach of reachOverrides.values()) {
-      dist.set(reach, (dist.get(reach) || 0) + 1);
-    }
-    for (const [reach, count] of [...dist.entries()].sort((a, b) => b[1] - a[1])) {
-      console.log(`     ${reach}: ${count}`);
+      // Show distribution
+      const dist = new Map<string, number>();
+      for (const reach of reachOverrides.values()) {
+        dist.set(reach, (dist.get(reach) || 0) + 1);
+      }
+      for (const [reach, count] of [...dist.entries()].sort((a, b) => b[1] - a[1])) {
+        console.log(`     ${reach}: ${count}`);
+      }
     }
   }
 
-  return (reachOverrides.get(contentId) as Reach | undefined) ?? 'commons';
+  // Collect candidates: authored reach + override (if account packages enabled)
+  const candidates: string[] = [];
+  if (authoredReach && REACH_ORDER[authoredReach] !== undefined) {
+    candidates.push(authoredReach);
+  }
+  if (USE_ACCOUNT_PACKAGES && reachOverrides) {
+    const override = reachOverrides.get(contentId);
+    if (override && REACH_ORDER[override] !== undefined) {
+      candidates.push(override);
+    }
+  }
+
+  if (candidates.length === 0) return defaultReach;
+
+  // Pick the most-open (highest rank) candidate — authored floor cannot be lowered
+  const best = candidates.reduce((a, b) =>
+    (REACH_ORDER[a] ?? 0) >= (REACH_ORDER[b] ?? 0) ? a : b
+  );
+  return best as Reach;
 }
 
 function transformContent(json: ConceptJson): CreateContentInput {
@@ -594,7 +634,7 @@ function transformContent(json: ConceptJson): CreateContentInput {
     blobCid: undefined,
     contentSizeBytes: contentSizeBytes,
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-    reach: getReachForContent(json.id),
+    reach: getReachForContent(json.id, json.reach),
     createdBy: undefined,
     tags: json.tags || [],
   };

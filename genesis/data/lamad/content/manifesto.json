@@ -2,6 +2,7 @@
   "id": "manifesto",
   "did": "did:web:elohim.host:content:manifesto",
   "contentType": "epic",
+  "reach": "commons",
   "activityPubType": "Article",
   "title": "Elohim Protocol - Digital Infrastructure for Human Flourishing: A Manifesto for Love-Centered Technology",
   "description": "Learn more at [https://elohim.host](https://elohim.host) a vision-setting project of Ethosengine.",
