@@ -282,15 +282,45 @@ pub fn upsert_with_anchor(
     let existing = get_commitment(conn, ctx, &id)?;
 
     if existing.is_some() {
-        // Update dht_anchor_hash on existing record
-        diesel::update(
-            rea_commitments::table
-                .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
-                .filter(rea_commitments::id.eq(&id)),
-        )
-        .set(rea_commitments::dht_anchor_hash.eq(dht_anchor_hash))
-        .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
+        // On reseed of an existing id, refresh the projected columns the
+        // EprRouter reads (in_scope_of / note / metadata_json) IN ADDITION to
+        // dht_anchor_hash — but ONLY when the input carries them
+        // (in_scope_of.is_some() distinguishes a full create input from a
+        // state-only anchor update). This backfills rows authored before the
+        // camelCase-deserialization fix (57bf7d672) landed in the deployed
+        // storage binary, which persisted in_scope_of as NULL. Because
+        // find_active_projections filters `in_scope_of LIKE '%doorway:..|%'`
+        // and `NULL LIKE _` is never true, those rows were invisible → the
+        // doorway EprRouter stayed empty → '/' fell to /threshold and '/lamad'
+        // 404'd. A plain reseed could not self-heal because this branch
+        // previously touched only dht_anchor_hash. The guard ensures the
+        // state-only `update_state_via_conductor` path (in_scope_of=None) never
+        // clobbers an existing scope.
+        if input.in_scope_of.is_some() {
+            diesel::update(
+                rea_commitments::table
+                    .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+                    .filter(rea_commitments::id.eq(&id)),
+            )
+            .set((
+                rea_commitments::dht_anchor_hash.eq(dht_anchor_hash),
+                rea_commitments::in_scope_of.eq(input.in_scope_of.as_deref()),
+                rea_commitments::note.eq(input.note.as_deref()),
+                rea_commitments::metadata_json.eq(input.metadata_json.as_deref()),
+            ))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+        } else {
+            // State-only anchor update: advance dht_anchor_hash, preserve the rest.
+            diesel::update(
+                rea_commitments::table
+                    .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+                    .filter(rea_commitments::id.eq(&id)),
+            )
+            .set(rea_commitments::dht_anchor_hash.eq(dht_anchor_hash))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
+        }
     } else {
         let new = NewReaCommitment {
             id: &id,
