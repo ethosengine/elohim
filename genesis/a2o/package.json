@@ -28,6 +28,8 @@
     "test:genesis:layer": "cucumber-js --dry-run --tags '@governance_layer:$npm_config_name' '../docs/content/elohim-protocol/**/*.feature'",
     "generate:skeletons": "tsx scripts/generate-step-skeletons.ts",
     "test:unit": "tsx --test 'src/**/__tests__/*.test.ts' 'scripts/__tests__/*.test.ts'",
+    "a2o:setup": "playwright install chromium",
+    "look": "tsx scripts/look.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -45,7 +47,7 @@
     "@cucumber/cucumber": "^11.2.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "playwright": "^1.50.0",
+    "playwright": "1.59.1",
     "undici": "^7.3.0"
   },
   "devDependencies": {
