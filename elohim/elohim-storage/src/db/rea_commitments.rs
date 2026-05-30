@@ -589,6 +589,13 @@ pub fn find_active_operator_binding(
 /// the scope column stores `doorway:alpha-elohim-host|epr:{epr_id}`. The
 /// returned `EprProjectionView.doorway_id` is the LONG form
 /// (`doorway:alpha-elohim-host`).
+///
+/// NOTE: the `in_scope_of LIKE` filter excludes rows with `in_scope_of IS NULL`
+/// (`NULL LIKE _` is never true). Rows seeded before the camelCase-deserialization
+/// fix landed in the deployed binary persisted NULL scope and were invisible here,
+/// emptying the doorway EprRouter. `upsert_with_anchor` now backfills `in_scope_of`
+/// on reseed (see its existing-row branch), so re-running the genesis projection
+/// seed against a fixed binary repairs those legacy rows.
 pub fn find_active_projections(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
