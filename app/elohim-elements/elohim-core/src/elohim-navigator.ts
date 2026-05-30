@@ -545,6 +545,18 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
             </div>
           </div>
         </nav>
+
+        <!--
+          Default slot — projects host-provided light-DOM children (e.g. an
+          Angular <router-outlet> wrapper) BELOW the nav bar. Without this slot
+          a consumer that wraps content in <elohim-navigator>…</elohim-navigator>
+          (as app/lamad's lamad-layout does) renders the nav but the wrapped
+          content stays in the light DOM unprojected → present in the DOM but
+          zero-size/invisible. The Angular predecessor used <ng-content>; the
+          Lit migration (8ce50c4e2) dropped the equivalent <slot>. Restored
+          2026-05-30 (/deliver: the-landing-page-loads, /lamad render).
+        -->
+        <slot part="content"></slot>
       </div>
     `;
   }
