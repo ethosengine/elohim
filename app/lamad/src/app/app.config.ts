@@ -4,7 +4,17 @@ import { provideRouter } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 
 import { routes } from './app.routes';
-import { ELOHIM_ENV } from '@elohim/service';
+import {
+  ELOHIM_ENV,
+  ELOHIM_CLIENT,
+  BLOB_FETCHER,
+  GOVERNANCE,
+  CONTENT_ATTESTATION,
+  GovernanceApiService,
+  provideElohimClient,
+  detectClientMode,
+} from '@elohim/service';
+import { ECONOMIC_EVENT_FACTORY } from '@elohim/rea-runtime';
 import { environment } from '../environments/environment';
 import { LEARNER_BACKEND } from './interfaces/learner-backend.interface';
 import { LearnerBackendApiService } from './services/learner-backend-api.service';
@@ -39,6 +49,26 @@ import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
 import { ContextAssemblyService } from '@app/elohim/services/context-assembly.service';
 import { LensRegistryService } from '@app/elohim/services/lens-registry.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
+import { HeliaFetchService } from '@app/elohim/services/helia-fetch.service';
+import { ContentAttestationApiService } from '@app/elohim/services/content-attestation-api.service';
+import { EconomicEventsApiService } from '@app/shefa/services/economic-events-api.service';
+
+/**
+ * Resolve the doorway URL at runtime.
+ *
+ * The lamad SPA is served as a projected /apps/{slug}/ bundle from doorway —
+ * meaning window.location.origin IS the doorway. Using it keeps all API calls
+ * co-origin with the serving instance (alpha or prod) without baking a hostname.
+ *
+ * In local dev (hostname === 'localhost') the Angular dev-server proxy forwards
+ * /api, /db, /blob to doorway at the configured port — honour the environment URL.
+ */
+function resolveDoorwayUrl(configured: string | undefined): string {
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return window.location.origin;
+  }
+  return configured ?? 'http://localhost:8888';
+}
 
 /**
  * Lamad bundle application config.
@@ -62,14 +92,39 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(),
     provideAnimations(),
-    // ELOHIM_ENV — maps lamad-local environment to the @elohim/service token contract
+    // ELOHIM_ENV — maps lamad-local environment to the @elohim/service token contract.
+    // doorwayUrl uses the same origin-aware resolution as the ElohimClient below.
     {
       provide: ELOHIM_ENV,
       useValue: {
         production: environment.production,
-        doorwayUrl: environment.client?.doorwayUrl,
+        doorwayUrl: resolveDoorwayUrl(environment.client?.doorwayUrl),
       },
     },
+    // ELOHIM_CLIENT — @elohim/service token consumed by ContentBackendService.
+    // doorwayUrl resolves to window.location.origin when served as a projected bundle,
+    // so API calls reach the correct doorway instance without a hardcoded hostname.
+    ...provideElohimClient({
+      mode: detectClientMode({
+        doorwayUrl: resolveDoorwayUrl(environment.client?.doorwayUrl),
+        apiKey: environment.client?.apiKey,
+      }),
+    }),
+    // BLOB_FETCHER — HeliaFetchService provides CID-verified blob fetch with
+    // HTTP doorway fallback. It only injects HttpClient + StorageClientService
+    // (both present in this injector), and uses dynamic import() for @helia —
+    // safe in a browser context.
+    { provide: BLOB_FETCHER, useClass: HeliaFetchService },
+    // GOVERNANCE — GovernanceApiService (from @elohim/service) is a thin HTTP
+    // client that only injects HttpClient. Satisfies data-loader.service.ts.
+    { provide: GOVERNANCE, useExisting: GovernanceApiService },
+    // CONTENT_ATTESTATION — ContentAttestationApiService (from @app/elohim)
+    // is a thin HTTP client that only injects HttpClient.
+    { provide: CONTENT_ATTESTATION, useExisting: ContentAttestationApiService },
+    // ECONOMIC_EVENT_FACTORY — EconomicEventsApiService (from @app/shefa)
+    // is a thin HTTP client that only injects HttpClient. Satisfies
+    // signal-harness.service.ts.
+    { provide: ECONOMIC_EVENT_FACTORY, useExisting: EconomicEventsApiService },
     // LEARNER_BACKEND — concrete provider for the lamad-local learner backend token
     // (P-disposition: token + interface live in lamad/interfaces/; elohim-app's token retired)
     { provide: LEARNER_BACKEND, useClass: LearnerBackendApiService },
