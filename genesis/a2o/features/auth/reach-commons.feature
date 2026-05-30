@@ -42,6 +42,8 @@ Feature: Commons and public reach content is accessible to anonymous visitors
   Scenario: Anonymous reader is rejected for community-reach content (403 with requiredReach)
     # Community reach requires a session. The 403 body must declare the required
     # reach so the client can present the correct onboarding prompt.
+    # autonomous-entity-epic is community-reach (live-verified 403); rea-foundations
+    # is public (200) and would not exercise the negative gate.
     When an anonymous client GETs content "autonomous-entity-epic"
     Then the response status is 403
     And the 403 body requiredReach is "community"
