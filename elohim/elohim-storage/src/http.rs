@@ -2813,6 +2813,19 @@ impl HttpServer {
             "nodes",
             "relationships",
             "knowledge-maps",
+            // Projection-read routes (single-segment). These MUST be listed here:
+            // otherwise extract_app_context's new-route branch (below) treats the
+            // single segment as an h_app_id and defaults resource_path to "stats",
+            // SHADOWING the real handler (it becomes dead code) and returning an
+            // empty DbStats {contentCount:0,uniqueTags:0}. That is exactly why the
+            // doorway EprRouter boot-fetch/refresh got "error decoding response body"
+            // (DbStats is not Vec<EprProjectionView>) and "/" + "/lamad" 404'd on
+            // every doorway even though the project-epr commitments existed in SQL.
+            "rea_commitments",
+            "gate-decisions",
+            "gate-decision-challenges",
+            "challenge-outcomes",
+            "elohim-reputation",
         ];
         for prefix in &legacy_prefixes {
             if sub_path == *prefix || sub_path.starts_with(&format!("{}/", prefix)) {
