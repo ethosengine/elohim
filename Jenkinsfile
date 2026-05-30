@@ -1020,16 +1020,24 @@ VEOF
                         // for ad-hoc or in-cluster targeting — kept named that way
                         // for backward compatibility with existing deploy scripts.
                         def branch = env.BRANCH_NAME ?: 'dev'
-                        def defaultDoorwayEprUrl
+                        def defaultDoorwayEprUrls
                         if (branch == 'main') {
-                            defaultDoorwayEprUrl = 'https://elohim.host'
+                            defaultDoorwayEprUrls = ['https://elohim.host']
                         } else if (branch == 'staging' || branch.startsWith('staging-')) {
-                            defaultDoorwayEprUrl = 'https://staging.elohim.host'
+                            defaultDoorwayEprUrls = ['https://staging.elohim.host']
                         } else {
-                            defaultDoorwayEprUrl = 'https://alpha.elohim.host'
+                            // Alpha cluster has TWO storage backends — matthew
+                            // (alpha.elohim.host) + adam (elohim.host) — and each must
+                            // carry the SPA blob bytes + blobHash itself: the blob does
+                            // not auto-replicate P2P and the blobHash PATCH is a
+                            // per-storage write. Seeding one left apex /apps/* at 404
+                            // (empty blobHash). Matches the Environment Architecture
+                            // intent (projected by doorway-A + doorway-B).
+                            defaultDoorwayEprUrls = ['https://alpha.elohim.host', 'https://elohim.host']
                         }
-                        def doorwayEprUrl = env.STORAGE_URL ?: defaultDoorwayEprUrl
-                        echo "stageSpaBlobs doorwayEprUrl: ${doorwayEprUrl}"
+                        // STORAGE_URL override stays single-target (ad-hoc/in-cluster).
+                        def doorwayEprUrls = env.STORAGE_URL ? [env.STORAGE_URL] : defaultDoorwayEprUrls
+                        echo "stageSpaBlobs doorwayEprUrls: ${doorwayEprUrls}"
                         // Auth for PATCH /db/content/{id} (the new route).
                         // Try `storage-api-key-admin` (k8s-provisioned for
                         // this work) then fall back to
@@ -1097,10 +1105,12 @@ VEOF
                         // hard error (real misconfig, not a transient flake). Mirrors the
                         // SonarQube + orchestrator post-build catchError precedent.
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                        stageSpaBlobs(doorwayEprUrl, [
-                            [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
-                            [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
-                        ], adminKey)
+                        for (int i = 0; i < doorwayEprUrls.size(); i++) {
+                            stageSpaBlobs(doorwayEprUrls[i], [
+                                [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
+                                [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
+                            ], adminKey)
+                        }
                         }
                     }
                 }
