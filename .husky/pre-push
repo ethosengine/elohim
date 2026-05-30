@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Pre-push hook: Runs project-specific checks before allowing push.
-# Bypass: HUSKY=0 git push  (or: git push --no-verify)
+# Bypass ALL gates:        HUSKY=0 git push   (or: git push --no-verify)
+# Skip ONLY sweettest:     SKIP_SWEETTEST=1 git push
+#   (drops the slow Holochain-conductor compile-check; keeps fmt/clippy/unit
+#    tests. CI still runs sweettest as a backstop. Use when iterating on
+#    zome/sweettest source and the cold cross-conductor `cargo check` is too
+#    slow to pay on every push.)
 #
 # Honor HUSKY=0 — git config core.hooksPath points at .husky/ directly,
 # so the husky shim (which normally handles this) is not in the call path.
@@ -57,6 +62,29 @@ PNPM_HOME="${PNPM_HOME:-/nix/xdg/cache/pnpm}"
 
 
 ZERO_SHA="0000000000000000000000000000000000000000"
+
+# ── sweettest pooled target slot (L3 — keep the compile-check warm) ──
+# The sweettest compile-check builds the entire Holochain conductor. If it
+# builds into the in-tree elohim/holochain/tests/sweettest/target/, that dir
+# is a NATIVE_WORKSPACES legacy target that `cargo-pool legacy-targets --clean`
+# reclaims under disk pressure — wiping the warm cache and forcing the next
+# pre-push into a cold multi-minute check. Redirecting CARGO_TARGET_DIR into
+# the cargo-target-pool slot (the same place every other native workspace
+# builds) keeps it under the gentle incremental GC instead, AND stops it
+# leaving a stray in-tree target/ behind.
+#
+# Inlined (not sourced from pool-lib.sh — that file sets `set -u`, unsafe here).
+# Formula mirrors pool-lib.sh slot_path(); fail-open (empty → in-tree default).
+sweettest_pool_slot() {
+  local root="${CARGO_TARGET_POOL_ROOT:-/projects/.cargo-target-pool}"
+  [ -d "$root/family" ] || return 1
+  local branch family
+  branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
+  [ -n "$branch" ] || return 1
+  family="$(echo "${branch%%[-/]*}" | tr '[:upper:]' '[:lower:]')"
+  [ -n "$family" ] || return 1
+  echo "$root/family/$family/elohim__holochain__tests__sweettest/dev"
+}
 
 # ── Lockfile Consistency Check ────────────────────────────────────
 # Catch uncommitted lockfile changes that would break CI's --frozen-lockfile
@@ -249,7 +277,12 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -qE "^elohim/holochain/dna/[^/]+/dna\.yaml|^elohim/holochain/dna/elohim/workdir/happ\.yaml|^elohim/holochain/tests/manifest-hygiene/"; then
     PROJECTS="$PROJECTS manifest-hygiene"
   fi
-  if echo "$CHANGED" | grep -qE "^elohim/holochain/dna/[^/]+/zomes/.*\.rs$|^elohim/holochain/tests/sweettest/"; then
+  # Scope the sweettest trigger to compilation-affecting paths, matching the
+  # build-manifest.json `sweettest-check` source globs (sweettest/src/** +
+  # Cargo.toml). The previous bare `tests/sweettest/` prefix over-triggered on
+  # README/scripts/.config/Cargo.lock/target — forcing a full Holochain
+  # cargo check for doc-only edits in the degraded (no-node) fallback path.
+  if echo "$CHANGED" | grep -qE "^elohim/holochain/dna/[^/]+/zomes/.*\.rs$|^elohim/holochain/tests/sweettest/(src/|Cargo\.toml)"; then
     PROJECTS="$PROJECTS sweettest-check"
   fi
   if echo "$CHANGED" | grep -q "^genesis/data/\|^elohim/sdk/schemas/.*enum\|generated/schema-enums"; then
@@ -289,6 +322,20 @@ fi
 
 # Trim leading space
 PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
+
+# ── Selective gate skip (SKIP_SWEETTEST) ──────────────────────────
+# Drop ONLY the sweettest compile-check while keeping every other gate.
+# CI still runs sweettest as a backstop, so this trades a local pre-CI
+# catch for push speed — narrower than the all-or-nothing HUSKY=0.
+if [ "${SKIP_SWEETTEST-}" = "1" ] && echo "$PROJECTS" | grep -qw "sweettest-check"; then
+  NEW_PROJECTS=""
+  for p in $PROJECTS; do
+    [ "$p" = "sweettest-check" ] && continue
+    NEW_PROJECTS="$NEW_PROJECTS $p"
+  done
+  PROJECTS=$(echo "$NEW_PROJECTS" | sed 's/^ //')
+  echo "[pre-push] SKIP_SWEETTEST=1 — skipping sweettest compile-check (CI still runs it)."
+fi
 
 # No project source changes — let it through
 if [ -z "$PROJECTS" ]; then
@@ -388,6 +435,14 @@ run_gate() {
         # sccache (RUSTC_WRAPPER=sccache from the devfile env) is left intact
         # — verified 2026-05-27 to work without crashing in this image
         # (Garage S3 backend, both cache-hit and cache-miss paths).
+        # L3: redirect into the pooled slot (this case runs in its own
+        # subshell, so the export does not leak to other gates). Fail-open:
+        # no pool → in-tree target/ as before.
+        SWT_SLOT="$(sweettest_pool_slot 2>/dev/null || true)"
+        if [ -n "${SWT_SLOT:-}" ] && mkdir -p "$SWT_SLOT" 2>/dev/null; then
+          export CARGO_TARGET_DIR="$SWT_SLOT"
+          echo "  [sweettest-check] pooled target: $SWT_SLOT"
+        fi
         BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)}" \
         RUSTFLAGS="" \
         OPENSSL_NO_VENDOR=1 \
@@ -572,6 +627,12 @@ run_gate() {
         ;;
       sweettest-check)
         echo "[$PROJECT_NAME] Running sweettest compile check..."
+        # L3: redirect into the pooled slot (subshell-scoped export; fail-open).
+        SWT_SLOT="$(sweettest_pool_slot 2>/dev/null || true)"
+        if [ -n "${SWT_SLOT:-}" ] && mkdir -p "$SWT_SLOT" 2>/dev/null; then
+          export CARGO_TARGET_DIR="$SWT_SLOT"
+          echo "  [sweettest-check] pooled target: $SWT_SLOT"
+        fi
         BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)}" \
         RUSTFLAGS="" \
           cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests 2>&1
