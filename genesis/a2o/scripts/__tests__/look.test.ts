@@ -1,7 +1,11 @@
 import { strict as assert } from 'node:assert';
+import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
+import { pathToFileURL } from 'node:url';
 
-import { parseArgs } from '../look.js';
+import { parseArgs, runLook } from '../look.js';
 
 describe('parseArgs', () => {
   it('parses a bare url', () => {
@@ -42,5 +46,28 @@ describe('parseArgs', () => {
 
   it('throws on an unknown flag', () => {
     assert.throws(() => parseArgs(['https://x.test', '--nope', 'v']), /Unknown flag: --nope/);
+  });
+});
+
+describe('runLook (file:// hermetic render)', () => {
+  it('renders a local file to shot.png + capture.json', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'look-test-'));
+    const html = join(dir, 'page.html');
+    await writeFile(
+      html,
+      '<!doctype html><title>Look Smoke</title><h1 data-testid="probe">rendered</h1>',
+    );
+
+    const result = await runLook({ url: pathToFileURL(html).href, out: 'unit-smoke' });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.title, 'Look Smoke');
+    assert.equal(result.as, null);
+    assert.deepEqual(result.pageErrors, []);
+    // Files exist and are non-empty.
+    assert.ok((await stat(result.shotPath)).size > 0, 'shot.png written');
+    const capture = JSON.parse(await readFile(result.capturePath, 'utf8'));
+    assert.equal(capture.ok, true);
+    assert.equal(capture.title, 'Look Smoke');
   });
 });
