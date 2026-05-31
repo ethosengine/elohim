@@ -26,6 +26,18 @@ closes with done or a clean bail.
    replay of a prior build id. A single green is a *done-candidate* (one
    pass, awaiting fresh-trigger confirmation), not *done*.
 
+   **Visual gate (only when the journal header says `Visual gate: on`).**
+   "Done" then requires BOTH the numeric measurement stable as above AND
+   `validatedRegressed == 0` over the in-scope `@elohim-visually-validated`
+   scenarios, confirmed across **two consecutive local renders** with ≥1
+   against a fresh build/deploy (the same two-render flake guard `/deliver`
+   uses). A `validatedRegressed > 0` at done-candidate blocks *done*; the
+   failing tagged scenario's screenshot + steward judgment (§"Visual
+   validation as an integration candidate dimension") becomes the next
+   hypothesis. **When the header says `Visual gate: off`, this clause does
+   not apply and "done" is the numeric measure alone — byte-identical to a
+   non-visual shift.**
+
    Note on triggers: the Jenkins MCP runs as anonymous and cannot call
    `mcp__jenkins__triggerBuild`. Fresh triggers come from `git push` —
    either a real change, or an empty commit
@@ -333,7 +345,7 @@ Decide:
 | stall | no delta over 2+ iterations | consider bail |
 | novel | unexpected symptom, new hypothesis needed | continue cautiously |
 | done-candidate | predicate holds, stability counter = 1 | verify with fresh trigger |
-| done | predicate holds, stability counter ≥ required, fresh-trigger satisfied | terminal: close |
+| done | predicate holds, stability counter ≥ required, fresh-trigger satisfied — AND (only if `Visual gate: on`) `validatedRegressed == 0` confirmed across two local renders | terminal: close |
 | bail | stuck, untrustworthy measurement, out of ideas | terminal: close with question |
 
 ### 7. Journal
@@ -379,6 +391,8 @@ The 8-step skeleton is the same, but four steps adapt:
 | candidate-stalled | this candidate didn't move; demote it, advance to next | continue |
 
 Stability still requires two consecutive passing measurements, but in integration mode the predicate is per-candidate. The shift is "done" when the per-candidate measurements all stabilize OR the 5-loop budget is exhausted — whichever first. Bail if you've exhausted the candidate set without progress on any.
+
+When `Visual gate: on`, the `validatedRegressed == 0` requirement (principle #4) is an additional, mode-orthogonal condition on the shift's done state — it applies in bring-up and integration mode alike, fed by the local render (§"Visual validation" → Local generation).
 
 ## Visual validation as an integration candidate dimension
 
