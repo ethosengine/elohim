@@ -1,0 +1,69 @@
+[package]
+name = "elohim-edge-presence"
+version = "0.1.0"
+edition = "2021"
+description = "DDNS + ACME/TLS self-registration for Elohim doorway and steward nodes — establishes a node's presence at the WAN edge without k8s cert-manager or external-dns"
+authors = ["Elohim Protocol"]
+license = "Apache-2.0"
+# Published as a standalone path-dep crate; not part of any workspace root under crates/.
+
+# ──────────────────────────────────────────────────────────────────
+# Dependency version notes
+#
+# tokio-rustls 0.26 / rustls 0.23: already present in the repo's
+#   dependency tree (quinn, doorway-service). Use the same major.
+#
+# reqwest 0.12: matches doorway-service's reqwest version.
+#
+# instant-acme, rcgen, arc-swap: not yet in the local registry cache;
+#   versions chosen based on crates.io knowledge as of 2026-05.
+#   Pin narrowly. Verify with `cargo update` + `cargo build` before
+#   merging Phase 3 (see checklist in the design spec).
+#
+# async-trait: used for DnsProvider object safety. Can be removed
+#   when async-fn-in-traits is stable across the MSRV.
+# ──────────────────────────────────────────────────────────────────
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Async-trait for DnsProvider object safety
+async-trait = "0.1"
+
+# HTTP client — WAN IP discovery + DNS provider API calls
+# RUSTFLAGS="" required (native crate; no Holochain WASM backend)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+
+# Serialization — DNS provider API request/response payloads
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Structured error types
+thiserror = "1.0"
+
+# Observability
+tracing = "0.1"
+
+# ──────────────────────────────────────────────────────────────────
+# TLS dependencies (Phase 4 — add when implementing tls.rs)
+# Commented out so Phase 1 scaffold cargo-checks without them.
+# Uncomment in Phase 4.
+# ──────────────────────────────────────────────────────────────────
+# tokio-rustls = "0.26"
+# rustls = { version = "0.23", features = ["std"] }
+# rustls-pki-types = "1"
+# arc-swap = "1.7"
+
+# ──────────────────────────────────────────────────────────────────
+# ACME dependencies (Phase 3 — add when implementing acme.rs)
+# Commented out so Phase 1 scaffold cargo-checks without them.
+# Uncomment in Phase 3.
+# ──────────────────────────────────────────────────────────────────
+# instant-acme = "0.7"
+# rcgen = "0.13"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "macros"] }
+tempfile = "3"
+# wiremock = "0.6"  # Uncomment in Phase 2 for mock DNS provider tests
