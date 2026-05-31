@@ -1094,8 +1094,14 @@ fn infer_gate_event(path: &str) -> Option<gate_client::RelationalImpactEvent> {
 /// the scenario where `/api/v1/content` silently serves an SPA because a root
 /// projection (`url_path = "/"`) matches everything.
 fn is_service_path(path: &str) -> bool {
+    // Auth paths: only auth-layer-owned paths are service paths.
+    // Unowned /auth/* paths (e.g. /auth/portal) fall through to the EPR router.
+    if is_auth_owned_path(path) {
+        return true;
+    }
     // One-shot exhaustive check: each prefix belongs to a guaranteed explicit arm in
     // handle_request. Add new service prefixes here when new explicit arms land.
+    // Note: "/auth" is intentionally absent — gated above via is_auth_owned_path.
     for prefix in &[
         "/health",
         "/ready",
@@ -1104,7 +1110,6 @@ fn is_service_path(path: &str) -> bool {
         "/status",
         "/debug",
         "/admin",
-        "/auth",
         "/hc/",
         "/app/",
         "/threshold",
@@ -1156,24 +1161,51 @@ fn is_service_path(path: &str) -> bool {
 /// MUST stay in sync with the match arms in
 /// `routes::auth_routes::handle_auth_request`. (Follow-up: lift both off a shared
 /// routing table so this can't drift — tracked in the shift's sprint result.)
-#[allow(dead_code)]
-const AUTH_OWNED_PATHS: &[&str] = &[];
+const AUTH_OWNED_PATHS: &[&str] = &[
+    "/auth/register",
+    "/auth/login",
+    "/auth/logout",
+    "/auth/refresh",
+    "/auth/me",
+    "/auth/account",
+    "/auth/authorize",
+    "/auth/token",
+    "/auth/native-handoff",
+    "/auth/session-token",
+    "/auth/exchange-session",
+    "/auth/portal-host",
+    "/auth/export-key",
+    "/auth/confirm-stewardship",
+    "/auth/confirm-sovereignty",
+    "/auth/recover-custody",
+    "/auth/check-recovery-status",
+    "/auth/activate-recovery",
+    "/auth/elohim-verify/start",
+    "/auth/elohim-verify/answer",
+];
 
 /// True iff the doorway auth layer owns `path` (exact match, query stripped).
-/// STUB — implemented by the routing-shakeout shift.
-#[allow(dead_code)]
 pub(crate) fn is_auth_owned_path(path: &str) -> bool {
-    let _ = path;
-    false
+    let bare = path.split('?').next().unwrap_or(path);
+    AUTH_OWNED_PATHS.contains(&bare)
 }
 
 /// Derive the storage sub-path for an EPR projection from the request path, the
 /// projection's `url_path` prefix, and its `entry_file` (used on bare hits).
-/// STUB — implemented by the routing-shakeout shift.
-#[allow(dead_code)]
 pub(crate) fn derive_app_subpath(request_path: &str, url_path: &str, entry_file: &str) -> String {
-    let _ = (request_path, url_path, entry_file);
-    String::new()
+    let sub = if url_path == "/" {
+        request_path.trim_start_matches('/')
+    } else {
+        request_path
+            .strip_prefix(url_path)
+            .unwrap_or(request_path)
+            .trim_start_matches('/')
+    };
+    if sub.is_empty() {
+        entry_file.to_string()
+    } else {
+        sub.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -1324,25 +1356,8 @@ async fn dispatch_to_projected_epr(
         }
     };
 
-    // Strip the projection's url_path prefix from the request path.
-    let sub_path = if projection.url_path == "/" {
-        // Root projection: everything after the leading "/" is the sub-path.
-        request_path.trim_start_matches('/').to_string()
-    } else {
-        // Prefix projection (e.g. "/lamad"): strip the prefix, then the separator.
-        request_path
-            .strip_prefix(&projection.url_path)
-            .unwrap_or(request_path)
-            .trim_start_matches('/')
-            .to_string()
-    };
-
-    // Fall back to the bundle's entry file on bare prefix hits (e.g. GET /lamad).
-    let sub_path = if sub_path.is_empty() {
-        projection.entry_file.clone()
-    } else {
-        sub_path
-    };
+    // Derive the storage sub-path from the projection prefix and request path.
+    let sub_path = derive_app_subpath(request_path, &projection.url_path, &projection.entry_file);
 
     // Proxy to storage's /apps/{epr_id}/{sub_path} — the existing bundle-serving surface.
     // Storage's slug_index and AppFileCacheService handle caching; doorway proxies, not owns.
@@ -1355,12 +1370,13 @@ async fn dispatch_to_projected_epr(
         "EPR router dispatching to cached bundle"
     );
 
-    let client = reqwest::Client::builder()
+    match state
+        .ssr_http_client
+        .get(&storage_apps_path)
         .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .unwrap_or_default();
-
-    match client.get(&storage_apps_path).send().await {
+        .send()
+        .await
+    {
         Ok(resp) => {
             let status = resp.status();
             let content_type = resp
@@ -1473,8 +1489,9 @@ async fn handle_request(
         }
     }
 
-    // Handle auth routes (/auth/*) - these consume the request
-    if path.starts_with("/auth") {
+    // Handle auth routes (/auth/*) - only paths the auth layer owns.
+    // Unowned /auth/* paths (e.g. /auth/portal) fall through to the EPR router.
+    if is_auth_owned_path(&path) {
         if let Some(response) = routes::handle_auth_request(req, Arc::clone(&state)).await {
             return Ok(response);
         }
