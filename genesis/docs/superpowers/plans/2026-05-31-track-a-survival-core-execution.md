@@ -27,6 +27,15 @@ Three replication classes, by agency. **Track A survival core builds the involun
 - **D1 — Reciprocal pair for the first dwelling pact (Phase 1).** The existing resilience canon (`genesis/docs/content/elohim-protocol/resilience/README.md`) names **Gertrude (shem) ↔ Dowell (on-prem)** as the *minimum-viable backup relationship* — exactly the two-failure-domain pact we need. Your original framing was **Adam (shem) ↔ Matthew (on-prem)** (the genesis content pair). **Recommendation: wire the canonical Gertrude↔Dowell pact first** (it's already the documented recovery relationship and spans the two failure domains), and add Adam↔Matthew as a second pact later. *Confirm: Gertrude↔Dowell, Adam↔Matthew, or both?*
 - **D2 — Commons scope for Phase 4.** Recommendation: implement the *minimal* true-commons slice — commons-graded content is placed into the involuntarily-pledged commons capacity (no human choice), floor-via-pledge closes the declaration gap. Defer dynamic "elohim councils deciding the commons need" governance. *Confirm minimal slice vs richer governance.*
 
+## 0.2 Resiliency & projection axes (the HA target — backs the progressive icon story)
+
+Two **orthogonal** axes give the effort a target and back the existing progressive resiliency→projection icon story (`2026-05-29-durability-topology-felt-resilience.md` progressive icon / ambient status / free-used triptych; the `resilience-snapshot` component; reach/delivery/persistence in `2026-05-29-epr-reachability-economics.md`):
+
+- **Resiliency (durability) — this IS the graduation gradient:** `local-personal (1 replica)` → `dwelling-backed (2, a reciprocal pact)` → `collective-backed` → **High-Available = 5 hub-quality replicas** across distinct failure domains. A *hub-quality replica* = a full copy on a stewarded, always-on, WAN-reachable hub (not a transient peer cache). **HA = 5 is a threshold to confirm** — verify whether `target_replicas` / an HA tier already exists in `resilience.rs` / the corpus; if not, this canonizes it (a parameter-bearing decision → story-harvest).
+- **Projection/delivery (orthogonal):** `HA → globally-projected (global CDN)` via `project-epr`. An EPR can be HA without being globally projected; projection is delivery economics, not durability.
+
+**Consequence:** commons content (landing+core, `reach: commons`) reaches **HA by construction** once the commons floor holds (Phase 4) — every hub holds it → ≥5 hub-quality replicas. Dwelling pacts (Phase 1) give the 2-replica floor for *non-commons* household content. The three Phase-1 hubs (Dowell on-prem + Gertrude + Adam on shem) are the first replicas on the path to 5. The outage-drill success criterion (§2) is really "≥1 of the ≥5 HA replicas is reachable."
+
 ## 1. Existing-design index (build on these — do not re-derive)
 
 | Phase | Builds on (existing design/impl) |
