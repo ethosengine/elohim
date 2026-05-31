@@ -152,6 +152,15 @@ When `/shift` invokes this skill:
    block (`on`/`off`). The flag is frozen at kickoff like the measure — it
    is part of the judge and may not be edited mid-shift.
 
+   **Kickoff baseline (only when `Visual gate: on`).** After composing the
+   Objective, run the local render once (§"Visual validation" → Local
+   generation, scoped to in-scope features) and record the baseline
+   `visualValidation` counts + the `reports/screenshots/...` paths in the
+   journal's **Visual baseline** block. Read the baseline screenshot(s) and
+   state the starting visual state in the kickoff context — iteration-0
+   legibility for the before→after gradient. (Gate `off` → skip; no baseline
+   render.)
+
 2. **Predict the command palette for this shift.** Based on the Objective
    (paths, measure command, likely actions), list the bash/MCP commands
    you expect to need. Pattern-match against existing palette. Any gap
