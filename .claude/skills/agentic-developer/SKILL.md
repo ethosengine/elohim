@@ -128,12 +128,17 @@ When `/shift` invokes this skill:
    - *"What's the baseline floor — the measurement we must not drop below?"*
    - *"What paths may I edit? (globs)"*
    - *"Budget — how many iterations, how many minutes?"*
+   - *"Visual-delivery-gated? (does 'done' require the user-facing experience to render correctly — not just a green measure? Default off; on for shifts landing a visible feature.)"*
 
    Compose an Objective conforming to
    `.claude/schemas/objective.schema.json`. Write as JSON at
    `.claude/shifts/<shift-id>.objective.json` — the readiness script
    parses JSON in v1 (YAML support deferred). Show it to the user.
    Wait for explicit *"yes, kick off"* before proceeding.
+
+   Record the visual-gate answer in the journal header's **Visual Gate**
+   block (`on`/`off`). The flag is frozen at kickoff like the measure — it
+   is part of the judge and may not be edited mid-shift.
 
 2. **Predict the command palette for this shift.** Based on the Objective
    (paths, measure command, likely actions), list the bash/MCP commands
