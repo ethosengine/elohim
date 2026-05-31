@@ -394,6 +394,20 @@ Each step of the integration iteration loop adapts as follows:
 
 **Step 2 (Observe) — visual-regression is a first-class candidate.** When dispatching `ci-observer` against an integration-mode build, pass it `genesis/a2o/reports/sprint-report-browser.json` (in addition to the API one) if the file exists. Ask the observer to count the `visualValidation` buckets and to flag every `visual-regression` finding as a candidate.
 
+**Local generation (post-L1 — the round-trip closer).** The browser path now runs in Che (see `genesis/a2o/CLAUDE.md` → `pnpm look` and `E2E_DEVICE_MODE=playwright pnpm test:browser`). When `sprint-report-browser.json` is absent (CI browser stage skipped) or stale, produce it **locally** instead of waiting on CI — scoped to the objective's in-scope features so the render is cheap (the full `@browser` suite stresses the single shared browser, which dies partway through ~100+ scenarios; see the L1 memory `project_che_browser_feedback_loop`):
+
+```
+cd genesis/a2o && E2E_DEVICE_MODE=playwright E2E_DOORWAY_ALPHA=<target> \
+  pnpm exec cucumber-js <in-scope feature paths> --tags '@elohim-visually-validated' \
+    --format json:reports/cucumber-report-browser.json
+pnpm exec tsx scripts/build-sprint-report.ts \
+  --cucumber reports/cucumber-report-browser.json \
+  --out-json reports/sprint-report-browser.json --out-md reports/sprint-report-browser.md \
+  --profile browser
+```
+
+The **`--profile browser` flag is mandatory** — `genesis/a2o/scripts/lib/aggregate.ts` only emits `summary.visualValidation` for playwright profiles (`isPlaywrightProfile`); without it the report builds but the buckets are silently absent. Feed the resulting local artifact into the same observer/judge flow below; the local artifact and the CI artifact are interchangeable inputs.
+
 - `validatedRegressed > 0` is the highest-priority signal in the build. Each `visual-regression` finding goes to the front of the candidate set, ahead of generic scenario-failure candidates, even when its occurrence count is lower.
 - `pendingFailing` is already covered by the scenario-failure candidate path — no separate handling.
 - `pendingPassing` is the **backlog burndown surface**, not a failure. Do NOT dispatch on it during integration iteration unless the user's Objective explicitly named it (e.g. *"review the pending-passing list in lamad"*).
@@ -428,7 +442,7 @@ A drop in `validatedRegressed` or a rise in `validatedPassing` across iterations
 - Per-pillar list of `validatedRegressed` scenarios still failing — these are the next shift's load-bearing top-priority candidates, named.
 - A flag when `pendingPassing > 0` and no review happened — surface as a follow-up Objective candidate (*"review pending-passing in pillar X against manifesto, propose tag additions"*).
 
-If the browser stage did not run (probe failed, no Playwright in the image), say so explicitly: *"Visual validation: not measured — genesis pipeline browser stage skipped (Playwright probe failed). Follow-up: graduate to mcr.microsoft.com/playwright sidecar."* Don't omit the section.
+If the CI browser stage did not run (probe failed, no Playwright in the image), **render locally** via the Step-2 local-generation path and report the local `visualValidation` counts — local rendering no longer blocks measurement (the CI sidecar graduation remains the durable fix for unattended CI runs). Only if the local render *also* cannot run, say so explicitly: *"Visual validation: not measured — browser render unavailable locally and in CI."* Don't omit the section.
 
 **Rationalization counter:**
 
