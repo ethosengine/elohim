@@ -1,195 +1,142 @@
-# Che Browser Feedback — L2 Completion Oracle: Visual Done-Gate for `/shift` + `/deliver`
+# Che Browser Feedback — L2 Completion Oracle: Local Visual Done-Gate for `/shift`
 
-> Spec 2 of 2. Builds on L1 (`2026-05-30-che-browser-feedback-foundation-design.md`), which makes
-> a headless browser launch in Che and ships the `look` primitive. **Do not start L2 until L1 has
-> landed and verified** — L2 consumes L1's `shot.png` + `capture.json` directly.
+> Spec 2 of 2. Builds on L1 (`2026-05-30-che-browser-feedback-foundation-design.md`), which made a
+> headless browser launch in Che and shipped the `look` primitive.
 >
-> The thesis: the rendered experience is not just a tool the agent *may* reach for — it becomes a
-> **frozen-at-kickoff judge that gates "done."** A shift loops until the goal is *visibly*
-> accomplished, not merely until CI is green.
+> **REVISED 2026-05-30 (extension, not invention).** The first draft of this spec proposed a
+> parallel visual-verdict system (an Objective `visual` block + a new tier-3 verdict). That was
+> written blind to an existing system: the agentic-developer skill **already has** a full
+> visual-validation dimension. This revision rescopes L2 to *extend* that system with the three
+> things it genuinely lacks — local rendering, a hard done-gate, and a kickoff baseline — and
+> **drops** the duplicate machinery.
 
-## Why now — CI green ≠ visible delivery
+## What already exists (do NOT rebuild)
 
-The 2026-05-30 overnight cascade (7 layers, same defect class) ended with green pipelines while
-standalone bundles still white-paged on bootstrap. `/deliver` exists precisely because "CI green ≠
-human-visible delivery." Today that visual falsifier lives only in `/deliver`, run *after* a sprint
-is already declared complete. The operator's insight: pull the falsifier **into** the `/shift`
-iteration loop so a shift cannot call itself done while the screenshot contradicts the promise —
-and establish the baseline **formally at kickoff** so the loop knows what "done" looks like before
-it starts grinding.
+`.claude/skills/agentic-developer/SKILL.md` §"Visual validation as an integration candidate
+dimension" (line ~378) already provides, today:
 
-## The sockets already exist (this is integration, not invention)
+- **`summary.visualValidation`** — a 2×2 bucket object `{ validatedPassing, validatedRegressed,
+  pendingPassing, pendingFailing }`, computed in `genesis/a2o/scripts/lib/aggregate.ts` by joining
+  the **`@elohim-visually-validated`** Gherkin tag with each scenario's pass/fail status. Emitted
+  into `genesis/a2o/reports/sprint-report-browser.{json,md}` by `pnpm build:sprint-report`.
+- **The "goal" is already encoded** — a scenario tagged `@elohim-visually-validated` *is* the
+  declaration that "this experience must be delivered." Real features already use it
+  (`features/auth/threshold-login-domain-scoping.feature`, etc.).
+- **The tier-3 steward verdict already exists** (Step 3 directive): open `Finding.screenshotPath`
+  (`reports/screenshots/{featureSlug}/{scenarioSlug}--*.png`), describe it, and judge "does this
+  screen carry the experience the protocol promises here?" anchored in the manifesto/epic narrative.
+  This is exactly the screenshot-vs-promise judgment the old draft proposed to add.
+- **Per-iteration visual journaling** (`visual: 12vP / 3vR / 47pP / 18pF`) and **sprint-result
+  visual surfacing** are already specified.
 
-The agentic-developer (`/shift`) architecture already anticipates this:
+The old draft's Objective `visual` block, `whatShouldBeVisible`, and standalone verdict procedure
+are therefore **cut**. L2 reuses the tag, the buckets, the steward judgment, the journaling, and the
+sprint-result surfacing as-is.
 
-- **The Objective's `measure` command *is* the judge.** "Done is stable: two consecutive passing
-  measurements, at least one fresh trigger." "You may not edit the judge." (`agentic-developer`
-  skill.) The judge freezes at kickoff.
-- **Kickoff already asks for a baseline** — *"What's the baseline floor — the measurement we must
-  not drop below?"* — but today that baseline is a **number** (`objective.schema.json` → `baseline`
-  is `{predicate, value}`).
-- **`/deliver` already runs a two-render-stable tier-3 verdict** (`delivered`/`partial`/
-  `error_state`/`missing`) of `shot.png` vs a structural `what_should_be_visible` FeaturePromise,
-  citing `plan_deliverables` verbatim.
+## The one fatal dependency L2 removes
 
-L2 wires these together: the kickoff baseline gains a **rendered** form, the Objective gains a
-**visual goal**, and `/deliver`'s verdict becomes a **gate inside `/shift`'s done-definition**.
+The existing dimension is **CI-artifact-driven**: it reads `sprint-report-browser.json` produced by
+the **genesis Jenkins browser stage**, which the skill itself admits *"often did not run (Playwright
+probe failed, no Playwright in the image)"* — its documented fallback is *"graduate to a Playwright
+sidecar."* **That dependency is the Jenkins round-trip the operator wants gone.** L1 made the browser
+path work locally in Che. L2 closes the loop by generating the same artifact **locally**.
 
-## Settled design decisions (from brainstorming 2026-05-30)
+## Settled design — three deltas, all extensions
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| Done-gate shape | **Composite** | Done = CI measure stable **AND** visual verdict `delivered`. Two independent falsifiers, both required. Existing numeric judge untouched. |
-| Applicability | **Conditional** | The Objective `visual` block is **optional**. Present → gate runs. Absent → the loop behaves *exactly* as today. Backend-only shifts (zome validation, CI dispatch efficiency) are unaffected. |
-| Cadence | **Kickoff baseline + done-candidate gate** | Render at kickoff (the "before"); run the verdict only when the CI measure goes to done-candidate. Two-render-stable like `/deliver`. `look` stays available for opportunistic mid-loop glances, but the *gate* fires at done-candidate — iterations stay scarce. |
-| Baseline role | **Context, not pixel-diff** | The "before" render is qualitative context + the goal is the forward target. Judgment is structural (`what_should_be_visible`), never pixel comparison — pixel diffing is flaky and would poison the gate. |
-| Goal source | **Hybrid: derive, else author** | If the Objective references a feature with an existing `/deliver` FeaturePromise, reuse its `what_should_be_visible`. Else the kickoff interview authors an inline goal. Reuse where possible; author for greenfield. |
-| Verdict ownership | **Shared procedure** | Factor the tier-3 screenshot-vs-promise verdict so `/shift` and `/deliver` call the *same* judge. No duplication; `/deliver`'s local pathway (alive via L1) benefits too. |
+### Delta 1 — Local generation of the visual report (the round-trip closer)
 
-## Design — Part A: Objective schema gains an optional `visual` block
+Teach the agentic-developer skill that, post-L1, the browser path runs **in Che**. So the loop may
+**produce** `sprint-report-browser.json` locally instead of only **consuming** it from CI:
 
-`.claude/schemas/objective.schema.json` (`additionalProperties: false`, so this is an explicit,
-**not**-`required` property — absence = today's behavior):
+- **At kickoff and at done-candidate**, the orchestrator (or a delegated Sonnet) runs locally:
+  ```
+  cd genesis/a2o && E2E_DEVICE_MODE=playwright E2E_DOORWAY_ALPHA=<target> \
+    pnpm test:browser            # cucumber @browser → cucumber-report-browser.json + screenshots
+  pnpm build:sprint-report       # → sprint-report-browser.{json,md} with visualValidation buckets
+  ```
+  Then the **existing** §378 Step-2/3/4 flow runs against the local artifact — no new bucket logic,
+  no new verdict.
+- Scope it to the in-scope features (a `--tags`/`--feature` filter) so a done-candidate render is
+  cheap, not the full 110-scenario suite (which, per L1, also stresses the shared browser).
+- The skill's "browser stage skipped → not measured" caveat gains a resolution path: *"if CI didn't
+  render, render locally via the L1 path."* The CI artifact remains a valid source when present.
 
-```jsonc
-"visual": {
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["surfaces", "goal"],
-  "properties": {
-    "surfaces": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["name", "url"],
-        "properties": {
-          "name":       { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,40}$" },
-          "url":        { "type": "string", "minLength": 1 },
-          "as":         { "type": "string" },         // fixture human for --as
-          "waitTestid": { "type": "string" }          // --wait-testid
-        }
-      }
-    },
-    "goal": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["source", "whatShouldBeVisible"],
-      "properties": {
-        "source":     { "enum": ["feature-promise", "inline"] },
-        "featureRef": { "type": "string" },            // feature slug when source=feature-promise
-        "whatShouldBeVisible": {
-          "type": "array", "minItems": 1,
-          "items": { "type": "string", "minLength": 1 }
-        }
-      }
-    },
-    "stability": {                                      // visual-verdict stability; mirrors target.stability
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "consecutive":     { "type": "integer", "minimum": 1, "default": 2 },
-        "across_triggers": { "type": "boolean", "default": true }   // ≥1 render against a FRESH build/deploy, not a re-screenshot of unchanged state
-      }
-    }
-  }
-}
-```
+**Skill edits:** §378 Step-2 ("pass it `sprint-report-browser.json` *or generate it locally*"), and
+the "Close" caveat. Small, additive.
 
-`whatShouldBeVisible` entries are **structural** ("the shefa balance card shows a numeric balance
-and a provision button"), never transcribed pixel text — same discipline as `/deliver`'s
-`screenshot_targets`.
+### Delta 2 — Hard composite done-gate (genuinely new)
 
-## Design — Part B: kickoff ritual (agentic-developer skill + `/shift` command)
+Today principle #4 "Done is stable" is **numeric-measure-only**; `validatedRegressed` is merely the
+"highest-priority signal." L2 makes it a **gate** for delivery-oriented shifts:
 
-Inserted into the existing kickoff sequence (after the Objective interview, before the first
-iteration). **Runs only if the operator declares a visible surface for the objective.**
+- **Opt-in, zero schema change.** At kickoff the interview gains one question: *"Is this shift
+  visual-delivery-gated?"* The answer is frozen in the **journal header** (`Visual gate: on/off` —
+  markdown, consistent with "you may not edit the judge"). No change to `objective.schema.json`.
+- **When the gate is on**, "done" requires BOTH:
+  - the numeric `objective.measure` stable per `target.stability` (≥2 consecutive, ≥1 fresh), AND
+  - `validatedRegressed == 0` over the in-scope `@elohim-visually-validated` scenarios, **two
+    consecutive local renders** with ≥1 against a fresh build/deploy (mirrors the existing
+    two-render flake guard).
+- **When the gate is off**, behavior is **byte-identical to today** — `validatedRegressed` stays an
+  advisory signal; backend-only shifts are unaffected. (This is the conditional-applicability safety
+  property, now expressed via the journal flag instead of a schema block.)
+- A `validatedRegressed > 0` at done-candidate blocks "done"; the failing tagged scenario's
+  screenshot + steward judgment becomes the next hypothesis (already the §378 Step-3 behavior).
 
-1. **Establish the goal (hybrid).** If the objective references a feature with an existing
-   `/deliver` FeaturePromise, derive `whatShouldBeVisible` from it (`source: feature-promise`,
-   record `featureRef`). Else the interview authors the goal inline (`source: inline`) — short,
-   pointed: *"Which surface(s)? At what URL? What must be visible there when this is done?"*
-2. **Render the baseline.** For each surface, run L1 `look <url> [--as] [--wait-testid]
-   --out baseline`. Store under `.claude/shifts/<shift-id>/baseline/<surface>/{shot.png,capture.json}`.
-   This is the formal "before."
-3. **Freeze.** Write the `visual` block into `.claude/shifts/<shift-id>.objective.json` and record
-   goal + baseline paths in the journal header next to the measure. Goal and baseline are now
-   immutable for the shift — *you may not edit the judge.*
-4. The implementer `Read`s the baseline `shot.png` and states the starting visual state in the
-   kickoff stanza (so the before→after gradient is legible from iteration 0).
+**Skill edits:** principle #4 (add the gate clause, gated on the journal flag), the done-candidate
+decision row in §"Iteration loop" and §"adaptations in integration mode".
 
-## Design — Part C: iteration-loop change (the gate)
+### Delta 3 — Kickoff baseline (genuinely new, small)
 
-The existing loop (ground → observe → verify → act → measure → judge → journal) is **unchanged**
-until the CI `measure` reaches a **done-candidate** (one passing measurement). Then:
+The existing system is per-build deltas with no frozen "before." L2 adds a kickoff baseline so the
+before→after gradient is legible:
 
-1. **Render.** For each surface, `look <url> [--as] [--wait-testid] --out iter-<n>`. Archive under
-   `.claude/shifts/<shift-id>/renders/iter-<n>/` so every iteration's render is retained.
-2. **Verdict.** Opus runs the **shared tier-3 procedure**: judge each `shot.png` against the
-   surface's `whatShouldBeVisible`, citing each goal line verbatim. Per-surface verdict ∈
-   `{delivered, partial, error_state, missing}`. Roll up: the shift's visual verdict is `delivered`
-   only if **every** surface is `delivered`. `capture.json.pageErrors`/`failedRequests` non-empty →
-   cannot be `delivered`.
-3. **Composite done.** The shift is **done** iff:
-   - CI measure is stable per `target.stability` (≥2 consecutive, ≥1 fresh trigger), **AND**
-   - visual verdict is `delivered`, stable per `visual.stability` (≥2 consecutive `delivered`
-     verdicts, with ≥1 rendered against a **fresh build/deploy** — not two screenshots of the same
-     unchanged artifact; the tired-agent flake guard from `/deliver` applies). In practice the
-     visual gate's "fresh" render rides the same fresh CI trigger that confirms the numeric measure.
-4. **Not done → continue.** If the verdict is anything below `delivered`, the shift is **not** done
-   even with green CI. The verdict's gap (which `whatShouldBeVisible` line failed, which
-   `pageError` appeared) becomes the next iteration's hypothesis. Loop within budget.
-5. **Regression floor.** If a render that was previously `delivered` drops to `partial`/worse, treat
-   it like dropping below the numeric `baseline` floor — surface it loudly; it blocks done.
+- At kickoff, when the visual gate is on, run the local render once and record the baseline
+  `visualValidation` counts + the `reports/screenshots/...` paths in the journal header (a "Visual
+  baseline" block beside the Stability Tracker). For a lighter baseline of a single surface,
+  `pnpm look <url> --out baseline` is sufficient; for the tagged-scenario set, the
+  `build:sprint-report` snapshot is the baseline.
+- The implementer reads the baseline screenshot(s) and states the starting visual state in the
+  kickoff stanza (iteration 0 legibility).
 
-### Done state machine (surface declared)
+**Skill edits:** §"Kickoff" step list (add the conditional baseline render), JOURNAL-TEMPLATE header
+(add an optional "Visual baseline" block).
 
-```
-CI measure passes ─▶ done-candidate
-        │
-        ├─ render + verdict ──▶ delivered?  ── no ─▶ gap → next hypothesis (loop)
-        │                          │ yes
-        │                          ▼
-        └─ CI stable (2,fresh) AND visual stable (2 renders,fresh) ─▶ DONE
-```
+## Bring-up vs integration mode
 
-## Design — Part D: sprint-result artifact
+The existing visual dimension is documented under **integration mode**. The hard gate (Delta 2) must
+also be reachable from a **bring-up / delivery** shift whose whole point is landing one feature's
+visible experience. L2 notes that the visual gate is **mode-orthogonal**: it activates from the
+journal `Visual gate: on` flag regardless of bring-up/integration, and the local-render path (Delta
+1) is what makes it affordable in a bring-up shift (no CI browser stage needed).
 
-The single sprint-result markdown gains a **Visible Delivery** section: baseline `shot.png`, final
-render `shot.png`, the cited verdict, and the before→after narration. This is the notarized
-visible-delivery proof (mirroring `/deliver`'s evidence shape). For backend-only shifts (no
-`visual` block) the section is simply absent.
-
-## Files touched
+## Files touched (L2)
 
 | File | Change |
 |---|---|
-| `.claude/schemas/objective.schema.json` | + optional `visual` block (Part A) |
-| `.claude/skills/agentic-developer/SKILL.md` | kickoff ritual (Part B); done-gate in the iteration loop + "Done is stable" definition (Part C); sprint-result Visible Delivery section (Part D) |
-| `.claude/commands/shift.md` | surface the visual-goal questions in the Objective interview |
-| `.claude/skills/deliver/SKILL.md` | point the tier-3 verdict at the **shared** procedure; note the local pathway now works in Che via L1 |
-| shared verdict helper (new, e.g. `.claude/scripts/visual-verdict.md` or a documented procedure) | the one tier-3 screenshot-vs-promise judge both skills call |
-| `genesis/docs/shifts/JOURNAL-TEMPLATE.md` | header fields for goal + baseline; per-iteration render slot |
-| `pnpm run agentic:readiness` (objective validator) | accept + validate the `visual` block |
+| `.claude/skills/agentic-developer/SKILL.md` | §378 Step-2 (+local generation), principle #4 (+conditional gate), done-candidate rows, §Kickoff (+baseline), Close caveat (+local fallback) |
+| `.claude/commands/shift.md` | kickoff interview gains the "visual-delivery-gated?" question |
+| `genesis/docs/shifts/JOURNAL-TEMPLATE.md` | optional `Visual gate:` + `Visual baseline` header block |
+| (no change) `objective.schema.json` | **unchanged** — gate is a journal flag, not a schema field |
+| (no change) `aggregate.ts` / `build-sprint-report.ts` / the tag | **reused as-is** |
 
 ## Verification
 
-1. **Backend-only regression:** an objective with **no** `visual` block runs the loop *byte-identical*
-   to today (no render, no gate). Prove first — this is the safety property.
-2. **UI shift, happy path:** an objective with a `visual` block + a known-good alpha surface →
-   kickoff renders a baseline; at done-candidate the verdict reads `delivered`; composite done fires
-   only after both stabilities are met.
-3. **Gate actually blocks:** point the goal at a surface known to be broken (or use a stale bundle) →
-   CI green but verdict `partial`/`missing` → the loop does **not** declare done; the gap appears as
-   the next hypothesis.
-4. **Hybrid goal:** an objective referencing a feature with an existing FeaturePromise derives
-   `whatShouldBeVisible` without inline authoring; a greenfield objective authors inline.
-5. **Shared verdict:** `/deliver` and `/shift` produce the same verdict shape on the same
-   `shot.png` + goal (no divergence).
+1. **Off-gate regression (safety property, prove first):** a shift with `Visual gate: off` runs the
+   loop *byte-identical* to today — no local render forced, `validatedRegressed` advisory only.
+2. **Local generation:** with the gate on, the loop runs `pnpm test:browser` + `pnpm build:sprint-report`
+   locally in Che and produces `sprint-report-browser.json` with populated `visualValidation` buckets —
+   no CI dependency.
+3. **Gate blocks:** a tagged scenario whose surface is broken → `validatedRegressed > 0` → "done" does
+   NOT fire even with the numeric measure green; the screenshot + steward judgment drives the next
+   hypothesis.
+4. **Gate clears:** fixing the surface → `validatedRegressed == 0` across two local renders (≥1 fresh)
+   + numeric measure stable → composite done fires.
+5. **Baseline:** kickoff records the baseline counts + screenshot paths; the before→after delta is
+   legible in the sprint result.
 
 ## Out of scope (L2)
 
-Pixel-diffing; scriptable mini-flows; multi-tab/Tauri rendering; image-bake (L1 follow-up);
-auto-generating FeaturePromises for objectives that lack them (author inline instead); changing the
-numeric measure semantics (it stays exactly as-is — L2 only *adds* a co-equal gate).
+The cut machinery (Objective `visual` block, parallel verdict); pixel-diffing; multi-tab/Tauri;
+re-architecting `aggregate.ts`'s bucket logic; making the CI genesis browser stage itself reliable
+(separate ops task — L2 only adds the *local* path as an alternative source).
