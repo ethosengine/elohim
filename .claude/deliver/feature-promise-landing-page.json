@@ -1,0 +1,131 @@
+{
+  "handle": "the-landing-page-loads",
+  "feature_path": "genesis/a2o/features/delivery/landing-page.feature",
+  "adjacent_features": [
+    "genesis/a2o/features/protocol/landing-page-dogfood.feature",
+    "genesis/a2o/features/deployment/staging-validation.feature"
+  ],
+  "composed": "2026-05-30",
+  "composed_by": "deliver (Opus orchestrator)",
+  "corrected": "2026-05-30 — earlier draft confabulated 4 @elohim-visually-validated scenarios that DO NOT exist; ci-investigator (build 1067) caught it. Corrected to the real 8-scenario file.",
+  "one_line": "The elohim-app landing page (/) and lamad surface (/lamad) render visible, meaningful content — fast, warm-cache-served, white-screen-free — on the alpha doorway (and, once operator-enabled, the apex doorway), provable by a Playwright render-assert, not an HTTP shell check.",
+
+  "vision_quotes": [
+    { "text": "The substrate is proven; now it must become trustworthy infrastructure — the kind a grandmother can depend on without knowing it exists.", "source": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md:11-12 (paraphrase of goal stmt lines 3-5)" },
+    { "text": "Reliability comes next because \"apps load\" is the acute pain. Verify by render, not HTML shell (last night's measure false-positived on a <title> in the static shell).", "source": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md:18,46-47" },
+    { "text": "Verify every fix by render, not by HTTP shell — last night's measure false-positived on a static <title>.", "source": "genesis/docs/architecture/framework-cleanup/2026-05-30-reliability-backlog.md:14-15" }
+  ],
+
+  "manifesto_anchors": [
+    { "why": "Substrate trust must reach the Apple-mantra 'it just works' bar — credible to a grandmother — or the protocol cannot subsume incumbents. A white-screening landing page fails that bar at first contact.", "memory": "project_subsume_g_f_a_via_it_just_works" },
+    { "why": "The landing page is a first-time visitor's first lived contrast. If it doesn't render, the diffusion mechanism never fires.", "memory": "project_household_living_core_lived_contrast_diffusion" }
+  ],
+
+  "plan_deliverables": [
+    { "text": "alpha + apex both render landing + lamad as warm-cache fast hits, no apps-sw zip-unpack, render-verified", "source": "plan:73-75 (Sprint 2 exit)", "user_visible": true },
+    { "text": "bundle hashes identical across doorways (zip-once-upload-many)", "source": "plan:58-61,74", "user_visible": false },
+    { "text": "Define + measure delivery SLOs: warm-hit %, time-to-render, zero-SW-fallback; render-verified via Playwright against deployed doorways", "source": "plan:67-69", "user_visible": false },
+    { "text": "warm doorway projection cache is the reliable FAST path; apps-sw zip-unpack is a genuine last-resort only", "source": "plan:48-49", "user_visible": false },
+    { "text": "(operator) apex needs enable_app for adam's lamad/imagodei conductor cells (CellDisabled) + conductor-data PVC confirmation", "source": "plan:62-65,176-178", "user_visible": true, "lane": "operator" }
+  ],
+
+  "scenarios_existing": [
+    {
+      "path": "genesis/a2o/features/delivery/landing-page.feature",
+      "title": "Protocol Landing Page as SPA ContentNode",
+      "tags": ["@delivery", "@landing-page", "@protocol"],
+      "scenario_count": 8,
+      "scenarios": [
+        "Landing page loads with hero section",
+        "Landing page shows manifesto summary",
+        "Landing page shows five pillars",
+        "Landing page shows live protocol stats",
+        "Landing page has call-to-action to enter learning platform",
+        "Landing page is a ContentNode",
+        "Landing page has proper SEO meta tags",
+        "Bootstrap page shown when SPA not yet loaded"
+      ],
+      "background": "doorway configured with ROOT_APP_SLUG \"protocol-landing\"; protocol-landing SPA blob extracted",
+      "status": "EXISTS-BUT-DRIFTED-AND-UNVALIDATED",
+      "problems": [
+        "SLUG DRIFT: Background asserts slug 'protocol-landing'; the DEPLOYED projection slug is 'elohim-host-landing' (verified live: GET / 302→/apps/elohim-host-landing/index.html). The feature tests a slug that isn't deployed.",
+        "NOT tagged @elohim-visually-validated — per deliver step-3a #4, verdict is floored at active.alpha until the visual-validation contract tag is present on headline scenarios.",
+        "Step definitions are largely undefined (CI build 1067: 17 undefined steps across the run); these scenarios never reached a browser render step.",
+        "In CI build 1067 ALL delivery scenarios were blocked by doorway-alpha.elohim.host HTTP 503 (a service outage, since recovered) before any render assertion ran."
+      ]
+    },
+    {
+      "path": "genesis/a2o/features/protocol/landing-page-dogfood.feature",
+      "title": "Elohim Protocol landing page is dogfooded as protocol content",
+      "tags": ["@e2e", "@protocol", "@landing-dogfood"],
+      "scenario_count": 4,
+      "uses_correct_slug": "elohim-host-landing (matches deployment)",
+      "scenarios": [
+        "The elohim-host-landing ContentNode exists with html5-app format",
+        "The landing bundle serves at the /apps path",
+        "An in-kind REA Commitment declares Matthew's hosting agreement",
+        "(@browser-only) The protocol-signal badge renders on the landing page"
+      ],
+      "status": "ADJACENT — uses the correct deployed slug; the @browser-only scenario is the closest existing render-assert (asserts data-testid protocol-signal-badge-pill visible)."
+    }
+  ],
+
+  "scenarios_missing": [
+    {
+      "intent": "Render-verification harness: an un-@wip steps/ui/delivery-render.steps.ts that diffs real post-hydration textContent vs an empty shell, asserts no apps-sw zip-unpack fired, warm-cache HIT %, and TTR. Tag headline scenarios @elohim-visually-validated.",
+      "proposed_location": "genesis/a2o/steps/ui/delivery-render.steps.ts + genesis/a2o/features/delivery/warm-render.feature",
+      "source": "reliability-backlog.md:97-105 (R4)"
+    },
+    {
+      "intent": "Reconcile delivery/landing-page.feature to the deployed slug (elohim-host-landing) OR make ROOT_APP_SLUG configurable so the feature targets what is actually served; wire its 8 step defs.",
+      "proposed_location": "genesis/a2o/features/delivery/landing-page.feature + steps",
+      "source": "live probe: deployed slug = elohim-host-landing"
+    },
+    {
+      "intent": "DI smoke tests for lamad + imagodei-portal (the bundles that white-paged) — TestBed-boot the production provider graph.",
+      "proposed_location": "app/lamad/src/app/app.config.spec.ts (+ imagodei-portal sibling); port from app/elohim-app/src/app/app.config.spec.ts",
+      "source": "reliability-backlog.md:31 (R5)"
+    }
+  ],
+
+  "screenshot_targets": [
+    { "scenario": "Landing hero", "surface": "https://alpha.elohim.host/", "what_should_be_visible": "A populated landing hero with the protocol's vision statement; five pillar cards; live protocol stats; a 'Start Learning' CTA. app-root non-empty after hydration; NOT a white/blank viewport; NO apps-sw zip-unpack spinner." },
+    { "scenario": "Lamad surface", "surface": "https://alpha.elohim.host/lamad", "what_should_be_visible": "lamad-root inside elohim-page-chrome hydrated to a learning surface with at least one seeded concept/path title; not a blank shell; not raw JSON." },
+    { "scenario": "Apex parity", "surface": "https://elohim.host/ and /lamad", "what_should_be_visible": "(operator-gated) Same hero/lamad content as alpha; NOT the current 404 conductor-proxy fallthrough." }
+  ],
+
+  "live_render_baseline_2026-05-30T17:45Z": {
+    "alpha_root": "302 → /apps/elohim-host-landing/index.html → 200, 6866b real landing index (app-root, SEO/OG, inlined CSS, main-5SOIXPZH.js). HTML well-formed; hydration unproven.",
+    "alpha_lamad": "200, 1180b real lamad SPA shell (lamad-root in elohim-page-chrome, main-2EWPEX57.js). Header x-epr-router=dispatched, NO x-cache HIT → served via R1 BYPASS path (dispatch_to_projected_epr), not warm cache.",
+    "apex_lamad": "404 {\"error\":\"Not Found\",...\"Use WebSocket connection to /admin\"} — conductor-proxy fallthrough; empty EPR router (R10, operator-gated).",
+    "apex_root": "302.",
+    "prod_doorway": "doorway.elohim.host → 503 (elohim-prod-paused).",
+    "http_guard": "GET /db/rea_commitments?action=project-epr requires &doorwayId={id}; re-probe pending with alpha-elohim-host / elohim-host."
+  },
+
+  "ci_baseline_build_1067": {
+    "result": "UNSTABLE", "commit": "3e2baaa68 (baseline DI fix; NOT aeec00029 docs)",
+    "scenarios": "61 ran: 42 failed, 17 undefined, 1 pending, 1 passed",
+    "root_cause": "doorway-alpha.elohim.host HTTP 503 outage during the run (since recovered) blocked 42 scenarios at the first API step",
+    "render_proof": "NONE — no landing/delivery screenshots archived; no summary.visualValidation matrix in sprint-report.json; render scenarios never reached a browser step",
+    "post_deploy_gate": "deployment/staging-validation.feature asserts hero+footer+git-hash (richer than pure shell) but failed at agent provisioning (conductor admin WS lookup) before browser nav"
+  },
+
+  "scope": {
+    "default": "unbounded — app code, doorway Rust, seeder, a2o features/steps, schema, build glue",
+    "consent_required_paths": ["**/*.production.*", ".github/workflows/**", "DNA-notarized validators (changing the LAW)", "crypto/identity key files", "cluster manifests / kubectl (operator-owned)"],
+    "operator_gated_not_code": [
+      "O1 — adam conductor cells CellDisabled → operator enable_app (R10a)",
+      "O2 — conductor-data PVC survives redeploy (R10a)",
+      "O3 — DOORWAY_ID set on every doorway pod",
+      "O4 — confirm adam ran the backfill binary (ef5e1e2d5) via Loki"
+    ]
+  },
+
+  "iter0_verdict": {
+    "verdict": "partial",
+    "delivery_status": "active.alpha-candidate (NOT yet minted — render hydration unproven)",
+    "reasoning": "alpha SERVES well-formed SPA shells for both / (6.8KB landing index) and /lamad (1.2KB lamad shell) — real progress from the baseline DI fix. But (1) no proof the shells hydrate to VISIBLE content (white-screen-via-apps-sw risk per plan:153-156 remains unfalsified); (2) the lamad shell is served via the R1 BYPASS path (x-epr-router=dispatched, no cache HIT) — the warm fast path is not in the path that matters; (3) apex is 404 (operator-gated); (4) no render test, screenshot, or visualValidation exists anywhere — CI green/UNSTABLE cannot speak to render. The deliver gap is exactly open: served != rendered-and-proven.",
+    "next": "Grind iter-1: produce the falsifier — Playwright render of live alpha / and /lamad (screenshot + post-hydration textContent + apps-sw/console evidence). Then R1 warm-cache path + R4 render harness."
+  }
+}
