@@ -1131,6 +1131,136 @@ fn is_service_path(path: &str) -> bool {
     matches!(path, "/admin" | "/status.json")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Routing-shakeout seams (2026-05-31 shift: doorway-routing-projection-shakeout)
+//
+// `is_auth_owned_path` and `derive_app_subpath` are the testable seams the
+// shakeout shift hardens. They are the single source of truth for:
+//   - which `/auth/*` paths the auth dispatch block (~line 1347) consumes vs.
+//     which fall through to the EPR router (the `/auth/portal` un-shadow fix);
+//     this predicate ALSO gates `is_service_path` so an unowned `/auth/*` is not
+//     classified as a service path and the EPR router (~line 1365) gets to run.
+//   - how an EPR projection `url_path` + the request path derive the storage
+//     sub-path (extracted from `dispatch_to_projected_epr` so a cache-first
+//     serve path can reuse identical derivation).
+//
+// The STUBS below are intentionally wrong (TDD red) at kickoff; the shift
+// implements them. The `shakeout_tests` module is the FROZEN judge — it must not
+// be edited mid-shift (agentic-developer principle 6: never edit the oracle).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// The exact set of `/auth/*` request paths the doorway auth layer owns.
+/// Any `/auth/*` path NOT in this set must fall through to the EPR router so a
+/// seeded projection (e.g. `imagodei-portal` at `/auth/portal`) can serve it.
+///
+/// MUST stay in sync with the match arms in
+/// `routes::auth_routes::handle_auth_request`. (Follow-up: lift both off a shared
+/// routing table so this can't drift — tracked in the shift's sprint result.)
+#[allow(dead_code)]
+const AUTH_OWNED_PATHS: &[&str] = &[];
+
+/// True iff the doorway auth layer owns `path` (exact match, query stripped).
+/// STUB — implemented by the routing-shakeout shift.
+#[allow(dead_code)]
+pub(crate) fn is_auth_owned_path(path: &str) -> bool {
+    let _ = path;
+    false
+}
+
+/// Derive the storage sub-path for an EPR projection from the request path, the
+/// projection's `url_path` prefix, and its `entry_file` (used on bare hits).
+/// STUB — implemented by the routing-shakeout shift.
+#[allow(dead_code)]
+pub(crate) fn derive_app_subpath(request_path: &str, url_path: &str, entry_file: &str) -> String {
+    let _ = (request_path, url_path, entry_file);
+    String::new()
+}
+
+#[cfg(test)]
+mod shakeout_tests {
+    use super::*;
+
+    // ── is_auth_owned_path — the /auth/portal un-shadow contract ──────────────
+    #[test]
+    fn shakeout_auth_owned_login_true() {
+        assert!(is_auth_owned_path("/auth/login"));
+    }
+    #[test]
+    fn shakeout_auth_owned_me_true() {
+        assert!(is_auth_owned_path("/auth/me"));
+    }
+    #[test]
+    fn shakeout_auth_owned_portal_host_true() {
+        // The real endpoint is `/auth/portal-host` — distinct from `/auth/portal`.
+        assert!(is_auth_owned_path("/auth/portal-host"));
+    }
+    #[test]
+    fn shakeout_auth_owned_verify_start_true() {
+        assert!(is_auth_owned_path("/auth/elohim-verify/start"));
+    }
+    #[test]
+    fn shakeout_auth_portal_not_owned_false() {
+        // THE bug: /auth/portal must fall through to the EPR router, not 404.
+        assert!(!is_auth_owned_path("/auth/portal"));
+    }
+    #[test]
+    fn shakeout_auth_unknown_not_owned_false() {
+        assert!(!is_auth_owned_path("/auth/something-unseeded"));
+    }
+    #[test]
+    fn shakeout_auth_owned_strips_query() {
+        assert!(is_auth_owned_path("/auth/login?redirect=/lamad"));
+    }
+
+    // ── is_service_path — unowned /auth must not block the EPR router ─────────
+    #[test]
+    fn shakeout_service_path_owned_auth_true() {
+        assert!(is_service_path("/auth/login"));
+    }
+    #[test]
+    fn shakeout_service_path_unowned_auth_false() {
+        // /auth/portal is NOT a service path → EPR router (~line 1365) fires.
+        assert!(!is_service_path("/auth/portal"));
+    }
+    #[test]
+    fn shakeout_service_path_still_guards_db() {
+        // Regression guard: real service prefixes stay service paths.
+        assert!(is_service_path("/db/rea_commitments"));
+        assert!(is_service_path("/apps/lamad/index.html"));
+    }
+
+    // ── derive_app_subpath — projection url_path → storage sub-path ───────────
+    #[test]
+    fn shakeout_subpath_root_bare_uses_entry_file() {
+        assert_eq!(derive_app_subpath("/", "/", "index.html"), "index.html");
+    }
+    #[test]
+    fn shakeout_subpath_root_asset() {
+        assert_eq!(derive_app_subpath("/main.js", "/", "index.html"), "main.js");
+    }
+    #[test]
+    fn shakeout_subpath_prefix_bare_uses_entry_file() {
+        assert_eq!(
+            derive_app_subpath("/lamad", "/lamad", "index.html"),
+            "index.html"
+        );
+    }
+    #[test]
+    fn shakeout_subpath_prefix_strips_nested() {
+        assert_eq!(
+            derive_app_subpath("/lamad/concept/x", "/lamad", "index.html"),
+            "concept/x"
+        );
+    }
+    #[test]
+    fn shakeout_subpath_prefix_single_asset() {
+        assert_eq!(
+            derive_app_subpath("/lamad/main.js", "/lamad", "index.html"),
+            "main.js"
+        );
+    }
+}
+
 /// Dispatch a request to a projected EPR (B13).
 ///
 /// MVP scope (§8.1 + §8.2):
