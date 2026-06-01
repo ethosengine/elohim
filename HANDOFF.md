@@ -1,6 +1,6 @@
-# HANDOFF — Routing/projection shakeout landed on sprint; awaits operator dev-merge to deploy + validate
+# HANDOFF — Routing/projection shakeout MERGED to dev (`d439f6667`); alpha deploy in flight; render-validation pending
 
-_Last updated: 2026-06-01 · Author: Claude Opus (overnight agentic /shift) · Branch: `sprint/cross-pillar-cleanup`_
+_Last updated: 2026-06-01 (merge+deploy session) · Author: Claude Opus · Branch: `sprint/cross-pillar-cleanup` (now integrated with dev; merge pushed to `origin/dev`)_
 
 ---
 
@@ -16,11 +16,25 @@ routing-shakeout shift that ran overnight and what the operator must do to land 
 ## Current Progress (verified against the repo)
 
 ### Branch / deploy state — READ THIS FIRST (the can't-see-it facts)
-- **Local HEAD = `origin/sprint/cross-pillar-cleanup` = `68e45e144`** (everything is pushed; tree clean).
-- **`origin/dev` = `52e3f2d1b`** (unchanged). **The routing fix `37c822d1c` is NOT on `dev`.**
-  Verified: `git merge-base --is-ancestor 37c822d1c origin/dev` → false.
-- **⇒ The fix is NOT deployed to alpha.** `https://alpha.elohim.host/auth/portal` is still **404**
-  until the operator merges sprint→dev. The branch is **20 commits ahead of `origin/dev`**.
+- **2026-06-01 update:** sprint integrated with dev (merge `a088457f8`), then **merged sprint→dev**
+  (`d439f6667`) and **pushed to `origin/dev`** — the routing fix `37c822d1c` is now ON `dev`.
+  Verified: `git merge-base --is-ancestor 37c822d1c origin/dev` → true.
+- **Deploy status: BLOCKED on Harbor registry storage I/O error (operator/cluster action needed).**
+  Orchestrator builds #1118 (my merge push) and #1119 (empty `[build:edge]` re-trigger `975320bb1`)
+  both ABORTED at pod init — `ErrImagePull` on `harbor.ethosengine.com/ethosengine/ci-builder:latest`,
+  the registry returning **HTTP 500**. No code ran; nothing dispatched. Failing since at least
+  build #1117 (timer, 2026-06-01T00:00:00Z) — ~14h, NOT transient.
+  - **Root cause (reproduced directly via authenticated manifest GET):** registry storage-driver error
+    — `{"DriverName":"filesystem","Op":"open","Path":".../ci-builder/_manifests/revisions/sha256/
+    ff4951387e9ecfc6adfb253d0829fbf87f22a93a4f9ad32ae441495c2456c423/link","Err":5}`. `Err:5` = **EIO**:
+    the Harbor registry's backing volume is throwing I/O errors reading the `ci-builder:latest` manifest
+    link. Harbor's `/api/v2.0/health` reports all-green (shallow check; doesn't exercise this read path).
+  - **Operator fix:** heal the Harbor registry PV/storage (the I/O-erroring volume backing
+    `/storage/docker/registry`); OR, if only this manifest link is corrupt, rebuild+re-push the
+    `ci-builder` image to write a fresh `latest` manifest. Then the deploy re-runs on the next dev push
+    (or a Jenkins Replay of the orchestrator build).
+- **⇒ The deploy has NOT happened.** `https://alpha.elohim.host/auth/portal` is still **404** (routing
+  fix is on `dev` but not yet built/deployed). Render-validation (Next Steps #2) waits on the deploy.
 
 ### The routing shakeout shift — DONE (numeric target met + locally verified)
 Sprint result: `.claude/shifts/2026-05-31T03-16-doorway-routing-projection-shakeout.sprint-result.md`
@@ -113,13 +127,17 @@ overnight — it's teed up for the operator.
 
 ## Next Steps (ordered)
 
-### 1. Operator: merge `sprint/cross-pillar-cleanup` → `dev` (the gate for everything below)
-This is the only path to CI + alpha deploy for the fix (sprint/* is not orchestrator-indexed). The
-branch is 20 commits ahead of dev (14 browser-feedback tooling + the routing fix + docs/memory). The
-merge runs `elohim-orchestrator/dev` → dispatches `elohim-edge` (expect doorway `shakeout_` 15 + lib
-~524 green in the Docker `check` target) → **deploys to alpha**. *(Agent did not merge — sprint→dev is
-operator-driven.)* Use the `git commit-tree` plumbing merge if the stale `.git/index.stash.*.lock`
-reappears (do NOT touch the real operator stashes).
+### 1. ~~Operator: merge `sprint/cross-pillar-cleanup` → `dev`~~ — DONE (2026-06-01)
+Merged sprint→dev as `d439f6667` (explicit merge commit built on a detached HEAD at `origin/dev`, so
+the stale `dev` worktree at `/projects/elohim-worktrees/qahal-m1` — 316 behind — was left untouched)
+and pushed to `origin/dev`. First orchestrator build #1118 aborted on a transient Harbor 500;
+re-triggered with empty `[build:edge]` commit `975320bb1`. **Both orchestrator builds (#1118, #1119)
+ABORTED on a Harbor registry storage I/O error** (see "Deploy status" above — EIO reading the
+`ci-builder:latest` manifest link; ~14h, operator must heal Harbor's registry volume). Nothing
+dispatched; **no edge build ran, no deploy happened.** Once Harbor is healthy: deploy re-runs on the
+next dev push, a `[build:edge]` empty commit, or a Jenkins Replay of `elohim-orchestrator/dev` (expect
+doorway `shakeout_` 15 + lib ~524 green in the Docker `check` target before deploy). The stale
+`.git/index.stash.463121.lock` is still present but did NOT block normal `git merge` (stash-only).
 
 ### 2. Render-validate `/auth/portal` on alpha (closes the visual gate)
 `cd genesis/a2o && pnpm look https://alpha.elohim.host/auth/portal --out auth-portal-after`
