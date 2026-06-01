@@ -12,6 +12,20 @@
 - Required for done: `<consecutive>`
 - Fresh-trigger measurement captured: `<yes|no>`
 
+## Visual Gate
+
+- Visual-delivery-gated: `<on|off>`  *(frozen at kickoff; part of the judge)*
+- When `on`, "done" additionally requires `validatedRegressed == 0` over the
+  in-scope `@elohim-visually-validated` scenarios across two consecutive local
+  renders (≥1 against a fresh build/deploy).
+
+## Visual baseline *(only when visual-gated)*
+
+- Captured at kickoff: `<yes|no>`
+- Baseline buckets: `<vP>vP / <vR>vR / <pP>pP / <pF>pF`
+- Baseline screenshots: `<reports/screenshots/... paths>`
+- Starting visual state (one line): `<what the kickoff render showed>`
+
 ## Trajectory Summary *(last 3 iterations)*
 
 `<auto-maintained header; Opus refreshes at start of each iteration>`

@@ -74,6 +74,10 @@ components:
           value: user
         - name: RUST_BACKTRACE
           value: '1'
+        # Playwright: skip auto browser download on install; browsers persist via
+        # XDG_CACHE_HOME on /nix and are provisioned explicitly via `pnpm a2o:setup`.
+        - name: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+          value: '1'
         # Nix experimental features (required for flakes and nix develop)
         - name: NIX_CONFIG
           value: 'experimental-features = nix-command flakes'

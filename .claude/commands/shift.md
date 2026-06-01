@@ -14,7 +14,8 @@ Invokes the `agentic-developer` skill to run an agentic developer shift.
 ## What it does
 
 1. Interviews the user for the Objective (name, measure command,
-   baseline, scope, budget).
+   baseline, scope, budget, and whether the shift is
+   visual-delivery-gated).
 2. Composes a shift id, writes Objective YAML to
    `.claude/shifts/<shift-id>.objective.yaml`, writes initial journal
    to `.claude/shifts/<shift-id>.journal.md`.

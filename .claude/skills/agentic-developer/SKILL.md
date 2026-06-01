@@ -26,6 +26,18 @@ closes with done or a clean bail.
    replay of a prior build id. A single green is a *done-candidate* (one
    pass, awaiting fresh-trigger confirmation), not *done*.
 
+   **Visual gate (only when the journal header says `Visual gate: on`).**
+   "Done" then requires BOTH the numeric measurement stable as above AND
+   `validatedRegressed == 0` over the in-scope `@elohim-visually-validated`
+   scenarios, confirmed across **two consecutive local renders** with ≥1
+   against a fresh build/deploy (the same two-render flake guard `/deliver`
+   uses). A `validatedRegressed > 0` at done-candidate blocks *done*; the
+   failing tagged scenario's screenshot + steward judgment (§"Visual
+   validation as an integration candidate dimension") becomes the next
+   hypothesis. **When the header says `Visual gate: off`, this clause does
+   not apply and "done" is the numeric measure alone — byte-identical to a
+   non-visual shift.**
+
    Note on triggers: the Jenkins MCP runs as anonymous and cannot call
    `mcp__jenkins__triggerBuild`. Fresh triggers come from `git push` —
    either a real change, or an empty commit
@@ -128,12 +140,26 @@ When `/shift` invokes this skill:
    - *"What's the baseline floor — the measurement we must not drop below?"*
    - *"What paths may I edit? (globs)"*
    - *"Budget — how many iterations, how many minutes?"*
+   - *"Visual-delivery-gated? (does 'done' require the user-facing experience to render correctly — not just a green measure? Default off; on for shifts landing a visible feature.)"*
 
    Compose an Objective conforming to
    `.claude/schemas/objective.schema.json`. Write as JSON at
    `.claude/shifts/<shift-id>.objective.json` — the readiness script
    parses JSON in v1 (YAML support deferred). Show it to the user.
    Wait for explicit *"yes, kick off"* before proceeding.
+
+   Record the visual-gate answer in the journal header's **Visual Gate**
+   block (`on`/`off`). The flag is frozen at kickoff like the measure — it
+   is part of the judge and may not be edited mid-shift.
+
+   **Kickoff baseline (only when `Visual gate: on`).** After composing the
+   Objective, run the local render once (§"Visual validation" → Local
+   generation, scoped to in-scope features) and record the baseline
+   `visualValidation` counts + the `reports/screenshots/...` paths in the
+   journal's **Visual baseline** block. Read the baseline screenshot(s) and
+   state the starting visual state in the kickoff context — iteration-0
+   legibility for the before→after gradient. (Gate `off` → skip; no baseline
+   render.)
 
 2. **Predict the command palette for this shift.** Based on the Objective
    (paths, measure command, likely actions), list the bash/MCP commands
@@ -328,7 +354,7 @@ Decide:
 | stall | no delta over 2+ iterations | consider bail |
 | novel | unexpected symptom, new hypothesis needed | continue cautiously |
 | done-candidate | predicate holds, stability counter = 1 | verify with fresh trigger |
-| done | predicate holds, stability counter ≥ required, fresh-trigger satisfied | terminal: close |
+| done | predicate holds, stability counter ≥ required, fresh-trigger satisfied — AND (only if `Visual gate: on`) `validatedRegressed == 0` confirmed across two local renders | terminal: close |
 | bail | stuck, untrustworthy measurement, out of ideas | terminal: close with question |
 
 ### 7. Journal
@@ -375,6 +401,8 @@ The 8-step skeleton is the same, but four steps adapt:
 
 Stability still requires two consecutive passing measurements, but in integration mode the predicate is per-candidate. The shift is "done" when the per-candidate measurements all stabilize OR the 5-loop budget is exhausted — whichever first. Bail if you've exhausted the candidate set without progress on any.
 
+When `Visual gate: on`, the `validatedRegressed == 0` requirement (principle #4) is an additional, mode-orthogonal condition on the shift's done state — it applies in bring-up and integration mode alike, fed by the local render (§"Visual validation" → Local generation).
+
 ## Visual validation as an integration candidate dimension
 
 When the genesis pipeline runs the browser stage (Playwright probe passes), it emits a second sprint-report at `genesis/a2o/reports/sprint-report-browser.{json,md}` in addition to the API one. The browser report carries:
@@ -393,6 +421,20 @@ The bucket meanings:
 Each step of the integration iteration loop adapts as follows:
 
 **Step 2 (Observe) — visual-regression is a first-class candidate.** When dispatching `ci-observer` against an integration-mode build, pass it `genesis/a2o/reports/sprint-report-browser.json` (in addition to the API one) if the file exists. Ask the observer to count the `visualValidation` buckets and to flag every `visual-regression` finding as a candidate.
+
+**Local generation (post-L1 — the round-trip closer).** The browser path now runs in Che (see `genesis/a2o/CLAUDE.md` → `pnpm look` and `E2E_DEVICE_MODE=playwright pnpm test:browser`). When `sprint-report-browser.json` is absent (CI browser stage skipped) or stale, produce it **locally** instead of waiting on CI — scoped to the objective's in-scope features so the render is cheap (the full `@browser` suite stresses the single shared browser, which dies partway through ~100+ scenarios; see the L1 memory `project_che_browser_feedback_loop`):
+
+```
+cd genesis/a2o && E2E_DEVICE_MODE=playwright E2E_DOORWAY_ALPHA=<target> \
+  pnpm exec cucumber-js <in-scope feature paths> --tags '@elohim-visually-validated' \
+    --format json:reports/cucumber-report-browser.json
+pnpm exec tsx scripts/build-sprint-report.ts \
+  --cucumber reports/cucumber-report-browser.json \
+  --out-json reports/sprint-report-browser.json --out-md reports/sprint-report-browser.md \
+  --profile browser
+```
+
+The **`--profile browser` flag is mandatory** — `genesis/a2o/scripts/lib/aggregate.ts` only emits `summary.visualValidation` for playwright profiles (`isPlaywrightProfile`); without it the report builds but the buckets are silently absent. Feed the resulting local artifact into the same observer/judge flow below; the local artifact and the CI artifact are interchangeable inputs.
 
 - `validatedRegressed > 0` is the highest-priority signal in the build. Each `visual-regression` finding goes to the front of the candidate set, ahead of generic scenario-failure candidates, even when its occurrence count is lower.
 - `pendingFailing` is already covered by the scenario-failure candidate path — no separate handling.
@@ -428,7 +470,7 @@ A drop in `validatedRegressed` or a rise in `validatedPassing` across iterations
 - Per-pillar list of `validatedRegressed` scenarios still failing — these are the next shift's load-bearing top-priority candidates, named.
 - A flag when `pendingPassing > 0` and no review happened — surface as a follow-up Objective candidate (*"review pending-passing in pillar X against manifesto, propose tag additions"*).
 
-If the browser stage did not run (probe failed, no Playwright in the image), say so explicitly: *"Visual validation: not measured — genesis pipeline browser stage skipped (Playwright probe failed). Follow-up: graduate to mcr.microsoft.com/playwright sidecar."* Don't omit the section.
+If the CI browser stage did not run (probe failed, no Playwright in the image), **render locally** via the Step-2 local-generation path and report the local `visualValidation` counts — local rendering no longer blocks measurement (the CI sidecar graduation remains the durable fix for unattended CI runs). Only if the local render *also* cannot run, say so explicitly: *"Visual validation: not measured — browser render unavailable locally and in CI."* Don't omit the section.
 
 **Rationalization counter:**
 

@@ -157,3 +157,22 @@ the per-app patch approach is whack-a-mole and the standard-bootstrap (Sprint 3)
 - **bundle hash divergence per doorway** (alpha landing `sha256-65aa8…` vs #1489's `sha256-8a9481f`;
   lamad alpha `37318f6` vs apex `d198ee88`) — the zip-determinism bug; content-addressing is
   currently meaningless. → Sprint 2 (zip-once-upload-many).
+
+### Baseline fixes SHIPPED 2026-05-30 PM (a4ca81d89, 3e2baaa68) — so sprints start from working code
+- **DI fully resolved (lamad bundle renders):** collapsed the duplicate `ELOHIM_CLIENT` (alias the
+  elohim-app-local token → `@elohim/service` client) + provided `EVENT_API`, `AGENT_CONTEXT`, and the
+  earlier `LAMAD_HOLOCHAIN_CLIENT`/`BLOB_FETCHER`/`GOVERNANCE`/`CONTENT_ATTESTATION`. Full transitive
+  audit, both bundles. (Sprint 3 still owns the DURABLE fix: an SDK-owned standard bootstrap + collapsing
+  the two tokens at the source so this can't recur; lazy-route consumers remain an audit risk until then.)
+- **Landing delivery INTERIM fix:** doorway now prefers `extracted` whenever storage is reachable
+  (storage serves `/apps/{slug}/{file}` on demand) → the apps-sw uses the reliable per-file path instead
+  of the async compressed-zip fallback; `apps-sw` CACHE_NAME v1→v2 drops the stale index.html. Reliable,
+  **not yet blazing.**
+- **Still Sprint 2 (the real reliability):** warm doorway projection cache as the FAST path +
+  `app_file_cache`/MongoDB wiring (it was `None` → no cache upgrade); deterministic zip hashing
+  (zip-once-upload-many); automatic SW cache-invalidation on hash rotation; server-side extraction
+  pre-warm after deploy; blob-tier write-on-fetch; the `/wasm/elohim-cache-core` build dependency
+  (currently non-fatal via TS fallback).
+- **Operator dependencies (not code/CI):** apex `/lamad`+`/` need `enable_app` for adam's `lamad`/`imagodei`
+  conductor cells (`CellDisabled`) + conductor-data PVC confirmation. Until then, apex serves nothing
+  through its router regardless of the above.
