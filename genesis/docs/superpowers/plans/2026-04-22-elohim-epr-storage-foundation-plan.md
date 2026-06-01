@@ -4,6 +4,8 @@
 
 **Goal:** Land EPR atoms as first-class storage in elohim-storage (diesel tables + validator), expose a complete additive REST surface (`/api/v1/epr/...`), and regenerate the TypeScript storage client — all without changing any existing endpoint's wire shape.
 
+> **Status (2026-06-01): Landed — historical.** Batches A+B shipped; Batch C (Tasks 12–17) was superseded by the [P2P-native pivot](2026-04-22-elohim-epr-storage-foundation-plan-BATCH-C-PIVOT.md). Why single-node REST-over-diesel was the wrong substrate shape is distilled in [history/2026-06-01-dht-is-a-notary-not-a-byte-store](../../content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md). This plan body is retained for task-level provenance only — not a live plan.
+
 **Architecture:** `elohim-epr` crate (Phase 1) is the codec primitive; Phase 2a wraps it in elohim-storage's established three-layer pattern (controller → service → model). Four new diesel tables (`epr_atoms`, `epr_coupling`, `epr_claims`, `epr_supersedence`) store validated atoms. Six new HTTP routes expose them. All wire types go through JSON schema first per the Integrator Compatibility Contract.
 
 **Tech Stack:** Rust (elohim-storage crate), diesel + postgres, hyper HTTP, `elohim-epr` codec, `ts-rs` for TypeScript export, `@elohim/storage-client` consumer package, JSON Schema via `jsonschema` crate.

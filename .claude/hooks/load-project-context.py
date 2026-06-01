@@ -63,6 +63,20 @@ def get_sync_relationships_summary(relationships: dict) -> str:
 
     return "\n".join(lines)
 
+def get_memory_budget(project_dir: str) -> str:
+    """Always-on memory budget headline (deterministic; from placement-audit.py --headline)."""
+    import subprocess
+    audit = os.path.join(project_dir, '.claude', 'scripts', 'memory-kit', 'placement-audit.py')
+    if not os.path.exists(audit):
+        return ""
+    try:
+        r = subprocess.run([sys.executable, audit, '--headline'],
+                           capture_output=True, text=True, timeout=25)
+        return r.stdout.strip()
+    except Exception:
+        return ""
+
+
 def main():
     try:
         # Read hook input from stdin
@@ -78,6 +92,14 @@ def main():
 
         context_parts = []
 
+        # Always-on memory budget (deterministic) — fetched UNCONDITIONALLY (before any
+        # schema/relationship gating) so every session opens knowing the state of the memory
+        # surface + what's testable, per genesis/docs/PLACEMENT.md.
+        budget = get_memory_budget(project_dir)
+        if budget:
+            context_parts.append(budget)
+            context_parts.append("")
+
         # Add schema summary
         schemas = relationships.get('schemas', {})
         if schemas:
@@ -91,11 +113,12 @@ def main():
         if not context_parts:
             sys.exit(0)
 
-        # Add reminder about hooks
-        context_parts.append("SYNC HOOKS ACTIVE:")
-        context_parts.append("When you modify files in elohim-service or elohim-app,")
-        context_parts.append("hooks will remind you about related files that may need updates.")
-        context_parts.append("")
+        # Add reminder about hooks (only when schema/relationship context is present)
+        if schemas or rels:
+            context_parts.append("SYNC HOOKS ACTIVE:")
+            context_parts.append("When you modify files in elohim-service or elohim-app,")
+            context_parts.append("hooks will remind you about related files that may need updates.")
+            context_parts.append("")
 
         # Output context for Claude
         output = {

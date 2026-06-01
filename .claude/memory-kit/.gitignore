@@ -1,0 +1,5 @@
+# Generated context-coverage reports — regenerable via the tools (like coverage output, not source).
+# The config (context-coverage.yaml) and the ratchet floor (context-coverage-baseline.json) ARE tracked.
+state-ledger.json
+spec-coherence-index.json
+gap-items/

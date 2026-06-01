@@ -5,6 +5,11 @@
       "hits": 1,
       "last_changed": "genesis/docs/architecture/rea-compute-commitment-primitive.md",
       "last_signal_at": "2026-05-28T19:15:45Z"
+    },
+    "project_memory_cites_edge": {
+      "hits": 4,
+      "last_changed": ".claude/scripts/memory-kit/memory-coherence-audit.py",
+      "last_signal_at": "2026-06-01T18:03:32Z"
     }
   }
 }

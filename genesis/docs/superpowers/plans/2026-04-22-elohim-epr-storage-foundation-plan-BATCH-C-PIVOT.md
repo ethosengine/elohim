@@ -4,6 +4,8 @@
 **Date:** 2026-04-22
 **Reason:** Original Batch C designed routes as single-node REST over a local diesel store — ignoring the existing `/elohim/epr/1.0.0` libp2p protocol (`p2p/epr_protocol.rs`), Kademlia DHT (`p2p/kad_store.rs`), and swarm behaviour (`p2p/behaviour.rs`) already active in elohim-storage. This pivot aligns the new EPR routes with the existing P2P substrate so content discovery is peer-federated from day one.
 
+> **History (2026-06-01):** This pivot's substrate-placement lesson is distilled in [history/2026-06-01-dht-is-a-notary-not-a-byte-store](../../content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md) — the DHT notarizes; it never holds bytes.
+
 ---
 
 ## What changed in the architecture
