@@ -20,7 +20,7 @@ import {
   autoSkippedHumans,
   isAnyNodePoolAvailable,
   isHumanDeployed,
-  isShemAvailable,
+  isRemoteComputeAvailable,
 } from '../humans.js';
 
 interface FixtureHuman {
@@ -45,7 +45,7 @@ void describe('isHumanDeployed', () => {
 
   afterEach(() => {
     delete process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE;
-    delete process.env.ELOHIM_SHEM_STATUS;
+    delete process.env.ELOHIM_REMOTE_COMPUTE_STATUS;
     _resetDeploymentsCacheForTests();
     rmSync(workDir, { recursive: true, force: true });
   });
@@ -103,7 +103,7 @@ void describe('isHumanDeployed', () => {
   });
 });
 
-void describe('shem availability gating', () => {
+void describe('remote-compute availability gating', () => {
   let workDir: string;
 
   beforeEach(() => {
@@ -113,46 +113,46 @@ void describe('shem availability gating', () => {
 
   afterEach(() => {
     delete process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE;
-    delete process.env.ELOHIM_SHEM_STATUS;
+    delete process.env.ELOHIM_REMOTE_COMPUTE_STATUS;
     _resetDeploymentsCacheForTests();
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  void it('isShemAvailable() defaults to true when env unset (fail-open)', () => {
-    assert.equal(isShemAvailable(), true);
+  void it('isRemoteComputeAvailable() defaults to true when env unset (fail-open)', () => {
+    assert.equal(isRemoteComputeAvailable(), true);
   });
 
-  void it('isShemAvailable() returns false when ELOHIM_SHEM_STATUS=unavailable', () => {
-    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
-    assert.equal(isShemAvailable(), false);
+  void it('isRemoteComputeAvailable() returns false when ELOHIM_REMOTE_COMPUTE_STATUS=unavailable', () => {
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'unavailable';
+    assert.equal(isRemoteComputeAvailable(), false);
   });
 
-  void it('isShemAvailable() treats unknown values as available (fail-open)', () => {
-    process.env.ELOHIM_SHEM_STATUS = 'garbage';
-    assert.equal(isShemAvailable(), true);
+  void it('isRemoteComputeAvailable() treats unknown values as available (fail-open)', () => {
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'garbage';
+    assert.equal(isRemoteComputeAvailable(), true);
   });
 
   void it('isAnyNodePoolAvailable: dev-cluster pools always available', () => {
-    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'unavailable';
     assert.equal(isAnyNodePoolAvailable(['performance']), true);
     assert.equal(isAnyNodePoolAvailable(['edge']), true);
     assert.equal(isAnyNodePoolAvailable(['operations']), true);
   });
 
   void it('isAnyNodePoolAvailable: remote-only fails when shem down', () => {
-    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'unavailable';
     assert.equal(isAnyNodePoolAvailable(['remote']), false);
   });
 
   void it('isAnyNodePoolAvailable: remote-with-fallback passes when shem down', () => {
     // ["remote", "performance"] still has the performance fallback;
     // pool-level gating sees performance and returns true.
-    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'unavailable';
     assert.equal(isAnyNodePoolAvailable(['remote', 'performance']), true);
   });
 
   void it('auto-skips a remote-only human when shem unavailable', () => {
-    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'unavailable';
     process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE = writeFixture(workDir, [
       { name: 'matthew', nodeTypes: ['performance'] },
       { name: 'shemonly', nodeTypes: ['remote'] },
@@ -167,7 +167,7 @@ void describe('shem availability gating', () => {
     // meaning "prefer shem but fall back to performance node". When shem
     // is down, the scheduler lands them on performance — they are still
     // deployable, just on the dev cluster. Pool-level gating respects that.
-    process.env.ELOHIM_SHEM_STATUS = 'unavailable';
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'unavailable';
     process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE = writeFixture(workDir, [
       { name: 'gertrude', nodeTypes: ['remote', 'performance'] },
       { name: 'daniel', nodeTypes: ['remote', 'performance'] },
@@ -178,7 +178,7 @@ void describe('shem availability gating', () => {
   });
 
   void it('still respects hard "suspended" flag even when shem available', () => {
-    process.env.ELOHIM_SHEM_STATUS = 'available';
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'available';
     process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE = writeFixture(workDir, [
       { name: 'pete', suspended: true, nodeTypes: ['remote', 'performance'] },
     ]);

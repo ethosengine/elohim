@@ -144,6 +144,330 @@ def getConductorAppUrls() {
 }
 
 /**
+ * Probe the "remote" k8s node pool (shem) and return the substrate signal
+ * the whole pipeline reconciles to: 'available' | 'unavailable' | 'unknown'.
+ *
+ * This is the single toggle the deployment-wait, seeder, and a2o test bench
+ * all key off (via env.ELOHIM_REMOTE_COMPUTE_STATUS). The P2P substrate itself stays
+ * k8s-blind — this CI-layer probe only exists so the planning/test scope
+ * reconciles to the available compute as the hardware substrate shifts.
+ *
+ * Semantics (fail-OPEN so a probe outage never blocks a run):
+ *   - cluster unreachable (kubectl can't list nodes) → 'unknown'  (treat as up)
+ *   - shem Ready=True                                → 'available'
+ *   - shem Ready=Unknown/False, or node absent       → 'unavailable'
+ *
+ * The doc contract lives in genesis/a2o/src/framework/fixtures/humans.ts
+ * (ELOHIM_REMOTE_COMPUTE_STATUS / isRemoteComputeAvailable / isHumanDeployed).
+ */
+def probeRemotePoolStatus() {
+    def status = sh(returnStdout: true, script: '''#!/bin/bash
+        set -uo pipefail
+        # Fail-open: if we can't even list nodes, the probe is blind → unknown.
+        if ! kubectl get nodes >/dev/null 2>&1; then
+            echo "unknown"; exit 0
+        fi
+        READY=$(kubectl get node shem \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+        if [ "$READY" = "True" ]; then
+            echo "available"
+        else
+            echo "unavailable"
+        fi
+    ''').trim()
+    return (status in ['available', 'unavailable', 'unknown']) ? status : 'unknown'
+}
+
+/**
+ * Personas that auto-skip when the remote pool (shem) is down: those whose
+ * nodeTypes are ALL "remote" (no on-prem fallback) and are not hard-suspended.
+ * Mirrors isAnyNodePoolAvailable() in humans.ts so the pipeline banner names
+ * exactly the set the a2o runner will gate. Reads deployments.json (the same
+ * source of truth the test bench reads). Returns [] on any parse failure
+ * (fail-open: a banner is informational, never a gate).
+ */
+def remoteOnlyPersonas() {
+    def path = 'genesis/orchestrator/data/deployments.json'
+    if (!fileExists(path)) { return [] }
+    try {
+        def data = new groovy.json.JsonSlurper().parseText(readFile(path))
+        return (data.humans ?: [])
+            .findAll { h ->
+                def nt = h.nodeTypes ?: []
+                !h.suspended && nt && nt.every { it == 'remote' }
+            }
+            .collect { it.name }
+            .sort()
+    } catch (Exception e) {
+        echo "WARN: remoteOnlyPersonas() parse failed (banner only): ${e.message}"
+        return []
+    }
+}
+
+/**
+ * Bounded readiness probe for a single peer's storage /health. Returns true
+ * if it answered within maxAttempts (×2s), false otherwise. The basis of the
+ * "seed whoever is ready" discipline: a slow cold-starting peer still gets its
+ * full wait, but a peer whose hardware is gone is skipped rather than
+ * cascade-failing the stage. Never throws — callers branch on the boolean.
+ */
+def waitForStorageReady(String storageUrl, String label, int maxAttempts = 60) {
+    return sh(returnStatus: true, script: """#!/bin/bash
+        set -uo pipefail
+        for i in \$(seq 1 ${maxAttempts}); do
+            if curl -sf --max-time 5 "http://${storageUrl}/health" >/dev/null 2>&1; then
+                echo "✅ ${label} storage is ready (\$i/${maxAttempts})"
+                exit 0
+            fi
+            echo "   Waiting for ${label} storage... (\$i/${maxAttempts})"
+            sleep 2
+        done
+        echo "⏭️  ${label} storage not ready after ${maxAttempts} attempts"
+        exit 1
+    """) == 0
+}
+
+/**
+ * Probe Substrate stage body (extracted to keep the pipeline {} CPS method
+ * under the 64KB JVM limit — see .claude/hooks/jenkinsfile-method-size.py).
+ * Sets env.ELOHIM_REMOTE_COMPUTE_STATUS (the single signal the run reconciles to),
+ * emits a loud reduced-scope banner, archives substrate-status.json, and
+ * marks the build UNSTABLE (not FAILED) when the remote pool is down.
+ */
+def probeSubstrateScope() {
+    def remoteComputeStatus = probeRemotePoolStatus()
+    env.ELOHIM_REMOTE_COMPUTE_STATUS = remoteComputeStatus
+
+    def skipped = (remoteComputeStatus == 'unavailable') ? remoteOnlyPersonas() : []
+
+    echo """
+═══════════════════════════════════════════════════════════
+🛰️  SUBSTRATE PROBE — remote pool (shem): ${remoteComputeStatus.toUpperCase()}
+═══════════════════════════════════════════════════════════"""
+    if (remoteComputeStatus == 'unavailable') {
+        echo """⚠️  REDUCED SCOPE — operating on available compute only.
+   On-prem household (matthew, jessica, james) carries this run.
+   Auto-skipped remote-only personas (${skipped.size()}): ${skipped.join(', ') ?: '(none declared)'}
+   Seeder will seed whoever is ready; a2o will gate remote-only scenarios.
+   This run is intentionally UNSTABLE (loud signal), not FAILED — re-run
+   when shem returns to restabilize to full topology."""
+    } else if (remoteComputeStatus == 'unknown') {
+        echo """ℹ️  Probe blind (cluster unreachable from this agent) — failing OPEN.
+   Treating remote pool as available; per-peer readiness probes still apply."""
+    } else {
+        echo "✅ Full topology available — no reduced-scope gating this run."
+    }
+
+    writeJSON(file: 'substrate-status.json', pretty: 2, json: [
+        schemaVersion: '1',
+        probedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+        commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+        remotePool: 'shem',
+        remoteComputeStatus: remoteComputeStatus,
+        reducedScope: (remoteComputeStatus == 'unavailable'),
+        autoSkippedPersonas: skipped,
+    ])
+    archiveArtifacts(artifacts: 'substrate-status.json', allowEmptyArchive: true, fingerprint: true)
+
+    if (remoteComputeStatus == 'unavailable') {
+        unstable("Remote pool (shem) unavailable — running reduced scope; ${skipped.size()} remote-only personas auto-skipped")
+    }
+}
+
+/**
+ * Seed Database stage body (extracted for the 64KB CPS limit). Implements the
+ * "seed whoever is ready" discipline so the content-seed stage reconciles to
+ * the available compute instead of cascade-failing when a peer's hardware is
+ * gone:
+ *   - Genesis peers: seed each that becomes ready; SKIP (not fatal) any that
+ *     don't. Fatal ONLY if zero genesis peers seeded (nothing to ingest from).
+ *     Honors deployments.json's documented "pipeline tolerates 1..N genesis
+ *     peers" contract.
+ *   - Replica peers: wait for P2P catch-up; a down/lagging replica is SKIPPED
+ *     (never fatal) — it reconverges via identity-driven replication when it
+ *     returns.
+ * Any skip marks the build UNSTABLE (loud signal), never silently green.
+ */
+def runContentSeedStage() {
+    def humans = getHumanStorageUrls('alpha')
+    def genesisPeers = humans.findAll { it.genesisPeer == true }
+    if (genesisPeers.isEmpty()) {
+        error("No genesis peer found in topology — at least one human in deployments.json must have genesisPeer:true (and must not be suspended). See genesis/orchestrator/data/deployments.json.")
+    }
+    def replicaPeers = humans.findAll { it.genesisPeer != true }
+
+    echo "Substrate signal: ELOHIM_REMOTE_COMPUTE_STATUS=${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'} — seeding whoever is ready"
+    echo "Genesis peers (direct ingest): ${genesisPeers.collect { it.humanId }.join(', ')}"
+    echo "Replica peers (P2P replication): ${replicaPeers.collect { it.humanId }.join(', ')}"
+
+    // ── Genesis peers: seed whoever is ready (fatal only if zero seeded) ──
+    def seededGenesis = []
+    def skippedGenesis = []
+    for (gp in genesisPeers) {
+        if (!waitForStorageReady(gp.storageUrl, gp.service, 60)) {
+            echo "⏭️  Skipping genesis peer ${gp.humanId} — storage unreachable (seed-whoever-is-ready)"
+            skippedGenesis << gp.humanId
+            continue
+        }
+        dir('genesis/seeder') {
+            sh """#!/bin/bash
+                set -euo pipefail
+                echo "═══════════════════════════════════════════════════════════"
+                echo "🌱 SEEDING GENESIS PEER: ${gp.humanId} (${gp.storageUrl})"
+                echo "═══════════════════════════════════════════════════════════"
+                # Direct seed via SQLite write; replica peers receive it through
+                # P2P identity-driven replication. Idempotent across genesis
+                # peers — each peer's SQLite settles to the same content set.
+                STORAGE_URL="http://${gp.storageUrl}" npx tsx src/seed-sqlite.ts
+                echo "✅ ${gp.humanId} seeded successfully"
+            """
+        }
+        seededGenesis << gp.humanId
+    }
+    if (seededGenesis.isEmpty()) {
+        error("No genesis peer became ready — nothing seeded. At least one genesis peer's storage must answer (skipped: ${skippedGenesis.join(', ')}). If the remote pool is down, an on-prem genesis peer such as matthew must be healthy.")
+    }
+    if (!skippedGenesis.isEmpty()) {
+        unstable("Seeded genesis peers: ${seededGenesis.join(', ')}; skipped unreachable: ${skippedGenesis.join(', ')} — partial-cluster steady state (seed whoever is ready)")
+    }
+
+    // ── Replica peers: wait for P2P catch-up; never fatal ──
+    def laggingReplicas = []
+    for (peer in replicaPeers) {
+        if (!waitForStorageReady(peer.storageUrl, peer.service, 30)) {
+            echo "⏭️  Replica ${peer.humanId} storage unreachable — will reconverge when it returns"
+            laggingReplicas << peer.humanId
+            continue
+        }
+        def rc = sh(returnStatus: true, script: """#!/bin/bash
+            set -uo pipefail
+            echo "⏳ WAITING FOR REPLICATION: ${peer.humanId} (${peer.storageUrl})"
+            DEADLINE=\$((SECONDS + 600))
+            while [ \$SECONDS -lt \$DEADLINE ]; do
+                STATUS=\$(curl -sf "http://${peer.storageUrl}/p2p/status" 2>/dev/null || echo '{}')
+                CAUGHT_UP=\$(echo "\$STATUS" | jq -r '.replication.caughtUp // false')
+                COMPLETED=\$(echo "\$STATUS" | jq -r '.replication.completed // 0')
+                PENDING=\$(echo "\$STATUS" | jq -r '.replication.pending // 0')
+                # COMPLETED=0 is valid when the peer already had everything.
+                if [ "\$CAUGHT_UP" = "true" ] && [ "\$PENDING" = "0" ]; then
+                    echo "✅ ${peer.humanId} caught up: \$COMPLETED replicated this run, 0 pending"
+                    exit 0
+                fi
+                echo "   ${peer.humanId}: \$COMPLETED completed, \$PENDING pending"
+                sleep 10
+            done
+            echo "⏭️  ${peer.humanId} replication not caught up within 600s"
+            exit 1
+        """)
+        if (rc != 0) {
+            laggingReplicas << peer.humanId
+        }
+    }
+    if (!laggingReplicas.isEmpty()) {
+        unstable("Replica peers not yet caught up (reconverge when reachable): ${laggingReplicas.join(', ')}")
+    }
+
+    // ── Summary (graceful — curl failures fall through to 0) ──
+    echo "═══════════════════════════════════════════════════════════"
+    echo "📊 SEEDING SUMMARY (seeded: ${seededGenesis.join(', ')})"
+    echo "═══════════════════════════════════════════════════════════"
+    for (human in humans) {
+        sh """#!/bin/bash
+            STATS=\$(curl -sf "http://${human.storageUrl}/db/stats" 2>/dev/null || echo '{}')
+            COUNT=\$(echo "\$STATS" | jq -r '.contentCount // 0')
+            echo "   ${human.humanId}: \$COUNT content nodes"
+        """
+    }
+}
+
+/**
+ * Verify Seeding stage body (extracted for the 64KB CPS limit). Reconciles to
+ * available compute: verifies REACHABLE peers, tolerates unreachable ones
+ * (UNSTABLE, not FAILED). Fatal only on a real seed defect — a reachable peer
+ * that is empty, or zero reachable peers with content. The assessment
+ * spot-check runs on the first REACHABLE genesis peer, never a skipped one.
+ */
+def runVerifySeedingStage() {
+    def humans = getHumanStorageUrls('alpha')
+    def genesisPeers = humans.findAll { it.genesisPeer == true }
+    if (genesisPeers.isEmpty()) {
+        error("No genesis peer found in topology — at least one human in deployments.json must have genesisPeer:true (and must not be suspended).")
+    }
+
+    echo "═══════════════════════════════════════════════════════════"
+    echo "🔍 VERIFYING SEEDING (reachable peers only — reconcile to available compute)"
+    echo "═══════════════════════════════════════════════════════════"
+
+    def verified = []
+    def unreachable = []
+    def empty = []
+    for (human in humans) {
+        def count = sh(returnStdout: true, script: """#!/bin/bash
+            set -uo pipefail
+            STATS=\$(curl -sf --max-time 5 "http://${human.storageUrl}/db/stats" 2>/dev/null || echo '')
+            if [ -z "\$STATS" ]; then echo "-1"; exit 0; fi
+            echo "\$STATS" | jq -r '.contentCount // 0'
+        """).trim()
+        if (count == '-1' || count == '') {
+            echo "   ⏭️  ${human.humanId}: storage unreachable — skipped (reconciled out this run)"
+            unreachable << human.humanId
+        } else if (count == '0') {
+            echo "   ❌ ${human.humanId}: 0 content (reachable but empty — real failure)"
+            empty << human.humanId
+        } else {
+            echo "   ✅ ${human.humanId}: ${count} content"
+            verified << human.humanId
+        }
+    }
+
+    if (!empty.isEmpty()) {
+        error("Reachable peer(s) seeded empty (seed defect, not a substrate skip): ${empty.join(', ')}")
+    }
+    if (verified.isEmpty()) {
+        error("No reachable peer has content — seeding cannot be verified. Unreachable: ${unreachable.join(', ')}")
+    }
+    if (!unreachable.isEmpty()) {
+        unstable("Verified ${verified.join(', ')}; skipped unreachable peers: ${unreachable.join(', ')} (partial-cluster steady state)")
+    }
+
+    // Assessment spot-check on the first REACHABLE genesis peer (idempotent
+    // direct seeding means every genesis peer holds the same content).
+    def checkPeer = genesisPeers.find { verified.contains(it.humanId) }
+    if (!checkPeer) {
+        echo "⚠️  No reachable genesis peer for the assessment spot-check — skipping (replicas verified above)"
+        return
+    }
+    def genesisUrl = checkPeer.storageUrl
+    sh """#!/bin/bash
+        set -euo pipefail
+        echo ""
+        echo "🔬 Verifying assessment content on genesis peer (${checkPeer.humanId})..."
+        for ASSESSMENT_ID in assessment-personal-values assessment-values-hierarchy; do
+            ASSESSMENT=\$(curl -sf "http://${genesisUrl}/db/content/\$ASSESSMENT_ID" || echo '{}')
+            FMT=\$(echo "\$ASSESSMENT" | jq -r '.contentFormat // empty')
+            if [ -z "\$FMT" ]; then
+                echo "   ⚠️ Assessment '\$ASSESSMENT_ID' not found"
+                continue
+            fi
+            if [ "\$FMT" = "markdown" ]; then
+                echo "   ❌ Assessment '\$ASSESSMENT_ID' has format 'markdown' (likely defaulted from unknown format)"
+                exit 1
+            fi
+            HAS_WIDGETS=\$(echo "\$ASSESSMENT" | jq -r '.contentBody' | jq -e '.[0].content.widgets | length > 0' 2>/dev/null && echo "yes" || echo "no")
+            if [ "\$HAS_WIDGETS" = "yes" ]; then
+                echo "   ✅ Assessment '\$ASSESSMENT_ID': format=\$FMT, widgets present"
+            else
+                echo "   ⚠️ Assessment '\$ASSESSMENT_ID': format=\$FMT, no widgets in content body"
+            fi
+        done
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+        echo "✅ SEEDING VERIFIED"
+        echo "═══════════════════════════════════════════════════════════"
+    """
+}
+
+/**
  * Probe each conductor's admin WebSocket port for reachability before
  * invoking the seeder. Returns [ready: [...urls], unready: [...urls]]
  * and writes a structured conductor-readiness.json artifact.
@@ -655,6 +979,25 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Probe Substrate') {
+            // Single substrate probe → env.ELOHIM_REMOTE_COMPUTE_STATUS. Every downstream
+            // stage (Reset Storage, Seed Database, Verify Seeding, E2E) and the
+            // a2o test bench reconcile their scope to this one signal. Re-running
+            // the pipeline re-probes and restabilizes to the confirmed available
+            // compute — the CI-layer expression of the protocol's reconciliation
+            // principle. The remote pool flapping on/off is a steady state, not a
+            // failure: when it's down we run TOLERANT (seed/test whoever is ready)
+            // but LOUD (UNSTABLE + an explicit reduced-scope banner), honoring the
+            // "Pending if shem is down is intentional fail-loud" directive in
+            // genesis/orchestrator/data/deployments.json.
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script { probeSubstrateScope() }
+                }
+            }
+        }
+
         stage('Reset Storage') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
@@ -690,18 +1033,31 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             sleep 30
                         '''
 
+                        // Wait for each pod to come back Ready, but tolerate a
+                        // peer whose hardware is gone (reconcile to available
+                        // compute) — a down pod restarts when it returns; don't
+                        // hang 600s then cascade-fail the whole reset.
+                        def resetUnreachable = []
                         for (human in humans) {
-                            sh """#!/bin/bash
-                                set -euo pipefail
+                            def rc = sh(returnStatus: true, script: """#!/bin/bash
+                                set -uo pipefail
                                 echo "Waiting for ${human.service}..."
-                                kubectl wait --for=condition=Ready pod/${human.service}-0 -n ${human.namespace} --timeout=600s
-                                echo "   ✅ ${human.service} ready (600s: embedded-HC cold start, see #1055)"
-                            """
+                                if kubectl wait --for=condition=Ready pod/${human.service}-0 -n ${human.namespace} --timeout=600s 2>/dev/null; then
+                                    echo "   ✅ ${human.service} ready (600s: embedded-HC cold start, see #1055)"
+                                    exit 0
+                                fi
+                                echo "   ⏭️  ${human.service} not Ready within 600s — skipping (reconcile to available compute)"
+                                exit 1
+                            """)
+                            if (rc != 0) { resetUnreachable << human.humanId }
+                        }
+                        if (!resetUnreachable.isEmpty()) {
+                            unstable("Reset Storage: pods not Ready (restart when reachable): ${resetUnreachable.join(', ')}")
                         }
 
                         echo """
 ═══════════════════════════════════════════════════════════
-✅ ALL STORAGE DATABASES RESET
+✅ STORAGE DATABASES RESET (reachable peers)
 ═══════════════════════════════════════════════════════════
 """
                     }
@@ -938,117 +1294,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }}
             steps {
                 container('builder') {
-                    script {
-                        def humans = getHumanStorageUrls('alpha')
-                        def genesisPeers = humans.findAll { it.genesisPeer == true }
-                        if (genesisPeers.isEmpty()) {
-                            error("No genesis peer found in topology — at least one human in deployments.json must have genesisPeer:true (and must not be suspended). See genesis/orchestrator/data/deployments.json.")
-                        }
-                        def replicaPeers = humans.findAll { it.genesisPeer != true }
-
-                        echo "Genesis peers (direct ingest): ${genesisPeers.collect { it.humanId }.join(', ')}"
-                        echo "Replica peers (P2P replication): ${replicaPeers.collect { it.humanId }.join(', ')}"
-
-                        dir('genesis/seeder') {
-                            for (gp in genesisPeers) {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
-
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "🌱 SEEDING GENESIS PEER: ${gp.humanId}"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Storage: ${gp.storageUrl}"
-                                    echo ""
-
-                                    # Wait for genesis peer's storage to be ready
-                                    for i in \$(seq 1 60); do
-                                        if curl -sf "http://${gp.storageUrl}/health" > /dev/null 2>&1; then
-                                            echo "✅ ${gp.service} storage is ready"
-                                            break
-                                        fi
-                                        if [ \$i -eq 60 ]; then
-                                            echo "❌ ${gp.service} storage not ready after 60 attempts"
-                                            exit 1
-                                        fi
-                                        echo "   Waiting for ${gp.service} storage... (\$i/60)"
-                                        sleep 2
-                                    done
-
-                                    # Direct seed: genesis peers ingest content via SQLite write.
-                                    # Replica peers receive it via P2P identity-driven replication.
-                                    # Idempotent — safe to run across multiple genesis peers in
-                                    # sequence; each peer's SQLite settles to the same content set.
-                                    STORAGE_URL="http://${gp.storageUrl}" npx tsx src/seed-sqlite.ts
-
-                                    echo ""
-                                    echo "✅ ${gp.humanId} seeded successfully"
-                                    echo ""
-                                """
-                            }
-
-                            for (peer in replicaPeers) {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
-
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "⏳ WAITING FOR REPLICATION: ${peer.humanId}"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Storage: ${peer.storageUrl}"
-
-                                    # Wait for this peer's storage to be ready
-                                    for i in \$(seq 1 30); do
-                                        if curl -sf "http://${peer.storageUrl}/health" > /dev/null 2>&1; then
-                                            break
-                                        fi
-                                        sleep 2
-                                    done
-
-                                    # Poll /p2p/status until replication.caughtUp == true (timeout 600s)
-                                    DEADLINE=\$((SECONDS + 600))
-                                    while [ \$SECONDS -lt \$DEADLINE ]; do
-                                        STATUS=\$(curl -sf "http://${peer.storageUrl}/p2p/status" 2>/dev/null || echo '{}')
-                                        CAUGHT_UP=\$(echo "\$STATUS" | jq -r '.replication.caughtUp // false')
-                                        COMPLETED=\$(echo "\$STATUS" | jq -r '.replication.completed // 0')
-                                        PENDING=\$(echo "\$STATUS" | jq -r '.replication.pending // 0')
-
-                                        # Done when caught up and nothing is pending.
-                                        # COMPLETED=0 is valid when the peer already had everything
-                                        # (prior seed / P2P sync), so don't gate on it.
-                                        if [ "\$CAUGHT_UP" = "true" ] && [ "\$PENDING" = "0" ]; then
-                                            echo "✅ ${peer.humanId} caught up: \$COMPLETED replicated this run, 0 pending"
-                                            break
-                                        fi
-
-                                        echo "   ${peer.humanId}: \$COMPLETED completed, \$PENDING pending"
-                                        sleep 10
-                                    done
-
-                                    if [ \$SECONDS -ge \$DEADLINE ]; then
-                                        echo "❌ ${peer.humanId} replication timed out"
-                                        exit 1
-                                    fi
-                                """
-                            }
-
-                            sh '''#!/bin/bash
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "📊 SEEDING SUMMARY"
-                                echo "═══════════════════════════════════════════════════════════"
-                            '''
-                            for (human in humans) {
-                                sh """#!/bin/bash
-                                    STATS=\$(curl -sf "http://${human.storageUrl}/db/stats" 2>/dev/null || echo '{}')
-                                    COUNT=\$(echo "\$STATS" | jq -r '.contentCount // 0')
-                                    echo "   ${human.humanId}: \$COUNT content nodes"
-                                """
-                            }
-                            sh '''#!/bin/bash
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "✅ ALL CONDUCTORS HAVE CONTENT (genesis seeded + others replicated)"
-                                echo "═══════════════════════════════════════════════════════════"
-                            '''
-                        }
-                    }
+                    script { runContentSeedStage() }
                 }
             }
         }
@@ -1057,69 +1303,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
             steps {
                 container('builder') {
-                    script {
-                        def humans = getHumanStorageUrls('alpha')
-                        def genesisPeers = humans.findAll { it.genesisPeer == true }
-                        if (genesisPeers.isEmpty()) {
-                            error("No genesis peer found in topology — at least one human in deployments.json must have genesisPeer:true (and must not be suspended).")
-                        }
-                        def genesisPeer = genesisPeers[0]
-                        def genesisUrl = genesisPeer.storageUrl
-
-                        sh '''#!/bin/bash
-                            echo "═══════════════════════════════════════════════════════════"
-                            echo "🔍 VERIFYING SEEDING"
-                            echo "═══════════════════════════════════════════════════════════"
-                        '''
-
-                        for (human in humans) {
-                            sh """#!/bin/bash
-                                set -euo pipefail
-                                STATS=\$(curl -sf "http://${human.storageUrl}/db/stats")
-                                CONTENT=\$(echo "\$STATS" | jq -r '.contentCount // 0')
-                                echo "   ${human.humanId}: \$CONTENT content"
-                                if [ "\$CONTENT" -eq 0 ]; then
-                                    echo "❌ ${human.humanId} has no content!"
-                                    exit 1
-                                fi
-                            """
-                        }
-
-                        // Verify sophia assessment content on the first genesis peer.
-                        // (Idempotent direct seeding means every genesis peer has the
-                        // same content; the first one is sufficient for the spot-check.)
-                        sh """#!/bin/bash
-                            set -euo pipefail
-                            echo ""
-                            echo "🔬 Verifying assessment content on genesis peer (${genesisPeer.humanId})..."
-                            for ASSESSMENT_ID in assessment-personal-values assessment-values-hierarchy; do
-                                ASSESSMENT=\$(curl -sf "http://${genesisUrl}/db/content/\$ASSESSMENT_ID" || echo '{}')
-                                FMT=\$(echo "\$ASSESSMENT" | jq -r '.contentFormat // empty')
-
-                                if [ -z "\$FMT" ]; then
-                                    echo "   ⚠️ Assessment '\$ASSESSMENT_ID' not found"
-                                    continue
-                                fi
-
-                                if [ "\$FMT" = "markdown" ]; then
-                                    echo "   ❌ Assessment '\$ASSESSMENT_ID' has format 'markdown' (likely defaulted from unknown format)"
-                                    exit 1
-                                fi
-
-                                HAS_WIDGETS=\$(echo "\$ASSESSMENT" | jq -r '.contentBody' | jq -e '.[0].content.widgets | length > 0' 2>/dev/null && echo "yes" || echo "no")
-                                if [ "\$HAS_WIDGETS" = "yes" ]; then
-                                    echo "   ✅ Assessment '\$ASSESSMENT_ID': format=\$FMT, widgets present"
-                                else
-                                    echo "   ⚠️ Assessment '\$ASSESSMENT_ID': format=\$FMT, no widgets in content body"
-                                fi
-                            done
-
-                            echo ""
-                            echo "═══════════════════════════════════════════════════════════"
-                            echo "✅ SEEDING VERIFIED"
-                            echo "═══════════════════════════════════════════════════════════"
-                        """
-                    }
+                    script { runVerifySeedingStage() }
                 }
             }
         }
@@ -1573,10 +1757,12 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                     echo "🧪 E2E VERIFICATION (API)"
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "Doorway: ${doorwayHost}"
+                                    echo "Substrate: ELOHIM_REMOTE_COMPUTE_STATUS=${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'} (remote-only scenarios auto-skip when unavailable)"
                                     echo ""
 
                                     E2E_DOORWAY_ALPHA="${doorwayHost}" \
                                     E2E_DOORWAY_STAGING="${doorwayHost}" \
+                                    ELOHIM_REMOTE_COMPUTE_STATUS="${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'}" \
                                         npx cucumber-js --tags '@e2e and not @browser-only and not @local' \
                                         --format progress-bar \
                                         --format json:reports/cucumber-report.json \
@@ -1615,6 +1801,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         E2E_DEVICE_MODE=playwright \\
                                         E2E_DOORWAY_ALPHA="${doorwayHost}" \\
                                         E2E_STORAGE_URL="http://${env.INTERNAL_STORAGE_URL}" \\
+                                        ELOHIM_REMOTE_COMPUTE_STATUS="${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'}" \\
                                             npx cucumber-js --tags '@e2e and @browser-only and not @wip' \\
                                             --format progress-bar \\
                                             --format json:reports/cucumber-report-browser.json \\

@@ -223,7 +223,7 @@ export function relationshipsFor(humanId: string): HumansJsonRelationship[] {
 // (Tommy, Georgina, Maria, etc.) are doorway-seeded personas without a
 // k8s pod. When a node fails (e.g. shem 2026-05-04), affected humans get
 // "suspended": true in deployments.json — OR the operator declares shem
-// unavailable for this run via ELOHIM_SHEM_STATUS=unavailable. Both paths
+// unavailable for this run via ELOHIM_REMOTE_COMPUTE_STATUS=unavailable. Both paths
 // make isHumanDeployed() return false for the affected humans, and a2o
 // step definitions auto-skip those scenarios.
 //
@@ -296,10 +296,10 @@ function loadDeployments(): DeploymentsCache {
  * Pipelines should probe shem at start-of-run (e.g. via kubectl get node
  * shem) and set this env var explicitly. Local dev can leave it unset.
  */
-export type ShemStatus = 'available' | 'unavailable' | 'unknown';
+export type RemoteComputeStatus = 'available' | 'unavailable' | 'unknown';
 
-function readShemStatus(): ShemStatus {
-  const raw = (process.env.ELOHIM_SHEM_STATUS ?? '').toLowerCase().trim();
+function readRemoteComputeStatus(): RemoteComputeStatus {
+  const raw = (process.env.ELOHIM_REMOTE_COMPUTE_STATUS ?? '').toLowerCase().trim();
   if (raw === 'available' || raw === 'unavailable' || raw === 'unknown') {
     return raw;
   }
@@ -309,8 +309,8 @@ function readShemStatus(): ShemStatus {
 /** Returns true if shem is considered reachable for this test run. Fail-open
  * when status is "unknown" (the default) so tests still execute when the
  * pipeline hasn't probed. */
-export function isShemAvailable(): boolean {
-  return readShemStatus() !== 'unavailable';
+export function isRemoteComputeAvailable(): boolean {
+  return readRemoteComputeStatus() !== 'unavailable';
 }
 
 /** Returns true if at least one of `pools` is reachable on the test bench
@@ -320,7 +320,7 @@ export function isShemAvailable(): boolean {
 export function isAnyNodePoolAvailable(pools: NodePool[]): boolean {
   for (const p of pools) {
     if (p === 'remote') {
-      if (isShemAvailable()) return true;
+      if (isRemoteComputeAvailable()) return true;
     } else {
       // edge / performance / operations — dev clusters, always available.
       return true;
@@ -361,7 +361,7 @@ function ensureDeploymentsLoaded(): DeploymentsCache {
  * Two gating paths:
  *   1. Hard suspension via deployments.json "suspended": true (operator
  *      decision; persists across runs).
- *   2. Soft auto-skip via ELOHIM_SHEM_STATUS=unavailable (per-run probe;
+ *   2. Soft auto-skip via ELOHIM_REMOTE_COMPUTE_STATUS=unavailable (per-run probe;
  *      no deployments.json edit needed). Pipeline probes shem at start
  *      and sets the env; tests scale themselves to the available compute.
  *
@@ -389,6 +389,21 @@ export function isHumanDeployed(displayName: string): boolean {
     return false;
   }
   return true;
+}
+
+/**
+ * True if the named persona has NO on-prem fallback — every declared nodeType
+ * is the "remote" pool (shem). These are exactly the personas that auto-skip
+ * when the remote pool is unavailable. Household personas (with operations/
+ * edge/performance pools) return false; unknown or doorway-only personas (not
+ * in deployments.json, or with no nodeTypes) return false. Used by the
+ * substrate-reconciliation a2o scenarios to assert the invariant that the run
+ * only ever scales DOWN remote-only personas, never the household.
+ */
+export function isRemoteOnlyPersona(displayName: string): boolean {
+  const cache = ensureDeploymentsLoaded();
+  const nodeTypes = cache.nodeTypesByName.get(displayName.toLowerCase());
+  return Array.isArray(nodeTypes) && nodeTypes.length > 0 && nodeTypes.every(p => p === 'remote');
 }
 
 /**
