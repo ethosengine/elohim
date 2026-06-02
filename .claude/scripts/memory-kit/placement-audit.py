@@ -730,6 +730,19 @@ def mempalace_line():
         return ""
 
 
+def cleanup_line():
+    """drift-elevation gate — has enough churned since the last cleanup to warrant the memory-stasis-loop?"""
+    import subprocess
+    try:
+        out = subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "cleanup-pressure.py"), "--status"],
+            capture_output=True, text=True, timeout=15)
+        s = out.stdout.strip()
+        return "  " + s if s else ""
+    except Exception:
+        return ""
+
+
 def headline_mode():
     docs, _ = scan_docs()
     surface = [d for d in docs if not d["home"].startswith("_state")]
@@ -769,6 +782,10 @@ def headline_mode():
     pl = mempalace_line()
     if pl:
         print(pl)
+    # DRIFT-ELEVATION gate: has enough churned since the last cleanup to warrant the loop (the weekly trigger)?
+    cl = cleanup_line()
+    if cl:
+        print(cl)
     return 0
 
 
