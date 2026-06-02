@@ -16,18 +16,31 @@ Invokes the `agentic-developer` skill to run an agentic developer shift.
 1. Interviews the user for the Objective (name, measure command,
    baseline, scope, budget, and whether the shift is
    visual-delivery-gated).
-2. Composes a shift id, writes Objective YAML to
+2. **FRONT fire point (born-linked discovery).** Surfaces prior
+   canonical seed(s) + history watch-outs for the Objective via the
+   lexical `spec-coherence-index.py --query` floor plus a JIT-scoped
+   MemPalace semantic recall, so the shift is born linked to its seed
+   and warned of known anti-patterns (compaction-loop spec
+   `genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`,
+   §4).
+3. Composes a shift id, writes Objective YAML to
    `.claude/shifts/<shift-id>.objective.yaml`, writes initial journal
    to `.claude/shifts/<shift-id>.journal.md`.
-3. Pattern-matches the predicted command palette against current
+4. Pattern-matches the predicted command palette against current
    allowlists; proposes shift-scoped additions to
    `.claude/settings.local.json` for user approval.
-4. Runs `pnpm run agentic:readiness -- --objective <path>`. Aborts
+5. Runs `pnpm run agentic:readiness -- --objective <path>`. Aborts
    on any readiness failure with a report.
-5. Enters the iteration loop, using `ScheduleWakeup` to pace between
+6. Enters the iteration loop, using `ScheduleWakeup` to pace between
    iterations until done, bail, or budget exhaustion.
-6. On terminal state, writes a sprint result markdown at
+7. On terminal state, writes a sprint result markdown at
    `.claude/shifts/<shift-id>.journal.md` and prints its path.
+8. **BACK fire point (decompose-self, on concluded work).** Runs
+   `decompose-self` as the shift's closing act: the concluded plan(s)
+   dissolve to zero residue — durable gotchas/anti-patterns route to
+   canonical specs (inline watch-out) + curated history, open issues
+   to backlog, narration body to git — then MemPalace re-mines the
+   cleaned surface (spec §5). No parked plan is left behind.
 
 ## See also
 

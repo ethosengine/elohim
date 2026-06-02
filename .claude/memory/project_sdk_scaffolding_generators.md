@@ -4,6 +4,9 @@ description: "The 2026-05-18 manifest-modularization + SDK-boundary sprint surfa
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/docs/plans/2026-05-18-app-manifest-modularization.md
+  - elohim/sdk/schemas/scripts/codegen-ts.mjs
 ---
 
 The manifest-modularization sprint (2026-05-18, see `genesis/docs/plans/2026-05-18-app-manifest-modularization.md`) made 28 identical content-type extractions visible. The SDK boundary work (Plan 2, in progress) repeats the same shape 7 times for per-domain View moves. The CLAUDE.md at `elohim/elohim-storage/CLAUDE.md` already documents a 5-step ritual for adding a new entity (model → View → InputView → schema → handler → codegen). These are not one-offs; they are the *protocol's surface area as an SDK*, and right now every consuming developer (us included) is hand-walking the steps.

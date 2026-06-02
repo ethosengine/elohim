@@ -3,6 +3,8 @@ name: Doorway and hub as symmetric projection edges (web2 / peer-native)
 description: Doorway projects substrate truth outward to web2 (CDN, DNS, OAuth-relying-party for browsers). Hub projects substrate truth inward to nearby peers (school-laptop syncing a Khan library to student devices when they arrive). They are symmetric projection edges, not the same thing. Both project the same canonical DHT/libp2p truth; they differ in audience and reach contract.
 type: project
 originSessionId: 155036b0-387a-441c-91c5-7a1333fb2f07
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
 ---
 The four-surface model:
 

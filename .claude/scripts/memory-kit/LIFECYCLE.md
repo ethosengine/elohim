@@ -320,7 +320,7 @@ regression  <  unknown  <  undelivered  <  pending  <  envisioned  <  backlog
 
 **Sticky exception — `regression` propagates UP**: `regression` is sideways-orthogonal in the per-feature axis (a feature can flip from `active.beta` to `regression` and back). At the story-aggregation layer, **any contributing feature in `regression` forces the story to `regression`**, regardless of how the others are doing. Regression dominates. The rationale: a story whose narrative claims a delivered experience cannot itself be "delivered" while one of its load-bearing scenarios is broken; the story carries the regression until the substrate repairs.
 
-**Who computes this**: the `deliver-bridge` auto-poller (`.claude/scripts/memory-kit/delivery-status-poll.py`, when authored). The storyteller never writes `delivery_status` on a canonical story directly above `wip`; the operator may set a `wip`-or-below floor when seeding a new story before any feature has been judged. Anything `active.alpha` or above must be derived from a manifest verdict.
+**Who computes this**: the `deliver-bridge` auto-poller (`.claude/scripts/memory-kit/delivery-status-poll.py` — **[NOT YET BUILT]**). The storyteller never writes `delivery_status` on a canonical story directly above `wip`; the operator may set a `wip`-or-below floor when seeding a new story before any feature has been judged. **Once the bridge exists**, anything `active.alpha` or above must be derived from a manifest verdict (until then this rule cannot be enforced — there is no enforcer).
 
 **What `/deliver` does NOT do**: `/deliver` writes per-feature verdicts; it does not compute story aggregates. The aggregation is the bridge's job. This keeps `/deliver` focused on the rendered-experience falsifier and the memory-team's bridge focused on the read-side projection. `/deliver`'s feature-level writes are stable; the bridge re-derives story aggregates on each poll.
 
@@ -328,7 +328,7 @@ regression  <  unknown  <  undelivered  <  pending  <  envisioned  <  backlog
 
 **Role**: the auto-poller is NOT an authoring tool. It is a **bridge** that reads `/deliver`'s output and writes `delivery_status:` onto stories and backlog entries that link to features `/deliver` has judged. The memory-ceremony group reads the written values; it does not produce the verdict.
 
-**Lives at**: `.claude/scripts/memory-kit/delivery-status-poll.py` (librarian-invoked; bridge surface, not authority surface)
+**Lives at**: `.claude/scripts/memory-kit/delivery-status-poll.py` — **[NOT YET BUILT]** (planned; librarian-invoked; bridge surface, not authority surface)
 
 **Reads** (the primary source is `/deliver`'s output; raw a2o reports only fill the floor of the gradient where `/deliver` has not yet judged):
 

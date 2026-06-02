@@ -342,7 +342,7 @@ If bailing: same sprint-result template with `disposition: bail-with-followup`, 
 | Direction | Who | What |
 |---|---|---|
 | **Write** | `/deliver` only | Mints `active.*` / `stable` / `regression` to the manifest, **at the feature-level only** (and onto the story/backlog frontmatter for the **immediately-linked** feature). `/deliver` writes one verdict per feature it judges; story-level aggregates are derived elsewhere. |
-| **Read via bridge** | memory-ceremony group (via `.claude/scripts/memory-kit/delivery-status-poll.py` auto-poller) | Reads `.claude/deliver/manifest.json`, **aggregates per-feature verdicts into per-story `delivery_status` via the weakest-link policy** documented at LIFECYCLE.md → "Story-level aggregation from feature verdicts", and writes the aggregated story-level value back to story frontmatter |
+| **Read via bridge** | memory-ceremony group (via `.claude/scripts/memory-kit/delivery-status-poll.py` auto-poller — **planned; not yet built**) | Reads `.claude/deliver/manifest.json`, **aggregates per-feature verdicts into per-story `delivery_status` via the weakest-link policy** documented at LIFECYCLE.md → "Story-level aggregation from feature verdicts", and writes the aggregated story-level value back to story frontmatter |
 | **Floor only** | auto-poller fallback | When `/deliver` has not judged a feature, the auto-poller may write `envisioned` / `backlog` / `refined` / `wip` from raw a2o signals — **never** `active.*` / `stable` / `regression` |
 | **Never write** | memory-ceremony group | Does not author `active.*` / `stable` / `regression` under any circumstance |
 

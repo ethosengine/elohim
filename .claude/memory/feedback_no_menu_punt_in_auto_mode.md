@@ -3,6 +3,8 @@ name: No (a)(b)(c)(d) menus in auto mode when the call is mine
 description: When the next move is an Opus-level judgment call and inputs are in scope, decide and proceed — don't surface a multiple-choice menu back to the user
 type: feedback
 originSessionId: cdffa1f9-7b63-4657-ae44-2cafff5156bf
+cites:
+  - .claude/skills/deliver/SKILL.md
 ---
 Don't end an auto-mode report with "course-correction options (a)(b)(c)(d) — which way?" when the call is in my lane.
 

@@ -3,6 +3,9 @@ name: dwelling-hub-replication-pattern
 description: First concrete instance of the REA compute-commitment primitive — mutual storage replication between dwelling-hubs (households). Three load-bearing properties: donut economics (device-level), bilateral-by-reference mutuality (with grace-period soft-warn), intent-first observed-state-second. Hub-aware substrate vocabulary; encryption-decoupled commitments. Pattern extends to collective + commons tiers.
 metadata:
   type: project
+cites:
+  - genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md
+  - genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md
 ---
 
 The Sprint 3 shape (landed 2026-05-28, plan `genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md`, close-out `genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md`):

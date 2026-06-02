@@ -71,7 +71,7 @@ import json
 import os
 import re
 import sys
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 
 # Bootstrap: locate .claude/scripts/_lib via repo_root_from_file
@@ -298,7 +298,7 @@ def _load_prev() -> dict | None:
 def _build_state(stories: list[dict], backlog: list[dict]) -> dict:
     totals = _compute_totals(stories + backlog)
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": TODAY.isoformat(),
         "totals": totals,
         "stories": stories,
         "backlog": backlog,

@@ -3,6 +3,8 @@ name: Compute commitments are bounded REA primitives
 description: Compute is a low-level network primitive expressed as Commitment with signal_kind "compute-allocation"; three trigger_kinds; breach in compute-class never contaminates attribution-class flows.
 type: project
 originSessionId: 195ee79b-20ed-438e-8388-af439b3a42a7
+cites:
+  - genesis/data/rakia/compute-capacity.json
 ---
 Compute is a first-class economic primitive in the protocol, expressed as an extension of the existing REA `Commitment` entry via `signal_kind: "compute-allocation"`. Breach is recorded as `signal_kind: "compute-breach"`. Sketched in `docs/superpowers/specs/2026-05-04-compute-commitment-substrate-floor-design.md`.
 

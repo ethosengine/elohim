@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 5ed7452d-de73-43b1-814f-3b1742a3b1b8
+cites:
+  - genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md
 ---
 
 The orchestrator's `[build:<name>]` commit-tag syntax (per `genesis/orchestrator/Jenkinsfile`) uses **short aliases**, not full pipeline names.

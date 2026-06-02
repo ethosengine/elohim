@@ -3,6 +3,8 @@ name: elohim-app is a composable federation of view modules, not a monolith
 description: elohim-app today is a bootstrap/catch-all client; pieces should decompose into surfaces the human experiences regardless of whether the rendering host is their own tauri, their own browser-steward, or a peer rendering on their behalf
 type: project
 originSessionId: 4d20bf7b-4639-43d8-ad10-fccb514a7f0a
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
 ---
 **Framing (2026-04-25):** elohim-app today is in essence a **bootstrap/catch-all client** — everything is in one Angular app because that was the fastest path to a working stack. The architectural future is **decomposition**: each pillar's surfaces (account, profile, learning, wallet …) graduate into composable view modules that the human can experience through any rendering host:
 

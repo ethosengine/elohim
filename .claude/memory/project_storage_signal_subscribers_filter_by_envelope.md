@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: de3918e5-34fe-4832-bc41-5a3ca933e9fc
+cites:
+  - elohim/elohim-storage/src/hc_client.rs
 ---
 
 elohim-storage's conductor signal subscribers (`HcClient::subscribe_*` methods + matching `tokio::spawn` blocks in `main.rs`) each filter incoming signals by attempting to deserialize as a specific envelope type. Signals that don't match are logged at debug and dropped.

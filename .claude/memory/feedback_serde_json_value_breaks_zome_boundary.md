@@ -3,6 +3,8 @@ name: serde_json::Value breaks Holochain zome boundary — pre-stringify across 
 description: Holochain's SerializedBytes uses MessagePack; serde_json::Value doesn't round-trip — decodes byte arrays as raw bytes instead of structured JSON; breaks DNA init for ALL tests
 type: feedback
 originSessionId: 4d20bf7b-4639-43d8-ad10-fccb514a7f0a
+cites:
+  - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
 ---
 `serde_json::Value` as a field on a `#[derive(SerializedBytes)]` type that crosses the Holochain zome boundary **compiles fine but fails at runtime**, taking down DNA initialization for ALL sweettest scenarios in the conductor — not just the function that uses the broken type.
 

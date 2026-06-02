@@ -153,6 +153,24 @@ For the cradle-to-grave specifically:
 
 This is how the protocol's capability gradient becomes legible to humans across life-stage capacities.
 
+### §6.1 — Rendering-layer realization (Capability Profile + Element Contract)
+
+The gradient above is *realized at render time* by the elohim-elements capability-profile element contract (compacted here from `2026-05-20-capability-profile-element-contract-design.md` + its plan + the protocol-omni-component plan; raw bodies retire to git). The rendering layer exposes **two render-time observables**:
+
+- **Capability Profile** — what the *viewer* can do with this surface (the six disclosure lenses above, gated by standing).
+- **Content Certainty** — how settled/notarized the *content itself* is.
+
+A custom element declares its render-time needs in a **`capabilityContract` CEM block**, and a build-time **analyzer** validates the contract against the element's actual usage. Each surface passes **three all-or-nothing precondition gates** — there is **no "designed-but-not-yet-a11y" half-state cell**; a surface is either gated-ready across all three or it is not rendered. The `ProtocolOmniComponent` and `EprNavContextView` are **Category-C operational** (reconstructed, never notarized — the p2p-design-gate flag is pre-cleared for both).
+
+**Load-bearing constraints to preserve (a planner will want to flip these — don't):**
+
+- **Sabbath-as-default inversion** — the rendering default is `stimulus: still`, `textuality: textual`; motion is **opt-up** and **OS-capped**. This is deliberate; preserve it.
+- **Lens narrowing is a one-way downward ratchet** — climbing disclosure reveals more; narrowing never silently re-widens.
+- **Protocol vocabulary is preserved verbatim across locales** — translation localizes prose, never the protocol terms.
+- **Deferred sub-projects #3–#7 are real and unbuilt.** In particular **#3 (steward-lock persistence) IS a real DHT entry** and MUST re-invoke the `p2p-design-gate` skill before any design — it is not a Category-C operational shortcut.
+
+The doorway-side `renderCapability` (whether a *doorway* can server-render) is a **distinct** observable from the viewer-side Capability Profile here — see the [doorway-SSR runtime seed](../content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md); do not merge the two.
+
 ---
 
 ## §7 — Cradle-to-Grave Stewarded Compute

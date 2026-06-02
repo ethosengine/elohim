@@ -3,6 +3,8 @@ name: M5 is the plumbing/SDK convergence sprint, not a UX polish sprint
 description: M5's deliverable is a clearly-defined SDK/API/graph surface; UI is minimum scaffold to verify wiring, polished presentation is a SEPARATE Playwright-driven sprint
 type: project
 originSessionId: 4d20bf7b-4639-43d8-ad10-fccb514a7f0a
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
 ---
 **2026-04-25 user direction on Cut 3:** the goal is **wiring up** existing primitives end-to-end. Many patterns already exist — M5's job is convergence, not invention. **Emphasis on foundational plumbing** — explicitly note old patterns, gaps, and disconnects, and **resolve them in this sprint, definitely this sprint**.
 

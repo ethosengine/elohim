@@ -3,6 +3,8 @@ name: Elohim as counsel — imagodei has a right to elohim defense
 description: When a human is under attack (collusion, duress, silencing, or false attestation against them), their elohim-agent has first-class standing to represent their interests as counsel, as good as any legal system but without the socioeconomic barriers
 type: project
 originSessionId: a00556ea-66be-405a-985e-1a7a309d43a8
+cites:
+  - genesis/docs/content/elohim-protocol/constitution.md
 ---
 When an imagodei is attacked — by a colluding quorum, under duress, wrongly attested against, silenced, or otherwise unable to advocate for themselves — their elohim-agent acts as counsel. This is a first-class architectural role, not merely a validation rule or advisory output.
 

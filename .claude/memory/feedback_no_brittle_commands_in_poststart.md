@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: f5a2d454-b452-40db-b4fa-5bf6f18e9117
+cites:
+  - devfile.yaml
 ---
 
 Do not add new entries to `devfile.yaml` `events.postStart` unless the command is idempotent, fast, and effectively cannot fail. Commands can still be defined under `commands:` (invokable on demand via `exec`) without being auto-run.

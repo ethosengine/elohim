@@ -1,3 +1,9 @@
+---
+status: Design
+related:
+  - 2026-05-06-haiku-visual-triage-design.md   # a tier of the agentic visual-judgment loop this design frames
+---
+
 # Agentic Developer Loop — Design
 
 **Status:** Design — approved, pending implementation plan

@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: b08da6e2-3dac-4d8d-809f-aa002a0fd200
+cites:
+  - genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
 ---
 
 When a human opens their shefa dashboard, the compute they see is the **hub aggregate**, not a per-device breakdown. The hub is a storage pool aggregating capacities from all member devices — sliding a blade into the rack at home jumps the hub from "5GB / 15GB available" to "5GB / 100GB available" without changing the human's experience of "my hub."

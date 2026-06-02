@@ -205,6 +205,31 @@ How do we prevent this class of problem?
 - [ ] Tooling change: [description]
 ```
 
+## Compaction-loop: surface prior precedent + feed the lesson home (on-demand)
+
+Before you write a lesson as if first-learned, check whether this incident's shape is **already distilled** —
+the Spec/Plan Compaction Loop (`genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`)
+keeps recurring lessons in a curated history (`genesis/docs/content/elohim-protocol/history/`) and the
+`feedback_*` memory corpus. A *recurrence* verdict (your 4-line summary already asks for new vs known-recurring)
+is far stronger when you can cite the prior incident.
+
+You are **not** MemPalace-equipped by default. Pull the semantic lens **just in time** — load exactly the two
+surfacing tools, use them, release:
+
+```
+ToolSearch  →  select:mempalace_search,mempalace_check_duplicate
+```
+
+`mempalace_search` the incident's root-cause shape (plus Grep over `feedback_*` and `history/`) to ground the
+recurrence table with a real prior citation rather than "feels familiar."
+
+After concluding, feed the **cleanup side** of the loop: a lesson that "applies beyond this incident" is exactly
+a curate-to-history candidate (a distilled `history/` lesson + an inline `watch-out` pointer planted at the
+canonical decision point, §7.3) and/or a new `feedback_*` entry. Don't let the lesson rest only in a one-off
+post-mortem doc — propose it to the historian/librarian (or the operator) so it lands where the next agent will
+trip on it. If MemPalace is unavailable in your dispatch, fall back to Grep over `feedback_*` and `history/` and
+say so.
+
 ## Pattern Analysis
 
 When analyzing recurring issues:

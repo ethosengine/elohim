@@ -3,6 +3,9 @@ name: matchesGlob ** corruption — replace order matters
 description: build-graph.groovy:matchesGlob silently broke ** for nested files; sentinel placeholders required before single-* substitution
 type: feedback
 originSessionId: 06d0c187-b5c7-44a6-b8dd-2e89e7827615
+cites:
+  - doorway/doorway-service/src/server/http.rs
+  - genesis/orchestrator/build-graph.groovy
 ---
 In `genesis/orchestrator/build-graph.groovy:matchesGlob`, glob → regex compilation must substitute `**` tokens with a placeholder *before* the single-`*` pass. Otherwise the sequence (`**` → `.*`, then `*` → `[^/]*`) corrupts the `.*` from step 1 into `.[^/]*` — silently restricting `src/**` to one-level-deep matches. Three-levels-deep file edits bypass change detection.
 

@@ -1,3 +1,7 @@
+---
+status: Design
+---
+
 # Session Bridge Design — Visitor and Peer Graduation Patterns
 
 > **Status:** Design draft. Surfaces a substrate primitive (`session-bridge`) that resolves anonymous-visitor onboarding AND peer-to-peer sampling/demo flows on the same shape.

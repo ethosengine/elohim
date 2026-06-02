@@ -3,6 +3,9 @@ name: substrate-currency-ceremony-2026-05-18-yellow-backlog
 description: YELLOW findings from the 2026-05-18 substrate-currency ceremony's Phase 4b coherence check that were larger than mechanical and got backlogged for next-cycle pickup. Three load-bearing pattern-examples are missing from gospel-tier Rust surfaces and a controller-state claim in the resilience epic may overstate what code does. Next ceremony should consider these for inline closure or operator-elevation as a focused sprint.
 metadata:
   type: feedback
+cites:
+  - genesis/docs/content/elohim-protocol/resilience/README.md
+  - .claude/agents/rust-architect.md
 ---
 
 The 2026-05-18 substrate-currency ceremony (rust-architect.md + doorway-service/CLAUDE.md rewrites) had Phase 4b return YELLOW. Four findings were mechanical and closed inline; three were larger-than-mechanical and are documented here for the next memory-ceremony or cartographer pass.

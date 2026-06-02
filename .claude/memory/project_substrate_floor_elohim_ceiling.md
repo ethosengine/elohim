@@ -3,6 +3,8 @@ name: Substrate-deterministic floor + elohim-discernment ceiling
 description: Architectural pattern — substrate provides deterministic verdicts without AI; elohim layer enriches with discernment but never gates. Apply consistently to compute, reach, recovery, attribution, governance.
 type: project
 originSessionId: 195ee79b-20ed-438e-8388-af439b3a42a7
+cites:
+  - genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md
 ---
 The protocol has two architectural layers wherever a decision must be made.
 

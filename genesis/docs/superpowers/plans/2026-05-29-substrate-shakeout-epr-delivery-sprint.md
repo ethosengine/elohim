@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../specs/2026-05-29-epr-reachability-economics.md   # the related doc this derives from
+---
+
 # EPR-App Delivery — Substrate Shakeout Sprint Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

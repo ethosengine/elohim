@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 4b9a03ba-e6e3-4770-9ee2-00e1721d108f
+cites:
+  - .claude/agents/rust-architect.md
 ---
 
 When dispatching a subagent to do a per-domain mechanical move of `impl From<X> for Y` blocks out of a monolith into sibling modules, the subagent can silently drop impls — especially toward the end of long sessions where its context is loaded. The dropped impls aren't compile errors in the modified crate when nothing in `lib.rs` directly references them; only `cargo build --workspace` exposes the breakage when downstream `api/*.rs` or sibling crates try to invoke the missing trait.

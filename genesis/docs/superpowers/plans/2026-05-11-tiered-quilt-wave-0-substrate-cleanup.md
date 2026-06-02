@@ -1,3 +1,9 @@
+---
+status: Draft
+informed-by:
+  - ../../content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md   # the tiered-quilt canon this wave-0 cleanup serves
+---
+
 # Tiered Quilt — Wave 0: Substrate cleanup
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

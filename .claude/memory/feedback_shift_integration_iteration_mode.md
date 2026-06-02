@@ -3,6 +3,9 @@ name: /shift has two modes — bring-up and integration-iteration
 description: A shift's iteration loop adapts based on whether the cluster is broken (bring-up, single objective) or stable (integration-iteration, multi-candidate fix-as-many-classes-as-possible across 5 loops)
 type: feedback
 originSessionId: cdffa1f9-7b63-4657-ae44-2cafff5156bf
+cites:
+  - .claude/skills/agentic-developer/SKILL.md
+  - .claude/schemas/haiku-output.schema.json
 ---
 `/shift` runs in one of two modes, decided at kickoff from the last orchestrator build's status:
 

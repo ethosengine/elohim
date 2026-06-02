@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../specs/2026-05-25-pillar-epr-decomposition-design.md   # the design spec this plan implements
+---
+
 # Lamad Pillar Dependency Audit (for bundle split)
 
 **Generated:** 2026-05-25

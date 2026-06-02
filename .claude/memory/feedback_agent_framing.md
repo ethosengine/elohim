@@ -3,6 +3,8 @@ name: Frame autonomous agents as first-class developers, not babysitters
 description: Don't use "babysitter", "watcher", "sitter" or diminutive framing for autonomous agent loops. They are agentic developers.
 type: feedback
 originSessionId: 9a934a92-144d-4415-9d43-14fcb046e2db
+cites:
+  - .claude/agents/cartographer.md
 ---
 User rejects "babysitter" / "watcher" framing for autonomous agent loops that iterate on real work (CI pipelines, overnight builds, etc.). These are first-class agentic developers with the full dev cycle: claim work, understand, fix, verify, close or escalate.
 

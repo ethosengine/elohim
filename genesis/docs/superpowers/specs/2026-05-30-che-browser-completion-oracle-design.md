@@ -1,3 +1,7 @@
+---
+status: Design
+---
+
 # Che Browser Feedback — L2 Completion Oracle: Local Visual Done-Gate for `/shift`
 
 > Spec 2 of 2. Builds on L1 (`2026-05-30-che-browser-feedback-foundation-design.md`), which made a

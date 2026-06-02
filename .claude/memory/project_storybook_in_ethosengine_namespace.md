@@ -3,6 +3,8 @@ name: Storybook lives in ethosengine namespace, not elohim-<env>
 description: elohim-<env> namespaces enforce P2P peer isolation via default-deny-cross-env NetworkPolicy; tooling (storybook, design surfaces) belongs in ethosengine which has no such restriction
 type: project
 originSessionId: cc51fa69-af87-4c58-a30c-b86120b754fc
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 The `elohim-alpha` / `elohim-staging` / `elohim-prod` namespaces each carry a `default-deny-cross-env` NetworkPolicy that enforces P2P peer environment isolation. The policy works correctly for peer-to-peer traffic but has a latent gap with ingress-nginx pods (which run with `hostNetwork: true`).
 

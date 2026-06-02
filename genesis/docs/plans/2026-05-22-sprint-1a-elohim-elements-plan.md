@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../superpowers/specs/2026-05-22-qahal-homepage-ux-design.md   # the design spec this plan implements
+---
+
 # Sprint 1A — elohim-elements Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

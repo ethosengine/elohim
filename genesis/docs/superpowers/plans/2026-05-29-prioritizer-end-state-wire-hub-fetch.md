@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md   # the design spec this plan implements
+---
+
 # Replication-Prioritizer End-State (Wire Hints · Hub Derivation · Fetch Seam) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Primary implementer: **rust-architect** (read its "Canonical Implementation Patterns" section first — wire-format evolution, read-side inline diesel, correct-but-dormant projection, target-pool + shared-tree git discipline all apply here).

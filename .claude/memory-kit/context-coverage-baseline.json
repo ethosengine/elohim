@@ -1,0 +1,13 @@
+{
+ "score": 0.468,
+ "dimensions": {
+  "MEMORY.md within byte budget": 1.0,
+  "capture: specs/plans decomposed": 0.662,
+  "memory: entries cite a system": 0.044,
+  "CLAUDE.md right-sized (<= budget)": 0.75,
+  "history: bidirectional canonical link": 0.667,
+  "status: docs carry a state": 0.407,
+  "well-formed: docs linked (non-orphan)": 0.214,
+  "traceability: docs carry explained trace links": 0.0
+ }
+}

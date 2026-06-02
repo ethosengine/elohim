@@ -86,11 +86,25 @@ The orchestrator monitors these endpoints after deployments:
 ### Skipped Pipelines
 Individual pipelines check if they were triggered by the orchestrator. If triggered directly by webhook (not orchestrator), they show `NOT_BUILT` instead of running.
 
+> **Measure semantics — `NOT_BUILT`/`ABORTED`/superseded are NOT success and NOT failure.** A `NOT_BUILT` child means "didn't run", not "passed". Do not let a downstream readiness/measure step read `NOT_BUILT`/`ABORTED`/`UNSTABLE` as green or as 0-failures — that is a *lossy* measure that has repeatedly masked real regressions. When `abortPrevious` preempts an in-flight child (a new push superseding an older one), the superseded build lands `ABORTED`; reading that as a pass is the single most common false "it's fixed" signal. Tighten any pass-test to require `lastBuild.commit == HEAD` AND a non-`NOT_BUILT`/non-`ABORTED` result before trusting it.
+
+### Baseline state
+Each pipeline carries a per-pipeline baseline (the last build the orchestrator considers known-good). **Watch-out — baseline-rollback over-build:** a `FAILURE`/`ABORTED` result can invalidate the per-pipeline baseline and roll back to the *global* baseline, which then fans out into a full cascade rebuild; `lastSuccessful()` can pin an ancient green build that no longer reflects HEAD. The baseline should advance only on a *confirmed-downstream-success*, never on a dispatch that merely started. (Backlog: convert the baseline into an explicit state machine + a `build-manifest ⊆ orchestrator changePatterns` drift test — see the recurring-anti-patterns museum record below.)
+
 ### Genesis Triggering
 Genesis is triggered automatically after ALL dependent pipelines succeed. It auto-detects the target environment from the branch.
 
 ### Manual-Only Pipelines
 `elohim-steward` is marked `manualOnly: true` - the orchestrator never triggers it automatically.
+
+### Triggers — webhook double-fire
+**Watch-out — one dev push can produce two orchestrator builds.** When a Jenkinsfile declares an explicit `triggers { githubPush() }` AND the job is a Multibranch item (which fires its own implicit branch-indexing trigger), a single push fires *both*; the first build is immediately superseded (lands `ABORTED` — see measure semantics above) and looks like a phantom failure. The fix is to drop the explicit `triggers { githubPush() }` and rely on the Multibranch implicit trigger alone. A sibling variant is timer/cron collision with the webhook window (a scheduled build colliding with a late-EDT/PDT push) — reschedule the cron off that window. (Backlog: `orchestrator-trigger-dedup`.)
+
+## Recurring CI/orchestrator anti-patterns
+
+The frequency-ranked, curated catalog of recurring CI/orchestrator/build failure modes (measure-semantics, baseline-rollback, Dockerfile/build-manifest completeness, `HUSKY=0`-is-non-functional, sccache-poisons-rustc-output, `#[ignore]`-is-a-CI-no-op, cucumber parse-abort, CPS method-size, webhook double-fire) lives in the history museum:
+**`genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md`**.
+Read it before debugging a "regression" or proposing a measure/baseline change — most of these have cost real shift time more than once and each carries the specific symptom + the fix.
 
 ## Troubleshooting
 

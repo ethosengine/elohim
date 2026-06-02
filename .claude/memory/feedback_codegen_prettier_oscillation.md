@@ -3,6 +3,8 @@ name: schema codegen produces oscillating Prettier diff
 description: schema:codegen:ts oscillates 18 generated TS files between single-line and multi-line union types; the codegen script has no idempotent fixed point
 type: feedback
 originSessionId: bdf209e4-03e4-4d83-813b-19ac535d11dc
+cites:
+  - elohim/sdk/schemas/scripts/codegen-ts.mjs
 ---
 `pnpm run schema:codegen:ts` regenerates 18 files in `app/elohim-app/src/app/generated/`, `app/elohim-library/projects/elohim-service/src/generated/`, `elohim/sdk/schemas/generated-ts/`, and `genesis/seeder/src/generated/` with a Prettier line-wrap oscillation on union types like `Reach` and `ContentFormat`. Whichever form is committed, the next codegen run flips it.
 

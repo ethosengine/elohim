@@ -1,7 +1,7 @@
 ---
 title: Doorway Access-Tier Patterns
 tier: architecture
-status: Pattern catalog (descriptive, not prescriptive; names three patterns A / B / Recovery + one open question anon-hint; implementation deferred to subsequent shifts)
+status: accepted — Pattern catalog (descriptive, not prescriptive; names three patterns A / B / Recovery + one open question anon-hint; implementation deferred to subsequent shifts)
 created: 2026-05-23
 pillar coupling: doorway (web2 projection cache), elohim (peer-native substrate boundary)
 informed-by:

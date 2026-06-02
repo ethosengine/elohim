@@ -3,6 +3,8 @@ name: Doorway SSR pod resource floor
 description: Doorway with SSR enabled needs ≥1Gi memory + startupProbe; 256Mi was a coin-toss OOM, no startup probe killed pod for liveness fail before V8 init completed
 type: project
 originSessionId: 2a998ad1-49e1-4f9d-a4ca-0cb796181cbf
+cites:
+  - genesis/orchestrator/manifests/doorway/staging.yaml
 ---
 Doorway pod resource floor when SSR_BUNDLE_PATH is set.
 

@@ -3,6 +3,8 @@ name: 174 pre-existing pillar-boundary violations — backlog cleanup sprint
 description: M5 Task 16 audit surfaced 174 cross-pillar import violations in elohim-app; ESLint rule is currently warn-level; they need a dedicated cleanup sprint
 type: project
 originSessionId: 4d20bf7b-4639-43d8-ad10-fccb514a7f0a
+cites:
+  - genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md
 ---
 **Discovery (2026-04-25, M5 Task 16):** When `eslint-plugin-boundaries` was added to elohim-app to enforce composability per `project_elohim_app_as_composable_view_federation`, the audit found **174 pre-existing cross-pillar import violations** spanning every pillar.
 

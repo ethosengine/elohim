@@ -1,3 +1,7 @@
+---
+status: Design
+---
+
 # Durability, Topology & Felt Resilience — the Origin Half
 
 > **Status:** Vision / design note (companion to `2026-05-29-epr-reachability-economics.md`).

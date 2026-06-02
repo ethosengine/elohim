@@ -3,6 +3,8 @@ name: dev branch is integration target — no PR needed for batch merges
 description: dev IS the development branch in this project; merging feature branches to dev locally is the norm, not bypassing review
 type: feedback
 originSessionId: f89e70a8-12f4-4fbc-a7c5-589cce37e5b0
+cites:
+  - CLAUDE.md
 ---
 When merging feature branches (e.g. `feature/epr-phase-2b-batch-a`) into `dev`, do a local merge — do NOT push and create a PR. `dev` is the project's development/integration branch, not the protected default. PR review happens at `dev → main`, not at `feature → dev`.
 

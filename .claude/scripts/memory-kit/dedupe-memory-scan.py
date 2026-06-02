@@ -28,8 +28,20 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-MEMORY_ROOT = Path("/projects/.claude-config/projects/-projects-elohim/memory")
+# Bootstrap: locate .claude/scripts/_lib by walking up (see _lib/__init__.py),
+# matching cleanup-scan.py / memory-coherence-audit.py — portable across envs.
+_here = Path(__file__).resolve()
+for _ in range(8):
+    if (_here / ".claude" / "scripts" / "_lib").is_dir() and (_here / ".git").exists():
+        sys.path.insert(0, str(_here / ".claude" / "scripts"))
+        break
+    _here = _here.parent
+from _lib import paths as _paths  # noqa: E402
+
+REPO_ROOT = _paths.repo_root_from_file(__file__)
+# Primary memory location (.claude/memory under repo root) per
+# project_memory_in_repo_two_tier.md. The .claude-config slot is a symlink to it.
+MEMORY_ROOT = _paths.memory_dir(REPO_ROOT)
 TODAY = date.today()
 
 # Small built-in stopword list — common English glue and a few markdown noise words.
@@ -237,7 +249,9 @@ def cluster_pairs(
                 top_terms=top_terms,
             )
         )
-    clusters.sort(key=lambda c: -c.similarity)
+    # Stable tiebreaker: equal-similarity clusters rank by their lexicographically-first
+    # member slug, so output order is reproducible regardless of union-find internals.
+    clusters.sort(key=lambda c: (-c.similarity, sorted(d.path.stem for d in c.members)[0]))
     return clusters
 
 

@@ -3,6 +3,8 @@ name: Pace multi-agent sprints — don't run cargo tests concurrently across age
 description: When multiple agents work the codebase simultaneously, serialize cargo test runs to protect PVC / disk. Coordinate file scope between agents. Pre/post hooks help manage target dirs but agents can still starve each other.
 type: feedback
 originSessionId: 60007cbf-4a59-4bce-9be7-6e57d1568cf6
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 When orchestrating multi-agent sprints, do NOT launch multiple agents that will run `cargo test` (or any cargo build) concurrently. Even with the shared cargo-target-pool, parallel compilation locks + disk pressure can starve agents and crash builds. The PVC is a shared resource.
 

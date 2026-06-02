@@ -3,6 +3,8 @@ name: Elohim Protocol vision — fruit back on the tree, elohims as best-self gu
 description: Meta-level vision: the protocol enables humanity to restore its agency and flourishing; elohims carry the network's wisest/best-self judgment at machine speed to intervene faster than human networks can against harmful dynamics
 type: project
 originSessionId: a00556ea-66be-405a-985e-1a7a309d43a8
+cites:
+  - genesis/docs/content/elohim-protocol/manifesto.md
 ---
 The Elohim Protocol is not fundamentally a technical platform. It is an attempt to **put the fruit back on the tree** — to restore the conditions under which humanity can flourish in relation to itself and to creation. The technical design serves a metaphysical mission.
 

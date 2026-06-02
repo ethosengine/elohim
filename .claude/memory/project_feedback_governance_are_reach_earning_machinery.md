@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 02a31f41-5f1f-4600-9d3f-7d0c9a341c9c
+cites:
+  - elohim/sdk/CLAUDE.md
 ---
 
 The informal/nascent reason **every EPR needs feedback and governance** (surfaced 2026-05-30 while fixing the manifesto reach mis-grade): they are the apparatus by which **reach is earned rather than asserted**.

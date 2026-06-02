@@ -21,6 +21,51 @@ A fourth subagent — the **storyteller** ([`.claude/agents/storyteller.md`](../
 
 During disposition triage (the librarian's hygiene-sweep hands archive candidates to the storyteller — see the storyteller agent's "Disposition triage" section), the storyteller produces a graduate/memorialize/hold decision that the cartographer can fold into the next-actions menu.
 
+## State & Coherence Tooling — the deterministic memory-stasis kit (2026-06)
+
+A second toolkit sits alongside the hygiene scripts: a **deterministic (no-LLM) state machine** over the doc +
+memory surfaces, governed by the placement contract at **`genesis/docs/PLACEMENT.md`**. It exists so every file
+is instantly auditable for *position + state*, and so the surface trends toward **stasis** — equilibrium:
+pressure dirs empty, no dumps, every artifact has a next state.
+
+| Tool | What it gives you |
+|---|---|
+| `placement-audit.py` | scoreboard + `--ledger` (the BUDGET: every file → position + state + next-action) + `--focus` (currently-testable surface from cluster-state) + `--headline` (the SessionStart budget line) + structural anti-dump check |
+| `spec-coherence-index.py [--query "<topic>"]` | deterministic prior-art index (token overlap) → "have we spec'd this?" so you compose from canonical instead of re-speccing |
+| `decompose.py <doc>` | spec/plan → bounded, cited gap-items (OPEN = implement, CLAIMED = verify) — the gap budget |
+| `state-machine-gen.py` | regenerates the `genesis/docs/_state/<state>/` pressure-dir CLAUDE.md gates (blockers / regression / unverified / needs-triage) |
+| `prep-brainstorm.py "<topic>"` | the `/brainstorm` pre-step preload (prior-art + focus + budget) |
+| `genesis/manifests/cluster-state.yaml` | the env-reality input — flip a node/cluster/registry → `--focus` scope cascades |
+
+The lifecycle, the four verification states (VERIFIED-STABLE / CLAIMED-ONLY / REGRESSED / BLOCKED-BY-ENV), the
+feedback graph (regression *warms* a doc; env-unavailable *holds* it), and the home taxonomy (CANONICAL /
+HISTORY / ACTIVE + pressure dirs) all live in `genesis/docs/PLACEMENT.md`. Read it once.
+
+### Gotchas (hard-won — do not relearn the expensive way)
+
+- **A "landed" / checkbox / ✅ claim is NOT done.** Checkboxes lie (the iroh delivery-master showed every gate
+  ✅ while CI held landing commits for *unrun soaks*). "Done" is EARNED by the verification gate
+  (ci-investigator / CI / soak), never self-asserted. Treat `status: landed`-without-evidence as CLAIMED.
+- **Env-unavailable ≠ regression.** A node/cluster/registry down is `BLOCKED-BY-ENV` — *held, not broken* (a
+  partial cluster is the steady state). It must NOT fire a regression cascade. Only *red on an available env*
+  is a regression. Update `cluster-state.yaml`; scope cascades; no false alarm.
+- **No dumping grounds, anywhere.** Runaway docs, runaway directory trees (no `blocked-by-env/shem/…` nesting —
+  reason goes inline), and growing archives are all debt. `_retired/` holds ONLY verified-stable work. The
+  pressure dirs are MEANT to be empty.
+- **Don't archive trash.** mem-palace ingestion is a deliberate graduation act (landed-canonical +
+  distilled-history only); raw/abandoned/superseded is never embedded. Coherence comes from the cheap
+  deterministic floor, not from mining everything.
+- **Compose, don't fork.** Run `spec-coherence-index.py --query` before proposing — extend canonical; revive
+  nothing superseded (read its history gotcha first).
+
+### Your mandate (broad — you decide the how)
+
+You own a slice of this surface (past / present / future / meaning). **Use these tools to drive your domain
+toward memory stasis** — fewer no-status orphans, fewer unlinked memory entries, claims verified or moved to
+regression, dead paths distilled to history, pressure dirs empty. The budget (`placement-audit.py --ledger`)
+is your scoreboard; the debt numbers must fall. *How* you get there is your judgment — these are instruments,
+not a script.
+
 ## Architecture
 
 ```

@@ -3,6 +3,8 @@ name: Doorway as full-blown web2 facilitator (SPA host + projection + SSR + ingr
 description: Future sprint candidate — extend doorway to absorb the SPA-host role currently held by elohim-site, so every doorway is a complete web2 projection of its substrate (not split across separate static-site pod + ingress rules + cache layer)
 type: project
 originSessionId: 2a998ad1-49e1-4f9d-a4ca-0cb796181cbf
+cites:
+  - genesis/orchestrator/manifests/elohim-app/alpha/ingress.yaml
 ---
 Direction surfaced 2026-05-08 during /deliver of doorway-ssr-runtime: the alpha ingress had to gain explicit `/lamad/concept`, `/lamad/path` rules to keep them reaching doorway and not falling through to the static SPA pod. That's a routing concern that the source-of-truth (storage's `build_manifest()` with `render: "angular-ssr"` annotations) already declares — but the ingress can't introspect it.
 

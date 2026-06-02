@@ -3,6 +3,8 @@ name: DePIN contracts are policy (DHT); libp2p is mechanism
 description: Stewardship contracts between family/remote-family peers are DHT-notarized (REA commitments); libp2p dataplane operates within those contract bounds
 type: project
 originSessionId: 17546f03-3ee8-4704-bdf9-18d0d64baf9b
+cites:
+  - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
 ---
 DePIN-style contracts for stewarded compute and storage between family and remote-family peers are DHT-notarized. The libp2p dataplane (shard distribution, verification, reconstruction) operates **within** the bounds those contracts establish.
 

@@ -3,6 +3,8 @@ name: Standing composes from multiple evidence streams
 description: Standing is not just FeedbackSignal-derived debits; imagodei profile/psyche instruments + lamad emergent traits feed the same projection. Manifests declare which streams compose.
 type: project
 originSessionId: 42abe5eb-4a48-4a2a-8142-604a4c7a1bd3
+cites:
+  - elohim/elohim-storage/src/services/reach_earning.rs
 ---
 Standing as a derived view should compose from MULTIPLE evidence streams, not only FeedbackSignal-debit accumulation. The legitimate on-ramp out of `Standing::Unknown` is:
 

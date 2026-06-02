@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - 2026-05-18-app-manifest-modularization.md   # the related doc this derives from
+---
+
 # Structural Refactor Sprint — Compilation Boundaries + SDK Cleanup
 
 > ## 📦 SUPERSEDED 2026-05-18

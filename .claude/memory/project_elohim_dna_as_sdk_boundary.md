@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ca911629-dfdd-46f5-8bb1-e936364bea8e
+cites:
+  - genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md
 ---
 
 elohim DNA is the **protocol-core API/SDK boundary** — `Content` entries, attestations, governance-actions, the consolidated coordinator pattern. lamad is **one implementation** of that contract (the LMS pillar). Other implementations exist (imagodei, mishpat, infrastructure pillar manifests) or could exist — each declares "I implement contract X from elohim DNA."

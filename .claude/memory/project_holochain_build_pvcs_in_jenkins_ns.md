@@ -3,6 +3,8 @@ name: Holochain build PVCs live in `jenkins` namespace
 description: nix-cache-holochain, cargo-cache-holochain, sweettest-target-cache-holochain all in jenkins ns; ethosengine ns has zero of these
 type: project
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
+cites:
+  - genesis/manifests/nix-cache-pvc.yaml
 ---
 The three persistent caches consumed by the elohim-holochain/dev pipeline live in `namespace: jenkins`:
 

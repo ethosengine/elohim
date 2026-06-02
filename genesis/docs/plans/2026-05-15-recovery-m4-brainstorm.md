@@ -1,3 +1,9 @@
+---
+status: brainstorm   # D1–D4 decision outcomes — planning input for the M4 completion plan
+related:
+  - 2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt.md   # the completion plan these brainstorm decisions feed
+---
+
 # Recovery M4 — D1–D4 Brainstorm Outcomes
 
 **Date:** 2026-05-15

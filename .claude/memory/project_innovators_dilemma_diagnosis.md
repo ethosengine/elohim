@@ -3,6 +3,8 @@ name: Innovator's dilemma diagnosis — why people of influence don't answer the
 description: Pitch frame and theory of why shelter-bench-grade questions go structurally unanswered by people with influence. Wild success creates intellectual sunk costs.
 type: project
 originSessionId: 8e5ca156-4c16-43dc-99f2-3f117c53cc4f
+cites:
+  - genesis/docs/content/elohim-protocol/manifesto.md
 ---
 The question Hank asked in his shelter-bench video — "will AI allow wisdom to flourish, or let the powerful route around wisdom?" — is widely held, rarely answered. The diagnosis: **wild success creates intellectual sunk costs**. People whose value has come from operating well inside current systems cannot easily imagine systems that don't extend their success. The innovator's dilemma applied to social architecture, not just product strategy.
 

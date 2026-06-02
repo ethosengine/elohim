@@ -1,3 +1,9 @@
+---
+status: Draft
+related:
+  - ../superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md   # the Qahal DHT design spec this plan authors as substrate groundwork
+---
+
 # Viewer.* Symmetry + Reciprocity + Qahal Substrate Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

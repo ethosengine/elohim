@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Qahal MVP Roadmap
 
 > **For agentic workers:** This is a **roadmap-tier** document, not a task-level plan. It maps the path from architectural vision to MVP landing across multiple sprints, with explicit brainstorming checkpoints between sprints. Each sprint produces its own brainstorm → spec → task plan trio at the location named in that sprint's section.

@@ -3,6 +3,8 @@ name: Redeploy the substrate — capture-resistance as inversion
 description: Pitch frame — the powerful built AI to control; the same tools redeployed on edge/P2P hardware become the means of escape. Capture-resistance is structural, not policy.
 type: project
 originSessionId: 8e5ca156-4c16-43dc-99f2-3f117c53cc4f
+cites:
+  - genesis/docs/content/elohim-protocol/manifesto.md
 ---
 The powerful are building AI on hyperscale clouds, primed by the actors who already control resources, intended to point AI *at* people. The same fundamental tools — open model weights, commodity hardware, the inference substrate itself — can be redeployed:
 

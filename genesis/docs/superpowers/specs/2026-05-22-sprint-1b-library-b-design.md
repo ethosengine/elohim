@@ -1,3 +1,7 @@
+---
+status: Design
+---
+
 # Sprint 1B Design — Library B Pattern Stories for the Qahal Homepage
 
 **Date:** 2026-05-22

@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../../content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md   # the design spec this plan implements
+---
+
 # Multi-Collective Collaboration EPR — M1 Implementation Plan (T0 Collab End-to-End)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

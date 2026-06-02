@@ -4,6 +4,8 @@ description: "The full chain that makes / and /lamad serve via projected-EPR bun
 metadata:
   node_type: memory
   type: project
+cites:
+  - .claude/shifts/2026-05-30T03-15-landing-pages-both-doorways.sprint-result.md
 ---
 
 How `/` (landing) and `/lamad` (Lamad LMS) actually load on a doorway, and the failure

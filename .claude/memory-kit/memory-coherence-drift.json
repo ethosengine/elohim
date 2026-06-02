@@ -5,6 +5,291 @@
       "hits": 1,
       "last_changed": "genesis/docs/architecture/rea-compute-commitment-primitive.md",
       "last_signal_at": "2026-05-28T19:15:45Z"
+    },
+    "project_memory_cites_edge": {
+      "hits": 4,
+      "last_changed": ".claude/scripts/memory-kit/memory-coherence-audit.py",
+      "last_signal_at": "2026-06-01T18:03:32Z"
+    },
+    "project_shem_is_p2p_live_canvas": {
+      "hits": 1,
+      "last_changed": "genesis/docs/content/elohim-protocol/history/2026-04-19-d1-through-d5-node-and-household-canon.md",
+      "last_signal_at": "2026-06-01T23:41:15Z"
+    },
+    "project_dissolution_principle_sensemaking_collectives": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md",
+      "last_signal_at": "2026-06-01T23:42:55Z"
+    },
+    "project_canonical_wire_shape_newtype_pattern": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md",
+      "last_signal_at": "2026-06-01T23:43:02Z"
+    },
+    "project_substrate_floor_elohim_ceiling": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md",
+      "last_signal_at": "2026-06-01T23:43:02Z"
+    },
+    "project_node_metrics_vs_hub_aggregation_boundary": {
+      "hits": 4,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md",
+      "last_signal_at": "2026-06-02T04:40:17Z"
+    },
+    "project_storage_as_pod_operator_sets_virtual_limits": {
+      "hits": 4,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md",
+      "last_signal_at": "2026-06-02T04:40:17Z"
+    },
+    "project_household_horizontal_scaling": {
+      "hits": 4,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md",
+      "last_signal_at": "2026-06-02T04:40:17Z"
+    },
+    "project_elohim_node_role": {
+      "hits": 4,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md",
+      "last_signal_at": "2026-06-02T04:40:17Z"
+    },
+    "project_elohim_hub_elevation": {
+      "hits": 4,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md",
+      "last_signal_at": "2026-06-02T04:40:17Z"
+    },
+    "project_doorway_hub_sister_brother": {
+      "hits": 4,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md",
+      "last_signal_at": "2026-06-02T04:40:17Z"
+    },
+    "project_hub_optional_floor": {
+      "hits": 4,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md",
+      "last_signal_at": "2026-06-02T04:40:17Z"
+    },
+    "project_avodah_pillar": {
+      "hits": 1,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md",
+      "last_signal_at": "2026-06-01T23:45:25Z"
+    },
+    "project_epr_substrate_vs_vf_graphql": {
+      "hits": 1,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md",
+      "last_signal_at": "2026-06-01T23:45:25Z"
+    },
+    "project_first_class_graph_pattern": {
+      "hits": 1,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md",
+      "last_signal_at": "2026-06-01T23:45:25Z"
+    },
+    "project_iroh_phase11_all_backends_wired": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md",
+      "last_signal_at": "2026-06-01T23:59:40Z"
+    },
+    "project_epr2b_recovery_m4_convergence": {
+      "hits": 1,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md",
+      "last_signal_at": "2026-06-02T00:07:27Z"
+    },
+    "project_t6_legacy_revocation_path_retired": {
+      "hits": 1,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md",
+      "last_signal_at": "2026-06-02T00:07:27Z"
+    },
+    "project_multi_doorway_human_registration": {
+      "hits": 1,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md",
+      "last_signal_at": "2026-06-02T00:07:36Z"
+    },
+    "project_p2p_is_hosting": {
+      "hits": 1,
+      "last_changed": "genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md",
+      "last_signal_at": "2026-06-02T00:07:36Z"
+    },
+    "feedback_no_hebrew_pillar_names_in_narrative": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/specs/2026-05-22-qahal-homepage-ux-design.md",
+      "last_signal_at": "2026-06-02T00:08:00Z"
+    },
+    "project_elohim_dna_as_sdk_boundary": {
+      "hits": 1,
+      "last_changed": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md",
+      "last_signal_at": "2026-06-02T00:16:13Z"
+    },
+    "project_orchestrator_build_tag_syntax": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md",
+      "last_signal_at": "2026-06-02T00:17:10Z"
+    },
+    "project_agentic_loop_economics": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md",
+      "last_signal_at": "2026-06-02T00:17:41Z"
+    },
+    "project_reach_earned_genesis_seeder_grades_homework": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md",
+      "last_signal_at": "2026-06-02T00:17:56Z"
+    },
+    "feedback_haiku_observe_only_no_specifics": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md",
+      "last_signal_at": "2026-06-02T00:18:04Z"
+    },
+    "project_lit_wc_pivot_design_for_generation": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/specs/2026-05-08-ssr-capability-design.md",
+      "last_signal_at": "2026-06-02T00:18:11Z"
+    },
+    "project_qahal_collective_view_slide45_reference": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md",
+      "last_signal_at": "2026-06-02T00:18:20Z"
+    },
+    "project_social_compute_collective_is_stewardship_unit": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md",
+      "last_signal_at": "2026-06-02T00:18:20Z"
+    },
+    "project_qahal_graduated_capability_surface": {
+      "hits": 1,
+      "last_changed": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md",
+      "last_signal_at": "2026-06-02T00:18:20Z"
+    },
+    "feedback_research_before_brainstorming": {
+      "hits": 3,
+      "last_changed": ".claude/commands/brainstorm.md",
+      "last_signal_at": "2026-06-02T04:28:33Z"
+    },
+    "feedback_spare_no_expense_intelligence": {
+      "hits": 3,
+      "last_changed": ".claude/commands/brainstorm.md",
+      "last_signal_at": "2026-06-02T04:28:33Z"
+    },
+    "feedback_design_for_a_generation_no_shortcuts": {
+      "hits": 3,
+      "last_changed": ".claude/commands/brainstorm.md",
+      "last_signal_at": "2026-06-02T04:28:33Z"
+    },
+    "feedback_subagent_no_git_stash": {
+      "hits": 2,
+      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
+      "last_signal_at": "2026-06-02T04:29:13Z"
+    },
+    "feedback_no_generalize_permissions_in_shift": {
+      "hits": 3,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-02T04:29:29Z"
+    },
+    "feedback_shift_integration_iteration_mode": {
+      "hits": 2,
+      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
+      "last_signal_at": "2026-06-02T04:29:13Z"
+    },
+    "feedback_subagent_scope_guardrails": {
+      "hits": 2,
+      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
+      "last_signal_at": "2026-06-02T04:29:13Z"
+    },
+    "feedback_haiku_needs_compiler_ready_scaffold": {
+      "hits": 2,
+      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
+      "last_signal_at": "2026-06-02T04:29:13Z"
+    },
+    "project_historian_pattern_surface_agent": {
+      "hits": 1,
+      "last_changed": ".claude/agents/historian.md",
+      "last_signal_at": "2026-06-02T04:28:56Z"
+    },
+    "feedback_commit_attribution_parallel_agent_leak": {
+      "hits": 1,
+      "last_changed": ".claude/agents/librarian.md",
+      "last_signal_at": "2026-06-02T04:29:15Z"
+    },
+    "feedback_agent_prompts_no_process_status": {
+      "hits": 1,
+      "last_changed": ".claude/agents/librarian.md",
+      "last_signal_at": "2026-06-02T04:29:15Z"
+    },
+    "feedback_no_false_opposition_rhetoric": {
+      "hits": 1,
+      "last_changed": ".claude/agents/storyteller.md",
+      "last_signal_at": "2026-06-02T04:29:27Z"
+    },
+    "feedback_a2o_narrative_is_opus_work": {
+      "hits": 1,
+      "last_changed": ".claude/agents/storyteller.md",
+      "last_signal_at": "2026-06-02T04:29:27Z"
+    },
+    "project_forgetting_as_design": {
+      "hits": 1,
+      "last_changed": ".claude/agents/storyteller.md",
+      "last_signal_at": "2026-06-02T04:29:27Z"
+    },
+    "feedback_less_pushy_notifications": {
+      "hits": 1,
+      "last_changed": ".claude/agents/storyteller.md",
+      "last_signal_at": "2026-06-02T04:29:27Z"
+    },
+    "feedback_inline_summary_must_echo_frontmatter": {
+      "hits": 1,
+      "last_changed": ".claude/agents/storyteller.md",
+      "last_signal_at": "2026-06-02T04:29:27Z"
+    },
+    "feedback_pipeline_work_separate_from_sprint": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-02T04:29:29Z"
+    },
+    "feedback_cargo_nextest_installed": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-02T04:29:29Z"
+    },
+    "feedback_jenkins_token_strictly_guarded": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-02T04:29:29Z"
+    },
+    "feedback_shells_need_timeouts": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-02T04:29:29Z"
+    },
+    "feedback_shift_can_fix_unparseable_test_fixtures": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-02T04:29:29Z"
+    },
+    "feedback_pause_sprint_when_substrate_in_flight": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-02T04:29:29Z"
+    },
+    "feedback_overnight_shift_jenkins_is_workhorse": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-02T04:29:29Z"
+    },
+    "feedback_agent_framing": {
+      "hits": 1,
+      "last_changed": ".claude/agents/cartographer.md",
+      "last_signal_at": "2026-06-02T04:29:54Z"
+    },
+    "feedback_cargo_resolution_vs_compilation": {
+      "hits": 3,
+      "last_changed": "CLAUDE.md",
+      "last_signal_at": "2026-06-02T04:47:08Z"
+    },
+    "feedback_dev_branch_no_pr": {
+      "hits": 3,
+      "last_changed": "CLAUDE.md",
+      "last_signal_at": "2026-06-02T04:47:08Z"
+    },
+    "project_graduated_recovery_authority": {
+      "hits": 1,
+      "last_changed": "genesis/docs/architecture/cradle-to-grave-capability-gradient.md",
+      "last_signal_at": "2026-06-02T04:40:35Z"
     }
   }
 }

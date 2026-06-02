@@ -1,19 +1,39 @@
 {
-  "generated_at": "2026-05-14T18:53:39.996664+00:00",
+  "generated_at": "2026-06-01",
   "totals": {
     "stable": 0,
     "active.latest-stable": 0,
     "active.beta": 0,
     "active.alpha": 0,
     "wip": 1,
-    "refined": 1,
-    "backlog": 7,
-    "envisioned": 0,
-    "unknown": 1,
-    "undelivered": 1,
+    "refined": 10,
+    "backlog": 10,
+    "envisioned": 4,
+    "unknown": 3,
+    "undelivered": 5,
     "regression": 0
   },
   "stories": [
+    {
+      "slug": "gertrude-logs-in-with-help-from-her-people",
+      "path": "/projects/elohim/genesis/data/stories/gertrude-grandma--as-account-claimant--social-recovery-with-help-from-family.md",
+      "author_status": "draft",
+      "delivery_status": "undelivered",
+      "delivery_status_updated": "2026-05-18",
+      "delivery_status_source": "deliver-bridge-floor",
+      "declared_feature": "social-recovery-with-help-from-family",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "gertrude-holds-the-share",
+      "path": "/projects/elohim/genesis/data/stories/gertrude-grandma--as-recovery-counterparty--backup-stewardship-for-household-dowell.md",
+      "author_status": "draft",
+      "delivery_status": "undelivered",
+      "delivery_status_updated": "2026-05-18",
+      "delivery_status_source": "deliver-bridge-floor",
+      "declared_feature": "backup-stewardship-for-household-dowell",
+      "feature_file_exists": false
+    },
     {
       "slug": "james-and-the-spoke",
       "path": "/projects/elohim/genesis/data/stories/james-and-the-spoke.md",
@@ -33,6 +53,26 @@
       "delivery_status_source": "deliver-bridge-floor",
       "declared_feature": "stewarded-device-sync",
       "feature_file_exists": false
+    },
+    {
+      "slug": "the-dowells-hold-gertrudes-share",
+      "path": "/projects/elohim/genesis/data/stories/matthew-manager--as-recovery-counterparty--backup-stewardship-for-household-gertrude.md",
+      "author_status": "draft",
+      "delivery_status": "undelivered",
+      "delivery_status_updated": "2026-05-18",
+      "delivery_status_source": "deliver-bridge-floor",
+      "declared_feature": "backup-stewardship-for-household-gertrude",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "the-coop-decides",
+      "path": "/projects/elohim/genesis/data/stories/terrance-tutor--as-collective-steward--coop-decides.md",
+      "author_status": "canonical",
+      "delivery_status": "undelivered",
+      "delivery_status_updated": "",
+      "delivery_status_source": "ceremony-direct-author",
+      "declared_feature": "collective-governance",
+      "feature_file_exists": true
     }
   ],
   "backlog": [
@@ -48,6 +88,77 @@
       "legacy_status_translated_from": "proposed"
     },
     {
+      "slug": "audit-substrate-coverage-and-drift-fidelity",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/audit-substrate-coverage-and-drift-fidelity.md",
+      "author_status": "",
+      "delivery_status": "envisioned",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "canonical-stories-against-spec-audit",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/canonical-stories-against-spec-audit.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "claude-md-gospel-edit-run5",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/claude-md-gospel-edit-run5.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "claude-md-substrate-sweep-and-budget-trim",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/claude-md-substrate-sweep-and-budget-trim.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "cleanup-scan-cascade-investigation",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/cleanup-scan-cascade-investigation.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "cleanup-scan-disposition-mechanization",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/cleanup-scan-disposition-mechanization.md",
+      "author_status": "",
+      "delivery_status": "envisioned",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "cleanup-scan-disposition-taxonomy",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/cleanup-scan-disposition-taxonomy.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "codegen-prettier-pin-pre-emption",
       "path": "/projects/elohim/genesis/data/timeline/backlog/codegen-prettier-pin-pre-emption.md",
       "author_status": "",
@@ -59,6 +170,37 @@
       "legacy_status_translated_from": "proposed"
     },
     {
+      "slug": "collective-governance-canonical-story",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/collective-governance-canonical-story.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "cross-dna-role-name-and-contract-enforcement",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/cross-dna-role-name-and-contract-enforcement.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "missing_delivery_status"
+    },
+    {
+      "slug": "cross-dna-role-name-refactor",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/cross-dna-role-name-refactor.md",
+      "author_status": "",
+      "delivery_status": "envisioned",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "fix-audit-script-discovery",
       "path": "/projects/elohim/genesis/data/timeline/backlog/fix-audit-script-discovery.md",
       "author_status": "",
@@ -68,6 +210,27 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "legacy_status_translated_from": "ready"
+    },
+    {
+      "slug": "lifecycle-md-retired-class-and-source-enum",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/lifecycle-md-retired-class-and-source-enum.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "lift-wip-revocation-self-full-recovery",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/lift-wip-revocation-self-full-recovery.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "missing_delivery_status"
     },
     {
       "slug": "memory-md-size-discipline",
@@ -92,6 +255,17 @@
       "legacy_status_translated_from": "proposed"
     },
     {
+      "slug": "operationalize-disposition-triage",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/operationalize-disposition-triage.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
+    },
+    {
       "slug": "persona-rename-canonical-flip",
       "path": "/projects/elohim/genesis/data/timeline/backlog/persona-rename-canonical-flip.md",
       "author_status": "",
@@ -101,6 +275,26 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "legacy_status_translated_from": "in-progress"
+    },
+    {
+      "slug": "second-canonical-story-ssr-capability",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/second-canonical-story-ssr-capability.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "signal-infrastructure-bootstrap",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/signal-infrastructure-bootstrap.md",
+      "author_status": "",
+      "delivery_status": "envisioned",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
     },
     {
       "slug": "skill-catalog-hygiene",
@@ -114,6 +308,16 @@
       "legacy_status_translated_from": "proposed"
     },
     {
+      "slug": "skill-overlap-memory-ceremony-disambiguation",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/skill-overlap-memory-ceremony-disambiguation.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "stage-g-todo-disclosure-discipline",
       "path": "/projects/elohim/genesis/data/timeline/backlog/stage-g-todo-disclosure-discipline.md",
       "author_status": "",
@@ -125,6 +329,16 @@
       "legacy_status_translated_from": "proposed"
     },
     {
+      "slug": "stewarded-device-sync-feature-authoring",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/stewarded-device-sync-feature-authoring.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "story-memory-team-came-online",
       "path": "/projects/elohim/genesis/data/timeline/backlog/story-memory-team-came-online.md",
       "author_status": "",
@@ -134,12 +348,26 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "storyteller-coverage-sprint",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/storyteller-coverage-sprint.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
     }
   ],
   "pickup_queue_for_deliver": [
     {
       "slug": "james-and-the-spoke",
       "reason": "delivery_status=undelivered ; feature_file_missing:stewarded-device-sync.feature"
+    },
+    {
+      "slug": "the-coop-decides",
+      "reason": "delivery_status=undelivered ; feature_file_present:collective-governance.feature"
     }
   ]
 }

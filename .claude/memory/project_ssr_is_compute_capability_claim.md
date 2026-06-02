@@ -3,6 +3,8 @@ name: SSR is a compute-shape capability claim, not a deployment detail
 description: A doorway with SSR enabled makes a real compute claim (V8 + bundle + render CPU); should be feature-gated locally and advertised through peer compute-reporting so peers can match SSR-eligible content to SSR-capable doorways
 type: project
 originSessionId: cf962313-d70a-459d-acb7-925c8f19e9e1
+cites:
+  - .claude/shifts/doorway-ssr-deliver-2026-05-07T23-37/brainstorm-prompt-followup.md
 ---
 A doorway running server-side rendering is materially different from one that doesn't: ~200MB cold-start working set parsing the 51MB Angular bundle, per-render CPU cost, V8 isolate maintained per replica. Today (2026-05-08) every alpha doorway carries the runtime regardless of whether the operator opted in, and the substrate has no way to know which peers' doorways can SSR which content.
 

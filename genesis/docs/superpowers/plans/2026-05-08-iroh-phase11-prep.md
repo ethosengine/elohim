@@ -1,7 +1,8 @@
 ---
 title: iroh Phase 11 Cutover — Pre-Cutover Prep
-status: design-only
+status: Design
 created: 2026-05-08
+canonical: ../../content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
 parent: genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
 related:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md (pending — gates plane scope)

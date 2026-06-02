@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../../content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md   # the design spec this plan implements
+---
+
 # iroh Transport Bench Expansion — Multi-Plane Head-to-Head
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

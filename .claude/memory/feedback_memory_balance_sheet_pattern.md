@@ -2,6 +2,8 @@
 name: memory-balance-sheet-pattern
 description: Standing ceremonial artifact — run memory-balance.sh at Wave 0 + Wave 6 of every memory-team ceremony. Persists JSON snapshots so each cycle can be diffed against the prior. Headline metric — Surface:Archive ratio — gives deterministic evidence that distillation is running.
 type: feedback
+cites:
+  - genesis/scripts/memory-balance.sh
 ---
 
 The memory-team ceremony needs a deterministic "are we generating runaway documentation or reaching balance" measurement. Single-snapshot readings (e.g., "MEMORY.md is 28.5KB today") are ambiguous; the meaningful signal is the **delta across cycles**. `genesis/scripts/memory-balance.sh` captures a balance sheet across all tiers (code / gospel / surface-of-comet / working-memory / canonical / archive) and persists JSON + text to `.claude/memory-kit/balance-sheets/<ts>.{json,txt}`. Each run diffs against the most-recent prior snapshot.

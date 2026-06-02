@@ -3,6 +3,8 @@ name: Docker include_str! requires repo path mirroring in COPY
 description: Rust include_str! resolves relative to source file at compile time; Dockerfiles with WORKDIR /app must COPY referenced sibling/parent dirs to matching paths or builds fail with "couldn't read"
 type: feedback
 originSessionId: c423684a-b162-42c6-b5cf-177683da9ed0
+cites:
+  - elohim/elohim-storage/src/services/bootstrap_manifests.rs
 ---
 Rust's `include_str!` and `include_bytes!` resolve their string-literal path at compile time, relative to the source file containing the macro. In Docker builds with `WORKDIR /app + COPY elohim/elohim-storage/src ./src`, a source file at `/app/src/services/foo.rs` calling `include_str!("../../../sdk/schemas/...")` will look for `/sdk/schemas/...` (absolute root of the container) — NOT relative to the build context root.
 

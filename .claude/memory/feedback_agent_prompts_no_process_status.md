@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: ba3b92b8-8e5a-46b4-aa04-6dbcdeab5119
+cites:
+  - .claude/agents/librarian.md
 ---
 
 **Rule**: Agent prompts (`.claude/agents/*.md`), skill prompts (`.claude/skills/*/SKILL.md`), and any gospel-tier always-loaded substrate must not contain process-status phrasing — "Phase N closed", "prereq #1 CLOSED; gates #2–#N remaining", "in-flight graduation work", "next milestone is X", "currently sprinting Y". Describe the architecture and the stable patterns; let memory entries, chronicles, and sprint-results carry the temporal state.

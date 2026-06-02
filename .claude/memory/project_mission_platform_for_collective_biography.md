@@ -4,6 +4,8 @@ description: "Mission-level north-star anchor. The Elohim Protocol is a platform
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/docs/content/elohim-protocol/manifesto.md
 ---
 
 This is a mission-tier entry — re-read before any major design decision when you need to remember what the protocol is **for**.

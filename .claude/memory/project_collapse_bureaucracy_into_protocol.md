@@ -3,6 +3,8 @@ name: Collapse the bureaucracy into the protocol
 description: Reframe of why Elohim's substrate is formal — bureaucracy collapsed into deterministic primitives so the relational layer above can stay informal without rent-seeking gatekeepers
 type: project
 originSessionId: 569f0817-4d95-48ea-b9c1-aef1c4bd2409
+cites:
+  - genesis/docs/content/elohim-protocol/protocol-specification.md
 ---
 The protocol's formal substrate (DNA-notarized validators, schemas, REA commitments, deterministic enforcement) is **bureaucracy collapsed into the protocol itself**, not bureaucracy added on top.
 

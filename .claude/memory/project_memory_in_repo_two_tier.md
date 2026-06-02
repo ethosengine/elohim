@@ -2,6 +2,8 @@
 name: Memory in repo — two-tier storage (project / personal)
 description: Project memory lives in <repo>/.claude/memory/ (team-shareable, git-tracked, PVC-recoverable). The personal slot at .claude-config/projects/<slug>/memory/ is a symlink to the primary, kept as the harness-conventional path. Migrated 2026-05-13.
 type: project
+cites:
+  - .claude/scripts/memory-kit/CLAUDE.md
 ---
 
 Project memory must be **team-shareable and recoverable from git** — a corrupted PVC should not erase the architectural insights, design rationale, and lessons-learned that serve the project's goals. Memory in service of the project goals belongs in the repository.

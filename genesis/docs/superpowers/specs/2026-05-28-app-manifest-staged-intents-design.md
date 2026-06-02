@@ -1,6 +1,26 @@
+---
+status: Substrate LANDED (schema + codegen + tests on disk) — feature HELD on the unbuilt session-bridge consumer
+---
+
 # App-Manifest Staged-Intents & Graduation Vocabulary — Design
 
-> **Status:** Design draft. Surfaces a substrate extension to the app-manifest schema that adds first-class vocabulary for tentative-participation intent shapes and per-pillar graduation policy.
+> **STATUS (compacted-in-place 2026-06-02):** The **substrate LANDED** — the schema extension, the
+> `SessionLifecycleState` enum, the per-pillar codegen, and the validation tests are on disk and validate clean
+> (the truth now lives in the source files, not in this spec; the now-landed how-to sections §6/§7/§11/§12 were
+> stripped — recover from git history if needed).
+>
+> **The FEATURE is HELD, not verified-stable:** **zero pillar manifests declare a `stagedIntent`**, and the
+> **session-bridge consumer crate does not exist** (`crates/session-bridge/` is genuinely live, NOT landed — see
+> `2026-05-28-session-bridge-design.md` + implementation plan). Assert only "substrate landed"; do not claim the
+> staged-intents vocabulary is exercised end-to-end. This spec is **NOT yet an architecture seed** — the consuming
+> primitive is unbuilt, so the vocabulary is not stable enough to graduate to `tier: architecture`.
+>
+> **Silent-failure trap to remember:** ceremony IDs are validated only as **non-empty strings** — a typo passes
+> manifest validation and fails later at graduation-time registry lookup.
+>
+> **Residual open thread (plant the pointer THERE, not here):** the four `SessionLifecycleState` values landing as
+> protocol-core Standings via a §5.1 patch to the Capability-Profile element-contract spec
+> (`2026-05-20-capability-profile-element-contract-design.md`) — verify if landed and plant the confirmation in that spec.
 >
 > **Scope:** This spec covers ONLY the app-manifest substrate extension. The session-bridge primitive itself is specified separately (`genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md`). The runtime `CeremonyRegistry` pattern lives in the bridge crate, not here. The wisdom-invocation batch extension that powers negotiated graduation is a separate spec (deferred).
 >
@@ -270,110 +290,17 @@ Existing manifests without these sections validate unchanged. The validation tes
 
 ---
 
-## §6 — Per-pillar codegen extension
+## §6 — Per-pillar codegen + §7 — Protocol-level codegen integration
 
-### §6.1 — What each pillar's `scripts/codegen.mjs` emits
-
-Per the existing `elohim/sdk/domains/lamad/scripts/codegen.mjs` pattern, each pillar's codegen reads its manifest and emits TypeScript artifacts. The session-bridge implementation plan §1.7 names two new artifacts per pillar:
-
-```
-elohim/sdk/domains/<pillar>/scripts/codegen.mjs
-  ↓ reads vocabulary.stagedIntents + graduation
-  ↓ emits:
-    - staged-intents.ts       — discriminated union + type guards
-    - graduation-policy.ts    — informational runtime-trust constants
-```
-
-### §6.2 — `staged-intents.ts` shape
-
-```typescript
-// auto-generated from elohim/sdk/domains/lamad/manifest.json
-// Source of truth: manifest declaration
-
-import type { StagedMasteryIntent } from './schemas/staged-mastery-intent';
-import type { StagedPathExploredIntent } from './schemas/staged-path-explored-intent';
-
-export type LamadStagedIntent =
-  | { kind: 'staged-mastery-intent'; payload: StagedMasteryIntent }
-  | { kind: 'staged-path-explored-intent'; payload: StagedPathExploredIntent };
-
-export function isStagedMasteryIntent(
-  intent: LamadStagedIntent
-): intent is { kind: 'staged-mastery-intent'; payload: StagedMasteryIntent } {
-  return intent.kind === 'staged-mastery-intent';
-}
-
-export function isStagedPathExploredIntent(
-  intent: LamadStagedIntent
-): intent is { kind: 'staged-path-explored-intent'; payload: StagedPathExploredIntent } {
-  return intent.kind === 'staged-path-explored-intent';
-}
-
-// Per-intent metadata read from the manifest (runtime-trust constants)
-export const LAMAD_STAGED_INTENT_METADATA = {
-  'staged-mastery-intent': {
-    graduatesTo: 'ContentMastery',
-    actionableFrom: ['OauthIdentified', 'PeerNativeSampling', 'PeerNativeMember'] as const,
-    resolutionMode: 'deterministic' as const,
-  },
-  'staged-path-explored-intent': {
-    graduatesTo: 'HumanProgress',
-    actionableFrom: ['OauthIdentified', 'PeerNativeSampling', 'PeerNativeMember'] as const,
-    resolutionMode: 'deterministic' as const,
-  },
-} as const;
-```
-
-### §6.3 — `graduation-policy.ts` shape
-
-```typescript
-// auto-generated from elohim/sdk/domains/lamad/manifest.json
-// Source of truth: manifest declaration
-
-export const LAMAD_GRADUATION_POLICY = {
-  deterministicCeremony: 'lamad::DeterministicMasteryAndPathCeremony',
-  negotiatedCeremony: null,
-  framingCid: null,
-  appraisalAgent: 'home-elohim' as const,
-  notarizeAppraisal: 'on-request' as const,
-} as const;
-```
-
-### §6.4 — Distribution
-
-Same `GENERATED_OUTPUT_DIRS` pattern as existing per-pillar codegen: Angular app's pillar-local generated dir + seeder + library. The session-bridge implementation plan §1.7 adds a fifth: `@elohim/identity`'s `generated/` directory, so `VisitorSessionService` consumes the discriminated unions natively.
-
-### §6.5 — Empty-section behavior
-
-If a pillar's manifest has no `stagedIntents` (e.g., mishpat per the implementation plan), codegen emits no `staged-intents.ts` / `graduation-policy.ts` for that pillar. Downstream consumers (the bridge's pillar-discriminator router) skip pillars without these artifacts.
+> **Compacted-in-place 2026-06-02.** These two sections described now-LANDED codegen wiring; the truth lives on disk:
+> per-pillar `staged-intents.ts` + `graduation-policy.ts` emitted from `elohim/sdk/domains/<pillar>/scripts/codegen.mjs`;
+> the `SessionLifecycleState` enum + bridge wire types in the protocol enum/INTERFACE_FILES codegen path
+> (`elohim/sdk/schemas/scripts/codegen-ts.mjs`), distributed to the standard four locations plus
+> `@elohim/identity/generated/`; the schema-contract assertion in `elohim/elohim-storage/tests/schema_contract.rs`.
+> Recover the original how-to from git history if a re-derivation is ever needed.
 
 ---
 
-## §7 — Protocol-level codegen integration
-
-### §7.1 — New `INTERFACE_FILES` entries
-
-The session-bridge wire types — produced by the bridge's own JSON schemas (not authored here; authored as part of the session-bridge crate's schemas) — get added to `elohim/sdk/schemas/scripts/codegen-ts.mjs:INTERFACE_FILES`:
-
-```
-session-lifecycle.ts
-staged-intent-envelope.ts
-graduation-offer.ts
-graduation-manifest.ts
-stage-receipt.ts
-```
-
-These distribute to the standard locations plus the new `@elohim/identity` generated dir.
-
-### §7.2 — New enum
-
-`SessionLifecycleState` (per §4) is added to the protocol enum codegen path so `CORE_SESSION_LIFECYCLE_STATES`, `ALL_SESSION_LIFECYCLE_STATES`, and the `SessionLifecycleState` type alias ship as part of `schema-enums.ts`.
-
-### §7.3 — Schema-contract test
-
-`elohim/elohim-storage/tests/schema_contract.rs` adds an assertion that the Rust types backing the new bridge wire shapes match the JSON schemas. The session-bridge crate's `lib.rs` exposes the relevant types with `#[serde(rename_all = "camelCase")]` + `#[derive(TS)]` per the existing pattern.
-
----
 
 ## §8 — Per-pillar manifest examples
 
@@ -586,52 +513,14 @@ The spec defines `"either"` as "bridge tries deterministic first; falls back to 
 
 ---
 
-## §11 — Test surface
+## §11 — Test surface + §12 — Implementation deltas
 
-### §11.1 — Schema-validation tests
-
-New assertions added to `elohim/sdk/schemas/scripts/test-schema.mjs`:
-1. Manifest with `stagedIntents` validates clean (positive case).
-2. Manifest without `stagedIntents` validates clean (backward-compat).
-3. Manifest with `stagedIntents` but missing top-level `graduation` fails (conditional validation).
-4. `stagedIntents` entry missing `graduatesTo` fails.
-5. `stagedIntents` entry with `actionableFrom` containing an invalid lifecycle value fails.
-6. `graduation.deterministicCeremony` empty string fails.
-7. `graduation.framingCid` malformed CID fails.
-
-### §11.2 — Codegen tests
-
-New assertions added to per-pillar codegen test suites (`elohim/sdk/domains/<pillar>/scripts/test-codegen.mjs` if it exists, otherwise added):
-1. `staged-intents.ts` generated when `stagedIntents` section present.
-2. Generated discriminated union matches manifest entries.
-3. Generated type guards work as expected.
-4. `graduation-policy.ts` generated and matches manifest.
-
-### §11.3 — Backward-compat tests
-
-The existing per-pillar manifest validation tests are extended to confirm:
-1. Lamad manifest (after adding stagedIntents) still passes all existing assertions.
-2. Imagodei, qahal, shefa same.
-3. Mishpat manifest (no change) still passes.
-
----
-
-## §12 — Implementation surface (deltas to existing files)
-
-| File | Change |
-|---|---|
-| `elohim/sdk/schemas/v1/manifest/app-manifest.schema.json` | Add `vocabulary.stagedIntents`, top-level `graduation`, `$defs/StagedIntentDeclaration`, `$defs/GraduationPolicy`, `dependentRequired` rule per §5.4 |
-| `elohim/sdk/schemas/v1/enums/session-lifecycle-state.schema.json` | NEW — per §4.1 |
-| `elohim/sdk/schemas/scripts/codegen-ts.mjs` | Add new bridge wire types to `INTERFACE_FILES`; add new enum to enum-codegen path; add new distribution dir for `@elohim/identity/generated/` |
-| `elohim/sdk/schemas/scripts/test-schema.mjs` | Seven new assertions per §11.1 |
-| `elohim/sdk/domains/<pillar>/scripts/codegen.mjs` (each pillar that declares stagedIntents) | Extend to emit `staged-intents.ts` + `graduation-policy.ts` |
-| `elohim/sdk/domains/lamad/manifest.json` (+ split files) | Add `vocabulary.stagedIntents` + `graduation` per §8.1 |
-| `elohim/sdk/domains/imagodei/manifest.json` | Same per §8.2 |
-| `elohim/sdk/domains/qahal/manifest.json` | Same per §8.3 |
-| `elohim/sdk/domains/shefa/manifest.json` | Same per §8.4 |
-| (mishpat, avodah, infrastructure, elohim manifests) | No change |
-| `elohim/sdk/schemas/CLAUDE.md` | Add note about staged-intents + lifecycle enum |
-| `elohim/sdk/domains/lamad/CLAUDE.md` | Add note about staged-intents codegen extension (the canonical pattern) |
+> **Compacted-in-place 2026-06-02.** These two sections enumerated the now-LANDED schema/codegen/test deltas; the
+> truth lives on disk: the schema extension in `elohim/sdk/schemas/v1/manifest/app-manifest.schema.json`, the new
+> `elohim/sdk/schemas/v1/enums/session-lifecycle-state.schema.json`, the seven validation assertions in
+> `test-schema.mjs`, the per-pillar codegen extensions, and the backward-compat tests. **Caveat (HELD):** the
+> per-pillar *manifests* do NOT yet declare any `stagedIntent` — the schema accepts them, but nothing exercises them
+> end-to-end until the session-bridge consumer crate lands. Recover the original delta tables from git history if needed.
 
 ---
 

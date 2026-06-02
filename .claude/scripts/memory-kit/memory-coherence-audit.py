@@ -178,16 +178,18 @@ def run_audit() -> tuple[list[EntryReport], dict]:
 
 
 def collect_changed(args) -> list[str]:
+    # Sort + dedupe so the output JSON is deterministic regardless of stdin/git
+    # ordering (idempotent for consumers that hash/diff the report).
     if args.changed == "-":
         raw = sys.stdin.read()
-        return [ln.strip() for ln in raw.replace("\0", "\n").splitlines() if ln.strip()]
+        return sorted({ln.strip() for ln in raw.replace("\0", "\n").splitlines() if ln.strip()})
     if args.since:
         try:
             out = subprocess.run(
                 ["git", "diff", "--name-only", f"{args.since}...HEAD"],
                 cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
             ).stdout
-            return [ln.strip() for ln in out.splitlines() if ln.strip()]
+            return sorted({ln.strip() for ln in out.splitlines() if ln.strip()})
         except (subprocess.CalledProcessError, OSError) as e:
             print(f"git diff failed: {e}", file=sys.stderr)
             return []
@@ -216,12 +218,12 @@ def run_changed(changed: list[str]) -> list[dict]:
     return findings
 
 
-def write_index(index: dict) -> None:
-    payload = {"schema_version": 1, "generated_at": date.today().isoformat(), "cites": index}
+def write_index(index: dict, today: date) -> None:
+    payload = {"schema_version": 1, "generated_at": today.isoformat(), "cites": index}
     _store.save_json(CITES_INDEX_PATH, payload)
 
 
-def write_reports(reports: list[EntryReport]) -> tuple[Path, Path]:
+def write_reports(reports: list[EntryReport], today: date) -> tuple[Path, Path]:
     out_dir = _paths.reports_dir_for_today(REPO_ROOT)
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "memory-coherence-audit.json"
@@ -232,7 +234,7 @@ def write_reports(reports: list[EntryReport]) -> tuple[Path, Path]:
     candidates = [r for r in reports if r.cite_candidate]
 
     summary = {
-        "generated_at": date.today().isoformat(),
+        "generated_at": today.isoformat(),
         "total_entries": len(reports),
         "entries_with_cites": len(with_cites),
         "entries_with_dead_cites": len(dead),
@@ -291,8 +293,9 @@ def main() -> int:
         return 0
 
     reports, index = run_audit()
-    write_index(index)
-    json_path, md_path = write_reports(reports)
+    _today = date.today()
+    write_index(index, _today)
+    json_path, md_path = write_reports(reports, _today)
     if not args.json_only:
         s_dead = sum(len(r.dead_cites) for r in reports)
         n_cites = sum(1 for r in reports if r.cites)

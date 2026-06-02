@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 99f4004c-46d9-4467-81d3-14b203445785
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md
 ---
 
 ## The reframe

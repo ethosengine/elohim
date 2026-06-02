@@ -4,6 +4,9 @@ description: "Wire-format types deserve a constructor-validated newtype, not raw
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md
+  - elohim/elohim-storage/src/p2p/inventory_gossip.rs
 ---
 
 When a wire format has structural rules (prefix, length, character class — like `sha256-<64-lower-hex>`), wrap it in a newtype that constructor-validates the shape. The serde `try_from = "String"` attribute makes the deserializer enforce the shape on every receive. The newtype then propagates as a type-level guarantee through every downstream consumer.

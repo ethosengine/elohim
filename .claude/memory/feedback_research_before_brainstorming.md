@@ -3,6 +3,8 @@ name: Research existing design context before reaching for brainstorming
 description: When user reframes my proposal architecturally, that's a signal there is existing design context I haven't absorbed — research/debug first, brainstorm only when truly creating from scratch
 type: feedback
 originSessionId: 872c2e1c-02fe-453a-93b3-e69dac1e54e3
+cites:
+  - .claude/commands/brainstorm.md
 ---
 When the user reframes my technical proposal with their own architectural model (e.g., "actually the substrate should do X, doorway just caches"), that is a signal that **the design has already been extensively discussed**. Reaching for the brainstorming skill at that point is wrong — it forces them to re-narrate decisions they've already made.
 

@@ -1,3 +1,9 @@
+---
+status: design
+cites:
+  - 2026-05-19-topology-resilience-qahal-synthesis.md   # the related doc this derives from
+---
+
 # Doorway Stewardship Chain — Design
 
 **Status:** Substrate landed (Phase 2 L3 + amend-in-place). Wiring in progress (task #16).

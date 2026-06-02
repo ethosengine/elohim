@@ -4,6 +4,8 @@ description: "The protocol's value-flow points OUTWARD, not inward. The bargain 
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/docs/content/elohim-protocol/manifesto.md
 ---
 
 This is the move that distinguishes the Elohim Protocol from every modern platform's incentive structure. Platforms maximize *value capture* — the arrow points inward, and the network effects are designed to punish non-participation. The protocol described here maximizes **externality emission** — the arrow points outward, and the design refuses to punish non-participation.

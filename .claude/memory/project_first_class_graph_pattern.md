@@ -3,6 +3,8 @@ name: First-class graph pattern is the protocol primitive
 description: The Elohim Protocol IS a graph. EPRs are nodes, couplings/memberships/delegations/attestations are edges. Reach, discovery, validation, and distribution all derive from graph topology. Design must support this as a first-class primitive, not a bolt-on.
 type: project
 originSessionId: f534b7ae-d435-4ab8-ab3b-f7d23b6b0ed9
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md
 ---
 The Elohim Protocol's primary abstraction is a **content-addressed graph**, not a publish/subscribe network, not a request/response API, and not a key-value store. EPRs are nodes (content-addressed envelopes carrying coupled story + value + governance); couplings and memberships and delegations and attestations are edges. Every protocol property — reach, discovery, validation, distribution, recovery, trust — derives from graph topology.
 

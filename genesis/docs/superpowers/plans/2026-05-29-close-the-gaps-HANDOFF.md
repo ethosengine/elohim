@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - 2026-05-29-close-the-gaps-sprint-kickoff.md   # the related doc this derives from
+---
+
 # HANDOFF — Close the Gaps (paste into a fresh session, or: "read this and drive")
 
 You are picking up an in-flight sprint on branch **`sprint/cross-pillar-cleanup`** (repo `/projects/elohim`). A long prior session shipped the replication-prioritizer epic + hub-identity substrate + the keystone producer. Your job: **keep driving the remaining gaps to working code**, subagent-driven, letting the CI pipeline + a2o do end-to-end verification. This doc is self-contained — read the two plan docs it points to for depth, then drive.

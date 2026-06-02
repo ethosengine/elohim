@@ -1,0 +1,30 @@
+---
+title: History — Paths Not Taken & Settled Decisions
+tier: history
+created: 2026-06-01
+---
+
+# History — the distilled tail of the interpretability layer
+
+Sibling of [`../architecture/`](../architecture/) (canonical truth). This is where **landed, superseded, or
+abandoned** work is *distilled, not deleted*: a one-sentence lesson, a pointer, and **bidirectional** links
+to the canonical it informs. Raw bodies retire to git history. Placement rules: [`PLACEMENT.md`](../../../PLACEMENT.md).
+
+| Record | The lesson (one line) | Canonical it points back to |
+|---|---|---|
+| [dht-is-a-notary-not-a-byte-store](2026-06-01-dht-is-a-notary-not-a-byte-store.md) | The DHT notarizes; it never holds blob bytes or byte-movement state. | [graph-substrate](../architecture/2026-04-21-elohim-core-graph-substrate-design.md), [tiered-quilt](../architecture/2026-05-11-tiered-quilt-stewardship-design.md) |
+| [reach-backfill-policy](2026-04-22-reach-backfill-policy.md) | Existing rows project to EPRs at `reach: community` until the author re-asserts. | graph-substrate (EPR `reach` field) |
+| [d1-through-d5-node-and-household-canon](2026-04-19-d1-through-d5-node-and-household-canon.md) | Settled node/household canon (D1–D5). | node/household architecture |
+| [rno-reference-implementation-positioning](2026-06-02-rno-reference-implementation-positioning.md) | elohim is the missing substrate; coordination hApps graduate INTO it. R&O proves you can't put content on the DHT and can't upgrade a pure-HC DNA without a reset. | [wave3 VF/hREA interop](../architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md) |
+| [deploy-is-not-a-graph-node](2026-06-02-deploy-is-not-a-graph-node.md) | A deploy stage inside a pipeline isn't addressable; `DEPLOY_ONLY` (tactical) + brit attestations (strategic). | [orchestrator README](../../../../orchestrator/README.md) |
+| [seed-row-shape-satisfies-view-sql-predicates](2026-06-02-seed-row-shape-satisfies-view-sql-predicates.md) | A view's `WHERE` is a contract on seed-row shape; wrong values silently filter to a dark surface. | [view CONVENTIONS](../../../../../elohim/sdk/schemas/v1/views/CONVENTIONS.md) |
+| [request-correlation-path-not-taken](2026-06-02-request-correlation-path-not-taken.md) | Cross-runtime header-tracing was proposed and never built; headless capture + the sprint-report feed met the need. | `project_che_browser_feedback_loop` (memory) |
+| [epr-foundation-landed-by-waves](2026-06-02-epr-foundation-landed-by-waves.md) | Audit-as-truth over checkbox-as-truth; stubs hold the seam; reconcile parallel shapes as their own concern. | [graph-native substrate](../../../superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md) |
+| [light-up-topology-operational-visibility-arc](2026-06-02-light-up-topology-operational-visibility-arc.md) | Don't build a one-off federation codec for read-views; collapse to one GraphQL subgraph. Pre-flight: module exists ≠ table exists. | [durability/topology](../../../superpowers/specs/2026-05-29-durability-topology-felt-resilience.md), [graph-native](../../../superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md) |
+| [archetype-primary-a2o-taxonomy-not-executed](2026-06-02-archetype-primary-a2o-taxonomy-not-executed.md) | Don't bulk-restructure a2o dirs; express the archetype axis as `cites:` edges over the existing tree. | [coherence-substrate-design](../../../superpowers/specs/2026-06-01-coherence-substrate-design.md) |
+| [doorway-dispatch-registry-fallback-and-vocabulary](2026-06-02-doorway-dispatch-registry-fallback-and-vocabulary.md) | Make the RouteRegistry the unconditional fallback; never reintroduce a prefix guard. quilt/pantry vocab is design-only, not wire routes. | [doorway dispatch CLAUDE](../../../../../doorway/doorway-service/src/server/CLAUDE.md) |
+| [rno-cross-wave-guidance-graduate-into-not-from](2026-06-02-rno-cross-wave-guidance-graduate-into-not-from.md) | Don't work backwards from an external hApp's needs; build elohim's coherence, others graduate in. The narrative is the last act. | [wave3 VF/hREA interop](../architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md) |
+| [experience-story-discernment-gate](2026-06-02-experience-story-discernment-gate.md) | Don't re-draft as a TS gate (reverted); gates are Rust primitives in elohim-agent, rulesets manifest-declared. | [experience-story EPR design](../architecture/2026-04-18-experience-story-epr-design.md) |
+| [attestation-consolidation-phase2a-dedup](2026-06-02-attestation-consolidation-phase2a-dedup.md) | 18+ attestation entry types collapsed into one discriminated `Content` entry; never grep-and-delete a type by name — count callers first. | [attestation-consolidation design](../architecture/2026-05-11-attestation-consolidation-design.md) |
+| [conductor-agent-info-substrate-gossip](2026-06-02-conductor-agent-info-substrate-gossip.md) | Cross-mesh agent-info gossip warms the conductor peer cache ("step zero"); necessary but not sufficient — remote projection still gaps. | `project_multi_doorway_human_registration` (memory) |
+| [ci-orchestrator-recurring-anti-patterns-museum](2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md) | The frequency-ranked index of 10 CI/orchestrator traps (NOT_BUILT≠regression, host-green≠CI-green, HUSKY=0 non-functional, …). | [orchestrator README](../../../../orchestrator/README.md) |

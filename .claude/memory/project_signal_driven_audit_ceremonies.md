@@ -2,6 +2,10 @@
 name: Audit ceremonies are signal-triggered, not time-triggered
 description: Accumulate deterministic signal between audits; trigger the deep audit only when threshold is crossed. Pattern reused from EPR feedback. Cheap accumulator + expensive ceremony is the structure for any always-loaded/gospel-treated surface.
 type: project
+cites:
+  - .claude/scripts/memory-kit/claude-md-audit.py
+  - .claude/hooks/claude-md-drift-signal.py
+  - .claude/memory-kit/claude-md-drift.json
 ---
 
 When a surface is treated as authoritative (always-loaded, "gospel"), audit cost vs frequency has a sharp tradeoff. Per-call audit is wasteful when drift is rare. Time-cadence audit (every N days) is wasteful when nothing has changed. **The right pattern is signal accumulation: cheap deterministic counters during normal work + ceremony when threshold crosses.**

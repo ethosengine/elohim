@@ -3,6 +3,8 @@ name: "Seed-time 'database is locked' often means schema drift, not concurrency"
 description: When elohim-genesis Seed Database stage hits 'database is locked' errors clustered in specific content namespaces, the fix is usually to clear the database in the genesis stage, not patch SQLite pragmas or retry logic
 type: feedback
 originSessionId: cdffa1f9-7b63-4657-ae44-2cafff5156bf
+cites:
+  - elohim/elohim-storage/src/db/mod.rs
 ---
 When the Seed Database stage on elohim-genesis fails with `database is locked` errors, especially with errors clustered in specific content namespaces and shifting between builds, the underlying cause is usually **schema drift between the persisted DB and the current code's expectations**, not SQLite concurrency.
 

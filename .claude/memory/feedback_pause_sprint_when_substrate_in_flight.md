@@ -3,6 +3,8 @@ name: Pause sprint depth when substrate change is in flight
 description: When base images / cluster state are mid-rebuild, surface fixes only — don't dive into investigation that the new substrate may invalidate
 type: feedback
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
+cites:
+  - .claude/commands/shift.md
 ---
 When an infra change is in flight that will reset the substrate the pipeline runs on (e.g. base image rebuild, k8s upgrade, cluster restart, helm chart roll-forward), DO NOT dive deep into investigating cascade failures or kicking off speculative fixes. Apply the minimum revert to keep things runnable, then wait.
 

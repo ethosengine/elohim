@@ -3,6 +3,8 @@ name: Upstream containment as brit→rakia axis — MVP is substrate-native, not
 description: Generalize nexus-shape proxying for all CI upstreams; MVP target is substrate-replicated repos (Matthew's household replicates the elohim repo; doorway projects GitHub-shape) rather than yet-another web2 mirror service
 type: project
 originSessionId: e9127493-544b-44b2-8f81-c61c1fa5cbb6
+cites:
+  - genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md
 ---
 The pattern: `nexus.ethosengine.com` already insulates the cluster from npmjs.org availability. The same shape should extend to every upstream — but the MVP framing has shifted.
 

@@ -1,0 +1,772 @@
+#!/usr/bin/env python3
+"""
+placement-audit.py — DETERMINISTIC audit of the doc + memory surfaces against
+genesis/docs/PLACEMENT.md. No LLM. Three modes:
+
+  (default)      scoreboard: lifecycle state, tech-debt, agent pressure, STRUCTURAL
+                 EQUILIBRIUM (anti-dump: pressure-dir occupancy + runaway detection),
+                 equilibrium verdict.
+  --ledger       the BUDGET: every file → its position + state + next-action, instantly
+                 auditable. Writes the full per-file ledger to .claude/memory-kit/state-ledger.json.
+  --focus        the planner's currently-testable surface from cluster-state.yaml
+                 (BLOCKED-BY-ENV held, not regressed); flip a resource → scope cascades.
+                 [--cluster-state PATH]
+
+Honest by design: prints its own caveats. 'verified' = evidence DECLARED, not CI-green
+(actual green is the verification gate's job — ci-investigator).
+"""
+from __future__ import annotations
+
+import json
+import re
+import sys
+from pathlib import Path
+
+FLAGS = [a for a in sys.argv[1:] if a.startswith("--")]
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+AS_JSON = "--json" in FLAGS
+FOCUS = "--focus" in FLAGS
+LEDGER = "--ledger" in FLAGS
+HEADLINE = "--headline" in FLAGS
+COVERAGE = "--coverage" in FLAGS
+STASIS = "--stasis" in FLAGS
+CS_OVERRIDE = None
+if "--cluster-state" in sys.argv[1:]:
+    i = sys.argv.index("--cluster-state")
+    if i + 1 < len(sys.argv):
+        CS_OVERRIDE = sys.argv[i + 1]
+        ARGS = [a for a in ARGS if a != CS_OVERRIDE]
+ROOT = Path(ARGS[0]).resolve() if ARGS else Path(__file__).resolve().parents[3]
+
+SURFACES = {
+    "ACTIVE:specs": "genesis/docs/superpowers/specs",
+    "ACTIVE:plans": "genesis/docs/superpowers/plans",
+    "ACTIVE:plans(legacy)": "genesis/docs/plans",
+    "CANONICAL": "genesis/docs/content/elohim-protocol/architecture",
+    "HISTORY": "genesis/docs/content/elohim-protocol/history",
+    "NOTES": "genesis/docs/superpowers/notes",
+    "RESEARCH": "genesis/docs/research",
+}
+ACTIVE_HOMES = {"ACTIVE:specs", "ACTIVE:plans", "ACTIVE:plans(legacy)"}
+MEMORY_DIR = ".claude/memory"
+STATE_ROOT = ROOT / "genesis/docs/_state"          # pressure dirs (should trend EMPTY)
+RETIRED_DIR = ROOT / "genesis/docs/content/elohim-protocol/history/_retired"
+DOCS_ROOT = ROOT / "genesis/docs"
+LEDGER_OUT = ROOT / ".claude/memory-kit/state-ledger.json"
+CLUSTER_STATE = Path(CS_OVERRIDE).resolve() if CS_OVERRIDE else (ROOT / "genesis/manifests/cluster-state.yaml")
+
+LANDED_WORDS = {"landed", "stable", "done", "complete", "completed", "shipped", "accepted",
+                "latest-stable"}
+CLAIMED_WORDS = {"claimed-not-verified"}
+REGRESSED_WORDS = {"regressed", "regression"}
+DEAD_WORDS = {"superseded", "abandoned", "cancelled", "canceled", "deprecated", "retired"}
+ACTIVE_WORDS = {"draft", "design", "brainstorm", "proposal", "proposed", "in-flight",
+                "inflight", "wip", "vision", "approved", "accepted-draft"}
+LINK_KEYS = ("canonical", "distills", "cites", "verified_by", "informed-by", "informs",
+             "supersedes", "superseded-by", "supersedes-or-conforms-to",
+             # a declared parent/related/spec IS a real anchor — a doc that names its lineage
+             # is not orphaned; recognizing these keys removes a deterministic false-orphan class.
+             "parent", "related", "spec", "source-spec", "roadmap")
+MD_LINK_RE = re.compile(r"\]\(([^)\s]+?\.md)[^)]*\)")
+MD_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.M)
+
+# ---- STASIS = the loop's true "done". A composite STASIS SCORE benchmarks against an ideal of 1.0;
+# "at stasis" = score within the ±MARGIN band (>= 1 - MARGIN). Each dimension is a COVERAGE RATIO
+# (achieved / ideal, benchmark 1.0); BYTE dims pass at <= budget*(1+MARGIN); HARD dims (a dump is a
+# dump) gate the score. The margin is tuned to the agentic developers' context capacity (a surface
+# they can hold without burning the window).
+STASIS_MARGIN = 0.15          # ±15% band; benchmark = 1.0 → at stasis when score >= 0.85
+MEMORY_MD_BUDGET = 46000      # bytes — MEMORY.md (always-loaded index)
+CLAUDE_MD_BUDGET = 12000      # bytes — a gate an agent should hold without burning context
+# A LINK (every edge in the graph) = a PATH + a 1-2 sentence plain-text EXPLAINER of what's at the end.
+# Bare paths don't count: the traceability dimensions require the explainer, so a reader spends context
+# only on relevant links. History records (path + gotcha sentence) are the template.
+
+
+def parse_front_matter(text: str) -> dict:
+    fm: dict = {}
+    if not text.startswith("---"):
+        return fm
+    end = text.find("\n---", 3)
+    if end == -1:
+        return fm
+    cur = None
+    for raw in text[3:end].splitlines():
+        line = raw.rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        m = re.match(r"^([A-Za-z0-9_\-]+):\s*(.*)$", line)
+        if m and not line.startswith((" ", "\t")):
+            cur = m.group(1).strip()
+            val = m.group(2).strip()
+            if val.startswith("["):
+                inner = val[1:val.index("]")] if "]" in val else val[1:]
+                fm[cur] = [x.split("#")[0].strip().strip("'\"") for x in inner.split(",") if x.strip()]
+            elif val:
+                fm[cur] = val.split("#")[0].strip().strip("'\"")
+            else:
+                fm[cur] = []
+        else:
+            li = re.match(r"^\s*-\s+(.*)$", line)
+            if li and cur is not None and isinstance(fm.get(cur), list):
+                fm[cur].append(li.group(1).split("#")[0].strip().strip("'\""))
+    return fm
+
+
+def requires_env_of(fm):
+    v = fm.get("requires_env") or fm.get("requires-env") or []
+    return v if isinstance(v, list) else [v]
+
+
+def status_bucket(raw: str):
+    w = (raw or "").strip().lower().split()[0] if raw else ""
+    w = w.strip(":*").strip()
+    if w in LANDED_WORDS:
+        return "LANDED"
+    if w in CLAIMED_WORDS:
+        return "CLAIMED"
+    if w in REGRESSED_WORDS:
+        return "REGRESSED"
+    if w in DEAD_WORDS:
+        return "DEAD"
+    if w in ACTIVE_WORDS:
+        return "ACTIVE"
+    return "UNKNOWN" if w else "NONE"
+
+
+def load_cluster_state(path: Path):
+    avail, updated, cur = {}, "?", None
+    if path.exists():
+        for line in path.read_text().splitlines():
+            u = re.match(r"^updated:\s*(\S+)", line)
+            if u:
+                updated = u.group(1)
+            m = re.match(r"^  ([a-z0-9\-]+):\s*$", line)
+            if m:
+                cur = m.group(1)
+                continue
+            a = re.match(r"^    available:\s*(\S+)", line)
+            if a and cur:
+                avail[cur] = a.group(1).strip().strip("'\"")
+    return avail, updated
+
+
+def load_manifest():
+    """Read the context-coverage manifest (.claude/memory-kit/context-coverage.yaml) — the tuning
+    surface. Returns {targets:{k:{value}}, dimensions:{k:{weight}}, exclusions:[...], hard:[...]}.
+    Absent → empty (code defaults apply). The `why:` methodology blocks are for humans; ignored here."""
+    p = ROOT / ".claude/memory-kit/context-coverage.yaml"
+    cfg = {"targets": {}, "dimensions": {}, "exclusions": [], "hard": []}
+    if not p.exists():
+        return cfg
+    section, key = None, None
+    for raw in p.read_text().splitlines():
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        s = raw.strip()
+        if indent == 0:
+            section, key = s.rstrip(":"), None
+        elif section in ("targets", "dimensions") and indent == 2 and s.endswith(":"):
+            key = s[:-1].strip()
+            cfg[section].setdefault(key, {})
+        elif section in ("targets", "dimensions") and indent >= 4 and key:
+            k, _, v = s.partition(":")
+            if k.strip() in ("value", "weight"):
+                try:
+                    cfg[section][key][k.strip()] = float(v.strip().strip("'\""))
+                except Exception:  # noqa: BLE001
+                    pass
+        elif section in ("exclusions", "hard") and s.startswith("- "):
+            cfg[section].append(s[2:].strip().strip("'\""))
+    return cfg
+
+
+def _mfval(targets, k, default):
+    return targets.get(k, {}).get("value", default)
+
+
+# Override the deterministic-default constants FROM THE MANIFEST (the tuning surface). Edit the
+# manifest, not this file, to retune — and the `why:` block beside each value explains the choice.
+_MF = load_manifest()
+STASIS_MARGIN = _mfval(_MF["targets"], "margin", STASIS_MARGIN)
+MEMORY_MD_BUDGET = int(_mfval(_MF["targets"], "memory_md_budget", MEMORY_MD_BUDGET))
+CLAUDE_MD_BUDGET = int(_mfval(_MF["targets"], "claude_md_budget", CLAUDE_MD_BUDGET))
+DIMENSION_WEIGHTS = {k: v.get("weight", 1.0) for k, v in _MF["dimensions"].items()}
+
+
+def scan_docs():
+    """Every doc across the surfaces + the _state pressure dirs → records."""
+    homes = dict(SURFACES)
+    if STATE_ROOT.is_dir():
+        for sub in sorted(STATE_ROOT.iterdir()):
+            if sub.is_dir():
+                homes[f"_state:{sub.name}"] = str(sub.relative_to(ROOT))
+    basenames = set()
+    for rel in homes.values():
+        d = ROOT / rel
+        if d.is_dir():
+            for f in d.glob("*.md"):
+                if f.name not in ("INDEX.md", "CLAUDE.md", "README.md"):
+                    basenames.add(f.name)
+    docs, link_targets, status_vals = [], set(), {}
+    for home, rel in homes.items():
+        d = ROOT / rel
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.md")):
+            if f.name in ("INDEX.md", "CLAUDE.md", "README.md"):
+                continue
+            text = f.read_text(errors="replace")
+            fm = parse_front_matter(text)
+            raw = fm.get("status") or ""
+            md = MD_STATUS_RE.search(text)
+            if not raw and md:
+                raw = md.group(1)
+            bucket = status_bucket(raw if isinstance(raw, str) else "")
+            if raw and isinstance(raw, str):
+                status_vals[raw.strip()] = status_vals.get(raw.strip(), 0) + 1
+            out = set(MD_LINK_RE.findall(text))
+            for k in LINK_KEYS:
+                v = fm.get(k)
+                out.update(v if isinstance(v, list) else ([v] if isinstance(v, str) else []))
+            outb = {Path(x).name for x in out if x.endswith(".md")}
+            link_targets.update(b for b in outb if b in basenames and b != f.name)
+            docs.append({"home": home, "name": f.name, "path": str(f.relative_to(ROOT)),
+                         "bucket": bucket, "status": raw if isinstance(raw, str) else "",
+                         "out": outb, "verified": bool(fm.get("verified_by") or fm.get("landed_commit")),
+                         "requires_env": requires_env_of(fm),
+                         "traces": fm.get("traces") if isinstance(fm.get("traces"), list) else [],
+                         "has_canonical_link": ("canonical" in fm or any("/architecture/" in x for x in out))})
+    for r in docs:
+        r["inbound"] = r["name"] in link_targets
+    return docs, status_vals
+
+
+def scan_memory():
+    d = ROOT / MEMORY_DIR
+    out = []
+    if d.is_dir():
+        for f in sorted(d.glob("*.md")):
+            if f.name == "MEMORY.md":
+                continue
+            fm = parse_front_matter(f.read_text(errors="replace"))
+            out.append({"path": str(f.relative_to(ROOT)), "linked": bool(fm.get("cites")),
+                        "requires_env": requires_env_of(fm)})
+    return out
+
+
+def budget_state(rec, available):
+    """A doc's instantly-auditable STATE + the next action to advance it.
+
+    The directory a doc physically sits in IS its state (the state-machine-gen
+    invariant): a doc in a `_state/<state>/` pressure dir is classified by its
+    home, which is authoritative over frontmatter.
+    """
+    home = rec.get("home", "")
+    if home == "_state:regression":
+        return "REGRESSED", "fix and re-verify on an available env"
+    if home == "_state:blockers":
+        return "BLOCKED-BY-ENV", "restore env (cluster-state.yaml)"
+    if home == "_state:unverified":
+        return "CLAIMED-ONLY", "VERIFY (ci-investigator)"
+    if home == "_state:needs-triage":
+        return "NEEDS-TRIAGE", "classify: add status + place in graph"
+    missing = [e for e in rec["requires_env"] if e not in available]
+    if missing:
+        return "BLOCKED-BY-ENV", f"restore env: {','.join(missing)} (cluster-state.yaml)"
+    b = rec["bucket"]
+    if b == "NONE":
+        return "NEEDS-TRIAGE", "classify: add status + place in graph"
+    if b == "DEAD":
+        return "SUPERSEDED", "distill → history, retire body"
+    if b == "REGRESSED":
+        return "REGRESSED", "fix and re-verify on an available env"
+    if b == "CLAIMED":
+        return "CLAIMED-ONLY", "VERIFY (ci-investigator)"
+    if b == "LANDED":
+        # CANONICAL / HISTORY are the settled destinations (PLACEMENT.md): an `accepted`/`landed` status
+        # there is the steady state, not a deliverable awaiting CI. Only ACTIVE-home landed-without-evidence
+        # is the over-claim that needs the verification gate.
+        if home in ("CANONICAL", "HISTORY"):
+            return "SETTLED", "settled canon/history — no verification queue"
+        return ("VERIFIED-STABLE", "retire-eligible → history") if rec["verified"] else ("CLAIMED-ONLY", "VERIFY (ci-investigator)")
+    if b == "ACTIVE":
+        return "ACTIVE", "in-flight"
+    return "UNKNOWN-STATUS", "normalize the status string"
+
+
+# ----- modes -----------------------------------------------------------------
+def iter_env_requirers():
+    for rel in list(SURFACES.values()) + [MEMORY_DIR]:
+        d = ROOT / rel
+        if d.is_dir():
+            for f in sorted(d.glob("*.md")):
+                if f.name in ("INDEX.md", "CLAUDE.md"):
+                    continue
+                envs = requires_env_of(parse_front_matter(f.read_text(errors="replace")))
+                if envs:
+                    yield f, envs
+
+
+def focus_mode():
+    avail, updated = load_cluster_state(CLUSTER_STATE)
+    available = {k for k, v in avail.items() if v == "true"}
+    unavailable = {k: v for k, v in avail.items() if v != "true"}
+    in_scope, blocked = [], []
+    for f, envs in iter_env_requirers():
+        miss = [e for e in envs if e not in available]
+        (blocked if miss else in_scope).append((f, envs, miss))
+    print(f"FOCUS — currently-testable surface   (cluster-state: {CLUSTER_STATE.name} @ {updated})")
+    print("=" * 72)
+    print("  AVAILABLE   : " + (", ".join(sorted(available)) or "(none)"))
+    print("  UNAVAILABLE : " + (", ".join(f"{k}({v})" for k, v in sorted(unavailable.items())) or "(none)"))
+    print(f"\n  IN SCOPE for refinement-stability ({len(in_scope)}):")
+    for f, e, _ in in_scope:
+        print(f"    ✅ {f.relative_to(ROOT)}   requires_env: {e}")
+    if not in_scope:
+        print("    (none declared)")
+    print(f"\n  BLOCKED-BY-ENV ({len(blocked)}) — HELD, out of scope now, NOT regressed:")
+    for f, e, miss in blocked:
+        print(f"    ⛔ {f.relative_to(ROOT)}   needs {e} → missing {miss}")
+    if not blocked:
+        print("    (none)")
+    print("\n  → Edit cluster-state.yaml and re-run: scope cascades immediately.")
+    return 0
+
+
+def ledger_mode():
+    avail, _ = load_cluster_state(CLUSTER_STATE)
+    available = {k for k, v in avail.items() if v == "true"}
+    docs, _ = scan_docs()
+    mem = scan_memory()
+    rows = []
+    for d in docs:
+        st, nxt = budget_state(d, available)
+        rows.append({"path": d["path"], "position": d["home"], "state": st, "next": nxt})
+    for m in mem:
+        miss = [e for e in m["requires_env"] if e not in available]
+        if miss:
+            rows.append({"path": m["path"], "position": "MEMORY", "state": "BLOCKED-BY-ENV", "next": f"restore {','.join(miss)}"})
+        elif m["linked"]:
+            rows.append({"path": m["path"], "position": "MEMORY", "state": "LINKED", "next": "—"})
+        else:
+            rows.append({"path": m["path"], "position": "MEMORY", "state": "MEM-UNLINKED", "next": "add cites: to a system"})
+
+    LEDGER_OUT.parent.mkdir(parents=True, exist_ok=True)
+    LEDGER_OUT.write_text(json.dumps({"total_files": len(rows), "rows": rows}, indent=1, sort_keys=True))
+    if AS_JSON:
+        print(json.dumps({"total_files": len(rows), "rows": rows}, indent=1, sort_keys=True))
+        return 0
+
+    bal = {}
+    for r in rows:
+        bal[r["state"]] = bal.get(r["state"], 0) + 1
+    settled = {"VERIFIED-STABLE", "ACTIVE", "LINKED", "CANONICAL"}
+    # BLOCKED-BY-ENV is HELD (Cascade: NONE, out-of-current-scope per PLACEMENT.md) —
+    # not the doc's fault, so it is NOT counted as actionable pressure.
+    pressure_order = ["NEEDS-TRIAGE", "MEM-UNLINKED", "CLAIMED-ONLY", "REGRESSED",
+                      "SUPERSEDED", "UNKNOWN-STATUS"]
+    total = len(rows)
+    print(f"BUDGET LEDGER — every file accounted (position + state)   total files: {total}")
+    print("=" * 72)
+    print("  BALANCE (sums to total — nothing hides):")
+    for st in sorted(bal, key=lambda s: (-bal[s], s)):
+        mark = "·" if st in settled else "▶"
+        print(f"    {mark} {st:<16} {bal[st]:>4}  ({100*bal[st]//total:>2}%)")
+    need = sum(bal.get(s, 0) for s in pressure_order)
+    held = bal.get("BLOCKED-BY-ENV", 0)
+    print(f"  {'-'*4}\n    PRESSURE (needs action): {need}   HELD (not pressure): {held}   SETTLED: {total-need-held}")
+
+    print("\n  PRESSURE QUEUE (what to do, by state):")
+    for st in pressure_order:
+        items = [r for r in rows if r["state"] == st]
+        if not items:
+            continue
+        print(f"    ▶ {st} ({len(items)}) — {items[0]['next']}")
+        for r in items[:4]:
+            print(f"        {r['position']:<18} {r['path']}")
+        if len(items) > 4:
+            print(f"        … +{len(items)-4} more")
+    # decomposed gap-items (from decompose.py) — the implementation budget
+    gap_dir = ROOT / ".claude/memory-kit/gap-items"
+    gfiles = sorted(gap_dir.glob("*.json")) if gap_dir.is_dir() else []
+    if gfiles:
+        g_open = g_claim = 0
+        rows_g = []
+        for gf in gfiles:
+            try:
+                rec = json.loads(gf.read_text())
+            except Exception:  # noqa: BLE001
+                continue
+            o = sum(1 for it in rec.get("items", []) if it.get("state") == "OPEN")
+            c = sum(1 for it in rec.get("items", []) if it.get("state") == "CLAIMED")
+            g_open += o
+            g_claim += c
+            if o or c:
+                rows_g.append((rec.get("doc", gf.stem), o, c))
+        print(f"\n  DECOMPOSED GAPS ({len(rows_g)} docs with open/claimed items, "
+              f"{len(gfiles)} files scanned): "
+              f"{g_open} OPEN to implement, {g_claim} CLAIMED to verify (checked ≠ done)")
+        for doc, o, c in rows_g[:8]:
+            print(f"      {o:>3} open / {c:>3} claimed   {doc}")
+        if len(rows_g) > 8:
+            print(f"      … +{len(rows_g)-8} more")
+
+    print(f"\n  Full per-file ledger written: {LEDGER_OUT.relative_to(ROOT)}  (--json for stdout)")
+    return 0
+
+
+def equilibrium_section():
+    """Structural anti-dump: pressure-dir occupancy + runaway detection."""
+    print(f"\n{'='*72}\nSTRUCTURAL EQUILIBRIUM (anti-dump)\n{'='*72}")
+    pressure_occ = {}
+    if STATE_ROOT.is_dir():
+        for sub in sorted(STATE_ROOT.iterdir()):
+            if sub.is_dir():
+                pressure_occ[sub.name] = len([f for f in sub.glob("*.md") if f.name not in ("CLAUDE.md", "README.md")])
+    print("  PRESSURE DIRS (equilibrium = 0 docs each):")
+    for name, n in pressure_occ.items():
+        print(f"    {name:<14} {n:>4} docs   " + ("✅ empty (stable)" if n == 0 else "⚠ PRESSURE"))
+    if not pressure_occ:
+        print("    (none generated yet — run state-machine-gen.py)")
+    # runaway detection
+    depths, biggest = [], (None, 0)
+    if DOCS_ROOT.is_dir():
+        for d in sorted(DOCS_ROOT.rglob("*")):
+            if d.is_dir():
+                depth = len(d.relative_to(DOCS_ROOT).parts)
+                depths.append((depth, d))
+                n = len([f for f in d.glob("*.md")])
+                if n > biggest[1] or (n == biggest[1] and (biggest[0] is None or str(d) < str(biggest[0]))):
+                    biggest = (d, n)
+    maxdepth = max((x[0] for x in depths), default=0)
+    deep = [str(d.relative_to(ROOT)) for dp, d in depths if dp >= 5]
+    retired_n = len(list(RETIRED_DIR.glob("*.md"))) if RETIRED_DIR.is_dir() else 0
+    print("  RUNAWAY RISK:")
+    print(f"    deepest doc dir depth: {maxdepth}   " + (f"⚠ deep dirs: {deep[:3]}" if deep else "✅ shallow"))
+    if biggest[0]:
+        print(f"    largest single dir: {biggest[0].relative_to(ROOT)} ({biggest[1]} docs)  — watch for sprawl")
+    print(f"    archive (_retired): {retired_n} files   " + ("✅ no dump" if retired_n == 0 else "— verify all are verified-stable"))
+    return all(n == 0 for n in pressure_occ.values()) if pressure_occ else False
+
+
+def decompose_coverage(surface_docs):
+    """How many ACTIVE specs/plans have actually been REVIEWED (decomposed)?
+
+    This is the un-captured workload — the backlog the loop must drain. Without it the
+    loop could declare 'stasis' while 160 plans sit un-reviewed; with it, the loop keeps
+    dispatching until coverage is complete, so effort is proportional to the REAL backlog.
+      captured     = a gap-items/<slug>.json exists with extracted items
+      needs_agent  = decompose ran but found no structure (prose spec) → an agent must extract
+      undecomposed = never decomposed at all
+    """
+    gap_dir = ROOT / ".claude/memory-kit/gap-items"
+    active = [d for d in surface_docs if d["home"] in ACTIVE_HOMES]
+    captured, needs_agent, undecomposed, un_list = 0, 0, 0, []
+    for d in active:
+        p = Path(d["path"])
+        gf = gap_dir / f"{p.parent.name}__{p.stem}.json"
+        if not gf.exists():
+            undecomposed += 1
+            un_list.append((d["path"], "undecomposed"))
+            continue
+        try:
+            rec = json.loads(gf.read_text())
+        except Exception:  # noqa: BLE001
+            rec = {}
+        if rec.get("method") == "none" or not rec.get("items"):
+            needs_agent += 1
+            un_list.append((d["path"], "needs-agent"))
+        else:
+            captured += 1
+    return {"active": len(active), "captured": captured, "needs_agent": needs_agent,
+            "undecomposed": undecomposed, "uncaptured": undecomposed + needs_agent, "un_list": un_list}
+
+
+def coverage_mode():
+    docs, _ = scan_docs()
+    surface = [d for d in docs if not d["home"].startswith("_state")]
+    cov = decompose_coverage(surface)
+    if AS_JSON:
+        print(json.dumps({"active": cov["active"], "captured": cov["captured"],
+                          "needs_agent": cov["needs_agent"], "undecomposed": cov["undecomposed"],
+                          "uncaptured": cov["uncaptured"],
+                          "uncaptured_docs": [{"path": p, "why": w} for p, w in cov["un_list"]]}, indent=1))
+        return 0
+    print("DECOMPOSE-COVERAGE — the un-reviewed / un-captured workload")
+    print("=" * 72)
+    print(f"  active specs+plans          : {cov['active']}")
+    print(f"  ✅ decomposed (captured)     : {cov['captured']}")
+    print(f"  ▶ un-decomposed (never reviewed): {cov['undecomposed']}")
+    print(f"  ▶ needs-agent (prose, no structure): {cov['needs_agent']}")
+    print(f"  {'-'*4}")
+    print(f"  UN-CAPTURED WORKLOAD        : {cov['uncaptured']}   "
+          f"(the loop dispatches until this hits 0 → effort ∝ real backlog)")
+    print("\n  the loop's queue (next un-captured):")
+    for p, w in cov["un_list"][:14]:
+        print(f"    [{w:<12}] {p}")
+    if len(cov["un_list"]) > 14:
+        print(f"    … +{len(cov['un_list'])-14} more")
+    return 0
+
+
+def trace_coverage(active_docs):
+    """% of active specs/plans carrying >=1 EXPLAINED trace link: a `traces:` entry of the form
+    '<path> — <1-2 sentence explainer>' (em-dash / `--` / `|` separates path from explainer). Bare
+    paths do NOT count (the link rule). Starts near 0 until explained traces roll out; the loop drives it up."""
+    if not active_docs:
+        return 1.0
+    explained = 0
+    for d in active_docs:
+        for t in (d.get("traces") or []):
+            if isinstance(t, str) and any(sep in t for sep in (" — ", " -- ", " | ")):
+                explained += 1
+                break
+    return explained / len(active_docs)
+
+
+def _ratio(num, den):
+    return 1.0 if not den else num / den
+
+
+def stasis_mode():
+    docs, _ = scan_docs()
+    surface = [d for d in docs if not d["home"].startswith("_state")]
+    active = [d for d in surface if d["home"] in ACTIVE_HOMES]
+    mem = scan_memory()
+    cov = decompose_coverage(surface)
+    stated = sum(1 for d in active if d["bucket"] != "NONE")
+    nonorphan = sum(1 for d in active if d["inbound"] or d["out"])
+    hist = [d for d in surface if d["home"] == "HISTORY"]
+    hist_ok = sum(1 for d in hist if d["has_canonical_link"])
+    mem_linked = sum(1 for m in mem if m["linked"])
+    cmds = []
+    for pat in ("CLAUDE.md", "genesis/**/CLAUDE.md", ".claude/**/CLAUDE.md"):
+        cmds += [p for p in ROOT.glob(pat) if "worktrees" not in p.parts and "node_modules" not in p.parts]
+    cmds = sorted(set(cmds))
+    cmd_ok = sum(1 for p in cmds if p.stat().st_size <= CLAUDE_MD_BUDGET)
+    mmd = ROOT / MEMORY_DIR / "MEMORY.md"
+    mmd_bytes = mmd.stat().st_size if mmd.exists() else 0
+    dumps = 0
+    if RETIRED_DIR.is_dir():
+        for f in RETIRED_DIR.glob("*.md"):
+            fm = parse_front_matter(f.read_text(errors="replace"))
+            if not (fm.get("verified_by") or fm.get("verification") or fm.get("landed_commit")):
+                dumps += 1
+    pressure_docs = 0
+    if STATE_ROOT.is_dir():
+        for sub in STATE_ROOT.iterdir():
+            if sub.is_dir():
+                pressure_docs += len([f for f in sub.glob("*.md") if f.name not in ("CLAUDE.md", "README.md")])
+
+    measured = [
+        ("capture: specs/plans decomposed", _ratio(cov["captured"], cov["active"])),
+        ("status: docs carry a state", _ratio(stated, len(active))),
+        ("well-formed: docs linked (non-orphan)", _ratio(nonorphan, len(active))),
+        ("memory: entries cite a system", _ratio(mem_linked, len(mem))),
+        ("CLAUDE.md right-sized (<= budget)", _ratio(cmd_ok, len(cmds))),
+        ("history: bidirectional canonical link", _ratio(hist_ok, len(hist)) if hist else 1.0),
+        ("traceability: docs carry explained trace links", trace_coverage(active)),
+        ("MEMORY.md within byte budget", 1.0 if mmd_bytes <= MEMORY_MD_BUDGET * (1 + STASIS_MARGIN) else MEMORY_MD_BUDGET / max(mmd_bytes, 1)),
+    ]
+    hard = [("_retired dumps == 0", dumps == 0), ("pressure dirs empty", pressure_docs == 0)]
+    unmeasured = [
+        "code-FILE-level traceability (.ts/.rs → story/scenario) — doc-level traces measured above; per-code-file convention not yet wired",
+        "gap-items → testing-infrastructure tagging (NOT wired)",
+        "CLAUDE.md recursive coverage: every dir needing a gate has one (run claude-md-audit.py)",
+    ]
+    thr = 1 - STASIS_MARGIN
+    # weighted by the manifest's per-dimension weights (KEYS aligned with `measured` order)
+    KEYS = ["capture", "status", "well_formed", "memory_linked", "claude_md_rightsized",
+            "history_bidirectional", "traceability", "memory_md_budget"]
+    weights = [DIMENSION_WEIGHTS.get(k, 1.0) for k in KEYS]
+    wsum = sum(weights) or 1.0
+    score = sum(r * w for (_, r), w in zip(measured, weights)) / wsum
+    hard_ok = all(ok for _, ok in hard)
+    at_stasis = score >= thr and hard_ok
+
+    if AS_JSON:
+        print(json.dumps({"benchmark": 1.0, "margin": STASIS_MARGIN, "threshold": round(thr, 3),
+                          "score": round(score, 3), "hard_ok": hard_ok, "at_stasis": at_stasis,
+                          "dimensions": {n: round(r, 3) for n, r in measured},
+                          "unmeasured": unmeasured}, indent=1))
+        return 0
+
+    print(f"STASIS — composite score vs benchmark 1.0, ±{int(STASIS_MARGIN*100)}% band (at stasis ≥ {thr:.2f})")
+    print("=" * 72)
+    for name, r in measured:
+        print(f"  {'✅' if r >= thr else '❌'} {name:<40} {r*100:5.1f}%")
+    for name, ok in hard:
+        print(f"  {'✅' if ok else '❌'} {name:<40} {'pass' if ok else 'FAIL — gates the score'}")
+    print("  " + "-" * 40)
+    print(f"  STASIS SCORE (measured): {score:.3f} / 1.000   →  "
+          f"{'✅ AT STASIS' if at_stasis else f'❌ NOT at stasis (need ≥ {thr:.2f})'}")
+    print(f"\n  ⏳ UNMEASURED — full stasis CANNOT be claimed until these are wired (checked ≠ done):")
+    for u in unmeasured:
+        print(f"    ? {u}")
+    return 0
+
+
+def decompose_due_count():
+    """The BACK fire point's tripwire count: ACTIVE-home docs that carry a terminal
+    status (landed | superseded | abandoned) yet still live plan-shaped — i.e. they
+    are PAST-DUE to decompose to zero residue. Read from the placement-drift accumulator
+    (.claude/memory-kit/placement-drift.json) populated by the placement-drift-signal.py
+    PostToolUse hook. Absent/malformed store → 0 (graceful: the hook may not have fired yet).
+    Stale entries whose doc no longer carries a terminal status (or no longer exists) are
+    skipped, so the count reflects current reality, not historical signal."""
+    p = ROOT / ".claude/memory-kit/placement-drift.json"
+    try:
+        store = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return 0
+    due = store.get("due") if isinstance(store, dict) else None
+    if not isinstance(due, dict):
+        return 0
+    terminal = {"superseded", "abandoned", "cancelled", "canceled", "deprecated", "retired",
+                "landed", "stable", "done", "complete", "completed", "shipped", "accepted",
+                "latest-stable"}
+    n = 0
+    for rel in due:
+        f = ROOT / rel
+        if not f.is_file():
+            continue
+        fm = parse_front_matter(f.read_text(errors="replace"))
+        raw = fm.get("status") or ""
+        md = MD_STATUS_RE.search(f.read_text(errors="replace"))
+        if not raw and md:
+            raw = md.group(1)
+        w = (raw or "").strip().lower().split()
+        if w and w[0].strip(":*\"'") in terminal:
+            n += 1
+    return n
+
+
+def headline_mode():
+    docs, _ = scan_docs()
+    surface = [d for d in docs if not d["home"].startswith("_state")]
+    mem = scan_memory()
+    mem_un = sum(1 for m in mem if not m["linked"])
+    no_exit = sum(1 for d in surface if d["home"] in ACTIVE_HOMES and d["bucket"] == "NONE")
+    # scope CLAIMED-ONLY to ACTIVE_HOMES — CANONICAL/HISTORY `accepted`/`landed` is settled, not CI-gated
+    # (mirrors the scoreboard's landed_unverified filter; keeps the SessionStart line consistent)
+    claimed = sum(1 for d in surface
+                  if d["home"] in ACTIVE_HOMES and d["bucket"] == "LANDED" and not d["verified"])
+    avail, _ = load_cluster_state(CLUSTER_STATE)
+    a = sorted(k for k, v in avail.items() if v == "true")
+    u = sorted(k for k, v in avail.items() if v != "true")
+    pe = True
+    if STATE_ROOT.is_dir():
+        pe = all(len([f for f in sub.glob("*.md") if f.name not in ("CLAUDE.md", "README.md")]) == 0
+                 for sub in STATE_ROOT.iterdir() if sub.is_dir())
+    due = decompose_due_count()
+    print("MEMORY BUDGET  (`placement-audit.py --ledger` = per-file queue · `--focus` = testable scope)")
+    print(f"  debt: {no_exit} no-status · {mem_un} unlinked-memory · {claimed} claimed-unverified"
+          f"   |   pressure-dirs: {'empty ✅' if pe else '⚠ NON-EMPTY (pressure)'}")
+    print(f"  testable env: {', '.join(a) or 'none'}   |   blocked-by-env: {', '.join(u) or 'none'}")
+    cov = decompose_coverage(surface)
+    print(f"  review: {cov['captured']}/{cov['active']} specs+plans decomposed · "
+          f"{cov['uncaptured']} UN-CAPTURED (un-reviewed backlog — `--coverage` for the queue)")
+    # BACK fire point: ACTIVE-home docs with terminal status still living plan-shaped → past-due to dissolve
+    print(f"  decompose: {due} plan{'' if due == 1 else 's'} past-due to decompose"
+          f"   ({'clear ✅' if due == 0 else '⚠ decompose-self → zero residue'})")
+    return 0
+
+
+def main() -> int:
+    if FOCUS:
+        return focus_mode()
+    if LEDGER:
+        return ledger_mode()
+    if HEADLINE:
+        return headline_mode()
+    if COVERAGE:
+        return coverage_mode()
+    if STASIS:
+        return stasis_mode()
+
+    docs, status_vals = scan_docs()
+    surface_docs = [d for d in docs if not d["home"].startswith("_state")]
+    mem = scan_memory()
+    mem_unlinked = [m for m in mem if not m["linked"]]
+
+    no_exit = [d for d in surface_docs if d["home"] in ACTIVE_HOMES and d["bucket"] == "NONE"]
+    # CLAIMED-ONLY is the over-claim gate: an ACTIVE-home plan/spec saying "landed" without verification
+    # evidence is dangerous debt. But CANONICAL (living architecture truth) and HISTORY (settled/distilled
+    # decisions) ARE the verified/settled destinations per PLACEMENT.md — an `accepted`/`landed` status there
+    # is the correct steady state, not a deliverable awaiting CI. Scope the gate to ACTIVE_HOMES (mirroring
+    # no_exit / drift_dead / orphans on the surrounding lines) to drop that deterministic false-positive class.
+    landed_unverified = [d for d in surface_docs
+                         if d["home"] in ACTIVE_HOMES and d["bucket"] == "LANDED" and not d["verified"]]
+    drift_dead = [d for d in surface_docs if d["home"] in ACTIVE_HOMES and d["bucket"] == "DEAD"]
+    orphans = [d for d in surface_docs if not d["inbound"] and not d["out"] and d["home"] in ACTIVE_HOMES]
+    history_broken = [d for d in surface_docs if d["home"] == "HISTORY" and not d["has_canonical_link"]]
+    # Bidirectional history-edge check (PLACEMENT.md): a HISTORY record must ALSO be
+    # linked back FROM canonical. Build a reverse index of every .md basename any
+    # CANONICAL doc links outward to; a HISTORY doc with no inbound canonical link is
+    # an asymmetric (one-directional) edge.
+    canonical_targets = set()
+    for d in surface_docs:
+        if d["home"] == "CANONICAL":
+            canonical_targets.update(d["out"])
+    history_no_backref = [d for d in surface_docs
+                          if d["home"] == "HISTORY" and d["has_canonical_link"]
+                          and d["name"] not in canonical_targets]
+    dumps = []
+    if RETIRED_DIR.is_dir():
+        for f in RETIRED_DIR.glob("*.md"):
+            fm = parse_front_matter(f.read_text(errors="replace"))
+            if not (fm.get("verified_by") or fm.get("landed_commit")):
+                dumps.append(str(f.relative_to(ROOT)))
+    total = len(surface_docs)
+    with_state = sum(1 for d in surface_docs if d["bucket"] != "NONE")
+    debt_total = (len(no_exit) + len(landed_unverified) + len(drift_dead) + len(orphans)
+                  + len(history_broken) + len(history_no_backref) + len(dumps) + len(mem_unlinked))
+
+    if AS_JSON:
+        print(json.dumps({"total_docs": total, "memory_unlinked": len(mem_unlinked),
+                          "debt_total": debt_total, "no_exit": len(no_exit),
+                          "landed_unverified": len(landed_unverified), "orphans": len(orphans),
+                          "history_broken": len(history_broken),
+                          "history_no_backref": len(history_no_backref), "dumps": len(dumps)},
+                         indent=2, sort_keys=True))
+        return 0
+
+    def lst(items, n=6):
+        for d in items[:n]:
+            print(f"    - {d['path']}")
+        if len(items) > n:
+            print(f"    … +{len(items)-n} more")
+
+    print(f"PLACEMENT AUDIT — deterministic, no LLM   (root: {ROOT})")
+    print(f"\n{'='*72}\nTECH-DEBT SCOREBOARD  (each → 0)\n{'='*72}")
+    for n, tag, desc in [
+        (len(no_exit), "NO-EXIT", "active doc with no status (dumping-ground signal)"),
+        (len(landed_unverified), "CLAIMED-ONLY", "'landed' with NO verification evidence"),
+        (len(drift_dead), "DRIFT-DEAD", "superseded/abandoned still in ACTIVE"),
+        (len(orphans), "ORPHAN", "active doc with no inbound and no outbound link"),
+        (len(history_broken), "HIST-BROKEN", "history record with no canonical back-link (outbound)"),
+        (len(history_no_backref), "HIST-NO-BACKREF", "history record no canonical links TO (inbound)"),
+        (len(dumps), "DUMP", "_retired/ holding unverified content"),
+        (len(mem_unlinked), "MEM-UNLINKED", f"memory entry with no cites: ({len(mem)-len(mem_unlinked)}/{len(mem)} linked)"),
+    ]:
+        print(f"  {n:>4}  {tag:<15} {desc}")
+    print(f"  {'-'*4}\n  {debt_total:>4}  DEBT TOTAL")
+    print(f"  doc lifecycle-state coverage: {with_state}/{total} ({(100*with_state//total) if total else 0}%)"
+          f"   |  distinct status strings: {len(status_vals)}")
+
+    stable = equilibrium_section()
+
+    print(f"\n{'='*72}\nEQUILIBRIUM VERDICT\n{'='*72}")
+    if debt_total == 0 and stable:
+        print("  ✅ AT EQUILIBRIUM — no content debt, pressure dirs empty, no dumps.")
+    else:
+        print(f"  ❌ NOT AT EQUILIBRIUM — {debt_total} content-debt items"
+              + ("; pressure dirs empty (structurally clean)" if stable else "; structural pressure present"))
+        print("     Run `--ledger` for the per-file budget (every file's position + state + next-action).")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

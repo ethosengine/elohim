@@ -4,6 +4,8 @@ description: "The values-forward stance has lived costs. People whose continued 
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/docs/content/elohim-protocol/constitution.md
 ---
 
 This is the honest counterpart to [[project_consilience_higher_order_sensemaking]] and [[project_mission_platform_for_collective_biography]]. Those entries describe the protocol's patience and dignity-restoration mission. This entry names the population for whom patience-and-dignity-toward-everyone *would be the wrong move*, and the friction-by-design that follows.

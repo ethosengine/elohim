@@ -3,6 +3,8 @@ name: Quilt is the elohim-native S3 surface — don't reach for AWS S3 for build
 description: Build-side caching needs (sccache, blob backends, etc.) should target the EPR quilt surface as the dogfooding path; defer until iroh substrate matures
 type: project
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
 ---
 When designing build-cache or blob-cache infrastructure (e.g. sccache backend, build artifact stores), the default elohim-native answer is the EPR **quilt** surface — the S3-shaped abstraction over EPR content addressing. It's part of the resiliency social compute epic.
 

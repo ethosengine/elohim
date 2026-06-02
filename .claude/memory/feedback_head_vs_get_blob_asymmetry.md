@@ -3,6 +3,8 @@ name: Use GET, not HEAD, when probing /blob/<hash> on elohim-storage
 description: HEAD on /blob/<hash> returns 404 even when GET returns 200 — route registration is GET-only and HEAD falls through to a 404 catch-all; using `curl -sI` for blob existence checks gives false negatives
 type: feedback
 originSessionId: 872c2e1c-02fe-453a-93b3-e69dac1e54e3
+cites:
+  - doorway/doorway-service/src/routes/blob.rs
 ---
 `curl -sI` (HEAD) on `http://<peer>:8090/blob/<hash>` returns 404 even when `curl -s` (GET) on the same URL returns 200 with full bytes. This is because the route is registered GET-only in elohim-storage's http.rs (line ~533) and HEAD requests fall through to a 404 catch-all.
 

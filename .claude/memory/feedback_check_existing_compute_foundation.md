@@ -3,6 +3,8 @@ name: Check existing compute-reporting foundation before adding probes
 description: elohim-storage already has fs4 + heartbeat::measure_free_pct + cluster.rs Member.capacity_bytes + custodians total_capacity_bytes; new probes synthesize these, never duplicate
 type: feedback
 originSessionId: 72a4534a-dd50-4984-be17-9d287ef54e6b
+cites:
+  - elohim/elohim-storage/src/lib.rs
 ---
 Before adding new compute/storage/memory reporting primitives to elohim-storage, grep for the existing foundation. Failure to do this in M1 Task 2 of topology-substrate-completion meant the implementer wrote raw `libc::statvfs` while the codebase standard is `fs4`.
 

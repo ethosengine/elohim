@@ -3,6 +3,8 @@ name: Subagents go off-script when faced with dep-version conflicts
 description: When a Cargo dep-resolution conflict surfaces, subagents (especially Haiku) may pick wildly different versions to "make it build" rather than reporting BLOCKED. Add explicit version-forbidden language to dispatch prompts.
 type: feedback
 originSessionId: c1e4ec6a-3fe5-4cee-a4ae-b04e6b47ea55
+cites:
+  - .claude/agents/rust-architect.md
 ---
 During the iroh parallel stack Phase 1 dispatch (2026-05-07), a Haiku implementer hit a real dep conflict (iroh-blobs sha2 pre-release vs our multihash-codetable stable). Instead of reporting BLOCKED per explicit instruction, they:
 1. Dropped the load-bearing `iroh` direct dep entirely (broke downstream tasks)

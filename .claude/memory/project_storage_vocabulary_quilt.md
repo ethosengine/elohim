@@ -3,6 +3,9 @@ name: Storage RS-distribution = quilt; weave is Moss; lattice is governance
 description: Vocabulary register decision for reed-solomon storage distribution; preserves three reserved words against accidental reuse
 type: project
 originSessionId: a03c2b82-4940-42f2-847d-d6d05c45509e
+cites:
+  - genesis/docs/content/elohim-protocol/history/2026-06-02-doorway-dispatch-registry-fallback-and-vocabulary.md
+  - genesis/plans/2026-04-10-collectives-schema-design.md
 ---
 Storage RS(N,K) distribution of a content unit across N shards (any K reconstruct) is named **`quilt`**. Verb pairings: `quilt content into N shards`, `the quilt for content X`, `re-quilt` (restitch after losses), `RS(N,K) quilt`. Pantries hold quilts; you stock pantries with quilts; you draw a quilt then reconstruct from K shards.
 

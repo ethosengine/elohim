@@ -290,6 +290,29 @@ grep -rn "from '\.\./\.\./\.\." --include="*.ts" | head -20
 - [Good pattern 2 to document/spread]
 ```
 
+## Compaction-loop semantic surfacing (anti-pattern history, on-demand)
+
+You detect recurring shapes; the Spec/Plan Compaction Loop
+(`genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`) keeps the *distilled* shapes
+in a curated history (`genesis/docs/content/elohim-protocol/history/`) and a semantic index (MemPalace). Before
+you report a "new" anti-pattern as if first-seen, **check whether it is already a known, distilled lesson** — a
+recurrence is far more actionable than a fresh finding, and re-reporting a curated shape is its own kind of
+dump.
+
+You are **not** MemPalace-equipped by default (the four memory agents are). Pull the semantic lens **just in
+time** via the on-demand tool-load — load exactly the two surfacing tools, use them, release:
+
+```
+ToolSearch  →  select:mempalace_search,mempalace_check_duplicate
+```
+
+Then `mempalace_search` the anti-pattern's shape (and the `feedback_*` / `history/` corpus via Grep) to label
+each finding **new** vs **known-recurring** with its prior citation. After concluding, feed the cleanup side of
+the loop: a shape that recurs across modules is a candidate for a **canonical convention + a curated history
+lesson + an inline `anti-pattern` pointer** (§7.3) so the next planner trips on it at the decision point — route
+recurring shapes there (via the historian/librarian) rather than leaving them only in a backlog report. If
+MemPalace is unavailable in your dispatch, fall back to Grep over `feedback_*` and `history/` and say so.
+
 ## Ender's Wisdom
 
 *"The enemy's gate is down."*

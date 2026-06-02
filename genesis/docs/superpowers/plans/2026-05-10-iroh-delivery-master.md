@@ -1,4 +1,24 @@
+---
+status: in-flight
+verification: claimed-not-verified   # ci-investigator 2026-06-01 vs CI+Grafana: 1/12 gates verified-stable
+landed_commit: none                  # the per-gate ✅/⏳ tracker below is SELF-REPORTED and stale
+requires_env: [harbor, alpha-cluster-6peer]   # CI image builds + the 6-peer soak cluster
+---
+
 # Iroh Delivery Master Plan
+
+> **⚠ VERIFICATION STATUS (2026-06-01 — graded by ci-investigator against real CI + Grafana, NOT self-assessment).**
+> The per-gate `✅`/`⏳` tracker in this file is **stale and self-reported.** Independent verification found
+> **1 of 12 gates verified-stable (Gate #12, a deliberate no-op); the other 11 are CLAIMED-ONLY, BLOCKED-BY-ENV, or REGRESSED** —
+> code landed, never verified to work:
+> - **iroh tests never run in CI** — the elohim-storage Dockerfile is `cargo build --release` only, no `cargo test`; Gate #1's "43 tests" are unexercised.
+> - **Gate #6 parity soak: 0 of 7 nights ran** (skipped every build via `when`-guard / cascade-mask).
+> - **Gate #7 alpha-cluster: BLOCKED-BY-ENV (degraded)** — 10/13 peers CrashLooping (158–168 restarts, `failedSince: 1024`); the soak cannot start. Code-regression vs env-down is **unresolved** — see [cluster-state.yaml](../../../manifests/cluster-state.yaml); an unavailable env ≠ a regression until proven.
+> - **Gates #8 / #9 / #11:** harness + runbooks authored, never executed (empty baseline table, all 27 consumer cells `OPEN`, rollback drill never run).
+> - **CI currently broken:** Harbor registry down (`500`); orchestrator build #1119 ABORTED.
+>
+> **Disposition: IN-FLIGHT — stays HOT. This is verify-and-finish work, not done. Do NOT retire.** Trust this block
+> + CI evidence over the tracker, per [genesis/docs/PLACEMENT.md](../../PLACEMENT.md).
 
 > **For agentic workers:** This is the coordinating plan for the iroh integration cutover. It maps inter-plan dependencies, sequences execution waves, and surfaces Decisions Required + Discovery Required items that block sub-plan execution. Sub-plans use the writing-plans format with checkbox steps.
 >

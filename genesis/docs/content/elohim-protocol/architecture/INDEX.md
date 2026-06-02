@@ -84,6 +84,8 @@ The records-lifecycle spec rests on these substrate-defining architecture specs 
 | [`2026-05-02-elohim-hub-boundaries-design.md`](./2026-05-02-elohim-hub-boundaries-design.md) | Hub pattern (Tier-1 hub / Tier-3 node) |
 | [`2026-05-15-dna-signal-as-epr-envelope.md`](./2026-05-15-dna-signal-as-epr-envelope.md) | DNA signal as EPR envelope pattern |
 | [`2026-05-23-doorway-access-tier-patterns.md`](./2026-05-23-doorway-access-tier-patterns.md) | Doorway web2 projection access tiers |
+| [`2026-06-02-sweettest-integration-layer.md`](./2026-06-02-sweettest-integration-layer.md) | DNA-level integration test tier (in-process conductors; native-build CI gotchas) |
+| [`2026-06-02-doorway-ssr-runtime.md`](./2026-06-02-doorway-ssr-runtime.md) | Doorway server-render as an honest compute capability (Angular-19 SSR build-glue) |
 
 These 14 specs were migrated from `genesis/docs/superpowers/specs/` on 2026-05-24. Their frontmatter normalization (to the architecture contract — `tier: architecture` + `realizes:` / `informed-by:` / `informs:`) is a follow-up pass; their content remains canonical as-is.
 

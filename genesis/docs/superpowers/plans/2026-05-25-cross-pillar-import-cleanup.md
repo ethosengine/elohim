@@ -1,3 +1,7 @@
+---
+status: Draft
+---
+
 # Cross-Pillar Import Cleanup — Lamad Bundle Independence + Elohim SDK Surfacing
 
 > **For agentic workers:** SUBAGENT-DRIVEN parallel plan. Wave 1 sequential (blocking). Wave 2 parallel (5–7 agents). Wave 3 sequential (cutover). Use **superpowers:subagent-driven-development** + **superpowers:dispatching-parallel-agents** to execute.

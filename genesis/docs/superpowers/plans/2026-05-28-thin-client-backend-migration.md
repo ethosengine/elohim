@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - 2026-05-25-cross-pillar-import-cleanup.md   # the related doc this derives from
+---
+
 # Thin-Client Backend-Migration Plan
 
 > **Plan status:** Audit-driven backlog. Each ticket below is a discrete backend-migration that removes client-side substrate-policy or substrate-orchestration code.

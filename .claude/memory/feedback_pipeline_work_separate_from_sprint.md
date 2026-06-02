@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 5ed7452d-de73-43b1-814f-3b1742a3b1b8
+cites:
+  - .claude/commands/shift.md
 ---
 
 When the operator says "use the pipelines to shake out fixes" or asks for CI/CD iteration, do NOT stash or otherwise disturb in-flight sprint work (uncommitted scaffolding on a long-running sprint branch).

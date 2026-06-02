@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../specs/2026-05-25-pillar-epr-decomposition-design.md   # the design spec this plan implements
+---
+
 # B16 Disposition — EPR Resolver Endpoint for MVP
 
 **Date:** 2026-05-25

@@ -347,6 +347,8 @@ The existing `content_store` zome + blob storage (chunked, RS-4-7, RS-8-12) cont
 
 This preserves the split architecture: notarization + envelope in DHT/storage-atoms; bulk content in libp2p/erasure-coded blobs.
 
+> **Gotcha (history, 2026-06-01):** The DHT notarizes; it never holds blob bytes or byte-movement state. Three implementations drifted off this split — REST-over-diesel EPR routes, discovery-first blob custody (assuming a Kademlia provider track for blob hashes that does not exist), and a DB-`PATCH` deploy that went green while serving stale content — and each was corrected. Distilled in [history/2026-06-01-dht-is-a-notary-not-a-byte-store](../history/2026-06-01-dht-is-a-notary-not-a-byte-store.md).
+
 ### 8.3 Per-pillar projection tables
 
 Existing pillar projection tables (content_nodes, learning_paths, economic_events, etc.) are **kept**. They become materialized views over the EPR table — populated on insert by a kind-aware projector. Apps continue to query them via typed REST as today. The EPR table is the source of truth; the projections are indexes.
@@ -572,3 +574,9 @@ That is the 20-year primitive.
 | Federation | Cross-manifest query execution via coupling-ref traversal |
 | Pillar | One of imagodei / lamad / shefa / mishpat / qahal — capture-resistance obligation surface |
 | Process demonstrator | Subgraph that demonstrates protocol-as-process (avodah, doorway) |
+
+---
+
+## Settled decisions (history)
+
+The reach-on-existing-content backfill policy this envelope design depends on is settled and distilled into a history record: [Reach Backfill Policy for Existing Content](../history/2026-04-22-reach-backfill-policy.md).

@@ -1,0 +1,42 @@
+# Declared cluster / environment state — the "reality" input to the verification SCOPE gate.
+#
+# This is NOT auto-derived (no kubectl from the dev env — feedback_no_kubectl_from_dev_env). The operator
+# or an agent UPDATES it; the update cascades SCOPE (which tests/stories/gates are runnable right now),
+# NOT a regression signal. Partial availability is the STEADY STATE, not a failure (project_seed_whoever_is_ready).
+#
+# Scope resolver (to wire): a test/gate's `requires_env:` set must be ⊆ the `available: true` resources here.
+# Anything requiring an unavailable resource is BLOCKED-BY-ENV → HELD, out of planning scope, NO regression
+# cascade. See genesis/docs/PLACEMENT.md § "Availability ≠ regression".
+
+schema_version: 1
+updated: 2026-06-01
+
+resources:
+  household-nodes:
+    role: Matthew / Jessica / James household — local P2P          # project_shem_is_p2p_live_canvas
+    available: true
+
+  shem:
+    role: multi-tenant live P2P canvas — the cross-node proving ground   # project_shem_is_p2p_live_canvas
+    available: false
+    note: offline / inaccessible (operator-declared 2026-06-01). Cross-node P2P scenarios are OUT OF SCOPE
+          until it returns — held, NOT regressed.
+
+  alpha-cluster-6peer:
+    role: 6-peer alpha soak cluster (adam+matthew bootstrap pair)   # project_alpha_topology_bootstrap_pair
+    available: degraded
+    note: 10/13 peers CrashLooping (158-168 restarts, failedSince build #1024). Whether this is a CODE
+          regression or env-down is UNRESOLVED — needs operator/investigation before it earns a regression
+          cascade. Soak gates #7/#11 are BLOCKED-BY-ENV until a stable 6-peer cluster exists.
+
+  harbor-registry:
+    role: CI image registry (harbor.ethosengine.com)
+    available: false
+    note: 500 on image pull; orchestrator build #1119 ABORTED 2026-06-01. Blocks ALL CI builds → every
+          CI-graded gate is BLOCKED-BY-ENV (cannot run), NOT failed, until the registry is restored.
+
+# requires_env vocabulary used by tests/stories/gates (declare on the artifact):
+#   shem               — needs the shem multi-tenant canvas (cross-node)
+#   alpha-cluster-6peer— needs the stable 6-peer alpha soak cluster
+#   harbor             — needs CI image builds (any CI-graded verification)
+#   household-nodes    — needs the local household P2P (usually available)

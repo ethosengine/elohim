@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ba3b92b8-8e5a-46b4-aa04-6dbcdeab5119
+cites:
+  - .claude/skills/memory-kit/SKILL.md
 ---
 
 The Run #6 memory-ceremony successfully moved audit dimensions (CLAUDE.md OVER-BUDGET 3→0, Surface:Archive 938:1 → 2:1, MEMORY.md under-budget first time) but missed its actual job — three classes of gospel-tier drift in `rust-architect.md` were caught manually by the operator:

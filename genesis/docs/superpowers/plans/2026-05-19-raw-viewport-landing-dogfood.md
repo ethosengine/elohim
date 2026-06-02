@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../specs/2026-05-08-doorway-hub-edge-design.md   # the design spec this plan implements
+---
+
 # Raw Viewport + Landing-Page Dogfood Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

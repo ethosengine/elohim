@@ -1,3 +1,7 @@
+---
+status: Draft
+---
+
 # Records Lifecycle — Application Archetypes Full-Draft Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to dispatch the 7 parallel agents. Each agent receives THIS plan plus their assigned application. Steps use checkbox (`- [ ]`) syntax for tracking.

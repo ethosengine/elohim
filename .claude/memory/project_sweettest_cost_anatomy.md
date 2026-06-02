@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: c525e164-d9a4-4717-9a30-fcd1392710b6
+cites:
+  - elohim/holochain/tests/sweettest/src/common/conductors.rs
 ---
 
 Investigated 2026-05-29 (Jenkins builds #1302/#1304, grounded). Where the sweettest cost lives:

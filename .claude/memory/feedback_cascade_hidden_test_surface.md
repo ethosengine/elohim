@@ -3,6 +3,8 @@ name: Cascade-hidden test surface — failed-count is a misleading single metric
 description: When tests can't even start, sprint-report shows "98 fail" out of 98 visible — fixing the cascade root reveals 262 scenarios with 90 fails (better visibility, not regression)
 type: feedback
 originSessionId: cdffa1f9-7b63-4657-ae44-2cafff5156bf
+cites:
+  - .claude/skills/ci-triage/SKILL.md
 ---
 A failure-count target like "≤ 50 failures" is misleading when a cascade root keeps tests from running. Build #968 showed 98 findings out of ~98 visible scenarios because the cucumber-expression bug + Gherkin parse error blocked discovery. After fixing those, build #971 surfaced 262 scenarios with 90 failures — the absolute count barely dropped (98 → 90), but the proportion improved dramatically (98/98 → 90/262).
 

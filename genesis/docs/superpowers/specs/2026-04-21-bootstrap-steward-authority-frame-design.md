@@ -1,3 +1,9 @@
+---
+status: Design
+informed-by:
+  - ../../content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md   # the hub/steward boundary canon this authority frame sits within
+---
+
 # Bootstrap Steward — Authority Frame
 
 **Date:** 2026-04-21

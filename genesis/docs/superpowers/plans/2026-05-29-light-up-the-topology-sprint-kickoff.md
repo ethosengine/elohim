@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../specs/2026-05-29-durability-topology-felt-resilience.md   # the related doc this derives from
+---
+
 # Sprint Kickoff — Light Up the Topology: Felt Resiliency, Peer-Hosted EPR-Apps & the Reach/Hosting Boundary
 
 > **Kickoff prompt** for the next sprint intensive, captured 2026-05-29 while shaking out

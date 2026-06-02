@@ -1,3 +1,9 @@
+---
+status: Draft
+informed-by:
+  - ../../content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md   # the experience-story EPR canon the gate challenge gates on
+---
+
 # Gate Challenge and Indemnification — Protocol Design Spec
 
 **Status:** Draft

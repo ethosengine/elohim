@@ -3,6 +3,8 @@ name: A2o narrative authoring is Opus work; Haiku is glue-only
 description: A2o feature files, scenarios, and frontmatter must be authored by Opus — the human story has to land meaningfully into the technical libraries to convey deep value and interpretability. Haiku is fine for glue (step-def wiring, fixtures, helpers) but never for the story itself.
 type: feedback
 originSessionId: 60007cbf-4a59-4bce-9be7-6e57d1568cf6
+cites:
+  - .claude/agents/storyteller.md
 ---
 A2o features carry the human story — the learner's experience as a specification. The `Feature:` block, the scenario `Scenario:` titles, the Given/When/Then narrative, and any frontmatter / tags / persona setup are load-bearing for vision alignment. Haiku writes mechanical, pattern-matched scenarios that pass tests but don't *carry* the story; the result reads as "scenario shaped object" without the deep value or interpretability the format exists to convey.
 

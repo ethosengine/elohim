@@ -3,6 +3,8 @@ name: Sweettest two_agent_conductors needs explicit DHT consistency wait
 description: Cross-agent must_get_valid_record calls in sweettest fail with "Failed to get Record" unless tests explicitly exchange_peer_info + await_consistency between conductors
 type: feedback
 originSessionId: c423684a-b162-42c6-b5cf-177683da9ed0
+cites:
+  - elohim/holochain/tests/sweettest/src/common/conductors.rs
 ---
 The `two_agent_conductors()` helper in `elohim/holochain/tests/sweettest/src/common/conductors.rs` spins up two SweetConductors but does NOT exchange peer info or wait for DHT consistency. Tests that perform cross-agent reads (e.g. Agent B calling `must_get_valid_record(action_authored_by_A)` via a coordinator) will fail with `Host("Failed to get Record …")` because gossip hasn't propagated.
 

@@ -1,3 +1,7 @@
+---
+status: Design
+---
+
 # EPR Reachability Economics & the Thin-Fediverse Doorway
 
 > **Status:** Vision / design note (not an implementation plan). Captures a conceptual model

@@ -3,6 +3,8 @@ name: Cargo dep probes — resolution success ≠ compilation success
 description: A `cargo metadata` / `cargo generate-lockfile` probe only proves SemVer constraints reconcile. Pre-release crates can resolve cleanly but fail to compile (stale imports, removed paths). Always run `cargo build` against the candidate pin before declaring it viable.
 type: feedback
 originSessionId: 6e799b4d-d829-41f0-9d59-b60202c57923
+cites:
+  - CLAUDE.md
 ---
 During iroh parallel-stack Phase 1.1 (2026-05-07), three iterations landed in the wrong place:
 

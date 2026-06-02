@@ -3,6 +3,8 @@ name: Alpha cluster topology — 6 peers, bootstrap pair, k8s nodes as household
 description: Alpha test fabric layout — adam+matthew across the node-split deliberately to give seeder bulk-upload bandwidth; the k8s node split represents household boundaries
 type: project
 originSessionId: 872c2e1c-02fe-453a-93b3-e69dac1e54e3
+cites:
+  - genesis/orchestrator/data/deployments.json
 ---
 Alpha is a 6-peer test fabric where the k8s node split represents household boundaries (a simulacrum of the real-world household-level network):
 

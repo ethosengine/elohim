@@ -4,6 +4,8 @@ description: "Every load-bearing word in the protocol's vocabulary (consent, com
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/docs/content/elohim-protocol/constitution.md
 ---
 
 The relentless pressure on the epistemic integrity of the context we're designing to hold is not a hypothetical. Words that name relationships of power and accountability — *consent, community, stewardship, reach, trust, attestation, contribution, household, recovery, reconciliation* — are under constant capture pressure from the parties who would prefer easier definitions. "Consent" is one click-through away from meaning a TOS. "Community" is one rebrand away from meaning users-on-a-platform. "Stewardship" is one quarterly objective away from meaning ownership with extra steps. "Reach" is one growth-team away from meaning follower count. **The capture isn't always malicious; often it's just the natural compression of language under load, market framing, or regulator framing.** The result is the same: the word becomes hollow and any party can refill it.

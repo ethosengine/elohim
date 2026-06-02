@@ -3,6 +3,8 @@ name: Jenkins MCP runs as anonymous (OIDC constraint)
 description: Jenkins is OIDC-protected; MCP must omit Authorization header to avoid redirect-loop. Reads work, writes don't. Builds dispatch via webhook + [build:*] commit tags.
 type: project
 originSessionId: 76c5f4ce-df54-4e3e-b98c-5d1028949072
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 Jenkins MCP at `https://jenkins.ethosengine.com/mcp-server/mcp` is registered with `claude mcp add jenkins ... --transport http` — **no auth header**. Adding `Authorization: Basic <token>` triggers the OIDC plugin's interactive login flow and gets you a 50-redirect loop to `/securityRealm/commenceLogin`. Anonymous works because the MCP plugin doesn't require auth and Jenkins's anon role has Overall.Read + Job.Read.
 

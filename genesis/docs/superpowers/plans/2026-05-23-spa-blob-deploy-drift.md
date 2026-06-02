@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - 2026-05-23-landing-page-epr-dual-doorway.md   # the related doc this derives from
+---
+
 # SPA Blob Deploy Drift — `stageSpaBlob` writes a blob that nothing references
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

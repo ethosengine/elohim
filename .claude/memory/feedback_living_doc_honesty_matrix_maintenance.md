@@ -3,6 +3,8 @@ name: living-doc-honesty-matrix-maintenance
 description: A chapter that anchors load-bearing claims via a LIVE/DESIGNED/GAP matrix is only honest if the matrix migrates as the underlying code lands. The resilience epic's Part IX gap matrix names ~80 rows; every signal_kind whitelist edit, ReconcileController handler wiring, feature file passing on alpha, schema additions etc. should bump the matrix to reflect new state. Without migration discipline, the chapter's honesty rots and the trillion-dollar-civic-claim becomes overclaim.
 metadata:
   type: feedback
+cites:
+  - genesis/docs/content/elohim-protocol/resilience/README.md
 ---
 
 When a foundational chapter anchors its civic claim via a "what is built / what is designed / what is gap" matrix, the matrix is **the chapter's load-bearing honesty mechanism**. If the matrix doesn't migrate as the underlying substrate work lands, the chapter's claims rot from defensible to misleading without anyone editing the prose.

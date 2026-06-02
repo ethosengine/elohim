@@ -3,6 +3,8 @@ name: Agentic context graph model
 description: Architectural model for context across the dev lifecycle — skill-graph + typed baton + velocity-tiered memory + localized drift hooks + consolidation harvest; confirmed by industry convergence and Anthropic Dreams (2026-04-21 beta)
 type: project
 originSessionId: 10d85ef0-1979-4311-97e9-c2c209de48e2
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
 ---
 The model crystallized 2026-05-10 across a multi-probe brainstorm. Five load-bearing pieces, all in dialogue:
 

@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 4b9a03ba-e6e3-4770-9ee2-00e1721d108f
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 In `genesis/orchestrator/Jenkinsfile`, two failure regimes live side-by-side and the discipline-line between them is load-bearing for pipeline-quality:

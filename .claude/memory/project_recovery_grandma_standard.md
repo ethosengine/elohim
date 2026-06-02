@@ -3,6 +3,8 @@ name: Recovery's user-experience bar — grandma + trillion-dollar convenience
 description: Recovery design must let non-technical users trust their data and identity are safe, at the same convenience as big-tech custody, via social/peer trust instead of corporate custody
 type: project
 originSessionId: a00556ea-66be-405a-985e-1a7a309d43a8
+cites:
+  - genesis/docs/content/elohim-protocol/resilience/README.md
 ---
 The recovery protocol exists so grandma can trust that her family photos, her identity, and her perspective on the network are safe — at the same experience standard a trillion-dollar tech company provides, but without the corporate custodian.
 

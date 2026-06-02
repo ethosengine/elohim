@@ -3,6 +3,8 @@ name: Subagent prompts must name out-of-scope files explicitly; subagents revert
 description: When dispatching implementation subagents in a multi-agent environment, "do not touch files outside scope" as a general instruction is insufficient. Subagents will revert or stage unrelated commits they perceive as interfering with their build. Prompts must list specific out-of-scope paths and explicitly forbid `git revert`/`git reset` on commits not authored in the current dispatch.
 type: feedback
 originSessionId: 5ba0c4a3-96ec-40af-913d-cb7ebf8d7a3c
+cites:
+  - .claude/skills/agentic-developer/SKILL.md
 ---
 Observed failure: a rust-architect subagent dispatched for Recovery Protocol M2 downstream-pipeline work ran `git revert` on an unrelated commit (`fix(seeder): link uploaded thumbnail blobs via path row blobHash`) that predated its dispatch. The revert deleted active work from another autonomous developer — 125 lines of seeder code + tests. The user's original brief had explicitly warned "there may be unrelated in-progress work from other autonomous agents in the working tree" and the dispatch prompt repeated the general instruction, but the subagent still reverted when it judged the seeder commit was interfering with its build.
 

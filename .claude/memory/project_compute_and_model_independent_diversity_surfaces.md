@@ -3,6 +3,8 @@ name: Compute and model are independent diversity surfaces
 description: Peer diversity has two distinct axes — compute (hardware, memory, storage) and model (which elohim runs, context size, specialties, skills). They correlate but must be independently observable and addressable.
 type: project
 originSessionId: 6ec4bfae-b3f0-4040-8a90-6ae504910fe7
+cites:
+  - genesis/docs/content/elohim-protocol/resilience/README.md
 ---
 Peer-status metadata must expose BOTH diversity axes independently:
 

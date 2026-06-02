@@ -3,6 +3,8 @@ name: PVC threshold — act at 85%+, cargo-pool legacy-targets is the first recl
 description: Workspace PVC is 118G. Above 85% used, the operator considers the system "close to toast." First-party reclamation: cargo-pool legacy-targets --clean --yes (recovers ~30-35G of duplicate target/ dirs outside the shared pool — safe, build artifacts only).
 type: feedback
 originSessionId: 60007cbf-4a59-4bce-9be7-6e57d1568cf6
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 The workspace PVC is **118G**. The operator's threshold language: "you hit 118G and you close to toast." Above 85% used, take action — don't just observe.
 

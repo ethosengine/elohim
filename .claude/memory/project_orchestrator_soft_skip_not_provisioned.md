@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: d5ebc70b-b1ff-43c0-9172-9d14847a28ec
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 `triggerPipeline` in `genesis/orchestrator/Jenkinsfile:681` (landed `09d39c2f4`, 2026-05-17) now classifies `hudson.AbortException` carrying `"No item named"` as a soft-skip:

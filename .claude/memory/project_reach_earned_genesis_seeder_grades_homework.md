@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 02a31f41-5f1f-4600-9d3f-7d0c9a341c9c
+cites:
+  - genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md
 ---
 
 Reach is **earned at authoring** ([[project_social_reach_nervous_system]]). The reach gate is **universal and always on** for all content — there is no "exclusion list" or "public-surface bypass."

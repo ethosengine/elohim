@@ -3,6 +3,8 @@ name: Schema-first is IoC — never guess at implementation
 description: For any wire contract (HTTP view, coordinator input, enum, etc.), write the JSON schema FIRST and make Rust/TS comply. The contract leads, code follows.
 type: feedback
 originSessionId: 6ec4bfae-b3f0-4040-8a90-6ae504910fe7
+cites:
+  - elohim/elohim-storage/tests/schema_contract.rs
 ---
 When adding a new wire type (View, Input, enum, etc.), the correct order is:
 

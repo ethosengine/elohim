@@ -1,3 +1,9 @@
+---
+status: Draft
+related:
+  - 2026-05-28-sprint1-zd-substrate-correct-deploy.md   # sibling Sprint 1 Z.D deploy plan this build-trigger work supports
+---
+
 # Clean Build Triggers — Webhook-Gate Fix + Full Legacy Deprecation
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

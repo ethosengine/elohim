@@ -3,6 +3,8 @@ name: build-manifest.json is required for new orchestrator pipelines
 description: Adding a pipeline to the PIPELINES groovy map alone won't trigger it — the build graph (build-manifest.json files) is now authoritative
 type: feedback
 originSessionId: cc51fa69-af87-4c58-a30c-b86120b754fc
+cites:
+  - app/elohim-library/build-manifest.json
 ---
 When adding a new orchestrator-managed pipeline, you MUST create a `build-manifest.json` for the new project — registering the pipeline in `genesis/orchestrator/Jenkinsfile`'s `PIPELINES` map alone is not enough.
 

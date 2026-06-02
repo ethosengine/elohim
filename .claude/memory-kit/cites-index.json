@@ -1,24 +1,518 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-28",
+  "generated_at": "2026-06-02",
   "cites": {
+    "genesis/a2o/features": [
+      "feedback_a2o_is_human_experience_not_dev_bugs"
+    ],
+    ".claude/skills/story-harvest/SKILL.md": [
+      "feedback_a2o_is_human_experience_not_dev_bugs"
+    ],
+    ".claude/agents/storyteller.md": [
+      "feedback_a2o_narrative_is_opus_work",
+      "feedback_inline_summary_must_echo_frontmatter",
+      "feedback_less_pushy_notifications",
+      "feedback_no_false_opposition_rhetoric",
+      "project_forgetting_as_design"
+    ],
+    ".claude/agents/cartographer.md": [
+      "feedback_agent_framing"
+    ],
+    ".claude/agents/librarian.md": [
+      "feedback_agent_prompts_no_process_status",
+      "feedback_commit_attribution_parallel_agent_leak"
+    ],
+    "elohim/elohim-render/src/angular.rs": [
+      "feedback_angular19_ssr_build_glue"
+    ],
+    "doorway/doorway-service/Dockerfile": [
+      "feedback_angular19_ssr_build_glue"
+    ],
+    ".claude/scripts/memory-kit/agent-audit.py": [
+      "feedback_audit_convergence_evidence"
+    ],
+    ".claude/commands/shift.md": [
+      "feedback_cargo_nextest_installed",
+      "feedback_jenkins_token_strictly_guarded",
+      "feedback_no_generalize_permissions_in_shift",
+      "feedback_overnight_shift_jenkins_is_workhorse",
+      "feedback_pause_sprint_when_substrate_in_flight",
+      "feedback_pipeline_work_separate_from_sprint",
+      "feedback_shells_need_timeouts",
+      "feedback_shift_can_fix_unparseable_test_fixtures"
+    ],
+    "CLAUDE.md": [
+      "feedback_cargo_resolution_vs_compilation",
+      "feedback_dev_branch_no_pr"
+    ],
+    "genesis/orchestrator/Jenkinsfile": [
+      "feedback_cargo_target_dir_for_native_builds",
+      "feedback_cascade_halt_masks_failures",
+      "feedback_dockerfile_target_completeness",
+      "feedback_jenkins_checkout_layers_and_job_alias",
+      "feedback_jenkinsfile_safe_directory_required",
+      "feedback_multi_agent_pvc_pacing",
+      "feedback_orchestrator_abort_baseline_rollback",
+      "feedback_overnight_shift_jenkins_is_workhorse",
+      "feedback_pvc_threshold_and_recovery",
+      "feedback_sccache_cache_corruption_recovery",
+      "project_ci_playwright_image",
+      "project_devspace_disk_cleanup_procedure",
+      "project_jenkins_mcp_anonymous_mode",
+      "project_orchestrator_soft_skip_not_provisioned",
+      "project_pre_dispatch_hard_fail_post_dispatch_unstable",
+      "project_sprint_branch_not_orchestrator_indexed",
+      "project_storybook_in_ethosengine_namespace"
+    ],
+    ".claude/skills/ci-triage/SKILL.md": [
+      "feedback_cascade_hidden_test_surface",
+      "feedback_operator_recurrence_perception_verify_per_build"
+    ],
+    "elohim/elohim-storage/src/lib.rs": [
+      "feedback_check_existing_compute_foundation"
+    ],
+    "genesis/manifests": [
+      "feedback_check_helm_chart_status_before_runbooks",
+      "feedback_no_kubectl_from_dev_env",
+      "feedback_verify_cluster_state_before_runbook"
+    ],
+    ".claude/skills/handoff/SKILL.md": [
+      "feedback_checkpoint_and_handoff_when_scope_explodes",
+      "feedback_session_orchestrate_vs_implement"
+    ],
+    "elohim/elohim-storage/src/p2p/inventory_gossip.rs": [
+      "feedback_ci_evidence_underdetermines_cluster_diagnosis",
+      "feedback_structural_verify_canonical_wire_shape",
+      "project_canonical_wire_shape_newtype_pattern",
+      "project_generous_probes_pattern"
+    ],
+    "elohim/sdk/schemas/scripts/codegen-ts.mjs": [
+      "feedback_codegen_prettier_oscillation",
+      "feedback_codegen_relative_ref_keys",
+      "feedback_ts_rs_cross_crate_import_paths",
+      "project_sdk_scaffolding_generators"
+    ],
+    "steward/node": [
+      "feedback_config_yaml_over_cli",
+      "feedback_signature_changes_grep_callers"
+    ],
+    ".claude/scripts/memory-kit/memory-review.py": [
+      "feedback_correct_reindex_grows_index"
+    ],
+    "elohim/holochain/Jenkinsfile": [
+      "feedback_cucumber_report_empty_signature",
+      "feedback_sweettest_native_build_env",
+      "project_ci_storage_topology"
+    ],
+    ".claude/skills/deliver/SKILL.md": [
+      "feedback_deliver_drive_mode_no_menu",
+      "feedback_no_menu_punt_in_auto_mode",
+      "project_deliver_authority_discipline_paired_verdicts"
+    ],
+    ".claude/commands/brainstorm.md": [
+      "feedback_design_for_a_generation_no_shortcuts",
+      "feedback_research_before_brainstorming",
+      "feedback_spare_no_expense_intelligence"
+    ],
+    "elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/src/lib.rs": [
+      "feedback_dht_readback_use_to_app_option"
+    ],
+    "elohim/elohim-storage/src/db/mod.rs": [
+      "feedback_diesel_migration_timestamp_collision",
+      "feedback_seed_lock_means_schema_drift",
+      "project_alpha_edge_deploy_debugging_landmarks"
+    ],
+    "elohim/elohim-storage/src/services/bootstrap_manifests.rs": [
+      "feedback_docker_include_str_path_mirroring"
+    ],
+    "doorway/doorway-service/src/conductor/registry.rs": [
+      "feedback_doorway_registry_persistence_asymmetry"
+    ],
+    "doorway/doorway-service/src/routes/storage_proxy.rs": [
+      "feedback_env_var_test_flakiness"
+    ],
+    ".claude/scripts/memory-kit/CLAUDE.md": [
+      "feedback_first_memory_team_ceremony",
+      "feedback_routing_layer_is_librarian_scope",
+      "project_memory_in_repo_two_tier"
+    ],
+    ".claude/skills/agentic-developer/SKILL.md": [
+      "feedback_haiku_needs_compiler_ready_scaffold",
+      "feedback_no_generalize_permissions_in_shift",
+      "feedback_shift_integration_iteration_mode",
+      "feedback_subagent_no_git_stash",
+      "feedback_subagent_scope_guardrails"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md": [
+      "feedback_haiku_observe_only_no_specifics"
+    ],
+    ".claude/schemas/haiku-output.schema.json": [
+      "feedback_haiku_observe_only_no_specifics",
+      "feedback_shift_integration_iteration_mode"
+    ],
+    "doorway/doorway-service/src/routes/blob.rs": [
+      "feedback_head_vs_get_blob_asymmetry"
+    ],
+    ".husky/pre-push": [
+      "feedback_husky_bypass_for_ci_only_changes",
+      "feedback_pipe_tail_masks_exit_code"
+    ],
+    "elohim/sdk/epr-ts/src/generated/EprKind.ts": [
+      "feedback_husky_manifest_vs_grep_project_drift"
+    ],
+    "genesis/orchestrator/graph-walker.mjs": [
+      "feedback_husky_manifest_vs_grep_project_drift"
+    ],
+    "elohim/epr/build-manifest.json": [
+      "feedback_husky_manifest_vs_grep_project_drift"
+    ],
+    "elohim/holochain/dna/Jenkinsfile": [
+      "feedback_jenkins_checkout_layers_and_job_alias",
+      "feedback_sweettest_ignore_is_ci_noop",
+      "project_ci_storage_topology"
+    ],
+    "genesis/plans/2026-04-13-device-archetypes-design.md": [
+      "feedback_k8s_is_dev_substrate_not_protocol"
+    ],
+    "genesis/data/rakia/compute-capacity.json": [
+      "feedback_k8s_is_dev_substrate_not_protocol",
+      "project_compute_commitments_bounded"
+    ],
+    "genesis/docs/content/elohim-protocol/resilience/README.md": [
+      "feedback_living_doc_honesty_matrix_maintenance",
+      "feedback_substrate_currency_ceremony_2026_05_18_yellow_backlog",
+      "project_compute_and_model_independent_diversity_surfaces",
+      "project_household_is_resilience_unit",
+      "project_reach_enum_drift_reconciliation",
+      "project_recovery_grandma_standard",
+      "project_resilience_epic_landed_2026_05_18",
+      "project_socially_derived_security"
+    ],
+    "genesis/scripts/memory-balance.sh": [
+      "feedback_memory_balance_sheet_pattern"
+    ],
+    "app/elohim-app/src/app/elohim/components/gate-feedback/gate-feedback-modal.component.ts": [
+      "feedback_native_dialog_top_layer_modal"
+    ],
+    "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md": [
+      "feedback_nexus_cargo_publish_basic_auth",
+      "project_upstream_proxy_pattern_brit_rakia"
+    ],
+    "devfile.yaml": [
+      "feedback_no_brittle_commands_in_poststart"
+    ],
+    ".claude/skills/generalize-permissions/SKILL.md": [
+      "feedback_no_generalize_permissions_in_shift"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-22-qahal-homepage-ux-design.md": [
+      "feedback_no_hebrew_pillar_names_in_narrative"
+    ],
+    "app/elohim-library/build-manifest.json": [
+      "feedback_orchestrator_build_manifest_required"
+    ],
+    "doorway/doorway-service/src/server/http.rs": [
+      "feedback_orchestrator_glob_replace_order"
+    ],
+    "genesis/orchestrator/build-graph.groovy": [
+      "feedback_orchestrator_glob_replace_order"
+    ],
+    "genesis/data/timeline/chronicle/2026-05-14-first-memory-team-ceremony.md": [
+      "feedback_persona_rename_completeness_checklist"
+    ],
+    "genesis/data/humans/humans.json": [
+      "feedback_persona_rename_completeness_checklist",
+      "feedback_schema_data_enum_drift_cascade"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-06-02-sweettest-integration-layer.md": [
+      "feedback_sccache_spawn_enoent_rca"
+    ],
+    "genesis/a2o/src/framework/fixtures/humans.ts": [
+      "feedback_schema_data_enum_drift_cascade",
+      "project_deployments_json_seed_or_skip_truth"
+    ],
+    "elohim/elohim-storage/tests/schema_contract.rs": [
+      "feedback_schema_first_ioc"
+    ],
+    ".claude/scripts/_lib/paths.py": [
+      "feedback_self_reinforcing_path_bug_class"
+    ],
+    "elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs": [
+      "feedback_serde_json_value_breaks_zome_boundary"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md": [
+      "feedback_shift_measure_jenkins"
+    ],
+    "doorway/doorway-service": [
+      "feedback_signature_changes_grep_callers"
+    ],
+    "genesis/docs/content/elohim-protocol/history/2026-06-02-attestation-consolidation-phase2a-dedup.md": [
+      "feedback_skip_spec_doc_for_minor_changes"
+    ],
+    "genesis/data/stories/CONVENTIONS.md": [
+      "feedback_story_delivery_status_axis",
+      "project_forgetting_as_design"
+    ],
+    "genesis/graphos/vocabulary.md": [
+      "feedback_story_delivery_status_axis",
+      "project_quilt_pantry_vocabulary"
+    ],
+    ".claude/agents/rust-architect.md": [
+      "feedback_subagent_dep_conflict_supervision",
+      "feedback_subagent_silent_impl_drops",
+      "feedback_substrate_currency_ceremony_2026_05_18_yellow_backlog"
+    ],
+    "elohim/holochain/tests/sweettest/src/common/conductors.rs": [
+      "feedback_swarm_composition_fresh_tree_build",
+      "feedback_sweettest_cross_agent_consistency",
+      "project_sweettest_cost_anatomy"
+    ],
+    "elohim/holochain/tests/sweettest/.config/nextest.toml": [
+      "feedback_sweettest_ignore_is_ci_noop"
+    ],
+    "elohim/holochain/dna/elohim/flake.nix": [
+      "feedback_sweettest_native_build_env"
+    ],
+    "genesis/orchestrator/preview.mjs": [
+      "feedback_understand_orchestrator_substrate_before_changes",
+      "project_orchestrator_predictive_vision"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md": [
+      "project_agentic_context_graph_model",
+      "project_consolidation_events_economic_feedback",
+      "project_memory_classes",
+      "project_memory_lifecycle_comet_shape",
+      "project_subconscious_memory_tier",
+      "project_submerge_destinations_stewardship_routing",
+      "project_wisdom_resolves_into_epics"
+    ],
+    "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md": [
+      "project_agentic_loop_economics"
+    ],
+    "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml": [
+      "project_alpha_edge_deploy_debugging_landmarks",
+      "project_dna_changes_dont_redeploy_without_forced_reinstall"
+    ],
+    "genesis/orchestrator/data/deployments.json": [
+      "project_alpha_topology_bootstrap_pair",
+      "project_deployments_json_seed_or_skip_truth",
+      "project_generous_probes_pattern"
+    ],
+    "elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs": [
+      "project_attestation_consolidation_sprint_state"
+    ],
+    "elohim/elohim-storage/src/p2p/shamir_transport.rs": [
+      "project_attestation_consolidation_sprint_state"
+    ],
+    "elohim/elohim-storage/src/db/models.rs": [
+      "project_attestation_consolidation_sprint_state"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md": [
+      "project_avodah_pillar",
+      "project_epr_substrate_vs_vf_graphql",
+      "project_first_class_graph_pattern"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md": [
+      "project_bounds_validator_pattern"
+    ],
+    "elohim/elohim-storage/src/services/bounds_validator.rs": [
+      "project_bounds_validator_pattern"
+    ],
+    "elohim/sdk/domains/elohim/manifest.json": [
+      "project_bounds_validator_pattern",
+      "project_cadence_archetype_tunable_with_dev_overrides"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md": [
+      "project_canonical_wire_shape_newtype_pattern",
+      "project_substrate_floor_elohim_ceiling"
+    ],
+    "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md": [
+      "project_che_browser_feedback_loop"
+    ],
+    "genesis/manifests/nix-cache-pvc.yaml": [
+      "project_ci_storage_topology",
+      "project_holochain_build_pvcs_in_jenkins_ns"
+    ],
+    "steward/device/Jenkinsfile": [
+      "project_ci_storage_topology"
+    ],
+    "genesis/docs/content/elohim-protocol/protocol-specification.md": [
+      "project_collapse_bureaucracy_into_protocol"
+    ],
+    "genesis/docs/content/elohim-protocol/governance-layers-architecture.md": [
+      "project_commons_elohim_co_steward",
+      "project_elohim_councils_capture_apex",
+      "project_elohim_subagent_specialists",
+      "project_friction_gradient_limitarianism"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md": [
+      "project_compute_commitment_first_instance_pivot",
+      "project_hub_compute_aggregate_primary",
+      "project_storage_tiering_placement_intelligence"
+    ],
+    "genesis/docs/content/elohim-protocol/global-orchestra.md": [
+      "project_consilience_higher_order_sensemaking"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md": [
+      "project_depin_contracts_are_policy"
+    ],
+    "genesis/seeder/src/seed-humans.ts": [
+      "project_deployments_json_seed_or_skip_truth",
+      "project_seed_whoever_is_ready"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md": [
+      "project_dht_vs_libp2p_scoping",
+      "project_iroh_alpn_handlers_one_stream_design"
+    ],
     "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md": [
       "project_dissolution_principle_sensemaking_collectives"
+    ],
+    "genesis/orchestrator/manifests/elohim-app/alpha/ingress.yaml": [
+      "project_doorway_full_facilitator_sprint"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md": [
+      "project_doorway_hub_sister_brother",
+      "project_elohim_hub_elevation",
+      "project_elohim_node_role",
+      "project_household_horizontal_scaling",
+      "project_hub_optional_floor",
+      "project_node_metrics_vs_hub_aggregation_boundary",
+      "project_storage_as_pod_operator_sets_virtual_limits"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md": [
+      "project_doorway_is_federation_surface_atproto"
+    ],
+    "elohim/sdk/domains/lamad/manifest.json": [
+      "project_doorway_manifest_driven_routes"
+    ],
+    "doorway/doorway-service/src/services/storage_registration.rs": [
+      "project_doorway_peer_registration"
+    ],
+    "doorway/CLAUDE.md": [
+      "project_doorway_single_target_no_fanout",
+      "project_doorway_views_through_not_owned"
+    ],
+    "genesis/orchestrator/manifests/doorway/staging.yaml": [
+      "project_doorway_ssr_pod_resource_floor"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md": [
+      "project_dwelling_hub_replication_pattern"
+    ],
+    "genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md": [
+      "project_dwelling_hub_replication_pattern"
+    ],
+    "elohim/elohim-storage/src/hc_client.rs": [
+      "project_elohim_active_observed_not_flagged",
+      "project_storage_actor_vs_forwarder_patterns",
+      "project_storage_signal_subscribers_filter_by_envelope"
     ],
     "genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md": [
       "project_elohim_agent_sense_respond_architecture"
     ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md": [
+      "project_elohim_app_as_composable_view_federation",
+      "project_m5_is_plumbing_sprint",
+      "project_multi_doorway_human_registration",
+      "project_p2p_is_hosting",
+      "project_peer_native_account_canonical_surface"
+    ],
+    "genesis/docs/content/elohim-protocol/constitution.md": [
+      "project_elohim_as_counsel",
+      "project_epistemic_integrity_under_pressure",
+      "project_social_contract_makes_friction_explicit",
+      "project_values_forward_disclosure_accountability",
+      "project_values_forward_preference_guards"
+    ],
+    "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md": [
+      "project_elohim_dna_as_sdk_boundary"
+    ],
+    "genesis/docs/content/elohim-protocol/manifesto.md": [
+      "project_elohim_vision_fruit_back_on_tree",
+      "project_innovators_dilemma_diagnosis",
+      "project_intelligence_revolution_scales_to_humans",
+      "project_intelligence_zero_marginal_cost_inevitable",
+      "project_mission_platform_for_collective_biography",
+      "project_protocol_sheds_externalities_to_non_participants",
+      "project_redeploy_the_substrate",
+      "project_subsume_g_f_a_via_it_just_works"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md": [
+      "project_epr2b_recovery_m4_convergence",
+      "project_t6_legacy_revocation_path_retired"
+    ],
+    "elohim/sdk/schemas/v1/dna-signal-stream.schema.json": [
+      "project_epr2b_recovery_m4_convergence"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md": [
+      "project_epr_delivery_sprint_2026_05_11"
+    ],
+    "genesis/docs/content/elohim-protocol/history/2026-06-02-epr-foundation-landed-by-waves.md": [
+      "project_epr_foundation_closure_2026_05_16"
+    ],
+    ".claude/shifts/2026-05-30T03-15-landing-pages-both-doorways.sprint-result.md": [
+      "project_epr_projection_serving_chain"
+    ],
+    "elohim/sdk/CLAUDE.md": [
+      "project_feedback_governance_are_reach_earning_machinery"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md": [
+      "project_framework_cleanup_boundary_map"
+    ],
+    "genesis/data/humans/terrance-tutor.md": [
+      "project_genesis_is_protocol_interpretability_layer"
+    ],
     "genesis/docs/architecture/cradle-to-grave-capability-gradient.md": [
-      "project_graduated_recovery_authority"
+      "project_graduated_recovery_authority",
+      "project_imagodei_three_surfaces"
     ],
     "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md": [
+      "project_graph_native_is_accountability_substrate",
       "project_graph_native_substrate_landed_2026_05_16"
     ],
     "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md": [
       "project_graph_native_substrate_landed_2026_05_16"
     ],
+    "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/attestation_validator.rs": [
+      "project_hdi_no_get_links_in_validators"
+    ],
+    ".claude/agents/historian.md": [
+      "project_historian_pattern_surface_agent"
+    ],
     "genesis/docs/content/elohim-protocol/value_scanner/epic.md": [
       "project_household_living_core_lived_contrast_diffusion"
+    ],
+    "genesis/data/collectives/collectives.json": [
+      "project_hub_archetype_abstraction"
+    ],
+    "genesis/data/devices/devices.json": [
+      "project_hub_archetype_abstraction"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md": [
+      "project_hub_identity_cid_canonical_slug_alias"
+    ],
+    "genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md": [
+      "project_inventory_exchange_not_byte_replication"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md": [
+      "project_iroh_parallel_stack_phases3_7_landed",
+      "project_iroh_phase11_sync_first_plane_landed"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md": [
+      "project_iroh_phase11_all_backends_wired"
+    ],
+    "elohim/holochain/tests/manifest-hygiene/tests/manifest_hygiene.rs": [
+      "project_lineage_rna_upgrade_path"
+    ],
+    "elohim/holochain/dna/NETWORK_UPGRADES.md": [
+      "project_lineage_rna_upgrade_path"
+    ],
+    "genesis/docs/PLACEMENT.md": [
+      "project_link_is_path_plus_explainer"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md": [
+      "project_lit_wc_pivot_design_for_generation"
+    ],
+    "doorway/doorway-app/src/app/components/login/threshold-login.component.ts": [
+      "project_m5_reframe_auth_portal_convergence"
     ],
     "genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md": [
       "project_memory_cites_edge"
@@ -29,20 +523,110 @@
     ".claude/hooks/memory-coherence-signal.py": [
       "project_memory_cites_edge"
     ],
+    ".claude/scripts/memory-kit/claude-md-audit.py": [
+      "project_no_claude_md_opt_out_pattern",
+      "project_signal_driven_audit_ceremonies"
+    ],
     "genesis/docs/architecture/stewardship-over-sovereignty.md": [
       "project_no_sovereignty_stewardship_over_ownership"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md": [
+      "project_orchestrator_build_tag_syntax"
+    ],
+    ".claude/settings.local.json": [
+      "project_permission_allowlist_philosophy",
+      "project_shift_palette_wishlist"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md": [
+      "project_pillar_boundary_violations_backlog"
+    ],
+    "elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json": [
+      "project_placement_signals_are_shefa_inputs",
+      "project_signal_kind_extensible_protocol_class"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md": [
+      "project_principle_p1_reconciliation_controller",
+      "project_three_layer_truth_model",
+      "project_ubiquitous_wisdom_dissolves_chokepoint"
+    ],
+    "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md": [
+      "project_qahal_collective_view_slide45_reference",
+      "project_qahal_graduated_capability_surface",
+      "project_social_compute_collective_is_stewardship_unit"
+    ],
+    "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md": [
+      "project_quilt_as_native_s3_surface",
+      "project_tiered_quilt_spec_landed_2026_05_11"
+    ],
+    "genesis/docs/content/elohim-protocol/history/2026-06-02-doorway-dispatch-registry-fallback-and-vocabulary.md": [
+      "project_quilt_pantry_vocabulary",
+      "project_storage_vocabulary_quilt"
     ],
     "genesis/docs/architecture/rea-compute-commitment-primitive.md": [
       "project_rea_compute_commitment_primitive"
     ],
-    "genesis/docs/content/elohim-protocol/resilience/README.md": [
-      "project_resilience_epic_landed_2026_05_18"
+    "genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md": [
+      "project_rea_prefix_redundant"
+    ],
+    "elohim/elohim-storage/src/services/reach_earning.rs": [
+      "project_reach_earned_at_authoring",
+      "project_reach_enum_drift_reconciliation",
+      "project_reach_gate_is_elohim_mediated_matchmaking",
+      "project_social_reach_nervous_system",
+      "project_standing_composes_multiple_evidence_streams"
+    ],
+    "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md": [
+      "project_reach_earned_genesis_seeder_grades_homework"
+    ],
+    "elohim/sdk/schemas/v1/enums/reach.schema.json": [
+      "project_reach_enum_drift_reconciliation"
+    ],
+    "genesis/docs/plans/2026-05-18-app-manifest-modularization.md": [
+      "project_sdk_scaffolding_generators"
+    ],
+    ".claude/scripts/_lib/__init__.py": [
+      "project_shared_lib_pattern"
+    ],
+    "genesis/docs/content/elohim-protocol/history/2026-04-19-d1-through-d5-node-and-household-canon.md": [
+      "project_shem_is_p2p_live_canvas"
+    ],
+    ".claude/hooks/claude-md-drift-signal.py": [
+      "project_signal_driven_audit_ceremonies"
+    ],
+    ".claude/memory-kit/claude-md-drift.json": [
+      "project_signal_driven_audit_ceremonies"
+    ],
+    ".claude/shifts/doorway-ssr-deliver-2026-05-07T23-37/brainstorm-prompt-followup.md": [
+      "project_ssr_anonymous_auth_context",
+      "project_ssr_is_compute_capability_claim"
+    ],
+    "genesis/plans/2026-04-10-collectives-schema-design.md": [
+      "project_storage_vocabulary_quilt"
+    ],
+    ".claude/skills/memory-kit/SKILL.md": [
+      "project_substrate_currency_ceremony_redesign"
     ],
     "genesis/docs/content/elohim-protocol/hardware-spec.md": [
       "project_substrate_scale_ceiling"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md": [
-      "project_tiered_quilt_spec_landed_2026_05_11"
+    "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md": [
+      "project_three_temporal_perspectives",
+      "reference_mempalace"
+    ],
+    "genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md": [
+      "project_trust_as_efficiency_signal"
+    ],
+    "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md": [
+      "project_w2_agent_peer_binding_deferred"
+    ],
+    "elohim/sdk/schemas/v1/dna-signals/agent-peer-binding.schema.json": [
+      "project_w2_agent_peer_binding_deferred"
+    ],
+    "genesis/docs/content/elohim-protocol/history/2026-06-02-experience-story-discernment-gate.md": [
+      "reference_superpowers_docs_location"
+    ],
+    ".claude/hooks/p2p-plan-audit.py": [
+      "reference_superpowers_docs_location"
     ]
   }
 }

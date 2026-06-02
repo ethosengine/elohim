@@ -3,6 +3,8 @@ name: Social reach is a sense-respond nervous system — provenance, feedback, q
 description: Reach earning is the floor; the full contract requires a network nervous system — provenance traceable, sense/respond feedback back-propagating through propagation chains, quarantine of bad actors, and restitution. Edge-of-network response at every node. This is the social-reach epic.
 type: project
 originSessionId: f534b7ae-d435-4ab8-ab3b-f7d23b6b0ed9
+cites:
+  - elohim/elohim-storage/src/services/reach_earning.rs
 ---
 **The aunt-and-rage-bait scenario (canonical example):**
 

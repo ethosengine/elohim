@@ -3,6 +3,9 @@ name: Plan/spec locations in elohim repo
 description: Three plan locations based on scope — elohim domain work, meta/automation work, and submodule-scoped work. Corrected 2026-04-17.
 type: reference
 originSessionId: cba4ccfa-49ce-49fd-8896-afd15e101e73
+cites:
+  - genesis/docs/content/elohim-protocol/history/2026-06-02-experience-story-discernment-gate.md
+  - .claude/hooks/p2p-plan-audit.py
 ---
 **Location convention for this project:**
 

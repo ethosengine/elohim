@@ -3,6 +3,8 @@ name: Shell commands need explicit timeouts
 description: Long-running shell/cargo/build commands history of never ending; always set a timeout and kill on overrun
 type: feedback
 originSessionId: a343d895-dee4-491c-a4db-adda4c79312f
+cites:
+  - .claude/commands/shift.md
 ---
 Long-running shell commands — especially `cargo test`, `cargo build`, `pnpm build`, justfile recipes wrapping any of those — have a history in this repo of getting stuck and never returning. The wedged sync-bench at 86 minutes silent (May 2026) is the canonical case but not the only one.
 

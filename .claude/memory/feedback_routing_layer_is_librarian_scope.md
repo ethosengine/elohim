@@ -2,6 +2,8 @@
 name: routing-layer-hygiene-is-librarian-scope
 description: Agent-catalog and skill-catalog hygiene (description tightening, tools-mismatch, overlap disambiguation) is librarian's present-tense deliverable, not general-purpose. The audits that surface the drift (skill-audit, agent-audit) are explicitly librarian-driven per memory-kit CLAUDE.md.
 type: feedback
+cites:
+  - .claude/scripts/memory-kit/CLAUDE.md
 ---
 
 When dispatching work to fix the always-loaded routing layer — skill descriptions, agent definitions, trigger overlap, frontmatter tools-mismatch — dispatch to **librarian**, not general-purpose or claude.

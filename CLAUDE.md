@@ -44,7 +44,7 @@ cd sophia && pnpm install && pnpm build && pnpm test [-- --filter sophia-core] &
 ```bash
 pnpm run schema:{test,validate,check-dna,codegen:ts}
 ```
-The `.husky/pre-push` hook auto-detects changed projects and runs their quality gates. Bypass with `HUSKY=0 git push`.
+The `.husky/pre-push` hook auto-detects changed projects and runs their quality gates. Bypass with `git push --no-verify` (NOT `HUSKY=0` — `core.hooksPath=.husky` makes git invoke the hook directly, bypassing the npm wrapper that honors the `HUSKY` env var, so `HUSKY=0` is a no-op here; this doc-vs-behavior drift has cost shift time 4×).
 
 ## Architecture
 
@@ -173,7 +173,9 @@ Requires `macros` + `ed25519` features. Use `with_codec()` not `new()` for reque
 
 ## CI/CD
 
-Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. 
+Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. Recurring CI/orchestrator traps (NOT_BUILT/superseded ≠ regression, host-green ≠ CI-green, baseline-rollback over-build, sccache poisoning, `#[ignore]` is a CI no-op): see the frequency-ranked museum record `genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md`.
+
+> **Recurring CI/orchestrator watch-outs** (read before debugging a "regression"): `NOT_BUILT`/`ABORTED`/superseded builds read as 0-failures (lossy measure); `#[ignore]` is a CI no-op (DNA sweettests run `--run-ignored all`); webhook double-fire; baseline-rollback over-build. The frequency-ranked museum record is the canonical home: `genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md` (orchestrator-specific watch-outs detailed in `genesis/orchestrator/README.md`).
 
 Pipeline metadata is declared in per-project `build-manifest.json` files. The `genesis/orchestrator/graph-walker.mjs` + `build-graph.groovy` walk these manifests to build a dependency graph and determine which pipelines to trigger. `pipeline-registry.mjs` exposes the metadata to JavaScript consumers.
 

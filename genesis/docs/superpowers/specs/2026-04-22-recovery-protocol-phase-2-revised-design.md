@@ -1,3 +1,8 @@
+---
+status: draft
+supersedes: 2026-04-21-recovery-protocol-phase-2-design.md
+---
+
 # Recovery Protocol Phase 2 (Revised) — Graduated Authority, Not Shamir-First
 
 **Status:** Draft

@@ -3,6 +3,8 @@ name: cucumber-report-empty-signature
 description: Jenkins Cucumber plugin "Missing report result → UNSTABLE" + present-but-empty sprint-report JSON = Gherkin parse error elsewhere in the feature set; read E2E log for "Parse error in features/" first, NOT runner config / tag filter / hook bail
 metadata:
   type: feedback
+cites:
+  - elohim/holochain/Jenkinsfile
 ---
 
 When elohim-genesis/dev returns UNSTABLE with `Findings: 0, scenarios: 0` in the sprint-report (md + JSON both present, both empty of completed scenarios), the cause is almost always a **Gherkin parse error somewhere in the feature set** — NOT a runner configuration issue, tag filter exclusion, or pre-test hook bail.

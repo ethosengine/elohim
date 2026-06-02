@@ -2,6 +2,8 @@
 name: correct-reindex-grows-index
 description: Re-indexing orphaned topic files into MEMORY.md can grow the file even after tightening 10 entries — the orphans were always-load-bearing, just invisible. Tightening alone insufficient; umbrella consolidation needed.
 type: feedback
+cites:
+  - .claude/scripts/memory-kit/memory-review.py
 ---
 
 Wave 4 of the first memory-team ceremony: librarian was tasked with tightening MEMORY.md to budget (24.4 KB) AND re-indexing 12 orphaned topic files (files on disk but missing from the index). After tightening 10 longest entries (-1.4 KB) AND re-indexing 12 orphans (+2.2 KB), net result: MEMORY.md grew from 26.2 KB → 28.5 KB. Still over budget.

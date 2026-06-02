@@ -3,6 +3,10 @@ name: No /generalize-permissions gate in /shift kickoff
 description: Auto mode handles permission prompts inline; pre-shift palette pass is no longer required and adds friction
 type: feedback
 originSessionId: 9224e3af-0b7a-4f15-b700-1fc37bfe9b39
+cites:
+  - .claude/skills/generalize-permissions/SKILL.md
+  - .claude/skills/agentic-developer/SKILL.md
+  - .claude/commands/shift.md
 ---
 Do not run `/generalize-permissions` as the first step of `/shift` kickoff. Skip straight to Objective interview/composition.
 

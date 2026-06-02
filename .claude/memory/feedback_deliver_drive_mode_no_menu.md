@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: d8ac4ba5-8c70-42b9-a7eb-f98689dea358
+cites:
+  - .claude/skills/deliver/SKILL.md
 ---
 
 When running `/deliver` (or any other iteration-loop skill that ships with "present options, wait for kickoff" patterns), DO NOT present multi-option AskUserQuestion menus at iteration kickoff. The operator prefers self-directed driving.

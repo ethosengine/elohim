@@ -3,6 +3,8 @@ name: Three temporal perspectives — history / roadmap / development
 description: The temporal architecture for memory + epics. History is perspective on the past timeline, roadmap on the future timeline, development is the present cycle that bridges them. Memory-kit and converge serve this frame.
 type: project
 originSessionId: b5ef4833-2583-4482-b36e-b595da75dafe
+cites:
+  - genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md
 ---
 The user named this on 2026-05-13 while reframing memory-kit:
 

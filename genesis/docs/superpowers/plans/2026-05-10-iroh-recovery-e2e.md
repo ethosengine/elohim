@@ -1,6 +1,7 @@
 ---
 title: iroh Phase 11 Cutover Gate #5 — Recovery e2e Cross-Stack Harness
 status: complete
+requires_env: [shem]   # cross-stack / cross-node recovery needs the shem cross-node canvas
 created: 2026-05-10
 parent: genesis/docs/superpowers/plans/2026-05-08-iroh-phase11-prep.md
 spec: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md (gate #5, line 514)

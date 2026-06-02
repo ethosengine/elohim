@@ -7,10 +7,15 @@ pillar coupling: elohim (substrate), infrastructure (runtime composition)
 informed-by:
   - 2026-05-01-light-up-the-topology-design.md (Light Up the Topology)
   - 2026-05-02-blob-custody-reconciliation-design.md (Blob Custody Reconciliation)
+# Compacted into the "Doorway / hub edge" section below (raw bodies retire to git):
+compacted_from:
+  - genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md
+  - genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
 informs:
   - All future hub-archetype implementations (HouseholdHub, CollectiveHub)
   - All Phase 3+ work that needs to land in the right crate the first time (hub vs node vs storage)
   - All future runtime composition specs (operator UI, fixtures crate) that consume the Hub trait
+  - The doorway-vs-hub responsibility split and the four reach-earning surfaces at hub scale
 memory_anchors:
   - project_elohim_hub_elevation
   - project_hub_archetype_abstraction
@@ -18,6 +23,29 @@ memory_anchors:
   - project_three_layer_truth_model
   - project_household_horizontal_scaling
   - project_elohim_node_role
+  # Carried from the hub-edge spec (B.4 amendment — memory↔doc edges preserved):
+  - project_reach_earned_at_authoring
+  - project_social_reach_nervous_system
+  - project_trust_as_efficiency_signal
+  - project_dht_vs_libp2p_scoping
+  - project_doorway_single_target_no_fanout
+  - project_doorway_peer_registration
+  - project_doorway_manifest_driven_routes
+  - project_peer_native_account_canonical_surface
+  - project_p2p_is_hosting
+  - project_household_fabric
+  - project_substrate_floor_elohim_ceiling
+  - project_signal_kind_extensible_protocol_class
+  - project_social_compute_collective_is_stewardship_unit
+  - project_intelligence_revolution_scales_to_humans
+  - project_redeploy_the_substrate
+  - project_household_is_resilience_unit
+  - project_multi_doorway_human_registration
+  - project_inventory_exchange_not_byte_replication
+  - project_reach_gate_is_elohim_mediated_matchmaking
+# Bidirectional history edge (PLACEMENT.md): settled node/household/doorway decisions distilled here.
+history:
+  - ../history/2026-04-19-d1-through-d5-node-and-household-canon.md
 ---
 
 # elohim-hub / elohim-node / elohim-storage — Boundary Design
@@ -197,3 +225,44 @@ The companion plan (`2026-05-01-light-up-the-topology-plan.md`) gets a short fra
 ---
 
 **This document's job is done when** every implementer touching Phase 3+ federation work in this sprint can answer: "Where does this code live: substrate (elohim-storage), hub (elohim-node), or hub-abstraction (elohim-hub trait, future)?" — and pick the right answer without a vocabulary collision.
+
+---
+
+## Doorway / hub edge (amended 2026-06-02 — compacts the hub-edge + stewardship-chain cluster)
+
+> This section folds two docs that named the same topic at two layers: the **architecture boundary**
+> (`2026-05-08-doorway-hub-edge-design.md`) and the **landed standing-succession slice**
+> (`2026-05-19-doorway-stewardship-chain-design.md`). Their raw bodies retire to git history.
+
+### Doorway-vs-hub responsibility split
+
+Doorway is the **per-deployment web2 projection surface** and should stay simple — self-hosted, human-operable, the kind of thing a household steward runs on a single blade (per `project_doorway_single_target_no_fanout`: it moves bytes to one target and caches; it does not fan out). The **aggregate-scale** concerns — cross-deployment threat coordination, mobile inference processing, workload state migration, social-resilient compute contracts — belong at the **hub** layer (the home-node cluster that stewards a family or collective's compute, federates horizontally with peer hubs, coordinates discernment via elohim-operators). The arrows of this seed's three-layer diagram do not reverse here either: doorway projects, the hub composes.
+
+### The four reach-earning surfaces at hub scale
+
+The protocol already earns reach at **message authoring** (`project_reach_earned_at_authoring`, `project_social_reach_nervous_system`). The hub layer extends the *same* earning signal to four aggregate-scale surfaces:
+
+1. **Compute reach** — does this inference request / observer stream / workload migration / sponsored-compute call earn hub cycles? Mobile devices delegate inference to their dwelling hub; cross-hub sponsored compute is itself a continuously-negotiated REA contract.
+2. **Distribution reach** — does this traffic propagate across federated hubs? Cross-hub gossip, load balancing, content fanout, federation projection all spend the same signal. **A pattern shaped like a DDoS attack is structurally just unearned distribution reach** — it dies at the first unconvinced hub. There is no central anti-spam classifier; there is the cumulative judgment of every hub.
+3. **Defense reach** — defense is a **side-effect of earning, not a bolt-on firewall**. The hub fabric simply doesn't engage with unearned reach.
+4. **AI-coordination reach** — elohim-operator discernment at hub scale spends the same earning signal.
+
+**"DDoS = unearned reach"** is the throughline that makes the doorway/hub boundary coherent.
+
+### Vocabulary: DwellingHub / CollectiveHub
+
+`HouseholdHub` is a **retired synonym for `DwellingHub`** — use DwellingHub. CollectiveHub carries a different *attitude* (institutional/community-scale governance) but the same Hub trait. Keep the substrate hub-kind-agnostic (`dwelling | collective | computed` resolve in UI labels only, per `project_hub_archetype_abstraction`).
+
+**Hyperscaler-fronting is a constitutional constraint**, not the protocol's DDoS answer: it is operator opt-in, never required, and the defense story must be **household-scale-implementable** (a family on one blade can run it). Note the two source docs used *different* reach ladders — both are preserved here; do not silently merge them into one.
+
+### The three-tier stewardship chain (the "who has standing to operate the doorway" instance)
+
+The stewardship chain IS the standing/custody-succession instance of this boundary: it answers **"who has standing to operate the doorway"** as a chain of attestations, not a config flag. **Substrate LANDED:** the `operate-doorway` action, the schemas, `auth/operator.rs`, and the `DoorwayOperatorBindingView` projection.
+
+> **HELD — not done:** the **wiring** (task-#16) is NOT in the DNA. The imagodei `Attestation` kinds, the `verify_custody_chain` traversal, and the `request_kind` for custody transitions are **absent**. Read this as "substrate landed, chain not yet wired" — do not assert the succession chain operates end-to-end. The plan body for this wiring is HELD in the pile (not retired) until it lands or moves to a live successor.
+
+---
+
+## Settled decisions (history)
+
+The node / household / doorway / shem topology decisions this boundary design rests on were settled earlier and distilled into a history record: [D1–D5 Node / Household / Doorway / Shem canonical decisions](../history/2026-04-19-d1-through-d5-node-and-household-canon.md).

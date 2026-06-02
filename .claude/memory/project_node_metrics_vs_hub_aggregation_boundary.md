@@ -3,6 +3,8 @@ name: Per-node metrics vs household-hub aggregation boundary
 description: system_metrics-style modules are single-node only; cross-node aggregations (sum of CPU counts, total compute, household-wide capacity) belong to the household-hub surface, designed later
 type: project
 originSessionId: 72a4534a-dd50-4984-be17-9d287ef54e6b
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
 ---
 Per-node compute observations (filesystem capacity for *this* pod, RAM/CPU/RSS for *this* process) live in modules like `services/system_metrics.rs`. They surface single-node primitives and stop there.
 

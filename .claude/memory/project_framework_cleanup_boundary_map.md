@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e045cbeb-1783-45fc-974b-1a8fc8ae5de3
+cites:
+  - genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md
 ---
 
 Sprint 1 ("Classify & Map", 2026-05-30) of the Elohim framework-cleanup sequence produced three
