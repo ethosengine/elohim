@@ -16,13 +16,42 @@ Invokes the `agentic-developer` skill to run an agentic developer shift.
 1. Interviews the user for the Objective (name, measure command,
    baseline, scope, budget, and whether the shift is
    visual-delivery-gated).
-2. **FRONT fire point (born-linked discovery).** Surfaces prior
-   canonical seed(s) + history watch-outs for the Objective via the
-   lexical `spec-coherence-index.py --query` floor plus a JIT-scoped
-   MemPalace semantic recall, so the shift is born linked to its seed
-   and warned of known anti-patterns (compaction-loop spec
-   `genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`,
-   §4).
+2. **FRONT fire point (born-linked + born-oriented discovery).**
+   Surfaces prior canonical seed(s) + history watch-outs for the
+   Objective via the lexical `spec-coherence-index.py --query` floor
+   plus a JIT-scoped MemPalace semantic recall, so the shift is born
+   linked to its seed and warned of known anti-patterns. **Then orients
+   the Objective on the two standing maps** (additively — same FRONT
+   fire), each a plain-text read folded into the shift journal's opening
+   context:
+   - **MAP-PATH** — reads
+     `genesis/docs/content/elohim-protocol/architecture/MAP.md` and names
+     the concern-**domain D#** (Section 1) the Objective lives in
+     (*"this shift works in domain D#"*), its owning architecture
+     seed(s), the **pillar reading order** (Section 2's walk —
+     default to the Household Living Core path for care/recovery/memory
+     work), and any **Gap Ledger** row (Section 3) it collides with. MAP
+     is the walk over INDEX's graph; orient on MAP.
+   - **ROADMAP-PRIORITY** — reads
+     `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md`
+     and names where the Objective sits in vision × readiness: a ranked
+     **Sprint-N** (§1, with its readiness verdict), the **verification
+     track** (§2 — if the Objective is CLAIMED-ONLY/built-but-unverified,
+     the shift's job is *verify*, not rebuild), **BLOCKED-BY-ENV** (§3 —
+     a HELD Objective needing harbor/alpha/shem must NOT be picked; the
+     readiness check in step 5 will also gate it), or **vision-deferred**
+     (network-scale breadth ranked DOWN of the single-household seed).
+   - **Staleness guard:** both maps regenerate each ceremony, not live —
+     if the roadmap prose disagrees with `placement-audit.py --ledger` /
+     `--focus`, trust the audit numbers and say so. Never let a stale
+     ranking authorize rebuilding verified work or picking a HELD
+     Objective.
+
+   All four lenses (lexical, semantic, MAP-PATH, ROADMAP-PRIORITY) trace
+   to the compaction-loop spec
+   (`genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`,
+   §4): legibility (MAP) and prioritization (ROADMAP) are promoted into
+   the same FRONT-fire discovery the prior-art lenses already run.
 3. Composes a shift id, writes Objective YAML to
    `.claude/shifts/<shift-id>.objective.yaml`, writes initial journal
    to `.claude/shifts/<shift-id>.journal.md`.
@@ -46,6 +75,12 @@ Invokes the `agentic-developer` skill to run an agentic developer shift.
 
 - Skill: `.claude/skills/agentic-developer/SKILL.md`
 - Spec: `genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md`
+- Compaction-loop spec (the FRONT/BACK fire points this command realizes):
+  `genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`
+- MAP-PATH (legibility — the developer's walk):
+  `genesis/docs/content/elohim-protocol/architecture/MAP.md` (INDEX.md = the graph)
+- ROADMAP-PRIORITY (prioritization — vision × readiness sprints):
+  `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md`
 - Templates: `genesis/docs/shifts/`, `genesis/docs/retrospectives/TEMPLATE.md`
 
 ## Loading the skill

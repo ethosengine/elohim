@@ -30,6 +30,35 @@ the canonical it informs (the `dht-is-a-notary` record is the template). Each on
 SUPERSEDED slot and prevents a future re-spec. Full tooling + gotchas: `.claude/scripts/memory-kit/CLAUDE.md`.
 *How* is your judgment — instruments, not a script.
 
+### MAP-CURRENCY mandate (LEGIBILITY/PATH — gap-ledger honesty, co-owned with librarian)
+
+You co-own the currency of **`genesis/docs/content/elohim-protocol/architecture/MAP.md`** with the
+librarian — specifically the **substantive honesty of its §3 Gap Ledger** (the librarian verifies the
+map is *structurally* current: seeds present, walk-links resolve, pointers real; you verify the ledger
+is *substantively* honest). The Gap Ledger is MAP's self-aware list of what the canonical surface does
+not yet cover — each row tagged OPEN / STRADDLE / CODE-NO-DOC / GUIDE-GAP and pointing at a tracked
+`gap-items/*.json`. **Each `/converge` and each memory-ceremony**, walk it with your past-lens and report:
+
+1. **Closed-gap → history distillation.** When a gap row *closes* (a pillar guide written, a seed
+   authored, a straddle reconciled), the lesson of how it was open — the path not taken, the decision
+   settled — is often worth a `history/` record before the row is struck. This is your existing
+   distillation lever (`placement-audit.py --ledger` SUPERSEDED → `content/elohim-protocol/history/`)
+   applied to the MAP's own gaps: a closed gap that just disappears loses the "why it was a gap" lesson.
+   Surface closed gaps to the librarian (who strikes the row) with a one-line history-record proposal
+   where the closing taught something re-spec-worthy.
+2. **Recurring gap-shape.** If the ledger keeps re-listing the same *shape* of gap across cycles
+   (e.g., "code exists, no `tier: architecture` seed" recurs for elohim-agent, then infrastructure
+   crates, then brit), that is a precedent-pattern, not N independent holes — surface it as a
+   `feedback_*` candidate ("CODE-NO-DOC recurs whenever a crate ships ahead of its architecture seed")
+   so the gap-class gets a standing discipline rather than perpetual re-discovery. This is exactly your
+   *shape*-matching role (the `feedback_*` corpus is the crystallized-shape index) turned on the ledger.
+
+Output: when a gap closed worth a history record, the one-line proposal + the canonical it links back
+to (bidirectional, the `dht-is-a-notary` template). When a recurring shape, the `feedback_*` proposal.
+Silence is valid — most cycles the ledger is honest and you say "ledger current, no distillation due."
+This is distinct from your discovery-surfacer role below (which surfaces prior seeds for new brainstorms);
+here you surface prior *gaps* whose closure or recurrence carries a lesson.
+
 ### Compaction-loop FRONT fire point (semantic surfacing for `/brainstorm` discovery)
 
 You are the **discovery surfacer** for the Spec/Plan Compaction Loop's FRONT fire point

@@ -57,6 +57,38 @@ Surface the top-5 by total drift to the operator. **Operator picks 1-2 surfaces*
 
 If the operator picks 0 (audit numbers are clean, or all top-ranked surfaces are bare-filename-heavy noise): announce that the ceremony has no work this cycle, surface the audit summary, and exit.
 
+### Phase 1b — PATH + PRIORITIZATION currency readout (~3 min)
+
+Alongside the gospel-tier drift triage, the ceremony carries two **standing canonical-surface
+currency checks** — the LEGIBILITY/PATH map and the PRIORITIZATION/ROADMAP — so both are maintained
+in-flight, not one-off. This sub-phase is a deterministic readout the operator sees next to the
+substrate-currency audit; it does not consume a picked-surface slot. Dispatch (in parallel, one
+message) two lightweight currency checks:
+
+- **MAP-CURRENCY (librarian + historian).** The librarian verifies
+  `genesis/docs/content/elohim-protocol/architecture/MAP.md` is current with the seeds — every D1–D10
+  seed still on disk and matching INDEX.md, walk-links in §2 resolve, §3 gap-ledger pointers real —
+  per its `MAP-CURRENCY mandate` lens-job. The historian verifies the §3 gap ledger is *substantively*
+  honest (closed gaps worth a `history/` record; recurring gap-shapes worth a `feedback_*`), per its
+  `MAP-CURRENCY mandate` lens-job. The **map-drift accumulator** (`.claude/memory-kit/map-drift.json`,
+  surfaced at SessionStart through the budget headline) names which seeds moved without the map
+  following; if absent, fall back to an `architecture/` directory-diff against MAP §1.
+- **ROADMAP-CURRENCY (cartographer).** The cartographer regenerates
+  `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` from the three live inputs
+  (`placement-audit.py --ledger` × `--focus` × the re-mined vision axis) per its `ROADMAP-CURRENCY
+  mandate`, re-stamping the dated regeneration header even when rankings are unchanged, and surfaces
+  the single highest-leverage next move (§4) so it agrees with the next-actions menu.
+
+Readout shape (one line each, surfaced under the Phase-1 triage summary):
+> **PATH currency:** MAP.md — `<current ✅ | N seeds drifted / M gap rows stale / K dead walk-links>`
+> **PRIORITIZATION currency:** roadmap — `<re-stamped <date>; top move: <one line> | stale vs today's --ledger>`
+
+If both read current, the ceremony notes them green and proceeds to surface-picking. If either drifted,
+the fix is the owning agent's standing duty (librarian/historian for MAP, cartographer for roadmap),
+applied per their structural-vs-substantive authority split — it does **not** require picking MAP or the
+roadmap as one of the 1-2 gospel-tier rewrite surfaces unless the drift is a substantive re-framing (in
+which case it joins the candidate list and the storyteller pens it in Phase 3, same as any surface).
+
 ## Phase 2 — Four-lens deep-read (~25-30 min)
 
 Each picked surface goes through the four lenses. The librarian runs first as prologue; the other three run in parallel against the librarian's verified-facts ground.
@@ -177,6 +209,7 @@ The chronicle is forensic record, not narrative scaffolding. Future ceremonies g
 - Each picked surface has either (a) an applied rewrite + GREEN/YELLOW coherence verdict, or (b) a declined-with-rationale entry filed as backlog
 - All Phase 4b RED verdicts resolved before chronicle write
 - Chronicle entry exists with the three required frontmatter fields
+- **PATH + PRIORITIZATION currency read (Phase 1b)**: MAP.md verified current (or its drift handed to the librarian/historian as a standing fix) and the roadmap re-stamped this cycle (or its staleness closed by the cartographer). Both readouts appear in the ceremony summary.
 - All TaskCreate tasks closed
 
 The operator should leave the ceremony with substrate-grounded gospel-tier surfaces — picked, rewritten with four lenses' contribution, coherence-verified, recorded. Audit-number wins (byte budgets, archive ratios, cleanup-scan flags) are NOT the ceremony's job; those land in `/hygiene-sweep` on a separate cadence.
@@ -210,3 +243,5 @@ If the operator asks for byte-budget hygiene, invoke `/hygiene-sweep`. If they a
 - `.claude/memory/feedback_first_memory_team_ceremony.md` — wisdom from inaugural 6-wave ceremony
 - `.claude/memory/feedback_agent_prompts_no_process_status.md` — gospel-tier surfaces describe stable architecture
 - `genesis/data/timeline/CONVENTIONS.md` — chronicle schema
+- `genesis/docs/content/elohim-protocol/architecture/MAP.md` — the LEGIBILITY/PATH walk (Phase 1b MAP-CURRENCY target; librarian + historian own its currency)
+- `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` — the PRIORITIZATION/ROADMAP home (Phase 1b ROADMAP-CURRENCY target; cartographer regenerates it)

@@ -57,10 +57,51 @@ fork. The lexical floor (Step 1) always stands regardless.
 Carry the **surfaced seeds as plain text** into the brainstorm (exactly as the lexical preload is injected as
 text); the scoped MemPalace tools are released after this step, not kept live through the session.
 
+## Step 1c — FRONT-DISCOVERY: locate the work on the MAP and the ROADMAP
+
+The two lenses above surface *prior art* (what spec this descends from). This step surfaces *position* — the
+two standing legibility/prioritization maps the compaction-loop machinery keeps continuously current, so the
+brainstorm is born oriented, not just born linked. Both are plain-text reads; carry their answers into the
+brainstorm exactly as the surfaced seeds are.
+
+**(1) MAP-PATH — where on the canonical surface does this live?** Read
+[`architecture/MAP.md`](../../genesis/docs/content/elohim-protocol/architecture/MAP.md) and name, in one line:
+- **which concern-domain D# (Section 1's D1–D10 table)** this topic owns — *"you are working in domain D#"* —
+  and the **owning architecture seed(s)** in that domain (cite them `informed-by:` per INDEX's frontmatter
+  contract);
+- **which pillar(s)** the code lives in (Section 1's pillar axis), and the **per-pillar reading order**
+  (Section 2's walk) the implementer should follow — **default to the Household Living Core path** when the
+  topic touches care/recovery/memory at the household (it is the seed, not one of equals);
+- any **Gap Ledger row (Section 3)** this topic collides with — if it is a *known* OPEN / STRADDLE / CODE-NO-DOC
+  gap, say so (you may be filling a tracked hole, not discovering a new one). MAP is the **walk**; INDEX is the
+  **graph** — point the dev at MAP first.
+
+**(2) ROADMAP-PRIORITY — where does this sit in vision × readiness?** Read
+[`vision-readiness-sprint-roadmap.md`](../../genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md)
+(the maintained prioritization home, regenerated each ceremony) and name, in one line, where this work sits:
+- a ranked **Sprint-N** (§1) — quote its readiness verdict (READY / MOSTLY-READY / PARTIALLY-READY) and the
+  household-living-core *why-it-ranks-there*;
+- the **verification track** (§2) — if this is built-but-unverified (CLAIMED-ONLY), the move is *verify*, not
+  *re-build*;
+- **BLOCKED-BY-ENV** (§3) — if it needs harbor / alpha-cluster / shem, it is HELD: **do not brainstorm an
+  implementation against it**, only the design that can land when the operator flips `cluster-state.yaml`;
+- or **vision-deferred** (network-scale breadth ranked DOWN of the single-household seed).
+
+**Staleness guard (mirror of Step 1b §4.4):** both maps are regenerated each ceremony, not live. If the
+roadmap body is stale against today's `placement-audit.py --ledger` / `--focus`, or MAP's stanza predates the
+last seed that landed, treat the orientation as **degraded — trust the ledger/focus numbers over the prose**
+and say so. Never let a stale ranking wave through a rebuild of verified work or a pick of a HELD item.
+
+See the compaction-loop spec
+(`genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`, §4): MAP-PATH and
+ROADMAP-PRIORITY are the *legibility* and *prioritization* disciplines promoted into the same FRONT-fire
+discovery the lexical+semantic lenses already run — surfaced in-flight, additively, every brainstorm.
+
 ## Step 2 — Apply the composition rule (binding for this session)
 
-Apply this rule to the seeds surfaced by **both** lenses (Step 1 lexical PRIOR ART + Step 1b semantic recall) —
-a CANONICAL match found by *either* lens binds the session to compose:
+Apply this rule to the seeds surfaced by the lenses above (Step 1 lexical PRIOR ART + Step 1b semantic recall;
+Step 1c MAP-PATH names the owning architecture seed in the work's D# domain) — a CANONICAL match found by *any*
+lens binds the session to compose:
 
 - **CANONICAL / done match** → COMPOSE from it. Extend the canonical spec; do **not** fork a new one.
 - **SUPERSEDED match** → do **NOT** revive. Open its history record, read the gotcha, design *around* it.
@@ -84,7 +125,9 @@ title: <name>
 status: Draft            # the lifecycle state — NEVER omit
 topic: [<tokens>]        # what it's about (feeds the prior-art index)
 cites: [<prior-art paths you composed from>]   # the verifiable links back
-# requires_env: [<env>]  # if it can only be validated on a specific node/cluster
+domain: D#               # the MAP-PATH concern-domain (Step 1c) — where it lives on architecture/MAP.md
+informed-by: [<owning architecture seed(s) in that D#>]   # the INDEX/MAP graph edge
+# requires_env: [<env>]  # if it can only be validated on a specific node/cluster (a ROADMAP §3 HELD item)
 ---
 ```
 

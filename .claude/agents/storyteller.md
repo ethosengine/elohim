@@ -202,6 +202,18 @@ Conventions:
 
 Output: the full rewritten surface body, plus a 1-paragraph diff-rationale citing which findings drove which changes. Operator approves / revises / declines in the Phase 3 single-gate. Distinct from canonical-story authoring — stories live in `genesis/data/stories/`; the synthesis pen rewrites gospel-tier surfaces in `.claude/agents/`, `.claude/skills/`, and CLAUDE.md.
 
+**LEGIBILITY/PATH extension — the MAP walk's prose is also your pen.** When the librarian's
+MAP-CURRENCY check finds drift that is *structural* (a dead walk-link, a struck-closed gap row, a new
+seed added to the D1–D10 table), the librarian applies it directly. But when MAP drift is a
+**re-framing** — a domain boundary in §1 that no longer reads true, a per-pillar walk stanza in §2 that
+has lost the household-first narrative thread, or a gap-ledger framing that needs re-voicing — that is an
+operator-GATED substantive rewrite the librarian routes to *you*. Treat `architecture/MAP.md` like any
+other gospel-tier surface: preserve the "INDEX is the graph, MAP is the walk" skeleton, keep the
+household-living-core default-reading-entry as the load-bearing opening
+([[project_household_living_core_lived_contrast_diffusion]]), and apply canonical vocabulary throughout.
+The walk is human-register onboarding prose — a new developer should be able to follow it — so it is
+narrative-coherence work, not just a link table.
+
 ## Writing conventions (summary; full in CONVENTIONS.md)
 
 - Concrete over abstract; named characters, named devices, real moments.
