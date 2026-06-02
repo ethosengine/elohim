@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import time
 from pathlib import Path
 
 FLAGS = [a for a in sys.argv[1:] if a.startswith("--")]
@@ -643,6 +644,66 @@ def decompose_due_count():
     return n
 
 
+def _date_of_doc(path: Path):
+    """Best 'last refreshed' date for a living doc: frontmatter `updated:` wins, then
+    `created:`, then filesystem mtime. Returns a YYYY-MM-DD string or None. Honest: the
+    MAP/roadmap are uncommitted living docs, so frontmatter/mtime beats git for currency."""
+    if not path.is_file():
+        return None
+    try:
+        fm = parse_front_matter(path.read_text(errors="replace"))
+    except OSError:
+        fm = {}
+    for k in ("updated", "created", "date"):
+        v = fm.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()[:10]
+    try:
+        return time.strftime("%Y-%m-%d", time.gmtime(path.stat().st_mtime))
+    except OSError:
+        return None
+
+
+def map_currency_line():
+    """The LEGIBILITY/PATH + PRIORITIZATION/ROADMAP currency readout for the headline.
+
+    path:    N architecture seed(s) changed since the MAP walk was last refreshed,
+             read from the map-currency-drift.json accumulator (populated by the
+             map-drift-signal.py PostToolUse hook). The accumulator resets to 0 when
+             MAP.md itself is edited, so N is the in-flight staleness of the WALK vs
+             the seeds (territory). Absent/malformed store → 0 (graceful: hook may not
+             have fired yet).
+    roadmap: when the roadmap synthesis was last refreshed (the PRIORITIZATION axis).
+             Sourced from the canonical roadmap artifact's date (frontmatter/mtime)."""
+    store_p = ROOT / ".claude/memory-kit/map-currency-drift.json"
+    n, last_refresh = 0, None
+    try:
+        store = json.loads(store_p.read_text())
+        if isinstance(store, dict):
+            changed = store.get("changed")
+            if isinstance(changed, dict):
+                # only count seeds that still exist on disk (graceful self-correction)
+                n = sum(1 for rel in changed if (ROOT / rel).is_file())
+            lr = store.get("last_map_refresh")
+            if isinstance(lr, str) and lr:
+                last_refresh = lr[:10]
+    except (OSError, ValueError):
+        pass
+    # MAP.md date (the walk) — prefer the accumulator's recorded refresh, else the doc itself
+    map_date = last_refresh or _date_of_doc(
+        ROOT / "genesis/docs/content/elohim-protocol/architecture/MAP.md")
+    # roadmap date (the prioritization synthesis) — the canonical, maintained roadmap
+    # artifact the commands send developers to (the PATH axis tracks canonical MAP.md;
+    # the PRIORITIZATION axis tracks this canonical artifact, not the cartographer's
+    # scratch synthesis at .claude/memory-kit/Q2-emerging-roadmap.md it draws from).
+    roadmap_date = _date_of_doc(
+        ROOT / "genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md")
+    since = f" since MAP update ({map_date})" if map_date else " since MAP update"
+    return (f"  path: {n} seed{'' if n == 1 else 's'} changed{since}"
+            f"   |   roadmap: refreshed {roadmap_date or '—'}"
+            f"   ({'walk current ✅' if n == 0 else '⚠ MAP.md may be stale vs seeds → refresh the walk'})")
+
+
 def headline_mode():
     docs, _ = scan_docs()
     surface = [d for d in docs if not d["home"].startswith("_state")]
@@ -671,6 +732,9 @@ def headline_mode():
     # BACK fire point: ACTIVE-home docs with terminal status still living plan-shaped → past-due to dissolve
     print(f"  decompose: {due} plan{'' if due == 1 else 's'} past-due to decompose"
           f"   ({'clear ✅' if due == 0 else '⚠ decompose-self → zero residue'})")
+    # LEGIBILITY/PATH + PRIORITIZATION/ROADMAP currency: is the MAP walk current vs the
+    # architecture seeds, and when was the roadmap synthesis last refreshed?
+    print(map_currency_line())
     return 0
 
 

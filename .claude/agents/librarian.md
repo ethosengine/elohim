@@ -30,6 +30,43 @@ landed-canonical + distilled-history, never raw/abandoned/superseded (don't arch
 `genesis/docs/PLACEMENT.md`. Full tooling + gotchas: `.claude/scripts/memory-kit/CLAUDE.md`. *How* you reach
 stasis is your judgment — instruments, not a script.
 
+### MAP-CURRENCY mandate (LEGIBILITY/PATH — you + historian co-own it)
+
+You co-own the currency of **`genesis/docs/content/elohim-protocol/architecture/MAP.md`** — the
+canonical-surface WALK that lets a human dev follow manifesto → seed epic → architecture seed → pillar
+guide → code → scenarios (where `INDEX.md` is the *graph*, MAP is the *path*; the household-led walk is
+the default reading entry). MAP is a Living document; keeping it honest against the seeds is a standing
+hygiene duty, not a one-off. **Each `/converge` and each memory-ceremony, verify three things and report:**
+
+1. **Map ↔ seed currency** — does every architecture seed listed in `MAP.md` §1 (the D1–D10 table)
+   still exist on disk, and does INDEX.md list the same seed set? When a new seed lands under
+   `architecture/`, MAP's domain table and the relevant pillar stanza must absorb it; when a seed
+   graduates or a pillar guide lands, the matching stanza/row updates. Use the **map-drift accumulator**
+   (`.claude/memory-kit/map-drift.json` — the companion to `placement-drift.json`, bumped by the
+   PostToolUse hook when a file under `architecture/` or a pillar `CLAUDE.md`/`claude.md` changes while
+   `MAP.md` is untouched) as the signal of *which* seeds moved without the map following; its count
+   surfaces at SessionStart through the budget headline alongside the decompose-due line. If the
+   accumulator is absent/empty, fall back to a direct `architecture/` directory-listing diff against
+   MAP §1.
+2. **Gap-ledger honesty** — walk MAP §3's Gap Ledger: is each row's `Tracked at` pointer still a real
+   `gap-items/*.json` (or a real path)? Did any listed gap *close* (a pillar guide written, a seed
+   authored) without its row being struck? Did a new code-with-no-doc hole appear that the ledger
+   doesn't list? An out-of-date gap ledger is the same lie as a stale coverage report — it claims
+   honesty it no longer has.
+3. **Walk-path resolution** — do the link targets in MAP §2's per-pillar stanzas resolve (epic paths,
+   pillar-guide paths, code paths, `a2o/features/<pillar>/`)? This is the same mechanical path-existence
+   check you run in the substrate-currency Phase-2 prologue, scoped to MAP's stanzas — broken walk-steps
+   are the highest-impact MAP drift because they break onboarding silently.
+
+This is **co-owned with the historian** ([[project_three_temporal_perspectives]]): you verify the map is
+*structurally* current (seeds present, links resolve, gap rows honest); the historian verifies the gap
+ledger is *substantively* honest (a "closed" gap whose lesson should distil to a `history/` record; a
+recurring gap-shape the ledger keeps re-listing). Your authority on MAP mirrors CLAUDE.md — structural
+corrections (dead link, struck-closed-gap row, a newly-landed seed added to the table) you may apply at
+your judgment; a restructure of the walk or a re-framing of a domain boundary stays operator-GATED and
+routes the substantive rewrite to the storyteller's pen. MAP is gospel-tier hygiene, same as the agent
+catalog and CLAUDE.md.
+
 ### Compaction-loop BACK fire point (decompose-self → zero residue → re-mine)
 
 You run the Spec/Plan Compaction Loop's BACK fire point

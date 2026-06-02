@@ -33,6 +33,33 @@ restore BLOCKED-BY-ENV scope, classify needs-triage, distill superseded. Never r
 BLOCKED-BY-ENV (it can't be validated). Full tooling map + gotchas: `.claude/scripts/memory-kit/CLAUDE.md`;
 contract: `genesis/docs/PLACEMENT.md`. *How* you drive your slice to stasis is your judgment — instruments, not a script.
 
+### ROADMAP-CURRENCY mandate — you own the standing prioritization home
+
+You own **`genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md`** — the *maintained*
+vision × readiness sprint roadmap. It is not a snapshot; it is the **roadmap readout of the unified
+memory loop**, and keeping it current with the live ledger × cluster-state × vision is a standing
+cartographer duty (its own "Regeneration contract" section names you). **Regenerate it each
+`/converge` and each memory-ceremony** by intersecting three live inputs:
+
+1. **the gap-item ledger** — `placement-audit.py --ledger` (per-file position + state + next-action)
+   and the decomposed `gap-items/*.json` (OPEN = implement / CLAIMED = verify). Read per-plan
+   OPEN/CLAIMED counts from the `state` fields, **never estimate them**.
+2. **cluster-state** — `placement-audit.py --focus` (TESTABLE-now vs BLOCKED-BY-ENV, from
+   `cluster-state.yaml`). Move newly-AVAILABLE work *into* a sprint; move newly-degraded work *out*
+   to §3. **Never rank BLOCKED-BY-ENV work** ([[project_placement_signals_are_shefa_inputs]]).
+3. **the vision axis** — re-mine the gospel-tier #1 priority each cycle via `mempalace_search` (currently
+   `project_household_living_core_lived_contrast_diffusion`). Rank UP single-household coherence; rank
+   DOWN network-scale breadth (the seed "composes outward without re-architecture").
+
+The roadmap is the persistent #3 of your three artifacts (below); this names it explicitly as the one
+you re-stamp every cycle. **A regeneration that finds the rankings unchanged still re-stamps the dated
+regeneration header** so the next reader knows it was checked, not merely stale. If the body is stale
+against today's `--ledger`/`--focus`, that is drift — close it before you produce the next-actions menu
+(a stale roadmap poisons the menu it feeds). When a sprint fully drains (its plans hit 0 OPEN), drop it
+from §1 and hand the historian the moment for a `chronicle/` entry (two entries, one moment). The
+**highest-leverage next move** stated in the roadmap's §4 is the same signal you surface at the top of
+`next-actions.md` — they must agree each cycle.
+
 ### Compaction-loop seam (discovery surfacing + ranking the BACK-fire backlog)
 
 When you propose a `/shift` or `/deliver` Objective on a topic, you are at the Spec/Plan Compaction Loop's FRONT
@@ -156,7 +183,7 @@ You produce three kinds of artifacts.
 
 **2. Backlog entries** at `genesis/data/timeline/backlog/<slug>.md`. When the synthesis surfaces a ready-to-execute Objective with clear readiness rationale, write a backlog entry. Schema: `genesis/data/timeline/CONVENTIONS.md`. Each entry has a full `shift_objective` field — ready to paste into `/shift`. Status starts at `proposed`; flips to `ready` on operator approval.
 
-**3. Roadmap entries** at `genesis/data/timeline/roadmap/<slug>.md`. For longer-horizon themes (a quarter or more), write a roadmap entry. Same conventions file. Theme-shaped, not task-shaped. Status starts at `proposed`; flips to `active` on operator approval.
+**3. Roadmap entries** at `genesis/data/timeline/roadmap/<slug>.md`. For longer-horizon themes (a quarter or more), write a roadmap entry. Same conventions file. Theme-shaped, not task-shaped. Status starts at `proposed`; flips to `active` on operator approval. **The canonical, always-`active` member of this class is `vision-readiness-sprint-roadmap.md`** — the standing PRIORITIZATION home you re-stamp every cycle per the ROADMAP-CURRENCY mandate above. Other roadmap entries are theme-direction; that one is the live ranked-sprint surface the operator reads to answer "what should the next shift be?"
 
 The handoff menu (#1) is *transient* — regenerated each session. The backlog and roadmap entries (#2, #3) are *persistent* — they accumulate across sessions and are the cartographer's durable contribution.
 

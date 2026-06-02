@@ -39,11 +39,53 @@ the last BACK-fire dissolve, treat the semantic lens as **STALE — degraded to 
 explicitly; never present stale recall as authoritative "no prior plan." The lexical floor always stands. Carry
 the surfaced seeds/plans into the plan as **plain text**; release the scoped MemPalace tools after this step.
 
+## Step 1c — FRONT-DISCOVERY: locate the plan on the MAP and the ROADMAP
+
+The lenses above surface *prior plans* (what to compose from). This step surfaces *position + priority* — the
+two standing maps the compaction-loop machinery keeps continuously current — so the plan is born oriented and
+scoped to the right rung of the roadmap, not just born linked. Both are plain-text reads; fold their answers
+into the plan's opening context.
+
+**(1) MAP-PATH — where on the canonical surface does this plan live?** Read
+[`architecture/MAP.md`](../../genesis/docs/content/elohim-protocol/architecture/MAP.md) and name, in one line:
+- the **concern-domain D# (Section 1)** this work owns — *"this plan implements in domain D#"* — and the
+  **owning architecture seed(s)** the gaps trace to (these are the `informed-by:` edges the plan cites);
+- the **pillar(s)** the code lands in and the **per-pillar reading order (Section 2's walk)** the implementer
+  follows — **default to the Household Living Core path** for care/recovery/memory work at the household seed;
+- any **Gap Ledger row (Section 3)** these gaps correspond to — if this plan *closes* a tracked OPEN /
+  STRADDLE / CODE-NO-DOC / GUIDE-GAP, name it, so the MAP row can flip when the plan drains. MAP is the
+  **walk** over INDEX's **graph** — orient on MAP first.
+
+**(2) ROADMAP-PRIORITY — which sprint rung is this, and is it pickable?** Read
+[`vision-readiness-sprint-roadmap.md`](../../genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md)
+(the maintained prioritization home) and name, in one line:
+- the ranked **Sprint-N (§1)** this plan drains (quote the live OPEN/CLAIMED counts it lists for the plan, and
+  the readiness verdict) — these are the budget line-items Step 2 scopes to;
+- the **verification track (§2)** — if the plan is CLAIMED-ONLY (built, checkboxes unticked), the work is
+  *verify via ci-investigator*, not re-plan-and-rebuild;
+- **BLOCKED-BY-ENV (§3)** — if the plan (or some of its tasks) needs harbor / alpha-cluster / shem, those
+  tasks are HELD: **do not plan them now** (they drop out of `--focus` by design); plan only the
+  testable-on-`household-nodes` legs;
+- or **vision-deferred** (a #6-rung network-scale plan ranked DOWN of the single-household seed — confirm it
+  is the right pick before draining it ahead of the seed).
+
+**Staleness guard (mirror of Step 1b §4.4):** both maps regenerate each ceremony, not live. If the roadmap
+body disagrees with today's `placement-audit.py --ledger` / `--focus` (Step 1 already ran them), **trust the
+ledger/focus numbers over the roadmap prose** and say so — the audit is the live source; the roadmap is its
+readout. Never plan a rebuild of CLAIMED-ONLY work the verification track owns, or a HELD item, off stale prose.
+
+See the compaction-loop spec
+(`genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`, §4): MAP-PATH (legibility)
+and ROADMAP-PRIORITY (prioritization) are promoted into the same FRONT-fire discovery as the lexical+semantic
+lenses — surfaced in-flight, additively, on every plan.
+
 ## Step 2 — Scope rule (binding for this plan)
 
 - Plan **ONLY** the `OPEN` gaps (implement) + `CLAIMED` gaps (VERIFY via ci-investigator — a checked box is
   a claim, never trusted as done).
-- Do **NOT** plan work that is `BLOCKED-BY-ENV` (held — you can't validate it) or already verified-done.
+- Do **NOT** plan work that is `BLOCKED-BY-ENV` (held — you can't validate it; ROADMAP §3) or already
+  verified-done. Scope to the rung the ROADMAP (Step 1c) places this plan on — drain the named Sprint-N, or
+  route CLAIMED-ONLY work to the verification track rather than re-planning it.
 - Compose from the prior plans/seeds surfaced by **both** lenses (Step 1 lexical + Step 1b semantic); extend,
   don't fork. A CANONICAL/near-duplicate match from *either* lens binds you to compose.
 
@@ -60,7 +102,9 @@ The plan MUST carry PLACEMENT frontmatter so it's instantly auditable (never a n
 title: <name>
 status: Draft
 cites: [<spec path>, <gap-items it covers>]
-# requires_env: [<env>]   # if its tasks can only be validated on a specific node/cluster
+domain: D#               # the MAP-PATH concern-domain (Step 1c)
+sprint: <Sprint-N | verify-track | vision-deferred>   # the ROADMAP rung (Step 1c)
+# requires_env: [<env>]   # if its tasks can only be validated on a specific node/cluster (a ROADMAP §3 HELD leg)
 ---
 ```
 

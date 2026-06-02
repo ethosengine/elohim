@@ -34,6 +34,30 @@ python3 .claude/scripts/converge/converge-apply.py    # Phase 3: operator-approv
 
 4. **Session-start UX** — when a human says "what's next?", read the latest `next-actions.md`, present conversationally, hand off to `/shift` or `/deliver` with the chosen pre-authored Objective. No new skill needed; this is a convention.
 
+### Phase 0 — ROADMAP + MAP currency (runs first, before theme detection)
+
+`/converge` is the cartographer's seat, and the cartographer owns the **standing prioritization home**
+— `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md`. Before producing a "what's next"
+menu, **regenerate that roadmap** from the three live inputs (`placement-audit.py --ledger` × `--focus`
+× the re-mined vision axis) per the cartographer's `ROADMAP-CURRENCY mandate`. A stale roadmap poisons
+the menu it feeds, so this runs **first**:
+
+1. **Roadmap regeneration (cartographer, standing duty).** Re-rank the sprints against today's ledger +
+   cluster-state + re-mined gospel-tier #1 axis; re-stamp the dated regeneration header even if the
+   ranking is unchanged; move newly-AVAILABLE work into a sprint and newly-degraded work out to §3
+   (never rank BLOCKED-BY-ENV). The roadmap's §4 single-highest-leverage-move becomes the **top of the
+   next-actions menu** — they must agree.
+2. **MAP-currency glance (librarian + historian, the LEGIBILITY/PATH co-owners).** Check the
+   **map-drift accumulator** (`.claude/memory-kit/map-drift.json`, surfaced at the SessionStart budget
+   headline): did architecture seeds or pillar guides move without `architecture/MAP.md` following? If
+   so, that is a LEGIBILITY drift — surface it in the menu's "Quiet but load-bearing" section as a
+   structural-hygiene candidate (the owning agents apply the fix per their authority split). MAP
+   currency is *not* the cartographer's to fix, but a drifted walk-path is a legibility cost the menu
+   should name so onboarding doesn't silently rot.
+
+This Phase 0 is the in-flight maintenance half of `/converge`; the four phases below are the synthesis
+half. Both run each pass.
+
 ## Synthesis subagent prompt (Phase 2 dispatch)
 
 ```
@@ -121,6 +145,16 @@ When picking the TOP recommendation, prefer concrete gates over master plans —
 master plans are too coarse to be a single Objective; recommend the next gate
 the master plan unblocks. When scores tie, prefer the plan closer to "ships in
 1-2 cycles" over "ships in 5 cycles, more vision impact" — closes the loop faster.
+
+ALIGN WITH THE MAINTAINED ROADMAP. The menu is the transient, session-shaped
+projection of the persistent prioritization home at
+genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md (regenerated in
+Phase 0 above). The menu's TOP recommendation MUST agree with that roadmap's §4
+single-highest-leverage-move; if your fresh scoring disagrees, that is signal the
+roadmap regeneration is stale — reconcile (re-rank the roadmap) before emitting
+the menu, do not silently diverge. The roadmap is the durable ranked surface; the
+menu is its session read-out with pre-authored Objectives. They are one ranking,
+two readouts (the same "one loop, two readouts" shape as the unified memory loop).
 
 Output format (top 3-5 entries):
 
@@ -250,3 +284,5 @@ conservative; the operator can always tell you to be more aggressive next cycle.
 - `.claude/skills/memory-kit/SKILL.md` — produces the reports converge consumes
 - `genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md` — the design rationale and end-state vision
 - `genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md` — the lifecycle primitives this skill operates within
+- `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` — the standing PRIORITIZATION home the cartographer regenerates in Phase 0; the next-actions menu is its session read-out
+- `genesis/docs/content/elohim-protocol/architecture/MAP.md` — the LEGIBILITY/PATH walk; its map-drift accumulator surfaces in the menu's "Quiet but load-bearing" section when seeds move without the map following
