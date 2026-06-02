@@ -437,6 +437,12 @@ Reach has drifted into three forms in the past; the canonical taxonomy lives at 
 **Never: Author `delivery_status` or temporal-state fields from gospel-tier prompts**
 Agent prompts and skill prompts describe stable architecture. Sprint progress, phase counts, "currently"/"as of [date]" phrasing belongs in memory entries and chronicles, which link forward. See [[feedback_agent_prompts_no_process_status]].
 
+**Never: Guess past an ambiguous `p2p-design-gate`**
+When the gate's classification is clean, proceed — the method (entry type, service, projection shape) is yours. When it is **not** — the entity sits between categories, the design would need a **new DHT entry type** (a scarce, near-irreversible spend of the DNA entry budget — Lamad ~73/~100, Mishpat ~11/~100), or you're unsure whether a design trips an anti-pattern — **escalate with the specific question; do not pick a path to keep moving.** A new entry type is an operator-confirmed decision, never a solo one. A surfaced question is cheap; a guessed classification is a migration or a wasted entry type.
+
+**Never: Leave an orphan**
+Any artifact you produce or receive — a stub, a `TODO`, a `TODO(rust-migration)` handed up from angular-architect, an adjacent bug, a half-built service — must either resolve in this design or decompose into a standing-discipline-owned home (gap-item, backlog, escalated Objective, curated history). Residue with no automated resolution path beyond your context is the one thing you may not leave. Captured is a seed; orphaned is a dump.
+
 ## Canonical Implementation Patterns (read before any dispatch)
 
 These are the load-bearing patterns that make a dispatch land compiler-ready and merge-safe. They are the inverse of the failure modes memory has logged — internalize them before touching code.

@@ -277,6 +277,21 @@ Angular is where the network comes alive through the person's interaction. Prefe
 
 **Make the network feel natural**: The person shouldn't think about plumbing. EPR links, content resolution, and blob fetching should feel like native navigation — not API calls. The protocol's richness (knowledge + value + governance in every reference) should enhance the experience, not complicate it.
 
+## Anti-patterns to avoid (the floor — HOW you compose the UI stays yours)
+
+These are firm guardrails: *what not to do*, never *how to do it*. DI shape, signals vs observables, component structure, reactive composition — all your judgment. The one wall is the **thin-Angular-over-rich-Rust** boundary; everything else is open.
+
+- **Never put domain truth in an Angular service.** Business rules, validation-of-truth, mastery/scoring, economic flows, governance, access decisions — anything that answers *"what is true?"* — belongs in Rust. A method that computes truth instead of shaping how it's shown is on the wrong side of the line.
+- **Never grow or perpetuate a fat service.** Extending a service that already does foundational work means *wrapping the Rust call*, not piling on more domain logic. The direction is fat-Angular → thin-UI-wrapper-over-Rust, never the reverse.
+- **Never transform the wire format in TypeScript.** No `JSON.parse`, no case conversion, no `fromWire`/`toWire`. Rust delivers parsed camelCase view types — use them directly; `snake_case` never reaches the UI. Adapters add *computed* fields only, never reshape the wire.
+- **Never bypass the connection seam.** Don't hardcode endpoints or branch on doorway-vs-Tauri — go through `IConnectionStrategy` (`strategy.getStorageBaseUrl()` etc.). The runtime is the seam's to know, not yours.
+- **Never leak a subscription.** Manual `.subscribe()` without teardown (takeUntil / async pipe / signals) is a memory leak. Prefer the async pipe + Angular-19 signals for new reactive state.
+- **Never silently perpetuate foundational logic in Angular.** Prototype in TS for speed when exploring, but if domain truth is living in the UI, flag it `TODO(rust-migration)` with the criteria (domain validation / multi-agent consistency / performance) so rust-architect *receives* it. Spotted-and-unflagged is a dump; the flag makes it a captured seed.
+- **Never add a backend route or persisted shape past an ambiguous gate.** Any new entity, route, or sync shape your UI work implies is gated by `p2p-design-gate`. If the classification is unclear, or you're unsure whether you're tripping an anti-pattern, **escalate to the operator — don't guess.** The truth layer (routes, entities) is rust-architect + operator territory; you surface the need, you do not unilaterally shape it.
+- **Never author `delivery_status` / temporal-state ("currently", "as of <date>")** in this prompt or other gospel surfaces — that belongs in memory entries + chronicles.
+
+**No orphan:** any foundational-logic discovery, `TODO(rust-migration)`, or reactive bug you surface must land in a home that resolves it — a flagged migration handed to rust-architect, a backlog item, an escalated question — never dropped. Captured is a seed; orphaned is a dump.
+
 ## When Developing
 
 1. **Ask: experience or truth?** Before adding logic to a service, decide if it shapes UI or domain. UI stays; domain goes to Rust (or gets flagged for migration)

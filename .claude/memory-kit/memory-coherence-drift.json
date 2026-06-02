@@ -37,19 +37,19 @@
       "last_signal_at": "2026-06-02T16:58:50Z"
     },
     "feedback_subagent_dep_conflict_supervision": {
-      "hits": 2,
+      "hits": 3,
       "last_changed": ".claude/agents/rust-architect.md",
-      "last_signal_at": "2026-06-02T17:02:34Z"
+      "last_signal_at": "2026-06-02T17:14:47Z"
     },
     "feedback_subagent_silent_impl_drops": {
-      "hits": 2,
+      "hits": 3,
       "last_changed": ".claude/agents/rust-architect.md",
-      "last_signal_at": "2026-06-02T17:02:34Z"
+      "last_signal_at": "2026-06-02T17:14:47Z"
     },
     "feedback_substrate_currency_ceremony_2026_05_18_yellow_backlog": {
-      "hits": 2,
+      "hits": 3,
       "last_changed": ".claude/agents/rust-architect.md",
-      "last_signal_at": "2026-06-02T17:02:34Z"
+      "last_signal_at": "2026-06-02T17:14:47Z"
     }
   }
 }
