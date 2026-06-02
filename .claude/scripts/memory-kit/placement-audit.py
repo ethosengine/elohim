@@ -717,6 +717,19 @@ def memkit_line():
         return ""
 
 
+def mempalace_line():
+    """MemPalace semantic-index staleness — the 7th store's tripwire (index vs the cleaned surface)."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "mempalace-currency.py"), "--status"],
+            capture_output=True, text=True, timeout=15)
+        s = out.stdout.strip()
+        return "  " + s if s else ""
+    except Exception:
+        return ""
+
+
 def headline_mode():
     docs, _ = scan_docs()
     surface = [d for d in docs if not d["home"].startswith("_state")]
@@ -752,6 +765,10 @@ def headline_mode():
     ml = memkit_line()
     if ml:
         print(ml)
+    # SEMANTIC-INDEX tier: is the MemPalace index current with the cleaned surface?
+    pl = mempalace_line()
+    if pl:
+        print(pl)
     return 0
 
 
