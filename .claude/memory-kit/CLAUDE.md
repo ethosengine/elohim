@@ -36,7 +36,17 @@ Each entry below is a **link = path + a 1-2 sentence explainer** (the project li
 ## Sub-directories
 - **`balance-sheets/`** — per-cycle memory balance sheets.
 - **`horizon-scans/`** — the cartographer's quarterly LLM-memory horizon scans (`mem-horizon-scan`).
-- **`<YYYY-MM-DD>/`** — dated ceremony snapshots (that cycle's audit reports, path-update-proposals, etc.).
+- **`<YYYY-MM-DD>/`** — dated ceremony snapshots (that cycle's audit reports, cleanup proposals, etc.).
+
+## Retention — this is the PROCESS-ARTIFACT tier (comet shape, bounded)
+Unlike plans/specs, these reports do **NOT** decompose into the documentation — their only durable value is the
+**trajectory** (the dated sequence). So they follow the comet (`project_memory_lifecycle_comet_shape`), not
+decompose-to-zero: `memkit-retention.py` keeps the recent cycles full (head), compacts the tail to a one-line
+`_digest.md`, and memorializes the core as a single line in **`TRAJECTORY.md`** (the permanent spine; bodies stay
+in git) — so the dir can never grow indefinitely yet the arc stays inferable. Loose top-level reports are filed
+into their dated cycle. All of this is **gitignored except `CLAUDE.md` + `TRAJECTORY.md`**; the
+`memkit:` line in `placement-audit.py --headline` surfaces overflow, and the `memory-stasis-loop` drains it
+(librarian → `memkit-retention.py --apply`) as one more discipline.
 
 ## How it fits together
 `placement-audit.py` measures → `--ledger` (per-file budget) / `--coverage` (un-captured backlog) /

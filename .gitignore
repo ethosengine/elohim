@@ -97,3 +97,10 @@ genesis/research/repos/
 **/mempalace.yaml
 **/entities.json
 
+
+# memory-kit is the PROCESS-artifact tier (comet retention via memkit-retention.py).
+# Reports/proposals/snapshots are transient + regenerable — keep only the guide + the trajectory spine.
+.claude/memory-kit/*.md
+!.claude/memory-kit/CLAUDE.md
+!.claude/memory-kit/TRAJECTORY.md
+.claude/memory-kit/*.json
