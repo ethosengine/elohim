@@ -1,4 +1,15 @@
 {
   "schema_version": 1,
-  "entries": {}
+  "entries": {
+    "feedback_cargo_resolution_vs_compilation": {
+      "hits": 1,
+      "last_changed": "CLAUDE.md",
+      "last_signal_at": "2026-06-02T15:31:52Z"
+    },
+    "feedback_dev_branch_no_pr": {
+      "hits": 1,
+      "last_changed": "CLAUDE.md",
+      "last_signal_at": "2026-06-02T15:31:52Z"
+    }
+  }
 }
