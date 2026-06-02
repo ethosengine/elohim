@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 02e13765-e7d1-4ede-93b7-eb321ec8ab6e
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 When a Rust crate's `Cargo.toml` declares a `[[bin]]`, `[[bench]]`, or `[[example]]` target, every such target needs its source file present on disk at manifest-parse time (cargo aborts before compilation otherwise). For crates that build in Docker via the placeholder-then-real-source pattern (canonical example: `elohim/elohim-storage/Dockerfile`), this means **two** places must mirror every declared target:

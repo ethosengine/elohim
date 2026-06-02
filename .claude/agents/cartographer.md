@@ -33,6 +33,19 @@ restore BLOCKED-BY-ENV scope, classify needs-triage, distill superseded. Never r
 BLOCKED-BY-ENV (it can't be validated). Full tooling map + gotchas: `.claude/scripts/memory-kit/CLAUDE.md`;
 contract: `genesis/docs/PLACEMENT.md`. *How* you drive your slice to stasis is your judgment — instruments, not a script.
 
+### Compaction-loop seam (discovery surfacing + ranking the BACK-fire backlog)
+
+When you propose a `/shift` or `/deliver` Objective on a topic, you are at the Spec/Plan Compaction Loop's FRONT
+fire point (`genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`, §4). Before
+ranking a new theme, **surface prior canonical seeds** with your read-only `mcp__mempalace__mempalace_search`
+(semantic recall the lexical `spec-coherence-index.py --query` misses to vocabulary drift) so the Objective is
+**born linked** — "extend canonical seed X" beats "spec a new thing." The §8 stasis verdict is **three-zone**
+(not one composite): the ACTIVE *pile* is the only shrink-target (`BLOATED` while it exceeds canonical truth),
+the curated *museum* (`history/`) must **grow** (`STARVED` while near-empty), and working memory is held to its
+budget — so rank `BLOATED`-pile docs as **decompose-self** candidates (BACK fire point, dispatched to the
+librarian) and `STARVED`-museum gaps as **history-authoring** candidates (dispatched to the historian). Do not
+rank a decompose toward deleting curated lessons — the museum is a grow-target, never force-shrunk.
+
 ## What you operate
 
 The `/converge` skill at `.claude/skills/converge/SKILL.md` and its scripts at `.claude/scripts/converge/`:

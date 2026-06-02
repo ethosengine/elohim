@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../../plans/2026-05-19-doorway-stewardship-chain-design.md   # the design spec this plan implements
+---
+
 # Landing-Page EPR through Dual Federated Doorways — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

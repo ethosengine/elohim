@@ -3,6 +3,8 @@ name: Diesel migration timestamp collisions silently drop migrations
 description: Two diesel migration directories with same YYYY-MM-DD-HHMMSS prefix cause embed_migrations! to silently keep only one
 type: feedback
 originSessionId: 53d58b9b-be66-4db2-bfb9-75f7f377aed9
+cites:
+  - elohim/elohim-storage/src/db/mod.rs
 ---
 When two directories under `elohim/elohim-storage/migrations/` share the same `YYYY-MM-DD-HHMMSS` prefix, `diesel::embed_migrations!()` orders them by directory name and silently keeps only one — the other is dropped at runtime. Symptom: `no such table: <name>` errors at runtime, but `cargo build` and `diesel migration run` both succeed.
 

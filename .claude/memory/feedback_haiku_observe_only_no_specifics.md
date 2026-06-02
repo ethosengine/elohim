@@ -3,6 +3,9 @@ name: Haiku observers report API-grounded facts only — never specifics
 description: Haiku confidently hallucinates specifics from log content; structurally constrain its output schema to API-grounded facts and closed taxonomies, route specifics to Sonnet
 type: feedback
 originSessionId: 3cb7ed09-dde3-4e85-b6da-b0407506caa2
+cites:
+  - genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md
+  - .claude/schemas/haiku-output.schema.json
 ---
 Haiku-tier observation agents (e.g. `ci-observer`) must NOT make specific factual claims. Their output schema is constrained to API-grounded facts (build_id, status, first_failing_stage, counts) and closed-taxonomy classifications (error_class enum, pattern_id from catalog). They report `artifacts_pulled` as URL/MCP-ref pointers, never extracted content.
 

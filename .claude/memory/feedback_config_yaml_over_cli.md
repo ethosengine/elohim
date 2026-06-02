@@ -3,6 +3,8 @@ name: Prefer schema-able YAML config over CLI args for node configuration
 description: Node configuration should be declarative YAML files (schema-validated) that the elohim operator manages, not CLI args. CLI args are for dev/testing only.
 type: feedback
 originSessionId: 63499c63-1cde-41b5-a0b0-66503d4c008c
+cites:
+  - steward/node
 ---
 When configuring elohim-node (conductor settings, resource budgets, P2P topology), prefer schema-validatable YAML files over CLI args.
 

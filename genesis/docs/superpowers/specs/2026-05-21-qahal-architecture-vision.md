@@ -1,7 +1,8 @@
 ---
 project: elohim-protocol
 type: architecture-vision
-status: gospel-tier
+status: vision
+tier: gospel
 created: 2026-05-21
 scope: qahal-pillar
 authors:

@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../specs/2026-05-28-session-bridge-design.md   # the design spec this plan implements
+---
+
 # Session-Bridge Implementation Plan — Visitor + Peer Graduation Substrate
 
 > **Plan status:** Roadmap. No code. Each ticket below is a discrete substrate-first slice that lands the session-bridge primitive described in the spec.

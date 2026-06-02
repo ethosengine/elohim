@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 6d96f5fe-2184-4539-9ce1-dd7cae8d9d43
+cites:
+  - genesis/docs/PLACEMENT.md
 ---
 
 A link is **a path + a 1–2 sentence plain-text explainer of what's at the end of that path** — never a bare path or reference.

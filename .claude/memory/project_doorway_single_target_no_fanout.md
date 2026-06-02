@@ -3,6 +3,8 @@ name: Doorway is single-target dispatch — no blob fan-out, ever
 description: Architectural decision (2026-04-30) — doorway forwards each blob request to ONE storage target; peer-iteration belongs in the P2P substrate, never in the web2 projection layer
 type: project
 originSessionId: 872c2e1c-02fe-453a-93b3-e69dac1e54e3
+cites:
+  - doorway/CLAUDE.md
 ---
 Doorway forwards each `/blob/<hash>` request to a single storage target (singular `STORAGE_URL` or a registry-routed peer). It does NOT iterate `STORAGE_URLS` looking for which peer holds a particular blob. This is durable architectural decision, not a temporary state.
 

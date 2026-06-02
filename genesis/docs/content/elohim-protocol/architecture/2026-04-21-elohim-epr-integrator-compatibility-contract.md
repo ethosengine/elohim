@@ -1,7 +1,7 @@
 ---
 title: elohim-epr Integrator Compatibility Contract
 tier: architecture
-status: Contract — authoritative for Phase 2+ planning
+status: accepted — Contract, authoritative for Phase 2+ planning
 created: 2026-04-21
 authors: Matthew Dowell + Opus 4.7
 pillar coupling: cross-cutting — every consumer of elohim-epr REST or GraphQL surfaces

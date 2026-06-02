@@ -3,6 +3,8 @@ name: Reach-earning gate is elohim-mediated matchmaking, not a binary policy che
 description: The full gate is an elohim agent reading newcomer's imagodei against a collective's BYO manifest, producing welcome + sponsor suggestions ("you'll fit, talk to Adam Rachel and Susan"). The substrate gate is the deterministic floor underneath.
 type: project
 originSessionId: 42abe5eb-4a48-4a2a-8142-604a4c7a1bd3
+cites:
+  - elohim/elohim-storage/src/services/reach_earning.rs
 ---
 The reach-earning gate has two layers that must NOT be conflated:
 

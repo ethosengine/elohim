@@ -3,6 +3,8 @@ name: Check helm chart status before recommending in operator runbooks
 description: Bitnami has been blocking/deprecating charts lately; verify chart availability and license before naming a vendor in a runbook
 type: feedback
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
+cites:
+  - genesis/manifests
 ---
 When writing K8s deployment runbooks that name a specific helm chart (Bitnami, Helm Hub, vendor charts), check current status before publishing:
 - Is the chart still maintained?

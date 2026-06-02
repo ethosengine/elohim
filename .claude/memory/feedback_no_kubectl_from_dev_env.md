@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 41ea186d-062d-48b9-8772-9a4a3d9763d9
+cites:
+  - genesis/manifests
 ---
 
 Don't run kubectl from this Eclipse Che dev environment. When the operator says "clean up the ingresses" or similar cluster-touching task, that means: **make sure the repo manifests are coherent / clean / non-conflicting** so the next pipeline run (or operator-side apply) reconciles to the right state. The operator owns cluster access directly.

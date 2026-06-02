@@ -3,6 +3,8 @@ name: Storage as actor vs forwarder — two distinct HcClient patterns
 description: elohim-storage's existing HcClient is service-bot pattern (storage signs as itself); Phase 11 introduces the first "storage forwarding on behalf of human" use case which has different auth/cell-routing requirements
 type: project
 originSessionId: e208c11f-36b4-47a5-a45e-0dff7060161d
+cites:
+  - elohim/elohim-storage/src/hc_client.rs
 ---
 elohim-storage has an existing `HcClient` (`elohim/elohim-storage/src/hc_client.rs`) that wraps `holochain_client::AppWebsocket` with admin-issued signing credentials. All current consumers use it as **service-bot pattern** — storage acting on its own behalf:
 

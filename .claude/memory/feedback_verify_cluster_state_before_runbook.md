@@ -3,6 +3,8 @@ name: Verify cluster state before drafting operator runbooks
 description: Manifests in genesis/manifests/ may not match cluster reality; confirm namespace, storageClass, and existing PVCs against `kubectl get` before writing runbook expected-outputs
 type: feedback
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
+cites:
+  - genesis/manifests
 ---
 When drafting an operator runbook that says "this will be unchanged" or "this will be created," verify against actual cluster state — not against the manifest checked into the repo. The manifest is a desired-state declaration that may have drifted from what the cluster actually has.
 

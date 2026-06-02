@@ -3,6 +3,8 @@ name: Shift palette evolves via wishlist feedback loop
 description: Agentic developer shifts produce palette deltas — commands Opus wanted to run but couldn't — that refine the allowlist over time without manual curation.
 type: project
 originSessionId: 9a934a92-144d-4415-9d43-14fcb046e2db
+cites:
+  - .claude/settings.local.json
 ---
 For agentic developer shifts in this project, permission prompts are blocking — if Opus hits a novel bash command at 3am, the shift stalls until the human wakes up. So the palette must be predictive, and it must improve between shifts.
 

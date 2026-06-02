@@ -1,3 +1,7 @@
+---
+status: design   # findings synthesis — meta-patterns + revised gap list, planning input for Phase 3 Part D
+---
+
 # Records Lifecycle — Phase 2 Findings Synthesis
 
 **Status:** Phase 1 Wave 1 returned 8/8 (7 primitive walkthroughs + 1 frontmatter normalization). This document synthesizes the structured concerns reports into navigable form, identifies meta-patterns, proposes a revised gap list, and lists operator decisions for Phase 3 Part D plan finalization.

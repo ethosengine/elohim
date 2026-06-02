@@ -15,6 +15,7 @@
 .claude/memory-kit/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 # Memory-kit accumulator state — local-machine signal counters
 .claude/memory-kit/claude-md-drift.json
+.claude/memory-kit/placement-drift.json
 
 # Local worktree-state directories used by side tooling
 .claire/

@@ -1,3 +1,9 @@
+---
+status: Design
+informed-by:
+  - ../../content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md   # the EPR feedback-graph substrate this coherence design turns inward onto the docs
+---
+
 # Coherence Substrate for the Elohim Monorepo
 
 **A design for closing implementation and improving architecture every session — instead of minting conflicting specs.**

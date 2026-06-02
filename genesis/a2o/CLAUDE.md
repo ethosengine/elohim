@@ -24,6 +24,11 @@ Conceptual scenarios (in `genesis/docs/`) describe the human experience. Executa
 - Add `@wip` to scenarios with unimplemented step definitions
 - Add `@regression` to scenarios that guard against specific past bugs
 
+## Watch-outs
+
+- **A gherkin parse error aborts the WHOLE E2E run, not one scenario.** An unescaped `/` inside a scenario name or step (read by the parser as an empty regex alternation), a bare continuation line the AST rejects, or a malformed table will abort the entire feature-file load — every scenario in the run is lost and the build surfaces as `UNSTABLE` with a **blank cucumber report body** (empty report → UNSTABLE with no failing-scenario detail). When that happens, READ THE RAW E2E LOG FIRST (the parse error is there, not in the empty report). Backlog: a pre-push gherkin/cucumber grammar linter (`gherkin-prepush-lint`) to catch empty-alternation + bare-continuation before AST-abort drops the whole suite.
+- **Native `<dialog>` + `showModal()` modal migration gotchas (browser steps).** The top-layer modal fix (a `<dialog>` opened with `showModal()` renders into the browser top layer, above all stacking contexts, unaffected by ancestor `transform`/`overflow`) changes how you assert in step defs: (1) a native `<dialog>` has **no z-index** — `getComputedStyle().zIndex` returns `"auto"` (→ `NaN`); assert the `:modal` pseudo-class instead of a z-index value; (2) a synthetic `KeyboardEvent('Escape')` does **NOT** trigger the UA Escape handler — test close via the `(close)` event / `dialog.close()`, not by dispatching Escape; (3) backdrop-click is detected via `event.target === dialogEl`. (Full lesson: memory entry `feedback_native_dialog_top_layer_modal`.)
+
 ## Step Definition Patterns
 
 - File: `steps/ui/{domain}.steps.ts` for browser steps, `steps/{domain}.steps.ts` for API steps

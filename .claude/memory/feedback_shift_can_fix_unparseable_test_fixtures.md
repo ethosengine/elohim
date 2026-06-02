@@ -3,6 +3,8 @@ name: shift-can-fix-unparseable-test-fixtures
 description: shift principle #6 "test fixtures off-limits" doesn't apply when the fixture is GRAMMATICALLY UNPARSEABLE and dropping the whole run; restoring parseability is removing a gate, not moving the goalpost
 metadata:
   type: feedback
+cites:
+  - .claude/commands/shift.md
 ---
 
 Agentic-developer shift principle #6 ("Objective, measure command, files the measure reads, test runners, and test fixtures are off-limits") protects against moving goalposts: editing scenarios so they pass without changing the system. It does NOT prohibit fixing test fixtures that the runner currently can't load AT ALL.

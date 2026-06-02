@@ -2,6 +2,8 @@
 name: Shared lib pattern — _lib/ for .claude/* Python tools
 description: Pure-stdlib helpers at .claude/scripts/_lib/ for scripts and hooks. Bootstrap-by-walk-up imports work from any depth. Discipline: only extract when 3+ callers share the same pattern. New scripts use it from the start; older scripts migrate when touched.
 type: project
+cites:
+  - .claude/scripts/_lib/__init__.py
 ---
 
 `.claude/scripts/_lib/` is a Python package of pure-stdlib helpers shared by scripts (under `.claude/scripts/*/`) and hooks (under `.claude/hooks/`). Created 2026-05-13 alongside the `claude-md-review` ceremony.

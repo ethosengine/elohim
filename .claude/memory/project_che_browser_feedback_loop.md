@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: b54284e1-2315-4796-96a2-37fa74ba34d4
+cites:
+  - genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md
 ---
 
 L1 of the Che browser feedback loop landed 2026-05-30 (specs:
@@ -29,6 +31,13 @@ Reuses `PlaywrightDevice` capture. `pnpm a2o:setup` provisions the browser once.
 - **Shared-browser "Target closed" cascade:** running a large @browser set (~110 scenarios) on world.ts's single
   shared browser → it dies partway → later scenarios fail `Target page... has been closed`. Pre-existing a2o
   characteristic, not a wiring fault. L2's loop renders should NOT lean on one long-lived shared browser.
+- **WebGL surfaces CANNOT be visually verified headless in Che** (MapLibre/Three.js/WebGL charts). ANGLE/EGL
+  init fails (`xcb_connect failed, error 1`; `EGL_NOT_INITIALIZED`) because the Nix devcontainer has no X display;
+  the SwiftShader fallback also fails (the GL stack still inits via xcb). There is no `xvfb`, and `apt-get`/`sudo`
+  are blocked, so you can't install one. Visual proof for any WebGL surface must go **off-Che** (operator's own
+  browser at `localhost:4200`, alpha, or a CI browser image with WebGL). Non-WebGL DOM/layout defects ARE still
+  catchable headless — the same shift caught + fixed a `height:100%`→`100dvh` collapse that stunted a map canvas
+  to a 300px strip; the map's *tiles* just never rendered for the verify shot.
 
 **Pre-existing finding (flagged, not fixed):** pnpm v10.30.3 deprecates the `pnpm` field in root
 `package.json` (libsodium override + Angular patch + the new playwright override). Still honored via the

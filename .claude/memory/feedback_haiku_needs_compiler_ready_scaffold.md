@@ -3,6 +3,8 @@ name: Haiku needs a compiler-ready scaffold; Sonnet should design test infrastru
 description: When a task requires designing/discovering test infrastructure (vitest config split, Angular jsdom vs node env, mock setup patterns), use Sonnet to scaffold the first instance. Once the pattern is compiler-ready and proven, Haiku can mirror it. If Haiku has to design test infrastructure, it goes off the rails (silently excludes tests, invents wrong patterns, etc).
 type: feedback
 originSessionId: 4735acda-77b9-45df-9d2b-91d6374a32aa
+cites:
+  - .claude/skills/agentic-developer/SKILL.md
 ---
 When dispatching subagents in subagent-driven-development, the model
 selection rule has a refinement specific to test infrastructure work.

@@ -4,6 +4,8 @@ description: "Genesis artifacts (humans/, stories/, account-packages/, relations
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/data/humans/terrance-tutor.md
 ---
 
 The frontmatter on `genesis/data/humans/terrance-tutor.md` — `id`, `displayName`, `category`, `profileReach`, `bio`, `affinities`, `communities`, `attestations` — is already an EPR-shaped representation of personhood. The same shape that will, in production, be a notarized atom on the DHT, projected into the CozoDB graph as `epr_node`, served through a doorway, and rendered into an Angular surface. Genesis isn't *describing* the protocol; **genesis is the protocol's human-readable surface running in dev-mode**.

@@ -3,6 +3,8 @@ name: JENKINS_TOKEN — orchestrator-autonomous, but only on verified Jenkins st
 description: The shift Opus orchestrator may use JENKINS_TOKEN autonomously to trigger parameterized builds, but only after it has verified (not guessed) that doing so won't cause pipeline interruptions or build storms
 type: feedback
 originSessionId: cdffa1f9-7b63-4657-ae44-2cafff5156bf
+cites:
+  - .claude/commands/shift.md
 ---
 The shift Opus orchestrator can authenticate to Jenkins via `$JENKINS_USERNAME` + `$JENKINS_TOKEN` (env: `JENKINS_USERNAME`, `JENKINS_TOKEN`, `JENKINS_URL`) to trigger parameterized rebuilds (e.g. `RESET_STORAGE=true` for genesis schema-drift recovery). User clarified: **per-occurrence user confirmation is NOT the gate** — the orchestrator decides autonomously. The actual gate is verified Jenkins state.
 

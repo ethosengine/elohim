@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 21dcbb18-990e-405a-93d6-2beb9577827a
+cites:
+  - .husky/pre-push
 ---
 
 `cargo test ... 2>&1 | tail -60 && echo OK` reports success even when cargo FAILS,

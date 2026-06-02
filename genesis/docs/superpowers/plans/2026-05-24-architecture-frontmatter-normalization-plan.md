@@ -1,3 +1,7 @@
+---
+status: Draft
+---
+
 # Architecture Specs — Frontmatter Normalization Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans inline. Single agent (Sonnet); mechanical YAML normalization across 14 files. Steps use checkbox (`- [ ]`) syntax for tracking.

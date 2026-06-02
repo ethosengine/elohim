@@ -3,6 +3,8 @@ name: Doorway as peer registration point, not just proxy
 description: Doorway serves as inside-out peer registration — peers register content/capabilities with doorway for discovery, inverting Holo's outside-in marketplace model.
 type: project
 originSessionId: 63499c63-1cde-41b5-a0b0-66503d4c008c
+cites:
+  - doorway/doorway-service/src/services/storage_registration.rs
 ---
 Doorway is more than a conductor proxy/gateway. It's a peer registration point where peers on the network announce "I have this content, I can serve it." This inverts Holo Host's model:
 

@@ -3,6 +3,8 @@ name: No Hebrew pillar names in epic/manifesto narrative
 description: Epic and manifesto-style narrative docs in genesis/docs/content/elohim-protocol/ should not leak internal Hebrew pillar names (mishpat, qahal, shefa, imagodei, lamad, avodah) — translate to accessible English. "Elohim Protocol" / "elohim" (agent role) are protocol-name / load-bearing vocabulary and stay.
 type: feedback
 originSessionId: 08cb9ec5-d2e3-405a-8267-36f3a26a38f5
+cites:
+  - genesis/docs/superpowers/specs/2026-05-22-qahal-homepage-ux-design.md
 ---
 Hebrew pillar names are internal project jargon. They organize the design space technically (pillars, manifests, specs, plans, code) but should not appear in public-facing narrative documents — epics, manifesto, persona stories, blog posts, social-reach content.
 

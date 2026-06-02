@@ -3,6 +3,8 @@ name: Spare no expense of intelligence on load-bearing architecture
 description: On architectural brainstorms / cross-system design, prefer depth and parallel context-gathering over shallow autonomous execution; the cost of thin reasoning is leaving the whole vulnerable
 type: feedback
 originSessionId: 22f7d697-5b2e-4099-a324-99589cb67e40
+cites:
+  - .claude/commands/brainstorm.md
 ---
 On architectural / cross-system brainstorms, prefer deep context-gathering and rigorous synthesis over shallow autonomous fast-execution.
 

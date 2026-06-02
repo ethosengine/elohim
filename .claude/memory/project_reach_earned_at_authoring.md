@@ -3,6 +3,8 @@ name: Reach is earned at authoring — and coupled to embodied responsibilities 
 description: Burden of reach lies on author + stewarding peers. Receiver-side authorization is PRE-authorization (standing trust contract), never per-message filtering. Reach is coupled to embodied responsibilities for distribution/discovery/validation at every node.
 type: project
 originSessionId: f534b7ae-d435-4ab8-ab3b-f7d23b6b0ed9
+cites:
+  - elohim/elohim-storage/src/services/reach_earning.rs
 ---
 The burden of reach lies on the **author and the peers that steward what they author**, to earn that reach. **Reach is coupled to embodied responsibilities at every node on the network** — for that reach to flow with meaning, purpose, and validation, the peers who carry it have to bear the responsibility of carrying it. Authoring-earning is one face of this; receiver pre-authorization is another.
 

@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - 2026-05-29-light-up-the-topology-sprint-kickoff.md   # the related doc this derives from
+---
+
 # Sprint Kickoff — Close the Gaps: Make the Topology *Felt* (Producers · Convergence · Surface)
 
 > **Kickoff prompt** for the sprint following the prioritizer end-state epic (2026-05-29).

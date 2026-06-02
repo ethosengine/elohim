@@ -5,6 +5,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 21dcbb18-990e-405a-93d6-2beb9577827a
+cites:
+  - genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml
+  - elohim/elohim-storage/src/db/mod.rs
 ---
 
 Hard-won landmarks from a JSON-logging delivery + crashloop shake-out (2026-05-29/30):
@@ -29,6 +32,19 @@ Hard-won landmarks from a JSON-logging delivery + crashloop shake-out (2026-05-2
   `busy_timeout` AFTER `journal_mode=WAL`; under concurrent r2d2 warm-up a
   contended connection hit immediate SQLITE_BUSY ("database is locked") → pool
   init fail → crashloop. Fix: set busy_timeout FIRST.
+- **Storage SQLite multi-writer contention is the SEEDER's failure mode, not
+  seeder bugs (FIXED, 2026-04-28):** elohim-storage's SQLite pool ran
+  rollback-journal mode + a 5s busy_timeout. Under sustained load many background
+  writers — heartbeat, InfrastructureSignal subscriber, reconcile controller,
+  import-handler drain — compete for the file-level write lock alongside the HTTP
+  handlers and the bulk seeder. The seeder's 100-row batch transaction
+  deterministically loses to a concurrent writer around batch ~26, surfacing as
+  ~100 SQLITE_BUSY ("database is locked") errors per run. Fix: WAL +
+  `synchronous=NORMAL` + `busy_timeout=30000` (readers stop blocking writers;
+  writer-contention budget 6×) — this is the *upstream cause* the busy_timeout-FIRST
+  ordering landmark (above) sits inside. Validated: genesis #956/#957 reported 0
+  seeder errors and the defensive retry layer never fired — confirming root cause
+  was storage-side, not seeder logic. File: `elohim/elohim-storage/src/db/mod.rs`.
 - **OPEN next-blocker — conductor IPv6 EADDRINUSE on shem (PRE-EXISTING):**
   Holochain conductor binds dual-stack `[::]:4444/4445` by default; on `shem`
   (multi-tenant: 9 edgenode pods pinned via node-type=remote, podManagementPolicy

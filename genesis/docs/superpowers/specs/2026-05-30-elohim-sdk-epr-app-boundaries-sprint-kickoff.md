@@ -1,3 +1,7 @@
+---
+status: Design
+---
+
 # Sprint Kickoff — Elohim SDK + EPR-App Boundary Cleanup, Reliability & Classification
 
 > Seed brief for a fresh session. NOT a finished spec — the sprint should START with

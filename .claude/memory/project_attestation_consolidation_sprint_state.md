@@ -3,6 +3,10 @@ name: Attestation Consolidation Sprint — CLOSED (merged to local dev 2026-05-1
 description: Sprint result; A→G partial merged at 34fcf1070; Stage G follow-up scoped with TODO markers in code
 type: project
 originSessionId: 3dce0458-182f-4537-ad78-3c66bb35701b
+cites:
+  - elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs
+  - elohim/elohim-storage/src/p2p/shamir_transport.rs
+  - elohim/elohim-storage/src/db/models.rs
 ---
 Sprint merged to local dev at `34fcf1070`. Worktree removed. Stage G partially landed (humanness bridge + Shamir scaffold); remaining recovery migration deferred to follow-up sprint with `TODO(stage-G-followup)` markers in `elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs:2925+` and `elohim/elohim-storage/src/p2p/shamir_transport.rs` (swarm wiring).
 

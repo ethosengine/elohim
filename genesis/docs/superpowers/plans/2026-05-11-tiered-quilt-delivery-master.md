@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../../content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md   # the design spec this plan implements
+---
+
 # Tiered Quilt Stewardship — Delivery Master
 
 > **For agentic workers:** This is a **portfolio master plan**, not a single executable task list.

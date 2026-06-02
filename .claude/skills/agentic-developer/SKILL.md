@@ -133,6 +133,53 @@ When `/shift` invokes this skill:
 
 0. **Detect shift mode.** Before the Objective interview, read the last orchestrator build on the shift's branch (typically `dev`) per "Mode detection at kickoff" above. Record the detected mode in your kickoff context — `bring-up` or `integration-iteration` — and surface it during the interview so the user can confirm or override. The mode shapes the questions you ask in step 1 (an integration-mode Objective is plural; a bring-up Objective is singular) and the budget defaults you propose.
 
+0.5. **DISCOVERY — surface prior seeds + history watch-outs (the FRONT fire point).** This shift is born
+   into a corpus that has already learned things; surface them before the first iteration so the shift is
+   **born linked** to its canonical seed(s) and **warned of known anti-patterns** rather than re-treading burned
+   ground mid-shift. This is the FRONT fire point of the Spec/Plan Compaction Loop
+   (`genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`, §4; see also
+   `genesis/docs/PLACEMENT.md`). Run **both** lenses — one is provably blind:
+
+   - **Lexical floor (always run, cheap):** query the deterministic prior-art index for the Objective's topic:
+
+     ```bash
+     python3 .claude/scripts/memory-kit/spec-coherence-index.py --query "<objective topic / scope keywords>"
+     ```
+
+     It ranks every ACTIVE/CANONICAL doc with its PLACEMENT state, so you get
+     `CANONICAL → compose / don't re-spec`, `SUPERSEDED → read the gotcha, work around it`,
+     `claimed-UNVERIFIED → don't assume it works`. This is the floor — it costs nothing and never goes offline.
+
+   - **Semantic recall (JIT-scoped MemPalace, defeats vocabulary drift):** the lexical floor matches token
+     overlap, so the same lesson under different words returns zero matches (compaction-loop spec §4.1). Pull
+     MemPalace **just-in-time** — scope exactly the two tools needed, then release them; do NOT carry the full
+     ~18-tool MCP as ambient shift context (an always-on MCP is itself a dump, §4.2):
+
+     ```
+     ToolSearch "select:mempalace_search,mempalace_check_duplicate"
+     ```
+
+     Then query the palace semantically for the Objective topic — `mempalace_search` recalls the nearest
+     canonical seeds / **history watch-outs** / graduated stories by embedding similarity; `mempalace_check_duplicate`
+     flags whether this exact work is already covered. **Staleness guard (§4.4):** the index is frozen at
+     mine-time and does not auto-update — if it returns nothing or is older than the last BACK-fire dissolve,
+     treat the semantic lens as **STALE, degraded to lexical-only**, say so in the kickoff context, and never
+     present stale recall as authoritative "no prior art." (Fallback when on-demand tool-load is unavailable:
+     dispatch the MemPalace-equipped `historian` subagent for the same surfacing — it over-imports the full MCP,
+     §4.2, but runs today.) Release the scoped tools after this step.
+
+   **Carry the surfaced result as plain-text kickoff context**, and bind the shift to it:
+   - **CANONICAL match (either lens)** → the Objective should COMPOSE against that seed; note it in the journal
+     header's trajectory line and prefer extending/finishing the existing work over forking a parallel approach.
+   - **SUPERSEDED / history watch-out match** → record the named anti-pattern in the kickoff context as a
+     standing hazard for the iteration loop ("a prior attempt drifted onto X for reason Y — recognize the
+     silhouette"); design the iterations *around* it.
+   - **Empty from BOTH lenses** → genuinely new ground; proceed, and the BACK fire point (Close) will be the
+     first to seed history for this topic.
+
+   Record the surfaced seed(s) and any watch-outs in the journal header's **Trajectory Summary** at init (step
+   4) so they ride every iteration's Ground step.
+
 1. **Interview the user for the Objective.** Ask short, pointed questions:
 
    - *"What's the outcome you're aiming at? (one sentence)"*
@@ -530,7 +577,61 @@ When done or bail:
 3. Clean up shift-scoped `settings.local.json` entries — every entry
    tagged `// shift:<shift-id>` gets removed. Durable entries stay.
 4. Do NOT commit the shift journal (it's gitignored).
-5. Print the path of the sprint result and a one-paragraph summary.
+5. **decompose-self — dissolve concluded plan(s) to zero residue (the BACK fire point).** A shift may not end
+   leaving a parked plan behind (compaction-loop spec §5.1, §5.2; `genesis/docs/PLACEMENT.md`). For each plan/spec
+   this shift **concluded** — landed, superseded, or abandoned — run the BACK fire point so nothing plan-shaped
+   survives in the live tree under the **No-Dumping-Grounds law** (every chunk lands in a living surface or is
+   cleared; §10.3). Skip this for a *bail* that left the plan genuinely in-flight — bail dissolves nothing,
+   it hands off.
+
+   ```bash
+   python3 .claude/scripts/memory-kit/decompose.py <concluded-plan-path>
+   ```
+
+   `decompose.py` splits the plan into bounded, cited chunks (CHECKED ≠ VERIFIED). Route each chunk to exactly
+   one of the three terminal fates (the renamed lifecycle primitives, §5.2):
+
+   - **SUBSUME → living surface** (= compact). Verified, still-true content folds into the surface that owns it
+     with an inline `compacted_from:` + one-line "why we turned" trajectory pointer. **Verified behavior is
+     remembered AS a green a2o scenario and/or passing test** (the canonical resting place for "landed &
+     working"), the change itself AS code — **never as a parked plan.** This requires the **verify-gate** (§5.5):
+     a plan cannot grade its own homework, so a "landed & working" chunk is graded **green by ci-investigator**
+     (tests pass, pipeline green and not cascade-masked, any soak/parity window ran clean) before it is merged to
+     canon. A self-asserted "landed" is a CLAIM, never sufficient. (You already have the shift's measurement +
+     CI history — feed it as the evidence.)
+   - **Durable gotcha / anti-pattern → curated history + inline watch-out** (= close-interval, §5.2/§7). The
+     shift's hard-won gotchas — the **Observed anti-patterns** the journal accumulated — distill into a
+     textbook-quality lesson at `genesis/docs/content/elohim-protocol/history/` (`tier: history` + INDEX row,
+     bidirectionally linked to the canonical it qualifies) **AND** the lesson's hot-context pointer is mirrored
+     **inline in its `canonical:` target** as a `watch-out / paths-not-taken / anti-pattern` block (§7.2–7.3), so
+     the next planner trips on the lesson at the decision point — not in a register they never open.
+   - **Open issues → backlog** (= file backlog, AUTO; §5.3). Residual unfinished/blocked work that is NOT
+     verified-done routes to `genesis/data/timeline/backlog/` with a `spawned_backlog:` edge — it does NOT stay
+     as a live plan. (`env-blocked` chunks take a **BLOCKED-BY-ENV hold** with the blocker recorded, not
+     history, §5.5.)
+   - **Narration body → git** (= forget; §5.2 clear path). The plan's raw narrative/prose, once its truth has
+     been compacted/curated/filed above, retires to **git** (recoverable via `distills:` pointers) — the
+     standalone file is removed from the live tree. The journal itself stays gitignored (step 4); it is the
+     sprint-result (already written) that carries forward. There is **no `history/_retired/` graveyard and no
+     `.claude/archive/<date>/` sink** (§10.3).
+
+   **Apply discipline (§5.3):** link / write-history-stub / retire-body-to-git / file-backlog are **AUTO**; any
+   **canonical-seed rewrite, horizontal merge, or doc deletion is operator-GATED** — stage those as a proposal in
+   the sprint result, do not self-apply (only `/memory-ceremony` authors substrate-true gospel). When the shift
+   bailed or the concluded work mixes verified + unverified, decompose surfaces the split; only the
+   verified-stable chunks compact, the rest become backlog.
+
+6. **MemPalace re-mine on the cleaned surface (ordered, post-dissolve).** Because the index is frozen at
+   mine-time and embeddings do not auto-update, re-mine is an **ordered step after** step 5 dissolves the
+   residue — never concurrent (§5.4): (1) dissolve (step 5, done); (2) `mempalace_sync` **prune** the now-gone
+   plan/spec vectors so their semantic ghosts cannot surface in a future FRONT-link; (3) **re-mine the clean
+   surface** — embed only the compacted output (canonical seeds, curated history lessons, graduated stories,
+   living docs/tests/scenarios), **never** the pile or `.claude/archive/` (§4.5). This is a curate-grade act
+   owned by the **librarian** (`mempalace_sync` is the librarian's tool) — dispatch it, or surface it in the
+   sprint result as the next required hygiene step if MemPalace tooling is out of this shift's palette. The
+   ordering is invariant: **dissolve → prune → re-mine**, so the next shift's FRONT-link reads a clean index.
+
+7. Print the path of the sprint result and a one-paragraph summary.
 
 ## Invariants to never violate
 

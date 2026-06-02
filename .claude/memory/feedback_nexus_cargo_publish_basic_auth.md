@@ -4,6 +4,8 @@ description: "Nexus 3.x Cargo hosted publish requires HTTP Basic auth, not the B
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md
 ---
 
 When publishing to a Nexus 3.x Cargo hosted repository, `cargo publish` will fail with HTTP 401 even though the same token reads the sparse index successfully. This memory captures the specific shape of the failure and the recovery paths so future attempts don't re-walk the same wall.

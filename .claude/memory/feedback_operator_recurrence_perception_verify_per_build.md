@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: d5ebc70b-b1ff-43c0-9172-9d14847a28ec
+cites:
+  - .claude/skills/ci-triage/SKILL.md
 ---
 
 When the operator describes a CI/pipeline state as "we keep hitting this issue," do not assume the same root cause across the recent failure cluster. Pull `first_failing_stage` and a one-line failure signature for each of the last N builds and confirm the failure SHAPE matches before scoping the fix.

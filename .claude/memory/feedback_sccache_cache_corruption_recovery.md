@@ -4,6 +4,8 @@ description: "When sccache produces null-byte output (clippy 'unclosed delimiter
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 When sccache surfaces cache corruption — symptoms include `error: unknown start of token: \u{0}` from rustc, clippy errors of the form `error: this file contains an unclosed delimiter` pointing at cached source positions, or build failures that disappear when `RUSTC_WRAPPER=""` is set — the corrupted cache entries need to be cleared. This memory captures only the verified recovery steps. The deeper question of *why* the cache became corrupted in the first place, or why some downstream invocation paths surface it differently, is **not isolated** as of this writing.

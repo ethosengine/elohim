@@ -3,6 +3,8 @@ name: Collective is the stewardship unit — social compute epic
 description: Household is one kind of collective; stewardship/DePIN contracts also run between church memberships, patron/creator circles, DAOs. Design for collective-general, not household-specific.
 type: project
 originSessionId: 17546f03-3ee8-4704-bdf9-18d0d64baf9b
+cites:
+  - genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md
 ---
 Households are the foundational case but not the only case. The protocol's "social compute" epic enables:
 

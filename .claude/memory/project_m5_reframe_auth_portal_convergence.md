@@ -3,6 +3,8 @@ name: M5 reframed — auth-portal convergence + stub defender, not full defender
 description: M5 pivots from full elohim-defender implementation to connecting hosted-doorway + peer-native-steward auth portals via the account management surface; defender stays stubbed
 type: project
 originSessionId: 4d20bf7b-4639-43d8-ad10-fccb514a7f0a
+cites:
+  - doorway/doorway-app/src/app/components/login/threshold-login.component.ts
 ---
 The original M5 kickoff prompt (recovery-m5-elohim-defender-and-revocation-ux, archived) scoped M5 as defender backend + revocation UX. **2026-04-25 user reframe** changed scope:
 

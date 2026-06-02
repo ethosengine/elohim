@@ -3,6 +3,8 @@ name: Doorway conductor registry persistence asymmetry
 description: Two-store registry where one store persists and the other rebuilds is a recurring 502 source — diagnostic shape for any "stale-mapping after deploy" failure
 type: feedback
 originSessionId: cca06402-6047-484c-bbca-93f417436056
+cites:
+  - doorway/doorway-service/src/conductor/registry.rs
 ---
 Doorway's `ConductorRegistry` keeps two DashMaps with mismatched lifecycles:
 - `conductors`: in-memory only, rebuilt from `CONDUCTOR_URLS` env each boot

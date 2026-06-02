@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: d8ac4ba5-8c70-42b9-a7eb-f98689dea358
+cites:
+  - genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml
 ---
 
 On the alpha cluster (and any embedded-conductor deployment), a DNA-content change — e.g. an integrity-zome fix that changes the DNA hash but keeps the same role structure — does **NOT** reach the running conductors via a normal edge redeploy. Three compounding facts:

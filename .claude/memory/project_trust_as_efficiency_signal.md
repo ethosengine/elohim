@@ -3,6 +3,8 @@ name: Trust is an efficiency signal — trustworthy/accurate/reliable reduces co
 description: Trustworthy, accurate, and reliable content costs LESS to distribute. These are not just moral categories — they are compute-economic signals. Reach earning, pre-authorization, and reputation all reduce overhead for the network's distribution and discovery work.
 type: project
 originSessionId: f534b7ae-d435-4ab8-ab3b-f7d23b6b0ed9
+cites:
+  - genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
 ---
 **Trustworthy, accurate, and reliable are efficiency signals.** They naturally reduce the compute burden on peers for distribution, discovery, validation, and reach. Trust is not just a moral category in the Elohim Protocol — it is a **compute-economic category**.
 

@@ -1,3 +1,9 @@
+---
+status: Design
+related:
+  - 2026-05-21-qahal-architecture-vision.md   # the vision spec this is Section 4 of
+---
+
 ## Section 4 — Worked-Example Canonical Narratives
 
 The architecture sketched in the preceding sections is best understood by walking through it at four scales. These are not toy examples. They are four collectives the protocol must actually serve — an intimate household, a single congregation that practices plural-elder governance, a life-group nested inside that congregation, and a horizontal federation of autonomous congregations with no institutional hierarchy above them. Each narrative shows the same Qahal primitive rendering differently because the rubric, the standing, the reach, and the commons-elohim's vantage shift with the collective. The primitive does not change. What it carries does.

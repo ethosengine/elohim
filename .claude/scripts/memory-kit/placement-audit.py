@@ -63,7 +63,10 @@ DEAD_WORDS = {"superseded", "abandoned", "cancelled", "canceled", "deprecated", 
 ACTIVE_WORDS = {"draft", "design", "brainstorm", "proposal", "proposed", "in-flight",
                 "inflight", "wip", "vision", "approved", "accepted-draft"}
 LINK_KEYS = ("canonical", "distills", "cites", "verified_by", "informed-by", "informs",
-             "supersedes", "superseded-by", "supersedes-or-conforms-to")
+             "supersedes", "superseded-by", "supersedes-or-conforms-to",
+             # a declared parent/related/spec IS a real anchor — a doc that names its lineage
+             # is not orphaned; recognizing these keys removes a deterministic false-orphan class.
+             "parent", "related", "spec", "source-spec", "roadmap")
 MD_LINK_RE = re.compile(r"\]\(([^)\s]+?\.md)[^)]*\)")
 MD_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.M)
 
@@ -282,6 +285,11 @@ def budget_state(rec, available):
     if b == "CLAIMED":
         return "CLAIMED-ONLY", "VERIFY (ci-investigator)"
     if b == "LANDED":
+        # CANONICAL / HISTORY are the settled destinations (PLACEMENT.md): an `accepted`/`landed` status
+        # there is the steady state, not a deliverable awaiting CI. Only ACTIVE-home landed-without-evidence
+        # is the over-claim that needs the verification gate.
+        if home in ("CANONICAL", "HISTORY"):
+            return "SETTLED", "settled canon/history — no verification queue"
         return ("VERIFIED-STABLE", "retire-eligible → history") if rec["verified"] else ("CLAIMED-ONLY", "VERIFY (ci-investigator)")
     if b == "ACTIVE":
         return "ACTIVE", "in-flight"
@@ -600,13 +608,51 @@ def stasis_mode():
     return 0
 
 
+def decompose_due_count():
+    """The BACK fire point's tripwire count: ACTIVE-home docs that carry a terminal
+    status (landed | superseded | abandoned) yet still live plan-shaped — i.e. they
+    are PAST-DUE to decompose to zero residue. Read from the placement-drift accumulator
+    (.claude/memory-kit/placement-drift.json) populated by the placement-drift-signal.py
+    PostToolUse hook. Absent/malformed store → 0 (graceful: the hook may not have fired yet).
+    Stale entries whose doc no longer carries a terminal status (or no longer exists) are
+    skipped, so the count reflects current reality, not historical signal."""
+    p = ROOT / ".claude/memory-kit/placement-drift.json"
+    try:
+        store = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return 0
+    due = store.get("due") if isinstance(store, dict) else None
+    if not isinstance(due, dict):
+        return 0
+    terminal = {"superseded", "abandoned", "cancelled", "canceled", "deprecated", "retired",
+                "landed", "stable", "done", "complete", "completed", "shipped", "accepted",
+                "latest-stable"}
+    n = 0
+    for rel in due:
+        f = ROOT / rel
+        if not f.is_file():
+            continue
+        fm = parse_front_matter(f.read_text(errors="replace"))
+        raw = fm.get("status") or ""
+        md = MD_STATUS_RE.search(f.read_text(errors="replace"))
+        if not raw and md:
+            raw = md.group(1)
+        w = (raw or "").strip().lower().split()
+        if w and w[0].strip(":*\"'") in terminal:
+            n += 1
+    return n
+
+
 def headline_mode():
     docs, _ = scan_docs()
     surface = [d for d in docs if not d["home"].startswith("_state")]
     mem = scan_memory()
     mem_un = sum(1 for m in mem if not m["linked"])
     no_exit = sum(1 for d in surface if d["home"] in ACTIVE_HOMES and d["bucket"] == "NONE")
-    claimed = sum(1 for d in surface if d["bucket"] == "LANDED" and not d["verified"])
+    # scope CLAIMED-ONLY to ACTIVE_HOMES — CANONICAL/HISTORY `accepted`/`landed` is settled, not CI-gated
+    # (mirrors the scoreboard's landed_unverified filter; keeps the SessionStart line consistent)
+    claimed = sum(1 for d in surface
+                  if d["home"] in ACTIVE_HOMES and d["bucket"] == "LANDED" and not d["verified"])
     avail, _ = load_cluster_state(CLUSTER_STATE)
     a = sorted(k for k, v in avail.items() if v == "true")
     u = sorted(k for k, v in avail.items() if v != "true")
@@ -614,6 +660,7 @@ def headline_mode():
     if STATE_ROOT.is_dir():
         pe = all(len([f for f in sub.glob("*.md") if f.name not in ("CLAUDE.md", "README.md")]) == 0
                  for sub in STATE_ROOT.iterdir() if sub.is_dir())
+    due = decompose_due_count()
     print("MEMORY BUDGET  (`placement-audit.py --ledger` = per-file queue · `--focus` = testable scope)")
     print(f"  debt: {no_exit} no-status · {mem_un} unlinked-memory · {claimed} claimed-unverified"
           f"   |   pressure-dirs: {'empty ✅' if pe else '⚠ NON-EMPTY (pressure)'}")
@@ -621,6 +668,9 @@ def headline_mode():
     cov = decompose_coverage(surface)
     print(f"  review: {cov['captured']}/{cov['active']} specs+plans decomposed · "
           f"{cov['uncaptured']} UN-CAPTURED (un-reviewed backlog — `--coverage` for the queue)")
+    # BACK fire point: ACTIVE-home docs with terminal status still living plan-shaped → past-due to dissolve
+    print(f"  decompose: {due} plan{'' if due == 1 else 's'} past-due to decompose"
+          f"   ({'clear ✅' if due == 0 else '⚠ decompose-self → zero residue'})")
     return 0
 
 
@@ -642,7 +692,13 @@ def main() -> int:
     mem_unlinked = [m for m in mem if not m["linked"]]
 
     no_exit = [d for d in surface_docs if d["home"] in ACTIVE_HOMES and d["bucket"] == "NONE"]
-    landed_unverified = [d for d in surface_docs if d["bucket"] == "LANDED" and not d["verified"]]
+    # CLAIMED-ONLY is the over-claim gate: an ACTIVE-home plan/spec saying "landed" without verification
+    # evidence is dangerous debt. But CANONICAL (living architecture truth) and HISTORY (settled/distilled
+    # decisions) ARE the verified/settled destinations per PLACEMENT.md — an `accepted`/`landed` status there
+    # is the correct steady state, not a deliverable awaiting CI. Scope the gate to ACTIVE_HOMES (mirroring
+    # no_exit / drift_dead / orphans on the surrounding lines) to drop that deterministic false-positive class.
+    landed_unverified = [d for d in surface_docs
+                         if d["home"] in ACTIVE_HOMES and d["bucket"] == "LANDED" and not d["verified"]]
     drift_dead = [d for d in surface_docs if d["home"] in ACTIVE_HOMES and d["bucket"] == "DEAD"]
     orphans = [d for d in surface_docs if not d["inbound"] and not d["out"] and d["home"] in ACTIVE_HOMES]
     history_broken = [d for d in surface_docs if d["home"] == "HISTORY" and not d["has_canonical_link"]]

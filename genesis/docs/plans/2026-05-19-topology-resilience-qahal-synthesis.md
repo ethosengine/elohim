@@ -1,3 +1,9 @@
+---
+status: design   # synthesis + re-baseline — planning input
+cites:
+  - ../superpowers/specs/2026-05-01-light-up-the-topology-design.md   # the design spec this plan implements
+---
+
 # Topology + Resilience + Qahal — Synthesis & Re-baseline
 
 **Status:** Synthesis (pre-shift). Supersedes obsolete portions of the 2026-05-07 M1 plan; preserves the design intent of `light-up-the-topology` while reprojecting the work onto the graph-native substrate landed 2026-05-16.

@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 1b52af5d-0197-4098-82d8-8f9e143a6ea5
+cites:
+  - genesis/docs/content/elohim-protocol/history/2026-06-02-epr-foundation-landed-by-waves.md
 ---
 
 EPR foundation sprint closed 2026-05-16 with the @wip disposition walk + Band B Task 8 deferral.

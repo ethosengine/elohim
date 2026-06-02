@@ -4,6 +4,9 @@ description: "A persona rename touches content + filenames + generated indices +
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - genesis/data/timeline/chronicle/2026-05-14-first-memory-team-ceremony.md
+  - genesis/data/humans/humans.json
 ---
 
 When renaming a persona (or any first-class identity used across genesis stories, simulacra, and gherkin), updating `genesis/data/humans/*.md` + regenerating `humans.json` is the *beginning* of the work, not the end. Generators write new files but do not delete old ones, so stale files linger with the old name. Verified twice now: the 2026-05-14 chronicle claimed the `timothy → terrance` rename completed with "zero stale references"; a coherence pass on 2026-05-17 found eight residual surfaces.

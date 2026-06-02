@@ -3,6 +3,8 @@ name: Values-forward preference guards — the legitimate user-side filter
 description: Humans CAN set personal preference guards on what reaches them — but only as values-forward, time-limited, tended filters with anti-filter-bubble constraints that feed collective reach-governance signals. Distinct from email-collapse network-imposed filtering.
 type: project
 originSessionId: f534b7ae-d435-4ab8-ab3b-f7d23b6b0ed9
+cites:
+  - genesis/docs/content/elohim-protocol/constitution.md
 ---
 There IS a legitimate role for peer-side preference filtering — but it has a very specific shape. It is **values-forward, time-limited, tended, constrained against filter-bubble formation, and feeds collective wisdom signals**. It is NOT what receive-side network-imposed filtering looks like. Get the shape right or revert to the email-collapse anti-pattern.
 

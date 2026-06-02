@@ -3,6 +3,9 @@ name: project-forgetting-as-design
 description: Forgetting is inevitable in any memory system that respects time; the protocol's promise is not perfect recall but meaningful re-emergence. The storyteller agent is the gatekeeper that decides graduate / memorialize / hold for every memory candidate.
 metadata:
   type: project
+cites:
+  - genesis/data/stories/CONVENTIONS.md
+  - .claude/agents/storyteller.md
 ---
 
 > *"And some things that should not have been forgotten were lost. History became legend. Legend became myth. And for two and a half thousand years, the Ring passed out of all knowledge."*  — Galadriel, *The Lord of the Rings*

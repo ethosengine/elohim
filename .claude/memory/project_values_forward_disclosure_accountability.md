@@ -3,6 +3,8 @@ name: Values-forward disclosure — protocol is adversarial to accountability-re
 description: Some humans (through nature or nurture) cannot take accountability and will viscerally hate the protocol's consolidation/restitution/reach-drop mechanics; this must be disclosed crystal-clear and values-forward, never hidden or softened — being explicit IS the consent; frame is "yes this will feel bad AND you+your network are better off because the structure prevents Icarus-into-the-sun outcomes when self-correction is hard"; protocol takes a side, doesn't pretend neutrality
 type: project
 originSessionId: 10d85ef0-1979-4311-97e9-c2c209de48e2
+cites:
+  - genesis/docs/content/elohim-protocol/constitution.md
 ---
 The reality: there is a real population of humans who, through nature or nurture, are structurally unable to take accountability. Not bad-faith in the moment-to-moment sense — *patterned*. The protocol's accountability mechanics (consolidation events, restitution obligations, reach-drop on bad-propagation, reconciliation requirements, quarantine of known-harm) will feel oppressive to this population.
 

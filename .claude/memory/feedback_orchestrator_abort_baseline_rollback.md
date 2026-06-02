@@ -3,6 +3,8 @@ name: Aborting orchestrator runs forces full-chain rebuild on next push
 description: Push during an in-flight orchestrator chain superseded the prior orchestrator without persisting its build state — next push rebases against last-SUCCESSFUL orchestrator, pulling in everything that ran in the aborted attempt
 type: feedback
 originSessionId: 46cb3fbb-28fb-454c-b337-8d4d482a814d
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 When a push during an in-flight orchestrator triggers `disableConcurrentBuilds(abortPrevious: true)`, the aborted orchestrator never persists its updated build state (`build-graph-sha256-*` artifact). The next orchestrator's "Determine Build Plan" stage rolls back its baseline to the last *successful* orchestrator, NOT the last attempted one.
 

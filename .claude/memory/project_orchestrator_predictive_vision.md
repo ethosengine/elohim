@@ -3,6 +3,8 @@ name: Orchestrator predictive build-graph vision
 description: Long-term vision for orchestrator — predict before push, reconcile after run, every disconnect = investigation
 type: project
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
+cites:
+  - genesis/orchestrator/preview.mjs
 ---
 The user's stated vision for the elohim-orchestrator pipeline: **a real build-graph pipeline that helps visualize how each run flows, gives great visibility to investigators (human + AI), and lets us know before we push what we expect to run, then reconciles against what actually ran. Every disconnect elevates to an investigation, iterating toward predictive compiler-validated builds every run.**
 

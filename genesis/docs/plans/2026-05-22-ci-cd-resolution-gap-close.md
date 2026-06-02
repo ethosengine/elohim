@@ -1,3 +1,9 @@
+---
+status: Draft
+related:
+  - ../superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md   # sibling CI/orchestrator pipeline work
+---
+
 # CI/CD Resolution-Gap Close — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

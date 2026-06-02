@@ -574,3 +574,9 @@ That is the 20-year primitive.
 | Federation | Cross-manifest query execution via coupling-ref traversal |
 | Pillar | One of imagodei / lamad / shefa / mishpat / qahal — capture-resistance obligation surface |
 | Process demonstrator | Subgraph that demonstrates protocol-as-process (avodah, doorway) |
+
+---
+
+## Settled decisions (history)
+
+The reach-on-existing-content backfill policy this envelope design depends on is settled and distilled into a history record: [Reach Backfill Policy for Existing Content](../history/2026-04-22-reach-backfill-policy.md).

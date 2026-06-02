@@ -3,6 +3,9 @@ name: Signature changes need crate-wide caller grep before spec-compliance
 description: Subagent reviews catch in-file regressions but miss other-file callers; signature changes in Rust need grep across src/+tests/+benches/ before declaring done
 type: feedback
 originSessionId: 72a4534a-dd50-4984-be17-9d287ef54e6b
+cites:
+  - steward/node
+  - doorway/doorway-service
 ---
 When a Rust function's signature changes, the implementer subagent (and the spec/code reviewers) typically verify the inline tests adapted, but they don't always grep for callers across the whole crate. **Integration tests in `tests/`, examples in `examples/`, and benches in `benches/` get missed** — the change passes inline review then fails at pre-push (or CI) when those external-but-still-in-crate callers don't match the new signature.
 

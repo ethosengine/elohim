@@ -4,6 +4,8 @@ description: "ts-rs 10.x computes cross-crate import paths in generated TypeScri
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - elohim/sdk/schemas/scripts/codegen-ts.mjs
 ---
 
 When refactoring ts-rs-anchored types across crate boundaries, the safe pattern is **atomic single-crate consolidation**, not incremental partial moves. Verified the hard way 2026-05-18.

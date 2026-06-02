@@ -3,6 +3,8 @@ name: Elohim active is observed, not flagged
 description: Phase::ElohimActive is determined by whether real inference actually happened, not by a config flag. If stub runs, elohim are not active — regardless of what any flag says.
 type: project
 originSessionId: 6ec4bfae-b3f0-4040-8a90-6ae504910fe7
+cites:
+  - elohim/elohim-storage/src/hc_client.rs
 ---
 `Phase::ElohimActive` vs `Phase::DevContext` is NOT a feature flag. It is an observed property of the actual execution.
 

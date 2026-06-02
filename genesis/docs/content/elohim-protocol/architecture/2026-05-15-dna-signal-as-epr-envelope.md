@@ -1,7 +1,7 @@
 ---
 title: DnaSignal as EPR Envelope — T18 Specification
 tier: architecture
-status: Implemented (back-compat window active)
+status: accepted — Implemented (back-compat window active)
 created: 2026-05-15
 pillar coupling: elohim (EPR envelope primitive), imagodei (key-revocation producer site)
 informed-by:

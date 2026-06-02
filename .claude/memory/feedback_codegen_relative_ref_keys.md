@@ -3,6 +3,8 @@ name: codegen-ts.mjs refMap must register all relative-path key forms
 description: $refs from sibling files use both bare-filename and "./prefix" forms; refMap must register both or json-schema-to-typescript falls through to filesystem ENOENT
 type: feedback
 originSessionId: cdffa1f9-7b63-4657-ae44-2cafff5156bf
+cites:
+  - elohim/sdk/schemas/scripts/codegen-ts.mjs
 ---
 `elohim/sdk/schemas/scripts/codegen-ts.mjs` `loadRefMap` registers schemas under multiple key forms because $refs in different schema directories use different relative-path conventions:
 - Bare filename: `epr-envelope-view.schema.json` (sibling reference, used by some)

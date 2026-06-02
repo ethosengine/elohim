@@ -3,6 +3,8 @@ name: EPR substrate is not VF-GraphQL
 description: EPR envelope/codec/libp2p work is graph substrate (parent session scope), not shefa-speaks-VF-GraphQL (R&O lessons #4). Do not conflate.
 type: project
 originSessionId: 6e6b33c4-4e5a-4f96-9d46-9e2f7fc4fcc9
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md
 ---
 EPR Phase 1 (codec), 2A (storage), 2C (libp2p `/elohim/epr-atom/1.0.0`) delivered the graph substrate: signed envelopes with reach/coupling/claims, carried as opaque payloads over a federation transport. This is the foundation several downstream pieces depend on.
 

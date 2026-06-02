@@ -1,11 +1,11 @@
 ---
 project: elohim-protocol
 type: ux-design-spec
-status: checkpoint-A-output
+status: design — checkpoint-A output
 created: 2026-05-22
 gates: Sprint 1 — Qahal homepage UX exploration
-companion_vision: /projects/elohim/genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md
-companion_roadmap: /projects/elohim/genesis/docs/plans/2026-05-21-qahal-mvp-roadmap.md
+spec: 2026-05-21-qahal-architecture-vision.md            # companion vision this UX exploration realizes
+related: 2026-05-21-qahal-mvp-roadmap.md                 # companion roadmap
 ---
 
 # Qahal Homepage UX Design

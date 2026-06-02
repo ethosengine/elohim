@@ -3,6 +3,9 @@ name: Hub abstraction — household and collective as separate implementations
 description: Hub is an abstract substrate-topology interface; HouseholdHub and CollectiveHub are intentionally separate implementations because governance considerations differ in shape, not in settings. Mirrors the elohim-agent specialization pattern. Household-archetype fixtures are needed to model hub-and-spoke scaling; can start as @wip then add simulation harness.
 type: project
 originSessionId: 909de5de-3db0-4c88-af4b-12f47dd2762c
+cites:
+  - genesis/data/collectives/collectives.json
+  - genesis/data/devices/devices.json
 ---
 To model hub-and-spoke scaling rigorously (the inclusion math from `project_substrate_scale_ceiling`), the protocol needs Hub fixtures parallel to device archetypes. Today: device archetypes exist (`genesis/data/devices/devices.json`), collective archetypes exist (`genesis/data/collectives/collectives.json`, governance-shaped), humans have a `householdId` foreign key — but **no first-class household/hub fixture exists**. Conductor-groups (`account-packages/conductor-groups.json`) name buckets "Household" but are flat human-id lists for compute placement, not topology models.
 

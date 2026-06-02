@@ -2,6 +2,8 @@
 name: self-reinforcing-path-bug-class
 description: A walk-up-to-find-marker resolution can satisfy its own broken output and lock the bug in. Co-anchor on two independent markers (e.g., .claude/ AND .git) to break self-reinforcement.
 type: feedback
+cites:
+  - .claude/scripts/_lib/paths.py
 ---
 
 Three memory-kit audit scripts were writing reports to `.claude/.claude/memory-kit/<date>/` instead of `.claude/memory-kit/<date>/`. Root cause: a `repo_root_from_file` walk-up looking only for `.claude/` would find `.claude/` as the result of its own buggy output (the doubled-path artifact contains `.claude/` as a child directory, which the next walk-up satisfies). The bug bootstrapped itself.

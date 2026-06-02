@@ -3,6 +3,8 @@ name: After editing swarm composition, do a fresh-tree cargo build before commit
 description: just check on a DNA worktree does not verify that crate-level type/field references resolve on a clean checkout of dev; for elohim-storage swarm/behaviour edits, run cargo build on the actual storage crate from a clean state
 type: feedback
 originSessionId: 7cbbcc6f-985c-471c-9b04-22720c83ef2a
+cites:
+  - elohim/holochain/tests/sweettest/src/common/conductors.rs
 ---
 When touching libp2p swarm composition (NetworkBehaviour derived structs, event variant mappings, `From<FooEvent>` impls), **run `cargo build` on `elohim-storage` from a clean tree** before committing. Do not rely on `just check` against a DNA worktree — that verifies a different workspace and doesn't catch crate-level field/variant references.
 

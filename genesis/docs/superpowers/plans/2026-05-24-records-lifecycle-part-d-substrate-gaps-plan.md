@@ -1,3 +1,7 @@
+---
+status: Draft
+---
+
 # Records Lifecycle — Part D Substrate Gaps Plan (Revised After Phase 2)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan is **operator-led** — intended to be executed inline with human review at each subsection. Findings from Phase 1 ([phase2-findings-synthesis.md](./2026-05-24-records-lifecycle-phase2-findings-synthesis.md)) expanded the gap list from 10 to 19 (Gap 1+2 merged into D.1; 10 new gaps from Phase 1). Each subsection now resolves the operator-decisions surfaced by Phase 1 alongside the spec content.

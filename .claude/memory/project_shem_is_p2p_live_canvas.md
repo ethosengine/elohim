@@ -3,6 +3,8 @@ name: Shem is the live P2P modeling canvas (household + shem topology)
 description: shem runs most personas; Matthew/Jessica/James run on the household cluster on separate nodes (Matthew is a doorway operator); cross-node topology is the real P2P test environment
 type: project
 originSessionId: 9c3a2266-4f19-410d-b4d4-30d06366e38d
+cites:
+  - genesis/docs/content/elohim-protocol/history/2026-04-19-d1-through-d5-node-and-household-canon.md
 ---
 
 The live P2P test environment is a **multi-node topology**, not a single-node simulation:

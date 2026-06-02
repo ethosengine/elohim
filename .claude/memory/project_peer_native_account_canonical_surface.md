@@ -3,6 +3,13 @@ name: Account layer — graduation-based login supersession (shape, not committe
 description: Initial shape for the account layer; hosted-doorway login for unsgraduated humans, peer-native login once graduated to peer-steward; peer-native supersedes hosted; doorway then facilitates browser VIEW only, not auth
 type: project
 originSessionId: 253292ea-69ea-4e76-86e3-6d87ebdac46c
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
+landed_as:
+  - a2o scenarios (peer-OAuth portal flows)
+  - elohim-imagodei elements package (portal wrappers over doorway auth_routes.rs)
+supersedes:
+  - the "how graduation happens / how doorway detects a returning peer-steward / libp2p↔browser handoff" open questions below — now ANSWERED by trustMode discovered-from-/auth/me
 ---
 The account layer is not yet designed, but the **current shape** (as of 2026-04-24, not yet committed) is graduation-based supersession:
 
@@ -31,10 +38,18 @@ This is consistent with the three-layer truth model: doorway is web2 projection;
 **What's still open:**
 
 - ~~The actual peer-native login mechanism (Moss / Launcher integration? bespoke?).~~ **Resolved 2026-04-25:** elohim-app itself fills the role holochain-launcher / moss-launcher would serve today. The p2p-native OAuth portal is rendered either (a) directly from the human's own steward device running elohim-app, or (b) by their trusted peer network rendering it on their behalf (mesh-rendered IdP — meaningful for recovery/availability when the steward device is unavailable).
-- How graduation happens as a ceremony (when does a hosted human's identity migrate to peer-native?).
-- How doorway detects "this browser session is a returning peer-steward, use peer-native auth handoff" vs. "this is a fresh hosted human, use doorway-hosted login." (Likely via `peer_identity_bindings` projection table from EPR 2B Batch A.)
-- Whether the hosted-login path is ever upgraded to some richer form, or remains the transitional shim for unsgraduated users.
-- The libp2p ↔ browser bridging mechanic for the actual session handoff (identity-handshake is libp2p; browser-side needs translation).
+- ~~How graduation happens as a ceremony (when does a hosted human's identity migrate to peer-native?).~~ **Answered 2026-05-25 (peer-OAuth portal design):** graduation is signalled by `trustMode` **discovered from `/auth/me`** — never config. The doorway reads the session's trustMode at portal-render time; a returning peer-steward's `/auth/me` reports peer-native trust, so the portal backs auth with the peer-native IdP rather than minting a hosted login.
+- ~~How doorway detects "this browser session is a returning peer-steward, use peer-native auth handoff" vs. "this is a fresh hosted human, use doorway-hosted login."~~ **Answered:** same `trustMode`-from-`/auth/me` discovery — not the `peer_identity_bindings` table guess; the trustMode signal is authoritative.
+- ~~The libp2p ↔ browser bridging mechanic for the actual session handoff.~~ **Answered:** the handoff is **transport-agnostic** — `trustMode` is the contract, not the transport; the portal does not care whether the peer-native side arrived over libp2p, a mesh-render, or the steward device directly.
+- Whether the hosted-login path is ever upgraded to some richer form, or remains the transitional shim for unsgraduated users. **(Still genuinely open.)**
+
+**Watch-outs (from the peer-OAuth portal design — load-bearing constraints):**
+
+- **NO THIRD PORTAL.** The doorway `auth_routes.rs` IS the substrate auth surface; the Angular/Lit components are **wrappers** over it, not a parallel portal. Do not stand up a second auth implementation "for the browser" — render the existing substrate surface.
+- **`trustMode` MUST stay discovered-from-`/auth/me`, never config.** A config-pinned trustMode reintroduces the two-parallel-auth-systems trap this whole shape exists to avoid.
+- **Explored-and-deferred items are deliberate fast-follow, NOT gaps:** recovery-launcher Lit primitives, hosted→native migration UI, dynamic OAuth-client registration, cross-doorway PortalHost lookup. Naming them as gaps re-opens settled scope.
+- **Anti-crypto-bro framing is a values constraint** on this surface, not a stylistic preference — the portal must read as "log in with help from your people," never as a wallet-connect.
+- **Genuinely live, NOT folded here (leave in pile):** the net-new `crates/session-bridge/` substrate (`2026-05-28-session-bridge-design.md` + implementation plan) — verified NOT landed; it shares only the "graduation" vocabulary with this surface.
 
 **How to apply:**
 

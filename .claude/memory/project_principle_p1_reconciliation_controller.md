@@ -3,6 +3,8 @@ name: Principle P1 — elohim-storage as reconciliation controller
 description: Load-bearing architectural principle unifying EPR Phase 2B design and (claimed) future phases; k8s controller-manifest pattern applied to the three-layer truth model
 type: project
 originSessionId: 8c8c7e97-f63b-4df5-ae26-36e0fb18bcf7
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md
 ---
 The Holochain DHT is the authoritative manifest for identity/key/governance state. The libp2p/elohim-storage layer is a reconciliation controller over that manifest — k8s-controller-over-manifest pattern. Observed state changes → controller reconciles → no hesitation, no lazy acceptance.
 

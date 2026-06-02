@@ -3,6 +3,8 @@ name: Design for a generation — no shortcuts on substrate decisions
 description: When the user explicitly invokes "design for a generation" or rejects pragmatic shortcuts, prefer the W3C-standards / fundamentals option over the path of least resistance, even when the cost is substantially higher
 type: feedback
 originSessionId: 75ea3d40-9dd2-4e0c-ba96-dcb49c5221b5
+cites:
+  - .claude/commands/brainstorm.md
 ---
 Rule: when a substrate-level decision comes up (component framework, protocol design, identity layer, persistence model), present the full spectrum honestly — don't bias toward the pragmatic short-term option. If the user invokes "design for a generation" / "no shortcuts" / "fundamentals," pivot to the standards-aligned option even when it costs substantially more upfront.
 

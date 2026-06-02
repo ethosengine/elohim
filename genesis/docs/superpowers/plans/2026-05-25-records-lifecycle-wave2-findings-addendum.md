@@ -1,3 +1,9 @@
+---
+status: design   # Wave 2 findings addendum — synthesis of application-archetype concerns, planning input
+related:
+  - 2026-05-24-records-lifecycle-phase2-findings-synthesis.md   # the Phase 2 synthesis this extends
+---
+
 # Records Lifecycle — Wave 2 Findings Synthesis Addendum
 
 **Status:** Phase 1 Wave 2 returned 7/7 (Khan-Academy, Google-Drive, Google-Photos, Meta-Facebook, Patreon, Requests-and-Offers, AWS-Compute application archetype full-drafts). This document synthesizes the structured concerns reports into navigable form as an addendum to [`2026-05-24-records-lifecycle-phase2-findings-synthesis.md`](./2026-05-24-records-lifecycle-phase2-findings-synthesis.md).

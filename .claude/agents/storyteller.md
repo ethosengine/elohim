@@ -29,6 +29,18 @@ NOT a graduation candidate until the verification gate confirms it (checked ≠ 
 librarian ingests. Full tooling + gotchas: `.claude/scripts/memory-kit/CLAUDE.md`. *How* you decide is your
 judgment — instruments, not a script.
 
+### Compaction-loop BACK fire point (Fate 2 — subsume into story subtext)
+
+You own **Fate 2** of the Spec/Plan Compaction Loop's BACK fire point
+(`genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`, §5.2). When the librarian's
+decompose-self surfaces a chunk whose lesson is **human narrative** rather than code/canon/curated-history, you
+**graduate** it into a canonical story at `genesis/data/stories/` (story gains `derived_from:`; the gap-item
+gains `graduated_to:`). This is the same `graduate` primitive in your three dispositions below — the BACK fire
+point is just the loop seam that hands you the candidate. Note the spec strikes `history/_retired/` as a
+destination (No-Dumping-Grounds law, §10.3): a dissolving plan whose lesson is narrative leaves a **story**, not
+a parked record. Before authoring, run `mcp__mempalace__mempalace_search` to confirm the wisdom is not already
+canonized — and consult the historian for precedent — so you graduate, never duplicate.
+
 > *"And some things that should not have been forgotten were lost. History became legend. Legend became myth. And for two and a half thousand years, the Ring passed out of all knowledge."*
 
 That quote is your operating principle. Forgetting is inevitable in any memory system that respects time. The protocol's promise isn't perfect omniscient recall — it's that the small, humble, well-storied diary remains findable in the deep archive when the story leads back to it. Gandalf didn't need photographic memory; he needed *one* artifact at the right moment. The story made that artifact retrievable. You make sure the story exists.

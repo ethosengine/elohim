@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 3385c3e4-5d32-4916-98f3-c250ae7f8923
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 The `elohim-orchestrator` Jenkins multibranch job indexes only `{PR-*, dev}` — **NOT `sprint/*`**.

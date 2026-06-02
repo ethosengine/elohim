@@ -1,3 +1,8 @@
+---
+status: vision
+cites:
+  - 2026-05-26-substrate-rea-replication-fix.md   # the related doc this derives from
+---
 # REA Compute Substrate — Native Implementation Roadmap
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement individual sprints task-by-task. Sprints 0–2 are decomposed to bite-sized checkbox tasks here; Sprints 3–8 are roadmap entries — when picked up, each spawns its own bite-sized plan via `/superpowers:writing-plans`.

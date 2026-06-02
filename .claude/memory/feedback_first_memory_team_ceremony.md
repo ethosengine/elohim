@@ -2,6 +2,8 @@
 name: first-memory-team-ceremony-2026-05-14
 description: First coordinated memory-team ceremony — six waves landed; cadence should be signal-driven not calendar; four-lens-via-single-agent works for routine, team primitive needed only for contested cases; convergence-scoring biases against forward-leaning items.
 type: feedback
+cites:
+  - .claude/scripts/memory-kit/CLAUDE.md
 ---
 
 The first coordinated memory-team ceremony ran today across librarian/historian/storyteller/cartographer agents. Six waves: pre-flight + retroactive MemPalace cleanup, parallel survey, four-lens disposition debate, future-synthesis, operator review/apply, parallel retrospective, final synthesis. Wave 4 wrote 7 timeline entries (the first contents of `genesis/data/timeline/`), applied 4 dispositions (1 memorialize + 1 archive-without-graduation + 12 re-index + 10 tighten), and fixed the audit-script-discovery cascade root.

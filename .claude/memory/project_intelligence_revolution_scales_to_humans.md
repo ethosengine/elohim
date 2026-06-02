@@ -3,6 +3,8 @@ name: Intelligence revolution as first non-flattening scale
 description: Pitch framing — past revolutions (industrial, green) scaled by flattening human complexity; intelligence revolution is the first that can scale TO human complexity instead of away from it
 type: project
 originSessionId: 8e5ca156-4c16-43dc-99f2-3f117c53cc4f
+cites:
+  - genesis/docs/content/elohim-protocol/manifesto.md
 ---
 Past general-purpose technological revolutions changed what was possible for human life by *flattening human variation to fit the machines*. Industrial revolution: assembly line, standardized worker, mass production. Green revolution: monoculture, standardized crop, standardized farm. Both produced enormous gains and enormous costs in human and ecological diversity.
 

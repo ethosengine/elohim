@@ -2,6 +2,8 @@
 name: agent-audit-drift-counter-convergence-2026-05-14
 description: First attested cross-cycle convergence of an audit-discovery drift counter — agent-audit dropped from 6 (Run #2) to 1 (Run #3) after Run #1 deployed the fix. Forensic evidence that the corrective edit actually converged, not just promised.
 type: feedback
+cites:
+  - .claude/scripts/memory-kit/agent-audit.py
 ---
 
 The agent-audit drift-counter showed an attested cross-cycle convergence across the first three Memory Ceremony runs. Run #1 deployed the fix to the audit-discovery cascade root. Run #2 (post-deploy) observed a counter of **6** flagged agents. Run #3 (this ceremony) observed **1**. The trajectory 6 → 1 on the same metric, measured a cycle apart, is the first cross-cycle convergence evidence the memory team has captured — it distinguishes "fix deployed" from "fix converged" as separately-attestable states.

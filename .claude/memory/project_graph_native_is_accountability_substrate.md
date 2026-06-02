@@ -4,6 +4,8 @@ description: "Graph-native isn't a backend query optimization — it's the physi
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md
 ---
 
 The 2026-05-16 graph-native landing (CozoDB sled-backed projection + manifest graph extensions + Apollo Federation v2 SDL) reads in the spec as a query-substrate choice — Reading A, projection engine alongside diesel. The deeper claim is structural: **graph-native is the load-bearing primitive that lets elohim agents hold accountable positions in a shared memory of understanding between humans.**

@@ -3,6 +3,10 @@ name: bounds-validator-pattern
 description: Single substrate-side bounds_validator::validate function that every per-instance per-row-of-the-table validator delegates to. Walks bounded_by → Commitment → 7 checks (commitment_found, not_revoked, active window, scope_includes_event, reach_ceiling_ok, rate_within_limit, key_rotation_current). CommitmentFetcher + RateHistory traits enable mocking without conductor.
 metadata:
   type: project
+cites:
+  - genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md
+  - elohim/elohim-storage/src/services/bounds_validator.rs
+  - elohim/sdk/domains/elohim/manifest.json
 ---
 
 When implementing a per-instance validator (Sprint 1's republish_epr_validator, Sprint 3's serve_url_projection_validator, Sprints 5a-e's per-row validators), DELEGATE to `services::bounds_validator::validate` for the substrate-wide concerns. Per-instance validators only handle (1) schema validation of the action's specific payload, (2) action-discriminator check, and (3) construction of an `EventForValidation` projection. The substrate-wide concerns — Commitment fetch, active-window, scope-includes-event, reach-ceiling, rate-limit, key-rotation, revoked — all live in one function.

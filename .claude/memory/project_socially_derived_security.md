@@ -3,6 +3,8 @@ name: Socially derived security — peer-held shares, elohim-attested identity
 description: Foundational recovery principle — identity recovery goes through peers' elohim-agents attesting to you, not through doorway custody or seed phrases
 type: project
 originSessionId: a00556ea-66be-405a-985e-1a7a309d43a8
+cites:
+  - genesis/docs/content/elohim-protocol/resilience/README.md
 ---
 Identity and key recovery are **socially derived**. No single party (not doorway, not any peer, not the protocol itself) can recover your identity alone. Recovery requires your people's elohim-agents, plus your people themselves, to attest you are who you say you are.
 

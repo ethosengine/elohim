@@ -3,6 +3,8 @@ name: SSR fetch shim has anonymous-only auth context (higher-reach content rende
 description: Current AngularRenderer fetcher only sees V8 HttpClient headers, not the originating request's Cookie/Authorization; commons-reach renders fine, but regional-private/local/private content gets anonymous-equivalent denial in the rendered HTML
 type: project
 originSessionId: cf962313-d70a-459d-acb7-925c8f19e9e1
+cites:
+  - .claude/shifts/doorway-ssr-deliver-2026-05-07T23-37/brainstorm-prompt-followup.md
 ---
 The doorway-ssr-deliver shift (2026-05-08) wired `ResolverFetcher::new(client, storage_url)` and the worker uses `with_full_shims(fetcher)`. The shim forwards Angular's HttpClient request headers to elohim-storage — but those are headers the SSR-running Angular code set, not the originating public request's `Authorization` / `Cookie`. Effective auth context for storage fetches during render is anonymous.
 

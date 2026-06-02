@@ -1,3 +1,7 @@
+---
+status: Design
+---
+
 # Che Browser Feedback — L1 Foundation: Wiring Fix + `look` Primitive
 
 > Spec 1 of 2. This is the **foundation**: make a headless browser actually launch in the

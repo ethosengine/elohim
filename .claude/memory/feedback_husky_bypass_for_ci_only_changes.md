@@ -3,6 +3,8 @@ name: husky-bypass-for-ci-only-changes
 description: When pushing a CI/CD-specific fix (Jenkinsfile, manifests, orchestrator config) and the pre-push gate fails on unrelated code drift, HUSKY=0 bypass is appropriate
 metadata:
   type: feedback
+cites:
+  - .husky/pre-push
 ---
 
 When the only changes in a commit are CI/CD configuration (Jenkinsfiles, k8s manifests, orchestrator code) and the husky pre-push gate fails on unrelated drift in code surfaces the commit doesn't touch, `HUSKY=0 git push` is the right call.

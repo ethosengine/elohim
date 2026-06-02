@@ -3,6 +3,8 @@ name: Historian — pattern-aware un-archive agent
 description: The inverse of cleanup. Indexes the archive, recognizes when current work matches an archived pattern, surfaces the precedent as a risk/precedent annotation into the active plan or sprint. Performs the `surface` primitive named in the lifecycle spec.
 type: project
 originSessionId: b5ef4833-2583-4482-b36e-b595da75dafe
+cites:
+  - .claude/agents/historian.md
 ---
 Cleanup archives stale memory. Historian *re-activates* archived memory when the present trajectory matches an archived pattern. Archive isn't a graveyard; it's a library. Historian is the librarian.
 

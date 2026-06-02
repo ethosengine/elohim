@@ -3,6 +3,8 @@ name: Devspace disk-fill recovery procedure
 description: Eclipse Che workspace /projects volume is 118G; fills from .angular/node_modules/target plus .claude/worktrees Rust target dirs; cleanup procedure recovered 104G on 2026-05-08
 type: project
 originSessionId: 49471c84-ee22-4391-ade3-cfcabbe03f0d
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 The Eclipse Che workspace `/projects` volume is 118G. When it hits 100%, the harness silently truncates `/projects/.claude-config/.claude.json` to 0 bytes (Claude refuses to start, "JSON Parse error: Unexpected EOF"). Backups in `/projects/.claude-config/backups/` rotate; restore the most recent.
 

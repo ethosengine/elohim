@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 22de0299-7a43-43b5-a84a-e497e9397bbe
+cites:
+  - genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md
 ---
 
 **Decision (2026-05-29, operator, sprint/cross-pillar-cleanup):** a hub (household/collective) has TWO first-class identifiers:

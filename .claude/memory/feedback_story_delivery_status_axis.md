@@ -3,6 +3,9 @@ name: story-delivery-status-axis
 description: Story author-status is orthogonal to delivery-status; the delivery-status gradient (envisioned → backlog → refined → wip → active{alpha,beta,latest-stable} → stable, with regression as orthogonal) is the same lifecycle as backlog status, extended both ends
 metadata:
   type: feedback
+cites:
+  - genesis/data/stories/CONVENTIONS.md
+  - genesis/graphos/vocabulary.md
 ---
 
 Story `status:` (draft/canonical/retired) and story `delivery_status:` are **orthogonal axes**. Author-status says "the storyteller has finished composing, operator sealed it as canonical narrative." Delivery-status says "the feature this story dramatizes actually runs at some maturity level — its Gherkin scenarios + visual confirmation prove the lived substrate."

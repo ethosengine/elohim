@@ -2,6 +2,8 @@
 name: /deliver authority discipline — paired verdicts proof
 description: Two /deliver verdicts taken weeks apart, in opposite directions, both honest. May 7 honored Delivered despite a framework-gap; 2026-05-14 bootstrap honored deferred-substrate-missing for an absent feature file. Paired evidence that /deliver's authority floor is method-grounded, not vibe-grounded.
 type: project
+cites:
+  - .claude/skills/deliver/SKILL.md
 ---
 
 Two /deliver verdicts, weeks apart, in opposite directions, both honest:

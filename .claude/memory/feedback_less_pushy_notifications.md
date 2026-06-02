@@ -3,6 +3,8 @@ name: Less pushy notifications — prefer ambient over interruptive
 description: UX default: ambient status > passive prompts > gentle one-time nudges > never interruptive notifications; system does sensible thing automatically, surfaces result quietly
 type: feedback
 originSessionId: a00556ea-66be-405a-985e-1a7a309d43a8
+cites:
+  - .claude/agents/storyteller.md
 ---
 Default strongly toward ambient, non-interruptive UX. The fewer notifications, modals, badges, and "you should do X" prompts the user sees, the better.
 

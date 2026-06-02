@@ -1,3 +1,9 @@
+---
+status: Draft
+cites:
+  - ../superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md   # the related doc this derives from
+---
+
 # Elohim Framework Cleanup — Sprint Sequence
 
 Goal: turn the substrate into a **clean, reliable (our apps load), developer-friendly framework**

@@ -3,6 +3,8 @@ name: elohim-hub elevation — emergent scaling primitive for Tier 3
 description: elohim-node graduates from passive deployment wrapper into the active runtime composition primitive for HouseholdHub/CollectiveHub; federation between hubs is the Tier 3 substrate scaling story
 type: project
 originSessionId: 155036b0-387a-441c-91c5-7a1333fb2f07
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
 ---
 elohim-node is being elevated from "passive deployment wrapper" (per project_elohim_node_role) into the **active runtime composition primitive** for hubs. A hub (HouseholdHub | CollectiveHub per project_hub_archetype_abstraction) is what scales the P2P dataplane while keeping the whole human-scale invariants (deep inclusivity, integrity, care for system limits).
 

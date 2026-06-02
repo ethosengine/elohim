@@ -3,6 +3,9 @@ name: k8s-is-dev-substrate-not-protocol
 description: K8s is the dev/test-bench scaffolding the alpha cluster runs on today; it is NOT part of the elohim protocol. Protocol docs must keep k8s primitives (pods, PVCs, kubectl, StatefulSets, kube-rs) out of substrate descriptions. K8s carries forward only as inspirational analogue for the elohim-operator complexity-collapse pattern.
 metadata:
   type: feedback
+cites:
+  - genesis/plans/2026-04-13-device-archetypes-design.md
+  - genesis/data/rakia/compute-capacity.json
 ---
 
 K8s and the elohim protocol are easy to confuse because the analogues are so close. They are NOT the same thing.

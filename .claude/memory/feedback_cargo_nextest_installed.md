@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: ca911629-dfdd-46f5-8bb1-e936364bea8e
+cites:
+  - .claude/commands/shift.md
 ---
 
 `cargo nextest run` is the preferred way to run Rust tests in this repo. Installed 2026-05-15 at `/opt/rust/cargo/bin/cargo-nextest`. Version 0.9.135.

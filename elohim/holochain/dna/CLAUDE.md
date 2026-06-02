@@ -61,6 +61,11 @@ Clients write to the conductor. Storage listens and indexes. Never write
 to storage directly for notarized types (legacy code may still do this —
 migrate toward conductor-first).
 
+## Coordinator Watch-outs
+
+- **Read DHT entries back with `record.entry().to_app_option::<T>()`, never `Entry::try_into() -> SerializedBytes`.** An `Entry::try_into()` SerializedBytes round-trip serializes the `Entry::App(...)` *variant tag* into the bytes instead of unwrapping the inner app entry; on readback it fails with `Deserialize error: missing field '<first_field>'` even when the fixture and integrity structs have identical shape — the shape is fine, the *envelope* is wrong. This is a distinct failure mode from `serde_json::Value` at the zome-call boundary (that one is `feedback_serde_json_value_breaks_zome_boundary`; this is the `Entry` variant envelope on DHT readback). Sibling DNAs (mishpat, imagodei) use the correct `to_app_option` pattern. (Full lesson: memory entry `feedback_dht_readback_use_to_app_option`.)
+- **`#[ignore]` on a sweettest is a CI NO-OP — it does NOT silence the test in CI.** The DNA sweettest stage invokes `cargo nextest run --release --run-ignored all`, which deliberately runs every `#[ignore]`-marked test (sweettests carry `#[ignore]` so *local* runs skip them; CI overrides to run them all). Adding `#[ignore]` to quarantine a broken sweettest does nothing in CI — the test still runs and still fails, costing a full ~75-min holochain build cycle. To actually remove a sweettest from the CI run you must DELETE it or change the Jenkinsfile invocation, not annotate it. (Full lesson: memory entry `feedback_sweettest_ignore_is_ci_noop`; the `--run-ignored all` invocation lives in `elohim/holochain/dna/Jenkinsfile`.)
+
 ## Build
 
 ```bash

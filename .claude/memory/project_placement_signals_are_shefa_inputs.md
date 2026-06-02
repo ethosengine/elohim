@@ -3,6 +3,8 @@ name: Placement/verification signals are shefa economic inputs
 description: Gaps, breaches, and recovery needs are structured signals for shefa economic planning — not just operational errors
 type: project
 originSessionId: 17546f03-3ee8-4704-bdf9-18d0d64baf9b
+cites:
+  - elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json
 ---
 Placement gaps, verification breaches, reconstruction events, and over-extended commitments are not operational warnings — they are **structured economic signals** that flow up into shefa to drive planning: where new peer support is needed (more nodes), where subsidies should flow, who needs recovery/repair, who is over-extended.
 

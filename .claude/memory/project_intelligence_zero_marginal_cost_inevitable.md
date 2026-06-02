@@ -3,6 +3,8 @@ name: Zero marginal cost of intelligence is inevitable — fiber pattern
 description: Pitch frame — there's one AI, currently hyperscaled. Inference is racing to the edge. Marginal cost of applied intelligence going to zero is inevitable, same pattern as fiber/telco rental collapse.
 type: project
 originSessionId: 8e5ca156-4c16-43dc-99f2-3f117c53cc4f
+cites:
+  - genesis/docs/content/elohim-protocol/manifesto.md
 ---
 There aren't two AIs (an extractive one and a benevolent one). There's one AI, currently hyperscaled because training requires large capital. But **inference** — applied intelligence — is racing to the edge. Home hardware will run it; commodity GPUs already do. The marginal cost of applied intelligence is going to zero.
 

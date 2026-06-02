@@ -4,6 +4,8 @@ description: "When capturing protocol design principles, refuse the rhetorical m
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - .claude/agents/storyteller.md
 ---
 
 When writing memory entries (or any framing of what the protocol is) about a distinguishing principle (patience, accountability, dignity, stewardship), **do not reach for contrast via mutually-exclusive negation** — phrases of the shape *"not a control machine, not a truth machine, not a coordination machine, but a patience machine."* Caught twice in the same session writing the consilience entry: first by disclaiming coordination, then by disclaiming truth-arbitration and control after the first correction. The reflex is rhetorical; the move is wrong.

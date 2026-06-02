@@ -2,6 +2,8 @@
 name: `.no-claude.md` opt-out marker — captured decisions for heuristic false-positives
 description: When the claude-md-review audit flags a directory as MISSING-CLAUDE-MD but the operator concludes no doc is needed, a `.no-claude.md` marker file in that directory carries the rationale. Future audits surface the marker (with rationale excerpt) rather than re-flagging. Pattern generalizes to other false-positive-prone heuristics.
 type: project
+cites:
+  - .claude/scripts/memory-kit/claude-md-audit.py
 ---
 
 The `claude-md-review` audit flags directories that look like they need a CLAUDE.md (≥15 files OR ≥4 subdirs, ≥2 distinct architectural extensions, nearest ancestor ≥2 levels up). Some flags are real; some are false-positives (parent doc covers it, design-asset directory, component-flat-tree pattern).

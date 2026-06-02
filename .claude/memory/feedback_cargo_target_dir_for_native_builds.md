@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: ca911629-dfdd-46f5-8bb1-e936364bea8e
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 Native cargo builds (NOT WASM) should set `CARGO_TARGET_DIR` to the cargo-target-pool slot to avoid silently filling `/projects` with legacy `target/` dirs at each workspace root.

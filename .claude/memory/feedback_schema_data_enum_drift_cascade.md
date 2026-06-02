@@ -3,6 +3,9 @@ name: Schema-data enum drift cascades to fake auth-credential bugs
 description: When seed data uses an enum value the protocol schema rejects, doorway 503s on registration cascade silently into 401 INVALID_CREDENTIALS at login — masquerading as fixture-credential bugs. Always check seed-humans.log before chasing 401s.
 type: feedback
 originSessionId: ccbf3926-fd47-4d11-a145-40de2ac32777
+cites:
+  - genesis/a2o/src/framework/fixtures/humans.ts
+  - genesis/data/humans/humans.json
 ---
 When a fixture human's login surfaces `POST /auth/login returned 401: INVALID_CREDENTIALS`, do NOT assume the credentials are wrong. Check the **seed-humans phase log first** for HTTP 503 / validation errors during their registration.
 

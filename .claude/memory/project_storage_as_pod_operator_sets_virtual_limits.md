@@ -3,6 +3,8 @@ name: elohim-storage as pod / elohim-operator as virtual-limit setter
 description: Per-node compute features (SSR concurrency, transcode budget, etc.) must subscribe to ComputeMetricsView; elohim-operator imposes virtual limits via AllocationBlockView + CeilingLimitView; treating these as hard limits is the dwellinghub-orchestration model. Probes + view live (2026-05-10), allocation/ceiling env-driven until DHT-attested policy
 type: project
 originSessionId: f5eddd4d-c824-4266-b68e-fd61a7afac58
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
 ---
 elohim-storage models itself as a pod that elohim-operator orchestrates as part of a household/dwellinghub fabric. Three layered surfaces:
 

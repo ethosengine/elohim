@@ -3,6 +3,8 @@ name: Elohim as specialist subagents — context-bound and ephemeral
 description: Elohims are not monolithic agents; they spawn as specialist subagents with focused context (e.g., a defender subagent with deep imagodei profile access) and are governed by constitutional disclosure rules
 type: project
 originSessionId: a00556ea-66be-405a-985e-1a7a309d43a8
+cites:
+  - genesis/docs/content/elohim-protocol/governance-layers-architecture.md
 ---
 Elohims are LLMs, so they're context-bound and ephemeral by nature. An elohim isn't a single persistent agent that "knows everything about Matthew" — it's a pattern of specialist subagents spawned with focused context for specific responsibilities, each with its own manifest declaring inputs/outputs/disclosure rules.
 

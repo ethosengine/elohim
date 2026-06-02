@@ -3,6 +3,8 @@ name: inline-summary-must-echo-frontmatter
 description: Storyteller inline four-lens summaries can lossy-compress story-as-authored counts; the story frontmatter is the source of truth, summaries must echo verbatim
 metadata:
   type: feedback
+cites:
+  - .claude/agents/storyteller.md
 ---
 
 When the storyteller carries an inline four-lens debate (single-agent default for routine ceremonies, ≤10 candidates, no obvious disagreement), the inline summary can lose fidelity that the story-as-authored already declared. Memory ceremony Run #2 (2026-05-14): storyteller's Wave 2 inline output mentioned only 1 MEMORIALIZE (`project_stewarded_child_identity`), but the story's frontmatter `memorializes:` block listed 3 entries (`stewarded_child_identity`, `stewardship_philosophy`, `bootstrap_to_elohim_security_gradient`). The librarian executing Wave 4 dispatched on the story-as-authored (which is the source of truth) and caught it; if the librarian had dispatched on the inline summary only, two memorializations would have silently dropped.

@@ -3,6 +3,8 @@ name: Cadences are archetype-tunable with dev-mode overrides
 description: Any scheduled/periodic loop must have archetype-aware defaults, policy-file overrides, env/CLI dev overrides, and a synchronous admin trigger for testing
 type: project
 originSessionId: 17546f03-3ee8-4704-bdf9-18d0d64baf9b
+cites:
+  - elohim/sdk/domains/elohim/manifest.json
 ---
 Any scheduled or periodic operation (verification scans, distribution retries, reconstruction polls, PeerStatus cadence) must support **four layers of control**:
 

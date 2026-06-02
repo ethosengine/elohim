@@ -1,3 +1,9 @@
+---
+status: Design
+related:
+  - ../../plans/2026-05-19-viewer-symmetry-reciprocity-qahal-substrate.md   # L7 plan that authors this spec as substrate groundwork
+---
+
 # Qahal Collective + Membership DHT Design
 
 **Status:** Design (pre-implementation). Implementation deferred to a follow-on plan that consumes this spec. Likely co-sequenced with the deferred Wave 3 hREA / VF-GraphQL brainstorm (`genesis/docs/plans/2026-04-21-rno-lessons-cross-wave-guidance.md`).

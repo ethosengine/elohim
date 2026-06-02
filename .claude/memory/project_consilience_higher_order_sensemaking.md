@@ -4,6 +4,8 @@ description: "The P2P network has higher-order sensemaking that no single node h
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/docs/content/elohim-protocol/global-orchestra.md
 ---
 
 This is a mission-tier design principle — a guard rail that governs how *every* surface above the substrate floor behaves.

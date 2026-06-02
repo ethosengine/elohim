@@ -3,6 +3,8 @@ name: ci-playwright image is ci-builder + playwright layer
 description: ethosengine/ci-playwright inherits ci-builder (node:20 + corepack pnpm); bundles playwright@1.59.1; lockfile/image version drift triggers one-time chromium redownload
 type: project
 originSessionId: 81491e3a-1dae-4ea1-a00a-def3f332fbfd
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 `harbor.ethosengine.com/ethosengine/ci-playwright:latest` is a thin layer over `ci-builder`, not a Microsoft Playwright base image. Inherited from ci-builder: Node 20.20.2, corepack/pnpm 10.33.4, `CHROME_BIN=/usr/bin/chromium-wrapper` env var, root user (no USER directive). Adds: playwright@1.59.1 + `/ms-playwright/chromium-1217` (Chrome 147) + ffmpeg-1011.
 

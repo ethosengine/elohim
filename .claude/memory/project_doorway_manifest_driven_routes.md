@@ -3,6 +3,8 @@ name: Doorway routes are declared in app manifests, not coded in doorway
 description: App manifests declare HTTP routes; doorway reads manifests and acts as a registry-driven proxy to the right elohim-storage instance. elohim-storage CID/DAG routing is the network source of truth.
 type: project
 originSessionId: 6ec4bfae-b3f0-4040-8a90-6ae504910fe7
+cites:
+  - elohim/sdk/domains/lamad/manifest.json
 ---
 Doorway is not a per-route Rust coder. It is a **registry-driven proxy/load-balancer**.
 

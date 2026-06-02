@@ -1,3 +1,7 @@
+---
+status: Draft
+---
+
 # Records Lifecycle — Part A Primitives Walkthrough Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to dispatch the 7 parallel agents. Each agent receives THIS plan plus their assigned primitive. Steps use checkbox (`- [ ]`) syntax for tracking.

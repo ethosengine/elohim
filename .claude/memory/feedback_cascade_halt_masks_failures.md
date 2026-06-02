@@ -3,6 +3,8 @@ name: Cascade-halt orchestrator masks downstream failures
 description: When a CI pipeline is red, the orchestrator's halt-on-failure cascade hides errors in every downstream pipeline; driving toward green surfaces buried failures one layer at a time
 type: feedback
 originSessionId: c423684a-b162-42c6-b5cf-177683da9ed0
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 When the Elohim orchestrator (`genesis/orchestrator/Jenkinsfile`) sees an upstream pipeline FAIL, it aborts the cascade — downstream pipelines are never attempted. This means: while a critical pipeline (holochain, edge, etc.) is red, every other pipeline's potential failures are invisible. They could be broken for days and you wouldn't know.
 

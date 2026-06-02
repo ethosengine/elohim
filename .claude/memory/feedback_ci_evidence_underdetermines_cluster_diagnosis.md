@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: f5ed8831-8faa-47bc-a508-fa91142db0de
+cites:
+  - elohim/elohim-storage/src/p2p/inventory_gossip.rs
 ---
 
 When CI surfaces UNSTABLE + downstream failure + empty probes against a fresh deploy, the failure shape on the cluster is the ground truth — ci-investigator output is necessary but not sufficient. Ask the operator for `kubectl get pods -A | grep <namespace>`, `kubectl describe pod <stuck-pod>`, and `kubectl logs <stuck-pod>` before attributing causality.

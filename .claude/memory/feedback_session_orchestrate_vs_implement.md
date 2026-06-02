@@ -3,6 +3,8 @@ name: Sessions split into orchestrating vs implementing
 description: When classifying or resuming Claude sessions, distinguish orchestrating threads (high-level planning/strategy/delegation) from implementing threads (hands-on code edits). Resume prompts differ in shape.
 type: feedback
 originSessionId: a3da8e7a-0d13-473c-9e43-f45494bf2dde
+cites:
+  - .claude/skills/handoff/SKILL.md
 ---
 Sessions fall into two modes and should be classified/resumed differently:
 

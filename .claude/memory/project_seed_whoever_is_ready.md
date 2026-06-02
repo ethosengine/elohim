@@ -3,6 +3,8 @@ name: Seed whoever is ready — partial readiness aligns with P2P architecture
 description: Seeder must not be all-or-nothing on conductor health; per-peer seeding with partial reporting is the correct behaviour
 type: project
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
+cites:
+  - genesis/seeder/src/seed-humans.ts
 ---
 When a conductor admin WS is down on one peer (e.g. terrance in alpha-cluster #1002), the seeder must continue seeding the peers that ARE ready (adam, jessica, etc.) and report the unready peer as partial — not abort the whole stage.
 

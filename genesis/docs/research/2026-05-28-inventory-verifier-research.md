@@ -1,3 +1,9 @@
+---
+status: design   # research + fix plan; proposed one-function relaxation now present in inventory_gossip.rs (verify via CI)
+cites:
+  - ../../../elohim/elohim-storage/src/p2p/inventory_gossip.rs   # is_blob_hash_shaped — the verifier this research analyzes
+---
+
 # Inventory verifier wire-format mismatch — research + plan
 
 **Date:** 2026-05-28

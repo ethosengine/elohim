@@ -3,6 +3,8 @@ name: Imagodei has three distinct surfaces — social profile, self-knowledge, a
 description: Imagodei UX decomposes into three surfaces; M5 lands the third (account management) with Security & sign-in as its first pane
 type: project
 originSessionId: 4d20bf7b-4639-43d8-ad10-fccb514a7f0a
+cites:
+  - genesis/docs/architecture/cradle-to-grave-capability-gradient.md
 ---
 Imagodei is not a single page. It has three architecturally distinct surfaces, each with its own audience and access pattern:
 

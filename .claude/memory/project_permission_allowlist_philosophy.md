@@ -3,6 +3,8 @@ name: Permission allowlist philosophy — broader is better, within safety rails
 description: In this project, the .claude/settings.local.json allowlist is the trusted authority surface for agent commands. Make it as broad as safely possible, not more numerous.
 type: project
 originSessionId: 9a934a92-144d-4415-9d43-14fcb046e2db
+cites:
+  - .claude/settings.local.json
 ---
 When managing Claude Code bash/tool permissions in this project:
 

@@ -1,3 +1,9 @@
+---
+status: Draft
+informed-by:
+  - ../content/elohim-protocol/architecture/2026-04-21-elohim-epr-integrator-compatibility-contract.md   # the SDK/integrator boundary canon this clarifies
+---
+
 # SDK Boundary Clarification Implementation Plan (Revised — elohim-views)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

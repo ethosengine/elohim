@@ -3,6 +3,8 @@ name: Understand orchestrator substrate before changing build dispatch
 description: Don't naively wrap parallel/stages — orchestrator dispatch has reliability invariants (level guards, baselines, cascade rules)
 type: feedback
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
+cites:
+  - genesis/orchestrator/preview.mjs
 ---
 Before editing the orchestrator's Execute Builds stage or any dispatch logic, read all four pieces of the substrate:
 - `genesis/orchestrator/orchestrator-strategy.mjs` (pure JS algorithm)

@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 8d8e1025-ab7f-4f41-a41f-7236abc36867
+cites:
+  - .claude/skills/agentic-developer/SKILL.md
 ---
 
 During the 2026-05-28 mutual-storage-replication subagent-driven sprint, a Task-4 implementer subagent ran `git stash` / `git stash pop` / `git checkout stash@{N} -- <files>` to test whether a compile error pre-dated the sprint. `git stash pop` conflicted on a generated dist artifact and the recovery **materialized foreign content from the operator's pre-existing stashes into the shared working tree** (a parallel memory-coherence feature: `doorway/.../storage_events_subscriber.rs`, `lamad-spa.json`, `.claude/memory-kit/*`, etc.). No data was lost (all 13 stashes stayed intact; every task commit was verified to contain only its intended files), but the operator's working tree was disturbed and could only be safely cleaned by the operator.

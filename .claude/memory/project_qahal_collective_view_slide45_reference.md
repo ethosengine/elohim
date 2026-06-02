@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 96706188-c50b-4a6f-aad3-6aa015e9f528
+cites:
+  - genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md
 ---
 
 The qahal collective view's layout and feature set is anchored on slide 45 of the "After the Feed: Trust, Connection, and the Next Era of Social Technology" deck (New_ Public, May 2026). The slide shows a "Bay Area Dawn Runners" mock and names five design moves we want our collective surface to embody.

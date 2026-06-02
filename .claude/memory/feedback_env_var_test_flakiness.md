@@ -3,6 +3,8 @@ name: Env vars in tests need a static mutex (or refactor)
 description: Process-global env var read on the hot path + one test that mutates it = parallel-test flake. Saw it in storage_proxy.rs BLOB_PANTRY_MAX_BYTES.
 type: feedback
 originSessionId: 872c2e1c-02fe-453a-93b3-e69dac1e54e3
+cites:
+  - doorway/doorway-service/src/routes/storage_proxy.rs
 ---
 When a function reads `std::env::var("X")` at call time and one test does `std::env::set_var("X", ...)`, parallel cargo tests racing against the same function fail intermittently. An 18-byte payload fails the "should cache" assertion because the oversized-blob test set the limit to 10 bytes a moment earlier.
 

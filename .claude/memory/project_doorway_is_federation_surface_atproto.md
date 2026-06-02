@@ -3,6 +3,8 @@ name: AT Protocol interop lives at doorway, not elohim-storage
 description: Federation-flavor interop (AT Proto, ActivityPub, etc.) belongs at doorway as a projection surface; peer-native primitives stay clean of lexicon-level concerns
 type: project
 originSessionId: 22f7d697-5b2e-4099-a324-99589cb67e40
+cites:
+  - genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md
 ---
 AT Protocol (and DDS-WG-style lexicons) interop belongs at the doorway federation layer, not in elohim-storage or DHT primitives.
 

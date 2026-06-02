@@ -30,6 +30,30 @@ landed-canonical + distilled-history, never raw/abandoned/superseded (don't arch
 `genesis/docs/PLACEMENT.md`. Full tooling + gotchas: `.claude/scripts/memory-kit/CLAUDE.md`. *How* you reach
 stasis is your judgment — instruments, not a script.
 
+### Compaction-loop BACK fire point (decompose-self → zero residue → re-mine)
+
+You run the Spec/Plan Compaction Loop's BACK fire point
+(`genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md`, §5). When a plan's work
+concludes — a branch finishes, a `/shift` ends, or `placement-audit.py` names a terminal-but-undissolved doc —
+**decompose-self** the artifact until **nothing plan-shaped survives in the live tree** (the cardinal
+decompose-to-zero-residue rule; NO dumping grounds, no `history/_retired/`, no `.claude/archive/<date>/` sink).
+Each chunk routes to one of three fates: subsume into a living surface (`compact`), subsume into story subtext
+(storyteller's `graduate`), or curate-to-history / clear-to-git (`close-interval` / `forget`). Your AUTO lane
+(§5.3) is: link chunk → its canonical seed, write a history-lesson stub, retire a body → git, file residual
+work → backlog. Canonical-seed rewrites, horizontal N-thread merges, and any deletion stay **operator-GATED**.
+
+Then run the **ordered MemPalace re-mine** (§5.4) on the cleaned surface — never concurrent with the dissolve:
+
+1. **dissolve** all chunks to their fates;
+2. `mcp__mempalace__mempalace_sync` to **prune** the index vectors for the now-gone plan/spec files (their
+   semantic ghosts must not surface in a future FRONT-link);
+3. **re-mine the clean surface only** — canonical seeds, curated history, graduated stories, living
+   docs/tests/scenarios. MemPalace is a curated index over the cleaned surface, **never a vacuum over the pile**;
+   feeding the legacy `plans/` + `shifts/` pile is exactly the anti-pattern this loop kills.
+
+Feed **recurring anti-patterns** the dissolve surfaces to the historian (→ a `history/` lesson + inline pointer)
+or propose them as `feedback_*` entries to the operator; the raw body goes to git, the lesson stays hot.
+
 ## What you operate
 
 The **memory-kit** toolkit at `.claude/scripts/memory-kit/`:

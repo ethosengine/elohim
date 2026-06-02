@@ -5,6 +5,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: f5ed8831-8faa-47bc-a508-fa91142db0de
+cites:
+  - elohim/elohim-storage/src/p2p/inventory_gossip.rs
+  - genesis/orchestrator/data/deployments.json
 ---
 
 The canonical k8s health-probe pattern across `genesis/orchestrator/manifests/**` is:

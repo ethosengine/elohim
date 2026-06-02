@@ -3,6 +3,9 @@ name: DNA upgrade path — lineage regression + rna module
 description: HC 0.6 gates lineage behind unstable-migration; rna module is a backburnered upgrade-path exploration worth its own brainstorm
 type: project
 originSessionId: 79de6926-64bf-4e59-b5d7-f1a35d2d83c8
+cites:
+  - elohim/holochain/tests/manifest-hygiene/tests/manifest_hygiene.rs
+  - elohim/holochain/dna/NETWORK_UPGRADES.md
 ---
 DNA manifest `lineage` field was the protocol's designed forward-compat mechanism
 (each manifest carries the previous DNA hash so breaking-change chains are

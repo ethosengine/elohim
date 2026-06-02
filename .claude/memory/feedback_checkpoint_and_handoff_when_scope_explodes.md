@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: de3918e5-34fe-4832-bc41-5a3ca933e9fc
+cites:
+  - .claude/skills/handoff/SKILL.md
 ---
 
 When executing a written plan inline and discovering meaningful scope expansion that the plan didn't predict (typical signal: each "depth check" reveals another architectural layer that needs 1-2 hours of work), don't grind through to completion. Pause, write addenda to the existing plan documenting what was discovered, write a self-contained handoff prompt at the end of the plan, commit, and let a fresh context pick it up.

@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 3b93d5d1-a372-4195-9ba9-6d2c9b0faa75
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-06-02-sweettest-integration-layer.md
 ---
 
 ## The bug, correctly stated

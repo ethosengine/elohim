@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: f5ed8831-8faa-47bc-a508-fa91142db0de
+cites:
+  - elohim/elohim-storage/src/p2p/inventory_gossip.rs
 ---
 
 Structural-verify tests must use the canonical wire-format string shape, not synthetic constructor shapes. Otherwise tests pass while the production verifier rejects every real message.

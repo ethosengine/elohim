@@ -3,6 +3,8 @@ name: Household is the resilience unit
 description: Resilience computation is household-to-household, not peer-to-peer; households are the mutual-aid graph
 type: project
 originSessionId: 9c3a2266-4f19-410d-b4d4-30d06366e38d
+cites:
+  - genesis/docs/content/elohim-protocol/resilience/README.md
 ---
 Resilience is modeled household-to-household, not peer-to-peer. A household bundles humans + their devices (a couple, a parent + wards, a multi-generation home). The resilience graph asks "how many households hold a copy of my content, how many households do I reciprocally steward for, can my household survive without any one peer" — not "how many peers hold shards."
 

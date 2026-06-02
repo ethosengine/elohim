@@ -5,6 +5,10 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: d5ebc70b-b1ff-43c0-9172-9d14847a28ec
+cites:
+  - elohim/sdk/epr-ts/src/generated/EprKind.ts
+  - genesis/orchestrator/graph-walker.mjs
+  - elohim/epr/build-manifest.json
 ---
 
 `.husky/pre-push` has TWO project-detection paths that BOTH feed `run_gate`:

@@ -5,6 +5,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 22de0299-7a43-43b5-a84a-e497e9397bbe
+cites:
+  - genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
 ---
 
 The "reed-solomon S3 shape" quilt (aka p2p-redis; see [[project_quilt_pantry_vocabulary]]) should carry **storage-tier awareness** — a placement axis spanning `cache → available → storage → archive`. The intent: a blob/shard is stored at the *right availability on the right hardware substrate*, so hot content sits on fast cache-tier peers and cold/archive content settles on slow bulk-storage peers.

@@ -3,6 +3,8 @@ name: signal_kind is the protocol's extensible feedback vocabulary
 description: FeedbackSignal.signal_kind is a class-not-a-boolean — adding new variants (vouch, sponsor, acknowledge, witness) is the cheap path to extending the protocol's social vocabulary. Manifest declares debit weights; integrity validator whitelists.
 type: project
 originSessionId: 42abe5eb-4a48-4a2a-8142-604a4c7a1bd3
+cites:
+  - elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json
 ---
 `FeedbackSignal.signal_kind` started as an enum of {squelch, correction, retraction, quarantine} but its real purpose is to be the **protocol's extensible vocabulary of feedback moves**. Adding a new variant is cheap:
 

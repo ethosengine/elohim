@@ -3,6 +3,10 @@ name: deployments.json is the single source of truth for "is this human exercise
 description: When a node fails (shem 2026-05-04), suspending humans in deployments.json gates BOTH deploy and seed; seeder + a2o framework + isHumanDeployed all read the same flag
 type: project
 originSessionId: cdffa1f9-7b63-4657-ae44-2cafff5156bf
+cites:
+  - genesis/a2o/src/framework/fixtures/humans.ts
+  - genesis/seeder/src/seed-humans.ts
+  - genesis/orchestrator/data/deployments.json
 ---
 `genesis/orchestrator/data/deployments.json` is the per-human deployment registry. Each human entry has `nodeTypes: [...]` (which k8s node-type labels their conductor StatefulSet targets) and an optional `suspended: true` flag with a `$suspendedComment` explaining why.
 

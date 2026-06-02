@@ -5,6 +5,9 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 5ed7452d-de73-43b1-814f-3b1742a3b1b8
+cites:
+  - .claude/commands/shift.md
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 For overnight shifts where the operator says "you own the pipeline tonight" / "use Jenkins to do the heavy lifting":

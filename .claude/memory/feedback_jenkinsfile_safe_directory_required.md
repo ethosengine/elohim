@@ -3,6 +3,8 @@ name: New Jenkinsfiles need safe.directory before in-container git operations
 description: Any new pipeline that runs git commands inside a container (other than checkout scm) must set safe.directory first or git fails with dubious-ownership
 type: feedback
 originSessionId: cc51fa69-af87-4c58-a30c-b86120b754fc
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 When writing a new Jenkinsfile that uses the kubernetes pod-template agent and runs `git rev-parse`, `git log`, `git describe`, or any other git command inside `container('builder')` (or similar), you MUST add `sh 'git config --global --add safe.directory "*"'` BEFORE the first git command in that container.
 
