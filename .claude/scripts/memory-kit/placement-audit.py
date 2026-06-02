@@ -704,6 +704,19 @@ def map_currency_line():
             f"   ({'walk current ✅' if n == 0 else '⚠ MAP.md may be stale vs seeds → refresh the walk'})")
 
 
+def memkit_line():
+    """memory-kit PROCESS-ARTIFACT tier currency (comet retention — bounded, trajectory-preserving)."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "memkit-retention.py"), "--status"],
+            capture_output=True, text=True, timeout=10)
+        s = out.stdout.strip()
+        return "  " + s if s else ""
+    except Exception:
+        return ""
+
+
 def headline_mode():
     docs, _ = scan_docs()
     surface = [d for d in docs if not d["home"].startswith("_state")]
@@ -735,6 +748,10 @@ def headline_mode():
     # LEGIBILITY/PATH + PRIORITIZATION/ROADMAP currency: is the MAP walk current vs the
     # architecture seeds, and when was the roadmap synthesis last refreshed?
     print(map_currency_line())
+    # PROCESS-ARTIFACT tier: is the memory-kit report dir comet-shaped + within budget?
+    ml = memkit_line()
+    if ml:
+        print(ml)
     return 0
 
 
