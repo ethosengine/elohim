@@ -132,6 +132,10 @@ Before proposing design approaches for ANY feature involving data entities (tabl
 
 **The skill forces you to answer:** (1) Is the entity notarized (A), derived via link (A2), agent-scoped (B), agent-scoped with attestation (B2), or operational (C)? (2) Does a DHT entry type already exist? (Lamad DNA ~73/~100; Mishpat ~11/~100 — check headroom.) (3) Is identity content-derived (CID), agent-composite, or slug (must justify)? (4) What coordinator function creates it; what signal projects it? Answer BEFORE designing the HTTP route. If you're about to write `GET /api/v1/thing` without having answered these, STOP and invoke the skill.
 
+### Memory cleanup trigger (SessionStart)
+
+The SessionStart MEMORY BUDGET headline carries a `cleanup:` gate line. When it reads **`cleanup: ⚠ … due`** (≈ a week of heavy development has accumulated drift past the threshold), run the **`memory-stasis-loop`** workflow before substantive work — it drains every memory discipline (compaction · dumps · decompose · MAP/path · roadmap · memkit · MemPalace) back to stasis and self-resets the drift baseline. The reset means it fires at most ~once per heavy-dev week; on a quiet week the gate reads `held ✅` and you skip it. (This is the local, drift-accurate auto-trigger — the activity accumulators are session-local, so the trigger lives here in gospel, not in a remote cron.)
+
 ## Schema & Manifest Sources of Truth
 
 Two authoritative schemas govern content types and formats; all generated artifacts derive from these (never hand-edit generated files). **Protocol Schema** (`elohim/sdk/schemas/v1/`) governs DNA-notarized enums — generates `<consumer>/src/generated/schema-enums.ts` via `pnpm run schema:codegen:ts` and Rust constants via `pnpm run schema:codegen:rs`. **Lamad Manifest** (`elohim/sdk/domains/lamad/manifest.json`) governs app vocabulary (content types/formats, renderer mappings, relationships, signals, coupling rules) — generates `<consumer>/src/generated/manifest-types.ts` via `pnpm run lamad:codegen`.
