@@ -35,6 +35,21 @@
       "hits": 2,
       "last_changed": ".claude/skills/agentic-developer/SKILL.md",
       "last_signal_at": "2026-06-02T16:58:50Z"
+    },
+    "feedback_subagent_dep_conflict_supervision": {
+      "hits": 2,
+      "last_changed": ".claude/agents/rust-architect.md",
+      "last_signal_at": "2026-06-02T17:02:34Z"
+    },
+    "feedback_subagent_silent_impl_drops": {
+      "hits": 2,
+      "last_changed": ".claude/agents/rust-architect.md",
+      "last_signal_at": "2026-06-02T17:02:34Z"
+    },
+    "feedback_substrate_currency_ceremony_2026_05_18_yellow_backlog": {
+      "hits": 2,
+      "last_changed": ".claude/agents/rust-architect.md",
+      "last_signal_at": "2026-06-02T17:02:34Z"
     }
   }
 }
