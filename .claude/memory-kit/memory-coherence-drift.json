@@ -157,19 +157,19 @@
       "last_signal_at": "2026-06-02T00:18:20Z"
     },
     "feedback_research_before_brainstorming": {
-      "hits": 6,
+      "hits": 7,
       "last_changed": ".claude/commands/brainstorm.md",
-      "last_signal_at": "2026-06-02T14:03:01Z"
+      "last_signal_at": "2026-06-02T14:28:42Z"
     },
     "feedback_spare_no_expense_intelligence": {
-      "hits": 6,
+      "hits": 7,
       "last_changed": ".claude/commands/brainstorm.md",
-      "last_signal_at": "2026-06-02T14:03:01Z"
+      "last_signal_at": "2026-06-02T14:28:42Z"
     },
     "feedback_design_for_a_generation_no_shortcuts": {
-      "hits": 6,
+      "hits": 7,
       "last_changed": ".claude/commands/brainstorm.md",
-      "last_signal_at": "2026-06-02T14:03:01Z"
+      "last_signal_at": "2026-06-02T14:28:42Z"
     },
     "feedback_subagent_no_git_stash": {
       "hits": 2,
@@ -177,9 +177,9 @@
       "last_signal_at": "2026-06-02T04:29:13Z"
     },
     "feedback_no_generalize_permissions_in_shift": {
-      "hits": 5,
+      "hits": 6,
       "last_changed": ".claude/commands/shift.md",
-      "last_signal_at": "2026-06-02T14:04:52Z"
+      "last_signal_at": "2026-06-02T14:29:30Z"
     },
     "feedback_shift_integration_iteration_mode": {
       "hits": 2,
@@ -237,39 +237,39 @@
       "last_signal_at": "2026-06-02T14:04:21Z"
     },
     "feedback_pipeline_work_separate_from_sprint": {
-      "hits": 3,
+      "hits": 4,
       "last_changed": ".claude/commands/shift.md",
-      "last_signal_at": "2026-06-02T14:04:52Z"
+      "last_signal_at": "2026-06-02T14:29:30Z"
     },
     "feedback_cargo_nextest_installed": {
-      "hits": 3,
+      "hits": 4,
       "last_changed": ".claude/commands/shift.md",
-      "last_signal_at": "2026-06-02T14:04:52Z"
+      "last_signal_at": "2026-06-02T14:29:30Z"
     },
     "feedback_jenkins_token_strictly_guarded": {
-      "hits": 3,
+      "hits": 4,
       "last_changed": ".claude/commands/shift.md",
-      "last_signal_at": "2026-06-02T14:04:52Z"
+      "last_signal_at": "2026-06-02T14:29:30Z"
     },
     "feedback_shells_need_timeouts": {
-      "hits": 3,
+      "hits": 4,
       "last_changed": ".claude/commands/shift.md",
-      "last_signal_at": "2026-06-02T14:04:52Z"
+      "last_signal_at": "2026-06-02T14:29:30Z"
     },
     "feedback_shift_can_fix_unparseable_test_fixtures": {
-      "hits": 3,
+      "hits": 4,
       "last_changed": ".claude/commands/shift.md",
-      "last_signal_at": "2026-06-02T14:04:52Z"
+      "last_signal_at": "2026-06-02T14:29:30Z"
     },
     "feedback_pause_sprint_when_substrate_in_flight": {
-      "hits": 3,
+      "hits": 4,
       "last_changed": ".claude/commands/shift.md",
-      "last_signal_at": "2026-06-02T14:04:52Z"
+      "last_signal_at": "2026-06-02T14:29:30Z"
     },
     "feedback_overnight_shift_jenkins_is_workhorse": {
-      "hits": 3,
+      "hits": 4,
       "last_changed": ".claude/commands/shift.md",
-      "last_signal_at": "2026-06-02T14:04:52Z"
+      "last_signal_at": "2026-06-02T14:29:30Z"
     },
     "feedback_agent_framing": {
       "hits": 3,

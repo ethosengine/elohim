@@ -87,6 +87,14 @@ brainstorm exactly as the surfaced seeds are.
   implementation against it**, only the design that can land when the operator flips `cluster-state.yaml`;
 - or **vision-deferred** (network-scale breadth ranked DOWN of the single-household seed).
 
+**(3) CAPTURE COMPLEMENTARY WORK — keep the executed scope genuine.** As you orient, you will surface
+*supportive / adjacent* work — a gap this topic brushes, a dependency it implies, a fix it would benefit from.
+Do **not** absorb it into this brainstorm (scope-bloat — a bloated plan is a dump waiting to form). Do **not**
+drop it either (a dropped discovery is a dump). **Capture it**: write a one-line item to
+[`genesis/data/timeline/backlog/`](../../genesis/data/timeline/backlog/) and link it to its domain D# + roadmap
+rung, so it plays nice with whatever brainstorm → spec → plan → sprint actually executes. The genuine task stays
+*one thing*; the complementary work becomes a future roadmap entry, not a tangent that derails this one.
+
 **Staleness guard (mirror of Step 1b §4.4):** both maps are regenerated each ceremony, not live. If the
 roadmap body is stale against today's `placement-audit.py --ledger` / `--focus`, or MAP's stanza predates the
 last seed that landed, treat the orientation as **degraded — trust the ledger/focus numbers over the prose**
