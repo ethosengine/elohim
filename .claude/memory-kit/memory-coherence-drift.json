@@ -10,6 +10,31 @@
       "hits": 1,
       "last_changed": "CLAUDE.md",
       "last_signal_at": "2026-06-02T15:31:52Z"
+    },
+    "feedback_subagent_scope_guardrails": {
+      "hits": 2,
+      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
+      "last_signal_at": "2026-06-02T16:58:50Z"
+    },
+    "feedback_haiku_needs_compiler_ready_scaffold": {
+      "hits": 2,
+      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
+      "last_signal_at": "2026-06-02T16:58:50Z"
+    },
+    "feedback_no_generalize_permissions_in_shift": {
+      "hits": 2,
+      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
+      "last_signal_at": "2026-06-02T16:58:50Z"
+    },
+    "feedback_subagent_no_git_stash": {
+      "hits": 2,
+      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
+      "last_signal_at": "2026-06-02T16:58:50Z"
+    },
+    "feedback_shift_integration_iteration_mode": {
+      "hits": 2,
+      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
+      "last_signal_at": "2026-06-02T16:58:50Z"
     }
   }
 }

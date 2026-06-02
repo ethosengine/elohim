@@ -76,6 +76,29 @@ closes with done or a clean bail.
    (when the fix is a Jenkinsfile/orchestrator change) or surface it as
    a follow-up Objective candidate. CI efficiency is correctness too —
    silent matrix rebuilds waste real time and mask real signal.
+8. **Drive recursive stasis — leave no orphan.** The shape that governs the
+   memory substrate governs your shift too: a **deterministic floor** (the
+   measurable signals — CI, tests, the `placement-audit.py --headline`
+   disciplines you touch), a **judgment ceiling** (what only the operator /
+   ci-investigator / a ceremony can settle), and **automated triggers** that
+   pull a surface back to equilibrium. From *your* perspective, drive the code
+   + CI + doc surface you touch toward stasis: green-and-coherent on the floor,
+   *escalated* (never papered over) on the ceiling. **HOW you get there is
+   yours** — orchestrate, delegate, attempt, whatever converges; this principle
+   prescribes no procedure. What is NOT yours is leaving residue with no path
+   home. Every artifact you create or discover — a stub, a TODO, an adjacent
+   bug, a half-built scaffold, a doc, an unfinished task — must either be
+   **resolved in this shift** or **decomposed into a standing-discipline-owned
+   home that resolves it automatically**: a backlog item on the roadmap, a
+   gap-item, a captured complementary-work entry, a curated history record, or
+   an escalated Objective candidate. **Cardinal anti-pattern — a DUMP: anything
+   left behind with no automated resolution path beyond the context you're
+   working in.** A TODO no discipline owns is a dump; a stub no gap-item tracks
+   is a dump; a discovered issue you neither fix nor file is a dump. If you
+   can't finish it, *capture it where the stasis-loop, a ceremony, or a future
+   shift will pick it up* — captured, it's a seed; orphaned, it's a dump.
+   (Principle 7 already does this for CI change-detection — generalize it to
+   everything your shift touches.)
 
 ## Shift modes
 
@@ -642,3 +665,9 @@ When done or bail:
   user approval.
 - Never declare done on a single passing measurement.
 - Never commit the journal, readiness report, or Objective JSON.
+- Never leave a dump: any artifact (TODO, stub, scaffold, discovered issue,
+  doc, unfinished task) with no automated resolution path beyond this shift's
+  context. Resolve it in-shift, or decompose it into a standing-discipline-owned
+  home (backlog / gap-item / captured complementary-work / curated history /
+  escalated Objective) that will. Orphaned residue is the one thing a shift may
+  not produce — it is how a clean surface silently re-accretes a pile.
