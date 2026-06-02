@@ -1,30 +1,39 @@
 export const meta = {
   name: 'memory-stasis-loop',
-  description: 'Drive the memory surface toward stasis: each round measure the budget + the un-captured backlog (decompose-coverage), dispatch the EQUIPPED agent for the highest-leverage pressure with a broad goal, re-measure, repeat until every metric hits 0. Loop length is proportional to the REAL outstanding workload — it is not a guessed round-count.',
+  description: 'Drive the WHOLE memory discipline toward stasis in ONE loop: compaction debt + un-captured backlog + decompose-due + anti-dump equilibrium + MAP path-currency + roadmap-currency. Each round measure the full scoreboard, dispatch the EQUIPPED agent for the highest-leverage pressure with a broad goal, re-measure, repeat until every discipline hits stasis. Loop length tracks the REAL outstanding workload, not a guessed round-count.',
   phases: [{ title: 'Loop' }],
 }
 
-// STASIS = no content debt + no un-captured backlog + pressure dirs empty.
-// The loop never pre-guesses how long it runs: it keeps dispatching until the numbers
-// stop falling (convergence) or hit zero, so effort tracks the actual workload.
-// Deterministic measurement every round; agents only for the residue that needs judgment.
+// STASIS = the FULL discipline at equilibrium, not just compaction:
+//   (1) compaction — no content debt, every spec captured, context-coverage in band
+//   (2) NO DUMPS — pressure dirs / archive / stale shifts all clean (the cardinal rule; a dump
+//       is the one thing that cannot graduate to EPR, so it is fixed FIRST)
+//   (3) decompose-due — landed plans dissolved to zero residue
+//   (4) PATH currency — MAP.md (the walk) current with the architecture seeds (the graph)
+//   (5) ROADMAP currency — the vision x readiness roadmap current with the gap-ledger x cluster-state
+// One loop, every discipline. It never pre-guesses length: dispatch until the numbers stop falling
+// (convergence) or every dimension hits stasis. Deterministic measurement; agents only for judgment residue.
 
 const AUDIT = 'python3 .claude/scripts/memory-kit/placement-audit.py'
-const ROUND_CAP = 8 // backstop only; the real stop is stasis / convergence
+const ROUND_CAP = 10 // backstop only; the real stop is stasis / convergence
 
 const MEASURE = {
   type: 'object',
   properties: {
-    pressure_total: { type: 'number' }, // NEEDS-TRIAGE+MEM-UNLINKED+CLAIMED-ONLY+REGRESSED+SUPERSEDED+UNKNOWN
-    uncaptured: { type: 'number' }, // un-reviewed specs/plans (decompose-coverage)
+    pressure_total: { type: 'number' },   // compaction debt: NEEDS-TRIAGE+MEM-UNLINKED+CLAIMED-ONLY+REGRESSED+SUPERSEDED+UNKNOWN
+    uncaptured: { type: 'number' },        // un-reviewed specs/plans (decompose-coverage)
+    decompose_due: { type: 'number' },     // landed plans past-due to decompose-self (headline `decompose:`)
+    dumps: { type: 'number' },             // anti-dump: NO-EXIT + DRIFT-DEAD + DUMP + archive files + shifts past the ~14d budget
+    path_drift: { type: 'number' },        // architecture seeds changed since MAP.md update (headline `path:`)
+    roadmap_stale: { type: 'boolean' },    // roadmap artifact stale vs the gap-ledger x cluster-state (headline `roadmap:`)
     open_gaps: { type: 'number' },
     claimed_gaps: { type: 'number' },
     pressure_dirs_empty: { type: 'boolean' },
     stasis_score: { type: 'number' },
-    at_stasis: { type: 'boolean' },
+    at_stasis: { type: 'boolean' },        // compaction context-coverage within band
     dominant: { type: 'string', enum: ['needs-triage', 'mem-unlinked', 'superseded', 'claimed', 'regression', 'none'] },
   },
-  required: ['pressure_total', 'uncaptured', 'pressure_dirs_empty', 'stasis_score', 'at_stasis', 'dominant'],
+  required: ['pressure_total', 'uncaptured', 'decompose_due', 'dumps', 'path_drift', 'roadmap_stale', 'pressure_dirs_empty', 'stasis_score', 'at_stasis', 'dominant'],
 }
 
 // who drains what — equipped agents, BROAD goal, never step-by-step
@@ -32,9 +41,13 @@ const DISPATCH = {
   capture: { agentType: 'cartographer', goal: 'Decompose the un-captured (needs-agent prose) specs/plans into bounded, cited gap-items (5-15 each, citing source lines), so the budget reflects the REAL remaining work. Run `' + AUDIT + ' --coverage` for the queue; write each into .claude/memory-kit/gap-items/. Lower `uncaptured` toward 0.' },
   'needs-triage': { agentType: 'librarian', goal: 'Classify NEEDS-TRIAGE docs (give a status + a place in the graph) and link UNLINKED memory; drive those numbers down. Your call which to act on.' },
   'mem-unlinked': { agentType: 'librarian', goal: 'Give unlinked memory entries a `cites:` to the system they describe, or let them go (forget). Lower MEM-UNLINKED.' },
-  superseded: { agentType: 'historian', goal: 'Distill SUPERSEDED/abandoned docs into history records (gotcha + pointer + bidirectional canonical link) and retire the bodies. Empty the SUPERSEDED slots.' },
+  superseded: { agentType: 'historian', goal: 'Distill SUPERSEDED/abandoned docs into curated history records (gotcha + present-as-pointer + bidirectional canonical link) and retire the bodies to git. Empty the SUPERSEDED slots.' },
   claimed: { agentType: 'cartographer', goal: 'Rank the CLAIMED-ONLY gaps for verification (ci-investigator); do NOT trust checked boxes. Order by leverage toward lowering the CLAIMED count.' },
   regression: { agentType: 'cartographer', goal: 'Surface the REGRESSED items as the rework queue (highest priority); rank them for a fix sprint.' },
+  'decompose-due': { agentType: 'librarian', goal: 'A landed/superseded plan in an ACTIVE home is past-due to DECOMPOSE-SELF (headline `decompose:`). Dissolve it to ZERO residue per the compaction-loop spec + PLACEMENT.md: durable truth -> canonical seed, lesson -> curated history (present-as-pointer), unfinished -> backlog, body -> git. No dumping ground. Lower the decompose-due count.' },
+  dumps: { agentType: 'historian', goal: 'A DUMP is forming (EQUILIBRIUM: NO-EXIT / DRIFT-DEAD / archive non-empty / shifts past the ~14-day budget). This is the CARDINAL violation — a dump cannot graduate to EPR. Decompose it to zero residue NOW: distill any lesson to curated history, retire the body to git, clear the dump. Restore structural equilibrium.' },
+  'map-drift': { agentType: 'librarian', goal: 'Architecture seed(s) changed since MAP.md was last updated (headline `path:`) — the WALK is stale vs the GRAPH. Reconcile genesis/docs/content/elohim-protocol/architecture/MAP.md: update the affected domain stanza + the gap ledger so the new-developer spine still resolves. Keep INDEX (graph) and MAP (walk) consistent. Lower path-drift to 0.' },
+  'roadmap-stale': { agentType: 'cartographer', goal: 'The roadmap is stale vs the gap-ledger x cluster-state x vision (headline `roadmap:`). Regenerate genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md: re-rank by vision x readiness from the live gap-item states + cluster-state availability + the household-living-core gospel; refresh the single highest-leverage next move. The roadmap is a maintained readout, never a snapshot.' },
 }
 
 phase('Loop')
@@ -46,33 +59,34 @@ const history = []
 while (round < ROUND_CAP) {
   round++
 
-  // 1. MEASURE (deterministic, cheap) — an agent runs the tools and returns the numbers
+  // 1. MEASURE (deterministic, cheap) — an agent runs the tools and returns the FULL scoreboard
   const m = await agent(
-    `Run, from /projects/elohim, and return the numbers as the schema:\n` +
-    `  ${AUDIT} --ledger --json   → sum the rows whose state is one of NEEDS-TRIAGE, MEM-UNLINKED, CLAIMED-ONLY, REGRESSED, SUPERSEDED, UNKNOWN-STATUS = pressure_total; the largest of those classes = dominant (use 'none' if pressure_total is 0).\n` +
-    `  ${AUDIT} --coverage --json → uncaptured.\n` +
-    `  ${AUDIT}                    → read the STRUCTURAL EQUILIBRIUM section: pressure_dirs_empty = true iff every pressure dir shows 0 docs.\n` +
-    `  ${AUDIT} --ledger          → from "DECOMPOSED GAPS": open_gaps, claimed_gaps.\n` +
-    `  ${AUDIT} --stasis --json   → stasis_score (composite context-coverage) and at_stasis (score within the ±margin band AND hard dims pass).\n` +
-    `Return only the measured numbers. Do not edit anything.`,
+    `Run, from /projects/elohim, and return the numbers as the schema. Edit NOTHING.\n` +
+    `  ${AUDIT} --ledger --json   -> pressure_total = sum of rows whose state is one of NEEDS-TRIAGE, MEM-UNLINKED, CLAIMED-ONLY, REGRESSED, SUPERSEDED, UNKNOWN-STATUS; dominant = the largest of those classes ('none' if pressure_total is 0); open_gaps/claimed_gaps from "DECOMPOSED GAPS".\n` +
+    `  ${AUDIT} --coverage --json -> uncaptured.\n` +
+    `  ${AUDIT} --headline        -> decompose_due = the number on the \`decompose:\` line; path_drift = the "N seeds changed since MAP update" on the \`path:\` line; roadmap_stale = true unless the \`roadmap:\` line reads current/fresh.\n` +
+    `  ${AUDIT}                    -> STRUCTURAL EQUILIBRIUM section: dumps = NO-EXIT + DRIFT-DEAD + DUMP + archive(_retired) file count; pressure_dirs_empty = true iff every pressure dir shows 0 docs.\n` +
+    `  Also run: find .claude/shifts -name '*.md' -mtime +14 2>/dev/null | wc -l  -> ADD that count to dumps (stale shift narration past the ~14-day budget is a dump).\n` +
+    `  ${AUDIT} --stasis --json   -> stasis_score (composite context-coverage) and at_stasis (within +-margin band AND hard dims pass).\n` +
+    `Return only the measured numbers.`,
     { label: `measure:r${round}`, phase: 'Loop', schema: MEASURE, model: 'haiku' },
   )
 
-  const remaining = m.pressure_total + m.uncaptured
-  history.push({ round, remaining, stasis_score: m.stasis_score, uncaptured: m.uncaptured, pressure: m.pressure_total, open: m.open_gaps, claimed: m.claimed_gaps })
-  log(`round ${round}: context-coverage=${(m.stasis_score * 100).toFixed(1)}% · uncaptured=${m.uncaptured} · pressure=${m.pressure_total} · open_gaps=${m.open_gaps} · claimed=${m.claimed_gaps}`)
+  const remaining = m.pressure_total + m.uncaptured + m.decompose_due + m.dumps + m.path_drift + (m.roadmap_stale ? 1 : 0)
+  history.push({ round, remaining, stasis_score: m.stasis_score, uncaptured: m.uncaptured, pressure: m.pressure_total, decompose_due: m.decompose_due, dumps: m.dumps, path_drift: m.path_drift, roadmap_stale: m.roadmap_stale })
+  log(`round ${round}: coverage=${(m.stasis_score * 100).toFixed(1)}% · pressure=${m.pressure_total} · uncaptured=${m.uncaptured} · decompose-due=${m.decompose_due} · dumps=${m.dumps} · path-drift=${m.path_drift} · roadmap-stale=${m.roadmap_stale}`)
 
-  // 2. STASIS?  "done" = context-coverage score within the ±margin band (at_stasis) AND every spec/plan
-  //    captured. at_stasis already folds in the hard dims (pressure dirs empty, no dumps).
-  if (m.at_stasis && m.uncaptured === 0) {
-    log(`STASIS reached at round ${round}: context-coverage ${(m.stasis_score * 100).toFixed(1)}% within target band and capture complete.`)
+  // 2. STASIS? "done" = EVERY discipline at equilibrium: compaction in band + captured + no dumps +
+  //    decompose-due drained + MAP current + roadmap current.
+  if (m.at_stasis && m.uncaptured === 0 && m.decompose_due === 0 && m.dumps === 0 && m.path_drift === 0 && !m.roadmap_stale) {
+    log(`STASIS reached at round ${round}: all disciplines at equilibrium (compaction ${(m.stasis_score * 100).toFixed(1)}%, no dumps, MAP + roadmap current, capture complete).`)
     break
   }
-  // 3. CONVERGENCE?  (numbers stopped falling — diminishing returns)
+  // 3. CONVERGENCE? (numbers stopped falling — diminishing returns / operator-or-env residual)
   if (remaining >= prevRemaining) {
     dry++
     if (dry >= 2) {
-      log(`Convergence: remaining (${remaining}) has not fallen for 2 rounds — stopping. Residual needs operator judgment / blocked.`)
+      log(`Convergence: remaining (${remaining}) has not fallen for 2 rounds — stopping. Residual needs operator judgment / verification (ci-investigator) / blocked-by-env.`)
       break
     }
   } else {
@@ -80,15 +94,24 @@ while (round < ROUND_CAP) {
   }
   prevRemaining = remaining
 
-  // 4. DISPATCH the equipped agent for the highest-leverage pressure (un-captured first — you
-  //    can't drain what you haven't surfaced). Broad goal, agent's judgment on the how.
-  const which = m.uncaptured > 0 ? 'capture' : (m.dominant !== 'none' ? m.dominant : 'claimed')
+  // 4. DISPATCH the highest-leverage pressure. Priority: DUMPS first (cardinal: no dumps, ever) ->
+  //    capture (can't drain what isn't surfaced) -> decompose-due -> compaction debt -> path -> roadmap -> claimed.
+  const which =
+    m.dumps > 0 ? 'dumps' :
+    m.uncaptured > 0 ? 'capture' :
+    m.decompose_due > 0 ? 'decompose-due' :
+    (m.pressure_total > 0 && m.dominant !== 'none') ? m.dominant :
+    m.path_drift > 0 ? 'map-drift' :
+    m.roadmap_stale ? 'roadmap-stale' :
+    'claimed'
   const d = DISPATCH[which] || DISPATCH.capture
   log(`round ${round}: dispatching ${d.agentType} for "${which}" (highest-leverage drain).`)
   await agent(
-    `${d.goal}\n\nYou are draining the memory-stasis budget toward 0; this is round ${round}. Use the deterministic tools ` +
-    `(\`${AUDIT} --ledger / --coverage / --focus\`, decompose.py, spec-coherence-index.py) per ` +
-    `.claude/scripts/memory-kit/CLAUDE.md and genesis/docs/PLACEMENT.md. Lower YOUR pressure number; how is your judgment. ` +
+    `${d.goal}\n\nYou are draining the unified memory-stasis budget toward 0; this is round ${round}. Use the deterministic tools ` +
+    `(\`${AUDIT} --ledger / --coverage / --focus / --headline\`, decompose.py, spec-coherence-index.py) per ` +
+    `.claude/scripts/memory-kit/CLAUDE.md, genesis/docs/PLACEMENT.md, and the compaction-loop spec ` +
+    `(genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md). Lower YOUR pressure number; how is your judgment. ` +
+    `Cardinal rule: NO DUMPING GROUNDS — decompose to zero residue, curated history is present-as-pointer. ` +
     `Do not touch BLOCKED-BY-ENV work (it can't be validated). When done, the next round re-measures.`,
     { label: `drain:r${round}:${which}`, phase: 'Loop', agentType: d.agentType },
   )
@@ -96,15 +119,18 @@ while (round < ROUND_CAP) {
 
 // final measurement so the return reflects reality after the last drain
 const finalCov = await agent(
-  `Run \`${AUDIT} --stasis --json\` and \`${AUDIT} --coverage --json\` from /projects/elohim and return {pressure_total:0,uncaptured:<n>,pressure_dirs_empty:<bool>,stasis_score:<n>,at_stasis:<bool>,dominant:'none'}.`,
+  `Run from /projects/elohim: ${AUDIT} --stasis --json, ${AUDIT} --coverage --json, and ${AUDIT} --headline. Return the MEASURE schema ` +
+  `(pressure_total, uncaptured, decompose_due, dumps, path_drift, roadmap_stale, open_gaps, claimed_gaps, pressure_dirs_empty, stasis_score, at_stasis, dominant). Edit nothing.`,
   { label: 'measure:final', phase: 'Loop', schema: MEASURE, model: 'haiku' },
 )
 
+const reached = finalCov.at_stasis && finalCov.uncaptured === 0 && finalCov.decompose_due === 0 && finalCov.dumps === 0 && finalCov.path_drift === 0 && !finalCov.roadmap_stale
+
 return {
   rounds: round,
-  reached_stasis: (finalCov.at_stasis && finalCov.uncaptured === 0),
+  reached_stasis: reached,
   final_score: finalCov.stasis_score,
-  final_uncaptured: finalCov.uncaptured,
+  final: { uncaptured: finalCov.uncaptured, decompose_due: finalCov.decompose_due, dumps: finalCov.dumps, path_drift: finalCov.path_drift, roadmap_stale: finalCov.roadmap_stale, pressure: finalCov.pressure_total },
   history,
-  note: 'Loop length tracked the real backlog: it dispatched until uncaptured + pressure stopped falling. Un-captured (prose specs) is drained by agents; the resulting OPEN gaps are the implementation backlog for /plan; CLAIMED gaps await the verification index.',
+  note: 'One loop, every discipline. It drains compaction debt, un-captured prose, decompose-due plans, forming dumps (cardinal — fixed first), MAP path-drift, and roadmap staleness until all hit equilibrium or stop falling. Residual OPEN gaps are the implementation backlog for /plan; CLAIMED gaps await ci-investigator; blocked-by-env is held, not failed.',
 }

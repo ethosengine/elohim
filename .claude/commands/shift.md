@@ -41,6 +41,14 @@ Invokes the `agentic-developer` skill to run an agentic developer shift.
      a HELD Objective needing harbor/alpha/shem must NOT be picked; the
      readiness check in step 5 will also gate it), or **vision-deferred**
      (network-scale breadth ranked DOWN of the single-household seed).
+   - **CAPTURE-COMPLEMENTARY** — a shift executes *one* Objective. When
+     iteration surfaces adjacent/supportive work (a dependency, a fix it
+     would benefit from, a neighboring gap), do NOT widen the Objective
+     (scope-bloat is how a shift becomes a dump) and do NOT drop it (a
+     dropped discovery is a dump): capture a one-line item to
+     `genesis/data/timeline/backlog/`, linked to its domain D# + roadmap
+     rung, so it queues as a future shift. The executed shift stays
+     genuine; the complementary work plays nice as the next roadmap entry.
    - **Staleness guard:** both maps regenerate each ceremony, not live —
      if the roadmap prose disagrees with `placement-audit.py --ledger` /
      `--focus`, trust the audit numbers and say so. Never let a stale

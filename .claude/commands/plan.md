@@ -69,6 +69,13 @@ into the plan's opening context.
 - or **vision-deferred** (a #6-rung network-scale plan ranked DOWN of the single-household seed — confirm it
   is the right pick before draining it ahead of the seed).
 
+**(3) CAPTURE COMPLEMENTARY WORK — keep the plan's scope genuine.** Planning a sprint rung surfaces *adjacent*
+work the gaps brush — a dependency, a supportive fix, a neighboring gap-ledger row. Do **not** widen the plan to
+swallow it (scope-bloat is how a plan becomes a dump), and do **not** drop it (a dropped discovery is a dump).
+**Capture it**: a one-line item to [`genesis/data/timeline/backlog/`](../../genesis/data/timeline/backlog/),
+linked to its domain D# + roadmap rung, so it queues as a future sprint instead of bloating this one. The plan
+stays scoped to *one* rung; the complementary work plays nice as the roadmap's next entry.
+
 **Staleness guard (mirror of Step 1b §4.4):** both maps regenerate each ceremony, not live. If the roadmap
 body disagrees with today's `placement-audit.py --ledger` / `--focus` (Step 1 already ran them), **trust the
 ledger/focus numbers over the roadmap prose** and say so — the audit is the live source; the roadmap is its
