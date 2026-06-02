@@ -204,12 +204,23 @@ next_topic_sampled: <topic>
 
 The chronicle is forensic record, not narrative scaffolding. Future ceremonies grep it to recall "have we rewritten this surface recently?" and "did the coherence-check find anything we should remember?" — that's the deterministic drift-surface role it plays. If a cycle taught nothing cross-cutting, the Wisdom section is omitted. Most cycles will land there.
 
+### Phase 4d — MemPalace re-embed (the ceremony just rewrote the canonical surface)
+
+The ceremony's whole point is substrate-true rewrites of gospel-tier canonical content — which **changes the semantic surface the front-link recalls from**. A frozen index would keep surfacing the *old* gospel. So the final act, once 4b is GREEN, is to re-embed the cleaned surface:
+
+```bash
+python3 .claude/scripts/memory-kit/mempalace-currency.py --remine   # sync-prune + mine canonical+history+memory+stories + record
+```
+
+This is the same back-fire-point re-mine the shift runs, fired eagerly here because the ceremony is *exactly* the event that stales the index. Confirm `placement-audit.py --headline` then reads `mempalace: fresh ✅`. (The `memory-stasis-loop` would also catch this via its `mempalace` dimension; closing it in-ceremony means the next session's front-link recalls the new gospel immediately, not after the next drain.)
+
 ## End state criteria
 
 - Each picked surface has either (a) an applied rewrite + GREEN/YELLOW coherence verdict, or (b) a declined-with-rationale entry filed as backlog
 - All Phase 4b RED verdicts resolved before chronicle write
 - Chronicle entry exists with the three required frontmatter fields
 - **PATH + PRIORITIZATION currency read (Phase 1b)**: MAP.md verified current (or its drift handed to the librarian/historian as a standing fix) and the roadmap re-stamped this cycle (or its staleness closed by the cartographer). Both readouts appear in the ceremony summary.
+- **MemPalace re-embedded (Phase 4d)**: the index re-mined after the rewrites land; `--headline` reads `mempalace: fresh ✅`.
 - All TaskCreate tasks closed
 
 The operator should leave the ceremony with substrate-grounded gospel-tier surfaces — picked, rewritten with four lenses' contribution, coherence-verified, recorded. Audit-number wins (byte budgets, archive ratios, cleanup-scan flags) are NOT the ceremony's job; those land in `/hygiene-sweep` on a separate cadence.
