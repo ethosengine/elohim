@@ -2,8 +2,13 @@ import { strict as assert } from 'node:assert';
 
 import { Then, When } from '@cucumber/cucumber';
 
-const STORAGE_URL = process.env.STORAGE_URL ?? 'http://localhost:8090';
-const DOORWAY_URL = process.env.DOORWAY_URL ?? 'http://localhost:8888';
+// Prefer the CI-set endpoints (E2E_STORAGE_URL / E2E_DOORWAY_ALPHA) so these steps hit
+// the deployed alpha storage+doorway; fall back to the legacy vars then localhost for
+// local dev. Without this the ContentNode fetch + doorway GET hit localhost in CI.
+const STORAGE_URL =
+  process.env.E2E_STORAGE_URL ?? process.env.STORAGE_URL ?? 'http://localhost:8090';
+const DOORWAY_URL =
+  process.env.E2E_DOORWAY_ALPHA ?? process.env.DOORWAY_URL ?? 'http://localhost:8888';
 
 interface DogfoodWorld {
   fetchedNode?: Record<string, unknown>;
