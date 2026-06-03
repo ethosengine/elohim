@@ -718,6 +718,47 @@ def shouldRunStep(String stepName) {
 }
 
 /**
+ * Seed Stewardship Allocations — affinity-based content→steward allocations
+ * (genesis/seeder/src/seed-stewardship.ts; manifesto Part IV-C: content is
+ * stewarded by whoever has the most relational connection to it).
+ *
+ * The seeder script existed but was wired into NO pipeline stage, so the six
+ * a2o stewardship-allocation scenarios failed every run with "No stewardship
+ * allocations found — has the seeder been run?" (diagnosed genesis #1079).
+ * Idempotent: the script reads existing allocations first and only bulk-inserts
+ * the missing content ids.
+ *
+ * Body extracted to a helper above pipeline {} for the 64KB CPS method-size limit.
+ */
+def seedStewardshipStage() {
+    def doorwayHost = env.RESOLVED_DOORWAY_HOST
+    def apiKey = ''
+    try {
+        withCredentials([string(credentialsId: 'storage-api-key-admin', variable: 'ADMIN_KEY')]) {
+            apiKey = env.ADMIN_KEY
+        }
+    } catch (e) {
+        echo "storage-api-key-admin credential not visible — seeding without admin auth (may 401)"
+    }
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        dir('genesis/seeder') {
+            withEnv(["DOORWAY_API_KEY=${apiKey}"]) {
+                sh """#!/bin/bash
+                    set -euo pipefail
+                    echo "═══════════════════════════════════════════════════════════"
+                    echo "SEED STEWARDSHIP ALLOCATIONS (affinity-based content→steward)"
+                    echo "═══════════════════════════════════════════════════════════"
+                    echo "Doorway: ${doorwayHost}"
+                    echo "Admin key: \${DOORWAY_API_KEY:+provided}\${DOORWAY_API_KEY:-not set}"
+                    echo ""
+                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-stewardship.ts
+                """
+            }
+        }
+    }
+}
+
+/**
  * Seeds the EPR-projection REA commitments — one per (doorway, EPR, urlPath)
  * tuple — that the doorway's EprRouter polls from
  * /api/v1/commitments?action=project-epr and uses to dispatch path-prefix
@@ -1750,6 +1791,22 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             }
                         }
                     }
+                }
+            }
+        }
+
+        stage('Seed Stewardship Allocations') {
+            // Affinity-based content→steward allocations. Body in
+            // seedStewardshipStage() helper (64KB CPS limit). The seeder
+            // existed but was never wired — six a2o stewardship scenarios
+            // asserted on data no stage produced (genesis #1079).
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script { seedStewardshipStage() }
                 }
             }
         }
