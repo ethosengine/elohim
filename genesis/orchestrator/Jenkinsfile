@@ -868,6 +868,22 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
     } else {
         graphPipelines = fallbackPipelines
     }
+
+    // Self-dispatch guard: the orchestrator must NEVER dispatch itself as a downstream.
+    // A push touching any **/Jenkinsfile* path matches elohim-orchestrator's
+    // lint-jenkinsfiles source glob, which would schedule elohim-orchestrator/<branch>
+    // as a downstream of THIS very build. With abortPrevious concurrency, the
+    // self-triggered child aborts its still-running parent (and is itself orphaned as
+    // BuildTriggerCancelled), so the parent exits NOT_BUILT before Level-1 (genesis) ever
+    // dispatches. propagate:false / longRunning fire-and-forget cannot cover this — only
+    // self-exclusion can. (Diagnosed 2026-06-03: every Jenkinsfile-touching dev push
+    // produced a NOT_BUILT+ABORTED orchestrator pair (#1135–#1140) and dispatched no
+    // genesis build since #1076.) findAll (non-mutating) is immutable-list-safe.
+    def selfProject = (env.JOB_NAME ?: '').tokenize('/')[0]
+    if (selfProject && graphPipelines.contains(selfProject)) {
+        graphPipelines = graphPipelines.findAll { name -> name != selfProject }
+        echo "🛡️  self-dispatch guard: removed ${selfProject} from the dispatch set (a build never triggers itself)"
+    }
     return graphPipelines
 }
 
