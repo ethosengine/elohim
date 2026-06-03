@@ -22,7 +22,10 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import { BrowserDevice } from '../../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
+import { getFixture, isHumanDeployed } from '../../src/framework/fixtures/humans.js';
+import { Human } from '../../src/framework/human.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -133,24 +136,43 @@ function assertEvidenceRow(
  */
 Given(
   'human {string} is logged in on doorway {string} as operator',
-  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, humanName: string, doorwayId: string) {
-    // Delegate to the existing fixture-human login step by looking up the doorway
-    // and creating a Playwright device with the operator's credentials.
-    // The "as operator" suffix indicates intent but doesn't change the login flow.
+    // The "as operator" suffix marks the role but uses the same fixture-human login
+    // flow as "human X is logged in on doorway Y".  If the human is already in the
+    // world (registered by a prior step) we do nothing.  If not, we log them in now
+    // via an HTTP BrowserDevice so that subsequent steps (e.g. "{word} loads {string}")
+    // can resolve getHuman(humanName) without throwing "Unknown human: …".
     const doorway = this.getDoorway(doorwayId);
     assert.ok(doorway, `Doorway "${doorwayId}" not registered — add a "doorway at" step first`);
 
-    // If a Playwright device was created via fixture-humans step it already has a device.
-    // This step is a precondition marker; the actual device setup happens in the
-    // "human X is logged in on doorway Y with device" step that runs in Background.
-    // We accept that the human may or may not already be set up.
+    // Fast path: already registered by a prior Background step.
     try {
       this.getHuman(humanName);
-      // Human already registered — this is a no-op precondition
+      return; // already set up
     } catch {
-      // Human not yet registered — skip (background steps handle setup)
+      // Not yet registered — fall through and create it.
     }
+
+    // Respect suspended-human / pool-unavailable skip logic (same as fixture-humans.steps.ts).
+    if (!isHumanDeployed(humanName)) {
+      return 'pending';
+    }
+
+    const fixture = getFixture(humanName);
+    const human = new Human(humanName, fixture.credentials);
+    const device = new BrowserDevice(`${humanName}-browser`, doorway.url);
+    human.addDevice(device);
+
+    const auth = await device.login({
+      identifier: fixture.credentials.identifier,
+      password: fixture.credentials.password,
+    });
+
+    human.agentPubKey = auth.agentPubKey;
+    human.humanId = auth.humanId;
+    human.setToken(doorwayId, auth.token);
+
+    this.addHuman(humanName, human);
   }
 );
 

@@ -75,11 +75,19 @@ When(
   }
 );
 
+/** Normalise inScopeOf to an array regardless of wire shape.
+ *  Storage may return an array OR a pipe-delimited string (e.g. "doorway:x|epr:y"). */
+function normaliseScopeOf(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw as string[];
+  if (typeof raw === 'string') return raw.split('|');
+  return [];
+}
+
 Then(
   'at least one commitment has inScopeOf containing {string}',
   function (this: DogfoodWorld, expected: string) {
     const match = (this.commitments ?? []).find(c =>
-      Array.isArray(c.inScopeOf) ? (c.inScopeOf as string[]).includes(expected) : false
+      normaliseScopeOf(c.inScopeOf).includes(expected)
     );
     assert.ok(match, `No commitment had inScopeOf containing "${expected}"`);
     this.scopedCommitment = match;
@@ -89,7 +97,7 @@ Then(
 Then(
   'that commitment has inScopeOf containing {string}',
   function (this: DogfoodWorld, expected: string) {
-    const scope = (this.scopedCommitment?.inScopeOf ?? []) as string[];
+    const scope = normaliseScopeOf(this.scopedCommitment?.inScopeOf);
     assert.ok(scope.includes(expected), `scope was ${JSON.stringify(scope)}`);
   }
 );

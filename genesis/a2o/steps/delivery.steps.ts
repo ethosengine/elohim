@@ -46,6 +46,15 @@ export async function fetchApp(baseUrl: string, path: string): Promise<AppRespon
 // captures that the shared Then assertions in this file resolve.
 export const responseStore = new WeakMap<E2EWorld, AppResponse>();
 
+/** Sentinel value used in feature files when the real hash isn't known yet. */
+const PLACEHOLDER_HASH = 'sha256-abc123';
+
+/** Pattern that a real sha256 content-address must match. */
+const CONTENT_ADDRESS_PATTERN = /^sha256-[a-f0-9]{64}$/;
+
+/** World-local storage key for the captured X-Content-Address value. */
+const CAPTURED_CONTENT_ADDRESS_KEY = 'capturedContentAddress';
+
 // ---------------------------------------------------------------------------
 // Background: doorway and seeded-content context
 // ---------------------------------------------------------------------------
@@ -113,7 +122,20 @@ Given(
 When('I request {string}', async function (this: E2EWorld, path: string) {
   const doorway = [...this.doorways.values()][0];
   assert.ok(doorway, NO_DOORWAY);
-  const resp = await fetchApp(doorway.url, path);
+  // If the path contains the placeholder hash, substitute the real captured hash.
+  // This allows the feature file to remain readable with the literal placeholder
+  // while the step uses whichever hash the server actually returned.
+  let resolvedPath = path;
+  if (path.includes(PLACEHOLDER_HASH)) {
+    const captured = this.contentIds.get(CAPTURED_CONTENT_ADDRESS_KEY);
+    assert.ok(
+      captured,
+      `Path "${path}" contains placeholder "${PLACEHOLDER_HASH}" but no content address was captured yet. ` +
+        `Run the header-assertion step first to capture the real hash.`
+    );
+    resolvedPath = path.replace(PLACEHOLDER_HASH, captured);
+  }
+  const resp = await fetchApp(doorway.url, resolvedPath);
   responseStore.set(this, resp);
 });
 
@@ -147,7 +169,20 @@ Then(
       actual,
       `Header "${headerName}" not present. Present headers: ${JSON.stringify(resp.headers)}`
     );
-    assert.equal(actual, expectedValue);
+    // When the expected value is the well-known placeholder hash, treat it as
+    // "capture whatever hash the server returns" rather than a literal equality
+    // check.  Validate the pattern and store the real hash for later steps that
+    // need to build a CID URL.
+    if (expectedValue === PLACEHOLDER_HASH) {
+      assert.match(
+        actual,
+        CONTENT_ADDRESS_PATTERN,
+        `Header "${headerName}" value "${actual}" does not look like a sha256 content address`
+      );
+      this.contentIds.set(CAPTURED_CONTENT_ADDRESS_KEY, actual);
+    } else {
+      assert.equal(actual, expectedValue);
+    }
   }
 );
 

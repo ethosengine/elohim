@@ -39,11 +39,20 @@ const HEALTH_STARTUP = '/health/startup';
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** POST to an admin endpoint, assert 200, return parsed JSON. */
-async function adminPost(baseUrl: string, path: string): Promise<Record<string, unknown>> {
+/** POST to an admin endpoint, assert an acceptable status code, return parsed JSON.
+ *  By default only 200 is accepted; pass `acceptedStatuses` to broaden (e.g. [200, 202]
+ *  for async-accepted endpoints such as /admin/cache/warm). */
+async function adminPost(
+  baseUrl: string,
+  path: string,
+  acceptedStatuses: number[] = [200]
+): Promise<Record<string, unknown>> {
   const { statusCode, body } = await request(`${baseUrl}${path}`, { method: 'POST' });
   const text = await body.text();
-  assert.equal(statusCode, 200, `Admin POST ${path} failed: ${statusCode} ${text}`);
+  assert.ok(
+    acceptedStatuses.includes(statusCode),
+    `Admin POST ${path} failed: ${statusCode} ${text}`
+  );
   return JSON.parse(text) as Record<string, unknown>;
 }
 
@@ -120,8 +129,9 @@ Given(
   async function (this: E2EWorld, appSlug: string) {
     const url = getDoorwayUrl(this);
     await adminPost(url, CACHE_ENABLE);
-    // Trigger warmup and wait for entries to appear
-    await adminPost(url, CACHE_WARM);
+    // Trigger warmup and wait for entries to appear.
+    // 202 Accepted is a valid async-accepted response for this endpoint.
+    await adminPost(url, CACHE_WARM, [200, 202]);
     await retry(
       async () => {
         const stats = await adminGet(url, CACHE_STATS);
@@ -147,7 +157,8 @@ Given(
   async function (this: E2EWorld, appSlug: string) {
     const url = getDoorwayUrl(this);
     await adminPost(url, CACHE_ENABLE);
-    await adminPost(url, CACHE_WARM);
+    // 202 Accepted is a valid async-accepted response for this endpoint.
+    await adminPost(url, CACHE_WARM, [200, 202]);
     await retry(
       async () => {
         const stats = await adminGet(url, CACHE_STATS);
@@ -326,7 +337,8 @@ Then(
  */
 Then('the next load re-warms the caches', async function (this: E2EWorld) {
   const url = getDoorwayUrl(this);
-  await adminPost(url, CACHE_WARM);
+  // 202 Accepted is a valid async-accepted response for this endpoint.
+  await adminPost(url, CACHE_WARM, [200, 202]);
   await retry(
     async () => {
       const stats = await adminGet(url, CACHE_STATS);
