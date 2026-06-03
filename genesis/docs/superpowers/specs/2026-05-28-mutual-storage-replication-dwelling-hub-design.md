@@ -1,5 +1,6 @@
 ---
 title: Mutual Storage Replication (Dwelling-Hub Tier) — First REA Compute-Commitment Instance
+id: mutual-storage-replication-dwelling-hub-design
 tier: superpowers/spec
 status: Design (pre-implementation, post-brainstorm 2026-05-28)
 created: 2026-05-28

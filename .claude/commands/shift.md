@@ -78,6 +78,18 @@ Invokes the `agentic-developer` skill to run an agentic developer shift.
    canonical specs (inline watch-out) + curated history, open issues
    to backlog, narration body to git — then MemPalace re-mines the
    cleaned surface (spec §5). No parked plan is left behind.
+9. **SEAL the sprint (born-linked, deterministic).** Before dissolution,
+   every doc + memory authored this sprint must be content-addressed so
+   its cites survive into the permanent graph (and survive relocation
+   into `held/`). Run the linking-tool sweep:
+   ```bash
+   python3 .claude/scripts/memory-kit/cite-gen.py --seal-all   # seal any un-sealed doc-root .md (id + envelopes + verify)
+   ```
+   If it reports `✍ N cite(s) on the title-default desc`, author the
+   relationship hints (`cite-describe.py`, or dispatch the corpus-describe
+   workflow) — the progressive-discovery payload. Decompose-self should
+   not graduate a plan whose cites aren't sealed; the cite-seal postHook
+   nudges in-flight, this sweep is the closing guarantee.
 
 ## See also
 

@@ -1,4 +1,5 @@
 ---
+id: light-up-the-topology-sprint-kickoff
 status: Draft
 cites:
   - ../specs/2026-05-29-durability-topology-felt-resilience.md   # the related doc this derives from

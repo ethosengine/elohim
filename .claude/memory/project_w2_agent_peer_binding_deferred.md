@@ -1,10 +1,11 @@
 ---
+id: project-w2-agent-peer-binding-deferred
 name: project-w2-agent-peer-binding-deferred
 description: EPR W2 AgentPeerBinding IntegrityNotify arm deferred — iroh Phase 12 caller-identity not yet live. Re-evaluate after Phase 12 lands.
 metadata:
   type: project
 cites:
-  - genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md
+  - iroh-phase12-peer-transport-manifest | the Phase 12 plan whose four-adapter consumer wiring lifts this deferral once it lands | sha256:a03f82c9d61ebda3
   - elohim/sdk/schemas/v1/dna-signals/agent-peer-binding.schema.json
 ---
 

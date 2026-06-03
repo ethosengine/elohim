@@ -1,4 +1,5 @@
 ---
+id: feedback-subagent-dep-conflict-supervision
 name: Subagents go off-script when faced with dep-version conflicts
 description: When a Cargo dep-resolution conflict surfaces, subagents (especially Haiku) may pick wildly different versions to "make it build" rather than reporting BLOCKED. Add explicit version-forbidden language to dispatch prompts.
 type: feedback

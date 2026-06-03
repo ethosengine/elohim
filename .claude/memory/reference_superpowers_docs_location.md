@@ -1,10 +1,11 @@
 ---
+id: reference-superpowers-docs-location
 name: Plan/spec locations in elohim repo
 description: Three plan locations based on scope — elohim domain work, meta/automation work, and submodule-scoped work. Corrected 2026-04-17.
 type: reference
 originSessionId: cba4ccfa-49ce-49fd-8896-afd15e101e73
 cites:
-  - genesis/docs/content/elohim-protocol/history/2026-06-02-experience-story-discernment-gate.md
+  - experience-story-discernment-gate | the relocated-then-superseded rakia stub that demonstrates the cross-reference stub convention this doc describes | sha256:f51ed428d72a97ad
   - .claude/hooks/p2p-plan-audit.py
 ---
 **Location convention for this project:**

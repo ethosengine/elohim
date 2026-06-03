@@ -1,4 +1,5 @@
 ---
+id: feedback-a2o-is-human-experience-not-dev-bugs
 name: a2o features describe human experiences, not dev infrastructure bugs
 description: Story-harvest captures human-facing engineering constraints; serialization bugs, schema sync, type-check failures belong in unit tests / pre-push hooks / memory — NOT in feature files
 type: feedback

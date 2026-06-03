@@ -1,4 +1,5 @@
 ---
+id: project-alpha-topology-bootstrap-pair
 name: Alpha cluster topology — 6 peers, bootstrap pair, k8s nodes as household stand-ins
 description: Alpha test fabric layout — adam+matthew across the node-split deliberately to give seeder bulk-upload bandwidth; the k8s node split represents household boundaries
 type: project

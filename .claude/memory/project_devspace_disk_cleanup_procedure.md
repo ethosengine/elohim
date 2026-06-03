@@ -1,4 +1,5 @@
 ---
+id: project-devspace-disk-cleanup-procedure
 name: Devspace disk-fill recovery procedure
 description: Eclipse Che workspace /projects volume is 118G; fills from .angular/node_modules/target plus .claude/worktrees Rust target dirs; cleanup procedure recovered 104G on 2026-05-08
 type: project

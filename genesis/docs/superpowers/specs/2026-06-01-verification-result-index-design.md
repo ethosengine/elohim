@@ -1,11 +1,12 @@
 ---
 title: Verification-Result Index — the system→state store that closes the stasis loop
+id: verification-result-index-design
 status: Draft
 created: 2026-06-01
 topic: [verification, state-index, ci, regression, done-gate, memory-stasis]
 cites:
-  - genesis/docs/PLACEMENT.md
-  - genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md
+  - placement | the contract whose four verification states this index records rather than forks | sha256:f84d7cb16bea9379
+  - che-browser-completion-oracle-design | the L2 done-gate oracle this composes with to resolve claimed→done/regressed | sha256:355cc8523a03f33b
 # Produced via /brainstorm (coherence-wrapped): composed from the prior art the pre-step surfaced;
 # born auditable (status + topic + cites) so it never enters the budget as no-status/orphan debt.
 ---

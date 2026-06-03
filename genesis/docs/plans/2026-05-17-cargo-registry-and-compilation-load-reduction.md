@@ -1,4 +1,5 @@
 ---
+id: cargo-registry-and-compilation-load-reduction
 status: Draft
 ---
 

@@ -1,4 +1,5 @@
 ---
+id: app-manifest-staged-intents-design
 status: Substrate LANDED (schema + codegen + tests on disk) — feature HELD on the unbuilt session-bridge consumer
 ---
 

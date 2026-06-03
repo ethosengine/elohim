@@ -1,5 +1,6 @@
 ---
 title: EPR Phase 2c — Libp2p Federation of Signed Atoms Design
+id: epr-phase-2c-libp2p-federation-design
 tier: architecture
 status: Design — authoritative for the Phase 2c implementation plan
 created: 2026-04-23

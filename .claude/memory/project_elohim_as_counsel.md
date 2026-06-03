@@ -1,4 +1,5 @@
 ---
+id: project-elohim-as-counsel
 name: Elohim as counsel — imagodei has a right to elohim defense
 description: When a human is under attack (collusion, duress, silencing, or false attestation against them), their elohim-agent has first-class standing to represent their interests as counsel, as good as any legal system but without the socioeconomic barriers
 type: project

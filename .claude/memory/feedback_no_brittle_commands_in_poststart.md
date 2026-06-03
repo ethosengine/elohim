@@ -1,4 +1,5 @@
 ---
+id: feedback-no-brittle-commands-in-poststart
 name: feedback-no-brittle-commands-in-poststart
 description: "Devfile postStart failures abort whole-workspace startup; only add a command to postStart if it is idempotent, fast, and cannot reasonably fail"
 metadata: 

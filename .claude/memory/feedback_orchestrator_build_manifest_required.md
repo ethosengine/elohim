@@ -1,4 +1,5 @@
 ---
+id: feedback-orchestrator-build-manifest-required
 name: build-manifest.json is required for new orchestrator pipelines
 description: Adding a pipeline to the PIPELINES groovy map alone won't trigger it — the build graph (build-manifest.json files) is now authoritative
 type: feedback

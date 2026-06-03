@@ -1,5 +1,6 @@
 ---
 title: AT Protocol Lexicon Projection at Doorway
+id: atproto-lexicon-projection-doorway-design
 status: Draft
 created: 2026-05-01
 related:

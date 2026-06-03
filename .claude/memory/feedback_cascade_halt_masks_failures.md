@@ -1,4 +1,5 @@
 ---
+id: feedback-cascade-halt-masks-failures
 name: Cascade-halt orchestrator masks downstream failures
 description: When a CI pipeline is red, the orchestrator's halt-on-failure cascade hides errors in every downstream pipeline; driving toward green surfaces buried failures one layer at a time
 type: feedback

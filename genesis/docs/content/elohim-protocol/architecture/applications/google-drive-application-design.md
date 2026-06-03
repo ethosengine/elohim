@@ -1,5 +1,6 @@
 ---
 title: Google Drive — substrate-native file store + collaboration
+id: google-drive-application-design
 tier: architecture
 status: Composition draft (primitives mapped; full walkthrough pending)
 created: 2026-05-24

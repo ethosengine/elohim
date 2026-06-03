@@ -1,4 +1,5 @@
 ---
+id: feedback-cargo-resolution-vs-compilation
 name: Cargo dep probes — resolution success ≠ compilation success
 description: A `cargo metadata` / `cargo generate-lockfile` probe only proves SemVer constraints reconcile. Pre-release crates can resolve cleanly but fail to compile (stale imports, removed paths). Always run `cargo build` against the candidate pin before declaring it viable.
 type: feedback

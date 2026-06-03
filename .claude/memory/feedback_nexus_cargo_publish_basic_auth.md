@@ -1,11 +1,12 @@
 ---
+id: feedback-nexus-cargo-publish-basic-auth
 name: nexus-cargo-publish-basic-auth
 description: "Nexus 3.x Cargo hosted publish requires HTTP Basic auth, not the Bearer/NpmToken format cargo's default credential provider sends. NPM_TOKEN reads succeed; PUT /api/v1/crates/new returns 401 with www-authenticate: BASIC realm. Resolving needs either the Nexus user-token Pass Code (so Basic auth can be constructed) or a Nexus-side config change to accept token-format publishes. Verified 2026-05-18 on cargo-internal."
 metadata:
   node_type: memory
   type: feedback
 cites:
-  - genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md
+  - cargo-registry-and-compilation-load-reduction | the plan whose first-publish step hit this 401 wall — the registry trio + elohim-epr publish task | sha256:57641cddabeb30a2
 ---
 
 When publishing to a Nexus 3.x Cargo hosted repository, `cargo publish` will fail with HTTP 401 even though the same token reads the sparse index successfully. This memory captures the specific shape of the failure and the recovery paths so future attempts don't re-walk the same wall.

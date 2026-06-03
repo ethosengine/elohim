@@ -1,5 +1,6 @@
 ---
 title: "Wave 3 — `bridges/valueflows`: hREA / VF-GraphQL Interop Design"
+id: wave3-valueflows-hrea-interop-design
 tier: architecture
 status: Design (pre-implementation; implementation plan to be authored once approved)
 created: 2026-05-20

@@ -1,4 +1,5 @@
 ---
+id: lamad-pillar-dependency-audit
 status: Draft
 cites:
   - ../specs/2026-05-25-pillar-epr-decomposition-design.md   # the design spec this plan implements

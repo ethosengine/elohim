@@ -1,4 +1,5 @@
 ---
+id: project-genesis-is-protocol-interpretability-layer
 name: genesis-is-protocol-interpretability-layer
 description: "Genesis artifacts (humans/, stories/, account-packages/, relationships, gherkin) are the Elohim Protocol's interpretability layer running in dev-mode — not documentation OF the protocol, the protocol's human-readable surface ITSELF. Frontmatter is already EPR-shaped. Alpha-to-omega arc: dev-time markdown graduates into views upon the protocol it describes."
 metadata:

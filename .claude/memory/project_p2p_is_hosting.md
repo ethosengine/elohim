@@ -1,10 +1,11 @@
 ---
+id: project-p2p-is-hosting
 name: P2P mesh is the hosting layer, doorway is web 2.0 projection
 description: The peer-sharding P2P mesh IS the content hosting infrastructure. Doorway is an optional projection layer for web 2.0 browsers, not the hosting layer itself.
 type: project
 originSessionId: 63499c63-1cde-41b5-a0b0-66503d4c008c
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
+  - doorway-access-tier-patterns | the pattern catalog for how doorway projects mesh-hosted content to web2 visitors across access tiers | sha256:347f4a6ee935b18f
 ---
 The P2P mesh (libp2p in elohim-storage) provides human-scale content distribution. Peers who care about content shard and replicate it among themselves — 50 people interested in a learning path means 50 peers collectively hosting it. No central hosting needed.
 

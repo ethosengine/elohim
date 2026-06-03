@@ -1,4 +1,5 @@
 ---
+id: topology-resilience-qahal-synthesis
 status: design   # synthesis + re-baseline — planning input
 cites:
   - ../superpowers/specs/2026-05-01-light-up-the-topology-design.md   # the design spec this plan implements

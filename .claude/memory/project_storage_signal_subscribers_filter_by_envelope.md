@@ -1,4 +1,5 @@
 ---
+id: project-storage-signal-subscribers-filter-by-envelope
 name: storage-signal-subscribers-filter-by-envelope
 description: "elohim-storage signal subscribers filter by envelope type — new ProjectionSignal variants from the DNA need explicit subscribe_* methods wired in main.rs, not just receiver function impls"
 metadata: 

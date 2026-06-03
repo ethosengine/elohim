@@ -1,4 +1,5 @@
 ---
+id: project-feedback-governance-are-reach-earning-machinery
 name: project_feedback_governance_are_reach_earning_machinery
 description: "The teleological reason every EPR must declare feedback + governance legs — they ARE the machinery by which reach is earned (evidence + adjudication); reach can't be self-asserted, so an EPR without them can't earn reach and the manifest schema rejects it"
 metadata: 

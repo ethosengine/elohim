@@ -1,4 +1,5 @@
 ---
+id: sprint-1b-library-b-pattern-stories
 status: Draft
 cites:
   - ../specs/2026-05-22-sprint-1b-library-b-design.md   # the design spec this plan implements

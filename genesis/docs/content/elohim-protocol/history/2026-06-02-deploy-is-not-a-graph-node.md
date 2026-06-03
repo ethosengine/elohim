@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Deploy is not a graph node — the 2026-04-27 whole-matrix rebuild"
+id: deploy-is-not-a-graph-node
 type: history-gotcha
 status: Accepted
 tier: history

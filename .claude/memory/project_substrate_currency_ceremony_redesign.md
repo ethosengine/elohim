@@ -1,4 +1,5 @@
 ---
+id: project-substrate-currency-ceremony-redesign
 name: substrate-currency-ceremony-redesign
 description: "Memory-ceremony collapsed from 6-wave audit-driven into 4-phase substrate-currency rewrite ceremony; byte-budget hygiene split to /hygiene-sweep sibling cadence. Deliverable is substrate-grounded gospel-tier rewrites, not moved audit numbers."
 metadata: 

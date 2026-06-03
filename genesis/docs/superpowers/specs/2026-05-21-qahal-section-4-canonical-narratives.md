@@ -1,4 +1,5 @@
 ---
+id: qahal-section-4-canonical-narratives
 status: Design
 related:
   - 2026-05-21-qahal-architecture-vision.md   # the vision spec this is Section 4 of

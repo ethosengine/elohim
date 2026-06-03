@@ -1,4 +1,5 @@
 ---
+id: feedback-orchestrator-abort-baseline-rollback
 name: Aborting orchestrator runs forces full-chain rebuild on next push
 description: Push during an in-flight orchestrator chain superseded the prior orchestrator without persisting its build state — next push rebases against last-SUCCESSFUL orchestrator, pulling in everything that ran in the aborted attempt
 type: feedback

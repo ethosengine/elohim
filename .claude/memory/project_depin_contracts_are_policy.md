@@ -1,4 +1,5 @@
 ---
+id: project-depin-contracts-are-policy
 name: DePIN contracts are policy (DHT); libp2p is mechanism
 description: Stewardship contracts between family/remote-family peers are DHT-notarized (REA commitments); libp2p dataplane operates within those contract bounds
 type: project

@@ -1,5 +1,6 @@
 ---
 title: Meta / Facebook — substrate-native social graph + feed
+id: meta-facebook-application-design
 tier: architecture
 status: Composition draft (primitives mapped; full walkthrough pending)
 created: 2026-05-24

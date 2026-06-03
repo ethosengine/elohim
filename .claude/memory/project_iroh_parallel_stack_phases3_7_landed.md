@@ -1,10 +1,11 @@
 ---
+id: project-iroh-parallel-stack-phases3-7-landed
 name: iroh parallel stack — Phases 1–10 landed (cutover-ready transport)
 description: Wire transports for every plane (blob, gossip, sync, EPR×2, shard, view-fed, auth×2) proven via iroh QUIC parity tests; cross-stack peer-map bridge in place; Phase 11 cutover gate now reachable
 type: project
 originSessionId: bf3ce047-b0fb-41e7-a37a-fccd45eccad5
 cites:
-  - genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md
+  - iroh-recovery-e2e | Phase 11 cutover gate #5 (recovery e2e), one of the still-required prerequisites this entry lists | sha256:f02417b8d354d4ba
 ---
 Worktree `worktree-iroh-parallel-stack` (rebased onto origin/dev 2026-05-08, 22 commits ahead).
 

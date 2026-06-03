@@ -1,4 +1,5 @@
 ---
+id: project-epr-foundation-closure-2026-05-16
 name: epr-foundation-closure-2026-05-16
 description: "EPR foundation sprint closure (2026-05-16) — @wip walk, D4 GetDocument verdict, AgentPeerBinding deferred (Phase 12 RED), what graph-native inherits"
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: 1b52af5d-0197-4098-82d8-8f9e143a6ea5
 cites:
-  - genesis/docs/content/elohim-protocol/history/2026-06-02-epr-foundation-landed-by-waves.md
+  - epr-foundation-landed-by-waves | the history/ADR that distills this closure plus all prior waves into the audit-as-truth substrate record | sha256:5538a27c004be199
 ---
 
 EPR foundation sprint closed 2026-05-16 with the @wip disposition walk + Band B Task 8 deferral.

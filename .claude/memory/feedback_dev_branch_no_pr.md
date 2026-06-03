@@ -1,4 +1,5 @@
 ---
+id: feedback-dev-branch-no-pr
 name: dev branch is integration target — no PR needed for batch merges
 description: dev IS the development branch in this project; merging feature branches to dev locally is the norm, not bypassing review
 type: feedback

@@ -1,5 +1,6 @@
 ---
 title: iroh Phase 11 Cutover — Pre-Cutover Prep
+id: iroh-phase11-prep
 status: Design
 created: 2026-05-08
 canonical: ../../content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md

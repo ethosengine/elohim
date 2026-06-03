@@ -1,13 +1,16 @@
 ---
 title: Unified Memory Loop — One Scoreboard, One Loop (Two Readouts), One Ceremony
+id: unified-memory-loop-design
 status: Draft
+class: process-meta
+process_subdomain: memory
 topic: [memory, stasis, converge, loop, ceremony, context-coverage, orchestration, cadence-convergence]
 cites:
-  - genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md
-  - genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md
+  - converge-skill-design | the dreaming-to-execution loop this partially supersedes by folding it into one scoreboard | sha256:3034b991de8d3d87
+  - verification-result-index-design | the system-state store this loop reads to auto-resolve the back half of a claim | sha256:8d6b292dafc4a44e
   - genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
-  - genesis/docs/PLACEMENT.md
+  - memory-lifecycle-design | the comet-shaped product seed whose vocabulary this loop dogfoods for doc hygiene | sha256:b6545e6548573fa4
+  - placement | the contract defining the three doc homes this loop tends toward stasis | sha256:f84d7cb16bea9379
   - .claude/workflows/memory-stasis-loop.js
   - .claude/skills/memory-ceremony/SKILL.md
   - .claude/skills/memory-kit/SKILL.md

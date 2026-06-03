@@ -1,4 +1,5 @@
 ---
+id: converge-skill-design
 status: proposal
 date: 2026-05-10
 ---

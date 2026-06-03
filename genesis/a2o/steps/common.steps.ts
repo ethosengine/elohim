@@ -25,6 +25,11 @@ import {
   type CapturedPageError,
 } from '../src/framework/devices/playwright-device.js';
 import {
+  isRemoteComputeAvailable,
+  autoSkippedHumans,
+  resetAutoSkippedHumans,
+} from '../src/framework/fixtures/humans.js';
+import {
   isTestnetActive,
   stopTestnet,
   getComputeSummary,
@@ -187,14 +192,30 @@ BeforeAll(function () {
   mkdirSync('reports/console', { recursive: true });
   mkdirSync('reports/traces', { recursive: true });
 
+  // Reset node-pool auto-skip tracking so this run's reduced-scope summary
+  // (emitted in AfterAll) reflects only what THIS run skipped.
+  resetAutoSkippedHumans();
+
   const env = {
     doorwayAlpha: process.env['E2E_DOORWAY_ALPHA'] ?? '(not set)',
     deviceMode: process.env['E2E_DEVICE_MODE'] ?? 'http',
     trace: process.env['E2E_TRACE'] ?? 'false',
     nodeEnv: process.env['NODE_ENV'] ?? '(not set)',
+    remoteComputeStatus: process.env['ELOHIM_REMOTE_COMPUTE_STATUS'] ?? 'unknown',
   };
   // eslint-disable-next-line no-console
   console.log(`\n  Environment: ${JSON.stringify(env, null, 2)}\n`);
+
+  // Loud substrate banner: when the remote pool is down, scenarios that name
+  // remote-only personas auto-skip (the step defs return 'pending'). Announce
+  // it up front so a reduced-scope run reads as deliberate, not broken.
+  if (!isRemoteComputeAvailable()) {
+    // eslint-disable-next-line no-console
+    console.log(
+      '  🛰️  SUBSTRATE: remote pool (shem) UNAVAILABLE — running reduced scope.\n' +
+        '     Remote-only persona scenarios will auto-skip; on-prem household carries this run.\n'
+    );
+  }
 });
 
 /**
@@ -361,6 +382,30 @@ After(async function (this: E2EWorld, scenario) {
  */
 AfterAll(async function () {
   await E2EWorld.closeBrowser();
+
+  // Reduced-scope summary: name the personas this run auto-skipped because
+  // their node pool (shem) was unavailable. This is the planning signal —
+  // "here is what we could NOT exercise under the available compute" — and a
+  // machine-readable artifact the pipeline can fold into its run record.
+  const skipped = autoSkippedHumans();
+  const scope = {
+    remoteComputeStatus: process.env['ELOHIM_REMOTE_COMPUTE_STATUS'] ?? 'unknown',
+    reducedScope: skipped.length > 0,
+    autoSkippedHumans: skipped,
+  };
+  try {
+    writeFileSync('reports/substrate-scope.json', JSON.stringify(scope, null, 2));
+  } catch {
+    // reports/ may not exist in some local runs — non-fatal.
+  }
+  if (skipped.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n  🛰️  REDUCED SCOPE this run — ${skipped.length} persona(s) auto-skipped ` +
+        `(remote pool unavailable): ${skipped.join(', ')}\n` +
+        '     Re-run when shem returns to exercise the full topology.\n'
+    );
+  }
 
   // Testnet lifecycle cleanup — settle, report, stop
   if (isTestnetActive()) {

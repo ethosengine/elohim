@@ -1,4 +1,5 @@
 ---
+id: che-browser-feedback-foundation-plan
 status: Draft
 cites:
   - ../superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md   # the design spec this plan implements

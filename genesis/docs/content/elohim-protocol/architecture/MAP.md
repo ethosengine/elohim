@@ -1,5 +1,6 @@
 ---
 title: Architecture — MAP (the developer's walk)
+id: map
 tier: architecture
 status: Living document
 created: 2026-06-02
@@ -45,6 +46,16 @@ This map has three parts:
 ---
 
 ## 1 · The Subject-Domain Map
+
+> **Axis 0 · Subject class (read FIRST).** The D1–D10 lattice and the pillar axis below are **both
+> substrate-scoped** — they answer "where on the *product* surface does this live?" They are HONEST ONLY
+> for **`protocol-canonical`** work (changes a learner/peer experience; lands in `app/` + `architecture/` +
+> `a2o/features/<pillar>`). **`process-meta`** work (changes a developer/agent experience; lands in
+> `.claude/` + a CLAUDE.md gospel — the memory-kit, skills, agents, CI, the loops) has **no honest D# and
+> no pillar**; routing it through this lattice is the *D4 name-collision* that mis-filed four specs (see
+> `history/2026-06-02-d4-name-collision`). The subject-class axis lives in **`.claude/subject-routing.yaml`**
+> (the parent constitution, read by the brainstorm/decompose gates). Classify by deliverable-TARGET there
+> FIRST; only `protocol-canonical` proceeds into D#+pillar below.
 
 The architecture seeds are **concern-organized, not pillar-organized** — by design. A single seed
 (e.g. records-lifecycle) fans across all six pillars, so filing them by pillar would shred them. The

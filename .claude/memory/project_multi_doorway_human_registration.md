@@ -1,10 +1,11 @@
 ---
+id: project-multi-doorway-human-registration
 name: Humans register with multiple doorways for resiliency
 description: A human is not bound to a single doorway — they register with multiple doorways simultaneously, so any one can service their access; design flows must be doorway-agnostic
 type: project
 originSessionId: 253292ea-69ea-4e76-86e3-6d87ebdac46c
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
+  - doorway-access-tier-patterns | the pattern catalog where these doorway-agnostic flows surface as access tiers A / B / Recovery | sha256:347f4a6ee935b18f
 ---
 A human registers with multiple doorways (doorway-A, doorway-B, doorway-C...) as a resiliency pattern. No single doorway is the human's "home." Any registered doorway can facilitate that human's access to the network — login, content fetch, recovery ceremony, governance participation.
 

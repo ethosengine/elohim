@@ -1,4 +1,5 @@
 ---
+id: feedback-husky-manifest-vs-grep-project-drift
 name: husky-manifest-vs-grep-project-drift
 description: "husky pre-push has two project-detection paths (manifest-driven + grep-fallback) that emit DIFFERENT project names; when adding a manifest sub-project gate, audit the run_gate fallback case statement"
 metadata: 

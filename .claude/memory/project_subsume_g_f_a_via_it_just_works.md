@@ -1,4 +1,5 @@
 ---
+id: project-subsume-g-f-a-via-it-just-works
 name: Protocol mission — subsume Google/Facebook/Amazon via "it just works" P2P
 description: Strategic frame for why the substrate work has to be foundational-grade. The protocol's mission is to displace G/F/A by making peer-to-peer feel as effortless as Apple's "it just works." That requires foundational trust at the substrate so power can extend from below to the hubs without breaking the integrity of a different social contract under godlike AI.
 type: project

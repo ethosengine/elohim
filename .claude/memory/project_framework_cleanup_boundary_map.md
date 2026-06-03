@@ -1,4 +1,5 @@
 ---
+id: project-framework-cleanup-boundary-map
 name: project_framework_cleanup_boundary_map
 description: "Sprint 1 Classify&Map delivered the canonical framework boundary map + core↔reference split decision + reliability backlog (genesis/docs/architecture/framework-cleanup/, committed aeec00029). FOUR-bucket taxonomy: SDK / elohim-core / app-private / dev-tooling-&-delivery-harness — CI+seeder are the harness, NOT app-layers; their hand-coded delivery knowledge IS the symptom. Manifest has no delivery block = cascade root; doorway warm cache bypassed on / and /lamad routes."
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: e045cbeb-1783-45fc-974b-1a8fc8ae5de3
 cites:
-  - genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md
+  - elohim-sdk-epr-app-boundaries-sprint-kickoff | the kickoff brief whose three-bucket framing this Sprint-1 map corrected to four and grounded in evidence | sha256:9776d193efcabc84
 ---
 
 Sprint 1 ("Classify & Map", 2026-05-30) of the Elohim framework-cleanup sequence produced three

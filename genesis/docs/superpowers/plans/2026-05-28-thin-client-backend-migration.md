@@ -1,4 +1,5 @@
 ---
+id: thin-client-backend-migration
 status: Draft
 cites:
   - 2026-05-25-cross-pillar-import-cleanup.md   # the related doc this derives from

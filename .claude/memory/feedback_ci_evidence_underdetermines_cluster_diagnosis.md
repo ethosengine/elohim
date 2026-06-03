@@ -1,4 +1,5 @@
 ---
+id: feedback-ci-evidence-underdetermines-cluster-diagnosis
 name: feedback-ci-evidence-underdetermines-cluster-diagnosis
 description: "When CI surfaces UNSTABLE + downstream failure + empty probes against a fresh deploy, the failure shape on the cluster is the ground truth — ci-investigator output is necessary but not sufficient. Ask for kubectl-side evidence before attributing causality."
 metadata: 

@@ -1,4 +1,5 @@
 ---
+id: sprint-1a-elohim-elements-plan
 status: Draft
 cites:
   - ../superpowers/specs/2026-05-22-qahal-homepage-ux-design.md   # the design spec this plan implements

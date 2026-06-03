@@ -1,4 +1,5 @@
 ---
+id: feedback-check-helm-chart-status-before-runbooks
 name: Check helm chart status before recommending in operator runbooks
 description: Bitnami has been blocking/deprecating charts lately; verify chart availability and license before naming a vendor in a runbook
 type: feedback

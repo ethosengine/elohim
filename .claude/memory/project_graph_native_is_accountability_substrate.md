@@ -1,4 +1,5 @@
 ---
+id: project-graph-native-is-accountability-substrate
 name: graph-native-is-accountability-substrate
 description: "Graph-native isn't a backend query optimization — it's the physical structure that lets elohim agents hold positions accountable to a collective memory of understanding between human beings. Without a shared graph, elohim judgment is opinion held by model weights; with one, every position is grounded in the same atoms the humans are walking. Memory-kit + MemPalace are the dev-mode rehearsal of the same primitive."
 metadata:

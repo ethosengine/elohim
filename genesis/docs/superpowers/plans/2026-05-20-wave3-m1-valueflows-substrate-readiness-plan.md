@@ -1,4 +1,5 @@
 ---
+id: wave3-m1-valueflows-substrate-readiness-plan
 status: Draft
 cites:
   - ../../content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md   # the design spec this plan implements

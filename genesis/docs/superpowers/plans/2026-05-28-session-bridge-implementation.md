@@ -1,4 +1,5 @@
 ---
+id: session-bridge-implementation
 status: Draft
 cites:
   - ../specs/2026-05-28-session-bridge-design.md   # the design spec this plan implements

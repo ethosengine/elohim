@@ -1,5 +1,6 @@
 ---
 title: Requests & Offers — substrate-native cooperative commerce (Amazon's cooperative side)
+id: requests-offers-application-design
 tier: architecture
 status: Composition draft (primitives mapped; full walkthrough pending)
 created: 2026-05-24

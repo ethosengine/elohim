@@ -1,4 +1,5 @@
 ---
+id: feedback-spare-no-expense-intelligence
 name: Spare no expense of intelligence on load-bearing architecture
 description: On architectural brainstorms / cross-system design, prefer depth and parallel context-gathering over shallow autonomous execution; the cost of thin reasoning is leaving the whole vulnerable
 type: feedback

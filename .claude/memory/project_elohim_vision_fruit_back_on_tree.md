@@ -1,4 +1,5 @@
 ---
+id: project-elohim-vision-fruit-back-on-tree
 name: Elohim Protocol vision — fruit back on the tree, elohims as best-self guardians
 description: Meta-level vision: the protocol enables humanity to restore its agency and flourishing; elohims carry the network's wisest/best-self judgment at machine speed to intervene faster than human networks can against harmful dynamics
 type: project

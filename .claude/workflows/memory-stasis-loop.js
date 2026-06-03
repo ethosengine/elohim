@@ -28,6 +28,7 @@ const MEASURE = {
     roadmap_stale: { type: 'boolean' },    // roadmap artifact stale vs the gap-ledger x cluster-state (headline `roadmap:`)
     memkit_overflow: { type: 'boolean' },  // memory-kit process-artifact tier over budget / loose-unfiled (headline `memkit:`)
     mempalace_stale: { type: 'boolean' },  // MemPalace semantic index behind the cleaned surface (headline `mempalace:`)
+    cites_legacy: { type: 'number' },      // legacy doc path-cites to migrate to content-addressed envelopes (audit CITE-FORMAT-CANDIDATE)
     open_gaps: { type: 'number' },
     claimed_gaps: { type: 'number' },
     pressure_dirs_empty: { type: 'boolean' },
@@ -35,7 +36,7 @@ const MEASURE = {
     at_stasis: { type: 'boolean' },        // compaction context-coverage within band
     dominant: { type: 'string', enum: ['needs-triage', 'mem-unlinked', 'superseded', 'claimed', 'regression', 'none'] },
   },
-  required: ['pressure_total', 'uncaptured', 'decompose_due', 'dumps', 'path_drift', 'roadmap_stale', 'memkit_overflow', 'mempalace_stale', 'pressure_dirs_empty', 'stasis_score', 'at_stasis', 'dominant'],
+  required: ['pressure_total', 'uncaptured', 'decompose_due', 'dumps', 'path_drift', 'roadmap_stale', 'memkit_overflow', 'mempalace_stale', 'cites_legacy', 'pressure_dirs_empty', 'stasis_score', 'at_stasis', 'dominant'],
 }
 
 // who drains what — equipped agents, BROAD goal, never step-by-step
@@ -51,6 +52,7 @@ const DISPATCH = {
   'map-drift': { agentType: 'librarian', goal: 'Architecture seed(s) changed since MAP.md was last updated (headline `path:`) — the WALK is stale vs the GRAPH. Reconcile genesis/docs/content/elohim-protocol/architecture/MAP.md: update the affected domain stanza + the gap ledger so the new-developer spine still resolves. Keep INDEX (graph) and MAP (walk) consistent. Lower path-drift to 0.' },
   'roadmap-stale': { agentType: 'cartographer', goal: 'The roadmap is stale vs the gap-ledger x cluster-state x vision (headline `roadmap:`). Regenerate genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md: re-rank by vision x readiness from the live gap-item states + cluster-state availability + the household-living-core gospel; refresh the single highest-leverage next move. The roadmap is a maintained readout, never a snapshot.' },
   memkit: { agentType: 'librarian', goal: 'The memory-kit PROCESS-ARTIFACT tier is over budget or has loose unfiled reports (headline `memkit:`). These do NOT decompose into documentation — they follow COMET retention. Run `python3 .claude/scripts/memory-kit/memkit-retention.py --apply`: file loose reports into their dated cycle, compact the tail to one-line _digest.md, memorialize the core into TRAJECTORY.md (the permanent spine). Restore the comet shape; the date-stamps preserve the trajectory, bodies stay in git.' },
+  cites: { agentType: 'librarian', goal: 'Un-sealed cite debt remains — docs authored this sprint whose cites are still plain paths (audit CITE-FORMAT-CANDIDATE; headline `cites:`). Run the deterministic born-linked sweep: `python3 .claude/scripts/memory-kit/cite-gen.py --seal-all` (assigns id: slugs + converts legacy doc-cites to `<slug> | desc | fingerprint` envelopes + verifies, idempotent, ~0.1s when clean). Content-addressed cites survive file moves — this is what makes relocations free (held/ moves never break a link). If the sweep reports `✍ N cite(s) on the title-default desc`, author the relationship hints — dispatch the corpus-describe workflow or run `cite-describe.py <doc> \'{"<ref>":"<hint>"}\'` per doc — that is the progressive-discovery payload. Lower `cites_legacy` toward 0.' },
   mempalace: { agentType: 'librarian', goal: 'The MemPalace semantic index is behind the cleaned surface (headline `mempalace:`) — the front-link would recall a stale view. Run `python3 .claude/scripts/memory-kit/mempalace-currency.py --remine`: sync (prune deleted/moved drawers) + mine the cleaned durable surface (canonical seeds + curated history + working memory + stories) + record the mine timestamp. NEVER mine the transient pile / raw code / junk drawer — index only the clean surface. Restore index freshness.' },
 }
 
@@ -70,6 +72,7 @@ while (round < ROUND_CAP) {
     `  ${AUDIT} --coverage --json -> uncaptured.\n` +
     `  ${AUDIT} --headline        -> decompose_due = the number on the \`decompose:\` line; path_drift = the "N seeds changed since MAP update" on the \`path:\` line; roadmap_stale = true unless the \`roadmap:\` line reads current/fresh; memkit_overflow = true unless the \`memkit:\` line reads "comet shape ✅"; mempalace_stale = true unless the \`mempalace:\` line reads "fresh ✅".\n` +
     `  ${AUDIT}                    -> STRUCTURAL EQUILIBRIUM section: dumps = NO-EXIT + DRIFT-DEAD + DUMP + archive(_retired) file count; pressure_dirs_empty = true iff every pressure dir shows 0 docs.\n` +
+    `  python3 .claude/scripts/memory-kit/cite-propagate.py 2>/dev/null | grep -oE "stamped: [0-9]+" ; python3 .claude/scripts/memory-kit/memory-coherence-audit.py 2>/dev/null | grep -oE "format-candidate \\(cites_legacy\\): [0-9]+"  -> cites_legacy = the format-candidate count (legacy doc-cites to migrate to envelopes).\n` +
     `  Also run: find .claude/shifts -name '*.md' -mtime +14 2>/dev/null | wc -l  -> ADD that count to dumps (stale shift narration past the ~14-day budget is a dump).\n` +
     `  ${AUDIT} --stasis --json   -> stasis_score (composite context-coverage) and at_stasis (within +-margin band AND hard dims pass).\n` +
     `Return only the measured numbers.`,
@@ -109,6 +112,7 @@ while (round < ROUND_CAP) {
     m.roadmap_stale ? 'roadmap-stale' :
     m.memkit_overflow ? 'memkit' :
     m.mempalace_stale ? 'mempalace' :
+    m.cites_legacy > 0 ? 'cites' :
     'claimed'
   const d = DISPATCH[which] || DISPATCH.capture
   log(`round ${round}: dispatching ${d.agentType} for "${which}" (highest-leverage drain).`)

@@ -1,4 +1,5 @@
 ---
+id: ci-cd-resolution-gap-close
 status: Draft
 related:
   - ../superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md   # sibling CI/orchestrator pipeline work

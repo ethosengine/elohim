@@ -1,4 +1,5 @@
 ---
+id: recovery-protocol-phase-2-revised-design
 status: draft
 supersedes: 2026-04-21-recovery-protocol-phase-2-design.md
 ---

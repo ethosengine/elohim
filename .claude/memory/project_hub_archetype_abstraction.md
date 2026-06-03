@@ -1,4 +1,5 @@
 ---
+id: project-hub-archetype-abstraction
 name: Hub abstraction — household and collective as separate implementations
 description: Hub is an abstract substrate-topology interface; HouseholdHub and CollectiveHub are intentionally separate implementations because governance considerations differ in shape, not in settings. Mirrors the elohim-agent specialization pattern. Household-archetype fixtures are needed to model hub-and-spoke scaling; can start as @wip then add simulation harness.
 type: project

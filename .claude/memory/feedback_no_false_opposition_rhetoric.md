@@ -1,4 +1,5 @@
 ---
+id: feedback-no-false-opposition-rhetoric
 name: no-false-opposition-rhetoric
 description: "When capturing protocol design principles, refuse the rhetorical move of 'not X, not Y, not Z, but W' when the things aren't actually mutually exclusive. The protocol coordinates AND arbitrates truth AND exercises control — patience qualifies HOW each is done, not WHETHER. Hollowing-out by negation is still hollowing-out."
 metadata:

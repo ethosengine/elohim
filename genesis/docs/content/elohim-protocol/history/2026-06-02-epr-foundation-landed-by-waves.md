@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Landing the EPR substrate by waves — audit-as-truth, stubs that hold the seam"
+id: epr-foundation-landed-by-waves
 type: history-gotcha
 status: Accepted
 tier: history

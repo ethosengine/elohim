@@ -1,4 +1,5 @@
 ---
+id: feedback-sccache-spawn-enoent-rca
 name: sccache-spawn-enoent-rca
 description: "RCA for the sccache ENOENT bug that disabled sccache on the sweettest stage (efbac2938 → a92d91c2b). The prior framing ('cache-hit missing binary' or 'sccache cannot be exec'd in subprocess context') is WRONG. Actual failure: cargo intermittently fails to spawn the sccache binary itself with os error 2, ~1.7% of rustc invocations, after thousands of successful spawns in the same build. Matches sccache upstream issue #2023 class. Build-script involvement is incidental — the failing-to-spawn binary is sccache, not build-script-build."
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: feedback
   originSessionId: 3b93d5d1-a372-4195-9ba9-6d2c9b0faa75
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-06-02-sweettest-integration-layer.md
+  - sweettest-integration-layer | the DNA-test layer whose target-cache PVC path is this RCA workaround #3b (sccache-free sweettest) | sha256:a8747e884a24fdea
 ---
 
 ## The bug, correctly stated

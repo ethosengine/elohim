@@ -1,4 +1,5 @@
 ---
+id: project-protocol-sheds-externalities-to-non-participants
 name: protocol-sheds-externalities-to-non-participants
 description: "The protocol's value-flow points OUTWARD, not inward. The bargain is unilateral generosity — the substrate sheds positive externalities into the community whether anyone has a node, recognizes the protocol, accepts it, or uses it. Non-participants are not customers-not-yet-acquired or raw material; they are full humans the substrate is already accounting for. Refuses lock-in, refuses value extraction from non-users, refuses conditional dignity."
 metadata:

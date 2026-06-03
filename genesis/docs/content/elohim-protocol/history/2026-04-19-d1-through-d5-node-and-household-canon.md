@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: D1–D5 Node / Household / Doorway / Shem canonical decisions"
+id: d1-through-d5-node-and-household-canon
 type: history-gotcha
 status: Accepted
 tier: history

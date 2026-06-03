@@ -1,4 +1,5 @@
 ---
+id: project-household-living-core-lived-contrast-diffusion
 name: household-living-core-lived-contrast-diffusion
 description: "The household is the living core of the elohim protocol, the value-scanner is the substrate primitive that makes care-economy REA visible there, and lived contrast at home is the diffusion mechanism that spreads the substrate to every other institution — \"why isn't this like home?\" reforms common sense and drives participants to bring the substrate INTO work, school, civic life. The MVP focuses on the household because the seed is everything."
 metadata: 

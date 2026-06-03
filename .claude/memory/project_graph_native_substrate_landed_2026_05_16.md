@@ -1,4 +1,5 @@
 ---
+id: project-graph-native-substrate-landed-2026-05-16
 name: graph-native-substrate-landed-2026-05-16
 description: "Phase 3.7+4 of 2026-04-21 master spec — CozoDB embedded as 2nd projection target alongside diesel; manifest \"graph\" section + Rust validator; lamad + shefa graph extensions; 9 view builders; Apollo Federation v2 GraphQL surface (Reading A — projection-engine, not source-of-truth)."
 metadata: 
@@ -7,7 +8,7 @@ metadata:
   originSessionId: 609979e1-f473-4578-82ce-2db36db9404b
 cites:
   - genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md
-  - genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md
+  - graph-native-projection-substrate | the task-by-task plan this entry records as landed in one agentic session | sha256:73fda7fb750d6d53
 ---
 
 Sprint landed 2026-05-16 over a single agentic-developer session. Spec: `genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md`. Plan: `genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md`.

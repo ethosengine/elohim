@@ -1,4 +1,5 @@
 ---
+id: feedback-story-delivery-status-axis
 name: story-delivery-status-axis
 description: Story author-status is orthogonal to delivery-status; the delivery-status gradient (envisioned → backlog → refined → wip → active{alpha,beta,latest-stable} → stable, with regression as orthogonal) is the same lifecycle as backlog status, extended both ends
 metadata:

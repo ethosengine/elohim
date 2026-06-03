@@ -1,4 +1,5 @@
 ---
+id: feedback-pipeline-work-separate-from-sprint
 name: feedback-pipeline-work-separate-from-sprint
 description: "When iterating on CI/CD pipelines, do NOT stash or touch in-flight sprint work. Push the sprint to its target, then check out a feature branch off the target (e.g. dev) in a separate worktree for pipeline-fix iteration. Use Jenkins itself as the test surface — don't run local gates that block on a dirty sprint tree."
 metadata: 

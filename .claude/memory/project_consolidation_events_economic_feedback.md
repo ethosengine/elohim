@@ -1,10 +1,11 @@
 ---
+id: project-consolidation-events-economic-feedback
 name: Consolidation events as first-class economic-social feedback
 description: Consolidation/merge events are not janitorial — they emit structured signals to shefa (rewards/restitutions), qahal (governance), mishpat (restitution/reach), imagodei (relationship); discovering equivalence pays the discoverer + frees compute (shardable); discovering bad-propagation triggers restitution + reconciliation + reach-level drop; the substrate's nervous system runs partly on consolidation events
 type: project
 originSessionId: 10d85ef0-1979-4311-97e9-c2c209de48e2
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
+  - memory-lifecycle-design | the comet-shaped lifecycle whose merge/consolidation moment this entry turns into four-pillar economic feedback | sha256:b6545e6548573fa4
 ---
 A consolidation event (merge, dedup, equivalence-attestation) is **a first-class moment of judgment** with economic, social, and structural consequences. Treating it as a silent graph rewrite forfeits the protocol's most signal-rich operation.
 

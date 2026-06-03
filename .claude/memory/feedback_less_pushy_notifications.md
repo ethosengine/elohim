@@ -1,4 +1,5 @@
 ---
+id: feedback-less-pushy-notifications
 name: Less pushy notifications — prefer ambient over interruptive
 description: UX default: ambient status > passive prompts > gentle one-time nudges > never interruptive notifications; system does sensible thing automatically, surfaces result quietly
 type: feedback

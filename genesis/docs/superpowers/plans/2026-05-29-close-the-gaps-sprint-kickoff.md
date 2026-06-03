@@ -1,4 +1,5 @@
 ---
+id: close-the-gaps-sprint-kickoff
 status: Draft
 cites:
   - 2026-05-29-light-up-the-topology-sprint-kickoff.md   # the related doc this derives from

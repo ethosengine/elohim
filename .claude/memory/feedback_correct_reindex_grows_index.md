@@ -1,4 +1,5 @@
 ---
+id: feedback-correct-reindex-grows-index
 name: correct-reindex-grows-index
 description: Re-indexing orphaned topic files into MEMORY.md can grow the file even after tightening 10 entries — the orphans were always-load-bearing, just invisible. Tightening alone insufficient; umbrella consolidation needed.
 type: feedback

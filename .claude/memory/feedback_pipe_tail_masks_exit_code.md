@@ -1,4 +1,5 @@
 ---
+id: feedback-pipe-tail-masks-exit-code
 name: feedback_pipe_tail_masks_exit_code
 description: Piping cargo/git/test commands to tail/head/grep masks the real exit code — a failing gate reports green.
 metadata: 

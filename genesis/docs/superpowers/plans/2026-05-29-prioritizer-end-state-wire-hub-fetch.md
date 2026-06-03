@@ -1,4 +1,5 @@
 ---
+id: prioritizer-end-state-wire-hub-fetch
 status: Draft
 cites:
   - ../specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md   # the design spec this plan implements

@@ -1,4 +1,5 @@
 ---
+id: haiku-visual-triage-design
 status: Design
 related:
   - 2026-05-05-visual-validation-design.md   # visual validation as integration-mode candidate dimension (this triage is Tier-1 of it)

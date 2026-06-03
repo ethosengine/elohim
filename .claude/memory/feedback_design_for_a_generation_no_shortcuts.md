@@ -1,4 +1,5 @@
 ---
+id: feedback-design-for-a-generation-no-shortcuts
 name: Design for a generation — no shortcuts on substrate decisions
 description: When the user explicitly invokes "design for a generation" or rejects pragmatic shortcuts, prefer the W3C-standards / fundamentals option over the path of least resistance, even when the cost is substantially higher
 type: feedback

@@ -1,4 +1,5 @@
 ---
+id: project-substrate-scale-ceiling
 name: Substrate scales by federated Tier 3 nodes, not hyperscale
 description: Substrate is designed for ~100M Tier 3 nodes carrying billions of humans (most via hub-and-spoke, custodial keys, hosted accounts). Per-node load bounded by trust-network membership; doorway absorbs web2 mass-readership; substrate-level care is what enables honest entry-tier participation, not a side-effect for hardware owners.
 type: project

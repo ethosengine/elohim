@@ -1,9 +1,9 @@
 ---
 name: epr-content-addressing
-description: Reference for content linking in the Elohim Protocol — how links carry knowledge, value, and governance context, how they adapt to where the learner is, and how verified content addressing works. Use when authoring content links, explaining the architecture, creating content with verified fingerprints, or helping developers understand context-aware linking.
+description: Reference for content linking in the Elohim Protocol — how links carry knowledge, value, and governance context, how reach is earned at authoring, how links adapt to where the learner is, and how verified content addressing works. Use when authoring content links, explaining the architecture, creating content with verified fingerprints, or helping developers understand context-aware linking.
 metadata:
   author: elohim-protocol
-  version: 1.1.0
+  version: 1.2.0
 ---
 
 # Content Linking in the Elohim Protocol
@@ -18,15 +18,23 @@ Every content link in this system carries three things:
 2. **Value** — who stewards it, how they're recognized, and what kind of value flows (via REA economic events)
 3. **Governance** — what access rules apply, which community ratified it
 
-You cannot create a link without all three. This is structural — the system enforces it. The architecture makes it difficult to circulate knowledge without recognizing stewards, and difficult to apply rules without knowing what knowledge is affected.
+You cannot create a link without all three. This is structural — the system enforces it. The reason it must be so: feedback and governance *are* the reach-earning machinery. A link cannot earn its place in circulation by self-assertion — information without governance is propaganda, and value without attribution is extraction. The attestation chain (who vouches, who ratifies) *is* the coupling; coupling the three legs is what lets a link earn reach rather than declare it. So the architecture makes it difficult to circulate knowledge without recognizing stewards, and difficult to apply rules without knowing what knowledge is affected — not as a convenience, but because reach is earned, never asserted.
 
 ### The commons default
 
 Unattributed content doesn't vanish — it flows to the commons. When no steward attests, the constitutional governance layer takes responsibility and value flows to the community pool. This solves the cold-start problem: content enters and circulates immediately. When a steward later attests ("I wrote this," "I maintain this"), value redirects to them. The incentive is natural: find your content, attest to your care, and the value flows — otherwise it serves the world under community stewardship.
 
+The commons default is a routing fallback for *attribution*, not an exemption from *reach*. Reach is a graded, earned property, and the reach-gate stays universal — there is no public-surface bypass list. Public surfaces (a landing page, a manifesto, an open lesson) are not gate-exempt; they ship with their `commons`/`public` reach already earned because the genesis/seeder *grades the homework* — it seeds them as trusted-issuer content at the reach class they've earned. If content is mis-gated, the fix is in the seed data, never a bypass of the gate.
+
+### Reach is earned at compose-time
+
+A link's access class is not a free-text field — it is a position on the Reach ladder (`Personal → Intimate → Household → Neighborhood → … → Commons → Public`), and a link **cannot be composed** until its author has earned the reach class it requests. EPR compose consults the reach-earning gate, which returns one of three verdicts: **Allowed**, **Blocked**, or **Pending** (awaiting an elohim's sponsorship). This is the gate that makes "reach earned at authoring" real on the EPR plane: the access vocabulary in any envelope is a Reach class the author has standing to grant, not a vague "open to everyone."
+
+**Where this lives** (cartographer substrate): the compose gate is `elohim/elohim-storage/src/services/epr_compose.rs` (wraps compose in `reach_earning::evaluate` → `ReachVerdict`); the ladder is `enum Reach` with `is_floor_allowed` in `elohim/elohim-storage/src/epr_kind.rs`.
+
 ### How value flows (the REA bridge)
 
-Content delivery triggers an REA (Resource-Event-Agent) economic event — not a financial transaction, but a protocol-level acknowledgment. Recognition flows proportionally to stewards per their allocation ratios. Value is denominated in token types that match the kind of contribution:
+Content delivery triggers an REA (Resource-Event-Agent) economic event — not a financial transaction, but a protocol-level acknowledgment. Recognition is held *on behalf of the work* and flows proportionally to stewards per their allocation ratios — it is acknowledgment carried for the contribution, not a balance a steward owns. (The protocol rejects the ownership frame: stewardship, never sovereignty.) Value is denominated in token types that match the kind of contribution:
 
 | Token | Generated by | Decays? |
 |-------|-------------|---------|
@@ -35,12 +43,12 @@ Content delivery triggers an REA (Resource-Event-Agent) economic event — not a
 | Steward | Maintaining/protecting resources | Yes |
 | Infrastructure | Network maintenance | Yes (fast) |
 
-Each community defines circulation rules (decay rates, accumulation limits, dignity thresholds) in their constitutional documents. The `StewardshipAllocationView` tracks `recognitionAccumulated` per steward per content item.
+Each community defines circulation rules (decay rates, accumulation limits, dignity thresholds) in their constitutional documents. The `StewardshipAllocationView` tracks `recognitionAccumulated` per steward per content item — recognition held against the work, not a possession.
 
 **Key files**:
 - REA bridge models: `app/elohim-app/src/app/elohim/models/rea-bridge.model.ts`
-- Stewardship tracking: `holochain/sdk/storage-client-ts/dist/generated/StewardshipAllocationView.d.ts`
-- Economic events: `holochain/sdk/storage-client-ts/dist/generated/EconomicEventView.d.ts`
+- Stewardship tracking: `elohim/sdk/storage-client-ts/dist/generated/StewardshipAllocationView.d.ts`
+- Economic events: `elohim/sdk/storage-client-ts/dist/generated/EconomicEventView.d.ts`
 
 ## Context-Aware Linking
 
@@ -50,18 +58,23 @@ The same link resolves differently depending on where the learner is:
 - **In a different path**: cross-reference link to the other path
 - **Browsing freely**: standalone resource view
 
-This is the system's most novel feature. Traditional links always go to the same destination. These links adapt to context.
+Context-aware resolution is what distinguishes an EPR from a fixed URL: a fixed link always goes to one destination, while an EPR adapts to where the reader stands. The tradeoff is that the resolver needs the surrounding context to do its job — it cannot resolve in a vacuum (see the pure-function split below). This is one mechanic in service of the three-legged coupling: a context-aware link keeps the *knowledge* connection live regardless of which path the reader arrived through.
 
 ### How it works architecturally
 
-The resolver is a pure function — it never fetches data itself. The caller passes in:
+The client-side resolver is a pure function — it never fetches data itself. The caller passes in:
 - What to resolve (`epr:fair-exchange`)
-- Where the learner currently is (path ID, current steps)
+- Where the learner is (path ID, current steps)
 - Where else this content appears (cross-path matches)
 
 This keeps the protocol layer independent of the learning domain. The protocol doesn't know about learning paths — it just resolves based on the context it's given.
 
-**Key file**: `app/elohim-app/src/app/elohim/services/epr-resolver.service.ts`
+The pure-function resolver has a server-side counterpart: a **nav-context projection** computes context-aware navigation from the relationship graph (`epr_atoms` / `epr_coupling` / `epr_supersedence` / `epr_claims`) rather than from caller-supplied context. It is a projection over existing entries (no new tables), so the same context-aware behavior is available to callers that don't hold the surrounding path state.
+
+**Key files** (cartographer substrate):
+- Client pure resolver: `app/elohim-app/src/app/elohim/services/epr-resolver.service.ts`
+- Nav-context client service: `app/elohim-app/src/app/elohim/services/epr-nav-context.service.ts`
+- Nav-context view schema: `elohim/sdk/schemas/v1/views/epr-nav-context-view.schema.json`
 
 ### Resolution priority
 
@@ -88,18 +101,21 @@ Every piece of content has a small (~500 byte) metadata envelope that can be sha
 |   Token type: learning                            |
 |                                                    |
 | Governance:                                       |
-|   Access: open to everyone                        |
-|   Authority: community-level                      |
+|   Reach: commons   Authority: community-level     |
 |                                                    |
 | Connections:                                      |
 |   Teaches → "mutual credit"                       |
 |   Requires → "value flows"                        |
 |                                                    |
-| Content fingerprint: bafyrei...                    |
+| Fingerprint: bafyrei...                            |
 +--------------------------------------------------+
 ```
 
-The envelope serializes in a compact binary format for efficient transmission, but auto-detects and accepts plain text format too for backward compatibility.
+The envelope serializes in a compact binary format (DAG-CBOR) for efficient transmission, but the decoder auto-detects and accepts a plain-text format too.
+
+### Which layer is the truth, which is the projection
+
+The envelope is small enough to share by word-of-mouth networking, but be precise about *where* EPR data is canonical. The three-layer truth model applies: **Holochain DHT = notary** (expensive, a scarce entry budget — reserve it for notary-load-bearing facts); **libp2p / iroh = the cheap dataplane** (routine content circulation, envelope and payload movement); **doorway = web2 projection** (caching and browser reach). Do *not* route routine EPR-head writes onto the DHT for ordinary circulation — that burns the scarce entry budget on data that belongs on the dataplane, the exact noise-erodes-signal failure the layering guards against.
 
 **Key files**:
 - TypeScript model: `app/elohim-app/src/app/elohim/models/epr-head.model.ts`
@@ -112,25 +128,31 @@ Content links use the `epr:` prefix followed by the content's readable name:
 
 ```
 epr:manifesto                    — the manifesto
-epr:fair-exchange@2              — version 2
+epr:fair-exchange@2              — version 2 (resolves through supersedence)
 epr:manifesto/head               — just the metadata envelope
 epr:manifesto#section-3          — a specific section
 epr:manifesto?via=doorway.host   — transport hint
 ```
 
+The `@version` field is not just a parse token — it resolves through the supersedence graph. Versions are linked by sealed `supersedes` / `superseded_by` predecessor records (sealed under 2-of-2 keys in production), so `epr:fair-exchange@2` resolves to a real predecessor edge, not a string suffix.
+
 Parsing:
 ```typescript
-import { parseEpr, eprToRoute } from '@app/elohim';
+import { parseEpr, eprToRoute } from '@elohim/service';
 
 const ref = parseEpr('epr:fair-exchange@2#section-3');
 // { id: 'fair-exchange', version: '2', fragment: 'section-3' }
 ```
 
-**Key file**: `app/elohim-app/src/app/elohim/utils/epr-ref.ts` (40+ tests)
+EPR ref-parsing is **library-tier** — it lives in the shared `@elohim/service` library, consumable outside elohim-app, part of the same cross-pillar extraction that produced the framework-agnostic UI primitives (below).
+
+**Key file**: `app/elohim-library/projects/elohim-service/src/angular/utils/epr-ref.ts` (`parseEpr`, `eprToRoute`; spec alongside, 40+ tests)
 
 ## Content Verification
 
-Content is named by its fingerprint — a unique identifier computed from the content itself. If someone tampers with the content, the fingerprint won't match, and you know.
+Content is named by its fingerprint — a unique identifier (CID) computed from the content itself. If someone tampers with the content, the fingerprint won't match, and you know.
+
+Why this is load-bearing and not just a security checkbox: a verified fingerprint lets the network **trust-once, distribute-many**. A peer that has verified content doesn't force every downstream peer to re-verify from scratch — verified content fast-paths through distribution, and validation happens on-demand. This is *why* trust costs less here: trustworthy, fingerprint-verified content is cheaper to circulate. Verification is the efficiency mechanism, not a feature bolted on top.
 
 The browser verifies fingerprints using a lazy-loaded library (doesn't slow initial page load). It tries verified retrieval first (5-second timeout), then falls back to a standard download. This is invisible to the user.
 
@@ -153,9 +175,25 @@ import { BLOB_FETCHER } from '@app/elohim';
 - Interface: `app/elohim-app/src/app/elohim/interfaces/blob-fetcher.interface.ts`
 - Implementation: `app/elohim-app/src/app/elohim/services/helia-fetch.service.ts`
 
+## The EPR Transport Plane
+
+EPR requests are served byte-identically over both transports: the EPR atom protocol is **dual-stack** — an iroh ALPN arm and a libp2p request-response arm — returning wire-identical frames through identical authorization gates. This is permanent architecture, not a migration: a request resolves the same whether it arrives over iroh or libp2p (the Announce arm is the one asymmetric piece). The doorway is the web2 projection over this plane, not a third transport.
+
+**Key file** (cartographer substrate): `elohim/elohim-storage/src/p2p_iroh/epr_backend.rs`.
+
+### The receive path is the reach nervous system
+
+Serving content emits a single REA recognition event (above). The *arriving* side does more. When a FeedbackSignal EPR is published (`put_epr`), it fans out — one-hop back-prop plus a flood to subscribers — so evidence streams propagate to the peers whose reach they affect. This is the receive-side of the reach nervous system: feedback arriving on the EPR plane is the evidence that earns or debits reach, distinct from the recognition event that flows on delivery.
+
+Externally-arriving EPRs are not trusted blindly. The receive path runs a **republish validator** (schema check — anonymous publish rejected at the schema layer) that then delegates to the **bounds validator** (7 checks: rate-limit, custody, reach-escalation, and more — a stale or over-reaching compute-commitment republish is rejected at the bounds layer). This anchors the compute-commitment primitive to the EPR plane.
+
+**Key files** (cartographer substrate):
+- Put handler + fan-out: `elohim/elohim-storage/src/api/epr.rs` (`put_epr`)
+- Republish validator: `elohim/elohim-storage/src/services/republish_epr_validator.rs`
+
 ## Three Content Tiers
 
-Content comes in three sizes, each optimized for different use:
+Content comes in three sizes, each optimized for different use. Each tier still carries the three-legged coupling — the envelope is the smallest unit that can carry knowledge + value + governance and still earn reach:
 
 | Tier | What it is | Typical size | Used for |
 |------|-----------|-------------|----------|
@@ -175,18 +213,28 @@ Content comes in three sizes, each optimized for different use:
 <app-epr-link epr="epr:fair-exchange" display="inline"></app-epr-link>
 ```
 
-**Key file**: `app/elohim-app/src/app/elohim/components/epr-link/epr-link.component.ts`
+The canonical UI primitive is the framework-agnostic `elohim-core` Lit element (`<elohim-epr-link>`, `<elohim-epr-popover>`); `<app-epr-link>` is a thin Angular bridge around it for monolith templates. Authoring against `<app-epr-link>` works, but the load-bearing component lives in `elohim-core`.
+
+**Key files** (cartographer substrate):
+- Lit element: `app/elohim-elements/elohim-core/src/elohim-epr-link.ts`
+- Angular bridge: `app/elohim-app/src/app/elohim/components/epr-link/epr-link.component.ts`
+
+### Rendering EPR couplings
+
+The "Connections: Teaches → / Requires →" lines in the envelope diagram are rendered by a dedicated primitive: `<elohim-epr-relationships-panel>` groups EPR relationships by coupling type and fires an `epr-navigate` event. It is the visible face of the first-class coupling graph — the *knowledge* leg made navigable — and it consumes the nav-context projection.
+
+**Key file** (cartographer substrate): `app/elohim-elements/elohim-core/src/elohim-epr-relationships-panel.ts`
 
 ### In written content (markdown)
 
-Content links in markdown are auto-detected:
+Content links written as `[fair exchange](epr:fair-exchange)` are auto-detected and rendered through the EPR link components when content is delivered:
 
 ```markdown
 Learn about [fair exchange](epr:fair-exchange) to understand
 how communities can share resources without exploitation.
 ```
 
-**Key file**: `app/elohim-app/src/app/lamad/renderers/markdown-renderer/markdown-renderer.component.ts`
+Auto-detection routes through the content-delivery and EPR link component path (`app/elohim-app/src/app/elohim/components/content-delivery/`, the `epr-link` / `epr-popover` components) — the standalone `lamad/renderers/markdown-renderer` component no longer exists.
 
 ### In code
 
@@ -208,10 +256,15 @@ const result = this.eprResolver.resolveInContext('epr:fair-exchange', pathId, st
 
 ### Creating linkable content
 
-Give content a readable name (slug). That name becomes its permanent address:
+Give content a readable name (slug). That name becomes its permanent address. **Set `contentFormat`** — the renderer registry selects purely by `contentFormat`, and it must be a lamad-manifest extensible format (`sophia-quiz-json`, `html5-app`, `markdown`, …), **not** a core protocol format. A core format like `interactive` or `epr-composite` has no renderer and falls through to the raw-JSON fallback:
 
 ```json
-{ "id": "fair-exchange", "title": "Foundations of Fair Exchange", "contentType": "concept" }
+{
+  "id": "fair-exchange",
+  "title": "Foundations of Fair Exchange",
+  "contentType": "concept",
+  "contentFormat": "markdown"
+}
 ```
 
 Reference it as `epr:fair-exchange` anywhere in the system.
@@ -247,7 +300,9 @@ interface IEprContentResolver {
 
 **Key file**: `app/elohim-app/src/app/elohim/interfaces/epr-resolver.interface.ts`
 
-## Metadata Envelope Wire Format
+## Wire Format and Routes
+
+> **Schema-first is inversion of control.** The envelope wire format, the content-type preference header, and the EPR route shapes are a Rust ↔ TS ↔ doorway contract. Author the JSON schema FIRST (`elohim/sdk/schemas/v1/views/`); Rust structs and TS types comply downstream via codegen. Never hand-edit the generated `EprHead` / View types — that is how the snake_case-leak and drift class re-enters. Adding a flexible field on the Rust side? Do **not** put `serde_json::Value` on the `SerializedBytes` zome boundary — pre-stringify it as a `_json: String` field.
 
 The envelope requests include a content-type preference header. The gateway forwards this to storage, which returns the appropriate format:
 
@@ -256,29 +311,50 @@ Prefer compact binary → compact binary response
 Prefer plain text     → plain text response (fallback)
 ```
 
-The decoder auto-detects: if the first byte looks like plain text, it parses as text. Otherwise, it parses the compact binary. This ensures backward compatibility.
+The decoder auto-detects: if the first byte looks like plain text, it parses as text. Otherwise, it parses the compact binary.
+
+### Routes
+
+The canonical EPR surface is served by storage under the v1 namespace:
+
+```
+GET /api/v1/epr/{cid}              — full EPR
+GET /api/v1/epr/{cid}/envelope     — metadata envelope only
+GET /api/v1/epr/{cid}/nav-context  — context-aware navigation projection
+PUT /api/v1/epr/{cid}              — publish (runs reach gate + republish/bounds validators)
+```
+
+The doorway's `/api/epr-head/{id}` route is a **legacy envelope proxy** — it forwards only the metadata-envelope fetch to storage and does not carry the canonical v1 family. When probing content-addressed routes with curl, use **GET, not HEAD** — HEAD on a content-addressed route falls through to a 404 catch-all even when GET returns 200.
 
 **Key files**:
-- Gateway proxy: `doorway/doorway-service/src/routes/epr.rs`
+- Canonical v1 routes (storage): `elohim/elohim-storage/src/api/epr.rs`
+- Legacy envelope proxy (doorway): `doorway/doorway-service/src/routes/epr.rs`
 - Storage encoder: `elohim/elohim-storage/src/epr_codec.rs`
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `elohim-app/.../utils/epr-ref.ts` | Content link parsing and route generation |
-| `elohim-app/.../utils/epr-codec.ts` | Metadata envelope encode/decode |
-| `elohim-app/.../models/epr-head.model.ts` | Metadata envelope data model |
-| `elohim-app/.../services/epr-resolver.service.ts` | Link resolution (pure + network) |
-| `elohim-app/.../services/helia-fetch.service.ts` | Verified content retrieval |
-| `elohim-app/.../interfaces/blob-fetcher.interface.ts` | Content retrieval abstraction |
-| `elohim-app/.../interfaces/epr-resolver.interface.ts` | Resolver abstractions |
-| `elohim-app/.../components/epr-link/epr-link.component.ts` | Content link component |
-| `elohim-app/.../components/epr-popover/epr-popover.component.ts` | Three-pillar hover preview |
+| `app/elohim-library/.../elohim-service/src/angular/utils/epr-ref.ts` | Content link parsing and route generation (`@elohim/service`) |
+| `app/elohim-app/.../utils/epr-codec.ts` | Metadata envelope encode/decode |
+| `app/elohim-app/.../models/epr-head.model.ts` | Metadata envelope data model |
+| `app/elohim-app/.../services/epr-resolver.service.ts` | Link resolution (pure + network) |
+| `app/elohim-app/.../services/epr-nav-context.service.ts` | Nav-context projection client |
+| `app/elohim-app/.../services/helia-fetch.service.ts` | Verified content retrieval |
+| `app/elohim-app/.../interfaces/blob-fetcher.interface.ts` | Content retrieval abstraction |
+| `app/elohim-app/.../interfaces/epr-resolver.interface.ts` | Resolver abstractions |
+| `app/elohim-elements/elohim-core/src/elohim-epr-link.ts` | Canonical EPR link (Lit element) |
+| `app/elohim-elements/elohim-core/src/elohim-epr-popover.ts` | Three-pillar hover preview (Lit element) |
+| `app/elohim-elements/elohim-core/src/elohim-epr-relationships-panel.ts` | Coupling-graph relationship panel |
+| `app/elohim-app/.../components/epr-link/epr-link.component.ts` | Angular bridge for `<elohim-epr-link>` |
+| `elohim/elohim-storage/src/api/epr.rs` | Canonical v1 EPR routes + `put_epr` fan-out |
+| `elohim/elohim-storage/src/services/epr_compose.rs` | Compose gate (reach-earning) |
+| `elohim/elohim-storage/src/services/republish_epr_validator.rs` | Receive-path schema + bounds validation |
 | `elohim/elohim-storage/src/epr_codec.rs` | Rust metadata envelope codec |
-| `doorway/doorway-service/src/routes/epr.rs` | Gateway proxy for metadata envelopes |
-| `genesis/docs/.../protocol-specification.md` | Full protocol specification |
-| `genesis/docs/.../epr-developer-guide.md` | Architecture guide (accessible version) |
+| `elohim/elohim-storage/src/p2p_iroh/epr_backend.rs` | Dual-stack EPR transport (iroh arm) |
+| `doorway/doorway-service/src/routes/epr.rs` | Legacy envelope proxy (doorway) |
+| `genesis/docs/content/elohim-protocol/protocol-specification.md` | Full protocol specification |
+| `genesis/docs/content/elohim-protocol/epr-developer-guide.md` | Architecture guide (accessible version) |
 
 ## Common Tasks
 
@@ -298,6 +374,7 @@ TestBed.configureTestingModule({
 
 ### Verify the compact binary wire format
 ```bash
+# Use GET (not curl -I / HEAD) — content-addressed routes 404 on HEAD even when GET succeeds.
 curl -H 'Accept: application/vnd.ipld.dag-cbor' \
   http://localhost:8888/api/epr-head/manifesto-foundations | xxd | head
 ```
@@ -309,20 +386,22 @@ curl -H 'Accept: application/vnd.ipld.dag-cbor' \
 | Codebase term | Plain meaning |
 |---------------|---------------|
 | Blob | A raw content file (image, document, interactive app) |
-| Commons default | Unattributed content flows to the commons — governed by the community until a steward attests |
-| CID / content fingerprint | A unique name computed from the content itself — if the content changes, the name changes |
+| Commons default | Unattributed content flows to the commons — governed by the community until a steward attests (attribution fallback, not a reach exemption) |
+| CID / fingerprint | A unique name computed from the content itself — if the content changes, the name changes (the file uses "fingerprint" in human-facing prose; CID is the codebase synonym) |
 | DAG-CBOR | A compact binary format for metadata envelopes (like shorthand — same info, smaller package) |
 | DHT gossip | Word-of-mouth networking — computers share small messages with neighbors |
-| Doorway | A gateway server that connects browsers to the peer network |
+| Doorway | A gateway server that connects browsers to the peer network — the web2 projection over the EPR plane |
 | EPR | Elohim Protocol Reference — the content link format (`epr:content-name`) |
 | EPR Head | The metadata envelope — the "label on the book" |
 | Helia | Browser library that verifies content fingerprints |
 | InjectionToken | An Angular pattern for swappable dependencies (lets tests use mocks) |
 | IPFS / IPLD | Peer-to-peer content standards this system builds on |
 | Lamad | "To learn" — the knowledge pillar |
+| Nav-context | Server-side projection that computes context-aware navigation from the EPR relationship graph |
+| Reach | The earned access class of a link (Personal → … → Commons → Public); a link can't be composed above the reach its author has earned |
 | REA | Resource-Event-Agent — economic events that record when content is served and recognition flows to stewards |
-| Recognition event | Protocol-level acknowledgment that serving knowledge generates value — flows to stewards per allocation ratios |
+| Recognition event | Protocol-level acknowledgment that serving knowledge generates value — held on behalf of the work, flows to stewards per allocation ratios |
 | Qahal | "Assembly" — the governance pillar |
 | Shefa | "Abundance" — the value/stewardship pillar |
-| Three pillars | Every content link carries knowledge + value + governance context |
+| Three pillars | Every content link carries knowledge + value + governance context — coupled because reach is earned, not declared |
 | Tier | Content size level: envelope (~500B), document (5-50KB), file (any) |

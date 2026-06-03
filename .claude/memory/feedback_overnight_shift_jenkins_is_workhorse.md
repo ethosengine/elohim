@@ -1,4 +1,5 @@
 ---
+id: feedback-overnight-shift-jenkins-is-workhorse
 name: feedback-overnight-shift-jenkins-is-workhorse
 description: "For overnight pipeline-iteration shifts, Jenkins does the heavy lifting. Run only targeted local tests for diagnosis; never kick off huge local builds. Husky guards may be skipped freely. Long ScheduleWakeup intervals (1200-1800s) between observations are the norm."
 metadata: 

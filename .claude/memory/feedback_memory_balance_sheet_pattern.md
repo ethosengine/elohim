@@ -1,4 +1,5 @@
 ---
+id: feedback-memory-balance-sheet-pattern
 name: memory-balance-sheet-pattern
 description: Standing ceremonial artifact — run memory-balance.sh at Wave 0 + Wave 6 of every memory-team ceremony. Persists JSON snapshots so each cycle can be diffed against the prior. Headline metric — Surface:Archive ratio — gives deterministic evidence that distillation is running.
 type: feedback

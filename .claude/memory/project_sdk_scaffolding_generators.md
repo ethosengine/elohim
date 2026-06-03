@@ -1,11 +1,12 @@
 ---
+id: project-sdk-scaffolding-generators
 name: sdk-scaffolding-generators
 description: "The 2026-05-18 manifest-modularization + SDK-boundary sprint surfaced 6+ repeatable patterns that consuming-developer tooling should mechanize (ng-generate-style). Candidates: scaffold a new content-type, add a new View/InputView pair, add a JSON schema + matching Rust struct, split a monolithic manifest into modular form, add a new domain manifest, add a new signal-kind. Operator's framing: 'utility methods for SDK help in future app-manifest implementations for consuming developers.' Audience is app authors building on the protocol, not protocol maintainers."
 metadata:
   node_type: memory
   type: project
 cites:
-  - genesis/docs/plans/2026-05-18-app-manifest-modularization.md
+  - app-manifest-modularization | the modularization sprint whose 28 identical extractions surfaced the repeatable patterns this proposes to mechanize | sha256:1da4197b871cb7b4
   - elohim/sdk/schemas/scripts/codegen-ts.mjs
 ---
 

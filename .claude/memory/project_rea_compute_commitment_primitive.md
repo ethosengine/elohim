@@ -1,4 +1,5 @@
 ---
+id: project-rea-compute-commitment-primitive
 name: rea-compute-commitment-primitive
 description: "Gospel-tier — reciprocal REA compute commitments are the substrate primitive for bounded authority delegation; one shape, instantiated everywhere (deploy, hosting, household chores, qahal moderation, content authorship, DePIN compute lending, recovery quorum); Z.D is the proving ground."
 metadata: 

@@ -1,4 +1,5 @@
 ---
+id: feedback-ts-rs-cross-crate-import-paths
 name: ts-rs-cross-crate-import-paths
 description: "ts-rs 10.x computes cross-crate import paths in generated TypeScript using the Rust source crate's file path, NOT the export_to directory. If type A in crate X references type B that was moved to crate Y, A's generated .ts gets an import like '../../../../crateY/src/...' instead of './B'. Verified by 2026-05-18 PILOT (Plan 2 T4): 71 of 356 .ts files broke when shared primitives moved to elohim-sdk while consumer types stayed in elohim-storage. The fix: move ALL ts-rs-anchored types together to one crate in a single atomic migration — no partial moves, no incremental decomp."
 metadata:

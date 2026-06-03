@@ -1,10 +1,11 @@
 ---
+id: project-elohim-agent-sense-respond-architecture
 name: elohim-agent sense-and-respond architecture for gates and capabilities
 description: Architectural layering — discernment/gates live in elohim-agent (Rust primitive), app manifests declare which gates apply, TS is sense-and-respond UX only, not evaluator
 type: project
 originSessionId: 94ce7c3c-076a-4eaa-bbc8-9ba6bf9b48eb
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md
+  - experience-story-epr-design | the spec preserving the reverted TS discernment rule-logic that becomes the first Gate impl once gate-interface lands | sha256:f16adbb5e79ab493
 ---
 **Architectural layering (clarified 2026-04-18 during experience-story discernment work):**
 

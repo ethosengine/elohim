@@ -1,4 +1,5 @@
 ---
+id: feedback-checkpoint-and-handoff-when-scope-explodes
 name: checkpoint-and-handoff-when-scope-explodes
 description: "When inline execution of a plan surfaces unexpected substrate depth (>2 unforeseen architectural layers), operator preference is to checkpoint and write a fresh-context handoff at the end of the existing plan rather than push through indefinitely"
 metadata: 

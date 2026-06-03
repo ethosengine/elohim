@@ -1,5 +1,6 @@
 ---
 title: DnaSignal as EPR Envelope — T18 Specification
+id: dna-signal-as-epr-envelope
 tier: architecture
 status: accepted — Implemented (back-compat window active)
 created: 2026-05-15

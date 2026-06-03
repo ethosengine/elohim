@@ -1,10 +1,11 @@
 ---
+id: project-submerge-destinations-stewardship-routing
 name: Submerge as routing — destinations are attested stewardship collectives, not just personal subconscious
 description: When memory submerges from conscious view it ROUTES to a destination determined by class + content character + consent + purpose; destinations include personal subconscious, attested therapist collectives, research observatories, government-encrypted evidence stores, cultural archives; each destination has its own attestation/anonymization/consent/lifecycle rules; the dream cycle applies at every destination — no perpetual extraction; embodies elohim-wisdom-at-the-edge architecture with imagodei (image-bearing personhood) as the central commitment
 type: project
 originSessionId: 10d85ef0-1979-4311-97e9-c2c209de48e2
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
+  - memory-lifecycle-design | the comet-shape spec defining the submerge primitive this elaborates into destination routing | sha256:b6545e6548573fa4
 ---
 When memory submerges from conscious view, it does not all go to one place. **Submerge is a routing operation.** The destination is determined by:
 

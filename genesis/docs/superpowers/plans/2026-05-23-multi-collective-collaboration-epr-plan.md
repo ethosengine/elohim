@@ -1,4 +1,5 @@
 ---
+id: multi-collective-collaboration-epr-plan
 status: Draft
 cites:
   - ../../content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md   # the design spec this plan implements

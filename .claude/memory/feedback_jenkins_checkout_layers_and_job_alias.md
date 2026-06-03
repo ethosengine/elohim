@@ -1,4 +1,5 @@
 ---
+id: feedback-jenkins-checkout-layers-and-job-alias
 name: feedback_jenkins_checkout_layers_and_job_alias
 description: "Jenkins checkout on this 316MB / 65k-object repo needs three layers (skipDefaultCheckout + shallow CloneOption + honorRefspec single-branch fetch) or it dies at ~10:15 on the implicit Declarative-checkout default timeout; and the multibranch job 'elohim-holochain' loads the DNA Jenkinsfile, not the edge one."
 metadata:

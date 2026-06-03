@@ -1,4 +1,5 @@
 ---
+id: coherence-substrate-design
 status: Design
 informed-by:
   - ../../content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md   # the EPR feedback-graph substrate this coherence design turns inward onto the docs

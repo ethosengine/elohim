@@ -1,4 +1,5 @@
 ---
+id: project-storage-tiering-placement-intelligence
 name: project_storage_tiering_placement_intelligence
 description: "quilt blobs carry storage-tier awareness (cache→available→storage→archive) so RS-encoded shards land on the right hardware substrate via the compute-reporting surface; agent→hub derivation also unblocks device→hub aggregation scalability; modeled-in-genesis now, elohim-operator-tuned later"
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: 22de0299-7a43-43b5-a84a-e497e9397bbe
 cites:
-  - genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
+  - mutual-storage-replication-dwelling-hub-design | the dwelling-hub replication spec whose quilt/RS-encoded shards this tier-awareness axis (cache→archive) places | sha256:5596799dbb456bc2
 ---
 
 The "reed-solomon S3 shape" quilt (aka p2p-redis; see [[project_quilt_pantry_vocabulary]]) should carry **storage-tier awareness** — a placement axis spanning `cache → available → storage → archive`. The intent: a blob/shard is stored at the *right availability on the right hardware substrate*, so hot content sits on fast cache-tier peers and cold/archive content settles on slow bulk-storage peers.

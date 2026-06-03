@@ -39,6 +39,15 @@ if "--cluster-state" in sys.argv[1:]:
         ARGS = [a for a in ARGS if a != CS_OVERRIDE]
 ROOT = Path(ARGS[0]).resolve() if ARGS else Path(__file__).resolve().parents[3]
 
+# _lib bootstrap — env_scope is the gap-granular substrate-scope resolver (shared with decompose/scope-reconcile)
+_here = Path(__file__).resolve()
+for _ in range(8):
+    if (_here / ".claude" / "scripts" / "_lib").is_dir():
+        sys.path.insert(0, str(_here / ".claude" / "scripts"))
+        break
+    _here = _here.parent
+from _lib import env_scope as _es  # noqa: E402
+
 SURFACES = {
     "ACTIVE:specs": "genesis/docs/superpowers/specs",
     "ACTIVE:plans": "genesis/docs/superpowers/plans",
@@ -336,6 +345,23 @@ def focus_mode():
     return 0
 
 
+def _ledger_doc_req(rec):
+    """The doc-level requires_env default for a gap-cache record — read from the doc's LIVE frontmatter
+    (resolving its current path; the cached `doc` may be stale after a held<->live move), so the budget can't
+    drift from reality. Falls back to the cached doc_requires_env if the doc can't be located."""
+    ref = rec.get("doc", "")
+    p = (ROOT / ref) if ref else None
+    if ref and (not p or not p.is_file()):
+        matches = list(DOCS_ROOT.rglob(Path(ref).name))
+        p = matches[0] if matches else None
+    if p and p.is_file():
+        try:
+            return _es.parse_requires_env(parse_front_matter(p.read_text(encoding="utf-8", errors="replace")).get("requires_env"))
+        except OSError:
+            pass
+    return rec.get("doc_requires_env", [])
+
+
 def ledger_mode():
     avail, _ = load_cluster_state(CLUSTER_STATE)
     available = {k for k, v in avail.items() if v == "true"}
@@ -393,24 +419,39 @@ def ledger_mode():
     gap_dir = ROOT / ".claude/memory-kit/gap-items"
     gfiles = sorted(gap_dir.glob("*.json")) if gap_dir.is_dir() else []
     if gfiles:
-        g_open = g_claim = 0
+        # GAP-GRANULAR scope (honors iroh ≠ shem): each gap resolves requires_env (own override, else the
+        # doc-level default), and is BLOCKED-BY-ENV iff a cluster-tracked required cap is unavailable —
+        # regardless of whether its parent doc sits in held/. A blocked gap is OUT of the active budget; a
+        # household-testable gap inside a mixed/held doc stays pickable. See _lib/env_scope.py.
+        known = set(avail.keys())
+        g_open = g_claim = g_blocked = 0
         rows_g = []
         for gf in gfiles:
             try:
                 rec = json.loads(gf.read_text())
             except Exception:  # noqa: BLE001
                 continue
-            o = sum(1 for it in rec.get("items", []) if it.get("state") == "OPEN")
-            c = sum(1 for it in rec.get("items", []) if it.get("state") == "CLAIMED")
+            doc_req = _ledger_doc_req(rec)
+            o = c = b = 0
+            for it in rec.get("items", []):
+                resolved = _es.resolved_requires_env(it.get("requires_env"), doc_req)
+                if _es.gap_blocked(resolved, available, known):
+                    b += 1
+                elif it.get("state") == "OPEN":
+                    o += 1
+                elif it.get("state") == "CLAIMED":
+                    c += 1
             g_open += o
             g_claim += c
-            if o or c:
-                rows_g.append((rec.get("doc", gf.stem), o, c))
-        print(f"\n  DECOMPOSED GAPS ({len(rows_g)} docs with open/claimed items, "
-              f"{len(gfiles)} files scanned): "
-              f"{g_open} OPEN to implement, {g_claim} CLAIMED to verify (checked ≠ done)")
-        for doc, o, c in rows_g[:8]:
-            print(f"      {o:>3} open / {c:>3} claimed   {doc}")
+            g_blocked += b
+            if o or c or b:
+                rows_g.append((rec.get("doc", gf.stem), o, c, b))
+        bl = f", {g_blocked} BLOCKED-BY-ENV (held — gap needs an unavailable cap)" if g_blocked else ""
+        print(f"\n  DECOMPOSED GAPS ({len(rows_g)} docs with items, {len(gfiles)} files scanned): "
+              f"{g_open} OPEN to implement, {g_claim} CLAIMED to verify (checked ≠ done){bl}")
+        for doc, o, c, b in rows_g[:8]:
+            held = f" / {b:>2} held" if b else ""
+            print(f"      {o:>3} open / {c:>3} claimed{held}   {doc}")
         if len(rows_g) > 8:
             print(f"      … +{len(rows_g)-8} more")
 
@@ -435,7 +476,9 @@ def equilibrium_section():
     depths, biggest = [], (None, 0)
     if DOCS_ROOT.is_dir():
         for d in sorted(DOCS_ROOT.rglob("*")):
-            if d.is_dir():
+            # scope-tree held/ docs are sequestered out of the scan path — they
+            # must not count toward the structural anti-dump / runaway measure.
+            if d.is_dir() and "held" not in d.relative_to(DOCS_ROOT).parts:
                 depth = len(d.relative_to(DOCS_ROOT).parts)
                 depths.append((depth, d))
                 n = len([f for f in d.glob("*.md")])
@@ -743,6 +786,22 @@ def cleanup_line():
         return ""
 
 
+def scope_line():
+    """substrate scope-drift gate — is the held/ tree aligned with cluster-state, or are docs ready to EXPAND
+    onto the plate (a capability returned) / needing to be HELD (a capability was lost)? The symmetric inverse
+    of how the CI layer auto-reconciles: this surfaces the held<->live move so stories + architecture follow
+    the substrate without anyone remembering to run it."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "scope-reconcile.py"), "--report"],
+            capture_output=True, text=True, timeout=15)
+        s = out.stdout.strip()
+        return "  " + s if s else ""
+    except Exception:
+        return ""
+
+
 def headline_mode():
     docs, _ = scan_docs()
     surface = [d for d in docs if not d["home"].startswith("_state")]
@@ -786,6 +845,10 @@ def headline_mode():
     cl = cleanup_line()
     if cl:
         print(cl)
+    # SUBSTRATE-SCOPE gate: is the held/ tree aligned with cluster-state, or are docs ready to expand/hold?
+    sc = scope_line()
+    if sc:
+        print(sc)
     return 0
 
 

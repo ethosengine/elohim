@@ -1,4 +1,5 @@
 ---
+id: project-hub-identity-cid-canonical-slug-alias
 name: project_hub_identity_cid_canonical_slug_alias
 description: "hub identity is dual — Collective CID (collective:{action_hash}) is the canonical notarized identity; slug (family-dowell) is a first-class steward-configurable human-readable alias resolving to it (for names + SEO in the elohim network, not just the seeder). Wave 2 of the prioritizer epic reconciles the slug-keyed SQL onto the canonical CID + adds the DNA MembershipCommitted signal + storage projector."
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: 22de0299-7a43-43b5-a84a-e497e9397bbe
 cites:
-  - genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md
+  - prioritizer-end-state-wire-hub-fetch | the Wave-2 plan that lands this CID-canonical reconciliation + MembershipCommitted signal + projector | sha256:61d332d2871c644c
 ---
 
 **Decision (2026-05-29, operator, sprint/cross-pillar-cleanup):** a hub (household/collective) has TWO first-class identifiers:

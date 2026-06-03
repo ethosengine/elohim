@@ -2,14 +2,14 @@
   "schema_version": 1,
   "entries": {
     "feedback_cargo_resolution_vs_compilation": {
-      "hits": 1,
+      "hits": 5,
       "last_changed": "CLAUDE.md",
-      "last_signal_at": "2026-06-02T15:31:52Z"
+      "last_signal_at": "2026-06-03T01:42:58Z"
     },
     "feedback_dev_branch_no_pr": {
-      "hits": 1,
+      "hits": 5,
       "last_changed": "CLAUDE.md",
-      "last_signal_at": "2026-06-02T15:31:52Z"
+      "last_signal_at": "2026-06-03T01:42:58Z"
     },
     "feedback_subagent_scope_guardrails": {
       "hits": 2,
@@ -22,9 +22,9 @@
       "last_signal_at": "2026-06-02T16:58:50Z"
     },
     "feedback_no_generalize_permissions_in_shift": {
-      "hits": 2,
-      "last_changed": ".claude/skills/agentic-developer/SKILL.md",
-      "last_signal_at": "2026-06-02T16:58:50Z"
+      "hits": 3,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-03T00:24:35Z"
     },
     "feedback_subagent_no_git_stash": {
       "hits": 2,
@@ -50,6 +50,91 @@
       "hits": 3,
       "last_changed": ".claude/agents/rust-architect.md",
       "last_signal_at": "2026-06-02T17:14:47Z"
+    },
+    "project_deployments_json_seed_or_skip_truth": {
+      "hits": 3,
+      "last_changed": "genesis/a2o/src/framework/fixtures/humans.ts",
+      "last_signal_at": "2026-06-03T02:27:37Z"
+    },
+    "feedback_schema_data_enum_drift_cascade": {
+      "hits": 3,
+      "last_changed": "genesis/a2o/src/framework/fixtures/humans.ts",
+      "last_signal_at": "2026-06-03T02:27:37Z"
+    },
+    "feedback_a2o_is_human_experience_not_dev_bugs": {
+      "hits": 1,
+      "last_changed": "genesis/a2o/features/resilience/substrate-reconciliation.feature",
+      "last_signal_at": "2026-06-02T18:34:12Z"
+    },
+    "feedback_research_before_brainstorming": {
+      "hits": 3,
+      "last_changed": ".claude/commands/brainstorm.md",
+      "last_signal_at": "2026-06-03T00:23:09Z"
+    },
+    "feedback_design_for_a_generation_no_shortcuts": {
+      "hits": 3,
+      "last_changed": ".claude/commands/brainstorm.md",
+      "last_signal_at": "2026-06-03T00:23:09Z"
+    },
+    "feedback_spare_no_expense_intelligence": {
+      "hits": 3,
+      "last_changed": ".claude/commands/brainstorm.md",
+      "last_signal_at": "2026-06-03T00:23:09Z"
+    },
+    "project_link_is_path_plus_explainer": {
+      "hits": 1,
+      "last_changed": "genesis/docs/PLACEMENT.md",
+      "last_signal_at": "2026-06-02T21:19:35Z"
+    },
+    "project_memory_cites_edge": {
+      "hits": 8,
+      "last_changed": ".claude/scripts/memory-kit/memory-coherence-audit.py",
+      "last_signal_at": "2026-06-03T02:35:44Z"
+    },
+    "feedback_pipeline_work_separate_from_sprint": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-03T00:24:35Z"
+    },
+    "feedback_pause_sprint_when_substrate_in_flight": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-03T00:24:35Z"
+    },
+    "feedback_overnight_shift_jenkins_is_workhorse": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-03T00:24:35Z"
+    },
+    "feedback_shells_need_timeouts": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-03T00:24:35Z"
+    },
+    "feedback_cargo_nextest_installed": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-03T00:24:35Z"
+    },
+    "feedback_shift_can_fix_unparseable_test_fixtures": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-03T00:24:35Z"
+    },
+    "feedback_jenkins_token_strictly_guarded": {
+      "hits": 1,
+      "last_changed": ".claude/commands/shift.md",
+      "last_signal_at": "2026-06-03T00:24:35Z"
+    },
+    "project_no_claude_md_opt_out_pattern": {
+      "hits": 1,
+      "last_changed": ".claude/scripts/memory-kit/claude-md-audit.py",
+      "last_signal_at": "2026-06-03T02:38:00Z"
+    },
+    "project_signal_driven_audit_ceremonies": {
+      "hits": 1,
+      "last_changed": ".claude/scripts/memory-kit/claude-md-audit.py",
+      "last_signal_at": "2026-06-03T02:38:00Z"
     }
   }
 }

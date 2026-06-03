@@ -1,4 +1,5 @@
 ---
+id: community
 epic: value_scanner
 user_type: parent
 governance_layer: community

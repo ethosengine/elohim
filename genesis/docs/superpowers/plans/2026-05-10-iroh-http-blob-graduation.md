@@ -1,4 +1,5 @@
 ---
+id: iroh-http-blob-graduation
 status: Draft
 canonical: ../../content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
 ---

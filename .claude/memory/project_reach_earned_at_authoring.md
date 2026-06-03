@@ -1,4 +1,5 @@
 ---
+id: project-reach-earned-at-authoring
 name: Reach is earned at authoring — and coupled to embodied responsibilities at every node
 description: Burden of reach lies on author + stewarding peers. Receiver-side authorization is PRE-authorization (standing trust contract), never per-message filtering. Reach is coupled to embodied responsibilities for distribution/discovery/validation at every node.
 type: project

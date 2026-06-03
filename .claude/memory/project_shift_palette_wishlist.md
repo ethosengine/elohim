@@ -1,4 +1,5 @@
 ---
+id: project-shift-palette-wishlist
 name: Shift palette evolves via wishlist feedback loop
 description: Agentic developer shifts produce palette deltas — commands Opus wanted to run but couldn't — that refine the allowlist over time without manual curation.
 type: project

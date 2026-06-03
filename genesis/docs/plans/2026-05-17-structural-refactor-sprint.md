@@ -1,4 +1,5 @@
 ---
+id: structural-refactor-sprint
 status: Draft
 cites:
   - 2026-05-18-app-manifest-modularization.md   # the related doc this derives from

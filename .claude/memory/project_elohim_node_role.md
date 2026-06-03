@@ -1,10 +1,11 @@
 ---
+id: project-elohim-node-role
 name: elohim-node as deployment wrapper (not runtime)
 description: elohim-node is a container/placement wrapper enabling elohim-operator to coordinate blades; elohim-storage is the peer-stewarded P2P workload inside it
 type: project
 originSessionId: b2c4fbee-2183-475a-8cde-b245fa745bc4
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
+  - elohim-hub-boundaries-design | the crate-boundary design this wrapper/workload split refines — node vs storage vs hub | sha256:6b7ee97f246b732f
 ---
 elohim-node is a **deployment wrapper**, peer-class analogue to the tauri-desktop wrapper or the browser wrapper. Its job is to package elohim-storage for a specific deployment context (a k8s blade, a rack node, a plug-and-play storage unit) and provide whatever deployment glue that context needs.
 

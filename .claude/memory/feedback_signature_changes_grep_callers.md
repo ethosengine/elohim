@@ -1,4 +1,5 @@
 ---
+id: feedback-signature-changes-grep-callers
 name: Signature changes need crate-wide caller grep before spec-compliance
 description: Subagent reviews catch in-file regressions but miss other-file callers; signature changes in Rust need grep across src/+tests/+benches/ before declaring done
 type: feedback

@@ -1,4 +1,5 @@
 ---
+id: feedback-research-before-brainstorming
 name: Research existing design context before reaching for brainstorming
 description: When user reframes my proposal architecturally, that's a signal there is existing design context I haven't absorbed — research/debug first, brainstorm only when truly creating from scratch
 type: feedback

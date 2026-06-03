@@ -1,4 +1,5 @@
 ---
+id: project-signal-kind-extensible-protocol-class
 name: signal_kind is the protocol's extensible feedback vocabulary
 description: FeedbackSignal.signal_kind is a class-not-a-boolean — adding new variants (vouch, sponsor, acknowledge, witness) is the cheap path to extending the protocol's social vocabulary. Manifest declares debit weights; integrity validator whitelists.
 type: project

@@ -1,4 +1,5 @@
 ---
+id: tiered-quilt-delivery-master
 status: Draft
 cites:
   - ../../content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md   # the design spec this plan implements

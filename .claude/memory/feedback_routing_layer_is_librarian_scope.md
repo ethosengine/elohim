@@ -1,4 +1,5 @@
 ---
+id: feedback-routing-layer-is-librarian-scope
 name: routing-layer-hygiene-is-librarian-scope
 description: Agent-catalog and skill-catalog hygiene (description tightening, tools-mismatch, overlap disambiguation) is librarian's present-tense deliverable, not general-purpose. The audits that surface the drift (skill-audit, agent-audit) are explicitly librarian-driven per memory-kit CLAUDE.md.
 type: feedback

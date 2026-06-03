@@ -1,4 +1,5 @@
 ---
+id: feedback-angular19-ssr-build-glue
 name: feedback_angular19_ssr_build_glue
 description: "The 13-fix Angular-19-on-doorway SSR unblock cluster — the render unblock was wiring the fetch shim into the V8 isolate (with_full_shims, not with_shims); plus index.csr.html (not index.html), pnpm --filter doesn't walk tsconfig-path aliases, and shamefully-hoist is required."
 metadata:

@@ -1,5 +1,6 @@
 ---
 title: Multi-Collective Collaboration EPR Design
+id: multi-collective-collaboration-epr-design
 tier: architecture
 status: Design (pre-implementation; implementation plan to be authored once approved)
 created: 2026-05-23

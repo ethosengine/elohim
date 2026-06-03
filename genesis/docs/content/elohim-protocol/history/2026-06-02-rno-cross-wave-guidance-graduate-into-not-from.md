@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: R&O Lessons → Cross-Wave Guidance — graduate INTO elohim, not from it"
+id: rno-cross-wave-guidance-graduate-into-not-from
 type: history-gotcha
 status: Accepted
 tier: history

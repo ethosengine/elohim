@@ -1,4 +1,5 @@
 ---
+id: project-orchestrator-predictive-vision
 name: Orchestrator predictive build-graph vision
 description: Long-term vision for orchestrator — predict before push, reconcile after run, every disconnect = investigation
 type: project

@@ -1,4 +1,5 @@
 ---
+id: project-link-is-path-plus-explainer
 name: link-is-path-plus-explainer
 description: "A \"link\" in the elohim traceability/memory graph = a path PLUS a 1-2 sentence plain-text explainer of what's at the end; bare paths do not count."
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: 6d96f5fe-2184-4539-9ce1-dd7cae8d9d43
 cites:
-  - genesis/docs/PLACEMENT.md
+  - placement | the placement contract whose stasis check enforces this path-plus-explainer rule on every traceability edge | sha256:f84d7cb16bea9379
 ---
 
 A link is **a path + a 1–2 sentence plain-text explainer of what's at the end of that path** — never a bare path or reference.

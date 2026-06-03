@@ -1,5 +1,6 @@
 ---
 title: Genesis Docs Placement Contract — "this goes here"
+id: placement
 status: Accepted
 created: 2026-06-01
 ---
@@ -15,6 +16,14 @@ the memory-ceremony agents are the *librarian* that files and enforces. Three ho
 | **CANONICAL** | `content/elohim-protocol/architecture/` | living cross-cutting truth (gospel-tier) | `tier: architecture` + INDEX row |
 | **HISTORY** | `content/elohim-protocol/history/` | distilled paths-not-taken / superseded / settled decisions; each bidirectionally linked to a canonical | `tier: history` + INDEX row |
 | **ACTIVE** | `superpowers/specs/` + `superpowers/plans/` | in-flight specs + plans only | `status: Draft\|Design\|In-flight` |
+
+**The subject-class axis (the fourth "home" the §"Dev-doc home undefined" issue asked for).** A doc's
+`class` decides *which* set of homes its residue decomposes into. **`protocol-canonical`** → the three
+homes above (the rich flow). **`process-meta`** → a CLAUDE.md **gospel-diff** + a `.claude/` **tool**
+(`history/` stays LIVE for a tried-and-failed lesson; `architecture/` + `a2o/<pillar>` are NULL). The
+class registry + per-class flow is **`.claude/subject-routing.yaml`** (read by the brainstorm/decompose
+gates) — this is the class axis the same way `genesis/manifests/cluster-state.yaml` is the env axis; the
+"fourth home" is not a new directory but the `.claude/`+CLAUDE.md gospel target process work already lands in.
 
 ## Lifecycle — every artifact has a next state (this is the anti-debt rule)
 
@@ -110,7 +119,8 @@ so offline resources must NOT read as broken work. The four verification states:
 | **BLOCKED-BY-ENV** | can't grade — a required env resource is **unavailable** | **NONE** (not the doc's fault) | HELD / out-of-current-scope |
 
 The env layer (`genesis/manifests/cluster-state.yaml`) declares what is available (nodes, clusters, registry).
-Each test / story / gate declares `requires_env:` (e.g. `shem`, `alpha-cluster-6peer`, `harbor`). The scope
+Each test / story / gate declares `requires_env:` (caps must match cluster-state names exactly — e.g. `shem`,
+`alpha-cluster-6peer`, `harbor-registry`; an unknown cap is surfaced as vocab drift, never silently dropped). The scope
 resolver: **runnable = requirements ⊆ available.** Anything requiring an unavailable resource is **BLOCKED-BY-ENV**
 — held, not warmed, **no regression signal.** Updating cluster-state (e.g. `shem: offline`) cascades the *scope*
 — it narrows what planning and verification consider in-scope right now — and re-widens it when the resource

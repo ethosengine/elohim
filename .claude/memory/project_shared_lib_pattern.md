@@ -1,4 +1,5 @@
 ---
+id: project-shared-lib-pattern
 name: Shared lib pattern — _lib/ for .claude/* Python tools
 description: Pure-stdlib helpers at .claude/scripts/_lib/ for scripts and hooks. Bootstrap-by-walk-up imports work from any depth. Discipline: only extract when 3+ callers share the same pattern. New scripts use it from the start; older scripts migrate when touched.
 type: project

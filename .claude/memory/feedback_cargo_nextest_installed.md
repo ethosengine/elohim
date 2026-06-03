@@ -1,4 +1,5 @@
 ---
+id: feedback-cargo-nextest-installed
 name: cargo-nextest-installed
 description: "cargo-nextest 0.9.135 is installed at /opt/rust/cargo/bin/cargo-nextest — prefer it over `cargo test` for unit/integration test runs because it parallelizes and is significantly faster on warm caches."
 metadata: 

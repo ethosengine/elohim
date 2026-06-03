@@ -1,10 +1,11 @@
 ---
+id: project-subconscious-memory-tier
 name: Subconscious memory tier — encrypted, elohim-visible, surface-able through intentional facing
 description: When memory loses reach or decays from conscious visibility it submerges to an encrypted stewardship tier visible only to elohim agents (yours and the network's); same dream/compaction lifecycle applies; surface-able through human intentional facing OR elohim-detected pattern recurrence; mirrors how human psyche actually heals — patterns held safely until ready to face; gives the protocol a recovery loop that pure delete forfeits
 type: project
 originSessionId: 10d85ef0-1979-4311-97e9-c2c209de48e2
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
+  - memory-lifecycle-design | the lifecycle spec this extends with a subconscious visibility tier and submerge/surface inverse | sha256:b6545e6548573fa4
 ---
 When memory loses conscious reach (through reach-drop from bad-propagation, or natural decay, or compaction superseding the original) it does not vanish — it **submerges to an encrypted stewardship tier**:
 

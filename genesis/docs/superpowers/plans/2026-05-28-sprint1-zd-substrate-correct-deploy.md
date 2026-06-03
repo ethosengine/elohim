@@ -1,4 +1,5 @@
 ---
+id: sprint1-zd-substrate-correct-deploy
 status: Draft
 informed-by:
   - ../specs/2026-05-25-stagespablob-substrate-correct-deploy.md   # the substrate-correct-deploy design this Sprint 1 plan executes

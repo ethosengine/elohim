@@ -1,5 +1,6 @@
 ---
 title: iroh Cutover Gate #10 — Self-Hostable pkarr Resolver in Production
+id: iroh-pkarr-resolver
 status: Design
 created: 2026-05-10
 canonical: ../../content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md

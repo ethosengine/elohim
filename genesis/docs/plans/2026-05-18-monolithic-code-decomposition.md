@@ -1,4 +1,5 @@
 ---
+id: monolithic-code-decomposition
 status: Draft
 related:
   - 2026-05-18-sdk-boundary-clarification.md   # sibling decomposition/boundary-cleanup plan (same shift)

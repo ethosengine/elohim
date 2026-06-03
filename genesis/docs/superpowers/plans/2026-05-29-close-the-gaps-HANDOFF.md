@@ -1,4 +1,5 @@
 ---
+id: close-the-gaps-handoff
 status: Draft
 cites:
   - 2026-05-29-close-the-gaps-sprint-kickoff.md   # the related doc this derives from

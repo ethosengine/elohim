@@ -1,4 +1,5 @@
 ---
+id: feedback-shells-need-timeouts
 name: Shell commands need explicit timeouts
 description: Long-running shell/cargo/build commands history of never ending; always set a timeout and kill on overrun
 type: feedback

@@ -1,4 +1,5 @@
 ---
+id: feedback-subagent-silent-impl-drops
 name: feedback-subagent-silent-impl-drops
 description: "Rust-architect subagents can silently drop From impls during refactor moves; per-crate `cargo build` won't catch impls that are only exercised by sibling crates in the workspace"
 metadata: 

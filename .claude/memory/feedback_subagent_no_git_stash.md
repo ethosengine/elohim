@@ -1,4 +1,5 @@
 ---
+id: feedback-subagent-no-git-stash
 name: feedback_subagent_no_git_stash
 description: "In subagent-driven sprints, forbid subagents from git stash / checkout <ref> -- entirely; they entangle with the operator's pre-existing stashes and pollute the shared working tree."
 metadata: 

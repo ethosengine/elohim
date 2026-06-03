@@ -1,4 +1,5 @@
 ---
+id: project-household-is-resilience-unit
 name: Household is the resilience unit
 description: Resilience computation is household-to-household, not peer-to-peer; households are the mutual-aid graph
 type: project

@@ -1,4 +1,5 @@
 ---
+id: project-sweettest-cost-anatomy
 name: project_sweettest_cost_anatomy
 description: "Sweettest \"hour\" is ~72% Rust compile not test-run; local husky gate is check-only and was cold-evicted by legacy-targets clean"
 metadata: 

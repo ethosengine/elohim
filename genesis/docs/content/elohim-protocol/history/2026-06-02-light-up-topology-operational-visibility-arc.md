@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Light Up the Topology / Graph — operational-visibility arc, landed & evolved"
+id: light-up-topology-operational-visibility-arc
 type: history-gotcha
 status: Accepted
 tier: history

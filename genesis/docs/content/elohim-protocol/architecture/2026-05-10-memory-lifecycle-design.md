@@ -1,5 +1,6 @@
 ---
 title: Memory Lifecycle Design — Comet-Shaped Memory and Deliberate Forgetting
+id: memory-lifecycle-design
 tier: architecture
 status: proposal
 created: 2026-05-10

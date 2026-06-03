@@ -1,4 +1,5 @@
 ---
+id: feedback-structural-verify-canonical-wire-shape
 name: feedback-structural-verify-canonical-wire-shape
 description: "Structural-verify tests must use canonical wire-format string shapes, not synthetic constructor shapes. Otherwise tests pass while the production verifier rejects every real message.; fixed in c5d6dd827..6f66ffeb5 (Sprint 0 of REA-compute-substrate roadmap, 2026-05-28)"
 metadata: 

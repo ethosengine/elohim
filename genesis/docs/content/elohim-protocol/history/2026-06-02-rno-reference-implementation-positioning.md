@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: R&O as the reference coordination hApp that graduates into elohim"
+id: rno-reference-implementation-positioning
 type: history-gotcha
 status: Accepted
 tier: history

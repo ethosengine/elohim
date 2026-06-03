@@ -1,4 +1,5 @@
 ---
+id: project-trust-as-efficiency-signal
 name: Trust is an efficiency signal — trustworthy/accurate/reliable reduces compute burden on peers
 description: Trustworthy, accurate, and reliable content costs LESS to distribute. These are not just moral categories — they are compute-economic signals. Reach earning, pre-authorization, and reputation all reduce overhead for the network's distribution and discovery work.
 type: project

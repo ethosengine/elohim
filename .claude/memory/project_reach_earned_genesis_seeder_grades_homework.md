@@ -1,4 +1,5 @@
 ---
+id: project-reach-earned-genesis-seeder-grades-homework
 name: project_reach_earned_genesis_seeder_grades_homework
 description: "Public surfaces (landing/manifesto/lamad LMS) aren't reach-exempt — genesis+seeder is the bootstrap authoring authority that GRADES them as having earned commons/public reach; gate stays universal"
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: 02a31f41-5f1f-4600-9d3f-7d0c9a341c9c
 cites:
-  - genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md
+  - bootstrap-steward-authority-frame-design | the frame establishing genesis/seeder as bootstrap authoring authority that grades reach, not a sovereign | sha256:6fb209d2628d39bb
 ---
 
 Reach is **earned at authoring** ([[project_social_reach_nervous_system]]). The reach gate is **universal and always on** for all content — there is no "exclusion list" or "public-surface bypass."

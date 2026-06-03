@@ -1,4 +1,5 @@
 ---
+id: feedback-inline-summary-must-echo-frontmatter
 name: inline-summary-must-echo-frontmatter
 description: Storyteller inline four-lens summaries can lossy-compress story-as-authored counts; the story frontmatter is the source of truth, summaries must echo verbatim
 metadata:

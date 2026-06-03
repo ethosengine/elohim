@@ -1,5 +1,6 @@
 ---
 title: Observation/Event Layer — Witness Substrate for the Three-Layer Truth Model
+id: observation-event-layer-design
 tier: architecture
 status: Draft (awaiting user review)
 created: 2026-05-11

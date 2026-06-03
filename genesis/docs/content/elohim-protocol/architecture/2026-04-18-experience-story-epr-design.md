@@ -1,5 +1,6 @@
 ---
 title: Experience-Story EPRs — Design Spec
+id: experience-story-epr-design
 tier: architecture
 status: Design (brainstorm complete, awaiting user review)
 created: 2026-04-18

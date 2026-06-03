@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Conductor agent-info substrate gossip (step zero)"
+id: conductor-agent-info-substrate-gossip
 type: history-gotcha
 status: Accepted
 tier: history

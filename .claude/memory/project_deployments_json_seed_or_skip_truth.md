@@ -1,4 +1,5 @@
 ---
+id: project-deployments-json-seed-or-skip-truth
 name: deployments.json is the single source of truth for "is this human exercise-able"
 description: When a node fails (shem 2026-05-04), suspending humans in deployments.json gates BOTH deploy and seed; seeder + a2o framework + isHumanDeployed all read the same flag
 type: project

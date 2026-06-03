@@ -1,10 +1,11 @@
 ---
+id: project-wisdom-resolves-into-epics
 name: Wisdom resolves into epics — stories as compaction
 description: Memory's destination is story, not deletion. Epics are the wisdom-compaction substrate — like Tolkien, the rich detail isn't exposed, it becomes the meaning-shape that carries forward. This re-frames cleanup, converge, and the lifecycle primitives.
 type: project
 originSessionId: b5ef4833-2583-4482-b36e-b595da75dafe
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
+  - memory-lifecycle-design | the lifecycle spec whose lateral primitives this adds a missing vertical wisdom-compaction axis to | sha256:b6545e6548573fa4
 ---
 Memory should resolve INTO stories — not as imagination but as compaction of detail into meaning. The Lord of the Rings doesn't expose its subtext; the richness becomes the meaning-shape that carries forward. Oral tradition of rich storytelling IS compaction. Wisdom is what's essential to the details.
 

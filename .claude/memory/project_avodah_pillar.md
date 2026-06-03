@@ -1,10 +1,11 @@
 ---
+id: project-avodah-pillar
 name: Avodah is protocol-as-process, not a domain pillar
 description: Avodah is a reference implementation that demonstrates how protocol work/contribution flows through the protocol itself ('protocol as process'); it's not a domain pillar like lamad/shefa/mishpat/qahal/imagodei
 type: project
 originSessionId: c0f1a319-91e5-4243-b27f-950c810a1c2c
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md
+  - elohim-core-graph-substrate-design | the foundational graph substrate spec that lists avodah + doorway as process-reference demonstrators, not domain pillars | sha256:3c4a0d1e502d9823
 ---
 Avodah is a **reference implementation** that demonstrates the elohim-protocol's *own* process/pipeline — "protocol as process." It's how work/contribution/service flows are modeled *as protocol participants*, not a separate domain dimension. Exists at `app/elohim-app/src/app/avodah/`.
 

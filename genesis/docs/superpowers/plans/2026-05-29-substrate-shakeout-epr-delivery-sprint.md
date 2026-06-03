@@ -1,4 +1,5 @@
 ---
+id: substrate-shakeout-epr-delivery-sprint
 status: Draft
 cites:
   - ../specs/2026-05-29-epr-reachability-economics.md   # the related doc this derives from

@@ -1,4 +1,5 @@
 ---
+id: project-che-browser-feedback-loop
 name: project_che_browser_feedback_loop
 description: L1 browser feedback loop landed in Che — pnpm look render primitive + Playwright wiring; gotchas + L2 completion-oracle pointer
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: b54284e1-2315-4796-96a2-37fa74ba34d4
 cites:
-  - genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md
+  - che-browser-feedback-foundation-plan | the L1 implementation plan whose landing this entry records — the look primitive + playwright wiring | sha256:8edc931665a5c352
 ---
 
 L1 of the Che browser feedback loop landed 2026-05-30 (specs:

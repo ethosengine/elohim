@@ -1,4 +1,5 @@
 ---
+id: feedback-haiku-needs-compiler-ready-scaffold
 name: Haiku needs a compiler-ready scaffold; Sonnet should design test infrastructure
 description: When a task requires designing/discovering test infrastructure (vitest config split, Angular jsdom vs node env, mock setup patterns), use Sonnet to scaffold the first instance. Once the pattern is compiler-ready and proven, Haiku can mirror it. If Haiku has to design test infrastructure, it goes off the rails (silently excludes tests, invents wrong patterns, etc).
 type: feedback

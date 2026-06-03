@@ -1,4 +1,5 @@
 ---
+id: project-consilience-higher-order-sensemaking
 name: consilience-higher-order-sensemaking
 description: "The P2P network has higher-order sensemaking that no single node has — vantage points from healthier places can recognize what insular places cannot see. The substrate's job is to make that recognition RECEIVABLE at insular nodes — through bridges, nudges, and experiences — without imposing it. Not a control machine; a patience machine. Generational time-scale. The fish-in-water problem is universal; the gift of seeing one's own context (Foster) is rare and must be supplied structurally."
 metadata:

@@ -1,4 +1,5 @@
 ---
+id: spa-blob-deploy-drift
 status: Draft
 cites:
   - 2026-05-23-landing-page-epr-dual-doorway.md   # the related doc this derives from

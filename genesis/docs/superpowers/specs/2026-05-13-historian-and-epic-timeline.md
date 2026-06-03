@@ -1,5 +1,6 @@
 ---
 title: Historian, Epic-Graph Timeline, and the Three Temporal Perspectives
+id: historian-and-epic-timeline
 date: 2026-05-13
 status: draft
 related:

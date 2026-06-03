@@ -1,4 +1,5 @@
 ---
+id: project-hdi-no-get-links-in-validators
 name: HDI integrity-zome validators cannot use get_links
 description: Holochain validation callbacks can only access deterministic primitives (must_get_valid_record, must_get_entry, must_get_action, must_get_agent_activity). Link traversal (get_links) and non-deterministic reads are HDK-only (coordinator). Cross-entity enforcement rules that require link state must live in coordinator pre-commit gates, not validators.
 type: project

@@ -1,5 +1,6 @@
 ---
 title: Doorway SSR Runtime — server-render as an honest compute capability
+id: doorway-ssr-runtime
 tier: architecture
 status: Design + code landed; in-cluster deploy BLOCKED (alpha SSR pod on Harbor registry storage EIO, cf53a76c2) — do NOT assert in-cluster green
 created: 2026-06-02

@@ -1,10 +1,11 @@
 ---
+id: project-household-horizontal-scaling
 name: Household horizontal scaling via blade fleet
 description: Scaling within a household means more elohim-node instances across blades, not bigger single processes. Operator manages placement and purpose assignment.
 type: project
 originSessionId: 63499c63-1cde-41b5-a0b0-66503d4c008c
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
+  - elohim-hub-boundaries-design | defines the node/hub/storage boundary — the elohim-node unit this entry fleet-scales by running more of | sha256:6b7ee97f246b732f
 ---
 When a family's needs outgrow one node, they add blades to the rack. The elohim operator distributes purpose across the fleet — not by scaling up one process, but by running more elohim-node instances with different roles:
 

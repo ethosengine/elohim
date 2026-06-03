@@ -1,4 +1,5 @@
 ---
+id: project-historian-pattern-surface-agent
 name: Historian — pattern-aware un-archive agent
 description: The inverse of cleanup. Indexes the archive, recognizes when current work matches an archived pattern, surfaces the precedent as a risk/precedent annotation into the active plan or sprint. Performs the `surface` primitive named in the lifecycle spec.
 type: project

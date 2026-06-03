@@ -1,4 +1,5 @@
 ---
+id: project-memory-in-repo-two-tier
 name: Memory in repo — two-tier storage (project / personal)
 description: Project memory lives in <repo>/.claude/memory/ (team-shareable, git-tracked, PVC-recoverable). The personal slot at .claude-config/projects/<slug>/memory/ is a symlink to the primary, kept as the harness-conventional path. Migrated 2026-05-13.
 type: project

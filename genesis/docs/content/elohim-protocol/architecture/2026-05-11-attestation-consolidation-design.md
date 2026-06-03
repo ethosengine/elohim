@@ -1,5 +1,6 @@
 ---
 title: Attestation Consolidation — Validated Recognition as a Content Discriminator
+id: attestation-consolidation-design
 tier: architecture
 status: Draft (awaiting user review)
 created: 2026-05-11

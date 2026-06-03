@@ -1,5 +1,6 @@
 ---
 title: Elohim-Core Graph Substrate — Design Spec
+id: elohim-core-graph-substrate-design
 tier: architecture
 status: Design (brainstorm complete, awaiting user review)
 created: 2026-04-21

@@ -260,3 +260,7 @@ You can:
 - `.claude/memory/project_wisdom_resolves_into_epics.md` — story-compaction as memory's destination
 - `.claude/memory/feedback_a2o_narrative_is_opus_work.md` — narrative authoring is Opus work
 - `.claude/agents/historian.md`, `.claude/agents/librarian.md`, `.claude/agents/cartographer.md` — your peers
+
+## Content-addressed cites (semantic-links)
+
+Doc cites are content-addressed envelopes (`<slug> | desc | fingerprint`) that **survive file moves** — see `.claude/skills/semantic-links/SKILL.md`. Never hand-write a slug/fingerprint; run `cite-gen`. Audit verdicts: **HELD-CITE ≠ DEAD-CITE** (a cite to a `held/` doc still resolves — do NOT delete it), **STALE-CANDIDATE** (fingerprint drift → re-verify the lesson), **CITE-FORMAT-CANDIDATE** (legacy path → `cite-gen --into`). The `cites` stasis discipline drains `cites_legacy` via `cites-migrate.py`. Moving a doc never breaks an inbound cite.

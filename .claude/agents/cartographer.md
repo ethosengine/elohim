@@ -219,3 +219,7 @@ You can:
 - `.claude/skills/converge/SKILL.md` — full skill prompt with synthesis template
 - `genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md` — design rationale
 - Memory pointers: `project_three_temporal_perspectives.md`, `project_wisdom_resolves_into_epics.md`
+
+## Content-addressed cites (semantic-links)
+
+Doc cites are content-addressed envelopes (`<slug> | desc | fingerprint`) that **survive file moves** — see `.claude/skills/semantic-links/SKILL.md`. Never hand-write a slug/fingerprint; run `cite-gen`. Audit verdicts: **HELD-CITE ≠ DEAD-CITE** (a cite to a `held/` doc still resolves — do NOT delete it), **STALE-CANDIDATE** (fingerprint drift → re-verify the lesson), **CITE-FORMAT-CANDIDATE** (legacy path → `cite-gen --into`). The `cites` stasis discipline drains `cites_legacy` via `cites-migrate.py`. Moving a doc never breaks an inbound cite.

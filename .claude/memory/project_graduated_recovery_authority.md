@@ -1,4 +1,5 @@
 ---
+id: project-graduated-recovery-authority
 name: Graduated recovery authority — community can always make it right
 description: Recovery in the Elohim Protocol must never permit absolute lockout; authority graduates from intimate circle through qahal governance to global elohim witness; crypto is optional hardening, never the sole path
 type: project

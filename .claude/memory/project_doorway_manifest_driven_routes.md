@@ -1,4 +1,5 @@
 ---
+id: project-doorway-manifest-driven-routes
 name: Doorway routes are declared in app manifests, not coded in doorway
 description: App manifests declare HTTP routes; doorway reads manifests and acts as a registry-driven proxy to the right elohim-storage instance. elohim-storage CID/DAG routing is the network source of truth.
 type: project

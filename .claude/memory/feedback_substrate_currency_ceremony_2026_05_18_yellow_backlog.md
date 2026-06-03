@@ -1,4 +1,5 @@
 ---
+id: feedback-substrate-currency-ceremony-2026-05-18-yellow-backlog
 name: substrate-currency-ceremony-2026-05-18-yellow-backlog
 description: YELLOW findings from the 2026-05-18 substrate-currency ceremony's Phase 4b coherence check that were larger than mechanical and got backlogged for next-cycle pickup. Three load-bearing pattern-examples are missing from gospel-tier Rust surfaces and a controller-state claim in the resilience epic may overstate what code does. Next ceremony should consider these for inline closure or operator-elevation as a focused sprint.
 metadata:

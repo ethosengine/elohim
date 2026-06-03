@@ -1,4 +1,5 @@
 ---
+id: recovery-m4-completion-shamir-optional-plan
 status: Draft
 canonical: ../content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md
 ---

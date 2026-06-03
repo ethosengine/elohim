@@ -1,4 +1,5 @@
 ---
+id: feedback-commit-attribution-parallel-agent-leak
 name: commit-attribution-parallel-agent-leak
 description: When multiple agents work the same repo in parallel, an untracked-file directory created by one agent can be swept into another agent's commit if the second agent uses `git add <dir>` while files are pending. Resilience-epic commit e44bd77c3 accidentally swept in 10 views_convert/ scaffold files from a parallel monolithic-code-decomposition agent; the follow-up commit 994a17d46 ("scaffold views_convert/...") landed only a Cargo.lock bump because the file creation had already been absorbed.
 metadata:
