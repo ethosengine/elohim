@@ -48,6 +48,12 @@ Auth context is threaded through the **V8 fetch shim** so a server-render runs *
 
 Capability claims are **stratified** and conservative by default: a doorway stays Tier-2 (CSR-only projection) unless it has earned and advertised the render capability. The audit tuple emitted per render is **shaped for future REA settlement** of SSR compute — so the compute↔settlement loop can close later without a wire break — but settlement itself is deferred.
 
+### Render concurrency is a derived budget, not a hard-coded constant
+
+Because SSR is an honest compute capability, its `max_concurrent_renders` is **derived from the operator's compute view, never hard-coded.** elohim-storage models itself as a pod that elohim-operator orchestrates across a household/dwellinghub fabric, and it publishes three layered surfaces every per-node compute feature subscribes to: **probes** (what the hardware actually has), **allocation** (the operator's virtual "I'm using N cores for this workload" partition), and **ceiling** (the operator's hard "do not exceed M cores in this dwellinghub"). Even when the allocation/ceiling values are virtual (k8s modeling, dev convenience, env-driven before DHT-attested policy), peers treat them as authoritative — that is how the operator orchestrates compute across blades without each feature inventing its own throttle.
+
+SSR is the reference implementation of this discipline. `render::fetch_compute_budget` reads three pointer paths off `/api/v1/compute/dashboard` — `/computeMetrics/cpuTotalCores`, `/constitutionalLimits/ceilingLimit/computeMaxCores`, `/allocations/allocationBlocks/0/cpuCores` — and `derive_capability` picks **`min(non-zero values)`**. A cross-stack contract test guards those JSON pointer paths so a storage-side rename can't silently starve the doorway. The rule for any future per-node compute feature (transcode budget, indexer parallelism): subscribe to `ComputeMetricsView` and take `min(probes, allocation, ceiling)`; a hard-coded numeric default is allowed only as a last-resort fallback when the dashboard fetch fails entirely, and an operator override (`ELOHIM_OPERATOR_*`, never a per-feature `ELOHIM_<FEATURE>_MAX_CORES`) is the debugging escape hatch, not the primary input.
+
 ---
 
 ## Watch-outs (carry these forward)
@@ -67,7 +73,17 @@ Standing up SSR against an Angular 19 bundle is a build-glue problem before it i
 
 - The Angular-19 **global-shape shim must cover exactly what Angular touches** — no more (over-shimming masks real bootstrap errors).
 - **`sophia-element` / the UMD bundle must NOT run server-side** — placeholder it via `CUSTOM_ELEMENTS_SCHEMA`; the web component renders client-side only.
-- **V8 cold-start is real:** observed wall-time 2s → 15s → 60s as the isolate warms. The pod needs a **memory bump + a `startupProbe`**, or the orchestrator kills it mid-warm. (Operator note: staging/prod pod floors carried 256Mi and will OOM on an SSR roll — that bump is a tracked backlog item, not done here.)
+- **V8 cold-start is real:** observed wall-time 2s → 15s → 60s as the isolate warms. The pod needs a **memory bump + a `startupProbe`**, or the orchestrator kills it mid-warm.
+
+### Pod resource floor when SSR is enabled (`SSR_BUNDLE_PATH` set)
+
+A doorway with SSR on is a different-shaped pod from a CSR-only doorway, and the difference is load-bearing — a too-tight floor produces a *coin-toss* OOM that passes one build and flaps 502/503 on the next from the same image. V8 parsing the ~51MB Angular server bundle spikes the working set to ~200MB, so the CSR-era `256Mi` is a gamble. The deploy-verified floor:
+
+- **`resources.limits.memory: 1Gi`** minimum (V8 + the ~51MB bundle + the app working set).
+- **`resources.limits.cpu: 1000m`** — the cold-start parse needs headroom.
+- **`startupProbe` with `failureThreshold × periodSeconds ≥ 120s`** — V8 init takes 30–90s on a cold start, and a `livenessProbe` with a short `initialDelaySeconds` will fire *before* the HTTP server binds `:8080` and kill the pod mid-warm. The startupProbe gates liveness/readiness, so those can stay aggressive.
+
+The bundle size drives the memory floor: if the server bundle grows materially past ~51MB / ~171 `.mjs` files, revisit. Staging/prod manifests (`genesis/orchestrator/manifests/doorway/staging.yaml`, `prod.yaml`) must carry the same floor before SSR rolls to them.
 
 ---
 

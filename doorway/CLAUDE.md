@@ -27,6 +27,8 @@ We deleted 13 identical ~150-line proxy files (governance, attestations, contrib
 
 A dedicated match arm in `http.rs` is only needed when the route requires **doorway-specific logic** that can't be expressed as a simple storage proxy: custom auth gating, path rewriting across domains, non-storage targets (agent sidecar), or WebSocket upgrades.
 
+The other categories reserved for direct doorway Rust code: federation (peer discovery, cross-community routing), CDN (caching layer), DNS (DNS-over-HTTPS, human-readable names → CIDs), bootstrap, and signal. Everything that surfaces app-domain data (gate decisions, content nodes, attestations, economic events) flows through manifest-declared routes — adding a new such endpoint means a manifest change, not a doorway code change.
+
 ## CRITICAL: No Blob Fan-Out — Doorway is Single-Target Dispatch
 
 **Doorway forwards each request to a SINGLE storage target.** It does NOT iterate `STORAGE_URLS` looking for which peer holds a particular blob. If a request lands on a peer that doesn't have the bytes, that is a substrate replication problem to fix in elohim-storage's P2P layer — never a doorway dispatcher fix.
@@ -101,6 +103,14 @@ Sources:                              Targets:
 ### Trust Model
 
 Route registration is lightweight. Doorway does NOT validate route content — the protocol does. Content served through any route lands on protocol-validated, reach-moderated values of the network. The doorway operator trusts the network, not individual routes. What IS EPR-governed is the stewardship contract: providing projection, DNS, and compute.
+
+**Views are served THROUGH a doorway, never owned BY one.** Any view must be servable from any doorway projecting the same canonical substrate content — doorways are CDN edges, not authorities. When reviewing a plan for new doorway routes, apply the swap test: could a client point at a different doorway and get the same content? If the answer is "no, this doorway authored the response," it is an anti-pattern. Doorway-local Operational state (cache stats, federation peer list) is legitimate doorway-resident state — but the view contract (schema in `elohim/sdk/schemas/v1/views/`) is shared so a sibling doorway could serve its own equivalent.
+
+Anti-pattern smells in plans and PRs:
+- `routes/<thing>.rs` with hand-rolled aggregation logic → wrong unless doorway-local Operational state
+- Doorway iterating peers / fanning out / deciding which storage holds bytes → forbidden (see No Blob Fan-Out rule)
+- "Federation peer A asks doorway B for canonical content B authored" → doorways never author canonical content
+- Per-DNA proxy files → forbidden (we deleted 13 of these)
 
 ## Two Scaling Axes
 

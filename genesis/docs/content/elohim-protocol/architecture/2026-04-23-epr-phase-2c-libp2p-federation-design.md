@@ -150,6 +150,18 @@ EprAtomResponse = {
 
 **Same gate everywhere** is the invariant. REST and libp2p return the same "visible set" to the same caller identity. Divergence would be a correctness bug.
 
+#### 3.4.1 Reach is earned at authoring — never filtered on receive
+
+The reach gate in §3.4 is the *visibility* read of a deeper invariant: **the burden of reach lies on the author and the peers that steward what they author, to earn that reach.** Reach is a property of the graph topology (membership / relationship / delegation couplings on the DHT), not bolted-on perimeter access control — see `project_first_class_graph_pattern`.
+
+**The email lesson.** Email collapsed because anyone could publish to anyone, putting the cost of filtering on receivers. The asymmetry — cheap to send, expensive to filter — produced spam at scale, and the protocol now only survives because megacorps run spam-filtering megaliths. Email exists; participating in it at human scale does not. **Receive-side per-message filtering is that same slow-motion collapse, no matter how well-intentioned the filter.** This protocol must not replicate it.
+
+**Author side (the `AnnounceAtom` / `FederatedEprStore::put` path).** Before publishing on gossip / Kad / direct-notify, the author's node validates that the envelope's signer has *earned* the declared reach. Refuse the put otherwise. Stage 1 is structural (signer is a known agent); Stages 2/3 traverse the graph (DHT couplings) to confirm the relationship / collective-membership / delegation the envelope claims backs the reach it asserts. A spammer must earn reach before publishing at scope, and the earning is itself accountable on the DHT.
+
+**Receiver side is *pre-authorization*, not filtering.** Receivers do hold authorization — but it is a standing trust contract established BEFORE messages flow, not evaluated per-message. A peer holds pre-authorization for a scope only when it carries an embodied responsibility there (membership, stewardship, relationship), and that pre-authorization is what puts it into the topology. Taking it on means taking on, for that scope: **subscription** (receiving future gossip), **distribution** (propagating gossip, serving Kad provider records, answering fetches), **discovery** (being a discovery node), and **validation** (checking authors' membership/attestation/delegation claims). These are responsibilities, not entitlements. A peer with no claim to a scope simply isn't in the topology — it doesn't subscribe, doesn't appear in the provider set, isn't asked to vouch. There is nothing to "filter" because there is nothing to filter from. **The graph topology IS the policy.**
+
+This is why §3.4's PeerId → AgentPubKey mapping gates *visibility of served content*, and is categorically distinct from any inbound drop. **Never** introduce, in this protocol or its fanout plumbing: "drop messages from unauthorized peers"; a gossipsub validator that filters inbound by reach; blocking outside subscriptions to topics; or inbound rate-limiting as a reach control. Every one is the email-collapse anti-pattern. Redirect any such proposal to author-side earning + receiver-side pre-authorization rooted in embodied responsibilities.
+
 ### 3.5 Signature and CID verification on ingress
 
 Every atom received via `AnnounceAtom` or `FetchBatch` response **must** be verified before acceptance:
@@ -188,7 +200,7 @@ When a peer ingests a new atom (via REST or local authoring), how does `Announce
 - Direct send to K-closest peers from Kademlia (targeted, low noise, requires DHT).
 - Hybrid: gossip for `Commons/Public`, direct for `Collective/Steward`.
 
-Decide empirically during implementation. Start with direct send to a small peer set; measure before scaling.
+Decide empirically during implementation. Start with direct send to a small peer set; measure before scaling. Whichever policy wins, the gate is author-side (§3.4.1): subscribers receive a scope's gossip because they hold standing pre-authorization for it, never because a receive-side validator filtered inbound traffic by reach.
 
 ### 5.2 Announcement dedup
 Announcements are CID-keyed, but a peer may receive the same CID from multiple sources. Candidates:

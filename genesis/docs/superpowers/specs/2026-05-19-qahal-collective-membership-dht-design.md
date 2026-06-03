@@ -21,6 +21,28 @@ related:
 - `.claude/memory/project_collective_is_stewardship_unit.md` — collective = stewardship unit (load if exists; otherwise the principle is summarized in §1 below)
 - `.claude/memory/project_no_sovereignty_stewardship_over_ownership.md` — no `own*`, no `sovereign*`; use steward/contributor/authored vocabulary
 
+## 0. Design reference — slide 45 (*After the Feed*, New_ Public, May 2026)
+
+Epic E is anchored on slide 45 of the *After the Feed: Trust, Connection, and the Next Era of Social Technology* deck (New_ Public, May 2026). The slide shows a "Bay Area Dawn Runners" mock and names five design moves the qahal collective surface must embody.
+
+**Persistent assets:**
+- Image: `/projects/research/after-the-feed-2026-05/slide-45-bay-area-dawn-runners.png`
+- Full deck: `/projects/research/after-the-feed-2026-05/after-the-feed-full-deck.pdf` (82 pages; slide 49 crosswalks prosocial principles → product guidance; slide 50 carries the charter quote)
+
+**Layout (composite single screen):** identity strip (name + member avatars + role badges) across the top; member list in the right rail; center stage top-to-bottom — AI-coordinator card with a concrete recommendation + match score, stats row (active members · activity-instances · stewards), live co-presence pane ("happening now"), upcoming-activity cards.
+
+**Five named features (these are the acceptance criteria for Epic E):**
+
+1. **Community norms are visible and persistent** — reminders of agreed norms live on the surface, not buried in settings.
+2. **AI coordinator knows your goals** — surfaces specific, contextual recommendations; not a feed. (Backed by the elohim agent sense-and-respond layer.)
+3. **Live co-presence is prioritized over metrics or a feed** — "see who's here right now" beats "see what people posted." (Category C — operational; out of scope for this spec but the projection design must reserve the slot.)
+4. **Reputation is earned through contribution** — concrete acts ("organized 43 runs"), never follower counts. (Backed by existing `ContributionRecord` / `EconomicEvent` REA primitives.)
+5. **Smart matching** — notifies you only of members who match pace, schedule, and interests; pull not push. (Backed by the elohim reach-gate matchmaking layer.)
+
+When auditing any qahal collective view, verify all five are present and identifiable. This slide is a load-bearing reference, not a mood board.
+
+---
+
 ## 1. Problem statement
 
 Epic E of the synthesis plan promises a `/qahal/collective/:id` page with five facets (slide 45 of *After the Feed*): members, stewards, live co-presence, upcoming activities, visible-and-persistent norms, contribution recognition. All five facets must be backed by P2P-native DHT entries — every interaction in this page is a protocol primitive, not an Angular cache.

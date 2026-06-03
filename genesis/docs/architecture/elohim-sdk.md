@@ -203,7 +203,32 @@ The SDK's discipline IS the protocol's dignity. The same shape, served correctly
 
 ---
 
-## §7 — The Cross-Pillar Import Cleanup Sprint
+## §7 — Composable View Federation
+
+The five SDK libraries are the seam that makes composable view federation possible.
+
+`elohim-app` began as a bootstrap/catch-all Angular client — everything co-located because that was the fastest path to a working stack. The architectural destination is decomposition: each pillar's surfaces (account, profile, learning, wallet…) graduate into composable view modules that the human experiences through any rendering host:
+
+1. **Own Tauri** — native, the human's steward device.
+2. **Own browser-steward** — the human's steward serving the app over HTTP.
+3. **Peer-rendered** — a trusted peer's elohim-app instance renders the surface on the human's behalf when their own devices are unreachable. The peer is blind to secrets (secrets flow through socially-derived primitives, not through the rendering host).
+
+**Composability means concretely:**
+
+- Pillar has a clean public API. Cross-pillar dependencies go through `@elohim/storage-client`, not through Angular service imports across pillar source trees.
+- Pillar's routes are self-contained and lazily loadable.
+- Pillar's services have no hidden coupling to global app state beyond a documented interface.
+- Pillar can be embedded inside another elohim-app instance OR rendered as a discrete URL surface.
+
+**M5 graduates the first module** — the account/auth pillar — to this composability shape. That is the canonical example; other pillars follow in their own sprints.
+
+The SDK is what makes this graduation tractable. Without a documented boundary, "clean public API" is aspirational. With the five libraries here, each pillar split follows the runbook: the seam is the SDK, the gateway is doorway HTTP, the resolution primitive is `EprResolverService`. "Where does this render?" becomes a runtime configuration rather than a build-time assumption.
+
+**Design prompt for any new pillar surface:** does this support being rendered by a peer? If not, what would change? If yes, what is the discovery + auth-flow shape?
+
+---
+
+## §8 — The Cross-Pillar Import Cleanup Sprint
 
 The Elohim SDK boundary became canon during the cross-pillar import cleanup sprint (2026-05-25). The sprint took 261 cross-pillar imports out of `app/lamad/` source, classified each into one of eight dispositions (L / C / S / I / R / H / E / D / X), executed file-disjoint parallel migration slices, and reduced the bundle's own-source cross-pillar imports to 18 — all of which are architecturally intentional (composition-root `useExisting` wiring or documented deferrals).
 
@@ -218,7 +243,7 @@ The sprint's foundational artifacts (this canon doc + the runbook) are the durab
 
 ---
 
-## §8 — Implementation Reference
+## §9 — Implementation Reference
 
 | Surface | Path |
 | --- | --- |
@@ -236,7 +261,7 @@ The sprint's foundational artifacts (this canon doc + the runbook) are the durab
 
 ---
 
-## §9 — References
+## §10 — References
 
 ### Canon (this directory)
 
@@ -268,7 +293,7 @@ The sprint's foundational artifacts (this canon doc + the runbook) are the durab
 
 ---
 
-## §10 — Closing Note
+## §11 — Closing Note
 
 The five libraries are the SDK. The SDK is the seam between substrate and consumer. The seam is what makes pillar bundle independence real and what makes the protocol's "AI deployment maturity" framing navigable to a developer new to the codebase.
 

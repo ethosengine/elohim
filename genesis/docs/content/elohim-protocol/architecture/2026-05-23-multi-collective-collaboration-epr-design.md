@@ -348,6 +348,15 @@ A manufactured identity has none of that texture, or has texture that's been alg
 
 This is the same primitive doing double duty: it protects the commons against manufactured presence AND protects real humans against being misread or abandoned when they shift outside their usual pattern. The substrate's gates are **discerning** — they read texture, not just thresholds. A collab forming under elohim observation isn't being defended against; it is being held, and so are its prospective contributors.
 
+### 5.6 The reach gate is two layers — substrate floor + elohim discernment
+
+Every counter-attestation gate and reach claim in this spec rests on the reach-earning gate, which has **two layers that must never be conflated** (`project_reach_gate_is_elohim_mediated_matchmaking`):
+
+- **Substrate floor** — a *pure deterministic* evaluator `(author, subject, requested_reach) → ReachVerdict`, reading Standing + the *collective's own BYO manifest* floor classes + quarantine state. No DHT entity, no local table; ephemeral compose-time evaluation. It returns a **structured** verdict `{ decision: Allowed | Blocked | Pending, reason, floor_class_match, evidence_summary }` — designed structured from day one even where the immediate consumer is a boolean check, because the discernment layer is the eventual consumer.
+- **Elohim discernment** — a commons-elohim reads the substrate's `Pending` plus the newcomer's imagodei (psyche, traits, journaling) plus the collective's membership graph and produces *relational matchmaking* ("you fit here — talk to Adam, Rachel, and Susan") and sponsor suggestions, which may trigger Vouch entries that elevate Standing. The substrate floor is pure (no persistence); persistence lives on the discernment side.
+
+The load-bearing rule: `Pending` means **"I cannot decide alone; requires discernment"** — it must NEVER collapse to `Blocked` on "no information yet." A substrate-only gate that hard-blocked `Unknown` would become a sponsor-friendly first-mover advantage, stranding newcomers from disconnected social graphs in permanent purgatory. This is why §5.3's emergent contributors get *partial* weight rather than a binary in/out, and why a captured collab stays bounded at T0 reach (the floor) while the discernment layer is what actually *welcomes* — the gate is matchmaking, not a binary policy check.
+
 ---
 
 ## 6. REA allocation pattern

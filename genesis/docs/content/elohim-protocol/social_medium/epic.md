@@ -216,6 +216,8 @@ The Elohim Medium operates under constitutional principles that no actor can cha
 
 These aren't nice ideas—they're mathematical constraints. No update can violate them. No institution can override them. They're as fundamental as physics within the medium.
 
+"Reach must be earned" admits no exemption — not even for the protocol's own front door. There is no allowlist, no public-surface bypass, no carve-out for the canonical website, its manifesto, or the learning platform itself. These surfaces are *public by design* not because they skip the gate, but because they have **earned** commons reach and are seeded at that grade. The protocol's founding authorship is the bootstrap authority: it grades its own homework, vouching that the public material has earned wide reach, and then that material passes the same universal gate every contribution passes — honoring an earned grade rather than escaping the rule. When a public page is wrongly walled off, the repair is to correct its earned-reach grade at the source, never to punch a hole in the gate. A medium that exempted itself from its own first principle would have already broken it.
+
 ### **Infinite Local Variation**
 
 Within those constraints, infinite variation flourishes. Each space defines its own evidence standards—a science community requires peer review while a poetry circle values emotional authenticity. Governance ranges from consensus to democracy to earned authority. The medium provides tools for all variations without imposing one model.

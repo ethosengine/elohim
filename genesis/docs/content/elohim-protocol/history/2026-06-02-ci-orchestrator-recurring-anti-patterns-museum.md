@@ -83,6 +83,13 @@ all`). Host-green ≠ CI-green; the gap is the environment, not your code.
   — they are resolved into backlog items, not buried in shift narration.
 - The *operator-domain* items (jenkins-deployer RBAC drift, Harbor registry SPOF, cross-ns NetworkPolicy,
   checkout reliability, cluster pressure) are operator-owned and likewise routed to backlog.
+- **Fail-regime boundary (when you *do* touch the orchestrator Jenkinsfile for a real fix):** stages
+  *before* dispatch (e.g. `Post Predicted Build Graph`) MAY hard-fail — a broken setup should stop
+  dispatch loudly. Stages *after* dispatch are observational (`Post Actual Build Graph`, `Verify
+  Deployment`, `Post-flight Health Check`, `Reconcile Build Graph`) — the world is already what it is, so
+  a parse/archive/HTTP hiccup there must `catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE')`,
+  never FAILURE. A FAILURE'd orchestrator blanks the downstream truth those stages exist to surface and
+  forces the agentic loop to retry blind; UNSTABLE preserves the truth and still flags the hiccup.
 
 ## Bidirectional links
 

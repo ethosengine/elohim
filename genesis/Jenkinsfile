@@ -1068,6 +1068,19 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
         }
 
         stage('Reset Storage') {
+            // When to use RESET_STORAGE=true:
+            //   "database is locked" errors in the Seed Database stage almost always
+            //   indicate schema drift between a persisted DB and the current code's
+            //   expectations — NOT SQLite concurrency. Signals: errors clustered in
+            //   a single content namespace that SHIFTS between builds (e.g. all 100
+            //   errors in preteen-* on build N, caregiver-* on build N+1), high
+            //   "skipped" count (prior-run residue), or one batch reporting 0 inserted
+            //   while neighbors succeed. SQLite pragmas already include journal_mode=WAL
+            //   + busy_timeout=30000 (elohim/elohim-storage/src/db/mod.rs), so adding
+            //   more pragma/retry logic is the wrong path. Set RESET_STORAGE=true to
+            //   clear content.db and re-run migrations cleanly. Investigate real
+            //   concurrency (uniform/random errors, not namespace-clustered) only after
+            //   a clean run still reproduces.
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.RESET_STORAGE }

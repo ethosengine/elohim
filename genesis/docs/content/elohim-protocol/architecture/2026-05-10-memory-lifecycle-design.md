@@ -51,6 +51,16 @@ Most data lives in the tail, fading. Only what earns it stays in searing memory.
 
 The comet shape applies fractally: each lifecycle data type (a memory entry, an EPR cluster, a DHT entry-set) has its own head/tail/core relative to its scope.
 
+### The vertical axis: wisdom resolves into epics
+
+The lifecycle primitives below describe **lateral** flow — movement between tiers and visibility layers within the corpus. But there is a second, **vertical** direction the primitives alone don't name: memory's true destination is *story*, not deletion. Detail resolves into meaning the way oral tradition compacts a lived history into a carry-forward shape, or the way *The Lord of the Rings* never exposes its subtext yet the richness becomes the meaning-shape. Wisdom is what is essential to the details once the details themselves have faded.
+
+This re-reads the comet's two outer regions:
+- The **tail** is not headed toward `forget` — it is headed toward *distilled-into-epic*. Compaction is the operative motion, and its terminus is narrative.
+- The **memorialized core** *is* story. Manifesto-tier permanence is the asymptote that the wisdom memory class (class #7 below) reaches via story-compaction. The protocol's epic/manifesto corpus (`genesis/docs/content/elohim-protocol/`) is therefore not mere documentation — it is the lifecycle's *destination*.
+
+The design consequence: a memory tool serves either **hygiene** (lateral — promote/merge/close-interval keep the corpus walkable) or **compaction** (vertical — distilling a cluster of entries into a paragraph of epic). These are complementary, not the same motion. A `promote-to-epic` is distinct from a `compact`: it does not just shrink a body and attach a pointer, it synthesizes a cluster into meaning-shape. Converge's memorial-tier safeguard exists to *protect* compacted wisdom from damage; the promotion *into* wisdom is its inverse complement.
+
 ## Lifecycle primitives
 
 Every memory entry has **three orthogonal attributes**:
@@ -83,7 +93,7 @@ Fuse N entries (or N copies, or N adjacent records) into a new head.
 
 ### Network-Scale Merge (load-bearing implication)
 
-The merge primitive scales from memory entries to **whole-network content deduplication**. A movie copy does not need to live on every household. Many EPRs about the same subject do not need to all stay hot. If the protocol can attest "thing (a) we observed *is definitively* thing (a) THEY observed" via content addressing + governance, merging the storage records is the protocol's native deduplication primitive.
+The merge primitive scales from memory entries to **whole-network content deduplication**. A movie copy does not need to live on every household. Many EPRs about the same subject do not need to all stay hot. If the protocol can attest "thing (a) we observed *is definitively* thing (a) THEY observed" via content addressing + governance, merging the storage records is the protocol's native deduplication primitive. The network then replicates the *fact* of equivalence — a lightweight attestation record — without re-replicating the bytes; the equivalence attestation is itself the new shardable record.
 
 Identity-matching alone is **not sufficient** to authorize a merge. The decision must satisfy a multi-factor governance check:
 

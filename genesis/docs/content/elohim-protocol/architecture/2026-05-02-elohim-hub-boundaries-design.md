@@ -44,6 +44,8 @@ memory_anchors:
   - project_multi_doorway_human_registration
   - project_inventory_exchange_not_byte_replication
   - project_reach_gate_is_elohim_mediated_matchmaking
+  - project_doorway_hub_sister_brother
+  - project_hub_compute_aggregate_primary
 # Bidirectional history edge (PLACEMENT.md): settled node/household/doorway decisions distilled here.
 history:
   - ../history/2026-04-19-d1-through-d5-node-and-household-canon.md
@@ -61,6 +63,10 @@ history:
 The light-up-topology sprint surfaced a vocabulary gap. We are wiring substrate primitives — blob custody reconciliation, view federation, peer topology — but the architecture doc still describes elohim-node as "a deployment wrapper that packages elohim-storage." The wrapper framing is no longer load-bearing. The thing we are actually building is the **runtime composition primitive that scales the protocol while keeping it human-scale**.
 
 This document names the three crates' responsibilities, sketches the `Hub` trait that elohim-node will graduate into, and identifies what stays where. **No code moves in this sprint.** The intent is to make Phase 3+ decisions land in the right crate the first time, and to flag the refactor that the next sprint should pick up.
+
+### What "scales the protocol" means — the reach math
+
+The substrate is **not** built for FB/YT-shape hyperscale; it is built for a federated topology where Tier 3 family nodes (`hardware-spec.md`) are the substrate participants — closest analogy email/Mastodon federation, except each "instance" is a household, church basement, or community-center serving its trust-network members *deeply*, not one operator serving thousands shallowly. The reach is **~100M Tier 3 nodes × tens-to-hundreds of humans carried each = billions of participants, most without owning hardware**: a single Tier 3 carries its household, its spokes (laptops/phones syncing to the hub), custodial key hosting for less-technical relatives, and relational backup for the trust network. **Count humans carried (billions), not nodes (100M).** Doorway absorbs the web2 mass-readership at CDN scale — the substrate never sees Stage 1/2 visitors. Per-node load is therefore bounded by *trust-network membership* (realistic per-Tier-3 connection count 100–500), which is why most apparent "scale work" (bloom inventory, hierarchical aggregation, tiered storage) is **topology-expression, not new architecture** — it just makes substrate routing match what is already socially and hardware-true. The substrate-level care (narrow integrity layer, content-addressed identity, migration-preserves-everything) is precisely the load-bearing layer for *inclusion*: it is what makes entry-tier participation honest rather than extractive. **Never frame the protocol as "for the rich who can afford Tier 3"** — Tier 3 nodes are the substrate participants who carry billions through trusted hosting and hub-and-spoke; Stage 1/2 users are first-class, their substrate rights guaranteed by the same constitutional contracts the operators run on.
 
 ## The three layers
 
@@ -182,6 +188,10 @@ elohim-storage runs a libp2p swarm (the substrate). steward/node also has a `p2p
 
 The Hub trait owns the substrate-side handle (the storage participants); the hub-internal swarm is private to the HouseholdHub implementation. CollectiveHub may not need a hub-internal swarm at all — that decision is per-archetype.
 
+### Horizontal scaling is the operator's placement job
+
+A hub grows by adding blades, never by growing one process — `storage_participants()` lengthens, the hub identity does not change. The unit of deployment is the lightweight elohim-node binary; *design it to be cheap to run many of, not to scale up internally.* When a family outgrows one node the operator distributes **purpose** across the fleet — primary anchor (conductor + storage + doorway), content-stewardship nodes, inference/model-serving nodes, per-person nodes (each member's conductor + source chain on dedicated hardware), guest nodes (grandma slides her blades into the rack). The operator's job is placement (which blade runs what), local optimization (what's replicated for LAN speed vs. what rides the DHT), and lifecycle (blade joins/leaves). The substrate sees each node as a peer; the hub sees them collectively.
+
 ## Migration story (later sprint, not now)
 
 A reasonable sequence when this gets picked up:
@@ -220,7 +230,7 @@ The companion plan (`2026-05-01-light-up-the-topology-plan.md`) gets a short fra
 ## Open questions (deferred)
 
 1. **Where does the hub identity come from?** Content-derived from genesis configuration? Notarized via DHT? Self-signed at first boot? Probably starts self-signed and graduates per `project_bootstrap_to_elohim_security_gradient`.
-2. **How does a household with two blades present as one substrate peer?** Today each blade runs its own elohim-storage and shows up as a separate libp2p peer. The hub-internal swarm could let one blade speak for the household, but that is a federation-aggregation question, not a substrate-identity question. Defer until needed.
+2. **How does a household with two blades present as one substrate peer?** Today each blade runs its own elohim-storage and shows up as a separate libp2p peer. The hub-internal swarm could let one blade speak for the household, but that is a federation-aggregation question, not a substrate-identity question. Defer until needed. *Direction for the human-facing answer:* the surface a human sees is the **hub aggregate**, not a per-device breakdown — a hub is a storage pool rolling up its members' capacities (sliding a blade in jumps "5GB / 15GB" to "5GB / 100GB" without changing the human's sense of "my hub"). Substrate truth stays per-device (system_metrics probes + rea_commitments); the projection layer rolls it up with progressive disclosure by capability (kids/grandma see the two-tuple; power users see the stewarded/self triptych and drill down to per-device tiles). Build the per-device substrate without hub-aggregate coupling, but design the projection to roll up cleanly.
 3. **Does CollectiveHub federate via the same protocol as HouseholdHub?** Likely yes for view federation; possibly no for blob custody (collectives may have institutional storage with different commitment shapes). Out of scope until a CollectiveHub exists.
 
 ---
@@ -239,6 +249,13 @@ The companion plan (`2026-05-01-light-up-the-topology-plan.md`) gets a short fra
 
 Doorway is the **per-deployment web2 projection surface** and should stay simple — self-hosted, human-operable, the kind of thing a household steward runs on a single blade (per `project_doorway_single_target_no_fanout`: it moves bytes to one target and caches; it does not fan out). The **aggregate-scale** concerns — cross-deployment threat coordination, mobile inference processing, workload state migration, social-resilient compute contracts — belong at the **hub** layer (the home-node cluster that stewards a family or collective's compute, federates horizontally with peer hubs, coordinates discernment via elohim-operators). The arrows of this seed's three-layer diagram do not reverse here either: doorway projects, the hub composes.
 
+**Doorway and hub are symmetric projection edges, not the same thing.** Both project the *same* canonical DHT/libp2p truth; they differ only in audience and reach contract — which way the truth faces:
+
+- **Doorway projects outward to web2** — CDN/DNS/TLS, OAuth-relying-party for browsers, federation to other doorways (DNS bonding, federation registry), AT Proto / ActivityPub interop. Doorway is **not** a P2P participant.
+- **Hub projects inward to nearby peers** — aggregates substrate truth for peers in the same household / school / village. The teacher-laptop hosting a Khan library that student devices sync from the moment they walk in. Hub **is** a P2P participant; it federates hub-to-hub, peer-native.
+
+A village's hub may *peer with* a doorway when it wants a public web2 face, but the hub stands alone without one. The design test for any new projection feature: **is this serving browsers + other doorways, or nearby peers, or both?** A view contract (cluster-view, peer-topology, reciprocity, distribution, doorway-dashboard) that is valid on one edge should not bake the other edge's assumptions in — serve it from both where it makes sense.
+
 ### The four reach-earning surfaces at hub scale
 
 The protocol already earns reach at **message authoring** (`project_reach_earned_at_authoring`, `project_social_reach_nervous_system`). The hub layer extends the *same* earning signal to four aggregate-scale surfaces:
@@ -253,6 +270,12 @@ The protocol already earns reach at **message authoring** (`project_reach_earned
 ### Vocabulary: DwellingHub / CollectiveHub
 
 `HouseholdHub` is a **retired synonym for `DwellingHub`** — use DwellingHub. CollectiveHub carries a different *attitude* (institutional/community-scale governance) but the same Hub trait. Keep the substrate hub-kind-agnostic (`dwelling | collective | computed` resolve in UI labels only, per `project_hub_archetype_abstraction`).
+
+**Why intentionally separate implementations, not one parametric `Hub` with a `realm:` flag.** Governance considerations do not degrade gracefully. A dwelling's "we sync everything because we trust each other and live together" does not translate to a congregation hub where new spokes need consent to join, content visibility has institutional defaults, and removing a spoke is a community-governance event. A `realm` parameter would push governance into config flags and lose realm character. This is the **same pattern as elohim agents** (`human-elohim`, `household-elohim`, `collective-elohim` are separate specializations precisely because their contracts are different *shapes*, not different *settings*) — mirror it when adding future hub types (enterprise, civic): two implementations behind a narrow shared interface, never a parameter. Use **stewards**, never "members," for the humans with authority over a hub — membership is a passive category; stewardship carries agency, accountability, and the constitutional power below.
+
+**Constitutional rule — hub hardware MUST be steward-accessible.** A hub's access path must be inspectable, modifiable, retrievable, and must not depend on a third party who is not a steward. If access is denied or revoked by anyone other than a steward, the stewards retain the power to **quarantine** (mark unusable, reassign duties, treat its data as unrecoverable until access restored) or **evict** (remove from hub composition, halt routing through the device, notarize the eviction). Inaccessibility is a *violation*, not a normal failure mode — this is a constitutional power, not an operational override.
+
+**The encryption boundary terminates at the hub↔spoke edge.** A hub is an always-on, physically-present, centralized theft target: if it is stolen you lose data for every steward and every spoke that syncs through it. This makes hub at-rest encryption + key custody load-bearing in a way device-level OS custody on phones/laptops is not. The model: end-to-end-style encryption runs **peer↔hub**, terminates at the **hub boundary** on the way down, and **device-level OS custody** takes over on the spoke (the unencrypted-at-rest terminus we already accept — the phone/laptop OS does that work). Hubs sit in the middle ground that needs explicit design: at-rest encryption with steward-held keys, hardware-key-bound (TPM/secure-enclave on Tier 3) so theft yields ciphertext, key recovery via the same steward-quorum that handles eviction/quarantine (ties to `project_socially_derived_security`). CollectiveHub may warrant a different encryption profile than DwellingHub (institutional vs intimate trust — open). Do not accidentally re-introduce always-encrypted-at-rest on spokes (that's the OS layer's job) or unencrypted-at-rest on hubs (the theft target).
 
 **Hyperscaler-fronting is a constitutional constraint**, not the protocol's DDoS answer: it is operator opt-in, never required, and the defense story must be **household-scale-implementable** (a family on one blade can run it). Note the two source docs used *different* reach ladders — both are preserved here; do not silently merge them into one.
 

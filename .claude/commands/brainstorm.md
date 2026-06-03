@@ -8,6 +8,11 @@ provides it (same pattern as `/gap-analysis`, `/close-loop`, `/shift`).
 
 Topic: `$ARGUMENTS`
 
+**When NOT to brainstorm:** if the user reframes your proposal with an architectural model (e.g. "actually the
+substrate does X, doorway just caches"), that is a signal the design already exists and you haven't absorbed it
+yet — research / `systematic-debugging` first. Brainstorm only when the user is genuinely in exploration mode
+("I'm not sure how this should work") or when both prior-art lenses below return empty.
+
 ## Step 1 — PRE: deterministic prior-art + scope preload (cheap, always run)
 
 ```bash

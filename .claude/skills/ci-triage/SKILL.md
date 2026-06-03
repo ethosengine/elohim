@@ -33,6 +33,10 @@ MCP runs as anonymous against this Jenkins (OIDC realm — explicit auth would r
 **Quick scan**: `searchBuildLog pattern="ERROR|FAILED" maxMatches=5`
 **Tail logs**: `getBuildLog limit=-100`
 
+## Recurrence Claims
+
+When the operator says "we keep hitting this," do not assume one root cause. Pull `first_failing_stage` + a one-line failure signature for each of the last 5 builds. If the classes diverge, the active Objective targets only the class the operator pointed at — others become follow-up candidates surfaced in the sprint result. A run of F/U/F/F/U is often 5 distinct failures, not one bug biting repeatedly.
+
 ## Dependency Order
 
 When multiple fail, check upstream first:

@@ -95,6 +95,17 @@ Feedback is not a fourth coupling leg — it's information flowing through all t
 
 See `genesis/plans/2026-03-28-feedback-information-flows-design.md`.
 
+### Feedback + governance ARE the reach-earning machinery
+
+The three-leg requirement (value + governance + feedback/claims) is not arbitrary boilerplate — it is the mechanism by which reach is **earned rather than self-asserted**:
+
+- **Feedback = the evidence.** Claims + positive/negative observations + validity horizons are "the homework."
+- **Governance = the adjudication.** The qahal/mishpat process that reads the evidence and confers the reach grade.
+
+An EPR without feedback has no evidence to grade; without governance, no grader. Such an EPR cannot earn reach, so the schema rejects it. The three-leg requirement and the reach economy are the same fact from two sides.
+
+When reviewing a new content-type or EPR design, the test is not "are the fields present?" but "how does THIS earn its reach, and who grades it?" `genesis/seeder` bootstraps the loop as trusted issuer until a qahal can grade its own content.
+
 ## SDK Boundary
 
 The `elohim/sdk/` tree is the **TypeScript SDK** distributed to consumers (browser, doorway clients, future external integrators). Its boundary is:

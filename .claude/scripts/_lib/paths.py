@@ -25,6 +25,12 @@ def repo_root_from_file(file: str | Path, max_depth: int = 8) -> Path:
     Falls back to a `.claude/`-only match (legacy behavior) if no `.git`
     marker is found within `max_depth` levels — preserves usefulness in
     exotic layouts (e.g. monorepo subtrees vendored without `.git`).
+
+    Diagnostic: if you ever see an "x/x" doubled segment in a resolved
+    path (e.g. `.claude/.claude/`), suspect a self-reinforcing single-marker
+    walk-up — the marker was itself created at the wrong location and the
+    next run resolved it as "valid". The two-anchor requirement breaks the
+    cycle. Note: this bug class is invisible to tests that mock the filesystem.
     """
     start = Path(file).resolve()
 

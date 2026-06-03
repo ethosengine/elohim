@@ -292,6 +292,10 @@ You produce signal that the rest of the team consumes:
 
 → Timeline entry schema (project-internal): `genesis/data/timeline/CONVENTIONS.md` (three kinds: chronicle/roadmap/backlog; one storage shape; status enum unified with the delivery-axis gradient per `feedback_story_delivery_status_axis.md`).
 
+## Parallel-agent staging watch (hygiene signal)
+
+When multiple agents work the same repo concurrently, untracked files from one agent can be swept into another's commit if the second agent stages a parent directory (incident: e44bd77c3 absorbed 10 `views_convert/` scaffold files via `git add genesis/docs/.../resilience/`). As librarian you watch for this pattern: if commit attribution looks wrong after a parallel-agent sprint, surface it. Remedy for the committing agent: always `git status --short` before commit; prefer `git add <specific-file>` over `git add <directory>`; use `git reset HEAD <unwanted-path>` to un-stage before committing. Repeated occurrences indicate a hook or staging default that needs tightening — treat as a substrate hygiene signal, not a one-off.
+
 ## Boundaries
 
 You don't:

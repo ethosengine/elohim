@@ -163,6 +163,8 @@ Mirrors the struct one-to-one. Primary key `(observer_cid, log_cid, log_offset)`
 
 Migration documents source-of-truth: `-- Source of truth: iroh-blob log (per-observer, content-addressed). Classification: C.`
 
+**Observations are per-node primitives; cross-node rollups are a hub concern.** An `Observation` row is always an assertion about a single observer/node or its environment — never a sum/avg/count across the devices one human or household owns. Those aggregations (household-wide free storage, total committed bandwidth) are emergent properties of the hub surface, designed once the per-node primitives are mastered. The `observation_diversity_summary` (§6.2) rolls up *across observers of one subject* for anti-Sybil evidence — that is a substrate concern, distinct from rolling up *across one steward's own nodes*, which the hub owns. Don't add a metric to the observation schema that only makes sense as a multi-node total.
+
 ## 5. Substrate plane — wire, gossip, log
 
 The Observation plane is a new Track 2 plane sitting alongside the existing ten. Same dual-stack pattern: one wire spec, two ALPN registrations.
@@ -262,6 +264,8 @@ SELECT
 FROM observations
 GROUP BY subject_cid, observation_kind;
 ```
+
+**`archetype` and `compute_class` are independent axes — do not collapse them.** Hardware class (`archetype`) and which elohim/model runs (`compute_class`) correlate but address distinct capture surfaces: a high-compute pure-storage peer (no model) carries hardware diversity but zero judgment diversity; a modest-compute peer running a well-tuned elohim carries judgment diversity disproportionate to its hardware. Diversity that scores only on hardware can be Sybiled by a model-monoculture across varied hardware. The substrate therefore tags and counts both axes separately, and graduation policy can demand thresholds on either.
 
 ### 6.3 Trust-then-verify
 

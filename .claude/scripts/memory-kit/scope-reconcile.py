@@ -282,6 +282,13 @@ def reconcile(apply: bool) -> int:
         print(f"  ⚠ HELD-STAYS  {d.relative_to(ROOT)}  (no parseable requires_env — cannot confirm safe to publish; operator triage)")
     for d, unk in vocab:
         print(f"  ⚠ VOCAB  {d.relative_to(ROOT)}  requires_env {unk} unknown to cluster-state (reconcile the name)")
+    if apply:
+        # Keep the co-located focus baseline (.claude/subject-focus.md) in lockstep with the plate, so
+        # a fresh agent reads an always-current "what's in focus vs held" without running anything.
+        subprocess.run(
+            [sys.executable, str(Path(__file__).resolve().parent / "focus-baseline.py"), "--write"],
+            cwd=str(ROOT), capture_output=True,
+        )
     verb = "APPLIED" if apply else "DRY-RUN"
     print(f"scope-reconcile [{verb}]: available={sorted(avail) or '(none)'}")
     print(f"  → held: {len(to_held)}   ← live: {len(to_live)}")

@@ -52,6 +52,8 @@ memory_anchors:
 
 **The bridge speaks both worlds honestly.** VF-shaped requests are answered in VF shape; underneath, the substrate stays elohim. The translator's job is to make the seams *legible* — to clients (via structured error payloads, extension fields, denial reasons), to operators (via the learning ledger), and to upstream maintainers (via the upstream-contribution inventory that aggregates what we've learned is genuinely worth carrying back to VF/hREA proper). Faithful translation, not absorption masquerading as cooperation.
 
+**Don't conflate the substrate with the app layer (the recurring trap).** The EPR codec/storage/libp2p layer (signed envelopes with reach/coupling/claims over a federation transport) is the *graph primitive* — and it is tempting to look at "EPR works, it's graph-shaped, it federates" and conclude VF/hREA alignment is therefore done. It is not. VF-GraphQL is an *application layer* that builds **on** EPR: an Apollo subgraph, `@valueflows/vf-graphql-holochain`, Resource/Event/Agent types, a `.graphql` schema, the translator and authority gate in this spec. The litmus test: until there is a `/api/v1/vf-graphql` endpoint and a VF schema document, hREA alignment is unstarted regardless of how much EPR substrate has landed. This spec is that app layer; it does not replace the primitive, it consumes it.
+
 ## 2. Architecture
 
 ### 2.1 Top-level layout

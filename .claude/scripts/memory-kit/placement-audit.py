@@ -341,6 +341,9 @@ def focus_mode():
         print(f"    ⛔ {f.relative_to(ROOT)}   needs {e} → missing {miss}")
     if not blocked:
         print("    (none)")
+    print("\n  NOTE: this lists only .md docs that DECLARE requires_env. The a2o TEST SURFACE (per-subject")
+    print("  in-focus vs held features/scenarios) is the generated baseline → .claude/subject-focus.md")
+    print("    drill in: python3 .claude/scripts/memory-kit/focus-baseline.py [--subject <name>]")
     print("\n  → Edit cluster-state.yaml and re-run: scope cascades immediately.")
     return 0
 

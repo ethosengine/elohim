@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-Polyglot monorepo for the Elohim Protocol - a distributed learning platform built on Holochain, Angular, and Rust. The main branch is `dev`.
+Polyglot monorepo for the Elohim Protocol - a distributed learning platform built on Holochain, Angular, and Rust. `dev` is the integration target (not a protected default): feature branches land on `dev` via local fast-forward merge — no PR. Release-grade PR review happens at `dev → main`.
 
 ## Build & Test Commands
 
@@ -30,6 +30,7 @@ RUSTFLAGS="" cargo build --release && cargo test --lib --bins && cargo clippy --
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 cargo test export_bindings         # Regenerate TypeScript types
 ```
+Prefer `cargo nextest run` over `cargo test` for unit/integration runs (installed at `/opt/rust/cargo/bin/cargo-nextest`; parallel, faster on warm caches; same `--lib`/`--test <name>`/filter syntax). It does NOT replace `cargo test export_bindings` (separate ts-rs harness) and skips `#[ignore]` by default like `cargo test`.
 
 ### Other Angular surfaces
 - `doorway/doorway-app/`: `pnpm start | build`; lint via `pnpm exec eslint src --ext .ts,.html`
@@ -45,6 +46,8 @@ cd sophia && pnpm install && pnpm build && pnpm test [-- --filter sophia-core] &
 pnpm run schema:{test,validate,check-dna,codegen:ts}
 ```
 The `.husky/pre-push` hook auto-detects changed projects and runs their quality gates. Bypass with `git push --no-verify` (NOT `HUSKY=0` — `core.hooksPath=.husky` makes git invoke the hook directly, bypassing the npm wrapper that honors the `HUSKY` env var, so `HUSKY=0` is a no-op here; this doc-vs-behavior drift has cost shift time 4×).
+
+The hook has TWO project-detection paths that emit DIFFERENT names: manifest-driven (`graph-walker.mjs`, fine-grained names like `epr-ts`) and a grep fallback (coarser names like `elohim-epr`). When adding a sub-project to any `build-manifest.json` `gate.projects` map, also add a matching case to `run_gate`'s fallback `case` statement — a missing case hits the `*) Unknown project` default and aborts the whole push.
 
 ## Architecture
 
@@ -74,6 +77,8 @@ Types flow from Rust through auto-generation to TypeScript:
 
 **Key rule**: snake_case never leaves the Rust boundary. TypeScript receives camelCase with parsed JSON and proper booleans. No `JSON.parse()`, no case conversion, no `toWire/fromWire` functions in TypeScript.
 
+**ts-rs cross-crate trap**: ts-rs computes import paths in generated TS from the Rust *source* crate's location, not the `export_to` directory. Moving a ts-rs-anchored type into a different crate while consumers stay put emits broken `../../../../` import paths in every referencing `.ts`. Move ALL `#[derive(TS)]` types together to one crate in a single atomic migration — never partial/incremental cross-crate moves — and verify byte-identical generated TS via sha256 diff.
+
 ### Sophia Integration
 
 Sophia (forked from Khan Academy Perseus) renders assessments in three modes: mastery (graded), discovery (psychometric), reflection (open-ended). It distributes as a web component `<sophia-question>` via `sophia-element` UMD bundle, wrapped for Angular by `sophia-plugin` in elohim-library.
@@ -99,6 +104,10 @@ The app runs in four modes with different content loading paths:
 - **Local dev**: Same proxy pattern
 - **Production**: Browser direct to doorway.elohim.host
 - **Tauri desktop**: Direct HTTP to local elohim-storage sidecar at :8090
+
+**DNA changes don't redeploy by default**: a DNA-content change (new hash, same role structure) does NOT reach running conductors on a normal edge redeploy — the conductor data dir is a persistent PVC and the install stale-check is role-structure-only, so a new hash reads as "not stale." Forcing a reinstall is gated behind `ALLOW_DNA_REINSTALL` (default false; reinstall mints a new agent key, which on prod needs migration/lineage, not a blind wipe). Wired per-env in `elohim/holochain/Jenkinsfile` (non-prod=true). If you force-reinstall on some peers but not all in a namespace, they land on different DNA hashes → different DHTs → P2P partition; the alpha genesis pair must both get the flag.
+
+**Cluster ops are operator-owned**: never run `kubectl` (read or write) from the dev environment. "Clean up X resource" / "fix the live ingress" means make the repo manifests in `genesis/manifests/` (and orchestrator manifests) coherent so the next pipeline reconciles — the repo is the cleanup surface, the live cluster is the operator's. Read cluster state via Jenkins MCP or in-repo manifests, not `kubectl get`.
 
 ## Development Workflow
 
@@ -198,6 +207,10 @@ Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives G
 Pipeline metadata is declared in per-project `build-manifest.json` files. The `genesis/orchestrator/graph-walker.mjs` + `build-graph.groovy` walk these manifests to build a dependency graph and determine which pipelines to trigger. `pipeline-registry.mjs` exposes the metadata to JavaScript consumers.
 
 **Force dispatch:** Use commit tag syntax `[build:edge|dna|app|genesis|sophia|steward|all]` to force-dispatch specific pipelines on any trigger type (webhook, timer, manual, replay). Example: `git commit --allow-empty -m "test E2E [build:edge]"`.
+
+**Jenkins MCP is anonymous (OIDC-protected):** all `mcp__jenkins__*` READ tools work; `triggerBuild`/`updateBuild` are denied — don't call them. Trigger builds only via a fresh `git push` with a `[build:*]` tag. Never add an `Authorization` header to the MCP registration (it triggers a 50-redirect OIDC login loop).
+
+**New Jenkinsfiles:** any in-container git op (other than `checkout scm`) needs `sh 'git config --global --add safe.directory "*"'` first, or git fails with `dubious ownership` (checkout runs as a different UID than the build container). The multibranch job `elohim-holochain` loads the **DNA** Jenkinsfile (`elohim/holochain/dna/Jenkinsfile`), NOT the edge one — verify via the console's `Obtained …/Jenkinsfile from <sha>` line before editing "the holochain Jenkinsfile."
 
 | Pipeline | Jenkinsfile | Manifest |
 |----------|-------------|----------|
