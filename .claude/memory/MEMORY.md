@@ -61,7 +61,7 @@
 - [Shem is the live P2P canvas](project_shem_is_p2p_live_canvas.md) — Matthew/Jessica/James on household; others on shem; cross-node proves P2P.
 - [Compute and model are independent axes](project_compute_and_model_independent_diversity_surfaces.md) — hw+model; correlate but stay independent.
 - [Three-layer truth model + DHT scoping](project_three_layer_truth_model.md) — DHT=notary (expensive), libp2p=data-ops (cheap), doorway=web2 projection; see also _dht_vs_libp2p_scoping.
-- [Humans register with multiple doorways](project_multi_doorway_human_registration.md) — multi-registration = resiliency; flows doorway-agnostic.
+- [Humans register with multiple doorways](project_multi_doorway_human_registration.md) — aspiration: multi-registration = resiliency, doorway-agnostic flows; today (2026-05-27): single-primary per-human from nodeTypes (Jenkinsfile-driven); 3 layers block true multi (HC conductor singular bootstrap_url, doorway federation OutboundOnly stub, session.doorway_url single-string pin).
 - [Account layer — OAuth graduation](project_peer_native_account_canonical_surface.md) — doorway as OAuth RP; post-graduation loses identity agency.
 - [Imagodei three surfaces](project_imagodei_three_surfaces.md) — social profile / self-knowledge / account mgmt; M5 lands #3.
 - [M5 — auth-portal convergence + SDK sprint](project_m5_reframe_auth_portal_convergence.md) — hosted-doorway + peer-native-steward via account mgmt; SDK deliverable, UI min scaffold.
