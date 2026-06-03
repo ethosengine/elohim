@@ -24,7 +24,7 @@ Feature: Human Resilience Profile
 
   # --- Household Reciprocation --------------------------------------------
 
-  @wip
+  @wip @requires:shem
   Scenario: Matthew + Susan — household reciprocation, partial protection
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Susan" is in Matthew's household with relationship "spouse"
@@ -36,7 +36,7 @@ Feature: Human Resilience Profile
 
   # --- Community Depth ----------------------------------------------------
 
-  @wip
+  @wip @requires:shem
   Scenario: Matthew + Susan + Pete — community depth through trust topology
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Susan" is in Matthew's household with relationship "spouse"
@@ -52,7 +52,7 @@ Feature: Human Resilience Profile
 
   # --- Full Network -------------------------------------------------------
 
-  @wip
+  @wip @requires:shem
   Scenario: Full network — 5 conductors, protected
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Susan" is in Matthew's household with relationship "spouse"
@@ -79,7 +79,7 @@ Feature: Human Resilience Profile
 
   # --- Building Resilience ------------------------------------------------
 
-  @wip
+  @wip @requires:shem
   Scenario: Maria builds resilience through first connection
     Given human "Maria" is logged in on doorway "alpha" with device
     And Maria is connected with Susan via relationship "neighbor"
@@ -91,7 +91,7 @@ Feature: Human Resilience Profile
 
   # --- Degradation --------------------------------------------------------
 
-  @wip
+  @wip @requires:shem
   Scenario: Degradation — Matthew goes offline, Susan's resilience drops
     Given human "Susan" is logged in on doorway "alpha" with device
     And Susan previously had protection status "protected"
@@ -102,7 +102,7 @@ Feature: Human Resilience Profile
 
   # --- Recovery -----------------------------------------------------------
 
-  @wip
+  @wip @requires:shem
   Scenario: Recovery — after-action review when Matthew returns
     Given human "Susan" is logged in on doorway "alpha" with device
     And Susan had an active emergency mutual aid event

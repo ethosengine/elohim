@@ -1,4 +1,4 @@
-@e2e @content @epr @requires:doorway @requires:seeded-content
+@e2e @content @epr @requires:doorway @requires:seeded-content @requires:shem
 Feature: EPR Content Addressing
   As a learner navigating the protocol
   I want content links to resolve contextually

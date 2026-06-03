@@ -1,4 +1,4 @@
-@e2e @deployment @p2p @persona-testnet
+@e2e @deployment @p2p @persona-testnet @requires:shem
 Feature: Persona Testnet — 20 Humans on One Box
   As the Elohim Protocol,
   I want to simulate 20 real humans from genesis stories on a single machine

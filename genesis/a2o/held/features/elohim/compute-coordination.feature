@@ -1,4 +1,4 @@
-@e2e @elohim @compute
+@e2e @elohim @compute @requires:shem
 Feature: Elohim Compute Coordination
   As a learner interacting with the Elohim Protocol,
   I want compute resources to be coordinated transparently

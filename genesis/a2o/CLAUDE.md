@@ -23,6 +23,24 @@ Conceptual scenarios (in `genesis/docs/`) describe the human experience. Executa
 - Humans: use named personas (`Given human "Terrance" is logged in on doorway "alpha" with device`)
 - Add `@wip` to scenarios with unimplemented step definitions
 - Add `@regression` to scenarios that guard against specific past bugs
+- **Substrate scope: `@requires:<cap>`.** Tag a feature/scenario with `@requires:<cap>` when it needs a
+  substrate dependency point declared in `genesis/manifests/cluster-state.yaml` (`shem`,
+  `alpha-cluster-6peer`, …). This is the SETPOINT of a cybernetic scope reconciler with two arms that
+  share one vocabulary, so toggling a capability on/off cascades automatically:
+  - **Feature-level `@requires:<cap>`** (tag line above `Feature:`) ⇒ when `<cap>` is unavailable,
+    `scope-reconcile.py` git-mv's the WHOLE feature to `held/` — out of the cucumber glob AND out of
+    agentic-search/planning scope. Use when EVERY scenario needs the cap.
+  - **Scenario-level `@requires:<cap>`** (tag line above a `Scenario:`) ⇒ the feature stays live and the
+    `Before` gate in `steps/common.steps.ts` skips just that scenario at runtime (HELD, not failed). Use
+    for MIXED features where some scenarios are household-testable.
+  - **`shem` ≠ multi-node.** The household (matthew/jessica/james) is itself a 3-node cluster, so a
+    cross-node/`@requires:multi-node` scenario among them is household-testable — do NOT tag it `@requires:shem`.
+    Only the remote multi-tenant canvas (adam/caleb/pete/… or >3 independent peers) needs `shem`.
+  - Toggle a capability with `scope-reconcile.py --set <cap>=off|on [--apply]`; the runtime arm derives
+    from the same `cluster-state.yaml` (and the `ELOHIM_REMOTE_COMPUTE_STATUS` CI override for `shem`).
+    Caps NOT in cluster-state (`@requires:doorway`, `@requires:seeded-content`) are fixture preconditions,
+    not substrate gates — they're ignored by the scope reconciler. The primitive is
+    `src/framework/fixtures/substrate-scope.ts`; design: `genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md`.
 
 ## Watch-outs
 

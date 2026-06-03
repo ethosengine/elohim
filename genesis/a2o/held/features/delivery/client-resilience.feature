@@ -1,4 +1,4 @@
-@e2e @content @delivery @requires:doorway @requires:seeded-content
+@e2e @content @delivery @requires:doorway @requires:seeded-content @requires:shem
 Feature: Client Resilience — Service Worker and Capability Negotiation
   As a learner
   I want HTML5 apps to work offline after first load

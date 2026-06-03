@@ -15,7 +15,7 @@
         "remote"
       ],
       "genesisPeer": true,
-      "$genesisPeerComment": "Adam + Matthew form the genesis pair: each ingests content directly during seeding so the payload settles across two peers in parallel rather than serially through one. Re-armed 2026-05-18 with shem return (see $resumedComment) — bootstrap pair now active again on fresh agent key.",
+      "$genesisPeerComment": "Adam + Matthew form the genesis pair WHEN shem is available: each ingests content directly during seeding so the payload settles across two peers in parallel. Adam is remote-only (nodeTypes:['remote'], pinned to shem), so the seeder now HOLDS adam from the genesis set whenever the remote pool is down (ELOHIM_REMOTE_COMPUTE_STATUS=unavailable / cluster-state.yaml shem:false) and matthew (household) carries genesis alone. The gate is at CONSUMPTION (genesis/Jenkinsfile runContentSeedStage substrate-aware filter), so this static genesisPeer:true stays correct-when-shem-is-up and no longer drifts as shem comes and goes (feedback_shem_down_peers_are_held).",
       "suspended": false,
       "$resumedComment": "shem returned 2026-05-18 (decommissioned 2026-05-04 PSU failure; 40 GiB openebs-hostpath PVC was unrecoverable). Re-enabling on fresh PVC — original seeded chain is lost, so seed will bootstrap a new agent key. Genesis pair (adam+matthew) reactivates without pipeline edit; pipeline tolerates 1..N genesis peers."
     },
@@ -34,7 +34,7 @@
         "performance"
       ],
       "genesisPeer": true,
-      "$genesisPeerComment": "Matthew + Adam form the genesis pair (see adam.$genesisPeerComment). Pair re-armed 2026-05-18 with shem return; pipeline tolerates 1..N genesis peers so the single-peer interlude was non-disruptive.",
+      "$genesisPeerComment": "Matthew + Adam form the genesis pair when shem is available (see adam.$genesisPeerComment). Matthew (household) is the always-on genesis peer; the seeder holds adam (remote-only) when shem is down, so matthew-carries-genesis-alone is the steady state while remote compute is unavailable. Pipeline tolerates 1..N genesis peers.",
       "$comment": "TEMP BUMP (2026-04-17): seeder routes all /account/import traffic through matthew-alpha's storage; 4Gi/2000m OOMed with RESTARTS=2 serving 3409 content items to 33 parallel imports. Archetype floor for device-family-node-base is 1Gi/4Gi + 500m/2000m — restore once seeder import is split across peers or backpressure lands.",
       "edgenodeMemoryRequest": "2Gi",
       "edgenodeMemoryLimit": "8Gi",
@@ -84,13 +84,14 @@
       "template": "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml",
       "deviceArchetype": "device-chromebook-edu",
       "affinityComment": "James: stewarded minor — Dowell household peer (matthew+jessica guardians); pinned to the on-prem cluster (operations/edge/performance), MUST NOT land on shem (remote). Family-three split per 2026-05-27 placement directive: Matthew/Jessica/James stay on hostpath StatefulSets backed by Jiva-excluded-from-shem; every other persona moves to shem. New deployment 2026-05-18; bumped to typical-steward 2026-05-22 after OOM (see $comment).",
+      "$memoryBumpComment": "2026-06-03: edgenodeMemoryLimit 1536Mi → 3Gi (request 512Mi → 768Mi) to mirror jessica's household-member profile. James OOMKilled repeatedly at 1536Mi — the household must be solid because it carries the run when shem is down (the 2026-05-22 'bumped to typical-steward' claim above never reached the data; this fulfils it). Consolidated template reads these values; per-human manifest genesis/manifests/humans/james-son.yaml mirrors the same ceiling.",
       "nodeTypes": [
         "operations",
         "edge",
         "performance"
       ],
-      "edgenodeMemoryRequest": "512Mi",
-      "edgenodeMemoryLimit": "1536Mi",
+      "edgenodeMemoryRequest": "768Mi",
+      "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
       "edgenodeCpuLimit": "2000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m → 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 — accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md"

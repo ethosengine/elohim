@@ -17,6 +17,8 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { parseResourceAvailability } from './substrate-scope.js';
+
 import type { HumanCredentials } from '../human.js';
 
 // ---------------------------------------------------------------------------
@@ -312,34 +314,17 @@ export type RemoteComputeStatus = 'available' | 'unavailable' | 'unknown';
  * .claude/scripts/memory-kit/scope-reconcile.py. */
 const REMOTE_COMPUTE_RESOURCE = 'shem';
 
-/** Derive remote-compute status from cluster-state.yaml (the durable home).
- * Returns 'available'/'unavailable' when the file is readable, or null when it
- * is not — the caller then applies the legacy fail-open. Line-based parse that
- * mirrors scope-reconcile.py's _parse_cluster() (a2o has no YAML dep, and the
- * file's shape is stable: `resources:` → `  <name>:` → `    available: true`).
- * shem is available iff its `available` value is exactly `true` — false and
- * degraded are NOT available (the conservative read for a cross-node canvas). */
-/** Line-based scan of cluster-state.yaml text for shem's availability. Mirrors
- * scope-reconcile.py's _parse_cluster(): walk `resources:` → `  <name>:` →
- * `    available: <v>`; shem available iff its value is exactly `true`. shem
- * absent / no `available:` line → unavailable (not declared available). */
+/** shem availability from cluster-state.yaml text, as a RemoteComputeStatus. Delegates the generic
+ * parse to substrate-scope (one parser for every cap); shem is available iff its `available:` value
+ * is exactly `true` — `false`/`degraded`/absent all read as 'unavailable' (the conservative read for
+ * a cross-node canvas). */
 function parseShemAvailability(raw: string): RemoteComputeStatus {
-  let inRemoteBlock = false;
-  for (const line of raw.split('\n')) {
-    // a top-level resource entry: `  <name>:` (two-space indent, then EOL)
-    const head = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line);
-    if (head) {
-      inRemoteBlock = head[1] === REMOTE_COMPUTE_RESOURCE;
-      continue;
-    }
-    if (!inRemoteBlock) continue;
-    const avail = /^ {4}available:\s*(\S+)/.exec(line);
-    if (avail) return avail[1] === 'true' ? 'available' : 'unavailable';
-    // a sibling two-space key ends the block; deeper-indented role/note
-    // continuation lines stay inside it harmlessly.
-    if (/^ {2}\S/.test(line)) inRemoteBlock = false;
-  }
-  return 'unavailable';
+  // Delegate the generic line-based parse to substrate-scope (one parser for every cap). shem is
+  // available iff its `available:` value is exactly `true`; `false`/`degraded`/absent all read as
+  // 'unavailable' — the conservative read for a cross-node canvas.
+  return parseResourceAvailability(raw, REMOTE_COMPUTE_RESOURCE) === 'available'
+    ? 'available'
+    : 'unavailable';
 }
 
 function deriveRemoteComputeFromClusterState(): RemoteComputeStatus | null {

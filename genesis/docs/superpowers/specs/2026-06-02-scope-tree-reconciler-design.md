@@ -128,3 +128,31 @@ The runtime probe already *observed* reality: `genesis/Jenkinsfile`'s `Probe Sub
 - **Fingerprint scope**: hash the whole file, or a canonical content region (so a frontmatter edit doesn't trip `STALE-CANDIDATE`)?
 - **held/ root granularity**: one `held/` per artifact tree (`a2o/held/`, `docs/superpowers/held/`) vs a single repo-root `held/` mirror?
 - **Specs that cite a held spec**: does the citing spec itself get held, or just carry a `HELD-CITE`? (Lean: carry the note; holding is driven only by `requires_env`, not by transitive citation.)
+
+## 9. Runtime arm — the a2o `@requires:<cap>` skip gate (landed 2026-06-03)
+
+The §3 planning arm (move whole artifacts live↔held) now has a **runtime twin**, so the SAME
+`@requires:<cap>` vocabulary cascades into the executable test layer — not just the planner's scan path. The
+reconciler became a cybernetic control loop over the agentic-memory corpus: `cluster-state.yaml` is the
+sensor, `@requires:<cap>` the setpoint, the mover + the runtime gate the actuators, the SessionStart gate the
+feedback.
+
+- **Feature-level `@requires:<cap>`** → the planning arm git-mv's the whole `.feature` to `held/` (out of the
+  cucumber glob + agentic search). Unchanged from §3.
+- **Scenario-level `@requires:<cap>`** → a `Before` hook in `genesis/a2o/steps/common.steps.ts` reads the
+  scenario's tags and returns `'skipped'` when any required cap is unavailable — so a MIXED feature stays live
+  and only its capability-bound scenarios are held at runtime. This closes the seam where a scenario needed
+  the remote canvas but didn't name a remote-only persona, so it ran against down pods and failed (masking
+  the real signal).
+- The runtime reader is `genesis/a2o/src/framework/fixtures/substrate-scope.ts` — a cap-generic primitive over
+  `cluster-state.yaml` (env override → durable home → fail-open-only-if-undeclared), mirroring
+  `_lib/env_scope.py`. `humans.ts`'s shem-specific RemoteCompute API now delegates to it.
+- The CI probe (`genesis/Jenkinsfile probeRemotePoolStatus`) reconciles a blind kubectl probe to
+  `cluster-state.yaml` (the same durable home) rather than failing OPEN, so the three homes —
+  `cluster-state.yaml`, `ELOHIM_REMOTE_COMPUTE_STATUS`, and the held/ tree — cannot disagree.
+
+Net: `scope-reconcile.py --set <cap>=off|on` is a complete **bidirectional toggle over any dependency point** —
+it moves whole-cap features to/from held/ AND the runtime gate skips/restores scenario-level ones, for any
+capability in cluster-state.yaml. First exercised for `shem` (13 features held, 13 mixed scenario-gated) on
+2026-06-03. **Footgun:** `--set <cap>=off|on` *without* `--apply` still writes the durable home (only the
+move is dry-run) — flipping it leaves cluster-state changed even in "preview".

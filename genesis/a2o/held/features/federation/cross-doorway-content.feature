@@ -1,4 +1,4 @@
-@e2e @federation @staging
+@e2e @federation @staging @requires:shem
 Feature: Cross-Doorway Content Discovery
 
   Two humans on different doorways can create and discover each other's content

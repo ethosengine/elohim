@@ -16,14 +16,14 @@ Feature: Matthew sees real topology data after M1 substrate completion
     And the storage usage tile shows non-zero total bytes for his blob filesystem
     And the storage usage tile shows non-zero used bytes
 
-  @wip
+  @wip @requires:shem
   Scenario: Peer topology page shows Terrance's household
     When Matthew opens the peer topology page at "/shefa/peers"
     Then he sees a peer-household-card for household-terrance
     And the peer-household-card displays Terrance's display name
     And the card displays Terrance's household as a connected peer
 
-  @wip
+  @wip @requires:shem
   Scenario: Reciprocity page shows inflow from Terrance
     When Matthew opens the reciprocity page at "/shefa/reciprocity"
     Then he sees at least one inflow row whose counterparty is household-terrance

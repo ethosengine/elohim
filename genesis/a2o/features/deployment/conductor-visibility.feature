@@ -24,12 +24,14 @@ Feature: Conductor Pool Visibility
     Then the conductor agents response should include the conductor ID
     And the agents list should be an array
 
+  @requires:shem
   Scenario: Matthew checks which conductor hosts a user
     Given human "Susan" is logged in on doorway "alpha"
     When Matthew looks up which conductor hosts Susan
     Then the agent conductor lookup should return a conductor ID
     And the lookup should include the conductor URL
 
+  @requires:shem
   Scenario: Non-admin cannot access conductor pool
     Given human "Susan" is logged in on doorway "alpha"
     When Susan attempts to access the conductor pool

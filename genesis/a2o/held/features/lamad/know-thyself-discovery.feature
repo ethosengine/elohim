@@ -1,4 +1,4 @@
-@e2e @lamad @browser-only @discovery
+@e2e @lamad @browser-only @discovery @requires:shem
 Feature: Know Thyself Discovery Path
   As a learner beginning their self-discovery journey,
   I want to complete discovery assessments on the know-thyself path,

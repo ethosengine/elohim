@@ -1,4 +1,4 @@
-@e2e @lamad @love-map
+@e2e @lamad @love-map @requires:shem
 Feature: Love Map Path Negotiation
   As intimate partners (Adam and Eve),
   we want to negotiate and follow an emergent learning path together,

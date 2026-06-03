@@ -144,26 +144,59 @@ def getConductorAppUrls() {
 }
 
 /**
- * Probe the "remote" k8s node pool (shem) and return the substrate signal
- * the whole pipeline reconciles to: 'available' | 'unavailable' | 'unknown'.
+ * Derive shem availability from the durable home (genesis/manifests/cluster-state.yaml) — the CI
+ * twin of humans.ts deriveRemoteComputeFromClusterState() / substrate-scope.ts. Returns
+ * 'available'/'unavailable', or null when the file is unreadable (caller keeps the legacy
+ * fail-open). Line-based parse (no YAML dep on the agent): walk `  <name>:` → `    available: <v>`;
+ * shem available iff exactly `true`. shem block absent / no available: line → 'unavailable'
+ * (the conservative read for a cross-node canvas).
+ */
+def deriveRemoteComputeFromClusterState() {
+    def path = 'genesis/manifests/cluster-state.yaml'
+    if (!fileExists(path)) { return null }
+    boolean inShem = false
+    for (String ln : readFile(path).split('\n')) {
+        // A resource key: exactly 2-space indent then `<name>:` to EOL. `==~` returns a boolean, so
+        // no non-serializable Matcher is retained across the loop — CPS-safe (the file's idiom).
+        if (ln ==~ /^ {2}[A-Za-z0-9_-]+:\s*$/) {
+            inShem = (ln.trim() == 'shem:')
+            continue
+        }
+        if (!inShem) { continue }
+        def t = ln.trim()
+        if (t.startsWith('available:')) {
+            def val = t.substring('available:'.length()).trim().split(/\s+/)[0]
+            return (val == 'true') ? 'available' : 'unavailable'
+        }
+    }
+    return 'unavailable'
+}
+
+/**
+ * Probe the "remote" k8s node pool (shem) and return the substrate signal the whole pipeline
+ * reconciles to: 'available' | 'unavailable'. (Never 'unknown' — a blind probe RECONCILES.)
  *
- * This is the single toggle the deployment-wait, seeder, and a2o test bench
- * all key off (via env.ELOHIM_REMOTE_COMPUTE_STATUS). The P2P substrate itself stays
- * k8s-blind — this CI-layer probe only exists so the planning/test scope
- * reconciles to the available compute as the hardware substrate shifts.
+ * This is the single toggle the deployment-wait, seeder, and a2o test bench all key off (via
+ * env.ELOHIM_REMOTE_COMPUTE_STATUS). The P2P substrate itself stays k8s-blind — this CI-layer probe
+ * only exists so the planning/test scope reconciles to the available compute as the hardware shifts.
  *
- * Semantics (fail-OPEN so a probe outage never blocks a run):
- *   - cluster unreachable (kubectl can't list nodes) → 'unknown'  (treat as up)
+ * Semantics:
  *   - shem Ready=True                                → 'available'
  *   - shem Ready=Unknown/False, or node absent       → 'unavailable'
+ *   - cluster unreachable (kubectl blind from this agent) → RECONCILE to cluster-state.yaml (the
+ *     durable home) instead of failing OPEN. A blind probe must NOT silently treat shem as up —
+ *     that runs shem scenarios against down pods and masks the real test-layer signal. The two
+ *     signal homes (cluster-state.yaml + ELOHIM_REMOTE_COMPUTE_STATUS) cannot disagree
+ *     (project_ci_reconciles_to_substrate_signal). Only if cluster-state.yaml is itself unreadable
+ *     do we keep the legacy fail-open ('available').
  *
- * The doc contract lives in genesis/a2o/src/framework/fixtures/humans.ts
- * (ELOHIM_REMOTE_COMPUTE_STATUS / isRemoteComputeAvailable / isHumanDeployed).
+ * The doc contract lives in genesis/a2o/src/framework/fixtures/humans.ts + substrate-scope.ts
+ * (ELOHIM_REMOTE_COMPUTE_STATUS / isRemoteComputeAvailable / isHumanDeployed / @requires:<cap>).
  */
 def probeRemotePoolStatus() {
     def status = sh(returnStdout: true, script: '''#!/bin/bash
         set -uo pipefail
-        # Fail-open: if we can't even list nodes, the probe is blind → unknown.
+        # Blind probe: if we can't even list nodes, say so — the caller reconciles to cluster-state.
         if ! kubectl get nodes >/dev/null 2>&1; then
             echo "unknown"; exit 0
         fi
@@ -175,7 +208,17 @@ def probeRemotePoolStatus() {
             echo "unavailable"
         fi
     ''').trim()
-    return (status in ['available', 'unavailable', 'unknown']) ? status : 'unknown'
+    if (!(status in ['available', 'unavailable', 'unknown'])) { status = 'unknown' }
+    if (status == 'unknown') {
+        def derived = deriveRemoteComputeFromClusterState()
+        if (derived != null) {
+            echo "ℹ️  Probe blind (kubectl unreachable) — reconciling to cluster-state.yaml: shem=${derived}"
+            return derived
+        }
+        echo "⚠️  Probe blind AND cluster-state.yaml unreadable — keeping legacy fail-open (available)."
+        return 'available'
+    }
+    return status
 }
 
 /**
@@ -186,22 +229,29 @@ def probeRemotePoolStatus() {
  * source of truth the test bench reads). Returns [] on any parse failure
  * (fail-open: a banner is informational, never a gate).
  */
-def remoteOnlyPersonas() {
+def remoteOnlyHumanRecords() {
     def path = 'genesis/orchestrator/data/deployments.json'
     if (!fileExists(path)) { return [] }
     try {
         def data = new groovy.json.JsonSlurper().parseText(readFile(path))
-        return (data.humans ?: [])
-            .findAll { h ->
-                def nt = h.nodeTypes ?: []
-                !h.suspended && nt && nt.every { it == 'remote' }
-            }
-            .collect { it.name }
-            .sort()
+        return (data.humans ?: []).findAll { h ->
+            def nt = h.nodeTypes ?: []
+            !h.suspended && nt && nt.every { it == 'remote' }
+        }
     } catch (Exception e) {
-        echo "WARN: remoteOnlyPersonas() parse failed (banner only): ${e.message}"
+        echo "WARN: remoteOnlyHumanRecords() parse failed: ${e.message}"
         return []
     }
+}
+
+def remoteOnlyPersonas() {
+    return remoteOnlyHumanRecords().collect { it.name }.findAll { it }.sort()
+}
+
+/** humanIds (e.g. 'human-adam-firstman') of remote-only personas — the seeder keys genesis-peer
+ * holding off these, since the seeder topology carries humanId, not the short name. */
+def remoteOnlyHumanIds() {
+    return remoteOnlyHumanRecords().collect { it.humanId }.findAll { it }.sort()
 }
 
 /**
@@ -251,10 +301,9 @@ def probeSubstrateScope() {
    Seeder will seed whoever is ready; a2o will gate remote-only scenarios.
    This run is intentionally UNSTABLE (loud signal), not FAILED — re-run
    when shem returns to restabilize to full topology."""
-    } else if (remoteComputeStatus == 'unknown') {
-        echo """ℹ️  Probe blind (cluster unreachable from this agent) — failing OPEN.
-   Treating remote pool as available; per-peer readiness probes still apply."""
     } else {
+        // probeRemotePoolStatus() reconciles a blind probe to cluster-state.yaml, so the status is
+        // always 'available' or 'unavailable' here — never a fail-open 'unknown'.
         echo "✅ Full topology available — no reduced-scope gating this run."
     }
 
@@ -291,8 +340,28 @@ def probeSubstrateScope() {
 def runContentSeedStage() {
     def humans = getHumanStorageUrls('alpha')
     def genesisPeers = humans.findAll { it.genesisPeer == true }
+
+    // Substrate-aware genesis set: a remote-only genesis peer (e.g. adam, hard-pinned to shem) cannot
+    // ingest while the remote pool is down — drop it so the seeder doesn't wait 120s on a known-down
+    // peer and so no e2e expects content from it. The household genesis peer (matthew) carries the
+    // run. This reconciles to the substrate signal (env override wins, else cluster-state) instead of
+    // a static genesisPeer flag that drifts as shem comes and goes (feedback_shem_down_peers_are_held;
+    // adam's genesisPeer:true stays correct-when-shem-is-up — the GATE is at consumption, here).
+    def remoteStatus = env.ELOHIM_REMOTE_COMPUTE_STATUS
+    if (!(remoteStatus in ['available', 'unavailable'])) {
+        remoteStatus = deriveRemoteComputeFromClusterState() ?: 'available'
+    }
+    if (remoteStatus == 'unavailable') {
+        def remoteIds = remoteOnlyHumanIds()
+        def heldGenesis = genesisPeers.findAll { remoteIds.contains(it.humanId) }
+        if (!heldGenesis.isEmpty()) {
+            echo "🛰️  Holding remote-only genesis peer(s) while shem is down: ${heldGenesis.collect { it.humanId }.join(', ')} — household genesis (matthew) carries ingest."
+        }
+        genesisPeers = genesisPeers.findAll { !remoteIds.contains(it.humanId) }
+    }
+
     if (genesisPeers.isEmpty()) {
-        error("No genesis peer found in topology — at least one human in deployments.json must have genesisPeer:true (and must not be suspended). See genesis/orchestrator/data/deployments.json.")
+        error("No genesis peer found in topology — at least one non-remote human in deployments.json must have genesisPeer:true (and must not be suspended), OR the remote pool must be available. See genesis/orchestrator/data/deployments.json + genesis/manifests/cluster-state.yaml.")
     }
     def replicaPeers = humans.findAll { it.genesisPeer != true }
 
