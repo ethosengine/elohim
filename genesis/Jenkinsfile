@@ -1848,7 +1848,18 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         npx cucumber-js --tags '@e2e and not @browser-only and not @local and not @wip' \
                                         --format progress-bar \
                                         --format json:reports/cucumber-report.json \
-                                        --format html:reports/cucumber-report.html
+                                        --format html:reports/cucumber-report.html || CUCUMBER_EXIT=\$?
+
+                                    # Snapshot the API run's JSON before the browser stage clobbers it:
+                                    # cucumber.mjs's base config writes reports/cucumber-report.json on
+                                    # EVERY run (including the browser one), so without this copy the
+                                    # API sprint-report is silently built from BROWSER-stage data
+                                    # (diagnosed on genesis #1077: "API" report = 42 @browser-only scenarios).
+                                    cp -f reports/cucumber-report.json reports/cucumber-report-api.json || true
+
+                                    if [ "\${CUCUMBER_EXIT:-0}" -ne 0 ]; then
+                                        exit "\${CUCUMBER_EXIT}"
+                                    fi
 
                                     echo "✅ API E2E tests passed"
                                 """
@@ -1910,12 +1921,19 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                         // --- Sprint-report aggregator (API run) ---
                         // Always runs (pass or fail). Non-blocking: report is informational, not a gate.
+                        // NOTE: invoke tsx directly — `pnpm run X -- args` forwards a LITERAL `--`
+                        // (pnpm, unlike npm, does not consume the separator), which broke the
+                        // script's flag parsing so BOTH aggregators silently ran with all-default
+                        // flags (default cucumber path, default out paths, default profile).
+                        // Reads the cucumber-report-api.json snapshot (see API stage) so the API
+                        // report reflects the API run, not the browser run's clobbered JSON.
                         sh """
                           cd genesis/a2o
-                          pnpm run build:sprint-report -- \\
+                          pnpm exec tsx scripts/build-sprint-report.ts \\
                             --run-id \"${env.BUILD_TAG}\" \\
                             --profile \"\${CUCUMBER_PROFILE:-alpha}\" \\
                             --doorway \"\${E2E_DOORWAY_ALPHA:-}\" \\
+                            --cucumber reports/cucumber-report-api.json \\
                             || echo 'Sprint-report aggregator (API) failed (non-blocking)'
                         """
 
@@ -1926,7 +1944,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         if (env.PLAYWRIGHT_AVAILABLE == 'true') {
                             sh """
                               cd genesis/a2o
-                              pnpm run build:sprint-report -- \\
+                              pnpm exec tsx scripts/build-sprint-report.ts \\
                                 --run-id \"${env.BUILD_TAG}\" \\
                                 --profile browser \\
                                 --doorway \"\${E2E_DOORWAY_ALPHA:-}\" \\
