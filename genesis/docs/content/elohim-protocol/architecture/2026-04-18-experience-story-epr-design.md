@@ -181,6 +181,16 @@ Both are minted in the same coordinator call. They share `momentEntryHash`, `val
 
 Per the project's broader pattern (most elohim services are stubbed pending sophisticated implementations), the v1 mechanical discerner (§7) is itself a stub: a pure-function gate that fires deterministically given a moment and prior attestations. The real architecture is the **gate**, not the v1 implementation. Tests should mock the discernment call directly with explicit `(moment, priorAttestations) → Optional<StoryPointTag>` fixtures, exercising each valence at each magnitude. When sophisticated discernment lands (sophia-mediated, steward-curated, or REA-weighted), the gate doesn't move — the implementation behind it does.
 
+**The gate is an `elohim-agent` primitive, not an app concern.** Discernment is one instance of a cross-cutting class — comment reach checks, journal drafting, imagination-bounds, this experience-story gate all share the same shape: gather context → agent evaluates → render. That judgment belongs in `elohim-agent-service` as a `Gate` trait impl (Rust), where it inherits the constitutional-reasoning + audit-trail machinery (`ElohimCapability` + `ConstitutionalReasoning` + `AuditLog`). Three layers, never collapsed:
+
+| Layer | Where | Role |
+|-------|-------|------|
+| Gate-interface + impl | `elohim/elohim-agent/elohim-agent-service/` (Rust) | The `Gate` trait, registry, constitutional coupling. The §7 rule-logic (7 valences, ordering, 20% duration threshold) becomes the first `Gate` impl. |
+| Manifest gate declarations | `elohim/sdk/domains/*/manifest.json` | Declarative coupling: "contentType X uses gate Y." Emergent, not hardcoded. |
+| Sense-and-respond UX | `.ts` (elohim-library, elohim-app) | Gathers the moment/observation context, calls the agent via `elohim-agent-sdk` (`/invoke` sidecar), renders the response. **Never evaluates.** |
+
+Anti-pattern (a real incident drove this clarification): a pure-function discernment module in `elohim-library/*/discernment/` or an `elohim-app/*/services/judge*.ts`. If you catch yourself writing "judgment" logic (classify / discern / evaluate / gate) in TypeScript — even "temporarily, for testability" — stop and put it in elohim-agent. Implementing it per-app duplicates the pattern and bypasses the constitutional reasoning the agent already provides.
+
 ### 5.4 Compute fingerprint
 
 The fingerprint identifies the validating compute environment. Diversity of fingerprints attesting the same experience-story is the protocol's natural reach signal — it ports directly into brit/rakia's reach computation (`self → community → public`).

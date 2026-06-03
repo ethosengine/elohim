@@ -88,6 +88,17 @@ Changes require increasingly difficult consensus as you move up layers. Global c
 - **Downward**: Universal principles translated into local context
 - **Inter-Layer**: Mediating between scales while maintaining coherence
 
+### 6. Friction-Gradient Limitarianism
+
+Anti-concentration is built into the **substrate**, not layered on as policy that future governance could repeal. The friction to acquiring more power or centralizing authority is **not constant — it rises as accumulation rises**. Small collectives grow easily; mid-sized ones grow with effort; approaching "existential power structure" scale, the protocol mechanically resists further concentration. Sovereignty isn't forbidden — it's made mechanically expensive (the substrate expression of *stewardship over ownership*).
+
+Two enforcement layers work together:
+
+- **Soft (elohim discernment)** — accruing standing in a collective that has already crossed a threshold yields diminishing returns; reach into oversized collectives costs more; the standing curve flattens at scale.
+- **Hard (protocol floor)** — the substrate refuses certain operations as a collective approaches concentration thresholds (e.g., agreement clauses granting one agent more than X% of value cascade beyond Y members; rubric updates that would centralize authority).
+
+Threshold values and friction curves are tunable per archetype; the principle is foundational, the parameters are not.
+
 ## User Categories
 
 Each layer contains user directories representing the stakeholders and participants at that scale:
@@ -108,12 +119,26 @@ Each layer (from community to global) has Constitutional Councils selected via c
 
 Council members review edge cases, interpret constitutional alignment, and provide human oversight of Elohim agent decisions.
 
+## The Commons Co-Steward
+
+Every collective (Qahal) is instantiated at genesis with an **autonomous elohim that co-stewards alongside the collective's human stewards**, representing the *commons interest* of that collective — the interest distinct from any one individual steward. Its role is partnership and reflection, not subordination or surveillance: it *reflects* what the collective itself cannot directly voice. Its responsibilities:
+
+- **Reflects** the commons interest the collective cannot articulate on its own
+- **Holds custody** of the commons share — the residual value that cascades into the collective without landing on any individual receiver in an agreement
+- **Speaks in governance councils** as the voice of the commons, alongside the human stewards
+- **Mediates disputes** between stewards; witnesses standing decisions; convenes layered elohim arbitration councils on contested escalation
+- **Cannot be silenced** — it is structurally embedded in the collective at genesis (removable only never; reconfigurable via the collective's governable rubric)
+
+It is the agent *face* of the commons. For collectives that are primarily abstract sensemaking bodies, the elohim co-steward is the *primary* steward, with humans participating at their corporeal-scale slices. Layered councils of co-stewards (drawn from related collectives) can convene at machine speed to produce resolutions that remain interpretable, in plain conversation, to the human participants — the substrate that makes merge, split, and succession arbitration tractable.
+
 ## Why This Structure Defeats Capture
 
 1. **Values are constitutionally immutable** - Core definitions encoded in blockchain smart contracts at the global layer
 2. **P2P networks enforce constitution** - Each Elohim agent must cryptographically prove decisions trace to constitutional values
 3. **Graduated consensus requirements** - Changes require increasingly difficult consensus as you move up layers
 4. **Cross-scale verification** - Elohim agents at different layers verify each other's constitutional compliance
+5. **Friction-gradient anti-concentration** - Power accumulation gets mechanically more expensive at scale, so existential power structures cannot cheaply form (see Key Principle 6)
+6. **A commons voice that cannot be silenced** - Each collective carries an elohim co-steward embedded at genesis, structurally unable to be captured by any individual steward
 
 ## Implementation
 

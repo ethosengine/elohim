@@ -60,6 +60,13 @@ substrate self-tending without operator intervention.
 - Sccache, our live MinIO-backed build-cache substrate, is dogfooded as the
   first external-archive destination — and a new contributor's first cargo
   build participates in the cooperative compute substrate from day one.
+- **The quilt *is* the elohim-native S3 surface.** Any build-side or blob-cache
+  need (sccache, artifact stores) targets the quilt's `cid→blob` shape — never
+  AWS S3 / GCS / R2. Reaching for an external vendor couples the protocol's own
+  CI to the centralized substrate the protocol exists to subsume: the wrong
+  dependency direction, and a commitment that would have to be unwound when
+  quilt graduates. External object stores are legal only as `ExternalArchiveDriver`
+  *cellar destinations* (cold tier behind the shim), not as the primary surface.
 
 ### What this spec subsumes (and what it does not)
 
@@ -173,6 +180,32 @@ Approach B (collective-attested transitions) was rejected because every
 below-floor transition would couple to gossip round-trips. Approach C
 (per-household centralized orchestrator) was rejected because it creates
 a single point of failure and contradicts the P2P value pillar.
+
+### Maturity path: modeled-deterministic now, elohim-tuned later
+
+Tier-awareness is a placement axis that *rides on top of* the compute-reporting
+surface (per-node probes, peer archetype/capacity signals, gossip projections) —
+hot content settles on fast cache-tier peers, cold content on slow bulk-storage
+peers. The substrate carries that axis at two maturity stages, and the design
+must keep the path between them open:
+
+- **Now — modeled in genesis, deterministic.** Placement is decided by the
+  contract floor + the archetype-tuned `HeuristicClassifier` (a pure function of
+  observable signals). No per-node reasoning. This is the substrate floor doing
+  its job today.
+- **Later — elohim-operator-tuned.** Once real per-node elohim agents exist on a
+  dwelling hub, they add discernment *past* the modeled decisions (the
+  `FederatedDwellingDriver` policy is theirs; §11 defers it deliberately).
+
+The discipline this imposes on every wire/projection extension: thread the
+tier-awareness **hooks** (placement metadata on inventory-gossip deltas,
+`tier_*` event columns, the `cost_class` advisory) into the substrate *now*,
+even though only the deterministic classifier consumes them today — so the
+elohim-tuned stage plugs in without a wire-format migration. Never hardcode a
+single availability class. The same `peer_id → agent_cid → dwelling_hub_id`
+derivation that the placement prioritizer needs for its `recipient_hub_id` hint
+is *also* the missing piece for device→hub metric aggregation; build it once, as
+a reusable mapping, not a per-feature one-off.
 
 ---
 

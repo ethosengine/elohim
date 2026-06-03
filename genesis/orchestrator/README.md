@@ -106,6 +106,42 @@ The frequency-ranked, curated catalog of recurring CI/orchestrator/build failure
 **`genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md`**.
 Read it before debugging a "regression" or proposing a measure/baseline change — most of these have cost real shift time more than once and each carries the specific symptom + the fix.
 
+## Before Editing Orchestrator Dispatch Logic
+
+Read all four substrate pieces before touching Execute Builds, dispatch ordering, or trigger logic:
+- `orchestrator-strategy.mjs` — pure-JS algorithm mirror of the Groovy decision logic (`simulate`, `groupByDependencyLevel`, `propagateDependencies`)
+- `preview.mjs` — `just ci-preview`, runs `simulate()` locally pre-push to print predicted dispatch
+- `Jenkinsfile` `groupByDependencyLevel` and `triggerPipeline` (Groovy that mirrors strategy.mjs)
+- `orchestrator-strategy.test.mjs` — drift detector between Groovy and JS; keep it green
+
+Key invariants that naive edits break: `levelFailed` guard must abort downstream; baselines advance only after confirmed success; `cascades: false` pipelines (sophia, epr) opt out of downstream auto-include; Genesis is intentionally outside the levels loop. Any edit to `orderByDependencies`, `groupByDependencyLevel`, `propagateDependencies`, or the PIPELINES map **must** be mirrored in `orchestrator-strategy.mjs` — the test catches missed mirroring.
+
+Note: `graph-walker.mjs` is per-pipeline manifest-step gating (lint/test); `groupByDependencyLevel` is orchestrator-level dispatch ordering. Different layers, different concerns.
+
+## Predictive Build-Graph Vision
+
+The long-term target: predict what will run before you push, reconcile against what actually ran, and treat every disconnect as an investigation. Three-hour build runs hide cascading failures inside a single opaque "Execute Builds" stage; visible structure surfaces drift before it becomes a mystery.
+
+The substrate already exists — don't rebuild it:
+- `orchestrator-strategy.mjs` (`simulate()`) computes the predicted dispatch graph locally
+- `preview.mjs` runs it pre-push
+- `orchestrator-strategy.test.mjs` keeps Groovy/JS in sync
+
+Planned iterations (each safe to land independently):
+1. **Visibility** — nest stages inside Execute Builds so Blue Ocean shows level structure with per-pipeline timing. Presentation only, no behavior change.
+2. **Reconciliation artifact** — emit `predicted-build-graph.json` (from `simulate()`) and `actual-build-graph.json` (from Execute Builds results), then diff in a Reconcile stage.
+3. **Drift escalation** — any predicted-vs-actual disconnect marks UNSTABLE with an investigation pointer.
+
+## Seed Stage — Per-Peer, Not All-or-Nothing
+
+When one peer's conductor admin WebSocket is down, the seeder continues against ready peers and reports the unready one as partial — it does not abort the whole stage. Partial-cluster is the steady state in P2P architecture; an all-or-nothing seeder pretends the substrate is monolithic and masks per-peer health.
+
+Rules:
+- Readiness probes belong at the per-peer level; gate nothing globally on one pod's health.
+- Record a per-peer readiness snapshot at start; seed ready peers; surface unready peers in the report.
+- `actual-build-graph.json` `results` map carries per-peer status; downstream advisories decide whether partial-seed warrants UNSTABLE or informational.
+- E2E tests targeting a specific peer should skip-with-reason if that peer was unready, not fail-cascade.
+
 ## Troubleshooting
 
 **Q: Pipeline shows NOT_BUILT?**

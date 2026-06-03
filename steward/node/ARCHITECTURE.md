@@ -503,6 +503,19 @@ ws.onmessage = (event) => {
 
 ---
 
+## Configuration
+
+Node configuration is declarative YAML, not CLI args. CLI args are for dev convenience and one-off overrides only; the primary config path is a YAML file (see `elohim-node.toml` as the current seed) that can be schema-validated, version-controlled, and applied by automation.
+
+**Why:** The operator manages a fleet of nodes across blade servers — the mental model is `kubectl apply -f`. CLI flags don't compose for fleet management; schema-validatable YAML does.
+
+**Adding new configuration:**
+1. Define it in the YAML config file (not as a required CLI flag).
+2. Provide a JSON schema for validation (like `devices.schema.json`).
+3. CLI flag is fine as a dev-time override on top of the config.
+
+---
+
 ## Related Documentation
 
 - [P2P-DATAPLANE.md](../P2P-DATAPLANE.md) - Overall P2P architecture

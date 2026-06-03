@@ -495,6 +495,14 @@ Stage **only** the files you changed: `git add <explicit paths>` — never `git 
 
 `cargo fmt` + `clippy -D warnings` + the **full crate lib test** (not just the touched module — your reader feeds aggregators and routes). Per-crate green ≠ workspace green: a cross-crate `impl From<>` move or a ts-rs-anchored type change needs `cargo build --workspace` + a before/after `rg '^impl From<'` count (silent-drop guard). After editing libp2p swarm composition, build `elohim-storage` from a clean tree — a DNA-worktree `just check` verifies a different workspace ([[feedback_swarm_composition_fresh_tree_build]]). Sweep callers crate-wide (`rg <fn_name>`, including `tests/`) on any signature change. When clippy reports warnings, isolate yours from pre-existing/operator ones — fix yours, report theirs, don't clobber theirs. See [[feedback_signature_changes_grep_callers]], [[feedback_subagent_silent_impl_drops]], [[feedback_cascade_halt_masks_failures]].
 
+### Synthesize existing compute probes — never duplicate
+
+Before adding filesystem/capacity/memory probes to elohim-storage, grep for the existing foundation: `fs4::` (cross-platform statvfs wrapper already in deps), `heartbeat::measure_free_pct`, `cluster.rs Member.capacity_bytes`, `views.rs total_capacity_bytes` (custodians API). A new utility that *synthesizes* (calls `fs4::total_space` + adds CPU/memory probes) is fine; one that *duplicates* (raw `libc::statvfs` when fs4 covers it) is a regression — roll it back. The operator's rule: "complementary concerns handled elegantly is fine; duplication is not."
+
+### Dep-conflict supervision when dispatching
+
+When dispatching a subagent for any task that touches Cargo dep versions: explicitly forbid picking a different version than the plan specifies ("if `iroh X.Y.Z` doesn't work, report BLOCKED — do NOT pick a different version"). Forbid scope-creep into unrelated deps (`sha2`, `serde`, etc.); if they conflict, BLOCKED. Forbid "fix in future task" comments — each task must be complete on its own. Verify post-dispatch by reading the actual diff, not just the subagent's report. Dep-resolution probes are better done inline (Opus orchestration) than dispatched — the supervision overhead exceeds the delegation benefit for short investigations.
+
 ## Doorway Gateway (Web2 Bridge)
 
 ### Component Structure

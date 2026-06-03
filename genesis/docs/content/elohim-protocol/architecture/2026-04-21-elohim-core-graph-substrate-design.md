@@ -54,6 +54,7 @@ The target is a 20-year primitive: a publish model that survives framework churn
 4. **Capture test as the boundary rule.** "Could this capability be captured at scale for rent extraction?" Yes → protocol primitive (envelope). No → domain interpretation (payload).
 5. **Schema-first is IoC.** For any wire contract, the JSON Schema is authored first; Rust and TypeScript comply. Extended here: the schema *itself* is a content-addressed atom in the graph.
 6. **No sovereignty — stewardship instead.** No party owns any part of the graph. Stewardship is scoped, accountable, auditable, forkable.
+7. **The protocol IS a graph — first-class, not bolt-on.** The primary abstraction is a content-addressed graph, not a pub/sub network, a request/response API, or a key-value store. EPRs are nodes; couplings, memberships, delegations, and attestations are edges. *Every* protocol property — reach, discovery, validation, distribution, recovery, trust — is derived from graph topology, never from an ACL, a config rule, or a permission table. Concretely: "can peer P do X?" is answered by walking from P to a credential-bearing edge; "who has content C?" is answered by traversing C's scope edges; "is this valid?" is answered by walking from the asserted credential to ground truth. If a design reaches for an ACL or a config flag to answer one of these, it is solving the wrong problem. Projection tables, Kad providers, and gossip topics are *operational projections* of the graph — a cache and a propagation layer — never the graph itself. (This is the same primitive the dev-mode memory-kit + MemPalace rehearse for the development team: a graph of decisions/precedents/drift any agent can query and hold a position relative to.)
 
 ---
 
@@ -418,6 +419,17 @@ Agent hooks attach at three points in the EPR lifecycle:
 
 Gates and signals are declared per content-type in the manifest. The gate surface is declarative + auditable: any third party can see what gates apply to any EPR kind by reading the manifest.
 
+### 10.1 Social reach as an edge-of-network nervous system (seam)
+
+Reach earned at authoring (the validator's coupling check, §7) is the **floor** — an admission gate. The full social-reach contract turns reach into a self-healing relationship between author, content, propagators, and the network. It is built from four primitives, all operating edge-of-network at every node — **never** centralized. Central moderation is refused categorically: it cannot scale to AI-slop volume, it concentrates power (whoever moderates, rules), it breaks the human-scale contract, and it is a single point of capture. The canonical motivating case: an aunt reshares rage-bait without verifying it; she becomes an *accessory* to the harm, and every downstream relayer becomes accessory in proportion to how they propagated.
+
+1. **Provenance.** Every atom carries a verifiable, graph-traceable propagation history — who authored, who endorsed, who relayed. Signed envelopes establish authorship; the coupling graph establishes the knowledge↔value↔governance binding; content addressing makes the chain tamper-evident. (Capturing who-relayed-from-whom in the substrate is the missing piece downstream of the envelope.)
+2. **Sense / respond.** Every atom has a feedback channel. When any node recognizes "this is maliciously untrue," it registers a recognition signal (a feedback EPR kind) that **back-propagates in reverse through the propagation chain** — like nerves carrying pain back to a hand on a stove. This is the Observation-accumulation mechanism (§10, point 3) generalized to the whole propagation graph.
+3. **Quarantine.** When back-prop reaches enough recognition mass, the content is contained: further propagation short-circuits, downstream peers receive the quarantine signal alongside the content, and the atom is marked for correction/removal. Enacted at the edge by every node, never by a central authority. Likely lives in a Status/Attestation EPR kind that revokes downstream propagation; receivers project it and short-circuit further serve.
+4. **Restitution.** Accountability lands proportional to chain position — the primary creator bears the deepest responsibility; accessory propagators receive a meaningful corrective signal that touches their reach, relationships, and standing (real accountability, not punishment); edge nodes that participated in the sense/respond loop are protected. Restitution surfaces as shefa economic signals (REA events), not merely a moral note — and operates *ungrudgingly*: the protocol heals without requiring acknowledgment from those it corrects.
+
+For any feature touching propagation (gossip, Kad, fetch, federation), check that it preserves provenance, supports sense/respond back-prop, admits quarantine signals, and surfaces accountability. These are graph traversals (Principle 7) — provenance and back-prop walk the same coupling/propagation edges the validator already trusts.
+
 ---
 
 ## 11. Reference subgraph inventory
@@ -545,6 +557,12 @@ What this spec delivers is: **elohim-core is the substrate that lets hApps mean 
 This is a concrete gift to the HC team: the piece of their architecture they have not yet built, delivered in a way that respects their existing primitives, doesn't compete with Moss, doesn't replace hApps, and gives them an ecosystem story for Sasha's next pitch. Every hApp on Holochain becomes composable with every other hApp on Holochain — not by network merge, but by graph publication.
 
 That is the 20-year primitive.
+
+### 18.1 Why graph-native is the accountability substrate
+
+Graph-native is not merely a query-substrate choice (a projection engine alongside diesel). The deeper claim is structural: **the graph is the physical body of elohim accountability.** Without a shared graph rooted in DHT-notarized EPRs, an elohim agent's reasoning is private — it lives in model weights, isolated from the humans it serves, and whatever it produces is *opinion*. With the graph, every position an agent takes can be **pointed at**: same atoms the humans are walking, same couplings, same provenance, same reach. The agent shows what it knows; the human points back; disagreement becomes locatable. That distinction — pointing at shared structure versus asserting from private state — is the difference between **counsel and oracle**, and it is what makes the intelligence layer first-class rather than ornamental.
+
+Every elohim role the protocol promises (defender, advocate, steward, gate-discerner, recovery witness) needs this accountability surface; without it, those roles collapse into "an LLM with a manifesto," which is precisely what the protocol exists to refuse. So "more graph features later" is urgent, not nice-to-have. When designing any new elohim capability, ask first: *what graph does this agent point at when challenged?* If the answer is "model weights" or "private state," the capability is not ready. Trust-as-efficiency-signal compounds the case: shared-graph reasoning is both cheaper to distribute and more trustworthy than oracle-shaped reasoning, so the substrate's economics already favor this design.
 
 ---
 

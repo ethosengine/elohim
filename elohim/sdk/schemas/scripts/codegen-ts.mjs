@@ -164,6 +164,16 @@ const INTERFACE_FILES = [
 /**
  * Load all enum schemas and build a map of relative-path -> schema object.
  * This allows us to inline $ref targets that use relative file paths.
+ *
+ * Every directory registers each schema under ALL key forms authors may write:
+ *   bare filename, "./filename", "../subdir/filename", "../../enums/filename", $id URI.
+ * Missing any form causes json-schema-to-typescript to fall through to filesystem
+ * resolution from CWD → ENOENT on the build agent.
+ *
+ * When adding a new schema directory or $ref convention: mirror the enum-handling
+ * pattern (bare + ./ + cross-dir prefix + $id) for both directions.
+ * Audit: git grep '"$ref":' elohim/sdk/schemas/v1/ — each unique relative-path form
+ * must map to a refMap entry. The fix is always a one-liner here, not a rewrite of inlineRefs.
  */
 async function loadRefMap(baseDir) {
   const refMap = new Map();

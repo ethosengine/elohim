@@ -74,7 +74,7 @@ column — **where it ends** (the boundary to the next domain).
 | **D5** | **Data Plane & Transport** | `…iroh-libp2p-complementarity`, `…tiered-quilt-stewardship` | **elohim**/**shefa** · libp2p+iroh, quilt custody | iroh-libp2p = *transport choice/diversity*; tiered-quilt = *governed custody* atop either. When bytes are governed-as-economy → emits into **D9**. |
 | **D6** | **Runtime Topology & Composition** | `…elohim-hub-boundaries` | **elohim** · hub-trait / node / storage split | Ends at *the Hub trait + three-crate split*. When collectives coordinate across hubs → **D7**. |
 | **D7** | **Collective Coordination & Governance** | `…multi-collective-collaboration-epr` | **qahal**/**mishpat** · DHT membership + consensus | Ends at *recursive Qahal + dual-integrity consensus + friction-gradient*. Chain-layer consensus mechanics named but unspec'd (Gap Ledger). |
-| **D8** | **Web2 Projection & Doorway** | `…doorway-access-tier-patterns`, `…doorway-ssr-runtime` | **doorway** · projection + SSR compute | access-tiers = *reach-gating + cache-scoping*; ssr-runtime = *compute capability*. The Track-4 projection boundary; peer-native stays clean behind it. |
+| **D8** | **Web2 Projection & Doorway** | `…doorway-access-tier-patterns`, `…doorway-ssr-runtime` | **doorway** · projection + SSR compute | access-tiers = *reach-gating + cache-scoping*; ssr-runtime = *compute capability*. The Track-4 projection boundary; peer-native stays clean behind it. **Doorway is OPTIONAL, not architectural** — the D5 mesh *is* the hosting layer (peers who care about content shard+replicate it); doorway only projects mesh-hosted content to HTTP browsers and absorbs the read-mass a peer can't. A peer functions with zero doorway (layers 1+2 only). |
 | **D9** | **Economic Coordination & REA Interop** | `…wave3-valueflows-hrea-interop` | **shefa**/**elohim** · in elohim-storage (protocol-shaped), NOT doorway | Ends at *hREA / VF-GraphQL ↔ EPR-REA translation* (`bridges/valueflows`). |
 | **D10** | **Testing Infrastructure** — the non-architectural floor | `…sweettest-integration-layer` | **elohim** · DNA integration tier | Ends at *the in-process-conductor test tier*. Exercises D1 substrate; not a substrate concern itself. |
 
@@ -170,7 +170,9 @@ itself a known gap); (4) code `app/lamad/src/` + the `@elohim/sophia-*` renderer
 read-mass it absorbs); (2) seeds **D8** (doorway-access-tier-patterns, doorway-ssr-runtime); (3)
 pillar guide [`doorway/CLAUDE.md`](../../../../../doorway/CLAUDE.md); (4) code
 `doorway/doorway-service/` (Rust gateway) + `app/elohim-app/src/app/doorway/` (Angular integration);
-(5) scenarios `genesis/a2o/features/doorway/`, `ssr/`, `peer-oauth-portal/`.
+(5) scenarios `genesis/a2o/features/doorway/`, `ssr/`, `peer-oauth-portal/`. **Frame it correctly:**
+"peers host for each other; doorway projects that back to the web" — never "doorway hosts content for
+users." Don't route through doorway what peers can serve directly.
 
 > **avodah** is a reference impl of work-as-participation (D1 demonstrator), not a true pillar — code
 > lives at `app/elohim-app/src/app/avodah/` but has no pillar guide yet (Gap Ledger).
@@ -188,7 +190,7 @@ pass** — they are implementation-spec work, listed here so the walk is honest.
 
 | Gap | Kind | Status | Tracked at |
 |-----|------|--------|------------|
-| **Elohim-agent subsystem** — crate/service/sdk/specialists/mcp exist (`elohim/elohim-agent/`) but no `tier: architecture` seed; an architect can't answer "what is an elohim-agent's role in the three-layer truth model" from canonical | CODE-NO-DOC | OPEN (largest hole; Q2 Sprint 4 writes the thin seed first) | `gap-items/specs__2026-05-28-conductor-agent-info-substrate-gossip-design.json`; `project_elohim_active_observed_not_flagged` |
+| **Elohim-agent subsystem** — crate/service/sdk/specialists/mcp exist (`elohim/elohim-agent/`) but no `tier: architecture` seed; an architect can't answer "what is an elohim-agent's role in the three-layer truth model" from canonical. The seed must establish the **observed-not-flagged invariant**: `Phase::ElohimActive` vs `DevContext` is derived from whether real inference actually ran (the `/wisdom/invoke` response is the source of truth, threaded into the attestation) — never assigned from a config flag, or reputation accumulation off those attestations would be corruptible | CODE-NO-DOC | OPEN (largest hole; Q2 Sprint 4 writes the thin seed first) | `gap-items/specs__2026-05-28-conductor-agent-info-substrate-gossip-design.json`; `project_elohim_active_observed_not_flagged` |
 | **Pillar-service interface spec** — six pillar modules exist in `app/elohim-app/src/app/` but no canonical seed defines "what makes a pillar service" (interface, composition rules, truth-layer mapping); described only through application archetypes | CODE-NO-DOC | OPEN | `gap-items/plans__2026-05-25-pillar-epr-decomposition-plan.json`, `gap-items/specs__2026-05-25-pillar-epr-decomposition-design.json` |
 | **Chain-layer consensus mechanics** — named in multi-collective ("consensus weight = care-aggregate") but no spec; blocks qahal-grade authority design | OPEN | OPEN (infrastructure-tier) | `gap-items/plans__2026-05-19-doorway-stewardship-chain-design.json` |
 | **Bridge governance-acceptance gate** — records-lifecycle "Gap 9" (normative for all bridges) but no seed defines a bridge's governance gate; blocks any new `bridges/<vendor>` | OPEN | OPEN | `gap-items/specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design.json`; `bridges/CLAUDE.md` |

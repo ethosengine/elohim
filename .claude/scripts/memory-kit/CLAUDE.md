@@ -7,6 +7,23 @@ purpose: orient contributors to the project's memory system — storage, hygiene
 
 This is the navigational map for the project's memory tooling. The system is structured around **three temporal perspectives** on a single substrate (the epic-graph over time), each served by a dedicated subagent and toolkit.
 
+## ⚖ Pair-off boundary — native memory is Claude's; this discipline governs the ARTIFACTS (2026-06-03)
+
+`.claude/memory/` is Claude's **native** memory store (symlinked to the harness memory dir). It is now
+**Claude-self-managed and LIGHT** — saved per Claude's own native spec (only non-obvious facts useful across
+sessions), NOT a curation target for the heavy discipline below, and it must not accumulate durable knowledge.
+
+This kit's discipline (cleanup · dedupe · comet · cites · coherence · the `MEMORY.md` budget · the four-perspective
+team) governs the **MANAGED ARTIFACTS** — `genesis/docs/` · specs · plans · `genesis/data/stories/` · the CLAUDE.md
+gospel surfaces — routed by `.claude/subject-routing.yaml`. That is where durable architecture/vision/wisdom and
+stable how-to-work rules live, content-addressed and scope-aware.
+
+**Durable knowledge GRADUATES to the managed artifacts; it does not pile up in native memory.** The 2026-06-03
+pair-off drained 260 dumped entries → ~19 light ones (architecture/vision → the protocol corpus; stable rules →
+specific agent/skill/CLAUDE.md homes; duplicates/stale dropped). Going forward, route a durable fact to its managed
+home (per subject-routing), not to a new memory entry. Where the table below says "tend `MEMORY.md`," read it as
+"tend the artifact layer and keep native memory light."
+
 | Perspective | Subagent | Toolkit | Purpose |
 |---|---|---|---|
 | **Past** | [`historian`](../../agents/historian.md) | MemPalace MCP (wired) + archive walks + git log | Surface precedent/risk patterns from mined corpus (shifts/memory/plans/elohim-protocol wings) + archive + epic git history into present work |
@@ -57,6 +74,23 @@ HISTORY / ACTIVE + pressure dirs) all live in `genesis/docs/PLACEMENT.md`. Read 
   deterministic floor, not from mining everything.
 - **Compose, don't fork.** Run `spec-coherence-index.py --query` before proposing — extend canonical; revive
   nothing superseded (read its history gotcha first).
+- **Fix deployed ≠ fix converged.** When a ceremony deploys a substrate fix, the immediate post-deploy counter
+  shows the cascade unmasked — not convergence. Record it as the *starting baseline*. The next ceremony's
+  same-counter reading is the convergence evidence. One-cycle observation is insufficient; two cycles = minimum
+  proof. Applies to any drift counter (claude-md, cleanup-scan, dedupe clusters).
+- **Re-indexing orphans grows MEMORY.md.** After tightening entries AND re-indexing orphans, expect the file to
+  grow — orphans are load-bearing, just invisible. Tightening is bounded by entry-shape floor (~100–150 chars).
+  Real compression comes from: umbrella entries (fold related items under one link), graduation to stories
+  (one story carries 6+ entries), or archive-with-pointer. Per-entry tightening is a tiny correction, not a
+  budget path.
+
+### Ceremony discipline — balance sheet
+
+Run `genesis/scripts/memory-balance.sh` at **Wave 0** (baseline) and **Wave 6** (close) of every memory ceremony.
+Snapshots persist to `balance-sheets/<ts>.{json,txt}` and auto-diff against the prior run. The **Surface:Archive
+ratio** is the smoking-gun metric — healthy: trending <100:1; runaway: flat archive across multiple ceremonies.
+Paste the delta into the chronicle entry as the ceremony's evidence. Healthy ceremony targets: MEMORY.md ≤ 24KB;
+≥1 canonical story; 0 memorialize-archive orphans missing `story_pointer`.
 
 ### Your mandate (broad — you decide the how)
 

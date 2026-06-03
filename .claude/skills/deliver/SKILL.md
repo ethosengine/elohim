@@ -70,7 +70,9 @@ You (Opus orchestrator) compare screenshot vs FeaturePromise. Verdict ∈ {`deli
 
 ### 5. Compose journal + present
 
-Show user the bound FeaturePromise + iter-0 verdict + initial gap diagnosis. Wait for "kick off" before iterating.
+Show user the bound FeaturePromise + iter-0 verdict + initial gap diagnosis. If the handle + render state already make the highest-leverage next move obvious, **drive immediately** — do not present a menu of paths and wait for a pick. The operator will redirect if needed. Pause only when (a) design is genuinely uncharted (`search_trail < 7`) or (b) a consent-required destructive path is about to be touched.
+
+**While waiting on CI:** do anticipatory work — curl relevant endpoints to map the failure surface, pre-stage fixes for likely gaps, read code around the suspected gap. When CI lands, act immediately.
 
 ## Iteration loop
 

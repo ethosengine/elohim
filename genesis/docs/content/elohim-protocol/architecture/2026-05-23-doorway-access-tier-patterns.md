@@ -34,6 +34,8 @@ The shakeout work surfaced that the doorway's current behavior is partially hone
 
 This is **descriptive**, not prescriptive. The next `/shift` picks one pattern to ship first based on the operator's call.
 
+**Foundational direction (orthogonal to the tiers, but the surface they sit on):** the doorway is converging toward being the *complete* web2 projection of its substrate — absorbing the SPA-host role currently split across a separate `elohim-site` pod + ingress rules. The end state retires the static-site pod: one ingress rule per host (`/` Prefix → doorway), and the doorway internally dispatches SSR-eligible manifest routes (→ elohim-render), API/blob routes (→ storage proxy / blob cache), bare client-side SPA routes (→ baked-in `index.html`), and static assets (→ baked-in browser bundle). This collapses the "drift between ingress and storage manifest" bug class — the source of truth (storage's `build_manifest()` with `render: "angular-ssr"` annotations) becomes the *only* declaration of what a doorway does for an HTTP client. Every access tier below assumes this single-process projection surface.
+
 ---
 
 ## Three access tiers
@@ -87,6 +89,36 @@ A peer-native steward — someone whose conductor cell normally runs on their ow
 - The recovery surface is a peer-native primitive; the doorway implements the *web access* path for it.
 
 **Where this lives today:** Mostly vision. `RECOVERY-PROTOCOL.md` describes the social-recovery flows. The conductor-proxy code path is **not implemented**. This is what Pattern Recovery (below) ships.
+
+---
+
+## Tier 2 → Tier 3 is one identity trajectory (graduation-based supersession)
+
+Tier 2 and Tier 3 are not two parallel auth systems — they are two stages of one trajectory. The doorway's relationship to identity is an OAuth **relying-party** analogy: it presents the login portal but does not necessarily own it.
+
+- **Pre-graduation (Tier 2 / hosted):** the human has no peer-native identity yet, so the doorway is *both* relying party and identity provider. Doorway has agency over the human's identity — strictly bounded to this transitional state.
+- **Post-graduation (Tier 3 / peer-steward):** the human acquired a peer-native device (tauri steward / Moss / Launcher), and their identity migrated to being peer-native. A graduated steward who opens a browser at a doorway **does not use doorway-hosted login** — the doorway becomes relying-party only, backing auth with the peer-native IdP. Doorway permanently loses identity authority over a graduated human; it keeps only the view/proxy role.
+
+**How the doorway detects which stage a session is in:** `trustMode` is **discovered from `/auth/me`**, never config. A returning peer-steward's session reports peer-native trust at portal-render time, so the portal backs auth with the peer-native IdP rather than minting a hosted login. A config-pinned trustMode would reintroduce the two-parallel-auth-systems trap this whole shape exists to avoid. The handoff is transport-agnostic — `trustMode` is the contract, not the transport (libp2p, mesh-render, or the steward device directly are all equivalent).
+
+**Load-bearing constraints (from the peer-OAuth portal surface):**
+- **No third portal.** The doorway `auth_routes.rs` IS the substrate auth surface; Angular/Lit components are *wrappers* over it, never a parallel browser portal.
+- **Anti-crypto-bro framing is a values constraint**, not a style preference: the portal reads as "log in with help from your people," never as wallet-connect.
+- The hosted-login path is the transitional shim for ungraduated users; designs in any phase must not foreclose graduation (e.g., tying identity indissolubly to doorway-hosted infrastructure).
+
+---
+
+## Humans register with multiple doorways (no "home" doorway)
+
+The three-tier model above describes *a* doorway, but a human registers with several simultaneously (doorway-A, doorway-B, …) as a resiliency pattern. No single doorway is the human's home — any registered doorway can facilitate login, content fetch, recovery ceremony, or governance participation. Single-doorway binding would recreate corporate-custody lockout and violate the never-absolute-lockout commitment (graduated recovery authority).
+
+**This makes every tier flow doorway-agnostic:**
+- Recovery ceremonies (Tier 3) can initiate at *any* registered doorway — if doorway-A is offline mid-ceremony, the claimant retries at doorway-B and the ceremony state (on the DHT) is still valid. Conductor resolution in Pattern Recovery must not assume "the human's doorway."
+- Invitations and signals fan out over the **libp2p mesh** (gossipsub reaches all peers regardless of doorway-steward), *not* via doorway-to-doorway routing. A doorway is a local entry point, never a forwarder for claimant flows.
+- Data replicates across doorway-stewards' pods, so losing one doorway doesn't lose a human's history.
+- Cross-doorway resiliency (doorway-A down → retry at doorway-B) is an a2o test case; a single-doorway scenario is insufficient to prove these claims.
+
+Practical tell: any design that names "the human's doorway" (singular) is suspect — name the plural.
 
 ---
 

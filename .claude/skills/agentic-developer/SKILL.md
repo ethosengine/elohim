@@ -60,7 +60,13 @@ closes with done or a clean bail.
    the Wishlist curation rules) and either work around it or bail.
 6. **You may not edit the judge.** The Objective, measure command, files
    the measure reads, test runners, and test fixtures are off-limits.
-   Bail with a proposal if they need to change.
+   Bail with a proposal if they need to change. **Exception:** a fixture
+   that is *structurally unparseable* (parse failure, schema violation,
+   encoding error causing the runner to drop the entire suite at AST
+   construction) may be fixed narrowly — restoring parseability is removing
+   a gate, not moving the goalpost. Declare the scope expansion in the
+   journal, constrain edits to the grammar error only, and smoke-test
+   locally (`--dry-run`, `tsc --noEmit`) before pushing.
 7. **Validate change detection — every shift, every push.** A standing
    secondary goal of every shift is to confirm the CI's change-detection,
    build-graph, and dispatch decisions match what a developer would
@@ -206,7 +212,13 @@ When `/shift` invokes this skill:
 1. **Interview the user for the Objective.** Ask short, pointed questions:
 
    - *"What's the outcome you're aiming at? (one sentence)"*
-   - *"How do we measure it? (a command that returns a number)"*
+   - *"How do we measure it? (a command that returns a number)"* — In this
+     project the dev environment is Eclipse Che (no Docker, no Holochain
+     conductor, no k8s locally). Default measure shape:
+     `mcp__jenkins__getBuild` parsing `result` to a number, or
+     `getTestResults` returning pass count. Any `docker` / `kubectl` / `hc`
+     measure returns a silently misleading baseline. Acceptable local
+     measures: pnpm, cargo, tsx, node — tools Che ships.
    - *"What's the baseline floor — the measurement we must not drop below?"*
    - *"What paths may I edit? (globs)"*
    - *"Budget — how many iterations, how many minutes?"*
@@ -414,6 +426,22 @@ default to 1800 (30 min). On wake, check `mcp__jenkins__getStatus` —
 if the build is still running, re-sleep with a shorter delay (600s);
 otherwise run `objective.measure` and capture the number.
 
+**Jenkins is the workhorse in overnight shifts.** Push small targeted
+commits with `[build:<pipeline>]` tags; let Jenkins run the matrix.
+Never run whole-workspace builds locally during an overnight shift (they
+compete for the cargo-target pool and burn iteration budget). Targeted
+local validation is fine — one crate/package, finishes in <60s.
+`HUSKY=0 git push` is the standard form on pipeline-iteration branches;
+CI is the gate by design. ScheduleWakeup pacing: 1200–1800s between
+observations; each pipeline run takes 15–30 min.
+
+**Pause on substrate-in-flight.** When the user mentions an in-flight
+image rebuild, helm change, k8s reset, or cluster restart: switch to
+minimum-revert mode. Apply the smallest revert that restores known-working
+behavior. Don't investigate cascade failures that the new substrate may
+invalidate. Save the architectural context of what the change enables for
+the follow-up after the substrate lands.
+
 ### 6. Judge
 
 Decide:
@@ -553,6 +581,17 @@ If the CI browser stage did not run (probe failed, no Playwright in the image), 
 | "The browser stage was skipped, so visual is N/A" | Skipping is a finding too. Document it and surface the follow-up to graduate the Playwright environment. |
 
 ## Sonnet delegation patterns
+
+**Test infrastructure design rule.** When a task requires *designing* test
+infrastructure (which vitest config picks up a new spec, Angular TestBed vs
+vi.mock(), jsdom vs node env, new test harness), use Sonnet for the first
+instance. Once the scaffold is compiler-ready and proven, Haiku can mirror
+the pattern reliably. Haiku silently goes off the rails when forced to
+design infrastructure — it may add a directory to an exclude array to avoid
+a runtime error, claim "matches resilience pattern," and orphan the test.
+Symptoms: Haiku modified a config not in the plan's file list; added
+something to exclude/skip/ignore; reported the same test count as before.
+Recovery: roll back, re-dispatch with Sonnet.
 
 Common directives (pick whichever matches; always include the palette):
 

@@ -5,6 +5,29 @@
 > Companions: [`boundary-map.md`](./2026-05-30-boundary-map.md),
 > [`core-vs-reference-split-decision.md`](./2026-05-30-core-vs-reference-split-decision.md).
 
+## EPR-app serving chain (every link must hold)
+
+Before reading the defects, know the full chain that serves `/` and `/lamad` through a doorway:
+
+1. **Build + upload** — Angular bundles built, uploaded as content rows (`elohim-host-landing` as
+   `html5-app`, `lamad-spa` as `spa-bundle`) via `stageSpaBlobs` → `PUT /admin/seed/blob` + `PATCH /db/content/{slug}`.
+2. **Seeding** — project-epr REA commitments seeded (`seed-projections.ts` → `POST /api/v1/commitments`)
+   with `in_scope_of = doorway:{doorwayId}|epr:{eprId}`, scoped **per doorway** (not shared).
+3. **Router population** — doorway `EprRouter` populated from
+   `GET {STORAGE_URL}/db/rea_commitments?action=project-epr&doorwayId={id}` — expects a **bare
+   `Vec<EprProjectionView>` JSON array** (not a `{items,count}` wrapper; the wrapper breaks the decode).
+   Populated at boot + 30s self-heal refresh + SSE `projection.registered`.
+4. **Dispatch** — `GET /lamad` → `EprRouter` longest-prefix match → `dispatch_to_projected_epr` →
+   proxy `{STORAGE_URL}/apps/{epr_id}/{sub_path}` → storage `slug_index` resolves the blob.
+
+The R-items below are the failure modes at each link. The critical diagnostic signal: if
+`/db/rea_commitments?action=project-epr&doorwayId={id}` returns `{contentCount,uniqueTags}` (the
+`DbStats` shape) instead of an array, `extract_app_context` has shadowed the route to "stats" (see R14).
+The `/health` endpoint does **not** touch diesel — a pod can be Ready while its DB layer is jammed; probe
+the commitments route directly.
+
+---
+
 ## Root-cause framing
 
 Almost every item below traces to one structural fact: **the EPR-app delivery contract is hand-coded in

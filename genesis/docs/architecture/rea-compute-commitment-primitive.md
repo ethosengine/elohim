@@ -153,6 +153,22 @@ After Z.D Phase 1 lands, the implementation lives at:
 | SSE event types | `elohim/elohim-storage/src/sse.rs` (`delegates-compute.registered`, `delegates-compute.revoked`) |
 | Doorway subscriber | `doorway/doorway-service/src/projection/storage_events_subscriber.rs` |
 
+### §8.1 — Bounds Validator Pattern
+
+Every per-instance validator **delegates** substrate-wide concerns to a single `bounds_validator::validate` function. Per-instance validators only handle: (1) schema validation of the action's specific event payload, (2) action-discriminator check, and (3) construction of an `EventForValidation` projection. The substrate-wide checks — Commitment fetch, not-revoked, active window, scope-includes-event, reach-ceiling, rate-within-limit, key-rotation-current — all live in one function (7 checks). This is load-bearing for §4's auditability promise: revocation propagation and rate-limit discipline must be uniform across every row of the §5 table. One implementation; one place to fix bugs; one place to audit.
+
+`CommitmentFetcher` and `RateHistory` are traits, enabling mocking without a live conductor — run bounds-validator tests without a full Holochain setup.
+
+**Applying the pattern to a new instance:**
+
+1. Build your per-instance validator at `services/<instance>_validator.rs`.
+2. Schema-validate the event payload against `elohim/sdk/schemas/v1/economic-events/<instance>.schema.json`.
+3. Convert your view to `EventForValidation { action, performer, bounded_by, target_epr_id, reach, signed_at }`.
+4. Call `bounds_validator::validate(&event, fetcher, rate_history).await`.
+5. On `BoundsViolation`, emit the appropriate `FeedbackSignal` — `rate-limit-exceeded`, `bad-custody` (revoked/expired), or `reach-escalation-pending` (ReachCeilingExceeded). Signal weights live in `elohim/sdk/domains/elohim/manifest.json`; the standing pipeline applies them via `project_extension_signal`.
+
+**Reach hierarchy (counter-intuitive):** `private=0 < self=1 < intimate=2 < trusted=3 < familiar=4 < community=5 < public=6 < commons=7`. A ceiling of `commons` (7) is the **most permissive** — it permits everything, including `public`. Do not confuse "commons" with "restricted"; in the protocol, commons means unrestricted.
+
 When extending the primitive to a new concrete instance, the typical work is:
 
 1. Add a new action discriminator to the Mishpat zome's integrity validator (a few lines).
