@@ -749,7 +749,7 @@ def seedStewardshipStage() {
                     echo "SEED STEWARDSHIP ALLOCATIONS (affinity-based content→steward)"
                     echo "═══════════════════════════════════════════════════════════"
                     echo "Doorway: ${doorwayHost}"
-                    echo "Admin key: \${DOORWAY_API_KEY:+provided}\${DOORWAY_API_KEY:-not set}"
+                    echo "Admin key: $( [ -n "\${DOORWAY_API_KEY:-}" ] && echo provided || echo 'not set' )"
                     echo ""
                     DOORWAY_URL="${doorwayHost}" npx tsx src/seed-stewardship.ts
                 """
@@ -805,7 +805,7 @@ def seedProjectionsStage() {
                     echo "SEED PROJECTIONS (EPR project-epr commitments)"
                     echo "═══════════════════════════════════════════════════════════"
                     echo "Doorway: ${doorwayHost}"
-                    echo "Admin key: \${DOORWAY_API_KEY:+provided}\${DOORWAY_API_KEY:-not set}"
+                    echo "Admin key: $( [ -n "\${DOORWAY_API_KEY:-}" ] && echo provided || echo 'not set' )"
                     echo ""
                     DOORWAY_URL="${doorwayHost}" npx tsx src/seed-projections.ts
                 """
@@ -889,14 +889,61 @@ def seedProjectionsStage() {
                     # the ingress (genesis #1078: 57/79 failed, every one an nginx
                     # 503-HTML, run finished in 36s). Two consecutive 200s required —
                     # a single 200 can be a draining old pod.
-                    echo "⏳ waiting for doorway rollout to serve 200 at ${doorwayHost}/health ..."
+                    #
+                    # A bare 200 is NOT enough: a freshly-recreated doorway pod binds its
+                    # HTTP listener and answers 200 on /health BEFORE its admin-WS
+                    # handshake with the conductor pool completes (the james/conductor-2
+                    # race — E2E starts on the bare 200 and provisioning 503s because the
+                    # conductor is not yet serving). The /health body already carries the
+                    # right signal: "connected":true,...}. So a 200 only
+                    # counts toward the stable streak when the body ALSO reports the
+                    # conductor connected. This mirrors the jq-based Seed-preflight gate
+                    # (.conductor.connected) but stays jq-free for this sh context.
+                    #
+                    # Degrade gracefully: an older doorway image whose /health body omits
+                    # the conductor object must not deadlock the wait. After several
+                    # consecutive 200s with NO "conductor" object present at all, warn and
+                    # fall back to the old 200-only behavior.
+                    echo "⏳ waiting for doorway rollout to serve 200 (conductor-connected) at ${doorwayHost}/health ..."
                     OK_COUNT=0
+                    CONDUCTOR_FIELD_MISSING=0
+                    DEGRADE_TO_HTTP_ONLY=0
                     for i in \$(seq 1 72); do
-                        CODE=\$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${doorwayHost}/health" || echo 000)
+                        BODY=\$(curl -s --max-time 5 -w '\\n%{http_code}' "${doorwayHost}/health" || printf '\\n000')
+                        CODE=\$(printf '%s' "\$BODY" | tail -n1)
                         if [ "\$CODE" = "200" ]; then
-                            OK_COUNT=\$((OK_COUNT+1))
+                            # A 200 with the conductor reported connected is fully ready.
+                            if printf '%s' "\$BODY" | grep -q '"connected":true'; then
+                                OK_COUNT=\$((OK_COUNT+1))
+                                CONDUCTOR_FIELD_MISSING=0
+                            elif printf '%s' "\$BODY" | grep -q '"conductor"'; then
+                                # Conductor object present but not yet connected — the
+                                # listener is up but the admin-WS handshake is still
+                                # pending. Reset the streak; this is the race we guard.
+                                echo "  ↻ doorway 200 but conductor not yet connected — waiting (\$((i*5))s)"
+                                OK_COUNT=0
+                                CONDUCTOR_FIELD_MISSING=0
+                            else
+                                # No conductor object at all in the body. Tolerate an older
+                                # image: count consecutive field-absent 200s and degrade
+                                # after 3 so we never deadlock on a body shape we can't read.
+                                CONDUCTOR_FIELD_MISSING=\$((CONDUCTOR_FIELD_MISSING+1))
+                                if [ "\$CONDUCTOR_FIELD_MISSING" -ge 3 ] && [ "\$DEGRADE_TO_HTTP_ONLY" = "0" ]; then
+                                    echo "  ⚠️  conductor readiness field absent from /health body — proceeding on HTTP-200 only (degrade)"
+                                    DEGRADE_TO_HTTP_ONLY=1
+                                fi
+                                if [ "\$DEGRADE_TO_HTTP_ONLY" = "1" ]; then
+                                    OK_COUNT=\$((OK_COUNT+1))
+                                else
+                                    OK_COUNT=0
+                                fi
+                            fi
                             if [ "\$OK_COUNT" -ge 2 ]; then
-                                echo "✅ doorway serving 200 at public /health (stable ×2 after ~\$((i*5))s)"
+                                if [ "\$DEGRADE_TO_HTTP_ONLY" = "1" ]; then
+                                    echo "✅ doorway serving 200 at public /health (stable ×2 after ~\$((i*5))s, conductor field absent — HTTP-only degrade)"
+                                else
+                                    echo "✅ doorway serving 200 + conductor-connected at public /health (stable ×2 after ~\$((i*5))s)"
+                                fi
                                 break
                             fi
                         else
@@ -905,7 +952,7 @@ def seedProjectionsStage() {
                         sleep 5
                     done
                     if [ "\$OK_COUNT" -lt 2 ]; then
-                        echo "❌ doorway did not reach a stable 200 at the public boundary within 6min."
+                        echo "❌ doorway did not reach a stable 200 (conductor-connected) at the public boundary within 6min."
                         echo "   Failing THIS stage loudly (one true cause) instead of letting the"
                         echo "   e2e bench drown in dozens of misleading ingress-503 failures."
                         exit 1
@@ -1484,7 +1531,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         echo "SEED HUMANS"
                                         echo "═══════════════════════════════════════════════════════════"
                                         echo "Doorway: ${doorwayHost}"
-                                        echo "Admin key: \${API_KEY_ADMIN:+provided}\${API_KEY_ADMIN:-not set}"
+                                        echo "Admin key: $( [ -n "\${API_KEY_ADMIN:-}" ] && echo provided || echo 'not set' )"
                                         echo ""
                                         DOORWAY_URL="${doorwayHost}" npx tsx src/seed-humans.ts
                                     """
@@ -1522,7 +1569,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         echo "SEED PRESENCES"
                                         echo "═══════════════════════════════════════════════════════════"
                                         echo "Doorway: ${doorwayHost}"
-                                        echo "Admin key: \${API_KEY_ADMIN:+provided}\${API_KEY_ADMIN:-not set}"
+                                        echo "Admin key: $( [ -n "\${API_KEY_ADMIN:-}" ] && echo provided || echo 'not set' )"
                                         echo ""
                                         DOORWAY_URL="${doorwayHost}" npx tsx src/seed-presences.ts
                                     """
