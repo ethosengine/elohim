@@ -1,4 +1,5 @@
 ---
+id: feedback-dockerfile-target-completeness
 name: dockerfile-target-completeness
 description: "Adding any [[bin]], [[bench]], or [[example]] to a Rust crate that builds in Docker requires updating both the dep-cache placeholder stage AND the real-build COPY block — local pre-push gate will not catch this."
 metadata: 

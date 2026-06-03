@@ -1,4 +1,5 @@
 ---
+id: project-intelligence-revolution-scales-to-humans
 name: Intelligence revolution as first non-flattening scale
 description: Pitch framing — past revolutions (industrial, green) scaled by flattening human complexity; intelligence revolution is the first that can scale TO human complexity instead of away from it
 type: project

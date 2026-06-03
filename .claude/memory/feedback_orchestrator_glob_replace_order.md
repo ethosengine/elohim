@@ -1,4 +1,5 @@
 ---
+id: feedback-orchestrator-glob-replace-order
 name: matchesGlob ** corruption — replace order matters
 description: build-graph.groovy:matchesGlob silently broke ** for nested files; sentinel placeholders required before single-* substitution
 type: feedback

@@ -1,4 +1,5 @@
 ---
+id: project-cadence-archetype-tunable-with-dev-overrides
 name: Cadences are archetype-tunable with dev-mode overrides
 description: Any scheduled/periodic loop must have archetype-aware defaults, policy-file overrides, env/CLI dev overrides, and a synchronous admin trigger for testing
 type: project

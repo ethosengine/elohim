@@ -1,5 +1,6 @@
 ---
 title: elohim-epr Integrator Compatibility Contract
+id: elohim-epr-integrator-compatibility-contract
 tier: architecture
 status: accepted — Contract, authoritative for Phase 2+ planning
 created: 2026-04-21

@@ -1,4 +1,5 @@
 ---
+id: project-memory-cites-edge
 name: project_memory_cites_edge
 description: Memory entries declare a `cites:` frontmatter edge to the code/spec/scenario they depend on; a walker + in-flight accumulator hook re-open them when cited sources change — the reconciliation-controller pattern applied to memory.
 metadata:

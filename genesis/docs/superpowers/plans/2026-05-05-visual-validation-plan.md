@@ -1,4 +1,5 @@
 ---
+id: visual-validation-plan
 status: Draft
 cites:
   - ../specs/2026-05-05-visual-validation-design.md   # the design spec this plan implements

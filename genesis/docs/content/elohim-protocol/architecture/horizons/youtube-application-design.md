@@ -1,5 +1,6 @@
 ---
 title: YouTube-shape digital media platform on the substrate
+id: youtube-application-design
 tier: architecture
 status: Horizon (coherent pattern, not on active subsumption path)
 created: 2026-05-24

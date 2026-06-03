@@ -1,4 +1,5 @@
 ---
+id: sprint2-bounds-validator-standing-aggregator
 status: Draft
 ---
 

@@ -1,4 +1,5 @@
 ---
+id: feedback-persona-rename-completeness-checklist
 name: persona-rename-completeness-checklist
 description: "A persona rename touches content + filenames + generated indices + test fixtures + cross-doc references. Updating canonical sources is necessary but not sufficient; generators don't clean up old files. Audit per surface before claiming the rename is complete."
 metadata:

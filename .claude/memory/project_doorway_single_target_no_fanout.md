@@ -1,4 +1,5 @@
 ---
+id: project-doorway-single-target-no-fanout
 name: Doorway is single-target dispatch — no blob fan-out, ever
 description: Architectural decision (2026-04-30) — doorway forwards each blob request to ONE storage target; peer-iteration belongs in the P2P substrate, never in the web2 projection layer
 type: project

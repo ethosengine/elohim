@@ -1,4 +1,5 @@
 ---
+id: feedback-agent-framing
 name: Frame autonomous agents as first-class developers, not babysitters
 description: Don't use "babysitter", "watcher", "sitter" or diminutive framing for autonomous agent loops. They are agentic developers.
 type: feedback

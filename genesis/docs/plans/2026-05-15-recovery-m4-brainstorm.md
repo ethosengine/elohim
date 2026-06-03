@@ -1,4 +1,5 @@
 ---
+id: recovery-m4-brainstorm
 status: brainstorm   # D1–D4 decision outcomes — planning input for the M4 completion plan
 related:
   - 2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt.md   # the completion plan these brainstorm decisions feed

@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Attestation Consolidation (Phase 2a substrate dedup)"
+id: attestation-consolidation-phase2a-dedup
 type: history-gotcha
 status: Accepted
 tier: history

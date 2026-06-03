@@ -1,4 +1,5 @@
 ---
+id: project-social-contract-makes-friction-explicit
 name: social-contract-makes-friction-explicit
 description: "The values-forward stance has lived costs. People whose continued operations require the substrate to NOT do its job — accountability-resistant actors, weaponized-attention business models, harm-externalizing positions — will experience the protocol as friction. This is by design, not bug. The social contract is explicit: patience for PEOPLE, friction for harmful IDEAS. Some people will dislike the protocol after fully understanding it; that's coherence with the stance, not a usability failure."
 metadata:

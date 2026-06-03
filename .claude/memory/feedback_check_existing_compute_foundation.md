@@ -1,4 +1,5 @@
 ---
+id: feedback-check-existing-compute-foundation
 name: Check existing compute-reporting foundation before adding probes
 description: elohim-storage already has fs4 + heartbeat::measure_free_pct + cluster.rs Member.capacity_bytes + custodians total_capacity_bytes; new probes synthesize these, never duplicate
 type: feedback

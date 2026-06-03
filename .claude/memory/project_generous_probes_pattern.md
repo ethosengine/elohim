@@ -1,4 +1,5 @@
 ---
+id: project-generous-probes-pattern
 name: project-generous-probes-pattern
 description: "Canonical k8s health-probe pattern for elohim manifests — timeoutSeconds: 15, failureThreshold: 5 baseline; readiness initialDelaySeconds: 120 for containers running embedded Holochain install_app."
 metadata: 

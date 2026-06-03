@@ -1,10 +1,11 @@
 ---
+id: project-t6-legacy-revocation-path-retired
 name: project-t6-legacy-revocation-path-retired
 description: EPR Foundation Completion T6 — legacy RecoveryV2Signal::KeyRevocationEffective consumer path fully retired; T18 envelope is sole consumer.
 metadata:
   type: project
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md
+  - dna-signal-as-epr-envelope | the T18 spec defining the canonical envelope that replaced the legacy path this entry retired | sha256:e27281447cb146bc
 ---
 
 # T6 — legacy revocation consumer path retired

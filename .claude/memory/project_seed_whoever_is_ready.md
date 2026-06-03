@@ -1,4 +1,5 @@
 ---
+id: project-seed-whoever-is-ready
 name: Seed whoever is ready — partial readiness aligns with P2P architecture
 description: Seeder must not be all-or-nothing on conductor health; per-peer seeding with partial reporting is the correct behaviour
 type: project

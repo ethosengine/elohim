@@ -1,4 +1,5 @@
 ---
+id: feedback-schema-first-ioc
 name: Schema-first is IoC — never guess at implementation
 description: For any wire contract (HTTP view, coordinator input, enum, etc.), write the JSON schema FIRST and make Rust/TS comply. The contract leads, code follows.
 type: feedback

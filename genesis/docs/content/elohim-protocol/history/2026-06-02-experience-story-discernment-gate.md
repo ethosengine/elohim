@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Experience-Story Discernment Gate — relocated-then-superseded TS-gate stub"
+id: experience-story-discernment-gate
 type: history-gotcha
 status: Accepted
 tier: history

@@ -1,4 +1,5 @@
 ---
+id: records-lifecycle-phase2-findings-synthesis
 status: design   # findings synthesis — meta-patterns + revised gap list, planning input for Phase 3 Part D
 ---
 

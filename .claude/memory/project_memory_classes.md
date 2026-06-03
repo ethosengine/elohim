@@ -1,10 +1,11 @@
 ---
+id: project-memory-classes
 name: Memory classes — different shapes need different lifecycle defaults
 description: Memory is not one shape; classes (contextual, archival, identity, relational, operational, attestation, wisdom) have different default lifecycle policies; lifecycle primitives (promote/compact/merge/submerge/close-interval/memorialize/forget) are the operations, memory classes are the defaults that determine which operations apply, at what cadence, with what governance authority; substrate must tag every entry with its class
 type: project
 originSessionId: 10d85ef0-1979-4311-97e9-c2c209de48e2
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
+  - memory-lifecycle-design | the comet/forgetting spec whose lifecycle primitives this entry supplies the per-class defaults for | sha256:b6545e6548573fa4
 ---
 Memory is not one shape. Different classes of memory have fundamentally different lifecycles, and applying a single default policy to all of them wastes compute on transient data, under-preserves cultural artifacts, and mishandles attestation.
 

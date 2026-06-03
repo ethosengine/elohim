@@ -1,4 +1,5 @@
 ---
+id: feedback-docker-include-str-path-mirroring
 name: Docker include_str! requires repo path mirroring in COPY
 description: Rust include_str! resolves relative to source file at compile time; Dockerfiles with WORKDIR /app must COPY referenced sibling/parent dirs to matching paths or builds fail with "couldn't read"
 type: feedback

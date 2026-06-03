@@ -1,10 +1,11 @@
 ---
+id: project-compute-commitment-first-instance-pivot
 name: compute-commitment-first-instance-pivot
 description: Sprint 1 (2026-05-28) shipped Mishpat::Commitment substrate primitives but abandoned Z.D (SPA deploy) as the first instance. Deploy is authorship-delegation not compute-delegation. Recommended first real instance is mutual storage replication between family-network peers.
 metadata:
   type: project
 cites:
-  - genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
+  - mutual-storage-replication-dwelling-hub-design | the spec this pivot recommends — mutual storage replication as the real first compute-commitment instance | sha256:5596799dbb456bc2
 ---
 
 Sprint 1 (`2026-05-28-sprint1-zd-substrate-correct-deploy.md`) ended scope-narrowed: substrate primitives shipped (T1–T7) but Z.D-as-first-instance was abandoned mid-flight.

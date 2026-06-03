@@ -1,4 +1,5 @@
 ---
+id: project-elohim-councils-capture-apex
 name: elohim-councils-capture-apex
 description: "Elohim councils ARE the resident steward layer of the commons by design — they occupy the structural top of the authority gradient, capturing the apex that has historically been captured by morally-deformed actors. Anti-concentration applies recursively to the wisdom layer."
 metadata: 

@@ -1,4 +1,5 @@
 ---
+id: project-social-reach-nervous-system
 name: Social reach is a sense-respond nervous system — provenance, feedback, quarantine, restitution
 description: Reach earning is the floor; the full contract requires a network nervous system — provenance traceable, sense/respond feedback back-propagating through propagation chains, quarantine of bad actors, and restitution. Edge-of-network response at every node. This is the social-reach epic.
 type: project

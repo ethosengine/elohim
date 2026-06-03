@@ -1,4 +1,5 @@
 ---
+id: project-values-forward-preference-guards
 name: Values-forward preference guards — the legitimate user-side filter
 description: Humans CAN set personal preference guards on what reaches them — but only as values-forward, time-limited, tended filters with anti-filter-bubble constraints that feed collective reach-governance signals. Distinct from email-collapse network-imposed filtering.
 type: project

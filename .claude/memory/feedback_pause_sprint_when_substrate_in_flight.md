@@ -1,4 +1,5 @@
 ---
+id: feedback-pause-sprint-when-substrate-in-flight
 name: Pause sprint depth when substrate change is in flight
 description: When base images / cluster state are mid-rebuild, surface fixes only — don't dive into investigation that the new substrate may invalidate
 type: feedback

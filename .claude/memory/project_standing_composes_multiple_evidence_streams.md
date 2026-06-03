@@ -1,4 +1,5 @@
 ---
+id: project-standing-composes-multiple-evidence-streams
 name: Standing composes from multiple evidence streams
 description: Standing is not just FeedbackSignal-derived debits; imagodei profile/psyche instruments + lamad emergent traits feed the same projection. Manifests declare which streams compose.
 type: project

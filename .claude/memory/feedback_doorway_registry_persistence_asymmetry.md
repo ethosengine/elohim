@@ -1,4 +1,5 @@
 ---
+id: feedback-doorway-registry-persistence-asymmetry
 name: Doorway conductor registry persistence asymmetry
 description: Two-store registry where one store persists and the other rebuilds is a recurring 502 source — diagnostic shape for any "stale-mapping after deploy" failure
 type: feedback

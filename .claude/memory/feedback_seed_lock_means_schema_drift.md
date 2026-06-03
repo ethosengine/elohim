@@ -1,4 +1,5 @@
 ---
+id: feedback-seed-lock-means-schema-drift
 name: "Seed-time 'database is locked' often means schema drift, not concurrency"
 description: When elohim-genesis Seed Database stage hits 'database is locked' errors clustered in specific content namespaces, the fix is usually to clear the database in the genesis stage, not patch SQLite pragmas or retry logic
 type: feedback

@@ -1,10 +1,11 @@
 ---
+id: project-quilt-pantry-vocabulary
 name: Quilt/pantry storage vocabulary — register at genesis/graphos/vocabulary.md
 description: Storage and distribution vocabulary — `quilt` (RS-encoded content unit), `pantry` (peer-tended container), `stock`/`draw` (verbs), `shard`, `RS(N,K)`. Wire-level identifiers keep legacy names. Decided 2026-04-30.
 type: project
 originSessionId: 872c2e1c-02fe-453a-93b3-e69dac1e54e3
 cites:
-  - genesis/docs/content/elohim-protocol/history/2026-06-02-doorway-dispatch-registry-fallback-and-vocabulary.md
+  - doorway-dispatch-registry-fallback-and-vocabulary | the history ADR that distilled the vocabulary-cleanup sprint where quilt/pantry/stock/draw were decided | sha256:8adde339010ac508
   - genesis/graphos/vocabulary.md
 ---
 The protocol's storage and distribution vocabulary is registered in `genesis/graphos/vocabulary.md`. Use it for design discussion, signal/event names, narrative, and any new identifier we invent.

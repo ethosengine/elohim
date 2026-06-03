@@ -1,5 +1,6 @@
 ---
 title: iroh ↔ libp2p Complementarity — Three Substrate Transport Tracks, Anti-Capture by Design
+id: iroh-libp2p-complementarity
 tier: architecture
 status: Draft (architecture spec — gates Phase 11 backend wiring)
 created: 2026-05-08

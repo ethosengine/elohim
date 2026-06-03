@@ -1,4 +1,5 @@
 ---
+id: project-values-forward-disclosure-accountability
 name: Values-forward disclosure — protocol is adversarial to accountability-resistant patterns by design
 description: Some humans (through nature or nurture) cannot take accountability and will viscerally hate the protocol's consolidation/restitution/reach-drop mechanics; this must be disclosed crystal-clear and values-forward, never hidden or softened — being explicit IS the consent; frame is "yes this will feel bad AND you+your network are better off because the structure prevents Icarus-into-the-sun outcomes when self-correction is hard"; protocol takes a side, doesn't pretend neutrality
 type: project

@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: CI / orchestrator recurring anti-patterns — the museum face"
+id: ci-orchestrator-recurring-anti-patterns-museum
 type: history-gotcha
 status: Accepted
 tier: history

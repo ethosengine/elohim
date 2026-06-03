@@ -1,4 +1,5 @@
 ---
+id: feedback-sweettest-ignore-is-ci-noop
 name: feedback_sweettest_ignore_is_ci_noop
 description: "CI runs the DNA sweettests with --run-ignored all, so #[ignore] is a no-op as a CI silencer — adding #[ignore] to quarantine a broken sweettest does nothing in CI; the test still runs and still fails. To remove a sweettest from the CI run you must delete it or change the runner config, not annotate it."
 metadata:

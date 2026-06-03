@@ -1,5 +1,6 @@
 ---
 title: Tiered Quilt Stewardship — Design
+id: tiered-quilt-stewardship-design
 tier: architecture
 status: Draft (post-brainstorm, pre-implementation)
 created: 2026-05-11

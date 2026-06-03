@@ -1,4 +1,5 @@
 ---
+id: feedback-session-orchestrate-vs-implement
 name: Sessions split into orchestrating vs implementing
 description: When classifying or resuming Claude sessions, distinguish orchestrating threads (high-level planning/strategy/delegation) from implementing threads (hands-on code edits). Resume prompts differ in shape.
 type: feedback

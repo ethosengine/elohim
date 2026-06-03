@@ -1,10 +1,11 @@
 ---
+id: project-bounds-validator-pattern
 name: bounds-validator-pattern
 description: Single substrate-side bounds_validator::validate function that every per-instance per-row-of-the-table validator delegates to. Walks bounded_by → Commitment → 7 checks (commitment_found, not_revoked, active window, scope_includes_event, reach_ceiling_ok, rate_within_limit, key_rotation_current). CommitmentFetcher + RateHistory traits enable mocking without conductor.
 metadata:
   type: project
 cites:
-  - genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md
+  - sprint2-bounds-validator-standing-aggregator | the plan that specified building this validate fn + the standing aggregator that consumes its breach signals | sha256:8923ad357ea4ee80
   - elohim/elohim-storage/src/services/bounds_validator.rs
   - elohim/sdk/domains/elohim/manifest.json
 ---

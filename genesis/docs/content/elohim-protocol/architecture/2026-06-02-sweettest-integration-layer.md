@@ -1,5 +1,6 @@
 ---
 title: Sweettest — the DNA-Level Integration Test Layer
+id: sweettest-integration-layer
 tier: architecture
 status: Landed (mechanical floor live in CI; single-DNA ~10-15min target HELD — not yet demonstrated)
 created: 2026-06-02

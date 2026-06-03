@@ -1,4 +1,5 @@
 ---
+id: project-holochain-build-pvcs-in-jenkins-ns
 name: Holochain build PVCs live in `jenkins` namespace
 description: nix-cache-holochain, cargo-cache-holochain, sweettest-target-cache-holochain all in jenkins ns; ethosengine ns has zero of these
 type: project

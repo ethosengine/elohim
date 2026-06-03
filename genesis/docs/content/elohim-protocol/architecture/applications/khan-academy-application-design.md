@@ -1,5 +1,6 @@
 ---
 title: Khan Academy — substrate-native learning platform (lamad)
+id: khan-academy-application-design
 tier: architecture
 status: Composition draft (primitives mapped; full walkthrough pending)
 created: 2026-05-24

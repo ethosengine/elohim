@@ -1,4 +1,5 @@
 ---
+id: feedback-diesel-migration-timestamp-collision
 name: Diesel migration timestamp collisions silently drop migrations
 description: Two diesel migration directories with same YYYY-MM-DD-HHMMSS prefix cause embed_migrations! to silently keep only one
 type: feedback

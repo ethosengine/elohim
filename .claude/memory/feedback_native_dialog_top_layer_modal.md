@@ -1,4 +1,5 @@
 ---
+id: feedback-native-dialog-top-layer-modal
 name: feedback_native_dialog_top_layer_modal
 description: "Native <dialog> + showModal() is the fix for 'modal slides behind / off-page' — position:fixed is NOT viewport-relative under a transformed/filtered/contain:paint ancestor; the top-layer dialog escapes all stacking contexts. Migration gotchas: assert :modal not z-index; synthetic Escape is a no-op; backdrop-click via event.target."
 metadata:

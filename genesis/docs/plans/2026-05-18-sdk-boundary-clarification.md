@@ -1,4 +1,5 @@
 ---
+id: sdk-boundary-clarification
 status: Draft
 informed-by:
   - ../content/elohim-protocol/architecture/2026-04-21-elohim-epr-integrator-compatibility-contract.md   # the SDK/integrator boundary canon this clarifies

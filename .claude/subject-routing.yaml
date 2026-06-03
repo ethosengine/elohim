@@ -1,0 +1,171 @@
+# subject-routing.yaml — the SUBJECT-CLASS axis that MAP.md (D1–D10) and PLACEMENT.md (three homes) lack.
+#
+# THE PARENT CONSTITUTION (repo scope). Read at the brainstorm/plan FRONT-fire to bind
+#   class -> {write_location, decomposition_flow, discard_rule}
+# and stamped into spec/plan frontmatter as `class:`. The BACK-fire (decompose.py) reads it to route
+# residue per-class. One parent, two readers (the FRONT gate + decompose.py), two prose surfaces that
+# cite it (PLACEMENT.md, MAP.md) — mirroring how cluster-state.yaml is the env axis read by both the
+# pipeline and placement-audit.
+#
+# HAND-TUNED CONFIG (tracked, NOT generated). Lives at .claude/ root — alongside settings.json /
+# file-relationships.json — NOT in memory-kit/ (which is only one consumer; root placement also
+# preserves memory-kit's "only context-coverage.yaml is hand-edited" rule).
+#
+# CASCADE (one repo -> mono-repo -> submodule): a sub-tree may drop its own .claude/subject-routing.yaml
+# (or a `subject_routing:` block in its CLAUDE.md) that the resolver merges ON TOP of this root —
+# union of classes, nearest-wins on home-remaps — exactly as nested CLAUDE.md gospels cascade. A
+# single-purpose repo needs only this root; a mono-repo layers sub-project parents with no redesign.
+#
+# Spec: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md
+# Plan: genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md
+
+version: 1
+
+# Fail-safe: substrate is the historical default. A missing/un-resolvable class falls here ONLY if no
+# gate_signal fires; a mismatch (e.g. domain:D# + all-.claude targets) aborts fail-loud instead.
+default_class: protocol-canonical
+
+discriminator: >
+  Ask "whose experience does the DELIVERABLE change?" and "where does the landed change physically
+  live?" — NEVER "what vocabulary does it use." Vocabulary (comet / EPR / cites / REA) is a lineage
+  breadcrumb (derived_from:), never a routing key. A spec that says "comet" but amends only
+  .claude/ + PLACEMENT.md (0 product-code refs) is process-meta, full stop.
+
+# ── The two classes ─────────────────────────────────────────────────────────────────────────────
+classes:
+
+  protocol-canonical:
+    why: >
+      Deliverable changes a LEARNER's or PEER's experience — the running Elohim Protocol product
+      (DHT/EPR substrate, REA/shefa economy, imagodei identity/recovery, qahal/mishpat governance,
+      doorway projection, content pipeline, the Angular app). Has an honest D# (D1–D10) AND a pillar.
+    deliverable_changes: learner-or-peer
+    has_domain: true                 # MAP-PATH runs: domain: D# + informed-by: <architecture seed> REQUIRED
+    has_pillar: true
+    status_modes:
+      vision: >
+        Subsumption-archetype mode ("how would Google Drive / a bank compose from primitives?").
+        Born canonical in architecture/applications/ (or horizons/). The study mapping STAYS (it is
+        the durable artifact, not scaffolding); a surfaced primitive-gap sheds to MAP.md §3 Gap-Ledger
+        + backlog. Next-state: stay-as-reference OR graduate-to-impl (no over-commit alarm).
+    write_location:
+      active_source: [genesis/docs/superpowers/specs/, genesis/docs/superpowers/plans/]
+      impl_plan_home: genesis/docs/plans/            # genesis/docs/claude.md: Elohim-domain/cross-cutting plans
+      canonical_truth: genesis/docs/content/elohim-protocol/architecture/
+      vision_home: [genesis/docs/content/elohim-protocol/architecture/applications/, genesis/docs/content/elohim-protocol/architecture/horizons/]
+    decomposition_flow:
+      canonical: genesis/docs/content/elohim-protocol/architecture/        # compact (+ INDEX row)
+      verified:  genesis/a2o/features/<pillar>/*.feature + code under app/|elohim/|doorway/|steward/  # verify
+      history:   genesis/docs/content/elohim-protocol/history/             # curate (tier:history + INDEX)
+      story:     genesis/data/stories/                                     # graduate (storyteller)
+      research:  genesis/docs/research/                                    # compact
+      backlog:   genesis/data/timeline/backlog/                           # spawn (AUTO)
+      process_residue: [genesis/orchestrator/README.md, /CLAUDE.md]        # dual-target: a CI/build change sheds here
+      body:      git                                                       # forget (after compact+verify+curate)
+    discard: >
+      Raw design prose retires to git after the architecture seed + green a2o scenario/code + (judgment)
+      history lesson exist. Retire requires VERIFICATION (CI-green/soak-clean), not a self-asserted
+      landed. Unverified/regressed sub-tasks STAY in ACTIVE as the next sprint's input.
+
+  process-meta:
+    why: >
+      Deliverable changes a DEVELOPER's or AGENT's experience — the machinery of BUILDING (memory-kit,
+      skills, agents, CI/orchestrator, the brainstorm/decompose/converge/stasis loops, hooks, commands,
+      doc-lifecycle/placement, schema/codegen tooling, BDD-authoring). NO honest D#, NO pillar. The
+      .claude/ or CI artifact IS the implementation; there is usually no a2o scenario and no
+      architecture seed. (avodah is a D1-demonstrator only, not a true pillar.)
+    deliverable_changes: developer-or-agent
+    has_domain: false                # gate MUST NOT force a D#; forcing one is the D4 name-collision root cause
+    has_pillar: false
+    process_subdomains: [memory, ci, doc-lifecycle, a2o, skills, agents, hooks, build-and-test, schema-sdk, slash-commands, workflows]
+    write_location:
+      active_source: [genesis/docs/superpowers/specs/, genesis/docs/superpowers/plans/]  # meta-automation -> superpowers/ (genesis/docs/claude.md)
+      gospel_homes:                  # pick by process_subdomain (the durable operating-discipline residue)
+        root:          /CLAUDE.md
+        build-and-test: /CLAUDE.md
+        memory:        [.claude/scripts/memory-kit/CLAUDE.md, .claude/memory-kit/CLAUDE.md, .claude/scripts/memory-kit/LIFECYCLE.md]
+        doc-lifecycle: [genesis/docs/PLACEMENT.md, genesis/docs/_state/README.md]
+        ci:            [genesis/orchestrator/README.md, /CLAUDE.md]       # + root CLAUDE.md CI section
+        a2o:           genesis/a2o/CLAUDE.md
+        timeline:      genesis/data/timeline/CONVENTIONS.md
+        schema-sdk:    elohim/sdk/CLAUDE.md
+        plan-routing:  genesis/docs/claude.md
+      tool_homes:                    # the reusable executable-capability residue (pick by kind)
+        skill:    .claude/skills/<name>/SKILL.md
+        agent:    .claude/agents/<name>.md
+        command:  .claude/commands/<name>.md
+        hook:     .claude/hooks/<name>.py            # deterministic enforcement (PLACEMENT.md routes "the fire" here)
+        workflow: .claude/workflows/<name>.js
+        script:   .claude/scripts/{memory-kit,converge,_lib}/
+        schema:   .claude/schemas/<name>.json
+        prompt:   .claude/prompts/<name>.md
+    decomposition_flow:
+      gospel_diff: <gospel_home by process_subdomain>
+      tool:        <tool_home by kind>
+      history:     genesis/docs/content/elohim-protocol/history/     # LIVE (judgment-gated) — type:history-gotcha for a tried-and-failed mechanism or tool-design rationale; NOT auto-skipped
+      reports:     .claude/memory-kit/TRAJECTORY.md                  # comet retention (generated reports; does NOT decompose-to-zero)
+      backlog:     genesis/data/timeline/backlog/
+      canonical:   NULL                                              # no architecture/ seed — DO NOT FORCE
+      a2o:         NULL                                              # no <pillar> scenario — DO NOT FORCE
+      body:        git                                               # forget (after gospel-diff + tool + judgment-lesson exist)
+    discard: >
+      Prose retires to git after the gospel-diff lands in the right CLAUDE.md AND the tool exists in
+      .claude/ (verified = the hook fires / the skill runs / the script exits 0). The architecture-seed
+      and a2o-<pillar> legs are NULL — the substrate flow SKIPS them, never mis-routes a process chunk
+      into a fake pillar scenario or D# seed.
+
+# ── The unresolved state ────────────────────────────────────────────────────────────────────────
+provisional:
+  why: >
+    For an exploratory spike/brainstorm the deliverable-target is unknown at the FRONT (the whole point
+    of brainstorming). `class: provisional` is RECONCILED at the BACK-fire from the actual residue
+    landing site (mirroring PLACEMENT.md "scope is reconciled, not assigned"). domain:/informed-by: are
+    conditional on a resolved class, NEVER required at the front — a spike is not blocked by a domain it
+    cannot yet answer. decompose.py reconciles provisional -> {protocol-canonical | process-meta} and
+    fails loud if the residue contradicts a hand-stamped class.
+
+# ── The unifying keep/discard principle (lossless by construction) ────────────────────────────────
+keep_discard_principle: >
+  Discard the FORM (dispatch choreography, plan checkboxes, prose ordering, the raw body); KEEP any
+  RESIDUE that carries reusable reasoning (a why-we-turned, a tried-and-failed, a tool-design rationale,
+  a mis-classification forensic) — regardless of class. CLASS decides the HOME (architecture/ vs a
+  CLAUDE.md vs history/); REASONING-VALUE decides whether a curated record is written at all. A one-off
+  process finding that records a failure or a non-obvious constraint defaults to a tiny history-gotcha
+  STUB (promotable on recurrence, demotable to a CLAUDE.md one-liner only after an agent confirms no
+  reusable why). Stub-then-grade is the default; git-forget is the explicit exception.
+
+# ── The orthogonal artifact_kind axis (catches what the class axis would default into substrate) ──
+artifact_kind:
+  spec:       { routes_by: class }
+  plan:       { routes_by: class }
+  brainstorm: { routes_by: class, allow_provisional: true }          # pre-design; class may be unresolved
+  kickoff:    { retention: git, durable: false }                     # ephemeral
+  handoff:    { retention: git, durable: false }                     # ephemeral
+  run-output:                                                        # loop OUTPUTS — retention, NOT decompose-to-zero
+    why: "shift-results / horizon-scans / ceremony-rewrites / story-harvest scaffolds / audit reports are loop outputs, never design->plan->land docs; they must NOT default into a fake D# + pillar a2o leg"
+    homes:
+      shift-result:     .claude/shifts/                              # (+ genesis/docs/superpowers/sprints/)
+      horizon-scan:     .claude/memory-kit/horizon-scans/            # comet
+      ceremony-rewrite: [genesis/docs/content/elohim-protocol/architecture/, MEMORY.md]   # the one run-output whose deliverable IS an architecture rewrite (do not false-fire forced-architecture-seed)
+      audit-report:     .claude/memory-kit/TRAJECTORY.md             # comet
+
+# ── Deterministic mis-class detectors (the FRONT/BACK gate runs these fail-loud) ──────────────────
+gate_signals:
+  - id: vocab-vs-target-mismatch
+    fires_when: "domain: D# is set AND every proposed_amendments/cites target is under .claude/ or PLACEMENT.md (0 product-code refs)"
+    verdict: "MIS-CLASS — process-meta wearing a product D#. Drop domain:, set class: process-meta + process_subdomain:. See history/2026-06-02-d4-name-collision."
+    severity: hard
+  - id: forced-a2o-leg
+    fires_when: "class == process-meta AND a chunk routed to genesis/a2o/features/<pillar>/*.feature"
+    not_fires_on: "genesis/a2o/scripts/ | steps/ | src/framework/ (a2o HARNESS = process-owned, legitimately edited by process work)"
+    verdict: "NULL-LEG VIOLATION — process work has no pillar scenario; route to the hook/skill/test that IS the verification."
+    severity: hard
+  - id: forced-architecture-seed
+    fires_when: "class == process-meta AND a chunk routed to architecture/ as a NON-cite"
+    not_fires_on: "a spec whose DELIVERABLE is itself an architecture rewrite (artifact_kind run-output ceremony-rewrite; the memory-ceremony / historian) — these legitimately write architecture/"
+    verdict: "NULL-LEG VIOLATION — process work lands the gospel-diff in the CLAUDE.md, not an architecture seed (unless it is a ceremony-rewrite)."
+    severity: hard
+  - id: archetype-scheduled-a-sprint
+    fires_when: "status == vision AND it spawned an impl plan/sprint"
+    verdict: "ADVISORY — an archetype graduating to impl is a legitimate transition (the corpus shows it). Confirm it is intended; not an error."
+    severity: advisory

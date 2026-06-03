@@ -1,5 +1,6 @@
 ---
 title: WordPress-shape composed SPA / personal site on the substrate
+id: wordpress-application-design
 tier: architecture
 status: Horizon (coherent pattern, not on active subsumption path)
 created: 2026-05-24

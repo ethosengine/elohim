@@ -261,3 +261,7 @@ MemPalace is now wired in via the `mempalace` MCP server (frontmatter). Pattern-
 - `.claude/scripts/memory-kit/CLAUDE.md` — memory system overview
 - `genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md` — full design + open questions
 - Memory pointers: `project_historian_pattern_surface_agent.md`, `project_three_temporal_perspectives.md`, `project_wisdom_resolves_into_epics.md`, `reference_mempalace.md`
+
+## Content-addressed cites (semantic-links)
+
+Doc cites are content-addressed envelopes (`<slug> | desc | fingerprint`) that **survive file moves** — see `.claude/skills/semantic-links/SKILL.md`. Never hand-write a slug/fingerprint; run `cite-gen`. Audit verdicts: **HELD-CITE ≠ DEAD-CITE** (a cite to a `held/` doc still resolves — do NOT delete it), **STALE-CANDIDATE** (fingerprint drift → re-verify the lesson), **CITE-FORMAT-CANDIDATE** (legacy path → `cite-gen --into`). The `cites` stasis discipline drains `cites_legacy` via `cites-migrate.py`. Moving a doc never breaks an inbound cite.

@@ -1,4 +1,5 @@
 ---
+id: feedback-deliver-drive-mode-no-menu
 name: feedback-deliver-drive-mode-no-menu
 description: "When running /deliver (or any iteration-loop skill), prefer 'just drive' mode over presenting AskUserQuestion menus. Self-direct the iteration; if waiting on CI, schedule a wakeup and do anticipatory debugging in the meantime."
 metadata: 

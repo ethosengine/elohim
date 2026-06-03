@@ -64,7 +64,28 @@ two standing legibility/prioritization maps the compaction-loop machinery keeps 
 brainstorm is born oriented, not just born linked. Both are plain-text reads; carry their answers into the
 brainstorm exactly as the surfaced seeds are.
 
-**(1) MAP-PATH — where on the canonical surface does this live?** Read
+**(0) CLASSIFY-SUBJECT — substrate or process? (read `.claude/subject-routing.yaml`).** BEFORE MAP-PATH,
+name the subject **class**, because MAP-PATH's D#+pillar lookup is HONEST ONLY for substrate work. Ask the
+discriminator: *whose experience does the DELIVERABLE change, and where does the landed change physically
+live?* — never "what vocabulary does it use."
+- **protocol-canonical** (learner/peer; lands in `app/` + `architecture/` + `a2o/features/<pillar>`) →
+  proceed into (1) MAP-PATH + (2) ROADMAP-PRIORITY UNCHANGED. (`status: vision` = a subsumption archetype,
+  born in `architecture/applications/`.)
+- **process-meta** (developer/agent; lands in `.claude/` + a CLAUDE.md gospel) → **SKIP MAP-PATH's
+  D#+pillar lookup** — a process topic has no honest D#; forcing one is the D4 name-collision that mis-filed
+  four specs (see `history/2026-06-02-d4-name-collision`). Instead name the **process home**: the
+  `genesis/docs/superpowers/` ACTIVE source + the `process_subdomain` (memory / ci / doc-lifecycle / skills /
+  agents / hooks / …) whose gospel-diff + `.claude/` tool the residue will land in. ROADMAP-PRIORITY still
+  runs (process work is prioritizable) against the process backlog.
+- **`provisional`** (a spike whose deliverable-target isn't decided yet) → defer the class; it is *reconciled
+  at the BACK-fire* (decompose) from where the residue actually lands. Do **not** force a `domain:`.
+
+The classifier is the cascade resolver `_lib.subject_routing` (the root `.claude/subject-routing.yaml` merged
+with any sub-tree manifest on the path — the one-repo→mono-repo→submodule cascade). A product-vocabulary
+`derived_from:` (dogfooding EPR / comet / cites) is a **lineage breadcrumb, never a routing key**.
+
+**(1) MAP-PATH — where on the canonical surface does this live?** *(substrate classes only — skip for
+process-meta/provisional.)* Read
 [`architecture/MAP.md`](../../genesis/docs/content/elohim-protocol/architecture/MAP.md) and name, in one line:
 - **which concern-domain D# (Section 1's D1–D10 table)** this topic owns — *"you are working in domain D#"* —
   and the **owning architecture seed(s)** in that domain (cite them `informed-by:` per INDEX's frontmatter
@@ -127,17 +148,34 @@ Step-2 rule. Prefer "add a section to `<canonical spec>`" over "new spec" whenev
 Whatever the brainstorm produces, it must be **instantly auditable the moment it lands** — never a no-status
 orphan (that is the #1 debt). So the output spec MUST carry PLACEMENT frontmatter:
 
+The frontmatter is **class-conditional** (Step 1c.0 stamped the class):
+
 ```yaml
 ---
 title: <name>
 status: Draft            # the lifecycle state — NEVER omit
+class: <protocol-canonical | process-meta | provisional>   # the subject class (Step 1c.0) — ALWAYS
 topic: [<tokens>]        # what it's about (feeds the prior-art index)
 cites: [<prior-art paths you composed from>]   # the verifiable links back
+
+# ── protocol-canonical ONLY (substrate work has an honest D#) ──
 domain: D#               # the MAP-PATH concern-domain (Step 1c) — where it lives on architecture/MAP.md
 informed-by: [<owning architecture seed(s) in that D#>]   # the INDEX/MAP graph edge
+# status: vision         #   add for a subsumption archetype (born in architecture/applications/)
+
+# ── process-meta ONLY (NO domain: — a process topic has no honest D#) ──
+process_subdomain: <memory | ci | doc-lifecycle | a2o | skills | agents | hooks | build-and-test | schema-sdk>
+informed-by: [<process gospel/seed — NOT an architecture seed>]
+# derived_from: [<product seed>]   #   ONLY if it dogfoods a product primitive (the lineage breadcrumb)
+
+# ── provisional ONLY (a spike) ── omit domain:/informed-by:; the BACK-fire reconciles class from residue.
+
 # requires_env: [<env>]  # if it can only be validated on a specific node/cluster (a ROADMAP §3 HELD item)
 ---
 ```
+
+decompose.py (the BACK gate) re-reads `class:`, reconciles `provisional`, and fails loud if the residue
+contradicts the stamp (e.g. `domain: D#` + all-`.claude/` targets — the mis-class the gate catches).
 
 **BORN LINKED (§4.3):** `cites:` is **not** a retroactive afterthought — it is **front-loaded** from the seeds
 surfaced at Steps 1 + 1b. Write the lexical PRIOR-ART paths *and* the semantic MemPalace hits into `cites:`, and
@@ -146,6 +184,18 @@ preferred "add a section to `<canonical>`" path), or `derived_from:` / `compacte
 that surfaced a CANONICAL match but forks a standalone doc anyway is a placement violation the BACK fire point
 will catch. `cites: []` is legitimate **only** when both lenses came back empty (and the semantic lens was not
 stale).
+
+**SEAL the cites (born-linked, deterministic).** `cites:` was written as plain paths; make them
+content-addressed in one shot so the link survives the target moving (e.g. into `held/`) and carries a
+progressive-discovery hint:
+
+```bash
+python3 .claude/scripts/memory-kit/cite-gen.py --seal <new-spec-path>   # assign-id + path-cites → slug|desc|fingerprint + verify
+```
+
+If `--seal` flags `N cite(s) on the title-default desc`, author the relationship hint for each (what the
+target is AND why THIS spec points at it) — `cite-describe.py <doc> '{"<ref>":"<hint>"}'`. The cite-seal
+postHook nudges if you skip this; the seal is what makes the spec a stable, relocatable cite target.
 
 Then re-audit so the new artifact shows up in the budget immediately:
 

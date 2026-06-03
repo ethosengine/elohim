@@ -1,5 +1,6 @@
 ---
 title: Records Lifecycle — Wiring the EPR / Event / Resource Substrate
+id: records-lifecycle-design
 tier: architecture
 status: Draft (Parts A + B + D content-complete; Part C deferred to dev-sprint measurement; Part E migration-plan stubbed; awaiting Wave 2 application-archetype full-drafts)
 created: 2026-05-24

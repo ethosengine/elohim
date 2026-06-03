@@ -1,10 +1,11 @@
 ---
+id: project-agentic-loop-economics
 name: Agentic loop economics — iterations are the cost, not tokens
 description: In this project's agentic developer loops, optimize for iteration count (wall-clock, real pipeline runs), not per-iteration token cost. Use top-tier models for orchestration and attempts.
 type: project
 originSessionId: 9a934a92-144d-4415-9d43-14fcb046e2db
 cites:
-  - genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md
+  - agentic-developer-loop-design | the loop design whose Opus-orchestrates-every-iteration shape this iteration-cost rationale justifies | sha256:42b461f7c0b7a870
 ---
 For agentic developer loops in this project (CI/pipeline work, overnight shifts, anything where each iteration triggers real infrastructure like a Jenkins build):
 

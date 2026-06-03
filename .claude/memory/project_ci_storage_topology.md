@@ -1,4 +1,5 @@
 ---
+id: project-ci-storage-topology
 name: CI build storage topology — migrated openebs-jiva → openebs-hostpath; hostpath needs deterministic node pinning
 description: "CURRENT (2026-05-27): Holochain/edge CI cache PVCs are openebs-hostpath (node-local, WaitForFirstConsumer) and need a kubernetes.io/hostname nodeAffinity in each pipeline's pod spec or pods thrash on volume-node-affinity conflict. The pre-2026-05-27 openebs-jiva section below is SUPERSEDED history."
 type: project

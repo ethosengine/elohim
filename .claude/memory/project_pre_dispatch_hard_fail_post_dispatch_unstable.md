@@ -1,4 +1,5 @@
 ---
+id: project-pre-dispatch-hard-fail-post-dispatch-unstable
 name: pre-dispatch-hard-fail-post-dispatch-unstable
 description: "Jenkins orchestrator pipeline pattern — stages BEFORE dispatch may hard-fail; stages AFTER dispatch (observational/reporting) must use catchError → UNSTABLE so they don't blank the downstream truth"
 metadata: 

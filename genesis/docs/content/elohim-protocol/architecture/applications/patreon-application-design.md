@@ -1,5 +1,6 @@
 ---
 title: Patreon — substrate-native creator monetization
+id: patreon-application-design
 tier: architecture
 status: Composition draft (primitives mapped; full walkthrough pending)
 created: 2026-05-24

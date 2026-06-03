@@ -1,4 +1,5 @@
 ---
+id: project-imagodei-three-surfaces
 name: Imagodei has three distinct surfaces — social profile, self-knowledge, account management
 description: Imagodei UX decomposes into three surfaces; M5 lands the third (account management) with Security & sign-in as its first pane
 type: project

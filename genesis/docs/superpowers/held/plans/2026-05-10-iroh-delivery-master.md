@@ -1,8 +1,9 @@
 ---
+id: iroh-delivery-master
 status: in-flight
 verification: claimed-not-verified   # ci-investigator 2026-06-01 vs CI+Grafana: 1/12 gates verified-stable
 landed_commit: none                  # the per-gate ✅/⏳ tracker below is SELF-REPORTED and stale
-requires_env: [harbor, alpha-cluster-6peer]   # CI image builds + the 6-peer soak cluster
+requires_env: [harbor-registry, alpha-cluster-6peer]   # CI image builds + the 6-peer soak cluster
 ---
 
 # Iroh Delivery Master Plan

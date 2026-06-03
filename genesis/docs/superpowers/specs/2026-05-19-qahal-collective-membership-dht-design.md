@@ -1,4 +1,5 @@
 ---
+id: qahal-collective-membership-dht-design
 status: Design
 related:
   - ../../plans/2026-05-19-viewer-symmetry-reciprocity-qahal-substrate.md   # L7 plan that authors this spec as substrate groundwork

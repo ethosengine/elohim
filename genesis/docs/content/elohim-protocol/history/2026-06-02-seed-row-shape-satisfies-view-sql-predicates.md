@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Seed-row shape must satisfy the view's SQL predicates"
+id: seed-row-shape-satisfies-view-sql-predicates
 type: history-gotcha
 status: Accepted
 tier: history

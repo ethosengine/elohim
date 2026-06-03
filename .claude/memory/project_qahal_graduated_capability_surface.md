@@ -1,4 +1,5 @@
 ---
+id: project-qahal-graduated-capability-surface
 name: qahal-graduated-capability-surface
 description: "Qahal is one primitive with a graduated capability surface, gated by lamad-attested mastery on a Bloom's curve where the rubric is governable by the collective's stewards. Anti-colonization by construction."
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: 0deb6177-e250-4b18-9ca2-dd7a2b971a5d
 cites:
-  - genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md
+  - qahal-collective-membership-dht-design | the DHT Collective/Membership entry design that makes this one-primitive graduated surface concrete | sha256:5a4cd21525238d58
 ---
 
 # Qahal as graduated capability surface

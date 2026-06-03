@@ -1,4 +1,5 @@
 ---
+id: feedback-operator-recurrence-perception-verify-per-build
 name: operator-recurrence-perception-verify-per-build
 description: "when operator says \"we keep hitting this,\" verify per-build via getBuild + first_failing_stage before assuming same root cause; recurrence-shape (F/U/F/F/U cluster) ≠ same-root-cause"
 metadata: 

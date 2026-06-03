@@ -1,4 +1,5 @@
 ---
+id: rea-compute-substrate-native-roadmap
 status: vision
 cites:
   - 2026-05-26-substrate-rea-replication-fix.md   # the related doc this derives from

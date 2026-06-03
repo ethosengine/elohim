@@ -1,4 +1,5 @@
 ---
+id: project-friction-gradient-limitarianism
 name: friction-gradient-limitarianism
 description: "Protocol-level anti-concentration design — friction to acquiring more power/centralization increases as accumulation increases, making existential power structures mechanically expensive to form."
 metadata: 

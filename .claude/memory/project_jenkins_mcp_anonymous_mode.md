@@ -1,4 +1,5 @@
 ---
+id: project-jenkins-mcp-anonymous-mode
 name: Jenkins MCP runs as anonymous (OIDC constraint)
 description: Jenkins is OIDC-protected; MCP must omit Authorization header to avoid redirect-loop. Reads work, writes don't. Builds dispatch via webhook + [build:*] commit tags.
 type: project

@@ -1,4 +1,5 @@
 ---
+id: feedback-swarm-composition-fresh-tree-build
 name: After editing swarm composition, do a fresh-tree cargo build before committing
 description: just check on a DNA worktree does not verify that crate-level type/field references resolve on a clean checkout of dev; for elohim-storage swarm/behaviour edits, run cargo build on the actual storage crate from a clean state
 type: feedback

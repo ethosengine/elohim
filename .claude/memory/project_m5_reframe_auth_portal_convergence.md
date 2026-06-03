@@ -1,4 +1,5 @@
 ---
+id: project-m5-reframe-auth-portal-convergence
 name: M5 reframed — auth-portal convergence + stub defender, not full defender backend
 description: M5 pivots from full elohim-defender implementation to connecting hosted-doorway + peer-native-steward auth portals via the account management surface; defender stays stubbed
 type: project

@@ -1,4 +1,5 @@
 ---
+id: architecture-frontmatter-normalization-plan
 status: Draft
 ---
 

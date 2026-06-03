@@ -1,4 +1,5 @@
 ---
+id: feedback-jenkinsfile-safe-directory-required
 name: New Jenkinsfiles need safe.directory before in-container git operations
 description: Any new pipeline that runs git commands inside a container (other than checkout scm) must set safe.directory first or git fails with dubious-ownership
 type: feedback

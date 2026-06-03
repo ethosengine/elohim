@@ -1,4 +1,5 @@
 ---
+id: project-compute-and-model-independent-diversity-surfaces
 name: Compute and model are independent diversity surfaces
 description: Peer diversity has two distinct axes — compute (hardware, memory, storage) and model (which elohim runs, context size, specialties, skills). They correlate but must be independently observable and addressable.
 type: project

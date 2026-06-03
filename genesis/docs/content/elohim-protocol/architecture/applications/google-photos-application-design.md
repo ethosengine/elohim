@@ -1,5 +1,6 @@
 ---
 title: Google Photos — substrate-native media library
+id: google-photos-application-design
 tier: architecture
 status: Full draft
 created: 2026-05-24

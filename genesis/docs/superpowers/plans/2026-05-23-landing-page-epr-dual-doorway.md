@@ -1,4 +1,5 @@
 ---
+id: landing-page-epr-dual-doorway
 status: Draft
 cites:
   - ../../plans/2026-05-19-doorway-stewardship-chain-design.md   # the design spec this plan implements

@@ -1,5 +1,6 @@
 ---
 title: Factory-as-Collective — industrial supply chain on the substrate
+id: factory-application-design
 tier: architecture
 status: Horizon (coherent pattern, not on active subsumption path)
 created: 2026-05-24

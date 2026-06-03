@@ -1,4 +1,5 @@
 ---
+id: feedback-agent-prompts-no-process-status
 name: agent-prompts-no-process-status
 description: "Agent prompts (and skill prompts, and any gospel-tier always-loaded surface) describe stable architecture and patterns, not sprint progress. Temporal state belongs in memory entries and chronicles, which link forward and stay current."
 metadata: 

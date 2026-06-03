@@ -1,5 +1,6 @@
 ---
 title: Computation Attestation & Graduated Proof Rigor
+id: computation-attestation-graduated-rigor-design
 status: Draft
 created: 2026-05-01
 related:

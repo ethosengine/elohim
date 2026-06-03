@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: The DHT is a notary, not a byte store"
+id: dht-is-a-notary-not-a-byte-store
 type: history-gotcha
 status: Accepted
 created: 2026-06-01

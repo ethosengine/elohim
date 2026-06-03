@@ -1,4 +1,5 @@
 ---
+id: project-forgetting-as-design
 name: project-forgetting-as-design
 description: Forgetting is inevitable in any memory system that respects time; the protocol's promise is not perfect recall but meaningful re-emergence. The storyteller agent is the gatekeeper that decides graduate / memorialize / hold for every memory candidate.
 metadata:

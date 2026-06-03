@@ -1,4 +1,5 @@
 ---
+id: project-lineage-rna-upgrade-path
 name: DNA upgrade path — lineage regression + rna module
 description: HC 0.6 gates lineage behind unstable-migration; rna module is a backburnered upgrade-path exploration worth its own brainstorm
 type: project

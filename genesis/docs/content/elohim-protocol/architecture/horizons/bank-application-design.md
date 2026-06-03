@@ -1,5 +1,6 @@
 ---
 title: Bank-as-Collective — financial institution on the substrate, REA-native banking
+id: bank-application-design
 tier: architecture
 status: Horizon (coherent pattern, not on active subsumption path)
 created: 2026-05-24

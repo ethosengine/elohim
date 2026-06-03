@@ -1,10 +1,11 @@
 ---
+id: project-upstream-proxy-pattern-brit-rakia
 name: Upstream containment as brit→rakia axis — MVP is substrate-native, not web2 mirrors
 description: Generalize nexus-shape proxying for all CI upstreams; MVP target is substrate-replicated repos (Matthew's household replicates the elohim repo; doorway projects GitHub-shape) rather than yet-another web2 mirror service
 type: project
 originSessionId: e9127493-544b-44b2-8f81-c61c1fa5cbb6
 cites:
-  - genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md
+  - cargo-registry-and-compilation-load-reduction | the nexus cargo-proxy plan — the web2-mirror framing made concrete for the cargo upstream | sha256:57641cddabeb30a2
 ---
 The pattern: `nexus.ethosengine.com` already insulates the cluster from npmjs.org availability. The same shape should extend to every upstream — but the MVP framing has shifted.
 

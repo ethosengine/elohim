@@ -55,7 +55,7 @@ DEFAULT_OUT_ROOT = _paths.reports_root(REPO_ROOT)
 
 # --- Surface discovery -----------------------------------------------------
 
-CLAUDE_MD_EXCLUDE = ("node_modules", "target", ".cargo-target-pool", "sophia")
+CLAUDE_MD_EXCLUDE = ("node_modules", "target", ".cargo-target-pool", "sophia", "held")
 
 
 def discover_agents(root: Path) -> list[Path]:

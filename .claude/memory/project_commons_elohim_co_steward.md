@@ -1,4 +1,5 @@
 ---
+id: project-commons-elohim-co-steward
 name: commons-elohim-co-steward
 description: "Every Qahal has an autonomous elohim co-steward representing the commons interest alongside the collective's human stewards — reflects what the collective cannot directly voice, holds commons-share custody, speaks in councils, mediates disputes. Earlier framing called this 'shadow agent' — rejected in favor of co-steward/reflection language to remove surveillance/subordination connotations."
 metadata:

@@ -1,4 +1,5 @@
 ---
+id: project-collapse-bureaucracy-into-protocol
 name: Collapse the bureaucracy into the protocol
 description: Reframe of why Elohim's substrate is formal — bureaucracy collapsed into deterministic primitives so the relational layer above can stay informal without rent-seeking gatekeepers
 type: project

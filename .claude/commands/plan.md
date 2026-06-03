@@ -120,6 +120,15 @@ afterward — list the spec being planned, the prior plans (lexical + semantic) 
 gap-items covered. `cites: []` is legitimate only when both lenses came back empty and the semantic lens was
 not stale.
 
+**SEAL the cites (born-linked, deterministic)** — front-loaded `cites:` are plain paths; content-address them
+in one shot so they survive the target relocating and carry a discovery hint (the cite-seal postHook nudges if
+skipped):
+
+```bash
+python3 .claude/scripts/memory-kit/cite-gen.py --seal <new-plan-path>   # assign-id + path-cites → envelopes + verify
+# if it flags title-default descs, author relationship hints: cite-describe.py <plan> '{"<ref>":"<hint>"}'
+```
+
 Then decompose the plan into task-level gap-items (the budget line-items the implement→verify loop drives):
 
 ```bash

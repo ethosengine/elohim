@@ -1,4 +1,5 @@
 ---
+id: feedback-env-var-test-flakiness
 name: Env vars in tests need a static mutex (or refactor)
 description: Process-global env var read on the hot path + one test that mutates it = parallel-test flake. Saw it in storage_proxy.rs BLOB_PANTRY_MAX_BYTES.
 type: feedback

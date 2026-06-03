@@ -1,4 +1,5 @@
 ---
+id: feedback-codegen-prettier-oscillation
 name: schema codegen produces oscillating Prettier diff
 description: schema:codegen:ts oscillates 18 generated TS files between single-line and multi-line union types; the codegen script has no idempotent fixed point
 type: feedback

@@ -1,4 +1,5 @@
 ---
+id: project-elohim-subagent-specialists
 name: Elohim as specialist subagents — context-bound and ephemeral
 description: Elohims are not monolithic agents; they spawn as specialist subagents with focused context (e.g., a defender subagent with deep imagodei profile access) and are governed by constitutional disclosure rules
 type: project

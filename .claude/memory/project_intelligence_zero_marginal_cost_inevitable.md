@@ -1,4 +1,5 @@
 ---
+id: project-intelligence-zero-marginal-cost-inevitable
 name: Zero marginal cost of intelligence is inevitable — fiber pattern
 description: Pitch frame — there's one AI, currently hyperscaled. Inference is racing to the edge. Marginal cost of applied intelligence going to zero is inevitable, same pattern as fiber/telco rental collapse.
 type: project

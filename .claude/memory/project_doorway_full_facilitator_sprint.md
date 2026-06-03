@@ -1,4 +1,5 @@
 ---
+id: project-doorway-full-facilitator-sprint
 name: Doorway as full-blown web2 facilitator (SPA host + projection + SSR + ingress concerns)
 description: Future sprint candidate — extend doorway to absorb the SPA-host role currently held by elohim-site, so every doorway is a complete web2 projection of its substrate (not split across separate static-site pod + ingress rules + cache layer)
 type: project

@@ -1,4 +1,5 @@
 ---
+id: project-ci-playwright-image
 name: ci-playwright image is ci-builder + playwright layer
 description: ethosengine/ci-playwright inherits ci-builder (node:20 + corepack pnpm); bundles playwright@1.59.1; lockfile/image version drift triggers one-time chromium redownload
 type: project

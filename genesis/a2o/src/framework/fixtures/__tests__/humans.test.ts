@@ -7,13 +7,20 @@
  * step definitions auto-skip scenarios for suspended humans without
  * touching feature files. We use ELOHIM_DEPLOYMENTS_PATH_OVERRIDE +
  * _resetDeploymentsCacheForTests() to inject fixture data.
+ *
+ * The remote-compute suite also covers the cluster-state derivation: when
+ * ELOHIM_REMOTE_COMPUTE_STATUS is unset, the signal is DERIVED from
+ * genesis/manifests/cluster-state.yaml (injected via
+ * ELOHIM_CLUSTER_STATE_PATH_OVERRIDE) so the runtime can't disagree with the
+ * durable home. See scope-reconcile.py's derive_remote_compute_status().
  */
 
 import { strict as assert } from 'node:assert';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   _resetDeploymentsCacheForTests,
@@ -32,6 +39,28 @@ interface FixtureHuman {
 function writeFixture(dir: string, humans: FixtureHuman[]): string {
   const path = join(dir, 'deployments.json');
   writeFileSync(path, JSON.stringify({ humans }, null, 2));
+  return path;
+}
+
+/** Write a minimal cluster-state.yaml fixture exercising the line-based parser
+ * (role + multi-line note around the `available:` line, like the real file). */
+function writeClusterState(dir: string, shemAvailable: boolean | 'degraded'): string {
+  const path = join(dir, 'cluster-state.yaml');
+  writeFileSync(
+    path,
+    [
+      'schema_version: 1',
+      'resources:',
+      '  household-nodes:',
+      '    available: true',
+      '  shem:',
+      '    role: multi-tenant live P2P canvas',
+      `    available: ${shemAvailable}`,
+      '    note: fixture for the derivation test',
+      '          continuation line, deeper indent',
+      '',
+    ].join('\n')
+  );
   return path;
 }
 
@@ -114,11 +143,30 @@ void describe('remote-compute availability gating', () => {
   afterEach(() => {
     delete process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE;
     delete process.env.ELOHIM_REMOTE_COMPUTE_STATUS;
+    delete process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE;
     _resetDeploymentsCacheForTests();
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  void it('isRemoteComputeAvailable() defaults to true when env unset (fail-open)', () => {
+  void it('derives shem-available from cluster-state when env unset', () => {
+    process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE = writeClusterState(workDir, true);
+    assert.equal(isRemoteComputeAvailable(), true);
+  });
+
+  void it('derives shem-unavailable from cluster-state when env unset', () => {
+    process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE = writeClusterState(workDir, false);
+    assert.equal(isRemoteComputeAvailable(), false);
+  });
+
+  void it('treats a degraded shem as unavailable (conservative, mirrors scope-reconcile)', () => {
+    process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE = writeClusterState(workDir, 'degraded');
+    assert.equal(isRemoteComputeAvailable(), false);
+  });
+
+  void it('explicit ELOHIM_REMOTE_COMPUTE_STATUS=available overrides cluster-state (CI override)', () => {
+    // CI's probe wins even when the durable home declares shem down.
+    process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE = writeClusterState(workDir, false);
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'available';
     assert.equal(isRemoteComputeAvailable(), true);
   });
 
@@ -127,9 +175,43 @@ void describe('remote-compute availability gating', () => {
     assert.equal(isRemoteComputeAvailable(), false);
   });
 
-  void it('isRemoteComputeAvailable() treats unknown values as available (fail-open)', () => {
+  void it('unrecognized env value falls through to cluster-state derivation', () => {
+    // A typo'd env var no longer silently claims shem-up; it consults the
+    // durable home exactly like an unset value does.
     process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'garbage';
+    process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE = writeClusterState(workDir, false);
+    assert.equal(isRemoteComputeAvailable(), false);
+  });
+
+  void it("explicit 'unknown' derives from cluster-state (means: probe could not determine)", () => {
+    process.env.ELOHIM_REMOTE_COMPUTE_STATUS = 'unknown';
+    process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE = writeClusterState(workDir, true);
     assert.equal(isRemoteComputeAvailable(), true);
+  });
+
+  void it('fails open (available) when env unset AND cluster-state is unreadable', () => {
+    // No durable home to consult (e.g. a published consumer without the genesis
+    // tree) → preserve the legacy fail-open so tests still execute.
+    process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE = join(workDir, 'no-such-cluster-state.yaml');
+    assert.equal(isRemoteComputeAvailable(), true);
+  });
+
+  void it('default path (no override) resolves to the real cluster-state.yaml', () => {
+    // Independently compute the real path (5 levels up from this __tests__ dir)
+    // and confirm humans.ts's own default resolution (4 levels up from fixtures/)
+    // lands on the same file — catches a wrong relative depth. Robust to shem
+    // being flipped because both sides read the same file.
+    const realPath = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../../../manifests/cluster-state.yaml'
+    );
+    process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE = realPath;
+    const viaOverride = isRemoteComputeAvailable();
+    // Sanity: the real file must be readable for this assertion to mean anything.
+    assert.ok(readFileSync(realPath, 'utf-8').includes('shem:'));
+    delete process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE;
+    const viaDefault = isRemoteComputeAvailable();
+    assert.equal(viaDefault, viaOverride);
   });
 
   void it('isAnyNodePoolAvailable: dev-cluster pools always available', () => {

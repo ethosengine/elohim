@@ -1,4 +1,5 @@
 ---
+id: project-dwelling-hub-replication-pattern
 name: dwelling-hub-replication-pattern
 description: First concrete instance of the REA compute-commitment primitive — mutual storage replication between dwelling-hubs (households). Three load-bearing properties: donut economics (device-level), bilateral-by-reference mutuality (with grace-period soft-warn), intent-first observed-state-second. Hub-aware substrate vocabulary; encryption-decoupled commitments. Pattern extends to collective + commons tiers.
 metadata:

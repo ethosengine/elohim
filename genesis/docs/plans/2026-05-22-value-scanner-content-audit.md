@@ -1,4 +1,5 @@
 ---
+id: value-scanner-content-audit
 status: design   # content audit — inventory + integration decisions, planning input
 related:
   - 2026-05-22-scenario-archaeology-and-archetype-map.md   # the Sprint 0.5 archaeology this audit extends

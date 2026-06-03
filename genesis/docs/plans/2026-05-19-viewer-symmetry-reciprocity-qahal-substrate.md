@@ -1,4 +1,5 @@
 ---
+id: viewer-symmetry-reciprocity-qahal-substrate
 status: Draft
 related:
   - ../superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md   # the Qahal DHT design spec this plan authors as substrate groundwork

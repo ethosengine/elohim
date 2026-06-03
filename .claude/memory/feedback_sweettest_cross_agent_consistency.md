@@ -1,4 +1,5 @@
 ---
+id: feedback-sweettest-cross-agent-consistency
 name: Sweettest two_agent_conductors needs explicit DHT consistency wait
 description: Cross-agent must_get_valid_record calls in sweettest fail with "Failed to get Record" unless tests explicitly exchange_peer_info + await_consistency between conductors
 type: feedback

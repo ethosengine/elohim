@@ -1,4 +1,5 @@
 ---
+id: feedback-pvc-threshold-and-recovery
 name: PVC threshold — act at 85%+, cargo-pool legacy-targets is the first reclamation
 description: Workspace PVC is 118G. Above 85% used, the operator considers the system "close to toast." First-party reclamation: cargo-pool legacy-targets --clean --yes (recovers ~30-35G of duplicate target/ dirs outside the shared pool — safe, build artifacts only).
 type: feedback

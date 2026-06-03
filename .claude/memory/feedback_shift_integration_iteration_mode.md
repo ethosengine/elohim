@@ -1,4 +1,5 @@
 ---
+id: feedback-shift-integration-iteration-mode
 name: /shift has two modes — bring-up and integration-iteration
 description: A shift's iteration loop adapts based on whether the cluster is broken (bring-up, single objective) or stable (integration-iteration, multi-candidate fix-as-many-classes-as-possible across 5 loops)
 type: feedback

@@ -1,4 +1,5 @@
 ---
+id: project-attestation-consolidation-sprint-state
 name: Attestation Consolidation Sprint — CLOSED (merged to local dev 2026-05-11)
 description: Sprint result; A→G partial merged at 34fcf1070; Stage G follow-up scoped with TODO markers in code
 type: project

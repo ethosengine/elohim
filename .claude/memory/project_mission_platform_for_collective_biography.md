@@ -1,4 +1,5 @@
 ---
+id: project-mission-platform-for-collective-biography
 name: mission-platform-for-collective-biography
 description: "Mission-level north-star anchor. The Elohim Protocol is a platform for accepting our collective biography and its consequences, aiding families and communities in regaining a sense of the rightness of this effort, and restoring dignity to those who have suffered shame and oppression. From Foster's 'Reclaiming Reconciliation' via Coates — the passage that crystallizes the four moves: investigation → public acknowledgment → biographical accumulation with consequences → dignity restoration. Causal order matters."
 metadata:

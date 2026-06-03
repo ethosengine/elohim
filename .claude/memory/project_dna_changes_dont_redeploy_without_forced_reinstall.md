@@ -1,4 +1,5 @@
 ---
+id: project-dna-changes-dont-redeploy-without-forced-reinstall
 name: project-dna-changes-dont-redeploy-without-forced-reinstall
 description: "A changed DNA (new hash, same roles) does NOT reach running conductors on a normal deploy — the conductor data dir is a persistent PVC and the install stale-check is role-structure-only. Needs DNA-hash drift detection (gated reinstall) or a conductor-data wipe. Cost us ~a day on the Gap-F alpha delivery."
 metadata: 

@@ -1,5 +1,6 @@
 ---
 title: AWS — substrate-native peer-native compute marketplace
+id: aws-compute-application-design
 tier: architecture
 status: Composition draft (primitives mapped; full walkthrough pending)
 created: 2026-05-24

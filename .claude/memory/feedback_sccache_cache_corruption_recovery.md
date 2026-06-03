@@ -1,4 +1,5 @@
 ---
+id: feedback-sccache-cache-corruption-recovery
 name: sccache-cache-corruption-recovery
 description: "When sccache produces null-byte output (clippy 'unclosed delimiter' errors at random source positions), the underlying S3 cache likely has corrupted entries. SCCACHE_RECACHE=1 only repaves COMPILATION entries — NOT probe-response entries. A poisoned probe blob requires direct S3 DELETE (the specific key) or full bucket wipe via Garage admin. Procedure verified on 2026-05-17."
 metadata:

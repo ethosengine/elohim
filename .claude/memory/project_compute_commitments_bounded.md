@@ -1,4 +1,5 @@
 ---
+id: project-compute-commitments-bounded
 name: Compute commitments are bounded REA primitives
 description: Compute is a low-level network primitive expressed as Commitment with signal_kind "compute-allocation"; three trigger_kinds; breach in compute-class never contaminates attribution-class flows.
 type: project

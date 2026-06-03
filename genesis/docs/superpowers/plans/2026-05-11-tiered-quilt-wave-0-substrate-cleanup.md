@@ -1,4 +1,5 @@
 ---
+id: tiered-quilt-wave-0-substrate-cleanup
 status: Draft
 informed-by:
   - ../../content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md   # the tiered-quilt canon this wave-0 cleanup serves

@@ -1,4 +1,5 @@
 ---
+id: project-storybook-in-ethosengine-namespace
 name: Storybook lives in ethosengine namespace, not elohim-<env>
 description: elohim-<env> namespaces enforce P2P peer isolation via default-deny-cross-env NetworkPolicy; tooling (storybook, design surfaces) belongs in ethosengine which has no such restriction
 type: project

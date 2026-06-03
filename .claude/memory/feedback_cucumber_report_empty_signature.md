@@ -1,4 +1,5 @@
 ---
+id: feedback-cucumber-report-empty-signature
 name: cucumber-report-empty-signature
 description: Jenkins Cucumber plugin "Missing report result → UNSTABLE" + present-but-empty sprint-report JSON = Gherkin parse error elsewhere in the feature set; read E2E log for "Parse error in features/" first, NOT runner config / tag filter / hook bail
 metadata:

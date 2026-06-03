@@ -1,7 +1,10 @@
 ---
 title: iroh Phase 11 Cutover Gate #5 — Recovery e2e Cross-Stack Harness
+id: iroh-recovery-e2e
 status: complete
-requires_env: [shem]   # cross-stack / cross-node recovery needs the shem cross-node canvas
+# scope is gap-granular (iroh ≠ shem): the iroh transport / loopback fixture / Rust round-trip tests are
+# household-testable now; ONLY the live cross-node e2e tasks (Steps 6.2/6.3/9.2/9.4) carry @requires:shem.
+# No doc-level requires_env → this plan stays on the plate; only those gaps are BLOCKED-BY-ENV. See _lib/env_scope.py.
 created: 2026-05-10
 parent: genesis/docs/superpowers/plans/2026-05-08-iroh-phase11-prep.md
 spec: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md (gate #5, line 514)
@@ -373,7 +376,7 @@ Bodies call into the per-node admin HTTP port (the same one the `account.rs` API
 
 - [ ] **Step 6.1:** Add an `admin_port` accessor to `MultiStackFixture` that returns the bound port for a given node name. Each spawned node's `http::serve` returns its bound port (existing pattern in `forwarder_integration.rs`).
 
-- [ ] **Step 6.2:** Replace each step body with the real call:
+- [ ] **Step 6.2:** Replace each step body with the real call (binds to the live multi-node stack): @requires:shem
   - `Given('a 5-node cross-stack fixture is running...')` — spin up `MultiStackFixture` via a helper test binary launched from the cucumber world (or, if the existing a2o convention prefers an external `local-stack`, defer to `genesis/a2o/scripts/local-stack.ts` extension; reading `genesis/a2o/scripts/local-stack.ts` in this task confirms the exact integration shape).
   - `Given('Abby is registered with required_witness_count of 3')` — POST to Abby's node `POST /api/v1/...` (mirror the M3 happy-path step's call pattern; find with `grep -n 'create_recovery_request\|create_human' /projects/elohim/genesis/a2o/steps/*.ts`).
   - `Given('each of Ben, Cara, Dan, Evan, Faye has a HumanRelationship to Abby...')` — POST `/db/relationship` (or the equivalent — confirm by reading `account.rs` route table) on each relevant node.
@@ -390,7 +393,7 @@ Bodies call into the per-node admin HTTP port (the same one the `account.rs` API
   - `When('share-holder Ben publishes a RecoveryRevocationMessage on the recovery.revocation topic')` — POST Ben's node `/api/v1/account/self-revocation` (the existing self-revoke route triggers the gossip publish per `account.rs:74`).
   - `And('Abby's commit_key_rotation ... is rejected by the M2 validator')` — assert HTTP 4xx with body referencing `RECOVERY_AUTHORITY_LAYERS` validator rule.
 
-- [ ] **Step 6.3:** Run dry-run again — all steps should report "passed" or "failed" (not "skipped"):
+- [ ] **Step 6.3:** Run again — all steps should report "passed" or "failed" (not "skipped") against the running stack: @requires:shem
   ```bash
   cd /projects/elohim/genesis/a2o && pnpm exec cucumber-js --tags '@phase11-gate5' features/auth/recovery/cross-stack/recovery-cross-stack-transport.feature
   ```
@@ -498,7 +501,7 @@ Execute end-to-end. This task only fires after Plans 1+4 are merged on `dev`.
   ```
   Expected: all 5 tests pass.
 
-- [ ] **Step 9.2:** Cucumber a2o:
+- [ ] **Step 9.2:** Cucumber a2o (live cross-node e2e): @requires:shem
   ```bash
   cd /projects/elohim/genesis/a2o && pnpm exec cucumber-js --tags '@phase11-gate5'
   ```
@@ -510,7 +513,7 @@ Execute end-to-end. This task only fires after Plans 1+4 are merged on `dev`.
   ```
   Confirm only the four files this plan creates are dirty (multi_stack_fixture.rs, iroh_recovery_cross_stack.rs, recovery-cross-stack-transport.feature, recovery-cross-stack.steps.ts) plus the one-line `mod.rs` modification and the one-line `blob_fetch.rs` log line.
 
-- [ ] **Step 9.4:** Remove `@wip` from feature file; re-run Step 9.2 to confirm green at the non-wip default tag.
+- [ ] **Step 9.4:** Remove `@wip` from feature file; re-run Step 9.2 to confirm green at the non-wip default tag. @requires:shem
 
 ---
 

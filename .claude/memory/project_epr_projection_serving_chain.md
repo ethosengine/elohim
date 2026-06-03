@@ -1,4 +1,5 @@
 ---
+id: project-epr-projection-serving-chain
 name: project_epr_projection_serving_chain
 description: "The full chain that makes / and /lamad serve via projected-EPR bundles across doorways, and the 7 failure layers found delivering it (2026-05-30) — extract_app_context routing shadow, in_scope_of NULL backfill, spa-bundle filter, stageSpaBlobs single-doorway, EprRouter self-heal."
 metadata:

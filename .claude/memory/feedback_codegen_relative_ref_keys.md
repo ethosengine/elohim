@@ -1,4 +1,5 @@
 ---
+id: feedback-codegen-relative-ref-keys
 name: codegen-ts.mjs refMap must register all relative-path key forms
 description: $refs from sibling files use both bare-filename and "./prefix" forms; refMap must register both or json-schema-to-typescript falls through to filesystem ENOENT
 type: feedback

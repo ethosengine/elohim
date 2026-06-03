@@ -1,4 +1,5 @@
 ---
+id: project-signal-driven-audit-ceremonies
 name: Audit ceremonies are signal-triggered, not time-triggered
 description: Accumulate deterministic signal between audits; trigger the deep audit only when threshold is crossed. Pattern reused from EPR feedback. Cheap accumulator + expensive ceremony is the structure for any always-loaded/gospel-treated surface.
 type: project

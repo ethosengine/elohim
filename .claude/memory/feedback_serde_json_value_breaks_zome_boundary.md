@@ -1,4 +1,5 @@
 ---
+id: feedback-serde-json-value-breaks-zome-boundary
 name: serde_json::Value breaks Holochain zome boundary — pre-stringify across WASM
 description: Holochain's SerializedBytes uses MessagePack; serde_json::Value doesn't round-trip — decodes byte arrays as raw bytes instead of structured JSON; breaks DNA init for ALL tests
 type: feedback

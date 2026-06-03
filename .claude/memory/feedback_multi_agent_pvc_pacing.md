@@ -1,4 +1,5 @@
 ---
+id: feedback-multi-agent-pvc-pacing
 name: Pace multi-agent sprints — don't run cargo tests concurrently across agents
 description: When multiple agents work the codebase simultaneously, serialize cargo test runs to protect PVC / disk. Coordinate file scope between agents. Pre/post hooks help manage target dirs but agents can still starve each other.
 type: feedback

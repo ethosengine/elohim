@@ -1,4 +1,5 @@
 ---
+id: feedback-subagent-scope-guardrails
 name: Subagent prompts must name out-of-scope files explicitly; subagents revert parallel agent work otherwise
 description: When dispatching implementation subagents in a multi-agent environment, "do not touch files outside scope" as a general instruction is insufficient. Subagents will revert or stage unrelated commits they perceive as interfering with their build. Prompts must list specific out-of-scope paths and explicitly forbid `git revert`/`git reset` on commits not authored in the current dispatch.
 type: feedback

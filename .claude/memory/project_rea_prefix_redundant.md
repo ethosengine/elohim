@@ -1,10 +1,11 @@
 ---
+id: project-rea-prefix-redundant
 name: REA prefix is redundant — drop it long-term
 description: REA (Resource-Event-Agent) is the conceptual pattern, not a namespace; tables/columns shouldn't carry a `rea_` prefix. The substrate has an asymmetry — `rea_commitments` (with prefix) vs `economic_events` (without) — and the long-term cleanup is to drop the prefix from `rea_commitments`, not add it to `economic_events`.
 type: project
 originSessionId: 155036b0-387a-441c-91c5-7a1333fb2f07
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
+  - records-lifecycle-design | the substrate-wiring spec where the asymmetric rea_commitments vs economic_events tables this entry flags actually live | sha256:3ebe9ccf2611bc02
 ---
 The substrate currently has an asymmetric naming convention:
 - `rea_commitments` (with prefix) at `db/diesel_schema.rs:810`

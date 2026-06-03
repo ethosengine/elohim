@@ -1,14 +1,17 @@
 ---
 title: "Spec/Plan Compaction Loop — Born-Linked Front, Self-Dissolving Back, Curated-Present History"
+id: spec-plan-compaction-loop-design
 status: Draft
 created: 2026-06-02
 tier: design-spec
+class: process-meta
+process_subdomain: doc-lifecycle
 topic: [memory, compaction, lifecycle, decompose, stasis, comet, history, trajectory, born-linked, mempalace, no-dumping-grounds]
 cites:
-  - genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
-  - genesis/docs/PLACEMENT.md
-  - genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md
+  - unified-memory-loop-design | the loop this rides while correcting its single stasis metric to the three-zone comet shape | sha256:99100efd20d10129
+  - memory-lifecycle-design | the product seed supplying the compact/merge/memorialize primitives this loop dogfoods for docs | sha256:b6545e6548573fa4
+  - placement | the contract whose retired-language and doc homes this loop proposes six edits to | sha256:f84d7cb16bea9379
+  - verification-result-index-design | the state store whose verification results gate when a spec may self-dissolve | sha256:8d6b292dafc4a44e
   - genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md
   - .claude/scripts/memory-kit/LIFECYCLE.md
 refines:
@@ -406,6 +409,24 @@ gap-item gains `graduated_to:`.
   `cleanup-apply.py` is **corrected** here: it currently `shutil.move`s targets into `.claude/archive/<date>/`;
   under this spec it writes the distilled history lesson and lets the body retire to git. `.claude/archive/` is
   demoted to genuine memorialized deep-archive (story-pointer retrievable) only — never a back-fire destination.
+
+### 5.2b Per-class fate routing (the table above is the `protocol-canonical` branch)
+
+The §5.2 three-fates table assumes the chunk is **substrate** (verified → `a2o/<pillar>` + pillar code,
+durable truth → `architecture/`, lesson → `history/`). That is the **`protocol-canonical`** branch only.
+`decompose.py` now reads each spec's `class:` (the FRONT gate stamped it; the resolver is
+`_lib.subject_routing`, the registry `.claude/subject-routing.yaml`) and routes per-class:
+
+- **`process-meta`** → the `architecture/` and `a2o/<pillar>` legs are **NULL** (do not force them — that
+  is the D4 collision, `history/2026-06-02-d4-name-collision`). Durable truth → the matching **CLAUDE.md
+  gospel-diff** (by `process_subdomain`); the capability → a **`.claude/` tool**; a tried-and-failed
+  mechanism or tool-design rationale → `history/` (LIVE, judgment-gated, `type:history-gotcha`); the body
+  → git. The unifying rule: **discard the FORM, keep any RESIDUE carrying reusable reasoning** — class
+  picks the home, reasoning-value decides whether a record is written (stub-then-grade default).
+- A mis-class (e.g. `domain: D#` + all-`.claude/` targets) makes `decompose.py` **fail loud**, not
+  silently route process residue into substrate legs.
+
+Full design: `genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md`.
 
 ### 5.3 Mechanical-AUTO vs judgment-GATED apply
 

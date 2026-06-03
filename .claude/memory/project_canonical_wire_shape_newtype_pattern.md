@@ -1,11 +1,12 @@
 ---
+id: project-canonical-wire-shape-newtype-pattern
 name: canonical-wire-shape-newtype-pattern
 description: "Wire-format types deserve a constructor-validated newtype, not raw String. Verifier becomes pleonastic; producer↔verifier drift becomes impossible at type level. BlobAddress in elohim-storage is the reference instance."
 metadata:
   node_type: memory
   type: project
 cites:
-  - genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md
+  - rea-compute-substrate-native-roadmap | the roadmap through whose Stage-1 to Stage-4 Commitment graduation BlobAddress survives intact | sha256:64e5ffe3b8756e6e
   - elohim/elohim-storage/src/p2p/inventory_gossip.rs
 ---
 

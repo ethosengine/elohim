@@ -1,10 +1,11 @@
 ---
+id: project-epr-delivery-sprint-2026-05-11
 name: EPR delivery sprint — 2026-05-11 overnight result
 description: Wave 0 audit + Phase 4 substrate + Wave 2A/B + Wave 3A narrative landed. Substrate is essentially complete; W2D + W3B + W4 deferred. Convergent gaps from audit closed at expected sites. Non-obvious discovery — the substrate was 98.3% landed, not 0%; the plans were tracking debt, not implementation debt.
 type: project
 originSessionId: 60007cbf-4a59-4bce-9be7-6e57d1568cf6
 cites:
-  - genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md
+  - substrate-shakeout-epr-delivery-sprint | the later shakeout plan that finishes the app-delivery code path this substrate sprint left for the doorway projection | sha256:086e3437eb475995
 ---
 The EPR delivery master sprint (kicked off 2026-05-11, overnight execution under auto mode) closed all named substrate gaps. The headline non-obvious finding inverted the sprint scope: the four phase plans (P2B / P3 / P3.5 / Light Up the Graph) showed 0/479 unchecked boxes, but the implementations were substantively landed — the checkboxes were never converted as the work shipped. Wave 0 audit walked each plan task-by-task, grep-confirmed code presence, and ticked 471/479 boxes. The actual remaining backlog was 2 concrete gaps + a topology-substrate piece, not a fresh-from-zero substrate sprint.
 

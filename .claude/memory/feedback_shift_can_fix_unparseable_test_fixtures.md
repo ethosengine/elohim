@@ -1,4 +1,5 @@
 ---
+id: feedback-shift-can-fix-unparseable-test-fixtures
 name: shift-can-fix-unparseable-test-fixtures
 description: shift principle #6 "test fixtures off-limits" doesn't apply when the fixture is GRAMMATICALLY UNPARSEABLE and dropping the whole run; restoring parseability is removing a gate, not moving the goalpost
 metadata:

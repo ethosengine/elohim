@@ -1,4 +1,5 @@
 ---
+id: project-innovators-dilemma-diagnosis
 name: Innovator's dilemma diagnosis — why people of influence don't answer the question
 description: Pitch frame and theory of why shelter-bench-grade questions go structurally unanswered by people with influence. Wild success creates intellectual sunk costs.
 type: project

@@ -1,4 +1,5 @@
 ---
+id: project-redeploy-the-substrate
 name: Redeploy the substrate — capture-resistance as inversion
 description: Pitch frame — the powerful built AI to control; the same tools redeployed on edge/P2P hardware become the means of escape. Capture-resistance is structural, not policy.
 type: project

@@ -1,4 +1,5 @@
 ---
+id: raw-viewport-landing-dogfood
 status: Draft
 cites:
   - ../specs/2026-05-08-doorway-hub-edge-design.md   # the design spec this plan implements

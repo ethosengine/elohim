@@ -1,10 +1,11 @@
 ---
+id: feedback-skip-spec-doc-for-minor-changes
 name: Skip spec doc + writing-plans for minor changes
 description: For trivial scoped changes (small script, hook tweak, config edit), don't write a spec doc to genesis/docs/superpowers/specs/ and don't transition to writing-plans — the brainstorming convo + direct implementation is enough
 type: feedback
 originSessionId: 35be1571-6ae6-498c-ab6a-9534107e0330
 cites:
-  - genesis/docs/content/elohim-protocol/history/2026-06-02-attestation-consolidation-phase2a-dedup.md
+  - attestation-consolidation-phase2a-dedup | the substrate-dedup ADR whose minor-change tail prompted skipping the spec doc | sha256:b5bb7b0f18a4ac8e
 ---
 For minor changes (a small script, a few-line hook tweak, a config edit), do not write a spec doc to `genesis/docs/superpowers/specs/` and do not transition to the `writing-plans` skill. Brainstorming conversation in the chat + direct implementation is enough. Mark the spec/plan brainstorming tasks as `deleted` rather than `completed`.
 

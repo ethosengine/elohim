@@ -1,4 +1,5 @@
 ---
+id: reach-backfill-policy
 canonical: ../architecture/2026-04-21-elohim-core-graph-substrate-design.md
 ---
 # ADR: Reach Backfill Policy for Existing Content

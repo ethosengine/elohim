@@ -1,10 +1,11 @@
 ---
+id: project-iroh-phase11-all-backends-wired
 name: iroh Phase 11 — all six remaining backends wired (cutover gate #1 closed)
 description: Sync had landed earlier; this push wired EPR, EPR-atom, Shard, View-fed, IdentityHandshake, Trust as transport-neutral services + iroh adapters. All 16 iroh integration test binaries pass (43 tests, 0 failures). Phase 11 prerequisite #1 closed; #2-#10 (HTTP/seeder/gossip/recovery/soaks/pkarr/rollback) remain.
 type: project
 originSessionId: c95a6363-756d-496f-a85f-6793fc47ce42
 cites:
-  - genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md
+  - iroh-http-blob-graduation | the cutover gate #2 plan this entry leaves open — dual-format /blob reads after backend wiring closed #1 | sha256:1acc15b649b8b1a3
 ---
 Worktree `worktree-iroh-parallel-stack` (commits stacked on `dev` after the bench expansion). Power-outage pickup, 2026-05-09: extracted six transport-neutral services and registered iroh-side adapters under their ALPNs alongside the existing sync wiring.
 

@@ -1,10 +1,11 @@
 ---
+id: project-three-layer-truth-model
 name: Three-layer truth model — DHT / libp2p / doorway
 description: The Elohim Protocol separates concerns into three layers, each with a distinct role; code placement must match the layer's role
 type: project
 originSessionId: 253292ea-69ea-4e76-86e3-6d87ebdac46c
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md
+  - observation-event-layer-design | the witness substrate that operationalizes this three-layer model into observation/event primitives | sha256:63322aa57b9db914
 ---
 The protocol's architecture has three layers, each with one job. When designing any feature, placement decisions should start by asking which layer the work belongs to.
 

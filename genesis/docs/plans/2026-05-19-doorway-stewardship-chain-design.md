@@ -1,4 +1,5 @@
 ---
+id: doorway-stewardship-chain-design
 status: design
 cites:
   - 2026-05-19-topology-resilience-qahal-synthesis.md   # the related doc this derives from

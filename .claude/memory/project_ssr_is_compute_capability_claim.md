@@ -1,4 +1,5 @@
 ---
+id: project-ssr-is-compute-capability-claim
 name: SSR is a compute-shape capability claim, not a deployment detail
 description: A doorway with SSR enabled makes a real compute claim (V8 + bundle + render CPU); should be feature-gated locally and advertised through peer compute-reporting so peers can match SSR-eligible content to SSR-capable doorways
 type: project

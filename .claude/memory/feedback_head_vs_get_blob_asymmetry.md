@@ -1,4 +1,5 @@
 ---
+id: feedback-head-vs-get-blob-asymmetry
 name: Use GET, not HEAD, when probing /blob/<hash> on elohim-storage
 description: HEAD on /blob/<hash> returns 404 even when GET returns 200 — route registration is GET-only and HEAD falls through to a 404 catch-all; using `curl -sI` for blob existence checks gives false negatives
 type: feedback

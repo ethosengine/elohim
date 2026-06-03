@@ -1,4 +1,5 @@
 ---
+id: project-no-claude-md-opt-out-pattern
 name: `.no-claude.md` opt-out marker — captured decisions for heuristic false-positives
 description: When the claude-md-review audit flags a directory as MISSING-CLAUDE-MD but the operator concludes no doc is needed, a `.no-claude.md` marker file in that directory carries the rationale. Future audits surface the marker (with rationale excerpt) rather than re-flagging. Pattern generalizes to other false-positive-prone heuristics.
 type: project

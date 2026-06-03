@@ -1,4 +1,5 @@
 ---
+id: feedback-config-yaml-over-cli
 name: Prefer schema-able YAML config over CLI args for node configuration
 description: Node configuration should be declarative YAML files (schema-validated) that the elohim operator manages, not CLI args. CLI args are for dev/testing only.
 type: feedback

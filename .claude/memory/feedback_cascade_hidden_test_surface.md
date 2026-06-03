@@ -1,4 +1,5 @@
 ---
+id: feedback-cascade-hidden-test-surface
 name: Cascade-hidden test surface — failed-count is a misleading single metric
 description: When tests can't even start, sprint-report shows "98 fail" out of 98 visible — fixing the cascade root reveals 262 scenarios with 90 fails (better visibility, not regression)
 type: feedback

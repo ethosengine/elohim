@@ -1,4 +1,5 @@
 ---
+id: project-placement-signals-are-shefa-inputs
 name: Placement/verification signals are shefa economic inputs
 description: Gaps, breaches, and recovery needs are structured signals for shefa economic planning — not just operational errors
 type: project

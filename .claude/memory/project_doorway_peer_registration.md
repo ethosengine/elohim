@@ -1,4 +1,5 @@
 ---
+id: project-doorway-peer-registration
 name: Doorway as peer registration point, not just proxy
 description: Doorway serves as inside-out peer registration — peers register content/capabilities with doorway for discovery, inverting Holo's outside-in marketplace model.
 type: project

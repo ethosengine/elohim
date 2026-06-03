@@ -1,4 +1,5 @@
 ---
+id: feedback-jenkins-token-strictly-guarded
 name: JENKINS_TOKEN — orchestrator-autonomous, but only on verified Jenkins state
 description: The shift Opus orchestrator may use JENKINS_TOKEN autonomously to trigger parameterized builds, but only after it has verified (not guessed) that doing so won't cause pipeline interruptions or build storms
 type: feedback

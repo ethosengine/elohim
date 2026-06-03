@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-02",
+  "generated_at": "2026-06-03",
   "cites": {
     "genesis/a2o/features": [
       "feedback_a2o_is_human_experience_not_dev_bugs"
@@ -143,7 +143,7 @@
       "feedback_subagent_no_git_stash",
       "feedback_subagent_scope_guardrails"
     ],
-    "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md": [
+    "haiku-visual-triage-design | the bounded visual-triage design this cites as the exception proving closed-taxonomy fields stay safe | sha256:a8cd1f7830beef4b": [
       "feedback_haiku_observe_only_no_specifics"
     ],
     ".claude/schemas/haiku-output.schema.json": [
@@ -194,9 +194,8 @@
     "app/elohim-app/src/app/elohim/components/gate-feedback/gate-feedback-modal.component.ts": [
       "feedback_native_dialog_top_layer_modal"
     ],
-    "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md": [
-      "feedback_nexus_cargo_publish_basic_auth",
-      "project_upstream_proxy_pattern_brit_rakia"
+    "cargo-registry-and-compilation-load-reduction | the plan whose first-publish step hit this 401 wall \u2014 the registry trio + elohim-epr publish task | sha256:57641cddabeb30a2": [
+      "feedback_nexus_cargo_publish_basic_auth"
     ],
     "devfile.yaml": [
       "feedback_no_brittle_commands_in_poststart"
@@ -204,7 +203,7 @@
     ".claude/skills/generalize-permissions/SKILL.md": [
       "feedback_no_generalize_permissions_in_shift"
     ],
-    "genesis/docs/superpowers/specs/2026-05-22-qahal-homepage-ux-design.md": [
+    "qahal-homepage-ux-design | a UX spec keeping the Hebrew pillar name internally \u2014 fine here, but not in public narrative | sha256:2ce1cfd684d41eea": [
       "feedback_no_hebrew_pillar_names_in_narrative"
     ],
     "app/elohim-library/build-manifest.json": [
@@ -223,7 +222,7 @@
       "feedback_persona_rename_completeness_checklist",
       "feedback_schema_data_enum_drift_cascade"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-06-02-sweettest-integration-layer.md": [
+    "sweettest-integration-layer | the DNA-test layer whose target-cache PVC path is this RCA workaround #3b (sccache-free sweettest) | sha256:a8747e884a24fdea": [
       "feedback_sccache_spawn_enoent_rca"
     ],
     "genesis/a2o/src/framework/fixtures/humans.ts": [
@@ -239,13 +238,13 @@
     "elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs": [
       "feedback_serde_json_value_breaks_zome_boundary"
     ],
-    "genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md": [
+    "che-browser-completion-oracle-design | the L2 local visual done-gate that extends this jenkins-as-oracle shift loop with a kickoff baseline | sha256:355cc8523a03f33b": [
       "feedback_shift_measure_jenkins"
     ],
     "doorway/doorway-service": [
       "feedback_signature_changes_grep_callers"
     ],
-    "genesis/docs/content/elohim-protocol/history/2026-06-02-attestation-consolidation-phase2a-dedup.md": [
+    "attestation-consolidation-phase2a-dedup | the substrate-dedup ADR whose minor-change tail prompted skipping the spec doc | sha256:b5bb7b0f18a4ac8e": [
       "feedback_skip_spec_doc_for_minor_changes"
     ],
     "genesis/data/stories/CONVENTIONS.md": [
@@ -276,16 +275,10 @@
       "feedback_understand_orchestrator_substrate_before_changes",
       "project_orchestrator_predictive_vision"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md": [
-      "project_agentic_context_graph_model",
-      "project_consolidation_events_economic_feedback",
-      "project_memory_classes",
-      "project_memory_lifecycle_comet_shape",
-      "project_subconscious_memory_tier",
-      "project_submerge_destinations_stewardship_routing",
-      "project_wisdom_resolves_into_epics"
+    "memory-lifecycle-design | the comet-shape forgetting spec that grounds this model velocity-tiered memory plus consolidation harvest | sha256:b6545e6548573fa4": [
+      "project_agentic_context_graph_model"
     ],
-    "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md": [
+    "agentic-developer-loop-design | the loop design whose Opus-orchestrates-every-iteration shape this iteration-cost rationale justifies | sha256:42b461f7c0b7a870": [
       "project_agentic_loop_economics"
     ],
     "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml": [
@@ -306,12 +299,10 @@
     "elohim/elohim-storage/src/db/models.rs": [
       "project_attestation_consolidation_sprint_state"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md": [
-      "project_avodah_pillar",
-      "project_epr_substrate_vs_vf_graphql",
-      "project_first_class_graph_pattern"
+    "elohim-core-graph-substrate-design | the foundational graph substrate spec that lists avodah + doorway as process-reference demonstrators, not domain pillars | sha256:3c4a0d1e502d9823": [
+      "project_avodah_pillar"
     ],
-    "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md": [
+    "sprint2-bounds-validator-standing-aggregator | the plan that specified building this validate fn + the standing aggregator that consumes its breach signals | sha256:8923ad357ea4ee80": [
       "project_bounds_validator_pattern"
     ],
     "elohim/elohim-storage/src/services/bounds_validator.rs": [
@@ -321,11 +312,10 @@
       "project_bounds_validator_pattern",
       "project_cadence_archetype_tunable_with_dev_overrides"
     ],
-    "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md": [
-      "project_canonical_wire_shape_newtype_pattern",
-      "project_substrate_floor_elohim_ceiling"
+    "rea-compute-substrate-native-roadmap | the roadmap through whose Stage-1 to Stage-4 Commitment graduation BlobAddress survives intact | sha256:64e5ffe3b8756e6e": [
+      "project_canonical_wire_shape_newtype_pattern"
     ],
-    "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md": [
+    "che-browser-feedback-foundation-plan | the L1 implementation plan whose landing this entry records \u2014 the look primitive + playwright wiring | sha256:8edc931665a5c352": [
       "project_che_browser_feedback_loop"
     ],
     "genesis/manifests/nix-cache-pvc.yaml": [
@@ -344,13 +334,14 @@
       "project_elohim_subagent_specialists",
       "project_friction_gradient_limitarianism"
     ],
-    "genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md": [
-      "project_compute_commitment_first_instance_pivot",
-      "project_hub_compute_aggregate_primary",
-      "project_storage_tiering_placement_intelligence"
+    "mutual-storage-replication-dwelling-hub-design | the spec this pivot recommends \u2014 mutual storage replication as the real first compute-commitment instance | sha256:5596799dbb456bc2": [
+      "project_compute_commitment_first_instance_pivot"
     ],
     "genesis/docs/content/elohim-protocol/global-orchestra.md": [
       "project_consilience_higher_order_sensemaking"
+    ],
+    "memory-lifecycle-design | the comet-shaped lifecycle whose merge/consolidation moment this entry turns into four-pillar economic feedback | sha256:b6545e6548573fa4": [
+      "project_consolidation_events_economic_feedback"
     ],
     "genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md": [
       "project_depin_contracts_are_policy"
@@ -359,26 +350,19 @@
       "project_deployments_json_seed_or_skip_truth",
       "project_seed_whoever_is_ready"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md": [
-      "project_dht_vs_libp2p_scoping",
-      "project_iroh_alpn_handlers_one_stream_design"
+    "iroh-libp2p-complementarity | the transport spec that formalizes the notary-vs-dataplane split this scoping rule asserts | sha256:29235aeb35aff128": [
+      "project_dht_vs_libp2p_scoping"
     ],
-    "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md": [
+    "qahal-architecture-vision | the gospel-tier vision spec whose Section 2.11 is the canonical full-length treatment of this principle | sha256:6a519b464b586832": [
       "project_dissolution_principle_sensemaking_collectives"
     ],
     "genesis/orchestrator/manifests/elohim-app/alpha/ingress.yaml": [
       "project_doorway_full_facilitator_sprint"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md": [
-      "project_doorway_hub_sister_brother",
-      "project_elohim_hub_elevation",
-      "project_elohim_node_role",
-      "project_household_horizontal_scaling",
-      "project_hub_optional_floor",
-      "project_node_metrics_vs_hub_aggregation_boundary",
-      "project_storage_as_pod_operator_sets_virtual_limits"
+    "elohim-hub-boundaries-design | the boundary design that splits doorway-edge from hub-edge \u2014 the symmetry this entry names | sha256:6b7ee97f246b732f": [
+      "project_doorway_hub_sister_brother"
     ],
-    "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md": [
+    "atproto-lexicon-projection-doorway-design | the projection-adapter spec this entry generalizes into the doorway-is-federation-surface rule | sha256:c2836ed67cc28442": [
       "project_doorway_is_federation_surface_atproto"
     ],
     "elohim/sdk/domains/lamad/manifest.json": [
@@ -405,15 +389,11 @@
       "project_storage_actor_vs_forwarder_patterns",
       "project_storage_signal_subscribers_filter_by_envelope"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md": [
+    "experience-story-epr-design | the spec preserving the reverted TS discernment rule-logic that becomes the first Gate impl once gate-interface lands | sha256:f16adbb5e79ab493": [
       "project_elohim_agent_sense_respond_architecture"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md": [
-      "project_elohim_app_as_composable_view_federation",
-      "project_m5_is_plumbing_sprint",
-      "project_multi_doorway_human_registration",
-      "project_p2p_is_hosting",
-      "project_peer_native_account_canonical_surface"
+    "doorway-access-tier-patterns | the doorway pattern catalog that locates where peer-rendered surfaces bridge web2 visitors | sha256:347f4a6ee935b18f": [
+      "project_elohim_app_as_composable_view_federation"
     ],
     "genesis/docs/content/elohim-protocol/constitution.md": [
       "project_elohim_as_counsel",
@@ -422,8 +402,14 @@
       "project_values_forward_disclosure_accountability",
       "project_values_forward_preference_guards"
     ],
-    "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md": [
+    "sdk-boundary-clarification | the plan that hardens this SDK-vs-implementation split by moving View types into a dedicated elohim-views crate | sha256:527337430c8cd85a": [
       "project_elohim_dna_as_sdk_boundary"
+    ],
+    "elohim-hub-boundaries-design | the boundary-scaffold design this elevation kicks off \u2014 storage vs node vs hub crate split | sha256:6b7ee97f246b732f": [
+      "project_elohim_hub_elevation"
+    ],
+    "elohim-hub-boundaries-design | the crate-boundary design this wrapper/workload split refines \u2014 node vs storage vs hub | sha256:6b7ee97f246b732f": [
+      "project_elohim_node_role"
     ],
     "genesis/docs/content/elohim-protocol/manifesto.md": [
       "project_elohim_vision_fruit_back_on_tree",
@@ -435,26 +421,31 @@
       "project_redeploy_the_substrate",
       "project_subsume_g_f_a_via_it_just_works"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md": [
-      "project_epr2b_recovery_m4_convergence",
-      "project_t6_legacy_revocation_path_retired"
+    "dna-signal-as-epr-envelope | the T18 spec turning this shared signal stream into the EPR-envelope wire contract both epics implement | sha256:e27281447cb146bc": [
+      "project_epr2b_recovery_m4_convergence"
     ],
     "elohim/sdk/schemas/v1/dna-signal-stream.schema.json": [
       "project_epr2b_recovery_m4_convergence"
     ],
-    "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md": [
+    "substrate-shakeout-epr-delivery-sprint | the later shakeout plan that finishes the app-delivery code path this substrate sprint left for the doorway projection | sha256:086e3437eb475995": [
       "project_epr_delivery_sprint_2026_05_11"
     ],
-    "genesis/docs/content/elohim-protocol/history/2026-06-02-epr-foundation-landed-by-waves.md": [
+    "epr-foundation-landed-by-waves | the history/ADR that distills this closure plus all prior waves into the audit-as-truth substrate record | sha256:5538a27c004be199": [
       "project_epr_foundation_closure_2026_05_16"
     ],
     ".claude/shifts/2026-05-30T03-15-landing-pages-both-doorways.sprint-result.md": [
       "project_epr_projection_serving_chain"
     ],
+    "elohim-core-graph-substrate-design | the signed-envelope graph substrate this entry insists is NOT shefa-speaks-VF-GraphQL | sha256:3c4a0d1e502d9823": [
+      "project_epr_substrate_vs_vf_graphql"
+    ],
     "elohim/sdk/CLAUDE.md": [
       "project_feedback_governance_are_reach_earning_machinery"
     ],
-    "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md": [
+    "elohim-core-graph-substrate-design | the canonical spec formalizing this \u2014 EPR-atom nodes plus a traversal/discovery graph surface | sha256:3c4a0d1e502d9823": [
+      "project_first_class_graph_pattern"
+    ],
+    "elohim-sdk-epr-app-boundaries-sprint-kickoff | the kickoff brief whose three-bucket framing this Sprint-1 map corrected to four and grounded in evidence | sha256:9776d193efcabc84": [
       "project_framework_cleanup_boundary_map"
     ],
     "genesis/data/humans/terrance-tutor.md": [
@@ -468,7 +459,7 @@
       "project_graph_native_is_accountability_substrate",
       "project_graph_native_substrate_landed_2026_05_16"
     ],
-    "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md": [
+    "graph-native-projection-substrate | the task-by-task plan this entry records as landed in one agentic session | sha256:73fda7fb750d6d53": [
       "project_graph_native_substrate_landed_2026_05_16"
     ],
     "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/attestation_validator.rs": [
@@ -476,6 +467,9 @@
     ],
     ".claude/agents/historian.md": [
       "project_historian_pattern_surface_agent"
+    ],
+    "elohim-hub-boundaries-design | defines the node/hub/storage boundary \u2014 the elohim-node unit this entry fleet-scales by running more of | sha256:6b7ee97f246b732f": [
+      "project_household_horizontal_scaling"
     ],
     "genesis/docs/content/elohim-protocol/value_scanner/epic.md": [
       "project_household_living_core_lived_contrast_diffusion"
@@ -486,18 +480,29 @@
     "genesis/data/devices/devices.json": [
       "project_hub_archetype_abstraction"
     ],
-    "genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md": [
+    "mutual-storage-replication-dwelling-hub-design | the dwelling-hub design where hub-as-storage-pool aggregation is the substrate this UX surface projects | sha256:5596799dbb456bc2": [
+      "project_hub_compute_aggregate_primary"
+    ],
+    "prioritizer-end-state-wire-hub-fetch | the Wave-2 plan that lands this CID-canonical reconciliation + MembershipCommitted signal + projector | sha256:61d332d2871c644c": [
       "project_hub_identity_cid_canonical_slug_alias"
     ],
-    "genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md": [
+    "elohim-hub-boundaries-design | the hub-boundary design this floor-invariant constrains \u2014 hubs graduate, never gate participation | sha256:6b7ee97f246b732f": [
+      "project_hub_optional_floor"
+    ],
+    "dht-is-a-notary-not-a-byte-store | the ADR this is a memory_anchor of \u2014 same lesson at the DHT layer: notarize, do not move bytes | sha256:a1d408ef2478b288": [
       "project_inventory_exchange_not_byte_replication"
     ],
-    "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md": [
-      "project_iroh_parallel_stack_phases3_7_landed",
-      "project_iroh_phase11_sync_first_plane_landed"
+    "iroh-libp2p-complementarity | the architecture spec gating the Phase 11 transport wiring these ALPN handlers implement \u2014 iroh as one of three tracks | sha256:29235aeb35aff128": [
+      "project_iroh_alpn_handlers_one_stream_design"
     ],
-    "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md": [
+    "iroh-recovery-e2e | Phase 11 cutover gate #5 (recovery e2e), one of the still-required prerequisites this entry lists | sha256:f02417b8d354d4ba": [
+      "project_iroh_parallel_stack_phases3_7_landed"
+    ],
+    "iroh-http-blob-graduation | the cutover gate #2 plan this entry leaves open \u2014 dual-format /blob reads after backend wiring closed #1 | sha256:1acc15b649b8b1a3": [
       "project_iroh_phase11_all_backends_wired"
+    ],
+    "iroh-recovery-e2e | gate #5 of the same Phase 11 cutover \u2014 the cross-stack recovery harness this sync-plane pattern feeds toward | sha256:f02417b8d354d4ba": [
+      "project_iroh_phase11_sync_first_plane_landed"
     ],
     "elohim/holochain/tests/manifest-hygiene/tests/manifest_hygiene.rs": [
       "project_lineage_rna_upgrade_path"
@@ -505,11 +510,14 @@
     "elohim/holochain/dna/NETWORK_UPGRADES.md": [
       "project_lineage_rna_upgrade_path"
     ],
-    "genesis/docs/PLACEMENT.md": [
+    "placement | the placement contract whose stasis check enforces this path-plus-explainer rule on every traceability edge | sha256:f84d7cb16bea9379": [
       "project_link_is_path_plus_explainer"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md": [
+    "doorway-ssr-runtime | the SSR runtime that must server-render these framework-agnostic web components at the doorway projection edge | sha256:e6e27e8d86b6c5ee": [
       "project_lit_wc_pivot_design_for_generation"
+    ],
+    "doorway-access-tier-patterns | the pattern catalog (A/B/Recovery) whose wiring M5 converges rather than reinvents | sha256:347f4a6ee935b18f": [
+      "project_m5_is_plumbing_sprint"
     ],
     "doorway/doorway-app/src/app/components/login/threshold-login.component.ts": [
       "project_m5_reframe_auth_portal_convergence"
@@ -523,6 +531,15 @@
     ".claude/hooks/memory-coherence-signal.py": [
       "project_memory_cites_edge"
     ],
+    "memory-lifecycle-design | the comet/forgetting spec whose lifecycle primitives this entry supplies the per-class defaults for | sha256:b6545e6548573fa4": [
+      "project_memory_classes"
+    ],
+    "memory-lifecycle-design | the lifecycle spec whose comet shape + forgetting primitives this entry distills | sha256:b6545e6548573fa4": [
+      "project_memory_lifecycle_comet_shape"
+    ],
+    "doorway-access-tier-patterns | the pattern catalog where these doorway-agnostic flows surface as access tiers A / B / Recovery | sha256:347f4a6ee935b18f": [
+      "project_multi_doorway_human_registration"
+    ],
     ".claude/scripts/memory-kit/claude-md-audit.py": [
       "project_no_claude_md_opt_out_pattern",
       "project_signal_driven_audit_ceremonies"
@@ -530,42 +547,48 @@
     "genesis/docs/architecture/stewardship-over-sovereignty.md": [
       "project_no_sovereignty_stewardship_over_ownership"
     ],
-    "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md": [
+    "elohim-hub-boundaries-design | the boundary design that defines where the hub surface begins \u2014 cross-node aggregation lives there, not in node modules | sha256:6b7ee97f246b732f": [
+      "project_node_metrics_vs_hub_aggregation_boundary"
+    ],
+    "orchestrator-clean-build-triggers | the plan whose Task 1 (commit beba218b6) fixed the webhook-gate silent-drop this entry documents | sha256:7de67c902196b761": [
       "project_orchestrator_build_tag_syntax"
+    ],
+    "doorway-access-tier-patterns | the pattern catalog for how doorway projects mesh-hosted content to web2 visitors across access tiers | sha256:347f4a6ee935b18f": [
+      "project_p2p_is_hosting"
+    ],
+    "doorway-access-tier-patterns | the access-tier catalog whose trustMode-from-/auth/me discovery answers how doorway detects a returning peer-steward | sha256:347f4a6ee935b18f": [
+      "project_peer_native_account_canonical_surface"
     ],
     ".claude/settings.local.json": [
       "project_permission_allowlist_philosophy",
       "project_shift_palette_wishlist"
     ],
-    "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md": [
+    "cross-pillar-import-cleanup | the dedicated cleanup plan that drains this 174-violation backlog wave-by-wave | sha256:c59005650d5ea4b6": [
       "project_pillar_boundary_violations_backlog"
     ],
     "elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json": [
       "project_placement_signals_are_shefa_inputs",
       "project_signal_kind_extensible_protocol_class"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md": [
-      "project_principle_p1_reconciliation_controller",
-      "project_three_layer_truth_model",
-      "project_ubiquitous_wisdom_dissolves_chokepoint"
+    "observation-event-layer-design | the witness substrate built on this controller principle \u2014 observed state drives eager reconcile | sha256:63322aa57b9db914": [
+      "project_principle_p1_reconciliation_controller"
     ],
-    "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md": [
-      "project_qahal_collective_view_slide45_reference",
-      "project_qahal_graduated_capability_surface",
-      "project_social_compute_collective_is_stewardship_unit"
+    "qahal-collective-membership-dht-design | the DHT spec that backs slide-45 five features with first-class Collective/Membership entries | sha256:5a4cd21525238d58": [
+      "project_qahal_collective_view_slide45_reference"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md": [
-      "project_quilt_as_native_s3_surface",
-      "project_tiered_quilt_spec_landed_2026_05_11"
+    "qahal-collective-membership-dht-design | the DHT Collective/Membership entry design that makes this one-primitive graduated surface concrete | sha256:5a4cd21525238d58": [
+      "project_qahal_graduated_capability_surface"
     ],
-    "genesis/docs/content/elohim-protocol/history/2026-06-02-doorway-dispatch-registry-fallback-and-vocabulary.md": [
-      "project_quilt_pantry_vocabulary",
-      "project_storage_vocabulary_quilt"
+    "tiered-quilt-stewardship-design | the 8-wave quilt-stewardship roadmap whose S3-shaped surface this defers CI caching onto | sha256:c7eb6455c28470ef": [
+      "project_quilt_as_native_s3_surface"
+    ],
+    "doorway-dispatch-registry-fallback-and-vocabulary | the history ADR that distilled the vocabulary-cleanup sprint where quilt/pantry/stock/draw were decided | sha256:8adde339010ac508": [
+      "project_quilt_pantry_vocabulary"
     ],
     "genesis/docs/architecture/rea-compute-commitment-primitive.md": [
       "project_rea_compute_commitment_primitive"
     ],
-    "genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md": [
+    "records-lifecycle-design | the substrate-wiring spec where the asymmetric rea_commitments vs economic_events tables this entry flags actually live | sha256:3ebe9ccf2611bc02": [
       "project_rea_prefix_redundant"
     ],
     "elohim/elohim-storage/src/services/reach_earning.rs": [
@@ -575,19 +598,19 @@
       "project_social_reach_nervous_system",
       "project_standing_composes_multiple_evidence_streams"
     ],
-    "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md": [
+    "bootstrap-steward-authority-frame-design | the frame establishing genesis/seeder as bootstrap authoring authority that grades reach, not a sovereign | sha256:6fb209d2628d39bb": [
       "project_reach_earned_genesis_seeder_grades_homework"
     ],
     "elohim/sdk/schemas/v1/enums/reach.schema.json": [
       "project_reach_enum_drift_reconciliation"
     ],
-    "genesis/docs/plans/2026-05-18-app-manifest-modularization.md": [
+    "app-manifest-modularization | the modularization sprint whose 28 identical extractions surfaced the repeatable patterns this proposes to mechanize | sha256:1da4197b871cb7b4": [
       "project_sdk_scaffolding_generators"
     ],
     ".claude/scripts/_lib/__init__.py": [
       "project_shared_lib_pattern"
     ],
-    "genesis/docs/content/elohim-protocol/history/2026-04-19-d1-through-d5-node-and-household-canon.md": [
+    "d1-through-d5-node-and-household-canon | the canon fixing node/household/doorway/shem topology this names as the live P2P test target | sha256:5ee9472bbefad806": [
       "project_shem_is_p2p_live_canvas"
     ],
     ".claude/hooks/claude-md-drift-signal.py": [
@@ -596,33 +619,74 @@
     ".claude/memory-kit/claude-md-drift.json": [
       "project_signal_driven_audit_ceremonies"
     ],
+    "qahal-collective-membership-dht-design | the DHT design implementing the collective-general substrate this principle demands (and citing it as a source) | sha256:5a4cd21525238d58": [
+      "project_social_compute_collective_is_stewardship_unit"
+    ],
     ".claude/shifts/doorway-ssr-deliver-2026-05-07T23-37/brainstorm-prompt-followup.md": [
       "project_ssr_anonymous_auth_context",
       "project_ssr_is_compute_capability_claim"
     ],
+    "elohim-hub-boundaries-design | the hub/node/storage boundary spec that defines the pod-and-operator fabric these virtual limits orchestrate | sha256:6b7ee97f246b732f": [
+      "project_storage_as_pod_operator_sets_virtual_limits"
+    ],
+    "mutual-storage-replication-dwelling-hub-design | the dwelling-hub replication spec whose quilt/RS-encoded shards this tier-awareness axis (cache\u2192archive) places | sha256:5596799dbb456bc2": [
+      "project_storage_tiering_placement_intelligence"
+    ],
+    "doorway-dispatch-registry-fallback-and-vocabulary | the ADR distilling the vocabulary-cleanup sprint that chose quilt/pantry over the reserved weave/lattice | sha256:8adde339010ac508": [
+      "project_storage_vocabulary_quilt"
+    ],
     "genesis/plans/2026-04-10-collectives-schema-design.md": [
       "project_storage_vocabulary_quilt"
+    ],
+    "memory-lifecycle-design | the lifecycle spec this extends with a subconscious visibility tier and submerge/surface inverse | sha256:b6545e6548573fa4": [
+      "project_subconscious_memory_tier"
+    ],
+    "memory-lifecycle-design | the comet-shape spec defining the submerge primitive this elaborates into destination routing | sha256:b6545e6548573fa4": [
+      "project_submerge_destinations_stewardship_routing"
     ],
     ".claude/skills/memory-kit/SKILL.md": [
       "project_substrate_currency_ceremony_redesign"
     ],
+    "rea-compute-substrate-native-roadmap | the substrate-native sprint roadmap that applies this floor-decides/ceiling-enriches split to compute commitments | sha256:64e5ffe3b8756e6e": [
+      "project_substrate_floor_elohim_ceiling"
+    ],
     "genesis/docs/content/elohim-protocol/hardware-spec.md": [
       "project_substrate_scale_ceiling"
     ],
-    "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md": [
-      "project_three_temporal_perspectives",
-      "reference_mempalace"
+    "dna-signal-as-epr-envelope | the T18 spec defining the canonical envelope that replaced the legacy path this entry retired | sha256:e27281447cb146bc": [
+      "project_t6_legacy_revocation_path_retired"
+    ],
+    "observation-event-layer-design | the witness substrate that operationalizes this three-layer model into observation/event primitives | sha256:63322aa57b9db914": [
+      "project_three_layer_truth_model"
+    ],
+    "historian-and-epic-timeline | the spec that names this triad and the historian role animating the epic-graph timeline | sha256:7f1a6a2932456aa0": [
+      "project_three_temporal_perspectives"
+    ],
+    "tiered-quilt-stewardship-design | the 960-line spec this entry records as landed \u2014 8 waves, zero new DHT types, MinIO substrate | sha256:c7eb6455c28470ef": [
+      "project_tiered_quilt_spec_landed_2026_05_11"
     ],
     "genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md": [
       "project_trust_as_efficiency_signal"
     ],
-    "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md": [
+    "observation-event-layer-design | the witness substrate where each layer does one bypassable thing, so no layer is the chokepoint this reframe dissolves | sha256:63322aa57b9db914": [
+      "project_ubiquitous_wisdom_dissolves_chokepoint"
+    ],
+    "cargo-registry-and-compilation-load-reduction | the nexus cargo-proxy plan \u2014 the web2-mirror framing made concrete for the cargo upstream | sha256:57641cddabeb30a2": [
+      "project_upstream_proxy_pattern_brit_rakia"
+    ],
+    "iroh-phase12-peer-transport-manifest | the Phase 12 plan whose four-adapter consumer wiring lifts this deferral once it lands | sha256:a03f82c9d61ebda3": [
       "project_w2_agent_peer_binding_deferred"
     ],
     "elohim/sdk/schemas/v1/dna-signals/agent-peer-binding.schema.json": [
       "project_w2_agent_peer_binding_deferred"
     ],
-    "genesis/docs/content/elohim-protocol/history/2026-06-02-experience-story-discernment-gate.md": [
+    "memory-lifecycle-design | the lifecycle spec whose lateral primitives this adds a missing vertical wisdom-compaction axis to | sha256:b6545e6548573fa4": [
+      "project_wisdom_resolves_into_epics"
+    ],
+    "historian-and-epic-timeline | the spec that proposed mempalace as the historian substrate this entry records as wired | sha256:7f1a6a2932456aa0": [
+      "reference_mempalace"
+    ],
+    "experience-story-discernment-gate | the relocated-then-superseded rakia stub that demonstrates the cross-reference stub convention this doc describes | sha256:f51ed428d72a97ad": [
       "reference_superpowers_docs_location"
     ],
     ".claude/hooks/p2p-plan-audit.py": [

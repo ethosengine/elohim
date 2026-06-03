@@ -1,4 +1,5 @@
 ---
+id: feedback-sweettest-native-build-env
 name: feedback_sweettest_native_build_env
 description: "DNA Integration (sweettest) is a NATIVE build — it needs the native-build env (cmake/clang/LIBCLANG_PATH), the WASM RUSTFLAGS cleared, and a ~90/150-min stage/pipeline budget; three stacked failures, each revealing the next."
 metadata:

@@ -1,4 +1,5 @@
 ---
+id: feedback-understand-orchestrator-substrate-before-changes
 name: Understand orchestrator substrate before changing build dispatch
 description: Don't naively wrap parallel/stages — orchestrator dispatch has reliability invariants (level guards, baselines, cascade rules)
 type: feedback

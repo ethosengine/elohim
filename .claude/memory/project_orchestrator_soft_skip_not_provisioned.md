@@ -1,4 +1,5 @@
 ---
+id: project-orchestrator-soft-skip-not-provisioned
 name: orchestrator-soft-skip-not-provisioned
 description: "orchestrator's triggerPipeline now classifies \"No item named\" Jenkins errors as NOT_PROVISIONED soft-skip → UNSTABLE (not ERROR → FAILURE); lets strategy.mjs registration land ahead of Jenkins job provisioning without breaking delivery"
 metadata: 

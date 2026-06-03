@@ -1,10 +1,11 @@
 ---
+id: project-dht-vs-libp2p-scoping
 name: DHT vs libp2p scoping — keep DHT narrow and authoritative
 description: When designing new data flows, keep DHT usage narrow; push operational/ephemeral state onto libp2p. DHT signing is expensive and authoritative.
 type: project
 originSessionId: 17546f03-3ee8-4704-bdf9-18d0d64baf9b
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
+  - iroh-libp2p-complementarity | the transport spec that formalizes the notary-vs-dataplane split this scoping rule asserts | sha256:29235aeb35aff128
 ---
 DHT signing is expensive and authoritative. Keep DHT usage narrow to protect the integrity concern Holochain actually provides; push operational/ephemeral state (gossip, census, shard placement state) onto libp2p.
 

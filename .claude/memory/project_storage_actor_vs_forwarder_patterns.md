@@ -1,4 +1,5 @@
 ---
+id: project-storage-actor-vs-forwarder-patterns
 name: Storage as actor vs forwarder — two distinct HcClient patterns
 description: elohim-storage's existing HcClient is service-bot pattern (storage signs as itself); Phase 11 introduces the first "storage forwarding on behalf of human" use case which has different auth/cell-routing requirements
 type: project

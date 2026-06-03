@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Archetype-primary a2o taxonomy migration — proposed, never executed"
+id: archetype-primary-a2o-taxonomy-not-executed
 type: history-gotcha
 status: Accepted
 tier: history

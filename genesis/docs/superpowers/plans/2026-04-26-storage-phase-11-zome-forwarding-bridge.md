@@ -1,4 +1,5 @@
 ---
+id: storage-phase-11-zome-forwarding-bridge
 status: Draft
 canonical: ../../content/elohim-protocol/architecture/2026-04-23-epr-phase-2c-libp2p-federation-design.md
 informed-by: ../specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md

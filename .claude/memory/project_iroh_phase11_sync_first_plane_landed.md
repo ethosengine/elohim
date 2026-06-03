@@ -1,10 +1,11 @@
 ---
+id: project-iroh-phase11-sync-first-plane-landed
 name: iroh Phase 11 — sync is first wired plane (pattern set for 5 more)
 description: SyncManagerBackend adapter wires SyncManager into iroh ALPN dispatch; main.rs iroh branch builds DocStore + StreamTracker + SyncManager directly (mode-exclusive, opens same sync.sled as libp2p path); pattern reusable for EPR/EPR-atom/shard/view-fed/identity-handshake/trust
 type: project
 originSessionId: e7e20120-789e-4174-af38-3822fb5a869e
 cites:
-  - genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md
+  - iroh-recovery-e2e | gate #5 of the same Phase 11 cutover — the cross-stack recovery harness this sync-plane pattern feeds toward | sha256:f02417b8d354d4ba
 ---
 Sync is the first Phase 11 plane wired (commit `c0778907f`). The pattern for the remaining 5 backends:
 

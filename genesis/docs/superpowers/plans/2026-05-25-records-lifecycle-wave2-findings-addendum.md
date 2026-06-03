@@ -1,4 +1,5 @@
 ---
+id: records-lifecycle-wave2-findings-addendum
 status: design   # Wave 2 findings addendum — synthesis of application-archetype concerns, planning input
 related:
   - 2026-05-24-records-lifecycle-phase2-findings-synthesis.md   # the Phase 2 synthesis this extends

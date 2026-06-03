@@ -1,10 +1,11 @@
 ---
+id: project-memory-lifecycle-comet-shape
 name: Memory lifecycle as protocol design — comet shape + deliberate forgetting
 description: Memory should be comet-shaped (99% recent head, long dwindling tail, small memorialized core); deliberate forgetting is a first-class action; same lifecycle applies to Claude memory, elohim-agent memory, DHT entries, EPR gossip — household compute is bounded so intentional decay is required for sustainability; what we build to complement Anthropic Dreams IS the protocol's data hygiene prototype
 type: project
 originSessionId: 10d85ef0-1979-4311-97e9-c2c209de48e2
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
+  - memory-lifecycle-design | the lifecycle spec whose comet shape + forgetting primitives this entry distills | sha256:b6545e6548573fa4
 ---
 The comet shape: memory has a bright dense head (99% — recent artifact, hot, fully present), a long dwindling tail (compacted, distilled, lossy but referenceable), and a small memorialized core (manifesto-tier — never forgotten, structurally anchored). Most data lives in the tail, fading; only what *earns* memorialization stays in searing memory.
 

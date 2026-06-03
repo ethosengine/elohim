@@ -1,4 +1,5 @@
 ---
+id: project-ubiquitous-wisdom-dissolves-chokepoint
 name: ubiquitous-wisdom-dissolves-chokepoint
 description: "Pre-AI internets centralize moderation because intelligence was expensive — chokepoint = capture vector. Ubiquitous AI (elohim at every node, gating author/relay/consume) moves wisdom from chokepoint to fabric. Substrate (DHT/libp2p/content-addressing) becomes coordination tooling wisdom uses, not policy enforcement. Capture target shrinks to subverting each human's elohim authorization = human agency itself. Load-bearing reframe behind the social-reach epic, the three-layer truth model, and EPR-as-wire-envelope."
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: 99f4004c-46d9-4467-81d3-14b203445785
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md
+  - observation-event-layer-design | the witness substrate where each layer does one bypassable thing, so no layer is the chokepoint this reframe dissolves | sha256:63322aa57b9db914
 ---
 
 ## The reframe

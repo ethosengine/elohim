@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Doorway dispatch — registry-as-universal-fallback + storage vocabulary"
+id: doorway-dispatch-registry-fallback-and-vocabulary
 type: history-gotcha
 status: Accepted
 tier: history

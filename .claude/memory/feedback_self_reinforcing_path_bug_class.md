@@ -1,4 +1,5 @@
 ---
+id: feedback-self-reinforcing-path-bug-class
 name: self-reinforcing-path-bug-class
 description: A walk-up-to-find-marker resolution can satisfy its own broken output and lock the bug in. Co-anchor on two independent markers (e.g., .claude/ AND .git) to break self-reinforcement.
 type: feedback

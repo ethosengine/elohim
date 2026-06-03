@@ -291,24 +291,83 @@ function loadDeployments(): DeploymentsCache {
 /** Operator declarations for the test bench:
  *   - "available"   → shem is up; remote-resident humans are deployable
  *   - "unavailable" → shem is down; remote-resident humans auto-skip
- *   - "unknown"     → fail-open (default; treat as available)
+ *   - unset / "unknown" / unrecognized → DERIVE from the durable home
+ *       (genesis/manifests/cluster-state.yaml); fail-open only if that file is
+ *       itself unreadable.
  *
- * Pipelines should probe shem at start-of-run (e.g. via kubectl get node
- * shem) and set this env var explicitly. Local dev can leave it unset.
+ * The two signal homes MUST stay coherent: cluster-state.yaml (durable,
+ * planning-layer) and ELOHIM_REMOTE_COMPUTE_STATUS (runtime, a2o/CI). CI's
+ * Probe Substrate stage / the operator sets the env var explicitly, and an
+ * explicit available|unavailable always WINS (the CI override). When the env
+ * is unset — a bare local run — we derive the status from cluster-state so the
+ * runtime can't silently claim shem is up while the durable home says it is
+ * down (no need to `eval "$(scope-reconcile.py --env)"` first). Mirrors
+ * scope-reconcile.py's derive_remote_compute_status(): shem available iff its
+ * `available:` value is exactly `true`.
  */
 export type RemoteComputeStatus = 'available' | 'unavailable' | 'unknown';
 
-function readRemoteComputeStatus(): RemoteComputeStatus {
-  const raw = (process.env.ELOHIM_REMOTE_COMPUTE_STATUS ?? '').toLowerCase().trim();
-  if (raw === 'available' || raw === 'unavailable' || raw === 'unknown') {
-    return raw;
+/** The cluster resource whose availability drives the remote-compute signal.
+ * MUST match REMOTE_COMPUTE_RESOURCE in
+ * .claude/scripts/memory-kit/scope-reconcile.py. */
+const REMOTE_COMPUTE_RESOURCE = 'shem';
+
+/** Derive remote-compute status from cluster-state.yaml (the durable home).
+ * Returns 'available'/'unavailable' when the file is readable, or null when it
+ * is not — the caller then applies the legacy fail-open. Line-based parse that
+ * mirrors scope-reconcile.py's _parse_cluster() (a2o has no YAML dep, and the
+ * file's shape is stable: `resources:` → `  <name>:` → `    available: true`).
+ * shem is available iff its `available` value is exactly `true` — false and
+ * degraded are NOT available (the conservative read for a cross-node canvas). */
+/** Line-based scan of cluster-state.yaml text for shem's availability. Mirrors
+ * scope-reconcile.py's _parse_cluster(): walk `resources:` → `  <name>:` →
+ * `    available: <v>`; shem available iff its value is exactly `true`. shem
+ * absent / no `available:` line → unavailable (not declared available). */
+function parseShemAvailability(raw: string): RemoteComputeStatus {
+  let inRemoteBlock = false;
+  for (const line of raw.split('\n')) {
+    // a top-level resource entry: `  <name>:` (two-space indent, then EOL)
+    const head = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line);
+    if (head) {
+      inRemoteBlock = head[1] === REMOTE_COMPUTE_RESOURCE;
+      continue;
+    }
+    if (!inRemoteBlock) continue;
+    const avail = /^ {4}available:\s*(\S+)/.exec(line);
+    if (avail) return avail[1] === 'true' ? 'available' : 'unavailable';
+    // a sibling two-space key ends the block; deeper-indented role/note
+    // continuation lines stay inside it harmlessly.
+    if (/^ {2}\S/.test(line)) inRemoteBlock = false;
   }
-  return 'unknown';
+  return 'unavailable';
 }
 
-/** Returns true if shem is considered reachable for this test run. Fail-open
- * when status is "unknown" (the default) so tests still execute when the
- * pipeline hasn't probed. */
+function deriveRemoteComputeFromClusterState(): RemoteComputeStatus | null {
+  try {
+    const override = process.env.ELOHIM_CLUSTER_STATE_PATH_OVERRIDE;
+    const yamlPath =
+      override ??
+      // genesis/a2o/src/framework/fixtures/ → genesis/manifests/cluster-state.yaml
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../../../manifests/cluster-state.yaml');
+    return parseShemAvailability(readFileSync(yamlPath, 'utf-8'));
+  } catch {
+    return null; // unreadable durable home (e.g. published consumer) → fail-open
+  }
+}
+
+function readRemoteComputeStatus(): RemoteComputeStatus {
+  const raw = (process.env.ELOHIM_REMOTE_COMPUTE_STATUS ?? '').toLowerCase().trim();
+  // An explicit available|unavailable always wins — the CI/operator override.
+  if (raw === 'available' || raw === 'unavailable') return raw;
+  // Otherwise (unset / 'unknown' / unrecognized) derive from the durable home so
+  // the runtime can't disagree with cluster-state; fail-open only if unreadable.
+  return deriveRemoteComputeFromClusterState() ?? 'unknown';
+}
+
+/** Returns true if shem is considered reachable for this test run. Reflects an
+ * explicit ELOHIM_REMOTE_COMPUTE_STATUS when set, otherwise the value derived
+ * from cluster-state.yaml; fail-open ("unknown" → available) only when neither
+ * the env var nor the durable home is available. */
 export function isRemoteComputeAvailable(): boolean {
   return readRemoteComputeStatus() !== 'unavailable';
 }

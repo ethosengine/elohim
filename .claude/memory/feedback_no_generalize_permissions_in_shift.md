@@ -1,4 +1,5 @@
 ---
+id: feedback-no-generalize-permissions-in-shift
 name: No /generalize-permissions gate in /shift kickoff
 description: Auto mode handles permission prompts inline; pre-shift palette pass is no longer required and adds friction
 type: feedback

@@ -1,4 +1,5 @@
 ---
+id: feedback-living-doc-honesty-matrix-maintenance
 name: living-doc-honesty-matrix-maintenance
 description: A chapter that anchors load-bearing claims via a LIVE/DESIGNED/GAP matrix is only honest if the matrix migrates as the underlying code lands. The resilience epic's Part IX gap matrix names ~80 rows; every signal_kind whitelist edit, ReconcileController handler wiring, feature file passing on alpha, schema additions etc. should bump the matrix to reflect new state. Without migration discipline, the chapter's honesty rots and the trillion-dollar-civic-claim becomes overclaim.
 metadata:

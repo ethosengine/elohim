@@ -1,5 +1,6 @@
 ---
 title: elohim-hub / elohim-node / elohim-storage — Boundary Design
+id: elohim-hub-boundaries-design
 tier: architecture
 status: Design (pre-refactor scaffold; no code moves this sprint)
 created: 2026-05-02

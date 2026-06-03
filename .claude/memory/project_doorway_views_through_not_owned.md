@@ -1,4 +1,5 @@
 ---
+id: project-doorway-views-through-not-owned
 name: Views are served THROUGH a doorway, never owned BY one (CDN-shape)
 description: The EPR pattern says any view should be servable from any doorway projecting the same canonical content. Doorways are CDN edges, not authorities. DNS bonding records federate two doorway addresses into a CDN layer for the same canonical content. Implementers are tempted to write doorway-specific route handlers with business logic in doorway-service; this is the anti-pattern.
 type: feedback

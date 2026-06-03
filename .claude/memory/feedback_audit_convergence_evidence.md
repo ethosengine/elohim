@@ -1,4 +1,5 @@
 ---
+id: feedback-audit-convergence-evidence
 name: agent-audit-drift-counter-convergence-2026-05-14
 description: First attested cross-cycle convergence of an audit-discovery drift counter — agent-audit dropped from 6 (Run #2) to 1 (Run #3) after Run #1 deployed the fix. Forensic evidence that the corrective edit actually converged, not just promised.
 type: feedback

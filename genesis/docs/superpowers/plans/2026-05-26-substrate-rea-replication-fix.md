@@ -1,4 +1,5 @@
 ---
+id: substrate-rea-replication-fix
 status: design   # implementation plan — task-by-task fix, not yet verified-stable
 ---
 

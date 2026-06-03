@@ -1,10 +1,11 @@
 ---
+id: project-inventory-exchange-not-byte-replication
 name: P2P inventory exchange ≠ byte replication
 description: When alpha logs show "Received content inventory from peer count=N" but blobs only exist on the genesis peer, sync is metadata-only — byte-fetch is a separate step that must be diagnosed independently
 type: project
 originSessionId: 872c2e1c-02fe-453a-93b3-e69dac1e54e3
 cites:
-  - genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md
+  - dht-is-a-notary-not-a-byte-store | the ADR this is a memory_anchor of — same lesson at the DHT layer: notarize, do not move bytes | sha256:a1d408ef2478b288
 ---
 Elohim-storage's P2P layer has two distinct activities that are easy to conflate:
 

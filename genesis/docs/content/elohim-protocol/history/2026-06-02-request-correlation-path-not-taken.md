@@ -1,5 +1,6 @@
 ---
 title: "History/ADR: Cross-runtime request correlation — the path not taken"
+id: request-correlation-path-not-taken
 type: history-gotcha
 status: Accepted
 tier: history

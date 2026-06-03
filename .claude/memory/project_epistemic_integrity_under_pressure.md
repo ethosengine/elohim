@@ -1,4 +1,5 @@
 ---
+id: project-epistemic-integrity-under-pressure
 name: epistemic-integrity-under-pressure
 description: "Every load-bearing word in the protocol's vocabulary (consent, community, stewardship, reach, trust, attestation, recovery, reconciliation) sits in a field of relentless capture pressure. Defense isn't careful language — it's pointable structure that breaks visibly when the word drifts from the thing. Foster's 'Reclaiming Reconciliation' is the canonical worked example: truth-telling + repair as the two non-negotiable conditions for a hollowed word to mean again."
 metadata:

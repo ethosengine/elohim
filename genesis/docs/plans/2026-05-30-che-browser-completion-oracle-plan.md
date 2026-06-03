@@ -1,4 +1,5 @@
 ---
+id: che-browser-completion-oracle-plan
 status: Draft
 cites:
   - ../superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md   # the design spec this plan implements

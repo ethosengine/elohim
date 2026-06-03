@@ -104,6 +104,7 @@ SCOPE_SKIP_DIRS = {
     "node_modules", ".git", ".angular", "target", "dist", "build",
     "coverage", ".cargo", ".pnpm-store", "__pycache__", ".pytest_cache",
     "worktrees", ".claude-config",
+    "held",  # scope-tree held/ docs are sequestered out of the scan path
 }
 
 

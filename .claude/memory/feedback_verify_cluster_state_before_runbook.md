@@ -1,4 +1,5 @@
 ---
+id: feedback-verify-cluster-state-before-runbook
 name: Verify cluster state before drafting operator runbooks
 description: Manifests in genesis/manifests/ may not match cluster reality; confirm namespace, storageClass, and existing PVCs against `kubectl get` before writing runbook expected-outputs
 type: feedback

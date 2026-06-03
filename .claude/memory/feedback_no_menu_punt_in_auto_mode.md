@@ -1,4 +1,5 @@
 ---
+id: feedback-no-menu-punt-in-auto-mode
 name: No (a)(b)(c)(d) menus in auto mode when the call is mine
 description: When the next move is an Opus-level judgment call and inputs are in scope, decide and proceed — don't surface a multiple-choice menu back to the user
 type: feedback

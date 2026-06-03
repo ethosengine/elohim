@@ -1,10 +1,11 @@
 ---
+id: project-peer-native-account-canonical-surface
 name: Account layer — graduation-based login supersession (shape, not committed design)
 description: Initial shape for the account layer; hosted-doorway login for unsgraduated humans, peer-native login once graduated to peer-steward; peer-native supersedes hosted; doorway then facilitates browser VIEW only, not auth
 type: project
 originSessionId: 253292ea-69ea-4e76-86e3-6d87ebdac46c
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
+  - doorway-access-tier-patterns | the access-tier catalog whose trustMode-from-/auth/me discovery answers how doorway detects a returning peer-steward | sha256:347f4a6ee935b18f
 landed_as:
   - a2o scenarios (peer-OAuth portal flows)
   - elohim-imagodei elements package (portal wrappers over doorway auth_routes.rs)

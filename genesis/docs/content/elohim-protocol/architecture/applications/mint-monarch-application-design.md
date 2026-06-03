@@ -1,5 +1,6 @@
 ---
 title: Mint / Monarch.app — personal finance + household stuff on the substrate
+id: mint-monarch-application-design
 tier: architecture
 status: Full draft (exemplar — the template-shape for other application archetypes)
 created: 2026-05-24

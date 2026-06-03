@@ -1,10 +1,11 @@
 ---
+id: project-lit-wc-pivot-design-for-generation
 name: elohim-ui Lit/WC pivot — design for a generation
 description: Component layer pivots to Lit Web Components instead of Angular libraries; pay the framework-agnostic tax upfront so the protocol outlives any single frontend framework
 type: project
 originSessionId: 75ea3d40-9dd2-4e0c-ba96-dcb49c5221b5
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
+  - doorway-ssr-runtime | the SSR runtime that must server-render these framework-agnostic web components at the doorway projection edge | sha256:e6e27e8d86b6c5ee
 ---
 Decision (2026-05-06): the elohim component library pivots to Lit-based Web Components. Original plan was Path 2 (Angular libraries via ng-packagr); user pivoted because the protocol is meant to outlive any single frontend framework, and `<sophia-question>` already validates the WC boundary in this stack.
 

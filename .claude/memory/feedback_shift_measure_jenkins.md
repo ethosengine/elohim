@@ -1,10 +1,11 @@
 ---
+id: feedback-shift-measure-jenkins
 name: Shift measures live in Jenkins, not locally
 description: Eclipse Che dev env has no docker/holochain/k8s — shift Objective measures MUST use Jenkins MCP (triggerBuild, getBuild, getTestResults) rather than local build/test commands
 type: feedback
 originSessionId: 5284bee7-715e-4461-9a99-f9a170474791
 cites:
-  - genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md
+  - che-browser-completion-oracle-design | the L2 local visual done-gate that extends this jenkins-as-oracle shift loop with a kickoff baseline | sha256:355cc8523a03f33b
 ---
 When authoring `/shift` Objectives in this project, the `measure.run` command almost always needs to be a Jenkins MCP call, not a local shell command.
 

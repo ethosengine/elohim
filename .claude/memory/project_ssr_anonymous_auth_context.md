@@ -1,4 +1,5 @@
 ---
+id: project-ssr-anonymous-auth-context
 name: SSR fetch shim has anonymous-only auth context (higher-reach content renders empty)
 description: Current AngularRenderer fetcher only sees V8 HttpClient headers, not the originating request's Cookie/Authorization; commons-reach renders fine, but regional-private/local/private content gets anonymous-equivalent denial in the rendered HTML
 type: project

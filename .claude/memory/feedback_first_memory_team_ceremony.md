@@ -1,4 +1,5 @@
 ---
+id: feedback-first-memory-team-ceremony
 name: first-memory-team-ceremony-2026-05-14
 description: First coordinated memory-team ceremony — six waves landed; cadence should be signal-driven not calendar; four-lens-via-single-agent works for routine, team primitive needed only for contested cases; convergence-scoring biases against forward-leaning items.
 type: feedback

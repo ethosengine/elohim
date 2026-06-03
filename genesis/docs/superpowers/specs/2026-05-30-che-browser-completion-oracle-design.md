@@ -1,4 +1,5 @@
 ---
+id: che-browser-completion-oracle-design
 status: Design
 ---
 

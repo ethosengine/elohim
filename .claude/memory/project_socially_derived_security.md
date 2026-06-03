@@ -1,4 +1,5 @@
 ---
+id: project-socially-derived-security
 name: Socially derived security — peer-held shares, elohim-attested identity
 description: Foundational recovery principle — identity recovery goes through peers' elohim-agents attesting to you, not through doorway custody or seed phrases
 type: project

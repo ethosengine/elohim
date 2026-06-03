@@ -1,4 +1,5 @@
 ---
+id: project-alpha-edge-deploy-debugging-landmarks
 name: project_alpha_edge_deploy_debugging_landmarks
 description: "Landmarks for debugging alpha edge deploys via Jenkins+Loki — log labels, force-edge pattern, cascade-halt, and the pre-existing conductor IPv6-bind crashloop on shem."
 metadata: 

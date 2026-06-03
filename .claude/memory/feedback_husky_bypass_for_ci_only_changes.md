@@ -1,4 +1,5 @@
 ---
+id: feedback-husky-bypass-for-ci-only-changes
 name: husky-bypass-for-ci-only-changes
 description: When pushing a CI/CD-specific fix (Jenkinsfile, manifests, orchestrator config) and the pre-push gate fails on unrelated code drift, HUSKY=0 bypass is appropriate
 metadata:

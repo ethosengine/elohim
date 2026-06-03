@@ -1,5 +1,6 @@
 ---
 title: Doorway Access-Tier Patterns
+id: doorway-access-tier-patterns
 tier: architecture
 status: accepted — Pattern catalog (descriptive, not prescriptive; names three patterns A / B / Recovery + one open question anon-hint; implementation deferred to subsequent shifts)
 created: 2026-05-23

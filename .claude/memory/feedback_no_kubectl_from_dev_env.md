@@ -1,4 +1,5 @@
 ---
+id: feedback-no-kubectl-from-dev-env
 name: feedback-no-kubectl-from-dev-env
 description: "Don't run kubectl from this dev environment for cluster-state mutations or even reads — operator owns cluster access; agent owns code-level changes only."
 metadata: 

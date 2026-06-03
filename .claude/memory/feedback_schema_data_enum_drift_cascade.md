@@ -1,4 +1,5 @@
 ---
+id: feedback-schema-data-enum-drift-cascade
 name: Schema-data enum drift cascades to fake auth-credential bugs
 description: When seed data uses an enum value the protocol schema rejects, doorway 503s on registration cascade silently into 401 INVALID_CREDENTIALS at login — masquerading as fixture-credential bugs. Always check seed-humans.log before chasing 401s.
 type: feedback

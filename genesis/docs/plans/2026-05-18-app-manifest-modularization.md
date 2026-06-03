@@ -1,4 +1,5 @@
 ---
+id: app-manifest-modularization
 status: Draft
 ---
 

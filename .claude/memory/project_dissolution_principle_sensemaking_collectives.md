@@ -1,4 +1,5 @@
 ---
+id: project-dissolution-principle-sensemaking-collectives
 name: dissolution-principle-sensemaking-collectives
 description: "The substrate dissolves vestigial institutions into abstract sensemaking collectives; these collectives are the primary domain of the elohim councils — the substantive content of \"the apex.\" Humans steward corporeal-scale; elohim steward abstract-scale."
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: 0deb6177-e250-4b18-9ca2-dd7a2b971a5d
 cites:
-  - genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md
+  - qahal-architecture-vision | the gospel-tier vision spec whose Section 2.11 is the canonical full-length treatment of this principle | sha256:6a519b464b586832
 ---
 
 # The dissolution principle + sensemaking collectives as the primary domain of the elohim

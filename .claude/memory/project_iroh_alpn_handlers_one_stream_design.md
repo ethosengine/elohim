@@ -1,10 +1,11 @@
 ---
+id: project-iroh-alpn-handlers-one-stream-design
 name: Phase 5–10 ALPN handlers — one-stream design + post-fix loop pattern
 description: All custom iroh ALPN handlers (sync/EPR/EPR-atom/shard/view-fed/identity/trust) were originally one-stream-per-connection by design; bench discovery forced a loop-on-accept_bi pattern that supports both. Records the discovery and the resulting bench scenarios.
 type: project
 originSessionId: a343d895-dee4-491c-a4db-adda4c79312f
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
+  - iroh-libp2p-complementarity | the architecture spec gating the Phase 11 transport wiring these ALPN handlers implement — iroh as one of three tracks | sha256:29235aeb35aff128
 ---
 Every Phase 5–10 ALPN ProtocolHandler::accept in elohim/elohim-storage/src/p2p_iroh/ — sync, epr, epr_atom, shard, view_fed, identity, trust — was originally shaped:
 

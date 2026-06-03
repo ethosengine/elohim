@@ -1,4 +1,5 @@
 ---
+id: iroh-phase12-peer-transport-manifest
 status: Draft
 cites:
   - ../../content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md   # the design spec this plan implements

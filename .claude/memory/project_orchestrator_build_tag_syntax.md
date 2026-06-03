@@ -1,4 +1,5 @@
 ---
+id: project-orchestrator-build-tag-syntax
 name: project-orchestrator-build-tag-syntax
 description: "Orchestrator's [build:X] commit-tag syntax strips the elohim- prefix. Valid aliases per the 2026-05-28 pipelines-unstable shift investigation: edge, dna, app, genesis, sophia, steward, all. CAVEAT 2026-05-28: tag parsing is gated on env.BUILD_TRIGGER == 'WEBHOOK' (Jenkinsfile L1611) — timer-triggered, manual-rebuild, and replay builds SKIP tag parsing entirely even if HEAD commit message contains the tag. If the webhook build is NOT_BUILT/aborted and a later timer build picks up the same commit, the tag is silently lost. Wiring to build-graph dispatch IS correct (L1019-1028) once parsing fires."
 metadata: 
@@ -6,7 +7,7 @@ metadata:
   type: project
   originSessionId: 5ed7452d-de73-43b1-814f-3b1742a3b1b8
 cites:
-  - genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md
+  - orchestrator-clean-build-triggers | the plan whose Task 1 (commit beba218b6) fixed the webhook-gate silent-drop this entry documents | sha256:7de67c902196b761
 ---
 
 The orchestrator's `[build:<name>]` commit-tag syntax (per `genesis/orchestrator/Jenkinsfile`) uses **short aliases**, not full pipeline names.

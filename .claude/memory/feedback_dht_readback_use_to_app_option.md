@@ -1,4 +1,5 @@
 ---
+id: feedback-dht-readback-use-to-app-option
 name: feedback_dht_readback_use_to_app_option
 description: "Read DHT entries back with record.entry().to_app_option::<T>(), never Entry::try_into() -> SerializedBytes — the try_into round-trip serializes the Entry::App variant TAG into the bytes, so readback fails 'missing field' even when the struct shape is identical."
 metadata:

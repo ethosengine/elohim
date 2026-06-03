@@ -1,4 +1,5 @@
 ---
+id: project-recovery-grandma-standard
 name: Recovery's user-experience bar — grandma + trillion-dollar convenience
 description: Recovery design must let non-technical users trust their data and identity are safe, at the same convenience as big-tech custody, via social/peer trust instead of corporate custody
 type: project
