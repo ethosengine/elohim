@@ -718,6 +718,29 @@ def shouldRunStep(String stepName) {
 }
 
 /**
+ * The e2e bench presents the SAME dev admin key the doorway pod validates as its
+ * bootstrap key (operator directive 2026-06-03: consistency over rotation in the
+ * dev/simulated environment). The doorway pod's API_KEY_ADMIN ← Secret api-key-admin;
+ * the canonical Jenkins credential that mirrors it is `doorway-admin-bootstrap-key`
+ * — the SAME credential Seed Humans already binds to API_KEY_ADMIN (NOT
+ * storage-api-key-admin, which is the storage X-API-Key / DOORWAY_API_KEY write key,
+ * a different value). Returns '' when not visible — the bootstrap-key scenario then
+ * uses its fallback and the doorway 403s loudly (ADMIN_KEY_REJECTED) instead of
+ * silently issuing an Authenticated token. Extracted for the CPS method-size limit.
+ */
+def resolveE2eAdminKey() {
+    def key = ''
+    try {
+        withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+            key = env.ADMIN_KEY
+        }
+    } catch (e) {
+        echo "doorway-admin-bootstrap-key credential not visible — bootstrap-key scenario will use its fallback"
+    }
+    return key
+}
+
+/**
  * Seed Stewardship Allocations — affinity-based content→steward allocations
  * (genesis/seeder/src/seed-stewardship.ts; manifesto Part IV-C: content is
  * stewarded by whoever has the most relational connection to it).
@@ -1955,6 +1978,9 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
 
+                        // Same dev admin key as the doorway pod's Secret (see helper).
+                        def e2eAdminKey = resolveE2eAdminKey()
+
                         // Install E2E driver dependencies
                         dir('genesis/a2o') {
                             sh 'pnpm install --frozen-lockfile 2>/dev/null || pnpm install'
@@ -1963,6 +1989,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // Always run API-level tests (@e2e tag, fast, no browser)
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/a2o') {
+                                withEnv(["E2E_ADMIN_BOOTSTRAP_KEY=${e2eAdminKey}"]) {
                                 sh """#!/bin/bash
                                     set -euo pipefail
 
@@ -1994,6 +2021,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                                     echo "✅ API E2E tests passed"
                                 """
+                                }
                             }
                         }
 
