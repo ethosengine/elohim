@@ -839,9 +839,36 @@ def seedProjectionsStage() {
                     echo "  New pod's boot will fetch project-epr commitments from storage"
                     echo "  → EprRouter populated → / and /lamad serve 200"
                     echo ""
-                    echo "  Verify (60s after this stage):"
-                    echo "    curl -s https://alpha.elohim.host/version  # commit should flip off b45ad43"
-                    echo "    curl -sI https://alpha.elohim.host/lamad  # should be 200"
+
+                    # ── Rollout-wait at the PUBLIC boundary ────────────────────────
+                    # The e2e bench tests THROUGH the public ingress, so readiness is
+                    # defined there — not at pod or internal-DNS level. Without this
+                    # wait, E2E Verification starts while the Deployment controller is
+                    # still recreating the deleted pods and the ENTIRE API run 503s at
+                    # the ingress (genesis #1078: 57/79 failed, every one an nginx
+                    # 503-HTML, run finished in 36s). Two consecutive 200s required —
+                    # a single 200 can be a draining old pod.
+                    echo "⏳ waiting for doorway rollout to serve 200 at ${doorwayHost}/health ..."
+                    OK_COUNT=0
+                    for i in \$(seq 1 72); do
+                        CODE=\$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${doorwayHost}/health" || echo 000)
+                        if [ "\$CODE" = "200" ]; then
+                            OK_COUNT=\$((OK_COUNT+1))
+                            if [ "\$OK_COUNT" -ge 2 ]; then
+                                echo "✅ doorway serving 200 at public /health (stable ×2 after ~\$((i*5))s)"
+                                break
+                            fi
+                        else
+                            OK_COUNT=0
+                        fi
+                        sleep 5
+                    done
+                    if [ "\$OK_COUNT" -lt 2 ]; then
+                        echo "❌ doorway did not reach a stable 200 at the public boundary within 6min."
+                        echo "   Failing THIS stage loudly (one true cause) instead of letting the"
+                        echo "   e2e bench drown in dozens of misleading ingress-503 failures."
+                        exit 1
+                    fi
                 else
                     echo "WARNING: no doorway pods matched any selector in ${namespace}"
                     echo "  Tried: -l app.kubernetes.io/name=${deployment}"
