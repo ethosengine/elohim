@@ -9,7 +9,7 @@
 # cascade. See genesis/docs/PLACEMENT.md § "Availability ≠ regression".
 
 schema_version: 1
-updated: 2026-06-01
+updated: 2026-06-03
 
 resources:
   household-nodes:
@@ -31,9 +31,9 @@ resources:
 
   harbor-registry:
     role: CI image registry (harbor.ethosengine.com)
-    available: false
-    note: 500 on image pull; orchestrator build #1119 ABORTED 2026-06-01. Blocks ALL CI builds → every
-          CI-graded gate is BLOCKED-BY-ENV (cannot run), NOT failed, until the registry is restored.
+    available: true
+    note: restored 2026-06-03 — CI pulls images cleanly (genesis #1074 ran every real stage, no
+          ErrImagePull/500). Was down 2026-06-01 (#1119 ABORTED). Evidence-backed flip, mirrors the probe.
 
 # requires_env vocabulary used by tests/stories/gates (declare on the artifact):
 #   shem               — needs the shem multi-tenant canvas (cross-node)
