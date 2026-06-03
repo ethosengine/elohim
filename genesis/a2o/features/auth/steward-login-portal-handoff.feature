@@ -40,6 +40,7 @@ Feature: Doorway hands the login session off to the steward's portal host
     And the /auth/login response does NOT include "portalHostUrl"
     And the browser completes the OAuth dance at the doorway as relying-party-and-identity-provider
 
+  @requires:shem
   Scenario: Hosted visitor receives no portalHostUrl
     Given human "Susan" is a hosted visitor with no portal host registered
     When Susan submits credentials at the threshold-login page

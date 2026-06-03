@@ -21,6 +21,7 @@ Feature: Agency pipeline in doorway-account matches the elohim-app stages
     And the pipeline step "Steward" is NOT marked completed
     And the page reads "Accessing through alpha.elohim.host" near the header
 
+  @requires:shem
   Scenario: Susan's pipeline reflects no stewardship affordance
     Given human "Susan" is a hosted visitor with no portal host registered
     When Susan opens doorway/account

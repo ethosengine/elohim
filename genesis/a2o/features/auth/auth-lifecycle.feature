@@ -26,6 +26,7 @@ Feature: Authentication Lifecycle
     Then Matthew should have a valid token
     And Matthew's identifier should be "matthew.dowell@alpha.elohim.host"
 
+  @requires:shem
   Scenario: Susan logs in as a family member
     Given human "Susan" is logged in on doorway "alpha"
     Then Susan should have a valid token
@@ -80,6 +81,7 @@ Feature: Authentication Lifecycle
 
   # --- Concurrent sessions (the family is online) ---
 
+  @requires:shem
   Scenario: Multiple humans logged in simultaneously
     Given human "Matthew" is logged in on doorway "alpha"
     And human "Susan" is logged in on doorway "alpha"

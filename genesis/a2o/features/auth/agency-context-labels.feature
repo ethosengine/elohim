@@ -22,7 +22,7 @@ Feature: Agency badge distinguishes hosted-steward from hosted-visitor
     Then the agency stage badge reads "Hosted Steward"
     And the tagline reads "A steward, currently signed in through a doorway"
 
-  @elohim-visually-validated
+  @elohim-visually-validated @requires:shem
   Scenario: Susan sees the Hosted Visitor badge after OAuth login through doorway
     Given human "Susan" is a hosted visitor with no portal host registered
     When Susan logs in at elohim-app via the doorway OAuth flow

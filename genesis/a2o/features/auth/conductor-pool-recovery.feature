@@ -18,6 +18,7 @@ Feature: Conductor Pool Recovery for Hosted Users
   # chaperone now treats stale Path-2 mappings as a re-provision trigger
   # and recovers via the existing idempotent provisioner.
 
+  @requires:shem
   Scenario: Hosted human reconnects after the conductor pool composition changed
     Given human "Susan" is logged in on doorway "alpha"
     And Susan's agent→conductor mapping references a conductor no longer in the pool

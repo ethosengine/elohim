@@ -12,6 +12,7 @@ Feature: Hosted User Management
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And human "Matthew" is logged in on doorway "alpha"
 
+  @requires:shem
   Scenario: Matthew lists hosted users
     Given human "Susan" is logged in on doorway "alpha"
     When Matthew queries the admin users list
@@ -19,6 +20,7 @@ Feature: Hosted User Management
     And the users list should include Matthew's entry
     And the users list should include Susan's entry
 
+  @requires:shem
   Scenario: Matthew views user details
     Given human "Susan" is logged in on doorway "alpha"
     When Matthew views user details for Susan
@@ -33,6 +35,7 @@ Feature: Hosted User Management
     When Troublemaker checks their identity
     Then the identity check should fail with unauthorized
 
+  @requires:shem
   Scenario: Matthew updates a user's quota
     Given human "Susan" is logged in on doorway "alpha"
     When Matthew updates Susan's storage quota to 500 MB
@@ -40,6 +43,7 @@ Feature: Hosted User Management
     When Matthew views user details for Susan
     Then Susan's storage quota should be 500 MB
 
+  @requires:shem
   Scenario: Non-admin cannot access user management
     Given human "Susan" is logged in on doorway "alpha"
     When Susan attempts to access the admin users endpoint

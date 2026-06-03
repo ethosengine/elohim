@@ -54,6 +54,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
   # Threshold not met — revocation stays pending
   # ─────────────────────────────────────────────────────────
 
+  @requires:shem
   Scenario: Only two contacts respond — revocation stays pending
     Given a pending revocation request for Matthew's key "K1" with required votes 3
     When only Jessica and David approve the revocation request

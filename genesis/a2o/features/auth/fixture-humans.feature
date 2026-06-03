@@ -9,6 +9,7 @@ Feature: Fixture Human Categories
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
+  @requires:shem
   Scenario: Core family — Matthew's household
     Given human "Matthew" is logged in on doorway "alpha"
     And human "Susan" is logged in on doorway "alpha"
@@ -16,11 +17,13 @@ Feature: Fixture Human Categories
     And human "Gertrude" is logged in on doorway "alpha"
     Then all 4 humans should have distinct tokens
 
+  @requires:shem
   Scenario: Community humans
     Given human "Nancy" is logged in on doorway "alpha"
     And human "Pam" is logged in on doorway "alpha"
     Then all 2 humans should have distinct tokens
 
+  @requires:shem
   Scenario: Affinity group — learning and faith
     Given human "Pete" is logged in on doorway "alpha"
     And human "Terrance" is logged in on doorway "alpha"
@@ -28,6 +31,7 @@ Feature: Fixture Human Categories
     And human "Meriadoc" is logged in on doorway "alpha"
     Then all 4 humans should have distinct tokens
 
+  @requires:shem
   Scenario: Local economy humans
     Given human "Frank" is logged in on doorway "alpha"
     And human "Georgina" is logged in on doorway "alpha"

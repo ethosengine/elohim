@@ -46,6 +46,7 @@ Feature: Operator Onboarding
 
   # --- Agency pipeline funnel ---
 
+  @requires:shem
   Scenario: Matthew views the agency pipeline
     Given human "Matthew" is logged in on doorway "alpha"
     And human "Susan" is logged in on doorway "alpha"

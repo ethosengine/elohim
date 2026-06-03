@@ -9,7 +9,7 @@ Feature: Assessment Completion Feedback
 
   # ─── Discovery Completion ───────────────────────────────────────────────────
 
-  @discovery @happy-path
+  @discovery @happy-path @requires:shem
   Scenario: Learner sees personalized discovery result after completing assessment
     Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
@@ -22,7 +22,7 @@ Feature: Assessment Completion Feedback
     And the completion description should reference the primary type
     And the profile link should read "View on your profile"
 
-  @discovery @subscales
+  @discovery @subscales @requires:shem
   Scenario: Discovery completion shows subscale breakdown bars
     Given human "Susan" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
@@ -33,7 +33,7 @@ Feature: Assessment Completion Feedback
     And the subscale breakdown should be visible
     And each subscale bar should have a non-zero width
 
-  @discovery @attestation
+  @discovery @attestation @requires:shem
   Scenario: Discovery completion records an attestation
     Given human "Terrance" is logged in on doorway "alpha" with device
     And Terrance has not completed any discovery assessments
@@ -45,7 +45,7 @@ Feature: Assessment Completion Feedback
     And the "attachment-aware" attestation should be recorded
     And I should see the "first-discovery" attestation badge on my profile
 
-  @discovery @continue
+  @discovery @continue @requires:shem
   Scenario: Learner continues after discovery feedback
     Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
@@ -95,7 +95,7 @@ Feature: Assessment Completion Feedback
 
   # ─── Reflection Mode ────────────────────────────────────────────────────────
 
-  @reflection
+  @reflection @requires:shem
   Scenario: Reflection assessment shows generic completion
     Given human "Susan" is logged in on doorway "alpha" with device
     When I navigate to a reflection assessment
@@ -107,7 +107,7 @@ Feature: Assessment Completion Feedback
 
   # ─── Edge Cases ─────────────────────────────────────────────────────────────
 
-  @regression
+  @regression @requires:shem
   Scenario: No console errors during completion feedback
     Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
