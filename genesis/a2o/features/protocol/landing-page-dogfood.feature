@@ -8,7 +8,7 @@ Feature: Elohim Protocol landing page is dogfooded as protocol content
   steward↔doorway hosting model — and is impossible to silently centralize.
 
   Background:
-    Given elohim-storage is healthy at "http://localhost:8090"
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
   Scenario: The elohim-host-landing ContentNode exists with html5-app format
     When I fetch the ContentNode "elohim-host-landing"

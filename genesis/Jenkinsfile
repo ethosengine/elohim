@@ -1845,7 +1845,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                     E2E_DOORWAY_ALPHA="${doorwayHost}" \
                                     E2E_DOORWAY_STAGING="${doorwayHost}" \
                                     ELOHIM_REMOTE_COMPUTE_STATUS="${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'}" \
-                                        npx cucumber-js --tags '@e2e and not @browser-only and not @local' \
+                                        npx cucumber-js --tags '@e2e and not @browser-only and not @local and not @wip' \
                                         --format progress-bar \
                                         --format json:reports/cucumber-report.json \
                                         --format html:reports/cucumber-report.html

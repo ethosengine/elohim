@@ -2,11 +2,11 @@ import { strict as assert } from 'node:assert';
 
 import { Then, When } from '@cucumber/cucumber';
 
-// Prefer the CI-set endpoints (E2E_STORAGE_URL / E2E_DOORWAY_ALPHA) so these steps hit
-// the deployed alpha storage+doorway; fall back to the legacy vars then localhost for
-// local dev. Without this the ContentNode fetch + doorway GET hit localhost in CI.
-const STORAGE_URL =
-  process.env.E2E_STORAGE_URL ?? process.env.STORAGE_URL ?? 'http://localhost:8090';
+// Every fetch goes THROUGH the doorway — the web2 boundary / swap-test surface. The doorway
+// proxies /db/* and /api/* to its own elohim-storage (storage_proxy.rs → forward_to_storage),
+// so a client never needs (or should know) the internal storage URL. This is precisely the
+// steward↔doorway hosting model this feature exists to prove: pointing the test at internal
+// storage directly would bypass the very boundary under test (and couple to cluster topology).
 const DOORWAY_URL =
   process.env.E2E_DOORWAY_ALPHA ?? process.env.DOORWAY_URL ?? 'http://localhost:8888';
 
@@ -17,11 +17,13 @@ interface DogfoodWorld {
   scopedCommitment?: Record<string, unknown>;
 }
 
-// NOTE: `Given elohim-storage is healthy at {string}` is intentionally reused
-// from steps/compute-allocation.steps.ts — the assertion is identical.
+// Background `Given doorway "alpha" at "E2E_DOORWAY_ALPHA"` (mode-aware.steps.ts) registers
+// the doorway from the env var — the protocol features depend on the doorway being reachable,
+// not on a direct storage health probe (that would re-introduce the boundary bypass).
 
 When('I fetch the ContentNode {string}', async function (this: DogfoodWorld, id: string) {
-  const res = await fetch(`${STORAGE_URL}/db/content/${id}`);
+  // Through the doorway, not internal storage — the doorway proxies /db/content/{id}.
+  const res = await fetch(`${DOORWAY_URL}/db/content/${id}`);
   assert.ok(res.ok, `content fetch failed: ${res.status}`);
   this.fetchedNode = (await res.json()) as Record<string, unknown>;
 });
@@ -65,7 +67,7 @@ Then(
 When(
   'I list active REA commitments where provider is {string}',
   async function (this: DogfoodWorld, provider: string) {
-    const url = new URL(`${STORAGE_URL}/api/v1/commitments`);
+    const url = new URL(`${DOORWAY_URL}/api/v1/commitments`);
     url.searchParams.set('provider', provider);
     const res = await fetch(url);
     assert.ok(res.ok, `commitments list failed: ${res.status}`);

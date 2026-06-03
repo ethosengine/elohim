@@ -7,7 +7,7 @@ Feature: ProtocolOmniComponent makes protocol context legible at the top of the 
   neighbors — is legible without leaving the page.
 
   Background:
-    Given elohim-storage is healthy at "http://localhost:8090"
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
   Scenario: The EPR nav-context endpoint serves a navigation projection
     When I GET "/api/v1/epr/elohim-host-landing/nav-context" from the doorway
