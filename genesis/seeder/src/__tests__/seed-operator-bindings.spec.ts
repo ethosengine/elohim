@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { buildOperatorCommitmentBody, type OperatorBinding } from '../seed-operator-bindings.js';
+import {
+  buildOperatorCommitmentBody,
+  buildHostingAgreementBody,
+  type OperatorBinding,
+  type HostingAgreementSpec,
+} from '../seed-operator-bindings.js';
 
 describe('buildOperatorCommitmentBody', () => {
   const binding: OperatorBinding = {
@@ -24,19 +29,28 @@ describe('buildOperatorCommitmentBody', () => {
     expect(body.provider).toBe(body.receiver);
   });
 
-  it('resourceClassifiedAs is the capability array verbatim', () => {
+  it('resourceClassifiedAs is a JSON-encoded array string of capabilities', () => {
     const body = buildOperatorCommitmentBody(binding);
-    expect(body.resourceClassifiedAs).toEqual(['*']);
+    // Must be a string (not an array) — CreateReaCommitmentInput.resource_classified_as
+    // is Option<String>; sending a raw JSON array causes HTTP 500.
+    expect(typeof body.resourceClassifiedAs).toBe('string');
+    expect(JSON.parse(body.resourceClassifiedAs)).toEqual(['*']);
   });
 
-  it('inScopeOf is exactly ["doorway:<id>"]', () => {
+  it('inScopeOf is a JSON-encoded array string containing "doorway:<id>"', () => {
     const body = buildOperatorCommitmentBody(binding);
-    expect(body.inScopeOf).toEqual(['doorway:alpha-elohim-host']);
+    // Must be a string — CreateReaCommitmentInput.in_scope_of is Option<String>.
+    // The view layer parses it back to Vec<String> via serde_json::from_str.
+    expect(typeof body.inScopeOf).toBe('string');
+    expect(JSON.parse(body.inScopeOf)).toEqual(['doorway:alpha-elohim-host']);
   });
 
-  it('metadata carries schemaVersion=1, successionRole, reachScope, and operator humanId', () => {
+  it('metadataJson is a JSON-encoded string carrying schemaVersion, successionRole, reachScope, operatorHumanId', () => {
     const body = buildOperatorCommitmentBody(binding);
-    expect(body.metadata).toMatchObject({
+    // Must be metadataJson (not metadata) — CreateReaCommitmentInput.metadata_json.
+    expect(typeof body.metadataJson).toBe('string');
+    const meta = JSON.parse(body.metadataJson) as Record<string, unknown>;
+    expect(meta).toMatchObject({
       schemaVersion: 1,
       successionRole: 'primary',
       reachScope: 'stewards-only',
@@ -44,9 +58,10 @@ describe('buildOperatorCommitmentBody', () => {
     });
   });
 
-  it('metadata.reachScope defaults to "operator-private" when omitted', () => {
+  it('metadataJson.reachScope defaults to "operator-private" when omitted', () => {
     const body = buildOperatorCommitmentBody({ ...binding, reachScope: undefined });
-    expect(body.metadata).toMatchObject({ reachScope: 'operator-private' });
+    const meta = JSON.parse(body.metadataJson) as Record<string, unknown>;
+    expect(meta).toMatchObject({ reachScope: 'operator-private' });
   });
 
   it('id is deterministic — same (operator, doorway, action) → same id (idempotent re-runs)', () => {
@@ -64,5 +79,53 @@ describe('buildOperatorCommitmentBody', () => {
   it('id has the "operate-doorway-" prefix for ergonomic log scanning', () => {
     const body = buildOperatorCommitmentBody(binding);
     expect(body.id).toMatch(/^operate-doorway-[a-f0-9]{16}$/);
+  });
+});
+
+describe('buildHostingAgreementBody', () => {
+  const spec: HostingAgreementSpec = {
+    provider: 'matthew',
+    scopes: ['host:alpha.elohim.host', 'epr_root:elohim-host-landing'],
+    signalKind: 'compute-allocation',
+    triggerKind: 'subscription',
+    note: "matthew's in-kind compute hosting for elohim-host-landing on alpha.elohim.host",
+  };
+
+  it('action is exactly "hosting-agreement"', () => {
+    const body = buildHostingAgreementBody(spec);
+    expect(body.action).toBe('hosting-agreement');
+  });
+
+  it('provider is the literal string (not a peer_id) for direct ?provider= querying', () => {
+    const body = buildHostingAgreementBody(spec);
+    expect(body.provider).toBe('matthew');
+    expect(body.receiver).toBe('matthew');
+  });
+
+  it('inScopeOf is a JSON-encoded array containing both scope values', () => {
+    const body = buildHostingAgreementBody(spec);
+    expect(typeof body.inScopeOf).toBe('string');
+    const scopes = JSON.parse(body.inScopeOf) as string[];
+    expect(scopes).toContain('host:alpha.elohim.host');
+    expect(scopes).toContain('epr_root:elohim-host-landing');
+  });
+
+  it('metadataJson carries signalKind and triggerKind', () => {
+    const body = buildHostingAgreementBody(spec);
+    expect(typeof body.metadataJson).toBe('string');
+    const meta = JSON.parse(body.metadataJson) as Record<string, unknown>;
+    expect(meta.signalKind).toBe('compute-allocation');
+    expect(meta.triggerKind).toBe('subscription');
+  });
+
+  it('id is deterministic (idempotent re-runs)', () => {
+    const a = buildHostingAgreementBody(spec);
+    const b = buildHostingAgreementBody(spec);
+    expect(a.id).toBe(b.id);
+  });
+
+  it('id has the "hosting-agreement-" prefix', () => {
+    const body = buildHostingAgreementBody(spec);
+    expect(body.id).toMatch(/^hosting-agreement-[a-f0-9]{16}$/);
   });
 });

@@ -42,7 +42,13 @@ import type { ContentFormat, ContentType, Reach } from './generated/schema-enums
 import type { CreateContentInput } from './generated/create-content-input.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
 import { applyPathThumbnail } from './path-thumbnail.js';
-import { seedOperatorBindings, defaultM5Bindings, createOperatorBindingClient } from './seed-operator-bindings.js';
+import {
+  seedOperatorBindings,
+  seedHostingAgreements,
+  defaultM5Bindings,
+  defaultHostingAgreements,
+  createOperatorBindingClient,
+} from './seed-operator-bindings.js';
 import { seedProjections, defaultProjectionSeeds, createProjectionClient } from './seed-projections.js';
 // ========================================
 // PERFORMANCE TIMING UTILITIES
@@ -2093,6 +2099,17 @@ async function seed() {
   await seedOperatorBindings(
     createOperatorBindingClient(DOORWAY_URL!, DOORWAY_API_KEY),
     defaultM5Bindings(),
+  );
+
+  // ========================================
+  // HOSTING AGREEMENTS
+  // In-kind REA Commitments declaring Matthew's hosting of elohim-host-landing.
+  // Required by the landing-page-dogfood a2o scenario (provider="matthew").
+  // ========================================
+  console.log('\n=== Seeding Hosting Agreements ===');
+  await seedHostingAgreements(
+    createOperatorBindingClient(DOORWAY_URL!, DOORWAY_API_KEY),
+    defaultHostingAgreements(),
   );
 
   // ========================================
