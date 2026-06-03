@@ -11,6 +11,13 @@
 # file-relationships.json — NOT in memory-kit/ (which is only one consumer; root placement also
 # preserves memory-kit's "only context-coverage.yaml is hand-edited" rule).
 #
+# FOCUS BASELINE — its GENERATED sibling: .claude/subject-focus.md (written by
+# .claude/scripts/memory-kit/focus-baseline.py, refreshed on every scope-reconcile --apply/--set flip).
+# This manifest answers "which CLASS does this work route to"; subject-focus.md answers, for a subject
+# that IS in scope, "what within it is IN FOCUS vs HELD right now, WHY, and the options to baseline or
+# pivot." NO narrowing in a subject ⇒ it is FAIR-GAME (everything in focus, like ranging over plans/specs
+# out of the box). The generated baseline stays here, NOT inside this hand-tuned file.
+#
 # CASCADE (one repo -> mono-repo -> submodule): a sub-tree may drop its own .claude/subject-routing.yaml
 # (or a `subject_routing:` block in its CLAUDE.md) that the resolver merges ON TOP of this root —
 # union of classes, nearest-wins on home-remaps — exactly as nested CLAUDE.md gospels cascade. A

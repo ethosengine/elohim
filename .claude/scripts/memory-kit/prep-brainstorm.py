@@ -45,6 +45,7 @@ def main() -> int:
 
     prior = run("spec-coherence-index.py", "--query", TOPIC)
     focus = run("placement-audit.py", "--focus")
+    subject_focus = run("focus-baseline.py", "--brief")
     try:
         led = json.loads(run("placement-audit.py", "--ledger", "--json") or "{}")
         # Must match placement-audit ledger_mode pressure_order: BLOCKED-BY-ENV is
@@ -63,6 +64,8 @@ def main() -> int:
     print(prior)
     print("\n## 2. TESTABLE SURFACE (plan only what's in scope; BLOCKED-BY-ENV is held, not regressed)\n")
     print(focus)
+    print("\n  -- SUBJECT FOCUS (a2o; no narrowing = fair-game) --")
+    print(subject_focus)
     print(f"\n## 3. BUDGET — {pressure} pressure items outstanding "
           f"(run `placement-audit.py --ledger` for the per-file queue)\n")
     print("## RULE FOR THIS SESSION")
