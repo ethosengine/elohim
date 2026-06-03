@@ -1369,14 +1369,47 @@ async fn handle_register(
         user.agent_pub_key = p.agent_pub_key.clone();
     }
 
-    // Check admin bootstrap key - promote to Admin if key matches API_KEY_ADMIN
+    // Check admin bootstrap key - promote to Admin if key matches API_KEY_ADMIN.
+    //
+    // When a bootstrap key is *explicitly supplied* it expresses an intent to
+    // register as admin; if that intent cannot be honoured (server has no admin
+    // key configured, or the supplied key does not match) we must NOT silently
+    // fall through to an Authenticated registration — that produced an invisible
+    // failure where the operator could not distinguish "wrong key" from "key not
+    // honoured" until a later /auth/me permission assertion. Reject explicitly
+    // with a machine-readable code. The no-key path is unchanged: ordinary
+    // registrations never supply a bootstrap key and are unaffected.
     if let Some(ref bootstrap_key) = body.admin_bootstrap_key {
-        if let Some(ref admin_key) = state.args.api_key_admin {
-            if !admin_key.is_empty() && bootstrap_key == admin_key {
+        match state.args.api_key_admin.as_ref() {
+            Some(admin_key) if !admin_key.is_empty() && bootstrap_key == admin_key => {
                 user.permission_level = PermissionLevel::Admin;
                 info!("Admin bootstrap: promoting {} to Admin", body.identifier);
-            } else {
+            }
+            Some(admin_key) if !admin_key.is_empty() => {
                 warn!("Admin bootstrap key mismatch for {}", body.identifier);
+                return json_response(
+                    StatusCode::FORBIDDEN,
+                    &ErrorResponse {
+                        error: "Admin bootstrap key does not match the configured admin key".into(),
+                        code: Some("ADMIN_KEY_REJECTED".into()),
+                    },
+                );
+            }
+            _ => {
+                // api_key_admin is unset or empty: the server cannot honour a
+                // bootstrap-key promotion at all. Surface it rather than issuing
+                // a silently-downgraded Authenticated token.
+                warn!(
+                    "Admin bootstrap key supplied for {} but no admin key is configured",
+                    body.identifier
+                );
+                return json_response(
+                    StatusCode::FORBIDDEN,
+                    &ErrorResponse {
+                        error: "Admin bootstrap is not configured on this doorway".into(),
+                        code: Some("ADMIN_KEY_UNCONFIGURED".into()),
+                    },
+                );
             }
         }
     }
@@ -1790,6 +1823,45 @@ async fn handle_me(req: Request<hyper::body::Incoming>, state: Arc<AppState>) ->
     }
 
     let claims = result.claims.unwrap();
+
+    // Consult durable user state after JWT signature/expiry validation.
+    //
+    // A JWT is only signature+expiry-checked by verify_token; on its own it can
+    // outlive an admin suspension. If the user has since been deactivated
+    // (adminSetUserStatus(active=false) / soft-delete sets is_active=false), a
+    // still-held token must NOT continue to authenticate. We mirror the
+    // existing MongoDB lookup in handle_account. This is the active-flag partial
+    // of server-side revocation: it covers suspend-a-bad-actor-now without a
+    // shared cross-replica token blacklist (that broader substrate decision is
+    // tracked separately). When MongoDB is unavailable we degrade to the prior
+    // JWT-only behaviour rather than failing closed for every caller.
+    if let Some(mongo) = &state.mongo {
+        if let Ok(collection) = mongo.collection::<UserDoc>(USER_COLLECTION).await {
+            match collection
+                .find_one(doc! { "human_id": &claims.human_id })
+                .await
+            {
+                Ok(Some(user)) if !user.is_active => {
+                    warn!(
+                        "Rejecting /auth/me for suspended user {}",
+                        claims.identifier
+                    );
+                    return json_response(
+                        StatusCode::UNAUTHORIZED,
+                        &ErrorResponse {
+                            error: "Account is suspended".into(),
+                            code: Some("ACCOUNT_SUSPENDED".into()),
+                        },
+                    );
+                }
+                Ok(_) => {} // active user, or no row (legacy/dev) — proceed
+                Err(e) => {
+                    // DB error: degrade to JWT-only rather than fail closed.
+                    warn!("/auth/me active-status lookup failed (degrading): {}", e);
+                }
+            }
+        }
+    }
 
     // Derive authority label from doorway_url hostname; fall back to doorway_id,
     // then to a generic placeholder. This is the doorway-host mode label shown by
