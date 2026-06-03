@@ -15,10 +15,12 @@ resources:
   household-nodes:
     role: Matthew / Jessica / James household — local P2P          # project_shem_is_p2p_live_canvas
     available: true
+    provides_node_types: [operations, edge, performance]
 
   shem:
     role: multi-tenant live P2P canvas — the cross-node proving ground   # project_shem_is_p2p_live_canvas
     available: false
+    provides_node_types: [remote]
     note: offline / inaccessible (operator-declared 2026-06-01). Cross-node P2P scenarios are OUT OF SCOPE
           until it returns — held, NOT regressed.
 
@@ -40,3 +42,10 @@ resources:
 #   alpha-cluster-6peer— needs the stable 6-peer alpha soak cluster
 #   harbor             — needs CI image builds (any CI-graded verification)
 #   household-nodes    — needs the local household P2P (usually available)
+#
+# provides_node_types — the deployments.json arm of the scope reconciler. Each resource declares which
+# human nodeTypes it can place (deployments.json humans declare `nodeTypes`, the requirement side — same
+# pattern as a doc's requires_env / a feature's @requires). scope-reconcile.py derives each human's
+# `suspended` flag from this: suspended ⇔ NO nodeType maps to an available resource. Derived flags carry
+# `"suspendedBy": "scope-reconcile:<caps>"` provenance (never hand-write; operator-manual suspensions
+# without that marker are left alone). Flip a resource → the suspensions cascade with the held tree + env.

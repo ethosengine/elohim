@@ -156,3 +156,37 @@ it moves whole-cap features to/from held/ AND the runtime gate skips/restores sc
 capability in cluster-state.yaml. First exercised for `shem` (13 features held, 13 mixed scenario-gated) on
 2026-06-03. **Footgun:** `--set <cap>=off|on` *without* `--apply` still writes the durable home (only the
 move is dry-run) — flipping it leaves cluster-state changed even in "preview".
+
+## 8. Part D — The deployments arm (humans follow the same setpoint) — landed 2026-06-03
+
+`genesis/orchestrator/data/deployments.json` was a FOURTH home that could disagree: each human declares
+`nodeTypes` (the requirement side — same pattern as a doc's `requires_env` / a feature's `@requires:`), and
+the documented `suspended: true` flag gates all three consumer arms (deploy manifest rendering, seed-humans,
+the a2o `isHumanDeployed` test gate) — but the flag was hand-flipped. When shem went down (2026-06-01), the
+11 `nodeTypes=["remote"]` "shem-only, no on-prem fallback" humans stayed declared-deployed: every genesis run
+hammered a non-resolving conductor (elohim-emma-alpha / conductor-11) with 24 provisioning failures, and the
+doorway pool kept routing /auth/register there until the 503 storm surfaced it (genesis #1077/#1078,
+2026-06-03). The lesson: a hand-flipped flag IS the drift vector; the last manual flip is how the homes
+diverged.
+
+Now the flag is DERIVED, cites-style — never hand-written, provenance-marked, auditable:
+
+- **Vocabulary:** each cluster-state resource declares `provides_node_types: [...]` (the availability side).
+  `suspended ⇔ NO nodeType maps to an available resource` (ANY-placement semantics: a human is placeable if
+  at least one of its nodeTypes is provided by an available resource).
+- **Provenance:** derived flags carry `"suspendedBy": "scope-reconcile:<caps>"`. The reconciler only ever
+  touches its OWN flags — an operator-manual suspension (no marker) survives every cascade and is surfaced as
+  `manual-hold` in the report, the way a generated cite is distinguishable from a hand-written one.
+- **Drift gate:** `--report` (the SessionStart `scope:` line) counts deployment-flag drift, so a
+  declaration↔substrate disagreement is caught at session start — not in a 503 storm.
+- **Adoption:** a hand-set flag that MATCHES the derivation is adopted (provenance added) so migration from
+  hand-rolled state is lossless; nodeTypes matching no `provides_node_types` → `vocab` warning, conservative
+  no-op (same posture as unknown requires_env caps). Edits are line-based (the hand-maintained `$comment`
+  fields survive) and fail closed (re-validated with json.loads before write).
+
+Net: `--set shem=on --apply` now cascades ALL FOUR homes in one move — the held/ tree returns, the runtime
+env flips, the focus baseline regenerates, and the 11 shem-only humans un-suspend (deploy render + seed +
+test gates follow). Exercised by round-trip drill 2026-06-03: off→on dry-run showed 12 features→live + 11
+unsuspends; on→off restored alignment losslessly. Watch-out: the edge pipeline is what RENDERS the
+suspension into conductor statefulsets + the doorway pool — the orchestrator correctly dispatches an edge
+rebuild when deployments.json changes, so the flip's cluster effect lands on that build, not instantly.

@@ -31,6 +31,12 @@ from _lib import frontmatter as _fm  # noqa: E402
 ROOT = next(p for p in Path(__file__).resolve().parents if (p / ".git").exists())
 CLUSTER_STATE = ROOT / "genesis" / "manifests" / "cluster-state.yaml"
 GAP_DIR = ROOT / ".claude" / "memory-kit" / "gap-items"
+# The deployments arm — humans declare nodeTypes (requirement side); cluster-state resources declare
+# provides_node_types (availability side); `suspended` is DERIVED, never hand-written. Derived flags carry
+# a provenance marker so the reconciler only ever touches its OWN flags (an operator-manual suspension
+# without the marker survives every cascade) — same discipline as generated cites.
+DEPLOYMENTS = ROOT / "genesis" / "orchestrator" / "data" / "deployments.json"
+_PROVENANCE = "scope-reconcile:"
 
 # (live_dir, held_dir) — held_dir is OUTSIDE the live scan/glob path so a held doc is structurally invisible
 # to the planner (placement-audit scans specs/+plans/) and the runner (cucumber globs features/**).
@@ -247,6 +253,140 @@ def compute_drift() -> tuple:
     return to_held, to_live, vocab, held_anomalies
 
 
+# ── deployments.json arm (third arm of the reconciler) ──────────────────────────────────────────────────
+# deploy-render + seed + a2o test gates all key off `suspended` (the documented single source of truth for
+# "is this human exercise-able"); this arm keeps that flag DERIVED from cluster-state so the two homes
+# cannot drift apart again (2026-06-03: 11 shem-only humans stayed declared-deployed for days after shem
+# went down → every genesis run hammered a non-resolving conductor with 24 provisioning failures).
+
+
+def _parse_provides() -> dict:
+    """nodeType -> set(resource) from cluster-state `provides_node_types: [a, b]` (4-space key under a
+    resource). Same lenient line-based walk as _parse_cluster."""
+    mapping: dict = {}
+    if not CLUSTER_STATE.is_file():
+        return mapping
+    cur, in_resources = None, False
+    for ln in CLUSTER_STATE.read_text(encoding="utf-8", errors="replace").splitlines():
+        if re.match(r"^resources:\s*$", ln):
+            in_resources = True
+            continue
+        if not in_resources:
+            continue
+        if re.match(r"^[A-Za-z#]", ln):
+            in_resources, cur = False, None
+            continue
+        m = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", ln)
+        if m:
+            cur = m.group(1)
+            continue
+        m4 = re.match(r"^    provides_node_types:\s*\[(.*)\]\s*$", ln)
+        if cur and m4:
+            for nt in m4.group(1).split(","):
+                nt = nt.strip().strip("'\"")
+                if nt:
+                    mapping.setdefault(nt, set()).add(cur)
+    return mapping
+
+
+def _humans() -> list:
+    """The humans list from deployments.json (tolerates top-level array or {humans: [...]})."""
+    if not DEPLOYMENTS.is_file():
+        return []
+    try:
+        data = json.loads(DEPLOYMENTS.read_text(encoding="utf-8"))
+    except ValueError:
+        return []
+    return data if isinstance(data, list) else (data.get("humans") or [])
+
+
+def deployment_drift() -> list:
+    """[(name, action, caps)] — pure derivation, no side effects.
+    action ∈ suspend (blocked but declared live) | unsuspend (placeable but our flag still set) |
+             adopt (blocked + suspended but provenance missing → normalize ownership) |
+             manual-hold (operator-owned suspension the derivation disagrees with → report, never touch) |
+             vocab (nodeTypes match no provides_node_types → vocabulary drift, conservative no-op)."""
+    provides = _parse_provides()
+    _known, avail = _parse_cluster()
+    out = []
+    for h in _humans():
+        name = h.get("name")
+        if not name:
+            continue
+        nts = h.get("nodeTypes") or []
+        caps_per_nt = [provides.get(nt, set()) for nt in nts]
+        if nts and all(not c for c in caps_per_nt):
+            out.append((name, "vocab", nts))
+            continue
+        placeable = any(c & avail for c in caps_per_nt)
+        missing = sorted({cap for c in caps_per_nt for cap in c if cap not in avail})
+        susp = bool(h.get("suspended"))
+        ours = str(h.get("suspendedBy") or "").startswith(_PROVENANCE)
+        if not placeable and not susp:
+            out.append((name, "suspend", missing))
+        elif not placeable and susp and not ours:
+            out.append((name, "adopt", missing))
+        elif placeable and susp and ours:
+            out.append((name, "unsuspend", []))
+        elif placeable and susp and not ours:
+            out.append((name, "manual-hold", []))
+    return out
+
+
+def reconcile_deployments(apply: bool) -> list:
+    """Print + (with apply) line-edit deployments.json to match the derivation. Line-based so the
+    hand-maintained formatting and $comment fields survive; re-validated with json.loads before write
+    (an unparseable result is discarded — fail closed)."""
+    drift = deployment_drift()
+    for name, action, caps in drift:
+        if action == "suspend":
+            print(f"  ⏸ SUSPEND   {name}  (no nodeType placeable; needs {caps})")
+        elif action == "unsuspend":
+            print(f"  ▶ UNSUSPEND {name}  (capability returned)")
+        elif action == "adopt":
+            print(f"  ✦ ADOPT     {name}  (suspended matches derivation; adding provenance marker)")
+        elif action == "manual-hold":
+            print(f"  ⚠ MANUAL-HOLD {name}  (operator-owned suspension; derivation says placeable — left alone)")
+        elif action == "vocab":
+            print(f"  ⚠ VOCAB     {name}  nodeTypes {caps} match no provides_node_types in cluster-state")
+    actionable = [d for d in drift if d[1] in ("suspend", "unsuspend", "adopt")]
+    if not (apply and actionable):
+        return drift
+    lines = DEPLOYMENTS.read_text(encoding="utf-8").splitlines()
+    for name, action, caps in actionable:
+        idx = next((i for i, ln in enumerate(lines)
+                    if re.match(rf'^\s*"name":\s*"{re.escape(name)}",\s*$', ln)), None)
+        if idx is None:
+            continue
+        indent = re.match(r"^(\s*)", lines[idx]).group(1)
+        end = next((k for k in range(idx + 1, len(lines)) if re.match(r'^\s*"name":\s*"', lines[k])), len(lines))
+        sus = next((k for k in range(idx, end) if re.match(r'^\s*"suspended":', lines[k])), None)
+        prov = next((k for k in range(idx, end) if re.match(r'^\s*"suspendedBy":', lines[k])), None)
+        provline = f'{indent}"suspendedBy": "{_PROVENANCE}{",".join(caps)}",'
+        if action == "suspend":
+            if sus is not None:
+                lines[sus] = f'{indent}"suspended": true,'
+                if prov is not None:
+                    lines[prov] = provline
+                else:
+                    lines.insert(sus + 1, provline)
+            else:
+                lines.insert(idx + 1, provline)
+                lines.insert(idx + 1, f'{indent}"suspended": true,')
+        elif action == "adopt":
+            if prov is not None:
+                lines[prov] = provline
+            elif sus is not None:
+                lines.insert(sus + 1, provline)
+        elif action == "unsuspend":
+            for k in sorted([x for x in (sus, prov) if x is not None], reverse=True):
+                del lines[k]
+    new = "\n".join(lines) + "\n"
+    json.loads(new)  # fail closed: never write an unparseable deployments.json
+    DEPLOYMENTS.write_text(new, encoding="utf-8")
+    return drift
+
+
 def reconcile(apply: bool) -> int:
     _known, avail = _parse_cluster()
     to_held, to_live, vocab, held_anomalies = compute_drift()
@@ -282,6 +422,8 @@ def reconcile(apply: bool) -> int:
         print(f"  ⚠ HELD-STAYS  {d.relative_to(ROOT)}  (no parseable requires_env — cannot confirm safe to publish; operator triage)")
     for d, unk in vocab:
         print(f"  ⚠ VOCAB  {d.relative_to(ROOT)}  requires_env {unk} unknown to cluster-state (reconcile the name)")
+    dep = reconcile_deployments(apply)
+    dep_actionable = [x for x in dep if x[1] in ("suspend", "unsuspend", "adopt")]
     if apply:
         # Keep the co-located focus baseline (.claude/subject-focus.md) in lockstep with the plate, so
         # a fresh agent reads an always-current "what's in focus vs held" without running anything.
@@ -291,9 +433,9 @@ def reconcile(apply: bool) -> int:
         )
     verb = "APPLIED" if apply else "DRY-RUN"
     print(f"scope-reconcile [{verb}]: available={sorted(avail) or '(none)'}")
-    print(f"  → held: {len(to_held)}   ← live: {len(to_live)}")
-    if not apply and (to_held or to_live):
-        print("  (re-run with --apply to git mv)")
+    print(f"  → held: {len(to_held)}   ← live: {len(to_live)}   ⏸ deployments: {len(dep_actionable)}")
+    if not apply and (to_held or to_live or dep_actionable):
+        print("  (re-run with --apply to git mv + reconcile deployment flags)")
     return 0
 
 
@@ -313,10 +455,19 @@ def report() -> int:
         caps = sorted({c for _, _, r in to_held for c in r if c})
         capnote = f" ({','.join(caps)})" if caps else ""
         parts.append(f"{len(to_held)} to hold{capnote}")
+    dep = deployment_drift()
+    dep_actionable = [x for x in dep if x[1] in ("suspend", "unsuspend", "adopt")]
+    if dep_actionable:
+        caps = sorted({c for _, a, r in dep_actionable for c in r if c})
+        capnote = f" ({','.join(caps)})" if caps else ""
+        parts.append(f"{len(dep_actionable)} deployment flag(s){capnote}")
     vocab_note = ""
     if vocab:
         caps = sorted({c for _, u in vocab for c in u})
         vocab_note = f"  ⚠ unknown-cap: {','.join(caps)} (vocab drift vs cluster-state)"
+    dep_vocab = [x for x in dep if x[1] == "vocab"]
+    if dep_vocab:
+        vocab_note += f"  ⚠ nodeType-vocab: {','.join(sorted({n for n, _, _ in dep_vocab}))}"
     if not parts:
         print(f"scope: aligned ✅  (plate matches substrate){vocab_note}")
     else:
