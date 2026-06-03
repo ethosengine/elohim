@@ -35,8 +35,21 @@ export class AuthStateService {
   async init(): Promise<void> {
     this._isLoading.set(true);
     try {
-      // Check for session transfer token in URL (cross-app handoff)
+      // Check for session transfer token in URL (cross-app handoff).
+      // This may store a token before we check below.
       await this.handleSessionTokenIfPresent();
+
+      // Anonymous-page guard: if no stored token exists at this point, there is
+      // no credential to send and the server will 401. Probing unconditionally
+      // produced a console-visible "Failed to load resource: 401" on anonymous
+      // pages such as /threshold/login even though catchError swallowed the
+      // RxJS error — the browser network layer logs the response before RxJS
+      // processes it. Skip the probe and resolve as unauthenticated immediately.
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      if (!token) {
+        this._account.set(null);
+        return;
+      }
 
       const account = await firstValueFrom(this.adminService.getAccount());
       this._account.set(account);
