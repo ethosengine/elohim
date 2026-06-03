@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
-import { waitForContentByTags } from '../src/framework/assertions/content-sync.js';
+import { waitForContent, waitForContentByTags } from '../src/framework/assertions/content-sync.js';
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { E2EWorld } from '../src/framework/world.js';
 
@@ -99,7 +99,16 @@ When('{word} reads the content by id', async function (this: E2EWorld, humanName
   const id = this.contentIds.get('lastContentId');
   assert.ok(id, 'No content id to read');
 
-  const content = await device.client.getContent(id);
+  // A fresh POST /db/content becomes externally visible only after the
+  // provenance-publish drain loop marks the row (≈DRAIN_INTERVAL_SECS=15s on
+  // storage). A read-by-id immediately after create races that drain and 404s,
+  // so poll until the content is visible — mirroring the waitForContentByTags
+  // pattern the sibling tag-search step already uses.
+  const content = await waitForContent(device.client, id, {
+    maxAttempts: 5,
+    initialDelayMs: 1000,
+    timeoutMs: 15_000,
+  });
   this.contentIds.set('lastReadContent', JSON.stringify(content));
 });
 

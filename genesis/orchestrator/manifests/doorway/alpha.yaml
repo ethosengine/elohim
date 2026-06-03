@@ -112,6 +112,8 @@ spec:
               value: "info,doorway=debug"
             - name: PROJECTION_WRITER
               value: "true"
+            - name: ORCHESTRATOR_ENABLED
+              value: "true"
             # Alpha hosts Matthew (founder) + Jessica (household)
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"

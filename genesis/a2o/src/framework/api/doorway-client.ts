@@ -518,7 +518,7 @@ export class DoorwayClient {
   // -- Status (comprehensive) -----------------------------------------------
 
   async status(): Promise<StatusResponse> {
-    return this.get<StatusResponse>('/status');
+    return this.get<StatusResponse>('/status.json');
   }
 
   // -- Admin: Nodes ---------------------------------------------------------

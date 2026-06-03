@@ -136,6 +136,8 @@ spec:
               value: "info,doorway=debug"
             - name: PROJECTION_WRITER
               value: "true"
+            - name: ORCHESTRATOR_ENABLED
+              value: "true"
             # Full alpha conductor pool (matthew, jessica, james, adam, terrance, …)
             # injected from the Jenkins pipeline as a reach-fallback list.
             # Primary singular backend is adam (see CONDUCTOR_ADMIN_URL /

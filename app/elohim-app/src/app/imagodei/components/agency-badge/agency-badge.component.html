@@ -1,5 +1,5 @@
 <!-- Agency Badge: At-a-Glance View -->
-<div class="agency-section">
+<div class="agency-section" data-testid="agency-badge">
   <button
     type="button"
     class="agency-header"
@@ -10,7 +10,7 @@
     <span class="material-icons stage-icon">{{ stageInfo().icon }}</span>
 
     <!-- Stage Badge -->
-    <span class="stage-badge" [ngClass]="getStageBadgeClass()">
+    <span class="stage-badge" data-testid="agency-stage-badge" [ngClass]="getStageBadgeClass()">
       {{ stageInfo().label }}
     </span>
 
@@ -25,7 +25,7 @@
   </button>
 
   <!-- Tagline -->
-  <p class="stage-tagline">{{ stageInfo().tagline }}</p>
+  <p class="stage-tagline" data-testid="agency-stage-tagline">{{ stageInfo().tagline }}</p>
 
   <!-- Quick Summary -->
   <div class="quick-summary">

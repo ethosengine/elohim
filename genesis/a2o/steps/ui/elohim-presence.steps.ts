@@ -12,6 +12,7 @@ import { strict as assert } from 'node:assert';
 import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
+import { Human } from '../../src/framework/human.js';
 import { ELOHIM_PRESENCE, BANNER } from '../../src/framework/pages/selectors.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -19,16 +20,55 @@ import { E2EWorld } from '../../src/framework/world.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getDevice(world: E2EWorld): PlaywrightDevice {
+/** Synthetic anonymous learner carrying the presence Playwright device. */
+const PRESENCE_LEARNER = '_presence-learner';
+
+/**
+ * Resolve (or lazily create) the Playwright device the presence scenarios act
+ * on. The elohim-presence feature has no Background that logs a human in — its
+ * scenarios drive a discovery assessment as an anonymous learner — so a
+ * logged-in human's device is never created. Rather than throw "No Playwright
+ * device found", provision an anonymous device pointed at the alpha doorway,
+ * mirroring `ensureLandingVisitor` in browser-elements.steps.ts. If a human IS
+ * already logged in (e.g. a future Background adds one), reuse that device.
+ */
+async function getDevice(world: E2EWorld): Promise<PlaywrightDevice> {
   for (const [, human] of world.humans) {
     const device = human.devices.find(d => d.type === 'playwright') as PlaywrightDevice | undefined;
     if (device) return device;
   }
-  throw new Error('No Playwright device found.');
+
+  let learner: Human;
+  try {
+    learner = world.getHuman(PRESENCE_LEARNER);
+  } catch {
+    learner = new Human(PRESENCE_LEARNER, {
+      identifier: '',
+      password: '',
+      displayName: PRESENCE_LEARNER,
+    });
+    world.addHuman(PRESENCE_LEARNER, learner);
+  }
+
+  const existing = learner.devices.find(d => d.type === 'playwright');
+  if (existing) return existing as PlaywrightDevice;
+
+  const [, doorway] = [...world.doorways][0] ?? [];
+  const doorwayUrl = doorway?.url ?? process.env['E2E_DOORWAY_ALPHA'] ?? '';
+  assert.ok(doorwayUrl, 'No doorway URL — register one via Background or set E2E_DOORWAY_ALPHA');
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const browser = await world.getBrowser();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  const device = new PlaywrightDevice(`${PRESENCE_LEARNER}-pw`, doorwayUrl, doorwayUrl, browser);
+  await device.init();
+  learner.addDevice(device);
+  world.onCleanup(async () => device.close());
+  return device;
 }
 
-/** Returns null if not in Playwright mode. */
-function requirePlaywright(world: E2EWorld): PlaywrightDevice | null {
+/** Returns null if not in Playwright mode. Throws if in Playwright mode but no doorway URL is available (misconfiguration must fail loudly, never silently pend)., else the (lazily provisioned) device. */
+async function requirePlaywright(world: E2EWorld): Promise<PlaywrightDevice | null> {
   if (world.deviceMode !== 'playwright') return null;
   return getDevice(world);
 }
@@ -80,7 +120,7 @@ async function completeAssessment(device: PlaywrightDevice): Promise<void> {
 // ---------------------------------------------------------------------------
 
 Given('the learner navigates to a discovery assessment', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   // Navigate to the learning paths page, then enter a discovery assessment
@@ -95,7 +135,7 @@ Given('the learner navigates to a discovery assessment', async function (this: E
 });
 
 Given('the learner navigates to {string}', async function (this: E2EWorld, path: string) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -108,14 +148,14 @@ Given('the learner navigates to {string}', async function (this: E2EWorld, path:
 // ---------------------------------------------------------------------------
 
 When('the learner completes the assessment', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   await completeAssessment(device);
 });
 
 Given('the learner has completed a discovery assessment', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   // Navigate to discovery and complete it
@@ -136,7 +176,7 @@ Given('the learner has completed a discovery assessment', async function (this: 
 // ---------------------------------------------------------------------------
 
 Given('the elohim insight is visible', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const insight = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.INSIGHT_SECTION}"]`);
@@ -144,7 +184,7 @@ Given('the elohim insight is visible', async function (this: E2EWorld) {
 });
 
 Given('the elohim has responded with an insight', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const insight = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.INSIGHT_SECTION}"]`);
@@ -152,7 +192,7 @@ Given('the elohim has responded with an insight', async function (this: E2EWorld
 });
 
 Then('an elohim insight section appears below the results', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const insight = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.INSIGHT_SECTION}"]`);
@@ -166,7 +206,7 @@ Then('an elohim insight section appears below the results', async function (this
 Then(
   'the insight contains a learning path recommendation message',
   async function (this: E2EWorld) {
-    const device = requirePlaywright(this);
+    const device = await requirePlaywright(this);
     if (!device) return 'pending';
 
     const message = device.page.locator(
@@ -185,7 +225,7 @@ Then(
 Then(
   'the insight includes a {string} expandable section',
   async function (this: E2EWorld, _sectionName: string) {
-    const device = requirePlaywright(this);
+    const device = await requirePlaywright(this);
     if (!device) return 'pending';
 
     const expandable = device.page.locator(
@@ -196,7 +236,7 @@ Then(
 );
 
 When('the learner expands the reasoning details', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const expandable = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.REASONING_EXPANDABLE}"]`);
@@ -206,7 +246,7 @@ When('the learner expands the reasoning details', async function (this: E2EWorld
 });
 
 Then('the primary constitutional principle is visible', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const principle = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.REASONING_PRINCIPLE}"]`);
@@ -216,7 +256,7 @@ Then('the primary constitutional principle is visible', async function (this: E2
 });
 
 Then('the interpretation of the principle is visible', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const interpretation = device.page.locator(
@@ -234,7 +274,7 @@ Then('the interpretation of the principle is visible', async function (this: E2E
 Then(
   'the computation cost is visible showing tokens and processing time',
   async function (this: E2EWorld) {
-    const device = requirePlaywright(this);
+    const device = await requirePlaywright(this);
     if (!device) return 'pending';
 
     const tokens = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.COST_TOKENS}"]`);
@@ -245,7 +285,7 @@ Then(
 );
 
 Then('the insight shows tokens processed', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const tokens = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.COST_TOKENS}"]`);
@@ -255,7 +295,7 @@ Then('the insight shows tokens processed', async function (this: E2EWorld) {
 });
 
 Then('the insight shows processing time in milliseconds', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const time = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.COST_TIME}"]`);
@@ -273,7 +313,7 @@ Then('the insight shows processing time in milliseconds', async function (this: 
 When(
   'the learner clicks the {string} button',
   async function (this: E2EWorld, buttonLabel: string) {
-    const device = requirePlaywright(this);
+    const device = await requirePlaywright(this);
     if (!device) return 'pending';
 
     // First try by data-testid for known buttons, then fall back to role
@@ -291,7 +331,7 @@ When(
 );
 
 Then('the test result shows the mock backend is available', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const result = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.TEST_RESULT}"]`);
@@ -301,7 +341,7 @@ Then('the test result shows the mock backend is available', async function (this
 });
 
 Then('a banner notification appears confirming the connection', async function (this: E2EWorld) {
-  const device = requirePlaywright(this);
+  const device = await requirePlaywright(this);
   if (!device) return 'pending';
 
   const banner = device.page.locator(`[data-testid="${BANNER.NOTIFICATION}"]`);
