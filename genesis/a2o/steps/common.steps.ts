@@ -30,6 +30,12 @@ import {
   resetAutoSkippedHumans,
 } from '../src/framework/fixtures/humans.js';
 import {
+  unavailableRequiredCaps,
+  noteSubstrateSkip,
+  substrateSkippedScenarios,
+  resetSubstrateSkips,
+} from '../src/framework/fixtures/substrate-scope.js';
+import {
   isTestnetActive,
   stopTestnet,
   getComputeSummary,
@@ -195,6 +201,7 @@ BeforeAll(function () {
   // Reset node-pool auto-skip tracking so this run's reduced-scope summary
   // (emitted in AfterAll) reflects only what THIS run skipped.
   resetAutoSkippedHumans();
+  resetSubstrateSkips();
 
   const env = {
     doorwayAlpha: process.env['E2E_DOORWAY_ALPHA'] ?? '(not set)',
@@ -216,6 +223,34 @@ BeforeAll(function () {
         '     Remote-only persona scenarios will auto-skip; on-prem household carries this run.\n'
     );
   }
+});
+
+/**
+ * Substrate-scope gate — the RUNTIME arm of the cybernetic scope reconciler.
+ *
+ * A scenario (or its feature, via inherited tags) may declare `@requires:<cap>` where <cap> is a
+ * capability tracked in genesis/manifests/cluster-state.yaml (shem, alpha-cluster-6peer, …). When
+ * any required cap is unavailable for this run, the scenario is HELD — skipped, not failed —
+ * exactly as the planning arm (scope-reconcile.py) moves a whole-feature artifact to held/. This
+ * closes the seam where a scenario that needs the remote canvas but doesn't happen to name a
+ * remote-only persona would otherwise run against down pods and fail, masking the real signal.
+ *
+ * Generic over any cap; nothing here is shem-specific. Registered before the setup hooks so it
+ * short-circuits the scenario before any browser/doorway/peer work begins.
+ */
+Before(function (this: E2EWorld, scenario) {
+  const tags = scenario.pickle.tags.map(t => t.name);
+  const missing = unavailableRequiredCaps(tags);
+  if (missing.length > 0) {
+    noteSubstrateSkip(scenario.pickle.name, missing, scenario.pickle.uri);
+    // eslint-disable-next-line no-console
+    console.log(
+      `  ⏭️  HELD (substrate): "${scenario.pickle.name}" requires unavailable ` +
+        `${missing.join(', ')} — skipped, not failed.`
+    );
+    return 'skipped';
+  }
+  return undefined;
 });
 
 /**
@@ -388,10 +423,14 @@ AfterAll(async function () {
   // "here is what we could NOT exercise under the available compute" — and a
   // machine-readable artifact the pipeline can fold into its run record.
   const skipped = autoSkippedHumans();
+  const capSkips = substrateSkippedScenarios();
   const scope = {
     remoteComputeStatus: process.env['ELOHIM_REMOTE_COMPUTE_STATUS'] ?? 'unknown',
-    reducedScope: skipped.length > 0,
+    reducedScope: skipped.length > 0 || capSkips.length > 0,
     autoSkippedHumans: skipped,
+    // Scenarios held by the substrate-cap gate (the @requires:<cap> runtime arm), with the
+    // unavailable cap(s) that held each — the machine-readable "what we could NOT exercise".
+    substrateSkippedScenarios: capSkips,
   };
   try {
     writeFileSync('reports/substrate-scope.json', JSON.stringify(scope, null, 2));
@@ -404,6 +443,17 @@ AfterAll(async function () {
       `\n  🛰️  REDUCED SCOPE this run — ${skipped.length} persona(s) auto-skipped ` +
         `(remote pool unavailable): ${skipped.join(', ')}\n` +
         '     Re-run when shem returns to exercise the full topology.\n'
+    );
+  }
+  if (capSkips.length > 0) {
+    const caps = [...new Set(capSkips.flatMap(s => s.caps))]
+      .sort((a, b) => a.localeCompare(b))
+      .join(', ');
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n  🛰️  REDUCED SCOPE this run — ${capSkips.length} scenario(s) held by @requires gate ` +
+        `(unavailable: ${caps}).\n` +
+        '     These are HELD, not failed; they return when the capability does.\n'
     );
   }
 

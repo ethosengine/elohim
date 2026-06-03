@@ -35,12 +35,14 @@ Feature: Content Lifecycle
 
   # --- Cross-human discovery (same doorway) ---
 
+  @requires:shem
   Scenario: Susan discovers Matthew's content
     Given Matthew has created content titled "Family Governance" with tags "e2e-shared,family-systems"
     And human "Susan" is logged in on doorway "alpha"
     When Susan searches for content with tag "e2e-shared"
     Then the search results should include "Family Governance"
 
+  @requires:shem
   Scenario: Terrance discovers Matthew's content
     Given Matthew has created content titled "Learning Science" with tags "e2e-learning,education"
     And human "Terrance" is logged in on doorway "alpha"

@@ -82,7 +82,7 @@ Feature: Observable + contract-aware auto-distribute
     When Matthew opens "/shefa/cluster"
     Then the tile for "matthew-mobile" shows status "asleep · 4 min ago"
 
-  @browser-only @resilience-p1
+  @browser-only @resilience-p1 @requires:shem
   Scenario: Peer-topology page aggregates by household, not by peer
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Matthew's substrate is reciprocally hosting with 3 distinct households
@@ -101,7 +101,7 @@ Feature: Observable + contract-aware auto-distribute
     Then the page renders a "resilience cliff" warning
     And the count of cliff households is non-zero
 
-  @browser-only @resilience-p1
+  @browser-only @resilience-p1 @requires:shem
   Scenario: Reciprocity page shows inflow, outflow, and net hosting
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Adam has committed 5 GB to host Matthew's content and delivered 4.5 GB

@@ -1,4 +1,4 @@
-@testnet @compute-allocation @local
+@testnet @compute-allocation @local @requires:alpha-cluster-6peer
 Feature: Community compute allocation
   As Matthew, I have a distributed app to test.
   I request compute from my community, peers provision

@@ -127,6 +127,7 @@ Feature: Compute commitments are bounded and breach without contagion
 
   # --- Recovery and re-entry ---
 
+  @requires:shem
   Scenario: Replacement hardware allows breached commitments to either resume or formally retire
     Given adam's compute commitments are in breach state with cause "catastrophic-loss"
     When replacement remote-labeled hardware comes online

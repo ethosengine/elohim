@@ -1,4 +1,4 @@
-@stage1-structural @recovery-m3
+@stage1-structural @recovery-m3 @requires:shem
 Feature: Intimate Quorum Happy Path — A Lost Pubkey Is Restored Through Emergency Contacts
 
   The claimant Abby has lost access to her agent key. She has three emergency

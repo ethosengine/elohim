@@ -1,4 +1,4 @@
-@e2e @qahal @browser-only @feedback-gate @regression
+@e2e @qahal @browser-only @feedback-gate @regression @requires:shem
 Feature: Feedback dialogue panel — accountable peer surface
   As a learner viewing protocol content,
   I want to flag, challenge, share feedback, or report issues from the content view,

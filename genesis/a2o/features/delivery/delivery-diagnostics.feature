@@ -147,7 +147,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
 
   # --- Cold-Cache Performance (Phase 1 Validation) ---
 
-  @wip @browser-only @regression
+  @wip @browser-only @regression @requires:shem
   Scenario: Cold-cache HTML5 app loads via SW ZIP delivery without crashing storage
     # The original OOM failure happened when projection cache was cold and every
     # browser file request hit storage directly. SW ZIP delivery is the fix:

@@ -1,4 +1,4 @@
-@e2e @content @delivery @requires:doorway @requires:seeded-content
+@e2e @content @delivery @requires:doorway @requires:seeded-content @requires:shem
 Feature: Web2 Absorption — Doorway Projection Cache
   As a learner visiting via browser
   I want HTML5 apps to load without 502 errors

@@ -188,7 +188,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 10
   # Gate condition: lifts when federation-epr.steps.ts ships with `Pete views his recognition feed on peer "X"`, `he sees a recognition event for "Y" delivered to peer "Z"`, and the cross-peer fetch event tracking helper. Substrate emits recognition events on delivery; the BDD layer needs to surface them.
-  @wip
+  @wip @requires:shem
   Scenario: Steward sees recognition land for content delivered cross-peer
     # Pete is on his own peer when Jessica's peer fetches his guide for
     # a learner. Pete's recognition view should reflect the new event —
@@ -221,7 +221,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: iroh-phase-12-followon
   # Citation: 2026-05-16-epr-wip-disposition.md row 12
   # Gate condition: lifts when (a) iroh Phase 12 caller-identity is fully wired through the EPR-atom request-response codec end-to-end, and (b) federation-epr.steps.ts ships with `Matthew has an active AgentPeerBinding on peer "X"`, `peer "X" fetches "Y" via the EPR-atom protocol`, and `peer "Z" resolves the requesting peer to agent "A" via PeerIdentityMap` step verbs. The reach-gate accepting Matthew-as-steward is already substrate-live; the gap is the libp2p caller-identity threading + the BDD glue around it.
-  @wip
+  @wip @requires:shem
   Scenario: Identity binding allows cross-peer fetches to attribute reach correctly
     # Matthew's content with reach "trusted" is requested from peer
     # "shem-pete" — but the requester is Matthew himself on his desktop.
