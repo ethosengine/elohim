@@ -54,6 +54,8 @@ const CONTENT_ADDRESS_PATTERN = /^sha256-[a-f0-9]{64}$/;
 
 /** World-local storage key for the captured X-Content-Address value. */
 const CAPTURED_CONTENT_ADDRESS_KEY = 'capturedContentAddress';
+/** Module-level capture: survives across scenarios (each gets a fresh World). */
+let capturedContentAddress: string | undefined;
 
 // ---------------------------------------------------------------------------
 // Background: doorway and seeded-content context
@@ -127,12 +129,26 @@ When('I request {string}', async function (this: E2EWorld, path: string) {
   // while the step uses whichever hash the server actually returned.
   let resolvedPath = path;
   if (path.includes(PLACEHOLDER_HASH)) {
-    const captured = this.contentIds.get(CAPTURED_CONTENT_ADDRESS_KEY);
-    assert.ok(
-      captured,
-      `Path "${path}" contains placeholder "${PLACEHOLDER_HASH}" but no content address was captured yet. ` +
-        `Run the header-assertion step first to capture the real hash.`
-    );
+    // Cucumber gives every scenario a FRESH World, so a capture made in the
+    // slug-URL scenario is invisible here (caused genesis #1080's "no content
+    // address was captured yet"). Prefer the module-level capture; if absent,
+    // self-capture by fetching the slug URL and reading its X-Content-Address.
+    let captured = capturedContentAddress ?? this.contentIds.get(CAPTURED_CONTENT_ADDRESS_KEY);
+    if (!captured) {
+      const slug = this.contentIds.get('currentAppSlug') ?? 'evolution-of-trust';
+      const slugResp = await fetchApp(doorway.url, `/apps/${slug}/index.html`);
+      captured = slugResp.headers['x-content-address'];
+      assert.ok(
+        captured,
+        `Cannot resolve "${PLACEHOLDER_HASH}": /apps/${slug}/index.html exposed no X-Content-Address header`
+      );
+      assert.match(
+        captured,
+        CONTENT_ADDRESS_PATTERN,
+        `Captured "${captured}" does not look like a sha256 content address`
+      );
+    }
+    capturedContentAddress = captured;
     resolvedPath = path.replace(PLACEHOLDER_HASH, captured);
   }
   const resp = await fetchApp(doorway.url, resolvedPath);
@@ -180,6 +196,7 @@ Then(
         `Header "${headerName}" value "${actual}" does not look like a sha256 content address`
       );
       this.contentIds.set(CAPTURED_CONTENT_ADDRESS_KEY, actual);
+      capturedContentAddress = actual;
     } else {
       assert.equal(actual, expectedValue);
     }

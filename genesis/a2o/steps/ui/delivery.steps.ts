@@ -39,15 +39,24 @@ const SW_LOG_CACHE_HIT = '[apps-sw] cache-hit:';
 const APPS_PATH = '/apps/';
 const NO_DOORWAY_MSG = 'No doorway configured';
 
-function requirePlaywright(world: E2EWorld, humanName: string): PlaywrightDevice {
+/**
+ * Resolve the human's Playwright device, or null in HTTP mode (callers return
+ * 'pending' — the documented convention: browser-dependent steps HOLD in the
+ * API stage instead of throwing; genesis #1080 failed "Operator walks the
+ * fallback chain" with a hard throw here). In playwright mode a missing
+ * device is still a real error.
+ */
+function requirePlaywright(world: E2EWorld, humanName: string): PlaywrightDevice | null {
+  if (world.deviceMode !== 'playwright') return null;
   const human = world.getHuman(humanName);
   const device = human.devices.find(d => d.type === 'playwright') as PlaywrightDevice | undefined;
   assert.ok(device, `${humanName} has no Playwright device. Set E2E_DEVICE_MODE=playwright`);
   return device;
 }
 
-/** Find the first PlaywrightDevice across all registered humans. */
-function firstPlaywright(world: E2EWorld): PlaywrightDevice {
+/** First PlaywrightDevice across all humans, or null in HTTP mode (→ 'pending'). */
+function firstPlaywright(world: E2EWorld): PlaywrightDevice | null {
+  if (world.deviceMode !== 'playwright') return null;
   for (const [, human] of world.humans) {
     const device = human.devices.find(d => d.type === 'playwright') as PlaywrightDevice | undefined;
     if (device) return device;
@@ -208,6 +217,7 @@ Given('the Service Worker is active', async function (this: E2EWorld) {
  */
 Then('the Service Worker is registered and active', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const swState = (await device.page.evaluate(async () => {
     const reg = await navigator.serviceWorker.getRegistration('/apps/');
@@ -239,6 +249,7 @@ Then(
   'the SW intercepts requests matching {string}',
   async function (this: E2EWorld, pathPrefix: string) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     const swScope = (await device.page.evaluate(async () => {
       const reg = await navigator.serviceWorker.getRegistration('/apps/');
@@ -262,6 +273,7 @@ Given(
   'the Service Worker cache for {string} is empty',
   async function (this: E2EWorld, _appSlug: string) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
     const doorway = [...this.doorways.values()][0];
     assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -282,6 +294,7 @@ Given(
  */
 Given('the Service Worker has cached all app files', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
@@ -375,6 +388,7 @@ When(
   '{word} visits the app for the first time',
   async function (this: E2EWorld, humanName: string) {
     const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
     const doorway = [...this.doorways.values()][0];
     assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -392,6 +406,7 @@ When(
   '{word} loads the html5-app {string}',
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
     const doorway = [...this.doorways.values()][0];
     assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -412,6 +427,7 @@ When(
  */
 When('{word} loads {string}', async function (this: E2EWorld, humanName: string, appSlug: string) {
   const device = requirePlaywright(this, humanName);
+  if (!device) return 'pending';
   const doorway = [...this.doorways.values()][0];
   assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -431,6 +447,7 @@ When(
   '{word} reloads {string}',
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
     const doorway = [...this.doorways.values()][0];
     assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -450,6 +467,7 @@ When(
  */
 When('{word} goes offline', async function (this: E2EWorld, humanName: string) {
   const device = requirePlaywright(this, humanName);
+  if (!device) return 'pending';
 
   // Use CDP to set offline mode (Chromium-specific but standard for Playwright)
   // The page evaluates navigator.onLine after this
@@ -469,6 +487,7 @@ Given(
   '{word} has loaded {string} while online',
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
     const doorway = [...this.doorways.values()][0];
     assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -493,6 +512,7 @@ When(
   'a content update signal arrives with blob_hash {string} for {string}',
   async function (this: E2EWorld, newBlobHash: string, appSlug: string) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     // Simulate the SW receiving a content update signal via postMessage
     await device.page.evaluate(
@@ -524,6 +544,7 @@ When(
  */
 Then('the app loads and functions normally', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const bodyLength = (await device.page.evaluate(
     () => document.body?.innerText?.length ?? 0
@@ -542,6 +563,7 @@ Then(
     // Navigation already waited for networkidle with a 30s timeout.
     // By the time we reach this step, the page has loaded.
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     const bodyLength = (await device.page.evaluate(
       () => document.body?.innerText?.length ?? 0
@@ -560,6 +582,7 @@ Then(
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, _expectedStatus: number) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     const failed = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
     const failedLines = failed
@@ -584,6 +607,7 @@ Then(
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, expectedMode: string) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     const capLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_CAPABILITY));
 
@@ -612,6 +636,7 @@ Then(
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     // Check [apps-sw] zip-fetch: log lines — one per ZIP download
     const zipLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_ZIP_FETCH));
@@ -636,6 +661,7 @@ Then(
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('the SW downloads the ZIP blob once', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const zipLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_ZIP_FETCH));
 
@@ -656,6 +682,7 @@ Then('the SW downloads the ZIP blob once', async function (this: E2EWorld) {
  */
 Then('the SW extracts all app files into CacheStorage', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
@@ -668,6 +695,7 @@ Then('the SW extracts all app files into CacheStorage', async function (this: E2
 
 Then('the SW extracts all files from the ZIP into CacheStorage', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
@@ -686,6 +714,7 @@ Then('the SW extracts all files from the ZIP into CacheStorage', async function 
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('the SW fetches each file individually', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   // In extracted mode, there should be NO zip-fetch: logs
   const zipLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_ZIP_FETCH));
@@ -703,6 +732,7 @@ Then('the SW fetches each file individually', async function (this: E2EWorld) {
  */
 Then('each file is cached in SW CacheStorage', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
@@ -721,6 +751,7 @@ Then('each file is cached in SW CacheStorage', async function (this: E2EWorld) {
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('no ZIP download occurs', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const zipLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_ZIP_FETCH));
   assert.equal(zipLogs.length, 0, `ZIP was downloaded — expected extracted delivery mode`);
@@ -735,6 +766,7 @@ Then(
   'subsequent requests for the same app are served from CacheStorage',
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     // Verify CacheStorage has entries
     const cacheCount = (await device.page.evaluate(async () => {
@@ -753,6 +785,7 @@ Then(
  */
 Then('the requested file is returned from the local extraction', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   // Page loaded successfully with files from extraction
   const bodyLength = (await device.page.evaluate(
@@ -786,6 +819,7 @@ Then(
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, dataTable: { rawTable: string[][] }) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
     const evidence = collectDeliveryEvidence(device);
 
     // Skip header row
@@ -819,6 +853,7 @@ Then(
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, maxRequests: number) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
     const evidence = collectDeliveryEvidence(device);
 
     // Direct storage requests are inferred from failed /apps/ requests and
@@ -864,6 +899,7 @@ Then(
   'the SW evicts all cached files for {string}',
   async function (this: E2EWorld, _appSlug: string) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     // After eviction, CacheStorage should be empty for this app
     const cacheCount = (await device.page.evaluate(async () => {
@@ -903,6 +939,7 @@ Given(
   'the iframe renderer is building asset URLs for {string}',
   async function (this: E2EWorld, appSlug: string) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
     const doorway = [...this.doorways.values()][0];
     assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -924,6 +961,7 @@ When('the renderer resolves the entry point path', async function (this: E2EWorl
   // The renderer resolves paths when the component initializes.
   // Page is already loaded in the Given step.
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
   await device.page.waitForLoadState('networkidle');
 });
 
@@ -936,6 +974,7 @@ Then(
   /^the URL is relative to the main origin \(e\.g\. \/apps\/evolution-of-trust\/index\.html\)$/,
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     const iframeSrc = (await device.page.evaluate(() => {
       const iframe = document.querySelector('iframe[src*="/apps/"]');
@@ -963,6 +1002,7 @@ Then(
  */
 Then('the SW fetch event fires for the request', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
@@ -982,6 +1022,7 @@ Then('the SW fetch event fires for the request', async function (this: E2EWorld)
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('no CORS preflight is triggered', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   // CORS preflight OPTIONS requests would show up as failed requests if they
   // received unexpected responses, or as console warnings.
@@ -1003,6 +1044,7 @@ Then('no CORS preflight is triggered', async function (this: E2EWorld) {
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('zero network requests are attempted', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const networkRequests = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
   assert.equal(
@@ -1025,6 +1067,7 @@ Then('zero network requests are attempted', async function (this: E2EWorld) {
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('the SW logs which source served each file', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   // Look for [apps-sw] log lines that include source information
   const swSourceLogs = device.consoleLogs.filter(
@@ -1057,6 +1100,7 @@ Then('the SW logs which source served each file', async function (this: E2EWorld
 // eslint-disable-next-line @typescript-eslint/require-await
 Then(/^sources are one of: (.+)$/, async function (this: E2EWorld, sourcesRaw: string) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   // Parse the comma-separated quoted source names
   const allowedSources = sourcesRaw
@@ -1097,6 +1141,7 @@ Then(/^sources are one of: (.+)$/, async function (this: E2EWorld, sourcesRaw: s
  */
 When('{word} enables SW bypass mode', async function (this: E2EWorld, humanName: string) {
   const device = requirePlaywright(this, humanName);
+  if (!device) return 'pending';
 
   // Send a postMessage to the SW to enable bypass mode
   await device.page.evaluate(() => {
@@ -1115,6 +1160,7 @@ When('{word} enables SW bypass mode', async function (this: E2EWorld, humanName:
  */
 When('{word} disables SW bypass mode', async function (this: E2EWorld, humanName: string) {
   const device = requirePlaywright(this, humanName);
+  if (!device) return 'pending';
 
   await device.page.evaluate(() => {
     if (navigator.serviceWorker.controller) {
@@ -1171,6 +1217,7 @@ Then('the SW cache resumes serving', async function (this: E2EWorld) {
  */
 Given('elohim-cache-core WASM is loaded in the browser', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const wasmLoaded = (await device.page.evaluate(() => {
     return !!(globalThis as unknown as Record<string, unknown>).__elohim_cache_core;
@@ -1215,6 +1262,7 @@ When(
   '{word} navigates to a previously visited page in {string}',
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
     const doorway = [...this.doorways.values()][0];
     assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -1240,6 +1288,7 @@ Then('the content lookup resolves from the WASM cache', async function (this: E2
   // The WASM cache is transparent to the browser's network panel.
   // Verify indirectly by checking no /apps/ network requests failed.
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
   const failed = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
   assert.equal(failed.length, 0, 'Network requests failed — WASM cache may not have served');
 });
@@ -1252,6 +1301,7 @@ Then('the content lookup resolves from the WASM cache', async function (this: E2
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('no network request is made for that content', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
   const appRequests = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
   assert.equal(appRequests.length, 0, 'Network request made — WASM cache did not intercept');
 });
@@ -1287,6 +1337,7 @@ Then(
  */
 Then('the content is served successfully from the network', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
   const bodyLength = (await device.page.evaluate(
     () => document.body?.innerText?.length ?? 0
   )) as number;
@@ -1332,6 +1383,7 @@ Then(
   /^content requests bypass the WASM cache and go directly to the SW → network chain$/,
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     // WASM bypass is transparent — the content should still load.
     const bodyLength = (await device.page.evaluate(
@@ -1348,6 +1400,7 @@ Then(
  */
 Then('{string} loads and functions normally', async function (this: E2EWorld, _appSlug: string) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
   const bodyLength = (await device.page.evaluate(
     () => document.body?.innerText?.length ?? 0
   )) as number;
@@ -1362,6 +1415,7 @@ Then('{string} loads and functions normally', async function (this: E2EWorld, _a
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('no errors are shown to {word}', async function (this: E2EWorld, _humanName: string) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   assert.equal(
     device.pageErrors.length,
@@ -1381,6 +1435,7 @@ Then(
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, expectedCount: number) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     const wasmWarnings = device.consoleLogs.filter(
       l =>
@@ -1408,6 +1463,7 @@ Then(
  */
 Given('the bootstrap page is displayed', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
   const doorway = [...this.doorways.values()][0];
   assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -1459,6 +1515,7 @@ Given(
  */
 Then(String.raw`the bootstrap page navigates to \/ automatically`, async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   // Wait for the auto-navigation to complete
   await device.page.waitForURL('/', { timeout: 60_000 });
@@ -1482,6 +1539,7 @@ Then(
   '{word} sees the SPA without manually refreshing',
   async function (this: E2EWorld, _humanName: string) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     const bodyLength = (await device.page.evaluate(
       () => document.body?.innerText?.length ?? 0
@@ -1497,6 +1555,7 @@ Then(
  */
 Then('the bootstrap page reloads the browser', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   // After 30s the bootstrap page should reload — verify via URL staying at /
   // or by checking for the reload timer message in the page content
@@ -1518,6 +1577,7 @@ Then('the bootstrap page reloads the browser', async function (this: E2EWorld) {
  */
 Then('a message is shown explaining the delay', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const bodyText = (await device.page.evaluate(
     () => document.body?.textContent?.toLowerCase() ?? ''
@@ -1540,6 +1600,7 @@ Then('a message is shown explaining the delay', async function (this: E2EWorld) 
  */
 Then('the bootstrap page displays a loading indicator', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   // Look for common loading indicator patterns
   const hasIndicator = (await device.page.evaluate(() => {
@@ -1599,6 +1660,7 @@ When('{int} seconds have elapsed', async function (this: E2EWorld, seconds: numb
   // For @wip scenarios testing timing — use a shorter wait in test to avoid timeouts
   const waitMs = Math.min(seconds * 1000, 5000);
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
   await device.page.waitForTimeout(waitMs);
 });
 
@@ -1615,6 +1677,7 @@ When('{int} seconds have elapsed', async function (this: E2EWorld, seconds: numb
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('the SW sends a HEAD capability probe to the serving peer', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const capLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_CAPABILITY));
   if (capLogs.length === 0) {
@@ -1634,6 +1697,7 @@ Then(
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     const capLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_CAPABILITY));
     if (capLogs.length === 0) {
@@ -1665,6 +1729,7 @@ Then(
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
+    if (!device) return 'pending';
 
     // Verify the SW served the content (either via zip or extracted files)
     const swLogs = device.consoleLogs.filter(
@@ -1770,6 +1835,7 @@ Given(
  */
 When(String.raw`an unauthenticated request is made for \/`, async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
   const doorway = [...this.doorways.values()][0];
   assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -1784,6 +1850,7 @@ When(String.raw`an unauthenticated request is made for \/`, async function (this
  */
 Then(/^the response is the bootstrap page \(not the SPA\)$/, async function (this: E2EWorld) {
   const device = firstPlaywright(this);
+  if (!device) return 'pending';
 
   const bodyText = (await device.page.evaluate(
     () => document.body?.textContent?.toLowerCase() ?? ''

@@ -298,7 +298,7 @@ const CATEGORY_AFFINITY_MAP: Record<string, StewardAffinityEntry[]> = {
 
 class StewardshipClient extends DoorwayClient {
   async getAllContentIds(): Promise<string[]> {
-    const response = await this.fetch('/api/db/content?limit=10000', {
+    const response = await this.fetch('/db/content?limit=10000', {
       method: 'GET',
     });
 
@@ -311,7 +311,7 @@ class StewardshipClient extends DoorwayClient {
   }
 
   async getContentWithAllocations(): Promise<Set<string>> {
-    const response = await this.fetch('/api/db/allocations?active_only=true&limit=10000', {
+    const response = await this.fetch('/db/allocations?active_only=true&limit=10000', {
       method: 'GET',
     });
 
@@ -328,7 +328,7 @@ class StewardshipClient extends DoorwayClient {
   }
 
   async presenceExists(presenceId: string): Promise<boolean> {
-    const response = await this.fetch(`/api/db/presences/${presenceId}`, {
+    const response = await this.fetch(`/db/presences/${presenceId}`, {
       method: 'GET',
     });
     return response.ok;
@@ -348,7 +348,7 @@ class StewardshipClient extends DoorwayClient {
       metadata_json: data.metadata ? JSON.stringify(data.metadata) : null,
     };
 
-    const response = await this.fetch('/api/db/presences', {
+    const response = await this.fetch('/db/presences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -361,7 +361,7 @@ class StewardshipClient extends DoorwayClient {
   }
 
   async bulkCreateAllocations(inputs: CreateAllocationInput[]): Promise<BulkAllocationResult> {
-    const response = await this.fetch('/api/db/allocations/bulk', {
+    const response = await this.fetch('/db/allocations/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(inputs),
