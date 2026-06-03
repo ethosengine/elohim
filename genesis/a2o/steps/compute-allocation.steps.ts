@@ -44,9 +44,14 @@ Given('human {string} has a running steward node', function (this: E2EWorld, nam
 });
 
 Given('elohim-storage is healthy at {string}', async function (url: string) {
-  const client = new StorageClient(url);
+  // CI runs against the deployed storage at E2E_STORAGE_URL; the feature carries a
+  // localhost default for local-dev readability. Prefer the env when it is set so the
+  // health check targets the real endpoint (fixes the protocol/* "elohim-storage at
+  // http://localhost is not healthy" failures in CI).
+  const resolved = process.env['E2E_STORAGE_URL'] ?? url;
+  const client = new StorageClient(resolved);
   const healthy = await client.isHealthy();
-  assert.ok(healthy, `elohim-storage at ${url} is not healthy`);
+  assert.ok(healthy, `elohim-storage at ${resolved} is not healthy`);
 });
 
 Given('compute mutual credit medium exists', async function () {
