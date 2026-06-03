@@ -306,7 +306,13 @@ class StewardshipClient extends DoorwayClient {
       throw new Error(`Failed to get content: ${response.status}`);
     }
 
-    const content = (await response.json()) as Array<{ id: string }>;
+    // The doorway's /db/content list returns an envelope {items: [...]} (the
+    // legacy storage-direct path returned a bare array — genesis #1081 failed
+    // here with "content.map is not a function"). Accept both shapes.
+    const body = (await response.json()) as unknown;
+    const content = (
+      Array.isArray(body) ? body : ((body as { items?: unknown[] }).items ?? [])
+    ) as Array<{ id: string }>;
     return content.map((c) => c.id);
   }
 
@@ -323,7 +329,10 @@ class StewardshipClient extends DoorwayClient {
       throw new Error(`Failed to get allocations: ${response.status}`);
     }
 
-    const allocations = (await response.json()) as Array<{ content_id: string }>;
+    const allocBody = (await response.json()) as unknown;
+    const allocations = (
+      Array.isArray(allocBody) ? allocBody : ((allocBody as { items?: unknown[] }).items ?? [])
+    ) as Array<{ content_id: string }>;
     return new Set(allocations.map((a) => a.content_id));
   }
 
