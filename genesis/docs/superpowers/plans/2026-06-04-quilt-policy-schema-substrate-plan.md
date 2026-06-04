@@ -1,7 +1,7 @@
 ---
 title: Quilt-Policy Schema Substrate — Implementation Plan
 id: quilt-policy-schema-substrate-plan
-status: Draft
+status: Substrate LANDED (2026-06-04 — schema + ref-gates in both generators + 17 fixtures green; consumer TierController HELD; variances: prereq AJV-registration fix rode in 53290ea90; gate moved to single-owner model in 4085af4e4)
 class: protocol-canonical
 domain: D5
 topic: [quilt, tier, manifest, schema, storage-policy]
@@ -46,7 +46,7 @@ informed-by:
 **Files:**
 - Create: `elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs`
 
-- [ ] **Step 1: Write the failing acceptance test**
+- [x] **Step 1: Write the failing acceptance test**
 
 Create `elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs`. The harness pattern (Ajv2020, `assert`, `loadJson`, helper fixtures) is copied from `test-manifest-schema.mjs` — same conventions, no Vitest.
 
@@ -197,7 +197,7 @@ main().catch((err) => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails for the right reason**
+- [x] **Step 2: Run it to verify it fails for the right reason**
 
 Run: `node elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs`
 Expected: `FAIL: Accepts manifest with named quiltPolicies…` — AJV errors must say `must NOT have additional properties` for `quiltPolicies` / `quiltPolicyDefault` / `quiltPolicy` (the `Vocabulary` and `ContentTypeDeclaration` $defs are `additionalProperties: false`). If it fails with a schema-load error instead, fix the addSchema block (Step 1 note) until the failure is the additional-properties rejection.
@@ -209,7 +209,7 @@ Expected: `FAIL: Accepts manifest with named quiltPolicies…` — AJV errors mu
 **Files:**
 - Modify: `elohim/sdk/schemas/v1/manifest/app-manifest.schema.json`
 
-- [ ] **Step 1: Add the two Vocabulary properties**
+- [x] **Step 1: Add the two Vocabulary properties**
 
 In the `"Vocabulary"` entry under `"$defs"` (it has `"additionalProperties": false` — locate `"stagedIntents"` inside its `"properties"`), add **after** the `stagedIntents` property:
 
@@ -231,7 +231,7 @@ In the `"Vocabulary"` entry under `"$defs"` (it has `"additionalProperties": fal
 }
 ```
 
-- [ ] **Step 2: Add the ContentTypeDeclaration property**
+- [x] **Step 2: Add the ContentTypeDeclaration property**
 
 In the `"ContentTypeDeclaration"` entry under `"$defs"`, inside its `"properties"`, add:
 
@@ -242,7 +242,7 @@ In the `"ContentTypeDeclaration"` entry under `"$defs"`, inside its `"properties
 }
 ```
 
-- [ ] **Step 3: Add the two new $defs**
+- [x] **Step 3: Add the two new $defs**
 
 Add to `"$defs"` (sibling of `Vocabulary` / `ContentTypeDeclaration`):
 
@@ -291,17 +291,17 @@ Add to `"$defs"` (sibling of `Vocabulary` / `ContentTypeDeclaration`):
 }
 ```
 
-- [ ] **Step 4: Run the acceptance test to verify it passes**
+- [x] **Step 4: Run the acceptance test to verify it passes**
 
 Run: `node elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs`
 Expected: `2 passed, 0 failed`
 
-- [ ] **Step 5: Run the existing manifest suite to verify nothing regressed**
+- [x] **Step 5: Run the existing manifest suite to verify nothing regressed**
 
 Run: `pnpm run manifest:test && pnpm run schema:test`
 Expected: all PASS (the extension is optional + additive).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/manifest/app-manifest.schema.json elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs
@@ -315,7 +315,7 @@ git commit -m "feat(schema): vocabulary.quiltPolicies named storage-policy class
 **Files:**
 - Modify: `elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs`
 
-- [ ] **Step 1: Add the negative cases**
+- [x] **Step 1: Add the negative cases**
 
 Append inside `main()` after the acceptance block (before the summary `console.log`):
 
@@ -358,12 +358,12 @@ Append inside `main()` after the acceptance block (before the summary `console.l
   }
 ```
 
-- [ ] **Step 2: Run and verify all pass**
+- [x] **Step 2: Run and verify all pass**
 
 Run: `node elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs`
 Expected: `9 passed, 0 failed`. If any negative case unexpectedly VALIDATES, the schema is too loose — fix the schema (Task 2 patterns/enums), not the test.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs
@@ -378,7 +378,7 @@ git commit -m "test(schema): negative fixtures for quiltPolicies shape (duration
 - Create: `elohim/sdk/schemas/scripts/lib/manifest-quilt-refs.mjs`
 - Modify: `elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs`
 
-- [ ] **Step 1: Write the failing ref-check tests**
+- [x] **Step 1: Write the failing ref-check tests**
 
 Append inside `main()` (before the summary):
 
@@ -427,12 +427,12 @@ Append inside `main()` (before the summary):
   }
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `node elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs`
 Expected: crash with `Cannot find module './lib/manifest-quilt-refs.mjs'` — the right missing-API failure.
 
-- [ ] **Step 3: Implement the check**
+- [x] **Step 3: Implement the check**
 
 Create `elohim/sdk/schemas/scripts/lib/manifest-quilt-refs.mjs`:
 
@@ -477,12 +477,12 @@ export function validateQuiltPolicyRefs(manifest) {
 }
 ```
 
-- [ ] **Step 4: Run to verify all pass**
+- [x] **Step 4: Run to verify all pass**
 
 Run: `node elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs`
 Expected: `14 passed, 0 failed`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/sdk/schemas/scripts/lib/manifest-quilt-refs.mjs elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs
@@ -496,7 +496,7 @@ git commit -m "feat(schema): loader-enforced quiltPolicy referential integrity (
 **Files:**
 - Modify: `elohim/sdk/schemas/scripts/codegen-manifest.mjs`
 
-- [ ] **Step 1: Add the import + gate**
+- [x] **Step 1: Add the import + gate**
 
 In `codegen-manifest.mjs`, add to the imports at the top:
 
@@ -517,12 +517,12 @@ Inside `main()`, immediately after `const manifest = JSON.parse(raw);`, add:
   }
 ```
 
-- [ ] **Step 2: Verify codegen stays green on the real manifest**
+- [x] **Step 2: Verify codegen stays green on the real manifest**
 
 Run: `pnpm run manifest:codegen:verify && pnpm run lamad:codegen:verify`
 Expected: both PASS unchanged (the lamad manifest declares no quiltPolicies → zero ref errors, zero generated-output drift).
 
-- [ ] **Step 3: Verify the gate actually fires**
+- [x] **Step 3: Verify the gate actually fires**
 
 Run (creates a throwaway dangling-ref fixture, expects exit 1, then cleans up):
 
@@ -541,7 +541,7 @@ rm -rf /tmp/quilt-gate-check
 
 Expected: `Manifest quilt-policy referential-integrity errors:` + `exit=1`. (Note: `codegen-manifest.mjs` resolves paths against the repo root — if the `/tmp` path does not resolve, pass a repo-relative fixture path instead, e.g. write the fixture to `elohim/sdk/schemas/scripts/.quilt-gate-check.json` and delete it after.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/sdk/schemas/scripts/codegen-manifest.mjs
@@ -556,7 +556,7 @@ git commit -m "feat(codegen): fail manifest codegen loud on dangling quiltPolicy
 - Modify: `package.json` (repo root, line ~53)
 - Modify (local state, not committed): `.claude/memory-kit/gap-items/architecture__2026-05-11-tiered-quilt-stewardship-design.json`
 
-- [ ] **Step 1: Chain the new test into manifest:test**
+- [x] **Step 1: Chain the new test into manifest:test**
 
 In root `package.json`, change:
 
@@ -570,19 +570,19 @@ to:
 "manifest:test": "node elohim/sdk/schemas/scripts/test-manifest-schema.mjs && node elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs",
 ```
 
-- [ ] **Step 2: Run the full gate**
+- [x] **Step 2: Run the full gate**
 
 Run: `pnpm run manifest:test && pnpm run schema:test && pnpm run manifest:codegen:verify`
 Expected: all PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add package.json
 git commit -m "chore(schema): chain quilt-policy fixtures into manifest:test gate"
 ```
 
-- [ ] **Step 4: Flip gap-item states (local, no commit)**
+- [x] **Step 4: Flip gap-item states (local, no commit)**
 
 In `.claude/memory-kit/gap-items/architecture__2026-05-11-tiered-quilt-stewardship-design.json`, set `"state": "CLAIMED"` on items `#1` (schema shape), `#4` (referential integrity), `#5` (drawLatencyBudget + draw fields), `#12` (fixture tests + codegen round-trip). Leave `#2/#3/#6–#11` OPEN (HELD with the tier runtime). Then run `python3 .claude/scripts/memory-kit/placement-audit.py --ledger | head -16` to confirm the budget reflects it.
 
