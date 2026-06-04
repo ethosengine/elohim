@@ -182,6 +182,8 @@ async function main() {
   );
   ajv.addSchema(observationKindSchema, 'epr:observation-kind.schema.json');
 
+  // session-lifecycle-state is referenced by StagedIntentDeclaration.actionableFrom
+  // (added when staged-intents spec §2 landed); AJV cannot resolve the $ref without it
   const sessionLifecycleStateSchema = await loadJson(
     resolve(__dirname, '../v1/enums/session-lifecycle-state.schema.json'),
   );
