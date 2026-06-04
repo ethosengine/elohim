@@ -199,6 +199,7 @@ impl ContentService {
             tags: view.tags,
             reach: view.reach,
             blob_hash: view.blob_hash,
+            p2p_published_at: view.p2p_published_at,
         };
 
         let result = content_diesel::update_content(&mut conn, &self.ctx, input)?;

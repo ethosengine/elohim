@@ -66,6 +66,12 @@ pub struct UpdateContentInput {
     /// projects. Written by Jenkinsfile:stageSpaBlob at deploy time. None
     /// means "no change" — preserves existing blob_hash on the row.
     pub blob_hash: Option<String>,
+    /// RFC-3339 timestamp marking DHT publication. The drain loop is the
+    /// canonical writer (see `mark_published`); this PATCH-path field lets the
+    /// genesis seeder stamp it directly so household/local stacks with no DHT
+    /// peers still satisfy the `require_provenance` read gate. None means
+    /// "no change" — preserves the existing value on the row.
+    pub p2p_published_at: Option<String>,
 }
 
 fn default_content_type() -> String {
@@ -496,6 +502,10 @@ pub fn update_content(
         .blob_hash
         .as_deref()
         .or(existing.content.blob_hash.as_deref());
+    let new_p2p_published_at = input
+        .p2p_published_at
+        .as_deref()
+        .or(existing.content.p2p_published_at.as_deref());
 
     let now = current_timestamp();
 
@@ -513,6 +523,7 @@ pub fn update_content(
             content::metadata_json.eq(new_metadata_json),
             content::reach.eq(new_reach),
             content::blob_hash.eq(new_blob_hash),
+            content::p2p_published_at.eq(new_p2p_published_at),
             content::updated_at.eq(&now),
         ))
         .execute(conn)
@@ -1512,8 +1523,65 @@ mod tests {
             tags: None,
             reach: None,
             blob_hash: None,
+            p2p_published_at: None,
         };
         assert_eq!(input.id, "test-id");
+    }
+
+    /// PATCH semantics: stamping only `p2p_published_at` satisfies the
+    /// provenance read gate (`dht_anchor_hash OR p2p_published_at`) without
+    /// touching any other field. This is the genesis-seeder path for
+    /// household/local stacks with no DHT peers — see the local-stack
+    /// DHT-anchor gap.
+    #[test]
+    fn test_update_content_p2p_published_at_only_satisfies_provenance() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        // Seed a row with NO provenance markers (the bulk-seed state).
+        let create = CreateContentInput {
+            id: "patch-prov-test".to_string(),
+            title: "Seeded".to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "public".to_string(),
+            created_by: None,
+            content_body: None,
+            tags: vec![],
+        };
+        bulk_create_content(&mut conn, &ctx, vec![create]).unwrap();
+
+        // Provenance gate hides it: require_provenance=true → None.
+        assert!(
+            get_content_with_tags(&mut conn, &ctx, "patch-prov-test", true)
+                .unwrap()
+                .is_none(),
+            "pre-stamp: provenance gate must hide an unpublished row"
+        );
+
+        // PATCH only p2p_published_at.
+        let stamp = "2026-06-04T00:00:00Z";
+        let update = UpdateContentInput {
+            id: "patch-prov-test".to_string(),
+            p2p_published_at: Some(stamp.to_string()),
+            ..Default::default()
+        };
+        let result = update_content(&mut conn, &ctx, update).unwrap();
+        assert_eq!(result.content.p2p_published_at.as_deref(), Some(stamp));
+        assert_eq!(result.content.title, "Seeded");
+
+        // Provenance gate now passes — the row is visible to external reads.
+        assert!(
+            get_content_with_tags(&mut conn, &ctx, "patch-prov-test", true)
+                .unwrap()
+                .is_some(),
+            "post-stamp: provenance gate must reveal a stamped row"
+        );
     }
 
     /// PATCH semantics: setting only blob_hash leaves other fields untouched.

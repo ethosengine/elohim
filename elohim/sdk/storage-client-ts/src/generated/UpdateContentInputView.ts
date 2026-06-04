@@ -27,4 +27,14 @@ tags: Array<string> | null, reach: string | null,
  * Deliberately optional: PATCH callers MAY set this without touching
  * any other field.
  */
-blobHash: string | null, };
+blobHash: string | null, 
+/**
+ * RFC-3339 timestamp marking when this row was published to the libp2p
+ * Kad DHT. Stamping this satisfies the `require_provenance` read gate
+ * (content_diesel: `dht_anchor_hash IS NOT NULL OR p2p_published_at IS
+ * NOT NULL`). The drain loop is the canonical writer in a peered stack;
+ * the genesis seeder stamps it directly so household/local stacks with
+ * no DHT peers still pass the gate. Optional: PATCH callers MAY set this
+ * without touching any other field.
+ */
+p2pPublishedAt: string | null, };

@@ -554,6 +554,19 @@ mod schema_version_tests {
         assert!(view.blob_hash.is_none());
     }
 
+    /// PATCH /db/content/{id} must accept a body that stamps p2pPublishedAt
+    /// without touching any other field. This is the genesis-seeder path that
+    /// satisfies the provenance read gate for household/local stacks with no
+    /// DHT peers (see the local-stack DHT-anchor gap).
+    #[test]
+    fn test_update_content_input_view_p2p_published_at_only_patch() {
+        let json = r#"{"p2pPublishedAt": "2026-06-04T00:00:00Z"}"#;
+        let view: UpdateContentInputView = serde_json::from_str(json).unwrap();
+        assert_eq!(view.p2p_published_at.as_deref(), Some("2026-06-04T00:00:00Z"));
+        assert!(view.title.is_none());
+        assert!(view.blob_hash.is_none());
+    }
+
     #[test]
     fn collective_input_round_trips() {
         let json = r#"{"id":"c1","name":"Test Collective","governanceLayer":"community","reach":"commons","createdBy":"agent1"}"#;
