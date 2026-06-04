@@ -62,7 +62,26 @@ function resilienceIcon(stewardCount: number): string {
 }
 
 function resilienceTitle(resilience: ResilienceView): string {
-  return `Stewards: ${resilience.stewardship.stewardCount} · Status: ${resilience.health.status}`;
+  // Enrich the badge tooltip with the fetched-but-otherwise-unused distribution
+  // and health fields. All values are household-honest: at a single-household
+  // scale distinctPeers / canSurviveFailures are small (often 0/1) — we surface
+  // whatever the wire reports, never a fabricated multi-peer figure.
+  const parts = [
+    `Stewards: ${resilience.stewardship.stewardCount}`,
+    `Status: ${resilience.health.status}`,
+  ];
+
+  const { distinctPeers, shardsWithLocations, totalShards } = resilience.distribution;
+  if (distinctPeers > 0) {
+    parts.push(`Distinct peers: ${distinctPeers}`);
+  }
+  if (totalShards > 0) {
+    // k-of-n shard placement: how many shards have a known location.
+    parts.push(`Shards placed: ${shardsWithLocations}/${totalShards}`);
+  }
+  parts.push(`Survives ${resilience.health.canSurviveFailures} failure(s)`);
+
+  return parts.join(' · ');
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -133,6 +152,10 @@ function resilienceTitle(resilience: ResilienceView): string {
       .epr-rel-card__badge--resilience-none {
         color: var(--epr-resilience-none, #9ca3af);
       }
+      .epr-rel-card__badge--peers {
+        font-size: 0.72rem;
+        color: var(--epr-card-desc-color, #6b7280);
+      }
     `,
   ],
   template: `
@@ -164,6 +187,16 @@ function resilienceTitle(resilience: ResilienceView): string {
           >
             {{ resilienceIconValue }}
           </span>
+          @if (distinctPeers > 0) {
+            <span
+              class="epr-rel-card__badge epr-rel-card__badge--peers"
+              data-testid="epr-rel-card-peers"
+              [title]="'Distinct peers holding shards: ' + distinctPeers"
+              [attr.aria-label]="distinctPeers + ' distinct peers'"
+            >
+              ⛁ {{ distinctPeers }}
+            </span>
+          }
         }
       </div>
     </a>
@@ -183,6 +216,10 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
   resilience: ResilienceView | null = null;
   resilienceIconValue = '○';
   resilienceTitleValue = '';
+  /** Distinct peers holding shards (ResilienceView.distribution.distinctPeers).
+   *  Surfaced as a subtle count beside the resilience glyph; the template hides
+   *  the badge entirely when this is 0 so household-scale cards stay honest. */
+  distinctPeers = 0;
 
   // ── DI ────────────────────────────────────────────────────────────────────
 
@@ -226,6 +263,7 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
     this.resilience = null;
     this.resilienceIconValue = '○';
     this.resilienceTitleValue = '';
+    this.distinctPeers = 0;
   }
 
   private resolveRelationship(): void {
@@ -255,6 +293,7 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
           this.resilience = resilience;
           this.resilienceIconValue = resilienceIcon(resilience.stewardship.stewardCount);
           this.resilienceTitleValue = resilienceTitle(resilience);
+          this.distinctPeers = resilience.distribution.distinctPeers ?? 0;
         }
 
         this.cdr.markForCheck();

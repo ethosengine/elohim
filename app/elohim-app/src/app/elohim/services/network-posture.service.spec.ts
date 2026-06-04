@@ -157,6 +157,26 @@ describe('NetworkPostureService', () => {
   // get() — uses storage base URL
   // =========================================================================
 
+  // =========================================================================
+  // generated-type contract — the doctrine swap (local interface → generated)
+  // =========================================================================
+
+  describe('NetworkPostureView wire shape', () => {
+    it('round-trips the generated camelCase view fields', async () => {
+      const promise = firstValueFrom(service.get());
+      httpMock.expectOne('http://localhost:8888/api/v1/network/posture').flush(MOCK_POSTURE);
+      const posture = await promise;
+      // The fixture is typed as the imported NetworkPostureView; flushing it
+      // through and reading every field proves the generated type compiles and
+      // the service consumes camelCase straight off the wire (no transform).
+      expect(posture?.stalePeers).toBe(4);
+      expect(posture?.alwaysOnPeers).toBe(12);
+      expect(posture?.householdsReciprocating).toBe(9);
+      expect(posture?.storagePressure).toBeCloseTo(0.35);
+      expect(posture?.computedAt).toBe('2026-04-19T10:00:00.000Z');
+    });
+  });
+
   describe('get() — base URL delegation', () => {
     it('should use the base URL from StorageClientService', async () => {
       storageClientMock.getStorageBaseUrl = () => 'https://doorway.elohim.host';

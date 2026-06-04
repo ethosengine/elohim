@@ -5,14 +5,13 @@
     <div class="loading-indicator">Loading network posture...</div>
   </div>
 
-  <!-- Unavailable state: endpoint not yet deployed (F2 pending) -->
+  <!-- Empty/offline state: posture endpoint is live, but no peers are visible
+       yet (fresh household) or the node is currently offline/unreachable. -->
   <div *ngIf="!loading() && posture() === null" class="posture-unavailable">
     <div class="unavailable-icon">📡</div>
-    <p class="unavailable-message">Network posture unavailable (endpoint coming in F2)</p>
+    <p class="unavailable-message">No peers visible yet</p>
     <p class="unavailable-hint">
-      The
-      <code>/api/v1/network/posture</code>
-      endpoint will be live once the F2 sprint task ships.
+      Network posture will populate as peers come online and start reciprocating.
     </p>
   </div>
 

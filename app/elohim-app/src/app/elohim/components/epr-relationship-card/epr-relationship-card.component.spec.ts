@@ -120,6 +120,111 @@ describe('EprRelationshipCardComponent', () => {
     expect(el!.getAttribute('title')).toContain('3');
   });
 
+  // ── Peers count badge ─────────────────────────────────────────────────────
+
+  it('renders the distinct-peers badge when distinctPeers > 0', () => {
+    const el = query(fixture, 'epr-rel-card-peers');
+    expect(el).toBeTruthy();
+    // distinctPeers is 3 in the fixture
+    expect(el!.textContent).toContain('3');
+  });
+
+  it('hides the distinct-peers badge when distinctPeers is 0', () => {
+    mockResilience.getContentResilience.mockReturnValue(
+      of({
+        ...resilienceView,
+        distribution: { ...resilienceView.distribution, distinctPeers: 0 },
+      })
+    );
+
+    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
+    component.ngOnChanges({ relationship: {} as any });
+    fixture.detectChanges();
+
+    expect(query(fixture, 'epr-rel-card-peers')).toBeNull();
+  });
+
+  it('hides the distinct-peers badge when resilience is unavailable', () => {
+    mockResilience.getContentResilience.mockReturnValue(of(null));
+
+    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
+    component.ngOnChanges({ relationship: {} as any });
+    fixture.detectChanges();
+
+    expect(query(fixture, 'epr-rel-card-peers')).toBeNull();
+  });
+
+  // ── Resilience tooltip enrichment ─────────────────────────────────────────
+
+  it('enriches the resilience tooltip with distinct peers, k-of-n shards and survivable failures', () => {
+    const el = query(fixture, 'epr-rel-card-resilience');
+    expect(el).toBeTruthy();
+    const title = el!.getAttribute('title') ?? '';
+    // distinctPeers = 3, shardsWithLocations/totalShards = 6/6, canSurviveFailures = 2
+    expect(title).toContain('Distinct peers: 3');
+    expect(title).toContain('Shards placed: 6/6');
+    expect(title).toContain('Survives 2 failure(s)');
+  });
+
+  it('omits the distinct-peers tooltip fragment when distinctPeers is 0', () => {
+    mockResilience.getContentResilience.mockReturnValue(
+      of({
+        ...resilienceView,
+        distribution: { ...resilienceView.distribution, distinctPeers: 0 },
+      })
+    );
+
+    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
+    component.ngOnChanges({ relationship: {} as any });
+    fixture.detectChanges();
+
+    const el = query(fixture, 'epr-rel-card-resilience');
+    const title = el!.getAttribute('title') ?? '';
+    expect(title).not.toContain('Distinct peers');
+    // Survivable-failures fragment is always present.
+    expect(title).toContain('Survives 2 failure(s)');
+  });
+
+  // ── Glyph regression guard ────────────────────────────────────────────────
+
+  it('keeps ● glyph semantics for stewardCount >= 3', () => {
+    const el = query(fixture, 'epr-rel-card-resilience');
+    // Fixture stewardCount is 3 → solid glyph.
+    expect(el!.textContent).toContain('●');
+  });
+
+  it('renders ◐ glyph for 1 <= stewardCount < 3', () => {
+    mockResilience.getContentResilience.mockReturnValue(
+      of({
+        ...resilienceView,
+        stewardship: { stewardCount: 1, allocations: [] },
+      })
+    );
+
+    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
+    component.ngOnChanges({ relationship: {} as any });
+    fixture.detectChanges();
+
+    const el = query(fixture, 'epr-rel-card-resilience');
+    expect(el!.textContent).toContain('◐');
+  });
+
+  it('renders ○ glyph for stewardCount === 0', () => {
+    mockResilience.getContentResilience.mockReturnValue(
+      of({
+        ...resilienceView,
+        stewardship: { stewardCount: 0, allocations: [] },
+      })
+    );
+
+    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
+    component.ngOnChanges({ relationship: {} as any });
+    fixture.detectChanges();
+
+    const el = query(fixture, 'epr-rel-card-resilience');
+    expect(el!.textContent).toContain('○');
+  });
+
   // ── Routing ───────────────────────────────────────────────────────────────
 
   it('links to the resolved route', () => {

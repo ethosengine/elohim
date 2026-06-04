@@ -200,9 +200,9 @@ describe('NetworkHealthTabComponent', () => {
       expect(span?.textContent).toContain('45%');
     });
 
-    it('should NOT show the unavailable message', () => {
+    it('should NOT show the empty/offline message', () => {
       const el: HTMLElement = fixture.nativeElement;
-      expect(el.textContent).not.toContain('Network posture unavailable');
+      expect(el.textContent).not.toContain('No peers visible yet');
     });
   });
 
@@ -219,14 +219,15 @@ describe('NetworkHealthTabComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should show the unavailable message', () => {
+    it('should show an honest empty/offline message', () => {
       const el: HTMLElement = fixture.nativeElement;
-      expect(el.textContent).toContain('Network posture unavailable');
+      expect(el.textContent).toContain('No peers visible yet');
     });
 
-    it('should mention the F2 endpoint', () => {
+    it('should NOT carry stale "coming in F2" / "coming soon" copy', () => {
       const el: HTMLElement = fixture.nativeElement;
-      expect(el.textContent).toContain('F2');
+      expect(el.textContent).not.toContain('F2');
+      expect(el.textContent?.toLowerCase()).not.toContain('coming soon');
     });
 
     it('should NOT show peer metric testids', () => {
