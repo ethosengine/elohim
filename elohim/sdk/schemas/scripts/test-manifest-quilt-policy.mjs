@@ -159,6 +159,43 @@ async function main() {
     assert(validate(m), 'quiltPolicies is fully optional — existing manifests stay valid');
   }
 
+  // --- NEGATIVE: schema shape ---
+  {
+    const m = manifestWithQuiltPolicies();
+    m.vocabulary.quiltPolicies['streaming-media-library'].shelveAfter = '5 minutes';
+    assert(!validate(m), 'Rejects non-compact duration ("5 minutes")');
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    m.vocabulary.quiltPolicies['streaming-media-library'].defaultTierFloor = 'warm';
+    assert(!validate(m), 'Rejects unknown tier name ("warm" is not a temperature class)');
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    m.vocabulary.quiltPolicies = {};
+    assert(!validate(m), 'Rejects empty quiltPolicies {} (not a meaningful declaration)');
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    m.vocabulary.quiltPolicies['streaming-media-library'].draw = 'progressive';
+    assert(!validate(m), 'Rejects unknown draw mode ("progressive")');
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    delete m.vocabulary.quiltPolicies['long-term-personal'].defaultTierFloor;
+    assert(!validate(m), 'Rejects policy without defaultTierFloor (the one required field)');
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    m.vocabulary.quiltPolicies['long-term-personal'].costClassHint = 'long-term-personal';
+    assert(!validate(m), 'Rejects retired costClassHint field (the policy name IS the cost class)');
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    m.vocabulary.quiltPolicies['Bad_Name'] = { defaultTierFloor: 'stocked' };
+    assert(!validate(m), 'Rejects non-kebab-case policy name (names become <pillar>/<name> cost classes)');
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }
