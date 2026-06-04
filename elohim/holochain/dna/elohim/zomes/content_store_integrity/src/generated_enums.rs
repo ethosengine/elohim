@@ -329,6 +329,22 @@ pub const ALL_REACH_LEVELS: &[&str] = &[
     "commons",
 ];
 
+/// Core sessionlifecyclestate — All four lifecycle states are protocol-core; no app-tier extensions. The session-bridge primitive is the substrate-level owner of these values.
+pub const CORE_SESSION_LIFECYCLE_STATES: &[&str] = &[
+    "Anonymous",
+    "OauthIdentified",
+    "PeerNativeSampling",
+    "PeerNativeMember",
+];
+
+/// All sessionlifecyclestate — includes storage-only and extensible.
+pub const ALL_SESSION_LIFECYCLE_STATES: &[&str] = &[
+    "Anonymous",
+    "OauthIdentified",
+    "PeerNativeSampling",
+    "PeerNativeMember",
+];
+
 /// Core steptype — DNA-notarized step types. Structural path elements.
 pub const CORE_STEP_TYPES: &[&str] = &["content", "path", "external", "checkpoint", "reflection"];
 
