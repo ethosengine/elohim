@@ -772,7 +772,7 @@ def seedStewardshipStage() {
                     echo "SEED STEWARDSHIP ALLOCATIONS (affinity-based content→steward)"
                     echo "═══════════════════════════════════════════════════════════"
                     echo "Doorway: ${doorwayHost}"
-                    echo "Admin key: $( [ -n "\${DOORWAY_API_KEY:-}" ] && echo provided || echo 'not set' )"
+                    echo "Admin key: \$( [ -n "\${DOORWAY_API_KEY:-}" ] && echo provided || echo 'not set' )"
                     echo ""
                     DOORWAY_URL="${doorwayHost}" npx tsx src/seed-stewardship.ts
                 """
@@ -828,7 +828,7 @@ def seedProjectionsStage() {
                     echo "SEED PROJECTIONS (EPR project-epr commitments)"
                     echo "═══════════════════════════════════════════════════════════"
                     echo "Doorway: ${doorwayHost}"
-                    echo "Admin key: $( [ -n "\${DOORWAY_API_KEY:-}" ] && echo provided || echo 'not set' )"
+                    echo "Admin key: \$( [ -n "\${DOORWAY_API_KEY:-}" ] && echo provided || echo 'not set' )"
                     echo ""
                     DOORWAY_URL="${doorwayHost}" npx tsx src/seed-projections.ts
                 """
@@ -1554,7 +1554,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         echo "SEED HUMANS"
                                         echo "═══════════════════════════════════════════════════════════"
                                         echo "Doorway: ${doorwayHost}"
-                                        echo "Admin key: $( [ -n "\${API_KEY_ADMIN:-}" ] && echo provided || echo 'not set' )"
+                                        echo "Admin key: \$( [ -n "\${API_KEY_ADMIN:-}" ] && echo provided || echo 'not set' )"
                                         echo ""
                                         DOORWAY_URL="${doorwayHost}" npx tsx src/seed-humans.ts
                                     """
@@ -1592,7 +1592,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         echo "SEED PRESENCES"
                                         echo "═══════════════════════════════════════════════════════════"
                                         echo "Doorway: ${doorwayHost}"
-                                        echo "Admin key: $( [ -n "\${API_KEY_ADMIN:-}" ] && echo provided || echo 'not set' )"
+                                        echo "Admin key: \$( [ -n "\${API_KEY_ADMIN:-}" ] && echo provided || echo 'not set' )"
                                         echo ""
                                         DOORWAY_URL="${doorwayHost}" npx tsx src/seed-presences.ts
                                     """
