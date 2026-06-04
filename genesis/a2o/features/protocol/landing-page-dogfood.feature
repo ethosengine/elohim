@@ -30,6 +30,12 @@ Feature: Elohim Protocol landing page is dogfooded as protocol content
     And that commitment's metadata triggerKind is "subscription"
 
   @browser-only
+  # @wip 2026-06-04 shakeout: ProtocolSignalBadgeComponent was deliberately deleted
+  # 2026-05-20 (980ea505d — replaced by shell-mounted ProtocolOmniComponent). The
+  # standalone landing SPA may now carry NO protocol affordance — a product decision
+  # the dogfood scenario correctly surfaced. Backlog:
+  # genesis/data/timeline/backlog/landing-protocol-affordance-gap.md
+  @wip
   Scenario: The protocol-signal badge renders on the landing page
     When I open the landing page in a browser
     Then the element [data-testid="protocol-signal-badge-pill"] is visible

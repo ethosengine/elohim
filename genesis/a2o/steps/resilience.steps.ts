@@ -98,6 +98,14 @@ function loadResponse(world: E2EWorld): Record<string, unknown> {
  */
 Given('elohim-storage is reachable at {string}', async function (this: E2EWorld, urlOrEnv: string) {
   const url = process.env[urlOrEnv] ?? urlOrEnv;
+  // An unset env var falls through to the literal var NAME, which undici then
+  // rejects as "TypeError: Invalid URL" — fail with the real reason instead.
+  if (!/^https?:\/\//.test(url)) {
+    assert.fail(
+      `env var ${urlOrEnv} is not set (and "${url}" is not a URL) — ` +
+        `set ${urlOrEnv} (CI does; for local runs point it at the storage endpoint)`
+    );
+  }
   // elohim-storage exposes /health (see elohim/elohim-storage/src/http.rs:555).
   // The route is not under /api/v1/* — that prefix is reserved for storage
   // domain endpoints like /api/v1/cluster, /api/v1/peers, etc.

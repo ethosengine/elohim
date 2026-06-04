@@ -84,7 +84,7 @@ import type { ElohimBackendType } from '../../services/elohim-backend';
         <button
           class="btn-test"
           [disabled]="testing()"
-          data-testid="test-backend"
+          data-testid="elohim-test-connection-btn"
           (click)="testBackend()"
         >
           {{ testing() ? 'Testing...' : 'Test Connection' }}

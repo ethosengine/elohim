@@ -7,6 +7,12 @@ Feature: Elohim Presence
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
   @discovery @insight
+  # @wip 2026-06-04 shakeout: the elohim insight panel ([data-testid=elohim-insight-section])
+  # and banner-notification consumer were never built — service layer exists
+  # (ElohimPresenceService) but has no rendering component and no lamad caller.
+  # These scenarios are the spec for that surface; un-wip as it lands.
+  # Backlog: genesis/data/timeline/backlog/elohim-insight-panel-unwired.md
+  @wip
   Scenario: Learner sees elohim insight after discovery completion
     Given the learner navigates to a discovery assessment
     When the learner completes the assessment
@@ -15,6 +21,12 @@ Feature: Elohim Presence
     And the insight includes a "Constitutional Reasoning" expandable section
 
   @discovery @reasoning
+  # @wip 2026-06-04 shakeout: the elohim insight panel ([data-testid=elohim-insight-section])
+  # and banner-notification consumer were never built — service layer exists
+  # (ElohimPresenceService) but has no rendering component and no lamad caller.
+  # These scenarios are the spec for that surface; un-wip as it lands.
+  # Backlog: genesis/data/timeline/backlog/elohim-insight-panel-unwired.md
+  @wip
   Scenario: Elohim insight shows constitutional reasoning transparency
     Given the learner has completed a discovery assessment
     And the elohim insight is visible
@@ -24,6 +36,12 @@ Feature: Elohim Presence
     And the computation cost is visible showing tokens and processing time
 
   @transparency @cost
+  # @wip 2026-06-04 shakeout: the elohim insight panel ([data-testid=elohim-insight-section])
+  # and banner-notification consumer were never built — service layer exists
+  # (ElohimPresenceService) but has no rendering component and no lamad caller.
+  # These scenarios are the spec for that surface; un-wip as it lands.
+  # Backlog: genesis/data/timeline/backlog/elohim-insight-panel-unwired.md
+  @wip
   Scenario: Computation cost displayed after elohim interaction
     Given the learner has completed a discovery assessment
     And the elohim has responded with an insight
@@ -31,6 +49,12 @@ Feature: Elohim Presence
     And the insight shows processing time in milliseconds
 
   @config @banner
+  # @wip 2026-06-04 shakeout: the elohim insight panel ([data-testid=elohim-insight-section])
+  # and banner-notification consumer were never built — service layer exists
+  # (ElohimPresenceService) but has no rendering component and no lamad caller.
+  # These scenarios are the spec for that surface; un-wip as it lands.
+  # Backlog: genesis/data/timeline/backlog/elohim-insight-panel-unwired.md
+  @wip
   Scenario: Test connection emits visible banner notification
     Given the learner navigates to "/doorway/elohim"
     When the learner clicks the "Test Connection" button

@@ -29,8 +29,18 @@ export interface PWPage {
   evaluate(fn: (...args: any[]) => unknown, ...args: unknown[]): Promise<unknown>;
   url(): string;
   title(): Promise<string>;
-  waitForLoadState(state?: string): Promise<void>;
+  waitForLoadState(state?: string, options?: Record<string, unknown>): Promise<void>;
   waitForTimeout(ms: number): Promise<void>;
+  /**
+   * Register a network interceptor. Used to abort/observe navigations toward
+   * server-less fixture origins (e.g. a steward portal host) so assertions can
+   * read the attempted URL without hanging on an unresolvable load.
+   */
+  route(
+    url: string | RegExp | ((url: URL) => boolean),
+    handler: (route: PWRoute) => unknown,
+    options?: Record<string, unknown>
+  ): Promise<void>;
   waitForURL(
     url: string | RegExp | ((url: URL) => boolean),
     options?: Record<string, unknown>
@@ -47,6 +57,14 @@ export interface PWPage {
     arg?: unknown,
     options?: Record<string, unknown>
   ): Promise<unknown>;
+}
+
+/** Minimal stub for a Playwright Route handed to a `page.route` interceptor. */
+export interface PWRoute {
+  request(): { url(): string; method(): string };
+  abort(errorCode?: string): Promise<void>;
+  continue(options?: Record<string, unknown>): Promise<void>;
+  fulfill(options?: Record<string, unknown>): Promise<void>;
 }
 
 export interface PWLocator {

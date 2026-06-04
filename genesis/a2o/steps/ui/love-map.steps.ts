@@ -36,7 +36,7 @@ When('{word} navigates to the path', async function (this: E2EWorld, _humanName:
   const pathId = this.contentIds.get('loveMapPathId');
   assert.ok(pathId, 'No love map path ID stored — was "the love map path exists" step run?');
 
-  await device.navigate(`/lamad/path:${pathId}`);
+  await device.navigate(`/lamad/path/${pathId}`);
   await device.page.waitForLoadState('networkidle');
 });
 
@@ -47,7 +47,7 @@ When('{word} views the path chapters', async function (this: E2EWorld, _humanNam
   const pathId = this.contentIds.get('loveMapPathId');
   assert.ok(pathId, 'No love map path ID stored');
 
-  await device.navigate(`/lamad/path:${pathId}`);
+  await device.navigate(`/lamad/path/${pathId}`);
   await device.page.waitForLoadState('networkidle');
 });
 

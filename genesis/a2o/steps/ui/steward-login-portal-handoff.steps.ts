@@ -52,11 +52,13 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import { DoorwayClient } from '../../src/framework/api/doorway-client.js';
 import { BrowserDevice } from '../../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { getFixture } from '../../src/framework/fixtures/humans.js';
 import { Human } from '../../src/framework/human.js';
 import { ThresholdLoginPage } from '../../src/framework/pages/index.js';
+import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -66,6 +68,18 @@ import { E2EWorld } from '../../src/framework/world.js';
 const LOGIN_STATUS_KEY = 'portalHandoffLoginStatus';
 const LOGIN_BODY_KEY = 'portalHandoffLoginBody';
 const REGISTERED_HOST_KEY = 'portalHostUrl'; // shared key with account-m5 redirect steps
+
+/**
+ * Captured URL of the client-driven navigation toward the portal host.
+ *
+ * The portal host (`https://matthew.steward.example/…`) is a fixture origin with
+ * no real server, so the attempted navigation can never resolve. In Playwright
+ * mode the submit step installs a `page.route` interceptor that ABORTS the
+ * portal-host navigation and records the attempted URL here, so the redirect
+ * assertions can observe the client's intent without hanging on an unresolvable
+ * load. See the submit step and the "browser is redirected" Then step.
+ */
+const REDIRECT_ATTEMPT_KEY = 'portalHandoffRedirectAttemptUrl';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -125,6 +139,77 @@ async function rawPost(
   return { statusCode, body: text };
 }
 
+/**
+ * Raw PUT that captures status + body without throwing on non-2xx — mirrors
+ * rawPost above. Used by the steward grant so a FIXTURE_ONLY/dev_mode rejection
+ * surfaces a clear diagnostic rather than an opaque undici throw.
+ */
+async function rawPut(
+  baseUrl: string,
+  path: string,
+  payload: unknown,
+  token?: string
+): Promise<{ statusCode: number; body: string }> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (token) headers['authorization'] = `Bearer ${token}`;
+  const { statusCode, body } = await request(`${baseUrl}${path}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  const text = await body.text();
+  return { statusCode, body: text };
+}
+
+/**
+ * Force-grant graduated-steward status to a fixture human via the dev/fixture
+ * admin surface (PUT /admin/users/{id}/steward).
+ *
+ * Admin auth: the steward-login fixtures are staged by Matthew, who is the a2o
+ * admin fixture (humans.ts: ADMIN_HUMAN_ID = 'human-matthew-manager',
+ * isAdmin: true). His login token is therefore an admin bearer — the same
+ * pattern user-management.steps.ts uses for adminListUsers / adminSetUserStatus.
+ *
+ * The grant endpoint keys on the Mongo `_id` (handle_grant_steward does
+ * ObjectId::parse_str), NOT the Holochain humanId — so we resolve the id from
+ * the admin users list by identifier, exactly as the suspend/view-details steps
+ * do. The grant is REQUIRED: a non-2xx throws, naming the most likely cause
+ * (the FIXTURE_ONLY dev-mode gate) so the failure is self-explanatory.
+ */
+async function grantStewardFixture(
+  doorway: string,
+  adminToken: string,
+  identifier: string
+): Promise<void> {
+  // Resolve the Mongo _id from the admin users list (keyed by identifier).
+  const adminClient = new DoorwayClient(doorway);
+  adminClient.setToken(adminToken);
+  const list = await adminClient.adminListUsers({ search: identifier, limit: 50 });
+  const entry = list.users.find(u => u.identifier === identifier);
+  if (!entry) {
+    throw new Error(
+      `Cannot grant stewardship: user "${identifier}" not found in the admin users list. ` +
+        'Is the fixture human seeded on this doorway?'
+    );
+  }
+
+  const { statusCode, body } = await rawPut(
+    doorway,
+    `/admin/users/${encodeURIComponent(entry.id)}/steward`,
+    {},
+    adminToken
+  );
+
+  if (statusCode < 200 || statusCode >= 300) {
+    throw new Error(
+      `Steward grant for "${identifier}" (id=${entry.id}) failed: PUT /admin/users/${entry.id}/steward ` +
+        `→ ${statusCode}: ${body}. ` +
+        'A 403 with code "FIXTURE_ONLY" means the doorway is NOT in dev mode — this ' +
+        'fixture-only grant surface is hard-gated off unless dev_mode is set.'
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Given — fixture setup
 // ---------------------------------------------------------------------------
@@ -133,12 +218,20 @@ async function rawPost(
  * Matthew is a graduated steward whose peer-native portal host is registered.
  *
  * Extends the fixture-humans Matthew toward the graduated-steward-with-portal
- * variant: log in via HTTP (BrowserDevice) for the bearer token, then register
- * the portal host through the same /api/v1/account/portal-hosts surface the
- * account-m5 portal-host-discovery scenarios use. The registered host URL is
- * stashed for the redirect/match assertions. Registration is best-effort —
- * until the GAP-1 surface accepts it, the host URL is still recorded from the
- * scenario argument so the wire-shape assertions remain meaningful.
+ * variant: log in via HTTP (BrowserDevice) for the bearer token, register the
+ * portal host through the canonical /api/v1/account/portal-hosts surface, then
+ * GRANT graduated-steward status via the dev/fixture admin surface so the
+ * /auth/login response actually carries isSteward:true + portalHostUrl.
+ *
+ * Admin auth: Matthew IS the a2o admin fixture (humans.ts ADMIN_HUMAN_ID,
+ * isAdmin:true), and he is also the grant target here — so his own login token
+ * is the admin bearer for the grant. The grant is REQUIRED (not best-effort): a
+ * failure throws, naming the FIXTURE_ONLY/dev_mode gate as the likely cause.
+ *
+ * Playwright mode: a BrowserDevice (HTTP, for the bearer token + grant) is
+ * always attached; when deviceMode === 'playwright' a PlaywrightDevice is ALSO
+ * attached so firstPlaywrightDevice() resolves and the submit/redirect steps can
+ * drive and observe the real client-driven navigation.
  *
  * Example:
  *   Given human "Matthew" is a graduated steward with portal host
@@ -166,14 +259,41 @@ Given(
     this.addHuman(humanName, human);
 
     // Register the portal host via the canonical account surface (best-effort:
-    // the graduated-steward grant + this surface land with GAP-1; a non-2xx
-    // here does not fail setup — the host URL is already recorded above).
+    // a non-2xx here does not fail setup — the host URL is already recorded
+    // above, and the grant below is what makes the response carry portalHostUrl).
     await rawPost(
       doorway,
       '/api/v1/account/portal-hosts',
       { hostUrl: portalHostUrl, label: `${humanName}'s steward portal` },
       device.token
     );
+
+    // Grant graduated-steward status (REQUIRED). Matthew's own token is the
+    // admin bearer; the grant keys on the Mongo _id resolved from the users
+    // list by identifier (see grantStewardFixture). Throws on failure.
+    const adminToken = device.token;
+    if (!adminToken) {
+      throw new Error(`${humanName} has no bearer token after login — cannot grant stewardship.`);
+    }
+    await grantStewardFixture(doorway, adminToken, fixture.credentials.identifier);
+
+    // In Playwright mode, ALSO attach a real browser device so
+    // firstPlaywrightDevice() finds one and the submit/redirect steps can drive
+    // the client-driven navigation. Mirrors fixture-humans.steps.ts.
+    if (this.deviceMode === 'playwright') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const browser = await this.getBrowser();
+      const appUrl = doorwayToAppUrl(doorway);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const pwDevice = new PlaywrightDevice(`${humanName}-pw`, appUrl, doorway, browser);
+      await pwDevice.init();
+      human.addDevice(pwDevice);
+      await pwDevice.login({
+        identifier: fixture.credentials.identifier,
+        password: fixture.credentials.password,
+      });
+      this.onCleanup(async () => pwDevice.close());
+    }
   }
 );
 
@@ -256,11 +376,29 @@ When(
     const device = firstPlaywrightDevice(this);
     if (!device) return; // HTTP mode — browser-navigation assertions skip.
 
+    // The portal host is a fixture origin with no real server, so the
+    // client-driven navigation toward it can never resolve. Intercept it: abort
+    // the request and CAPTURE its URL so the redirect assertions can observe the
+    // client's intent without hanging on an unresolvable load. Registered BEFORE
+    // the login navigation so the very first portal-host request is caught.
+    const portalHost = this.contentIds.get(REGISTERED_HOST_KEY);
+    if (portalHost) {
+      const portalOrigin = new URL(portalHost).origin;
+      await device.page.route(`${portalOrigin}/**`, async route => {
+        // Record the full attempted URL (path + query) for the Then steps.
+        this.contentIds.set(REDIRECT_ATTEMPT_KEY, route.request().url());
+        await route.abort();
+      });
+    }
+
     await device.navigate('/threshold/login');
     const loginPage = new ThresholdLoginPage(device.page);
     await loginPage.login(fixture.credentials.identifier, fixture.credentials.password);
-    // Allow the post-auth navigation (client-driven) to settle.
-    await device.page.waitForLoadState('networkidle');
+    // The client-driven navigation toward the portal host is intercepted+aborted
+    // above; allow the doorway-side state to settle. networkidle may not fire if
+    // the abort leaves the page mid-navigation, so cap the wait and swallow a
+    // timeout — the captured-URL assertions are the source of truth, not load.
+    await device.page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
   }
 );
 
@@ -349,11 +487,39 @@ Then(
 // ---------------------------------------------------------------------------
 
 /**
+ * Wait for the intercepted portal-host navigation URL to be captured.
+ *
+ * The submit step installs a `page.route` interceptor that aborts the
+ * client-driven navigation toward the (server-less) portal host and records the
+ * attempted URL in REDIRECT_ATTEMPT_KEY. Because the request is aborted, the
+ * page URL never changes — so the redirect assertions read this captured URL,
+ * not `page.url()`. Polls briefly to absorb the gap between form submit and the
+ * SPA issuing the navigation.
+ */
+async function waitForRedirectAttemptUrl(world: E2EWorld): Promise<string> {
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    const captured = world.contentIds.get(REDIRECT_ATTEMPT_KEY);
+    if (captured) return captured;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        'No client-driven navigation toward the portal host was observed within 15s. ' +
+          'Expected the SPA to read portalHostUrl from /auth/login and navigate; the ' +
+          'page.route interceptor never fired (REDIRECT_ATTEMPT_KEY unset).'
+      );
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
+/**
  * The browser is redirected to the portal host.
  *
  * CLIENT-driven: the SPA reads portalHostUrl from the JSON and navigates —
- * asserted against the resulting navigation URL, NOT an HTTP 302. HTTP mode
- * has no browser to observe, so this returns 'pending'.
+ * asserted against the INTERCEPTED navigation URL (captured + aborted by the
+ * submit step), NOT an HTTP 302 and NOT `page.url()` (the abort means the page
+ * never actually loads the server-less portal host). HTTP mode has no browser to
+ * observe, so this returns 'pending'.
  *
  * Example:
  *   Then the browser is redirected to "https://matthew.steward.example/account"
@@ -364,32 +530,35 @@ Then(
     const device = firstPlaywrightDevice(this);
     if (!device) return 'pending';
 
-    await device.page.waitForURL((url: URL) => url.href.startsWith(portalHostUrl), {
-      timeout: 15_000,
-    });
-    const current = device.page.url();
+    const attempted = await waitForRedirectAttemptUrl(this);
     assert.ok(
-      current.startsWith(portalHostUrl),
-      `Expected client-driven redirect to "${portalHostUrl}" but at: ${current}`
+      attempted.startsWith(portalHostUrl),
+      `Expected client-driven redirect to "${portalHostUrl}" but the SPA navigated to: ${attempted}`
     );
+    return undefined;
   }
 );
 
 /**
  * The redirect URL carries a session_token query parameter.
  *
+ * Reads the intercepted navigation URL (see waitForRedirectAttemptUrl), not
+ * `page.url()` — the portal-host navigation is aborted, so the token only ever
+ * appears on the attempted request URL.
+ *
  * Example:
  *   And the redirect URL carries a session_token query parameter
  */
-Then('the redirect URL carries a session_token query parameter', function (this: E2EWorld) {
+Then('the redirect URL carries a session_token query parameter', async function (this: E2EWorld) {
   const device = firstPlaywrightDevice(this);
   if (!device) return 'pending';
 
-  const url = new URL(device.page.url());
+  const url = new URL(await waitForRedirectAttemptUrl(this));
   assert.ok(
     url.searchParams.has('session_token'),
-    `Expected a session_token query param but URL is: ${url.href}`
+    `Expected a session_token query param but redirect URL is: ${url.href}`
   );
+  return undefined;
 });
 
 /**
@@ -407,11 +576,11 @@ Then('the redirect URL carries a session_token query parameter', function (this:
  */
 Then(
   'the redirect URL preserves the OAuth client_id, redirect_uri, response_type, and state when present',
-  function (this: E2EWorld) {
+  async function (this: E2EWorld) {
     const device = firstPlaywrightDevice(this);
     if (!device) return 'pending';
 
-    const redirectUrl = new URL(device.page.url());
+    const redirectUrl = new URL(await waitForRedirectAttemptUrl(this));
     const inboundRaw = this.contentIds.get('oauthInboundParams');
     // No inbound OAuth params recorded for this run ⇒ "when present" is vacuous.
     if (!inboundRaw) return undefined;

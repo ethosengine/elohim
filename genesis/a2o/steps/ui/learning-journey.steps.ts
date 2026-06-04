@@ -62,14 +62,14 @@ Given(
   async function (this: E2EWorld, stepIndex: number, _stepTitle: string) {
     const device = requirePlaywright(this);
     if (!device) return 'pending';
-    await device.navigate(`/lamad/path:default-elohim-protocol/step:${stepIndex}`);
+    await device.navigate(`/lamad/path/default-elohim-protocol/step/${stepIndex}`);
   }
 );
 
 When('I try to access step {int}', async function (this: E2EWorld, stepIndex: number) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
-  await device.navigate(`/lamad/path:default-elohim-protocol/step:${stepIndex}`);
+  await device.navigate(`/lamad/path/default-elohim-protocol/step/${stepIndex}`);
 });
 
 When('I read the content', async function (this: E2EWorld) {
@@ -90,8 +90,8 @@ Then(
     if (!device) return 'pending';
     const url = device.page.url();
     assert.ok(
-      url.includes(`/step:${stepIndex}`),
-      `Expected URL to include /step:${stepIndex}, got: ${url}`
+      url.includes(`/step/${stepIndex}`),
+      `Expected URL to include /step/${stepIndex}, got: ${url}`
     );
     const heading = device.page.locator('h1').getByText(stepTitle, { exact: false });
     await heading.waitFor({ state: 'visible', timeout: 10_000 });
