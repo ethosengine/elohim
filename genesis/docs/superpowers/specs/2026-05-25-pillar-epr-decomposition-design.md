@@ -2,6 +2,7 @@
 
 **Status:** Design (pending implementation plan)
 **Date:** 2026-05-25
+**Amended:** 2026-06-04 — §12 URL & Routing Contract added (SPA deep-link fallback, universal `/epr/{id}` addressing, mount-agnostic link minting). Motivated by the live alpha failure where `/lamad/path/foundations-christian-technology` returned a storage app-file 404 and shared code minted doubled `/lamad/lamad/…` URLs.
 **Predecessor:** `genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md` established the three-tier Custodian → Steward → Operator chain via REA Commitments + Attestations. This spec adds the next ring of the same wheel — projection contracts between EPR stewards and doorway operators.
 **P2P-design-gate:** Run inline. No new DHT entry types. Reuses existing `Commitment` (REA, content_store_integrity) with a new `action="project-epr"` discriminator.
 **Operator of record (MVP):** Matthew (alpha.elohim.host + elohim.host doorway pair).
@@ -507,6 +508,24 @@ Accessibility: Shift+F10, Context menu key, full keyboard navigation, ARIA roles
 
 Foundation in MVP: progressive loading (all 4 layers), default-click navigation, context-menu primitive scaffolded with three items only (**Open**, **About this EPR**, **Copy EPR link**). The "View as..." lens drill-down and "Where this leads..." hint chain land in a fast-follow shift, paired with the first per-pillar element-registry or the first gated projection (whichever ships first).
 
+### 7.5 EPR-derived menu composition (amendment 2026-06-04)
+
+The context menu is not a static action list — **its items derive from the EPR actually being looked at**. The menu is the same lens the doorway is: a projection of the EPR-head edges the viewer can reach. Composition sources, each riding machinery this spec already defines:
+
+| Menu region | Derived from | Machinery |
+|---|---|---|
+| Type verbs (*Start path*, *Resume*, *Open*, *Launch app*, *Talk to…*) | EPR head `contentType` | `resolveEprHead()` (DAG-CBOR head fetch, exists) |
+| *Open in {pillar}* targets | which mounted bundles claim this type | §12.3 `routeClaims` — the same table the `/epr/{id}` resolver reads |
+| *Where this leads…* | reach gates + `gateHints` | §6 outward face |
+| Relationship navigation | head's typed edges (PREREQUISITE, CONTAINS, …) | `#rel/` fragments + relationship cards |
+| Governance verbs (*Flag*, *Challenge*, *Feedback*, *Steward*) | viewer standing for THIS EPR's scope | host-injected via `contextMenuItems` (in-flight: `epr-menu-select` event wiring) |
+
+**Progressive, like §7.1:** the menu populates in the same L1→L4 layers — L1 shows *Copy EPR link* immediately; type verbs appear when the head resolves (L2/L3); standing-gated governance verbs appear last. No layer blocks the menu opening.
+
+**Boundary discipline:** the Lit `<elohim-context-menu>` / `<elohim-epr-link>` primitives stay blank-slate — they render `ContextMenuItem[]` and emit selection intent. *Derivation* (head → items) is host-side (Angular epr-link component consuming the resolver + claims context); *authority* (can this viewer flag/steward?) is substrate-side. No menu item encodes a URL literal — items carry EPR refs; the host mints routes via §12.3.
+
+MVP-deferral unchanged (§7.4 three static items); the derived composition lands with the routeClaims machinery (§12.6 Slice 3), since claims are what give the menu its *Open in…* targets for free.
+
 ---
 
 ## 8. MVP scope
@@ -728,6 +747,90 @@ These are decisions the writing-plans skill will handle when sizing the shifts, 
 3. **Angular wrapper strategy** — for transitional period, the remaining elohim-app monolith needs Angular components wrapping the Lit elements. Should we extract ALL `<elohim-*>` Angular wrappers in one pass, or only the ones the post-lamad-split monolith actually uses?
 
 4. **Lamad pillar service dependencies** — lamad has 37 services, some of which may depend on cross-pillar services in the elohim pillar (60 services). The bundle split needs to either (a) duplicate those services in lamad, (b) extract them to elohim-core, or (c) consume them via the elohim-app's HTTP API. Audit needed during planning.
+
+---
+
+## 12. URL & Routing Contract (amendment 2026-06-04)
+
+### 12.0 Why this section exists
+
+Live failure observed 2026-06-04 on alpha: `GET /lamad/path/foundations-christian-technology` returned `404 {"error": "File not found in app: path/foundations-christian-technology"}` — the content itself was seeded, public, and served fine at `/db/content/foundations-christian-technology`. Three stacked failures:
+
+1. **No SPA deep-link fallback.** `derive_app_subpath()` (`doorway/doorway-service/src/server/http.rs`) returns `entry_file` only for the bare mount prefix; every deep route passes through as a literal ZIP filename and storage 404s. Affects every projected bundle including the root app.
+2. **App-absolute route minting in shared code.** `eprToRoute()` (`@elohim/service`, `epr-ref.ts`), `epr-resolver.service.ts`, and lamad's `content-viewer.component.ts` hardcode `['/lamad/path', …]`. Inside the `/lamad/`-based bundle, Angular writes `/lamad/lamad/path/…` to the address bar and falls to the `**` catch-all.
+3. **Cross-bundle navigation undefined in code.** The same literal is also dead in the root app (the `/lamad` subtree moved out in the bundle split). The root tension: `urlPath` is *projection-scoped operator config* (§2), yet the shared TS library bakes `/lamad` in as a string.
+
+This section settles the URL model so all three resolve from one design.
+
+### 12.1 The URL contract — the EPR pins, the doorway lenses
+
+A session pins to the doorway it entered through; links never force a host change. The EPR is the durable address; the doorway is the viewport onto the EPR-head edges of the graph the visitor can reach (CID/DAG-CBOR inspiration: the head is a DAG node; addressing is identity). Each doorway exposes three URL surfaces:
+
+| Surface | Shape | Source of truth |
+|---|---|---|
+| **Mount URLs** (curated) | `{doorway}{urlPath}/{bundle-route}` e.g. `/lamad/path/{id}` | `project-epr` commitments (§2) |
+| **Universal EPR URLs** | `{doorway}/epr/{id}` for *any reachable EPR* | this section |
+| **Service paths** | `/db`, `/api`, `/blob`, `/apps`, `/auth`, … | unchanged |
+
+**`/epr/{id}` resolver semantics** (one rendering surface per EPR per doorway):
+- A mounted bundle claims the EPR's `contentType` (§12.3 routeClaims) → **302 to the pretty mount URL**, fragment-preserving (`#step/2` → the claimed fragment template).
+- Reachable but unclaimed → render via the shell bundle's resource viewer.
+- Unreachable → the designed gate experience (§6 outward face: `previewEprRef` + `gateHints` + `deadEnd`) — never a wall, never raw JSON.
+
+`/epr` joins the **reserved-prefix list**: `validate_url_path` (§2.4 Rule 3) MUST reject projections whose `urlPath` collides with `/epr|/db|/api|/blob|/apps|/auth|/status|/health`.
+
+This generalizes the §8.1 deliverable "EPR resolution endpoint `/api/v1/epr/{id}`" from an API route into the page-level universal address. The API form remains for programmatic resolution; `/epr/{id}` is its human-facing twin.
+
+### 12.2 SPA deep-link fallback — both layers, one rule
+
+**Shared discrimination rule** (single definition; identical test vectors in both crates): a sub-path is a **ROUTE** iff its final segment contains no `.`; otherwise it is an **ASSET**. Routes are fallback-eligible. Asset misses stay honest 404s — a missing hashed bundle file is a real deploy bug and MUST surface, never be masked by index.html.
+
+- **Doorway (contract-authoritative).** The projection gains `spa_fallback: bool` (serde default `true` for bundle EPRs) — a field on the *existing* `project-epr` commitment, like `entryFile`/`baseHref`; no new DHT entry types. `derive_app_subpath()` becomes: strip mount → empty → `entry_file`; ROUTE ∧ `spa_fallback` → `entry_file`; else pass through verbatim.
+- **Storage (safety net).** `handle_app_request` on extraction miss: ROUTE → serve the bundle's own `index.html` with `X-SPA-Fallback: 1`; ASSET → today's 404 JSON. Convention-level (Class C operational). This is what makes **tauri-direct** deep links work with no doorway in the loop.
+- **SSR seam (noted, out of scope).** The doorway fallback dispatch point is exactly where `doorway-ssr-runtime` (D8 seed) later substitutes server-rendered HTML for `entry_file`. The alpha ingress already carries `/lamad/path`-specific rules anticipating this; reconcile per the captures backlog.
+
+### 12.3 Mount-agnostic link minting
+
+**The rule: in-mount targets → relative routes; everything else → `/epr/{id}`.** No literal pillar prefix survives in shared code.
+
+- **`eprToRoute()` is rewritten around bundle route-claims.** Each bundle's composition root provides a `BundleRouteContext` declaring which EPR shapes it renders natively: lamad claims `contentType: 'path'` → `['/path', id]` (and `#step/n` → `['/path', id, 'step', n]`); the shell claims `resource`. Unclaimed → `['/epr', id]`. With `APP_BASE_HREF = '/lamad/'`, `['/path', id]` renders as `/lamad/path/{id}` — remount lamad at `/learn` and nothing breaks.
+- **The type-vs-slug heuristic dies.** Route shape comes from the EPR head's `contentType` (`"path"` for learning paths), never guessed from the id suffix. The §7.2 `resolveInContext()` in-path/cross-path arms consult the injected context instead of `'/lamad/path'` literals; lamad's `navigateToPath()` mints `['/path', pathId]`.
+- **Bundle manifests gain `routeClaims`** so the *doorway-side* `/epr/{id}` resolver can 302 to pretty mounts: `[{contentType: 'path', template: 'path/{id}', fragments: {step: 'path/{id}/step/{n}'}}]`. Claims are content (ride the bundle EPR, like §3 element manifests), surfaced through the projection the doorway already loads. Fragment mapping lives in exactly one place per side: claimed-in-bundle (bundle maps it) or `/epr` resolver (everyone else).
+- **elohim-elements stay blank-slate.** `<elohim-epr-link>` emits intent; the host resolves URLs. No URL knowledge in Lit primitives.
+- **Card-flip + pushState.** EPR-links flip cards in place (§7); on flip, pushState the target's canonical local URL — mount URL if this bundle claims it, else `/epr/{id}`. Refresh/share of any pushed URL cold-loads correctly via §12.2. Session and scroll survive flips; URLs stay durable addresses of the card being viewed.
+
+### 12.4 Data flows
+
+1. **Cold canonical URL** — `/lamad/path/{id}` → mount match → ROUTE → `entry_file` (`<base href="/lamad/">`) → Angular matches `path/:pathId` → renders.
+2. **Legacy doubled URL** — `/lamad/lamad/path/{id}` → fallback serves the bundle → router `**` → designed not-found page (no longer raw JSON). Doubled URLs stop being *minted* by §12.3; no redirect-heal hack (`redirects_from` on the commitment is the sanctioned migration tool).
+3. **Cross-pillar card-flip** — lamad step → qahal EPR chip: unclaimed in-bundle → in-place render + pushState `/epr/{qahal-id}`; later refresh → doorway resolver → 302 to qahal mount or shell render. Session pinned throughout.
+4. **Cross-doorway share** — `/epr/{id}` is host-relative; a recipient on another doorway swaps the host and it resolves there if reachable. The fediverse property, no `via=` machinery required yet.
+
+### 12.5 Testing additions (extends §9)
+
+- **a2o, render-verified** (these double as the substrate-shakeout sprint's open "verify by render, not HTML shell" acceptance): *learner opens a shared path URL cold* · *deep link to a step* · `/epr/{id}` *resolves to the mount* · *legacy doubled URL shows the designed not-found* · *asset miss stays 404 JSON*.
+- **Unit:** `derive_app_subpath` ROUTE/ASSET/bare cases + storage fallback against **one shared test-vector table** (the two-layer drift guard); `eprToRoute` matrix (claims-context × contentType × fragment); reserved-prefix rejection in `validate_url_path`.
+- **Canary audit** before touching routes: grep route-count specs per the pillar-bundle-split runbook §4.4.
+
+### 12.6 Delivery slices
+
+| Slice | Contents | Unblocks |
+|---|---|---|
+| **1 — alpha green** | doorway `spa_fallback` + storage safety net + relative routes in the lamad bundle | shared path URLs work; doubled URLs stop being minted |
+| **2 — universal address** | `/epr/{id}` doorway resolver + shell `epr/:id` route + `eprToRoute`/claims rewrite in `@elohim/service` | cross-bundle links, durable shares |
+| **3 — claims & gates** | `routeClaims` in bundle manifests + fragment mapping + designed gate experience | type-driven 302s, graceful boundaries |
+
+### 12.7 Vision-tier horizon (designed-for, not built)
+
+The URL contract is shaped so these layer in without changing URL shapes — only the resolution *policy* inside `/epr/{id}` evolves:
+
+- **Toll access.** Content reachable but un-contracted through this doorway can be served via a micro-transaction to a peer whose contract allows reachable content to be served for compute fees — a `delegates-compute` Mishpat::Commitment. Browsers backed by their own steward devices mostly never see the toll: native mutual stewarding commitments cover it.
+- **Federated anycast doorway edge.** Multiple doorways extend projected reach; any doorway that knows the contract can facilitate projection or access to the same EPRs. Seeing DNS-host-B's content from doorway A does not require re-routing through B — fediverse-like.
+- **Compute-capability load balancing.** When projection isn't handling the connection, which peer resolves the page/view/data is load-balanced across capable peers based on reported compute capability.
+
+### 12.8 P2P-design-gate addendum
+
+`spa_fallback` is a field on the existing notarized `project-epr` Commitment (A — extends Appendix B item 1, no new entry types). `routeClaims` is content inside the bundle EPR's manifest (operational projection, C — same classification as `ElementRegistryView`). The storage safety-net fallback is pure operational convention (C). No new DHT entry types, no new identity schemes.
 
 ---
 
