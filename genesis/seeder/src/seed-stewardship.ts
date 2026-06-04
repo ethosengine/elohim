@@ -51,12 +51,15 @@ interface PresenceData {
   metadata?: Record<string, unknown>;
 }
 
+// Storage InputView is #[serde(rename_all = "camelCase")] (elohim-views/src/shefa.rs
+// StewardshipAllocationInputView) — snake_case never crosses the storage boundary, so
+// the wire payload MUST be camelCase or storage rejects with "missing field contentId".
 interface CreateAllocationInput {
-  content_id: string;
-  steward_presence_id: string;
-  allocation_ratio: number;
-  allocation_method: string;
-  contribution_type: string;
+  contentId: string;
+  stewardPresenceId: string;
+  allocationRatio: number;
+  allocationMethod: string;
+  contributionType: string;
   note?: string;
 }
 
@@ -332,8 +335,8 @@ class StewardshipClient extends DoorwayClient {
     const allocBody = (await response.json()) as unknown;
     const allocations = (
       Array.isArray(allocBody) ? allocBody : ((allocBody as { items?: unknown[] }).items ?? [])
-    ) as Array<{ content_id: string }>;
-    return new Set(allocations.map((a) => a.content_id));
+    ) as Array<{ contentId: string }>;
+    return new Set(allocations.map((a) => a.contentId));
   }
 
   async presenceExists(presenceId: string): Promise<boolean> {
@@ -344,17 +347,19 @@ class StewardshipClient extends DoorwayClient {
   }
 
   async createPresence(data: PresenceData): Promise<void> {
+    // /db/presences (CreateContributorPresenceInputView) is camelCase + PARSED
+    // objects — NOT snake_case `_json` strings. Mirror seed-presences.ts (the
+    // canonical presence seeder) or storage rejects with "missing field displayName".
     const body = {
       id: data.id,
-      display_name: data.displayName,
-      presence_state: data.presenceState,
-      external_identifiers_json: data.externalIdentifiers
-        ? JSON.stringify(data.externalIdentifiers)
-        : null,
-      establishing_content_ids_json: JSON.stringify(data.establishingContentIds),
-      claimed_agent_id: data.claimedAgentId,
-      note: data.note,
-      metadata_json: data.metadata ? JSON.stringify(data.metadata) : null,
+      schemaVersion: 1,
+      displayName: data.displayName,
+      presenceState: data.presenceState,
+      externalIdentifiers: data.externalIdentifiers ?? [],
+      establishingContentIds: data.establishingContentIds ?? [],
+      claimedAgentId: data.claimedAgentId ?? null,
+      note: data.note ?? null,
+      metadata: data.metadata ?? null,
     };
 
     const response = await this.fetch('/db/presences', {
@@ -638,11 +643,11 @@ async function main() {
 
     for (const steward of stewards) {
       allocations.push({
-        content_id: contentId,
-        steward_presence_id: steward.presenceId,
-        allocation_ratio: steward.ratio,
-        allocation_method: 'affinity',
-        contribution_type: 'steward',
+        contentId: contentId,
+        stewardPresenceId: steward.presenceId,
+        allocationRatio: steward.ratio,
+        allocationMethod: 'affinity',
+        contributionType: 'steward',
         note: category
           ? `Affinity-based stewardship for ${category} content`
           : 'Bootstrap steward assignment - uncategorized content',
@@ -705,8 +710,8 @@ async function main() {
   const stewardSummary = new Map<string, number>();
   for (const alloc of allocations) {
     stewardSummary.set(
-      alloc.steward_presence_id,
-      (stewardSummary.get(alloc.steward_presence_id) || 0) + 1
+      alloc.stewardPresenceId,
+      (stewardSummary.get(alloc.stewardPresenceId) || 0) + 1
     );
   }
   console.log();
