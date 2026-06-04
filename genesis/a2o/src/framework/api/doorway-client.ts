@@ -216,13 +216,13 @@ export interface AdminNodeView {
   trustScore?: number;
   stewardTier?: string;
   lastHeartbeat?: string;
-  inventory?: {
-    cpuCores: number;
-    memoryGb: number;
-    storageTb: number;
-    bandwidthMbps: number;
-    region: string;
-  };
+  // Hardware capacity is returned at the TOP LEVEL by GET /admin/nodes
+  // (doorway-service NodeDetails) — not nested under `inventory`.
+  cpuCores?: number;
+  memoryGb?: number;
+  storageTb?: number;
+  bandwidthMbps?: number;
+  region?: string;
 }
 
 export interface AdminNodesResponse {

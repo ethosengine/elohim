@@ -32,14 +32,31 @@ Then('the contentFormat is {string}', function (this: DogfoodWorld, expected: st
   assert.equal(this.fetchedNode?.contentFormat, expected);
 });
 
+// html5-app metadata ({slug, entryPoint, fallbackUrl}) is stored in `contentBody`
+// as a JSON string — the seeder's conceptToInput() stringifies the content object,
+// and ContentView exposes only `contentBody: Option<String>`. Some shapes also expose
+// a parsed `content`; prefer it, fall back to parsing contentBody (mirrors the app's
+// ProjectionApiService). This is the real wire contract — not a `content` object.
+function landingContent(node: Record<string, unknown> | undefined): Record<string, unknown> {
+  const parsed = node?.content;
+  if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+  const body = node?.contentBody;
+  if (typeof body === 'string' && body.length) {
+    try {
+      return JSON.parse(body) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
 Then('the content.slug is {string}', function (this: DogfoodWorld, expected: string) {
-  const content = this.fetchedNode?.content as Record<string, unknown> | undefined;
-  assert.equal(content?.slug, expected);
+  assert.equal(landingContent(this.fetchedNode).slug, expected);
 });
 
 Then('the content.entryPoint is {string}', function (this: DogfoodWorld, expected: string) {
-  const content = this.fetchedNode?.content as Record<string, unknown> | undefined;
-  assert.equal(content?.entryPoint, expected);
+  assert.equal(landingContent(this.fetchedNode).entryPoint, expected);
 });
 
 Then('the blobHash is a sha256 hex string', function (this: DogfoodWorld) {

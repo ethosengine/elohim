@@ -70,18 +70,18 @@ Then('at least one node should have status {string}', function (expectedStatus: 
 
 Then('at least one node should report cpu cores greater than {int}', function (minCores: number) {
   assert.ok(lastNodes, 'No admin nodes response available');
-  const match = lastNodes.nodes.find(n => n.inventory && n.inventory.cpuCores > minCores);
+  const match = lastNodes.nodes.find(n => n.cpuCores !== undefined && n.cpuCores > minCores);
   assert.ok(
     match,
-    `No node with cpu cores > ${minCores}. Values: ${lastNodes.nodes.map(n => n.inventory?.cpuCores ?? 'N/A').join(', ')}`
+    `No node with cpu cores > ${minCores}. Values: ${lastNodes.nodes.map(n => n.cpuCores ?? 'N/A').join(', ')}`
   );
 });
 
 Then('at least one node should report memory greater than {int}', function (minMemory: number) {
   assert.ok(lastNodes, 'No admin nodes response available');
-  const match = lastNodes.nodes.find(n => n.inventory && n.inventory.memoryGb > minMemory);
+  const match = lastNodes.nodes.find(n => n.memoryGb !== undefined && n.memoryGb > minMemory);
   assert.ok(
     match,
-    `No node with memory > ${minMemory}. Values: ${lastNodes.nodes.map(n => n.inventory?.memoryGb ?? 'N/A').join(', ')}`
+    `No node with memory > ${minMemory}. Values: ${lastNodes.nodes.map(n => n.memoryGb ?? 'N/A').join(', ')}`
   );
 });
