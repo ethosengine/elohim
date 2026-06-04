@@ -269,6 +269,28 @@ The Elohim Family Node hosts a complete suite of applications that replace cloud
 - **Geographic Mapping**: Local resources and community assets
 - **Elohim Agent Interface**: Direct interaction with family AI
 
+## How the Substrate Scales
+
+The Elohim Protocol is designed for a **federated topology** where Tier 3 family nodes are the substrate participants. This is qualitatively different from hyperscale architectures: instead of one global service handling billions of users on centralized infrastructure, the protocol assumes ~100 million family nodes each serving a household of 4–10 humans deeply. The closest analogy is email or Mastodon's federation — but each "instance" is a single household serving its members fully, rather than one operator serving thousands shallowly. Per-node load is bounded by household membership, not by network popularity. Cross-node traffic is mediated by social trust relationships: your family node fetches from your sister-in-law's family node, not from random global peers.
+
+This federation paradigm changes what "scale" means for the substrate:
+
+- **Public mass-readership is served by edge gateways** (a web2-style projection of substrate content), not by the substrate itself. Stage 1 visitors and Stage 2 hosted users never reach the originating family node directly — they hit a CDN-style projection layer that scales with traditional infrastructure, leaving the substrate to handle peer-to-peer traffic only.
+- **Stage 3 spokes (laptops, phones) sync to their household's hub**, never participating in the always-on substrate hot path. The Tier 3 hub absorbs availability cost on their behalf.
+- **The hub-and-spoke + relational backup model is hierarchical aggregation, baked into both social architecture and routing**. Households aggregate their members; trust networks aggregate households; collectives aggregate trust networks. Cross-collective discovery uses mesh routing at the household-aggregate level rather than per-item.
+- **Performance scales with hardware capacity per node × number of households**, not with central infrastructure investment. There is no hyperscale
+-shape load to scale to, because there is no hyperscaled Youtube, Facebook, or Amazon shaped service — there are 100 million family nodes, each handling a handful of people's digital lives.
+
+### Inclusion Is the Point, Not a Side Effect
+
+The protocol is built for the **billions of humans on the planet**, not only the few who can afford or operate Tier 3 hardware. The Stage 1–4 progression exists so that anyone, anywhere, on any device can participate meaningfully from day one — and the substrate-level care is what makes that participation honest rather than extractive.
+
+A single Tier 3 family node serves far more than its own household. Through hub-and-spoke, it carries dozens of phone-only spokes — extended family, a community group, a small congregation. Through custodial key hosting, it carries relatives who aren't ready to manage cryptography themselves. Through relational backup, it provides redundancy for everyone in its trust network whether they own hardware or not. A church basement with one Tier 3 can be the substrate participation point for a hundred-person congregation. An aunt's family node can carry her entire extended family, including a grandmother who only ever opens a hosted-account browser. So the real math isn't "100 million households participate" — it's "100 million Tier 3 nodes, each carrying tens to hundreds of humans through trusted hosting, custodial keys, and hub-and-spoke sync, reaching billions of people without requiring each one to own infrastructure."
+
+This is precisely why the care taken at the peer-to-peer level matters. A hyperscale equivalent of this protocol would force everyone — wealthy and poor, technical and not — onto the same surveillance platform; "inclusion" there means "extraction at scale." The substrate's narrow integrity layer, content-addressed identity, and migration-preserves-everything contract are what let the visitor become a hosted user, the hosted user become an app user, and the app user become a node operator without losing data, identity, reputation, or relationships. Entry-tier participants are not second-class citizens of the protocol — they are first-class participants whose substrate-level rights are guaranteed by the same constitutional contracts the Tier 3 operators run on. The peer-to-peer work isn't optional plumbing for hardware owners; it is the load-bearing layer that makes meaningful participation possible at every economic and technical level.
+
+The Tier 3 hardware baseline is what makes radical locality work. With 64–128GB RAM, 10TB+ storage, GPU acceleration, always-on availability, and 10GbE local networking, each family node has the headroom to: maintain rich indexes for its stewarded content, participate in mesh gossip with hundreds of peer nodes, validate and rank incoming traffic with local AI models, and serve a household's full lifetime of digital assets without external dependencies. The protocol's narrow integrity layer (constitutional contracts, roughly one record per agreement) and rich data plane (peer-to-peer transport between Tier 3 nodes) reflect this division of concerns: integrity is bounded and constitutional; performance lives where the hardware is.
+
 ## Cost Analysis
 
 ### Initial Investment
