@@ -60,7 +60,7 @@ const MAX_CONCURRENT_HEALTH_CHECKS = 5;
  * Detect if running in Eclipse Che environment
  */
 function isEclipseChe(): boolean {
-  if (typeof globalThis === 'undefined') return false;
+  if (typeof globalThis === 'undefined' || !globalThis.location) return false;
   const hostname = globalThis.location.hostname;
   return hostname.includes('.code.ethosengine.com') || hostname.includes('.devspaces.');
 }
@@ -69,7 +69,7 @@ function isEclipseChe(): boolean {
  * Get the Che hc-dev endpoint URL for doorway access
  */
 function getCheHcDevUrl(): string {
-  if (typeof globalThis === 'undefined') return '';
+  if (typeof globalThis === 'undefined' || !globalThis.location) return '';
   const hostname = globalThis.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
   return `https://${hostname}`;
 }
@@ -506,6 +506,9 @@ export class DoorwayRegistryService {
    * Restore selection from localStorage, or auto-select Che doorway in dev.
    */
   private restoreSelection(): void {
+    // SSR-safe: no browser storage during server-side rendering
+    if (typeof localStorage === 'undefined') return;
+
     // In Eclipse Che, always use the local hc-dev endpoint
     if (isEclipseChe()) {
       const cheDoorway = createCheDoorway();

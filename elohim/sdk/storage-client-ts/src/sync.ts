@@ -5,9 +5,30 @@
  * via the elohim-storage sync API.
  */
 
-import * as Automerge from '@automerge/automerge';
+import type * as Automerge from '@automerge/automerge';
 import { StorageClient } from './client';
 import { StorageError } from './types';
+
+type AutomergeModule = typeof Automerge;
+
+let automergePromise: Promise<AutomergeModule> | undefined;
+
+/**
+ * Lazily load @automerge/automerge (ESM-only, wasm-backed) so that merely
+ * importing this package never evaluates the module. This package compiles
+ * to CommonJS; a top-level import becomes `require("@automerge/automerge")`,
+ * which browser bundlers reject at app bootstrap with
+ * "Dynamic require of \"@automerge/automerge\" is not supported".
+ * The indirection through `new Function` keeps tsc from down-leveling the
+ * dynamic import back into a require. Browser consumers that need sync
+ * should migrate this package to ESM output (tracked; no browser caller today).
+ */
+function loadAutomerge(): Promise<AutomergeModule> {
+  automergePromise ??= new Function(
+    'return import("@automerge/automerge")',
+  )() as Promise<AutomergeModule>;
+  return automergePromise;
+}
 
 /**
  * Sync result
@@ -59,21 +80,22 @@ export class AutomergeSync {
    * Creates a new empty document if it doesn't exist.
    */
   async load<T>(docId: string): Promise<Automerge.Doc<T>> {
+    const A = await loadAutomerge();
     try {
       const response = await this.client.getChangesSince(docId, []);
 
       if (response.changes.length === 0) {
         // Document doesn't exist, return empty doc
-        const doc = Automerge.init<T>();
+        const doc = A.init<T>();
         this.knownHeads.set(docId, []);
         return doc;
       }
 
       // Decode and apply all changes
-      let doc = Automerge.init<T>();
+      let doc = A.init<T>();
       for (const changeB64 of response.changes) {
         const changeBytes = this.client.decodeBase64(changeB64);
-        doc = Automerge.loadIncremental(doc, changeBytes);
+        doc = A.loadIncremental(doc, changeBytes);
       }
 
       // Track known heads
@@ -83,7 +105,7 @@ export class AutomergeSync {
     } catch (error) {
       if (error instanceof StorageError && error.statusCode === 404) {
         // Document doesn't exist
-        const doc = Automerge.init<T>();
+        const doc = A.init<T>();
         this.knownHeads.set(docId, []);
         return doc;
       }
@@ -97,14 +119,15 @@ export class AutomergeSync {
    * Sends only changes since last sync.
    */
   async save<T>(docId: string, doc: Automerge.Doc<T>): Promise<string[]> {
+    const A = await loadAutomerge();
     const knownHeads = this.knownHeads.get(docId) || [];
 
     // Get changes since known heads
-    const changeBytes = this.getChangesSince(doc, knownHeads);
+    const changeBytes = this.getChangesSince(A, doc, knownHeads);
 
     if (changeBytes.length === 0) {
       // No new changes
-      return this.getHeads(doc);
+      return this.getHeads(A, doc);
     }
 
     // Send changes to server
@@ -124,7 +147,8 @@ export class AutomergeSync {
    * 3. Merges everything locally
    */
   async sync<T>(docId: string, doc: Automerge.Doc<T>): Promise<SyncResult<T>> {
-    const localHeads = this.getHeads(doc);
+    const A = await loadAutomerge();
+    const localHeads = this.getHeads(A, doc);
     const knownHeads = this.knownHeads.get(docId) || [];
 
     // 1. Get server changes since our known heads
@@ -136,19 +160,19 @@ export class AutomergeSync {
 
     for (const changeB64 of serverResponse.changes) {
       const changeBytes = this.client.decodeBase64(changeB64);
-      updatedDoc = Automerge.loadIncremental(updatedDoc, changeBytes);
+      updatedDoc = A.loadIncremental(updatedDoc, changeBytes);
       changed = true;
     }
 
     // 3. Check if we have local changes the server doesn't have
-    const localChanges = this.getChangesSince(doc, knownHeads);
+    const localChanges = this.getChangesSince(A, doc, knownHeads);
     if (localChanges.length > 0) {
       // Send our changes to server
       await this.client.applyChanges(docId, [localChanges]);
     }
 
     // 4. Update known heads
-    const newHeads = this.getHeads(updatedDoc);
+    const newHeads = this.getHeads(A, updatedDoc);
     this.knownHeads.set(docId, newHeads);
 
     return {
@@ -183,18 +207,18 @@ export class AutomergeSync {
   /**
    * Get current heads from an Automerge document
    */
-  private getHeads<T>(doc: Automerge.Doc<T>): string[] {
+  private getHeads<T>(A: AutomergeModule, doc: Automerge.Doc<T>): string[] {
     // Automerge.getHeads returns string[] (hex-encoded hashes)
-    const heads = Automerge.getHeads(doc);
+    const heads = A.getHeads(doc);
     return heads as string[];
   }
 
   /**
    * Get changes since given heads from an Automerge document
    */
-  private getChangesSince<T>(doc: Automerge.Doc<T>, heads: string[]): Uint8Array {
+  private getChangesSince<T>(A: AutomergeModule, doc: Automerge.Doc<T>, heads: string[]): Uint8Array {
     // Automerge.saveSince expects string[] (hex-encoded hashes)
-    return Automerge.saveSince(doc, heads as Automerge.Heads);
+    return A.saveSince(doc, heads as Automerge.Heads);
   }
 
   /**

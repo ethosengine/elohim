@@ -139,6 +139,19 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   }
 
   /**
+   * Detect plain-localhost dev serving (ng serve on :4200 with the local
+   * doorway proxied at same-origin). Same proxy topology as Che — without
+   * this, /db/* and /blob/* requests fall through to the REMOTE doorway
+   * (environment.holochain.adminUrl) while relative-URL services hit the
+   * local proxy, splitting one page's reads across two substrates.
+   */
+  private isLocalDevHost(): boolean {
+    if (globalThis.window === undefined || !globalThis.location) return false;
+    const host = globalThis.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  }
+
+  /**
    * Get the dev proxy base URL in Che environment.
    * Converts angular-dev endpoint to hc-dev endpoint.
    */
@@ -225,7 +238,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
   getStorageBaseUrl(config: ConnectionConfig): string {
     // Check for Eclipse Che environment first
-    if (this.isCheEnvironment() && config.useLocalProxy) {
+    if ((this.isCheEnvironment() || this.isLocalDevHost()) && config.useLocalProxy) {
       // In Che, return the Angular dev server's origin so URLs are absolute
       // but still same-origin. This allows:
       // 1. <img src="..."> tags to work (browser requests same origin)

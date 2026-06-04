@@ -398,7 +398,7 @@ if [ "$RUN_SEED" = true ]; then
     echo "│ Step 4: Seeding content ($SEED_LIMIT items)                   │"
     echo "└──────────────────────────────────────────────────────────────┘"
 
-    cd "$HC_DIR/../genesis/seeder"
+    cd "$HC_DIR/../../genesis/seeder"
     DOORWAY_URL="http://localhost:8888" \
     STORAGE_URL="http://localhost:$STORAGE_PORT" \
     HOLOCHAIN_ADMIN_URL="ws://localhost:$ADMIN_PORT" \
