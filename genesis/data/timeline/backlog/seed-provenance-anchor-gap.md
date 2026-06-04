@@ -37,3 +37,16 @@ Related (same seeder home, capture together):
   soon as the tag query is fixed. Either the feature line should say Jessica (feature edit
   = fixture change, operator-gated) or DISPLAY_NAME_TO_PRESENCE gains Susan→jessica-spouse
   (only if Susan is canon somewhere upstream — verify against humans.json first).
+
+**2026-06-04 additions (same seed/alpha-data home, from shift iteration 3-4):**
+- `manifesto` content seeded with non-commons reach → anonymous GET /db/content/manifesto
+  403s ("Anonymous reader can read the manifesto" fails). Storage reach gate is correct;
+  the seed value (or a missed alpha re-seed after reach-enum reconciliation) is wrong.
+- `elohim-host-landing` EPR doc absent on alpha → GET /api/v1/epr/elohim-host-landing/nav-context
+  returns storage-level "epr not found" 404 ("The EPR nav-context endpoint serves a navigation
+  projection" fails). Routing is healthy (verified live 2026-06-04 ~17:30Z; placement-gaps from
+  the same merge resolves). Landing EPR seeding belongs to the landing-pages seed path
+  (blobHash-regex fix d32aba767 may need a follow-up anchor/seal step for the EPR doc itself).
+- Sidenote for a separate look: GET /api/v1/graphql 404s at the doorway while placement-gaps
+  (same manifest commit) routes — likely the manifest declares POST-only or the GET hint arm
+  isn't manifest-declared; harmless today (clients POST), worth one glance when in the file.

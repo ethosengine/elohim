@@ -47,7 +47,15 @@ When(
 Then('the register response is 200 with a valid agent identifier', function (this: E2EWorld) {
   const status = this.contentIds.get('adminReach:status');
   const body = this.contentIds.get('adminReach:body') ?? '';
-  assert.equal(status, '200', `expected 200, got ${status}: ${body}`);
+  // POST /auth/register returns 201 CREATED (auth_routes.rs:1469 — correct
+  // HTTP semantic for resource creation; both dev-mode and production paths).
+  // The earlier '200' literal was glue drift; the scenario's intent is
+  // "registration succeeded" — accept the success-class status the handler
+  // actually emits. (Step text kept verbatim — it is the feature's wording.)
+  assert.ok(
+    status === '200' || status === '201',
+    `expected registration success (200/201), got ${status}: ${body}`
+  );
   const parsed = JSON.parse(body) as Record<string, unknown>;
   assert.ok(
     typeof parsed['agentPubKey'] === 'string' && parsed['agentPubKey'].length > 10,
