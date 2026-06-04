@@ -93,6 +93,10 @@ import { SignalHarnessService } from '../../services/signal-harness.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
+// EPR relationships panel lives in the elohim pillar (cross-pillar composition-
+// root import, sanctioned by lamad/tsconfig.json @app/elohim alias). It renders
+// the EPR Head's typed relationships as grouped, navigable cards.
+import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
 
 import type { HouseholdResilienceView } from '../../../generated/household-resilience-view';
 import type { ResilienceSnapshotView } from '../../../generated/resilience-snapshot-view';
@@ -110,6 +114,7 @@ import type { ContentStewardshipView } from '@elohim/storage-client/generated';
     FocusedViewToggleComponent,
     ResilienceSnapshotComponent,
     DistributionBadgeComponent,
+    EprRelationshipsPanelComponent,
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './content-viewer.component.html',

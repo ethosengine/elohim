@@ -1108,6 +1108,42 @@ describe('ContentViewerComponent', () => {
       expect(panel).toBeTruthy();
     }));
 
+    it('mounts the real EprRelationshipsPanelComponent with the relationships from the head', fakeAsync(() => {
+      const eprResolverSpy = TestBed.inject(LAMAD_EPR_RESOLVER);
+      (eprResolverSpy.resolveEprHead as Mock).mockReturnValue(of({
+        version: 1,
+        id: 'test-content-1',
+        content: 'bafk-test',
+        lamad: { title: 'Test', contentType: 'concept' },
+        shefa: {},
+        qahal: {},
+        relationships: [
+          { type: 'PREREQUISITE', target: 'feedback-loops' },
+          { type: 'TEACHES', target: 'mental-models' },
+        ],
+      }));
+
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      // The mounted panel exposes its own internal testids (asserted by the
+      // epr-link-navigation a2o scenarios), proving the real Angular component
+      // is rendered — not a CUSTOM_ELEMENTS_SCHEMA-swallowed phantom tag.
+      const innerPanel = fixture.nativeElement.querySelector(
+        '[data-testid="epr-relationships-panel"]'
+      );
+      expect(innerPanel).toBeTruthy();
+
+      const groups = fixture.nativeElement.querySelectorAll('[data-testid="epr-rel-group"]');
+      expect(groups.length).toBe(2);
+
+      const cards = fixture.nativeElement.querySelectorAll(
+        '[data-testid="epr-relationship-card"]'
+      );
+      expect(cards.length).toBe(2);
+    }));
+
     it('does not render the panel when there are no relationships', fakeAsync(() => {
       const eprResolverSpy = TestBed.inject(LAMAD_EPR_RESOLVER);
       (eprResolverSpy.resolveEprHead as Mock).mockReturnValue(of({
@@ -1126,6 +1162,10 @@ describe('ContentViewerComponent', () => {
 
       const panel = fixture.nativeElement.querySelector('[data-testid="viewer-relationships-panel"]');
       expect(panel).toBeFalsy();
+      const innerPanel = fixture.nativeElement.querySelector(
+        '[data-testid="epr-relationships-panel"]'
+      );
+      expect(innerPanel).toBeFalsy();
     }));
   });
 

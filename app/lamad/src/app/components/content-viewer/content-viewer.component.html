@@ -401,11 +401,23 @@
         </div>
 
         <!-- EPR Relationships (protocol-level content relationships) -->
-        <elohim-epr-relationships-panel
+        <!--
+          Real Angular component from the elohim pillar (app-epr-relationships-panel).
+          The wrapper carries the legacy viewer-relationships-panel testid; the
+          component itself emits the epr-relationships-panel / epr-rel-group /
+          epr-relationship-card testids the epr-link-navigation a2o scenarios assert.
+          aria-label gives the section an accessible name for assistive tech.
+        -->
+        <div
           *ngIf="eprRelationships.length > 0"
-          [relationships]="eprRelationships"
+          class="epr-relationships-region"
           data-testid="viewer-relationships-panel"
-        ></elohim-epr-relationships-panel>
+          aria-label="Related concepts"
+        >
+          <app-epr-relationships-panel
+            [relationships]="eprRelationships"
+          ></app-epr-relationships-panel>
+        </div>
       </section>
 
       <!-- Trust/Attestations Tab -->
