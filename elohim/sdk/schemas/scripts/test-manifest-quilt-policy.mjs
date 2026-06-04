@@ -196,6 +196,49 @@ async function main() {
     assert(!validate(m), 'Rejects non-kebab-case policy name (names become <pillar>/<name> cost classes)');
   }
 
+  // --- REF CHECKS (loader-enforced; not expressible in JSON Schema) ---
+  const { validateQuiltPolicyRefs } = await import('./lib/manifest-quilt-refs.mjs');
+  {
+    const errs = validateQuiltPolicyRefs(manifestWithQuiltPolicies());
+    assert(errs.length === 0, 'Ref check: clean manifest has zero ref errors');
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    m.vocabulary.contentTypes['family-video'].quiltPolicy = 'streaming-media-libary'; // typo
+    const errs = validateQuiltPolicyRefs(m);
+    assert(
+      errs.length === 1 && errs[0].includes('family-video') && errs[0].includes('streaming-media-libary'),
+      "Ref check: typo'd contentType.quiltPolicy fails loud, naming type and ref",
+    );
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    m.vocabulary.quiltPolicyDefault = 'does-not-exist';
+    const errs = validateQuiltPolicyRefs(m);
+    assert(
+      errs.length === 1 && errs[0].includes('quiltPolicyDefault') && errs[0].includes('does-not-exist'),
+      'Ref check: dangling quiltPolicyDefault fails loud',
+    );
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    delete m.vocabulary.quiltPolicies;
+    const errs = validateQuiltPolicyRefs(m);
+    assert(
+      errs.length === 3,
+      'Ref check: references with NO quiltPolicies section at all → every reference is dangling (2 types + default)',
+    );
+  }
+  {
+    const m = manifestWithQuiltPolicies();
+    delete m.vocabulary.quiltPolicies;
+    delete m.vocabulary.quiltPolicyDefault;
+    delete m.vocabulary.contentTypes['photo-album'].quiltPolicy;
+    delete m.vocabulary.contentTypes['family-video'].quiltPolicy;
+    const errs = validateQuiltPolicyRefs(m);
+    assert(errs.length === 0, 'Ref check: manifest without any quilt vocabulary is clean (fully optional)');
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }
