@@ -322,13 +322,19 @@ mod tests {
 
     /// Wave 3 T3-8: receive-arm scoring — hint matches active commitment → HIGH.
     /// Non-matching hub → Skip. This is a pure scoring unit test (no DB).
+    ///
+    /// Fixture note (storage-tier review 2026-06-04, finding #2): scope values
+    /// MUST come from the replicates-dwelling `scope_filter.epr_kinds` schema
+    /// enum ("Content", "Manifest", …). The original fixture used "markdown"
+    /// (a lamad content_format — schema-INVALID) on both sides, which masked a
+    /// real producer/consumer vocabulary mismatch.
     #[test]
     fn receive_arm_scoring_high_when_hint_matches_commitment() {
         let commitment = ActiveCommitment {
             commitment_cid: "comm:dwelling-H".into(),
             action: "replicates-dwelling".into(),
             recipient_hub_id: "collective:hubH".into(),
-            scope_epr_kinds: Some(vec!["markdown".into()]),
+            scope_epr_kinds: Some(vec!["Content".into()]),
             bytes_per_blob_max: Some(10_000_000),
         };
         let matching = AdvertisedBlob {
@@ -336,18 +342,18 @@ mod tests {
             source_peer_cid: "peer:source".into(),
             blob_size_bytes: Some(1_000_000),
             recipient_hub_id_hint: Some("collective:hubH".into()),
-            epr_kind_hint: Some("markdown".into()),
+            epr_kind_hint: Some("Content".into()),
         };
         let non_matching = AdvertisedBlob {
             blob_cid: sha256_wire_str('b'),
             source_peer_cid: "peer:source".into(),
             blob_size_bytes: Some(1_000_000),
             recipient_hub_id_hint: Some("collective:hubZ".into()),
-            epr_kind_hint: Some("markdown".into()),
+            epr_kind_hint: Some("Content".into()),
         };
 
         assert_eq!(
-            score_advertised_blob(&matching, &[commitment.clone()]),
+            score_advertised_blob(&matching, std::slice::from_ref(&commitment)),
             FetchPriority::High,
             "hint matching active commitment → High"
         );

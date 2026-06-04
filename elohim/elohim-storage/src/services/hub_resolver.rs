@@ -83,6 +83,30 @@ pub fn resolve_owning_hub(
     Ok(row.map(|(cid,)| hub_id_from_row(cid, slug)))
 }
 
+/// Resolve the dwelling hub for a libp2p peer.
+///
+/// Chain: `peer_id → agent_cid (active peer_identity_bindings row) →
+/// dwelling_hub_id` via [`resolve_owning_hub`]. This is the reusable
+/// `peer_id → agent_cid → dwelling_hub_id` mapping the tiered-quilt design
+/// (§2 "Maturity path") asks for explicitly — the same derivation serves the
+/// placement prioritizer's `recipient_hub_id` hint AND device→hub metric
+/// aggregation; build it once, not per-feature.
+///
+/// Returns `None` when the peer has no active identity binding, or the bound
+/// agent resolves to no household hub (same degradation contract as
+/// [`resolve_owning_hub`]).
+pub fn resolve_peer_dwelling_hub(
+    conn: &mut SqliteConnection,
+    peer_id: &str,
+    now_iso: &str,
+) -> Result<Option<String>, StorageError> {
+    let Some(binding) = crate::db::peer_identity_bindings::lookup_active(conn, peer_id, now_iso)?
+    else {
+        return Ok(None);
+    };
+    resolve_owning_hub(conn, &binding.agent_cid)
+}
+
 /// Return all collectives the agent actively participates in.
 ///
 /// Uses a two-path query over `collective_participations`:

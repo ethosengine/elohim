@@ -2351,7 +2351,9 @@ impl P2PNode {
         let hints = if let Some(pool) = self.db_pool.as_ref() {
             use crate::p2p::inventory_broadcaster::LocalInventory as _;
             match pool.get() {
-                Ok(mut conn) => gather_hints(&mut conn, &inventory.current_hashes()),
+                Ok(mut conn) => {
+                    gather_hints(&mut conn, &inventory.current_hashes(), &local_peer_id)
+                }
                 Err(_) => vec![],
             }
         } else {
