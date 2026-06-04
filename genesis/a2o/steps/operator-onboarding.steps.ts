@@ -134,10 +134,13 @@ Then(
     assert.ok(device, `${humanName} has no device`);
 
     const me = await device.client.me();
+    // Wire contract is UPPERCASE: UserPermissionLevel = 'PUBLIC' | 'AUTHENTICATED'
+    // | 'ADMIN' (doorway-app doorway.model.ts:510; serde rename_all = "UPPERCASE"
+    // on PermissionLevel). The earlier 'Admin' literal was glue drift.
     assert.strictEqual(
       me.permissionLevel,
-      'Admin',
-      `Expected Admin permission but got ${me.permissionLevel}`
+      'ADMIN',
+      `Expected ADMIN permission but got ${me.permissionLevel}`
     );
   }
 );
@@ -152,8 +155,8 @@ Then(
     const me = await device.client.me();
     assert.notStrictEqual(
       me.permissionLevel,
-      'Admin',
-      `Expected non-Admin permission but got Admin`
+      'ADMIN',
+      `Expected non-ADMIN permission but got ${me.permissionLevel}`
     );
   }
 );

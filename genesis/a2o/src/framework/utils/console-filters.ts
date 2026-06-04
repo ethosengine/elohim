@@ -25,7 +25,13 @@ export function isSpaRoutingNoise(log: CapturedConsoleLog): boolean {
     // there's no doorway-service to handle the proxy and the dev-server
     // returns index.html, which fails JSON parsing. The Angular app handles
     // the result via catchError and the failure is cosmetic.
-    log.text.includes('[DoorwayAdmin] getAccount failed')
+    log.text.includes('[DoorwayAdmin] getAccount failed') ||
+    // Chrome's compute-pressure feature probe under Playwright emits a
+    // Permissions-Policy violation on documents that never call the API —
+    // no PressureObserver/compute-pressure caller exists anywhere in this
+    // codebase (verified 2026-06-04), and no Permissions-Policy header is
+    // set by doorway or the manifests. Pure browser-environment noise.
+    log.text.includes('Permissions policy violation: compute-pressure')
   );
 }
 
