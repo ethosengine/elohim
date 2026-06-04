@@ -134,9 +134,26 @@ export class ProjectionAPIService {
   /** Base URL for cache API */
   private get baseUrl(): string {
     const doorwayUrl =
-      this.env.holochain?.authUrl ?? this.env.holochain?.appUrl ?? 'http://localhost:8080';
+      this.env.holochain?.authUrl ?? this.env.holochain?.appUrl ?? this.deployedOriginFallback();
     const httpUrl = doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
     return `${httpUrl}/api/v1/cache`;
+  }
+
+  /**
+   * The lamad app has a single environment.ts (no fileReplacements), so the
+   * env never names a doorway URL in deployed builds. Deployed lamad is a
+   * SPA blob served BY a doorway, which also fronts /api/v1/cache — so
+   * same-origin is the correct cache base there. localhost:8080 stays the
+   * local-dev fallback. (Root cause of the deep-link/mastery e2e cluster:
+   * the blob bundle called http://localhost:8080/api/v1/cache/* from
+   * alpha.elohim.host — ERR_CONNECTION_REFUSED on every content fetch.)
+   */
+  private deployedOriginFallback(): string {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+      return origin;
+    }
+    return 'http://localhost:8080';
   }
 
   /** API key for authenticated requests */
