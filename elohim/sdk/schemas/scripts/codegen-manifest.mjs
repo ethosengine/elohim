@@ -16,6 +16,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateQuiltPolicyRefs } from './lib/manifest-quilt-refs.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../');
@@ -44,9 +45,44 @@ function formatTsConst(name, values) {
   return `export const ${name} = [\n${items}\n] as const;`;
 }
 
+/**
+ * Resolve $ref fields one level deep in a plain object. Manifests split into
+ * sub-files use { "$ref": "./manifest/foo.json" } at each concern's key; this
+ * codegen reads those fields directly and must resolve them before processing.
+ * Handles top-level fields AND fields nested one level inside `vocabulary`.
+ */
+async function resolveRefs(obj, baseDir) {
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== null && typeof value === 'object' && '$ref' in value && !Array.isArray(value)) {
+      const refPath = resolve(baseDir, value['$ref']);
+      const refRaw = await readFile(refPath, 'utf8');
+      obj[key] = JSON.parse(refRaw);
+    }
+  }
+}
+
+async function resolveManifestRefs(manifest, manifestDir) {
+  await resolveRefs(manifest, manifestDir);
+  if (manifest.vocabulary && typeof manifest.vocabulary === 'object') {
+    await resolveRefs(manifest.vocabulary, manifestDir);
+  }
+}
+
 async function main() {
   const raw = await readFile(manifestPath, 'utf8');
   const manifest = JSON.parse(raw);
+
+  // Resolve $ref fields (modular manifests split into sub-files)
+  await resolveManifestRefs(manifest, dirname(manifestPath));
+
+  // Loader-enforced referential integrity (tiered-quilt §4 v0.2): a dangling
+  // quiltPolicy reference must fail codegen loud, never silently not-apply.
+  const quiltRefErrors = validateQuiltPolicyRefs(manifest);
+  if (quiltRefErrors.length > 0) {
+    console.error('Manifest quilt-policy referential-integrity errors:');
+    for (const e of quiltRefErrors) console.error(`  - ${e}`);
+    process.exit(1);
+  }
 
   const appName = manifest.name; // e.g. "lamad"
   const prefix = appName.toUpperCase(); // LAMAD
