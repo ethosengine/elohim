@@ -12,8 +12,8 @@ Feature: Doorway hands the login session off to the steward's portal host
 
   See:
     - genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
-    - .claude/memory/project_m5_reframe_auth_portal_convergence.md
-    - .claude/memory/project_peer_native_account_canonical_surface.md
+    - MemPalace wing=memory: project_m5_reframe_auth_portal_convergence (graduated 2026-06-02)
+    - MemPalace wing=memory: project_peer_native_account_canonical_surface (graduated 2026-06-02)
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
