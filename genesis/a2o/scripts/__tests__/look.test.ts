@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-floating-promises -- node:test describe/it
+   return promises that the test runner itself consumes; awaiting them is wrong. */
 import { strict as assert } from 'node:assert';
 import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -41,7 +43,10 @@ describe('parseArgs', () => {
   });
 
   it('throws on a bad --viewport', () => {
-    assert.throws(() => parseArgs(['https://x.test', '--viewport', 'huge']), /--viewport expects WxH/);
+    assert.throws(
+      () => parseArgs(['https://x.test', '--viewport', 'huge']),
+      /--viewport expects WxH/
+    );
   });
 
   it('throws on an unknown flag', () => {
@@ -55,7 +60,7 @@ describe('runLook (file:// hermetic render)', () => {
     const html = join(dir, 'page.html');
     await writeFile(
       html,
-      '<!doctype html><title>Look Smoke</title><h1 data-testid="probe">rendered</h1>',
+      '<!doctype html><title>Look Smoke</title><h1 data-testid="probe">rendered</h1>'
     );
 
     const result = await runLook({ url: pathToFileURL(html).href, out: 'unit-smoke' });

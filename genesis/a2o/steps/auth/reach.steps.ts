@@ -61,26 +61,23 @@ When(
  * Parse the JSON 403 body and assert the requiredReach field.
  * Expected shape: { "error": "Authentication required", "requiredReach": "<level>" }
  */
-Then(
-  'the 403 body requiredReach is {string}',
-  function (this: E2EWorld, expectedReach: string) {
-    const resp = responseStore.get(this);
-    assert.ok(resp, NO_RESPONSE);
-    assert.equal(
-      resp.status,
-      403,
-      `Expected a 403 response to inspect requiredReach, got ${resp.status}`
-    );
-    let body: Record<string, unknown>;
-    try {
-      body = JSON.parse(resp.body.toString('utf-8')) as Record<string, unknown>;
-    } catch {
-      assert.fail(`Response body is not valid JSON: ${resp.body.toString('utf-8').slice(0, 200)}`);
-    }
-    assert.equal(
-      body['requiredReach'],
-      expectedReach,
-      `Expected requiredReach "${expectedReach}", got "${String(body['requiredReach'])}". Full body: ${JSON.stringify(body)}`
-    );
+Then('the 403 body requiredReach is {string}', function (this: E2EWorld, expectedReach: string) {
+  const resp = responseStore.get(this);
+  assert.ok(resp, NO_RESPONSE);
+  assert.equal(
+    resp.status,
+    403,
+    `Expected a 403 response to inspect requiredReach, got ${resp.status}`
+  );
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(resp.body.toString('utf-8')) as Record<string, unknown>;
+  } catch {
+    assert.fail(`Response body is not valid JSON: ${resp.body.toString('utf-8').slice(0, 200)}`);
   }
-);
+  assert.equal(
+    body['requiredReach'],
+    expectedReach,
+    `Expected requiredReach "${expectedReach}", got "${String(body['requiredReach'])}". Full body: ${JSON.stringify(body)}`
+  );
+});

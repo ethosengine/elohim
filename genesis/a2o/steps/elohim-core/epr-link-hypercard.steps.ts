@@ -220,10 +220,8 @@ Then(
     const device = pwDevice(this);
     if (!device) return 'pending';
     const text =
-      (await device.page
-        .locator(`${EPR_LINK.HOST} ${EPR_LINK.ANCHOR}`)
-        .first()
-        .textContent()) ?? '';
+      (await device.page.locator(`${EPR_LINK.HOST} ${EPR_LINK.ANCHOR}`).first().textContent()) ??
+      '';
     assert.ok(text.trim().length > 0, 'Expected the resolved chip to render a title');
     return undefined;
   }
