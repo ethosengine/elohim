@@ -64,7 +64,7 @@ function hostLocator(device: PlaywrightDevice) {
 // ---------------------------------------------------------------------------
 
 Given(
-  'the user is viewing {string} in a mounted lamad bundle',
+  'the user is viewing {string} in a mounted pillar bundle',
   async function (this: E2EWorld, path: string) {
     const device = pwDevice(this);
     if (!device) return 'pending';
@@ -76,7 +76,7 @@ Given(
 );
 
 Given(
-  'the concept view contains <elohim-epr-link epr={string} display={string}>',
+  'the view contains <elohim-epr-link epr={string} display={string}>',
   async function (this: E2EWorld, eprUri: string, _display: string) {
     const device = pwDevice(this);
     if (!device) return 'pending';
@@ -86,17 +86,74 @@ Given(
   }
 );
 
-Given('an EPR-link points to an EPR that is currently unreachable', function (this: E2EWorld) {
-  // Fixture setup (a sentinel EPR the storage layer denies) is wired during
-  // the browser shake-out; the L4/unreachable path is unit-proven in
-  // elohim-epr-link.spec.ts. Deferred until the unreachable fixture lands.
-  return 'pending';
-});
+// Sentinel EPR ref for the unreachable scenario: syntactically valid, but the
+// fabricated hash resolves to nothing — the seeded DHT has no such content, so
+// the injected element's resolver returns null and the host transitions to L4.
+const UNREACHABLE_EPR =
+  'epr:sha256-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+// Title carried by the previewEprRef the unreachable EPR declares — asserted by
+// "the chip renders the preview EPR's content".
+const PREVIEW_TITLE = 'Manifesto (cached preview)';
+// Marker so the injected host is uniquely locatable across the two scenarios.
+const UNREACHABLE_MARKER_ATTR = 'data-a2o-unreachable';
 
-Given('the EPR has a previewEprRef declared', function (this: E2EWorld) {
-  // Paired with the unreachable fixture above — the EPR Head previewEprRef
-  // assertion is wired during the browser shake-out.
-  return 'pending';
+Given(
+  'an EPR-link points to an EPR that is currently unreachable',
+  async function (this: E2EWorld) {
+    const device = pwDevice(this);
+    if (!device) return 'pending';
+    // Land on the home surface — it imports `elohim-core/register`, so the
+    // <elohim-epr-link> custom element is upgraded and available to construct.
+    const appUrl = doorwayToAppUrl(device.client.url);
+    await device.page.goto(`${appUrl}/`, { waitUntil: 'networkidle' });
+    await hostLocator(device).waitFor({ state: 'attached', timeout: 15_000 });
+
+    // Inject a SECOND <elohim-epr-link> whose EPR is a fabricated (syntactically
+    // valid) hash. We give it NO resolver so its own resolve() parks at L2 and
+    // never clobbers our forced state; we then drive it to L4/unreachable via
+    // the element's public setResolution() test seam. This exercises the REAL
+    // L4 render path (the <elohim-mention-base> fallback), not a mock.
+    await device.page.evaluate(
+      (args: { epr: string; marker: string }) => {
+        const existing = document.querySelector(`[${args.marker}]`);
+        if (existing) existing.remove();
+        const el = document.createElement('elohim-epr-link');
+        el.setAttribute('epr', args.epr);
+        el.setAttribute('display', 'chip');
+        el.setAttribute(args.marker, '');
+        document.body.appendChild(el);
+      },
+      { epr: UNREACHABLE_EPR, marker: UNREACHABLE_MARKER_ATTR }
+    );
+    return undefined;
+  }
+);
+
+Given('the EPR has a previewEprRef declared', async function (this: E2EWorld) {
+  const device = pwDevice(this);
+  if (!device) return 'pending';
+  // Drive the injected host to L4 with a preview declared. setResolution() is
+  // the element's documented test seam; preview.title is what the L4 render
+  // surfaces as the <elohim-mention-base> label (the "previewEprRef content").
+  // We wait for Lit's updateComplete so the fallback DOM is materialised before
+  // the When/Then steps query it.
+  await device.page.evaluate(
+    async (args: { marker: string; previewTitle: string }) => {
+      interface ResolvableLink extends Element {
+        setResolution?: (
+          level: number,
+          resolution: { unreachable?: boolean; preview?: { title?: string } }
+        ) => void;
+        updateComplete?: Promise<unknown>;
+      }
+      const el: ResolvableLink | null = document.querySelector(`[${args.marker}]`);
+      if (!el?.setResolution) return;
+      el.setResolution(4, { unreachable: true, preview: { title: args.previewTitle } });
+      if (el.updateComplete) await el.updateComplete;
+    },
+    { marker: UNREACHABLE_MARKER_ATTR, previewTitle: PREVIEW_TITLE }
+  );
+  return undefined;
 });
 
 Given(
@@ -118,7 +175,7 @@ When('the chip resolves', async function (this: E2EWorld) {
   if (!device) return 'pending';
   // Resolved chip renders the anchor button (L2/L3) inside the host shadow root.
   await device.page
-    .locator(`${EPR_LINK.HOST} >>> ${EPR_LINK.ANCHOR}`)
+    .locator(`${EPR_LINK.HOST} ${EPR_LINK.ANCHOR}`)
     .first()
     .waitFor({ state: 'visible', timeout: 15_000 });
   // Record the URL so a later "no navigation" assertion can compare.
@@ -129,7 +186,11 @@ When('the chip resolves', async function (this: E2EWorld) {
 When('the link resolves', async function (this: E2EWorld) {
   const device = pwDevice(this);
   if (!device) return 'pending';
-  await hostLocator(device).waitFor({ state: 'attached', timeout: 15_000 });
+  // For the unreachable scenario the injected host carries the marker; for the
+  // generic case fall back to the first host on the page.
+  const injected = device.page.locator(`${EPR_LINK.HOST}[${UNREACHABLE_MARKER_ATTR}]`);
+  const target = (await injected.count()) > 0 ? injected.first() : hostLocator(device);
+  await target.waitFor({ state: 'attached', timeout: 15_000 });
   urlBefore = device.page.url();
   return undefined;
 });
@@ -139,11 +200,11 @@ When('the user right-clicks the link', async function (this: E2EWorld) {
   if (!device) return 'pending';
   urlBefore = device.page.url();
   await device.page
-    .locator(`${EPR_LINK.HOST} >>> ${EPR_LINK.ANCHOR}`)
+    .locator(`${EPR_LINK.HOST} ${EPR_LINK.ANCHOR}`)
     .first()
     .click({ button: 'right' });
   await device.page
-    .locator(`${EPR_LINK.HOST} >>> ${EPR_LINK.CONTEXT_MENU}[open]`)
+    .locator(`${EPR_LINK.HOST} ${EPR_LINK.CONTEXT_MENU}[open]`)
     .first()
     .waitFor({ state: 'visible', timeout: 5_000 });
   return undefined;
@@ -153,15 +214,20 @@ When('the user right-clicks the link', async function (this: E2EWorld) {
 // Then — outcome assertions
 // ---------------------------------------------------------------------------
 
-Then("the chip renders with the landing EPR's title and metadata", async function (this: E2EWorld) {
-  const device = pwDevice(this);
-  if (!device) return 'pending';
-  const text =
-    (await device.page.locator(`${EPR_LINK.HOST} >>> ${EPR_LINK.ANCHOR}`).first().textContent()) ??
-    '';
-  assert.ok(text.trim().length > 0, 'Expected the resolved chip to render a title');
-  return undefined;
-});
+Then(
+  "the chip renders with the resolved EPR's title and metadata",
+  async function (this: E2EWorld) {
+    const device = pwDevice(this);
+    if (!device) return 'pending';
+    const text =
+      (await device.page
+        .locator(`${EPR_LINK.HOST} ${EPR_LINK.ANCHOR}`)
+        .first()
+        .textContent()) ?? '';
+    assert.ok(text.trim().length > 0, 'Expected the resolved chip to render a title');
+    return undefined;
+  }
+);
 
 Then('no browser navigation occurs', function (this: E2EWorld) {
   const device = pwDevice(this);
@@ -170,22 +236,50 @@ Then('no browser navigation occurs', function (this: E2EWorld) {
   return undefined;
 });
 
-Then('the lamad Angular app remains mounted', async function (this: E2EWorld) {
+Then('the Angular app remains mounted', async function (this: E2EWorld) {
   const device = pwDevice(this);
   if (!device) return 'pending';
   const mounted = await device.page.locator('app-root').count();
-  assert.ok(mounted > 0, 'Expected the lamad app-root to remain mounted');
+  assert.ok(mounted > 0, 'Expected the app-root to remain mounted');
   return undefined;
 });
 
-Then("the chip renders the preview EPR's content", function (this: E2EWorld) {
-  // Asserts the L4 preview render — deferred with the unreachable fixture.
-  return 'pending';
+Then("the chip renders the preview EPR's content", async function (this: E2EWorld) {
+  const device = pwDevice(this);
+  if (!device) return 'pending';
+  // At L4 the host renders <elohim-mention-base> (the `fallback` part) labelled
+  // with preview.title. Pierce the injected host's shadow root and assert the
+  // preview title text surfaces.
+  const fallback = device.page
+    .locator(`${EPR_LINK.HOST}[${UNREACHABLE_MARKER_ATTR}] ${EPR_LINK.FALLBACK}`)
+    .first();
+  await fallback.waitFor({ state: 'attached', timeout: 5_000 });
+  // The preview title surfaces as the mention-base's `label` attribute and is
+  // rendered inside ITS shadow root — light-DOM textContent is empty by design,
+  // so assert the attribute the L4 render binds.
+  const label = (await fallback.getAttribute('label')) ?? '';
+  assert.ok(
+    label.includes(PREVIEW_TITLE),
+    `Expected the L4 fallback to carry the preview title "${PREVIEW_TITLE}". Got label: "${label.trim()}"`
+  );
+  return undefined;
 });
 
-Then(/^the chip displays the offline\/unreachable marker$/, function (this: E2EWorld) {
-  // Asserts the [data-state="offline"] marker — deferred with the unreachable fixture.
-  return 'pending';
+Then(/^the chip displays the offline\/unreachable marker$/, async function (this: E2EWorld) {
+  const device = pwDevice(this);
+  if (!device) return 'pending';
+  // The L4 fallback IS the unreachable marker: the host swaps its interactive
+  // button.anchor for the generic <elohim-mention-base> chip (the "pillar
+  // element not loaded / unreachable" fallback). Assert (a) the fallback is
+  // present and (b) the live anchor is NOT — i.e. the host degraded, it did not
+  // resolve. The fallback's `fallback-mark` (role=presentation) is the visible
+  // marker dot.
+  const host = `${EPR_LINK.HOST}[${UNREACHABLE_MARKER_ATTR}]`;
+  const fallbackMark = device.page.locator(`${host} ${EPR_LINK.FALLBACK_MARK}`).first();
+  await fallbackMark.waitFor({ state: 'attached', timeout: 5_000 });
+  const anchorCount = await device.page.locator(`${host} ${EPR_LINK.ANCHOR}`).count();
+  assert.equal(anchorCount, 0, 'Expected no live anchor at L4 — the host should show the fallback');
+  return undefined;
 });
 
 Then(
@@ -195,7 +289,7 @@ Then(
     if (!device) return 'pending';
     // Pierce host shadow → context-menu shadow → menuitems.
     const items = device.page.locator(
-      `${EPR_LINK.HOST} >>> ${EPR_LINK.CONTEXT_MENU}[open] >>> ${CONTEXT_MENU.ITEM_ROLE}`
+      `${EPR_LINK.HOST} ${EPR_LINK.CONTEXT_MENU}[open] ${CONTEXT_MENU.ITEM_ROLE}`
     );
     await items.first().waitFor({ state: 'visible', timeout: 5_000 });
     const labels = (await items.allTextContents()).map(t => t.trim());
@@ -215,7 +309,7 @@ Then(
   async function (this: E2EWorld) {
     const device = pwDevice(this);
     if (!device) return 'pending';
-    const menu = device.page.locator(`${EPR_LINK.HOST} >>> ${EPR_LINK.CONTEXT_MENU}[open]`).first();
+    const menu = device.page.locator(`${EPR_LINK.HOST} ${EPR_LINK.CONTEXT_MENU}[open]`).first();
     await menu.waitFor({ state: 'visible', timeout: 5_000 });
     // ArrowDown/ArrowUp move focus across menuitems; Escape closes the menu.
     // The stub PWPage exposes no `keyboard`, so dispatch keydowns through the
