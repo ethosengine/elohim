@@ -54,6 +54,13 @@ interface OAuthTokenResponse {
   identifier: string;
   doorway_id?: string;
   doorway_url?: string;
+  /**
+   * Steward portal-handoff hint (camelCase by design — additive doorway
+   * metadata outside the RFC 6749 envelope). Present only when the human is a
+   * graduated steward with a reachable portal host. Display logic reads the
+   * canonical AccountView.portalHosts instead; this field documents the wire.
+   */
+  portalHostUrl?: string;
 }
 
 /** Error response from OAuth endpoints */

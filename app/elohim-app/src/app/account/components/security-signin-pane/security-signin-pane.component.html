@@ -1,5 +1,21 @@
 <h1 data-testid="pane-title-security">Security &amp; sign-in</h1>
 
+@if (showStewardRedirect()) {
+  <section class="card" data-testid="steward-redirect-section">
+    <h2>Manage from your steward</h2>
+    <p>Your account is stewarded by peer-native infrastructure you control.</p>
+    <button
+      type="button"
+      class="steward-redirect"
+      data-testid="portal-host-redirect"
+      aria-label="Manage your account from your steward’s portal host"
+      (click)="redirectToStewardPortal()"
+    >
+      Manage from your steward →
+    </button>
+  </section>
+}
+
 <section class="card" data-testid="my-keys-section">
   <h2>My keys</h2>
   <app-key-list />

@@ -30,4 +30,34 @@ export class PortalHostDiscoveryService {
 
   /** True when at least one portal host is registered. */
   readonly hasPortalHost = computed(() => this.portalHosts().length > 0);
+
+  // ---------------------------------------------------------------------------
+  // Reachability (canonical source: AccountView.portalHosts[].lastReachableAt)
+  //
+  // `lastReachableAt` is the operational enrichment libp2p writes onto each
+  // PortalHostView when a /healthz probe last succeeded (see portal-host-view
+  // schema). It is the conductor/storage projection's reachability verdict — the
+  // single source of truth. We do NOT consult ExchangeSessionResponse.portalHostUrl
+  // (a session-scoped hint) here; AccountView is canonical ("no third portal").
+  // ---------------------------------------------------------------------------
+
+  /**
+   * The first portal host the storage projection has marked reachable, or null.
+   * "Reachable" = a non-empty `lastReachableAt` timestamp.
+   */
+  readonly reachablePortalHost = computed(
+    () => this.portalHosts().find(h => !!h.lastReachableAt) ?? null
+  );
+
+  /** True when at least one registered portal host is currently reachable. */
+  readonly hasReachablePortalHost = computed(() => this.reachablePortalHost() !== null);
+
+  /**
+   * Display predicate for the "Manage from your steward →" redirect: the account
+   * is a steward AND a reachable portal host exists. When false, the hosted
+   * security view falls through unchanged.
+   */
+  readonly shouldOfferStewardRedirect = computed(
+    () => this.isSteward() && this.hasReachablePortalHost()
+  );
 }
