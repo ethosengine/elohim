@@ -452,7 +452,13 @@ export class DoorwayClient {
   }
 
   async getAllocationsForContent(contentId: string): Promise<AllocationView[]> {
-    return this.get<AllocationView[]>(`/db/allocations/content/${encodeURIComponent(contentId)}`);
+    // GET /db/allocations/content/{id} returns the ContentStewardshipView
+    // AGGREGATE (http.rs handle_allocations_for_content), not a bare array —
+    // unwrap the envelope so callers keep the AllocationView[] contract.
+    const view = await this.get<ContentStewardshipView>(
+      `/db/allocations/content/${encodeURIComponent(contentId)}`
+    );
+    return view.allocations;
   }
 
   async getAllocationsForSteward(stewardId: string): Promise<AllocationView[]> {
