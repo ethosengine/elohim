@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildCustodyCommitmentBody, defaultM1Pairs, type CustodyPair } from '../seed-commitments.js';
 
 describe('buildCustodyCommitmentBody', () => {
@@ -49,9 +49,19 @@ describe('buildCustodyCommitmentBody', () => {
 });
 
 describe('defaultM1Pairs triad fixture', () => {
+  let prevHash: string | undefined;
+  let prevSize: string | undefined;
   beforeAll(() => {
+    prevHash = process.env.M1_BLOB_HASH;
+    prevSize = process.env.M1_BLOB_SIZE_BYTES;
     process.env.M1_BLOB_HASH = 'sha256-cafebabe';
     process.env.M1_BLOB_SIZE_BYTES = '64';
+  });
+  afterAll(() => {
+    if (prevHash === undefined) delete process.env.M1_BLOB_HASH;
+    else process.env.M1_BLOB_HASH = prevHash;
+    if (prevSize === undefined) delete process.env.M1_BLOB_SIZE_BYTES;
+    else process.env.M1_BLOB_SIZE_BYTES = prevSize;
   });
 
   it('includes the james fixture pairs with formation-output provenance', () => {
@@ -63,6 +73,8 @@ describe('defaultM1Pairs triad fixture', () => {
     );
     expect(jamesPairs).toHaveLength(4);
     for (const p of jamesPairs) expect(p.fixture).toBe('formation-output');
+    const nonFixturePairs = pairs.filter(p => !p.fixture);
+    expect(nonFixturePairs).toHaveLength(2);
   });
 
   it('stamps fixture provenance into the commitment body metadata', () => {
