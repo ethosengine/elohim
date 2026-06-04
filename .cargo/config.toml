@@ -25,3 +25,30 @@ replace-with = "elohim-mirror"
 
 [source.elohim-mirror]
 registry = "sparse+https://nexus.ethosengine.com/repository/cargo/"
+
+# ── Dev-profile debug-info policy (validated 2026-06-04) ─────────────────────
+# Cargo's default dev profile embeds full DWARF (debug=2) in every artifact.
+# Measured on this monorepo: a 925MB elohim-storage binary was 79% debuginfo,
+# and 71% of a 321GB target pool was DWARF-laden test/bin executables.
+# A/B/C-validated on doorway-service (cold `cargo build --all-targets`):
+#   debug=2 (default)            9.50 GB   baseline
+#   line-tables-only             5.44 GB   -43%  (and builds faster)
+#   + deps debug=false           4.07 GB   -57%  ← this config
+#
+# What you keep: file:line in backtraces through OUR code (line tables).
+# What you lose: stepping INTO third-party crates with a debugger. If you
+# need that temporarily: CARGO_PROFILE_DEV_DEBUG=2 cargo build ... (env
+# overrides this file), or comment these sections out locally.
+#
+# Scope: dev profile only — release profiles and the DNA/WASM release builds
+# (hc dna pack) are untouched. This file is the single enforcement point for
+# every native workspace and worktree under the repo (the heavy crates are
+# standalone packages that cannot share a workspace [profile.*] — RUSTFLAGS
+# divergence + links=sqlite3 conflicts — but config.toml reaches them all).
+# First build after this lands recompiles at the new debug level; the pool's
+# `cargo-pool enforce` hash-GC collects the superseded fat artifacts after 6h.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
