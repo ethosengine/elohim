@@ -9,7 +9,7 @@
 # cascade. See genesis/docs/PLACEMENT.md § "Availability ≠ regression".
 
 schema_version: 1
-updated: 2026-06-03
+updated: 2026-06-04
 
 resources:
   household-nodes:
@@ -36,6 +36,15 @@ resources:
     available: true
     note: restored 2026-06-03 — CI pulls images cleanly (genesis #1074 ran every real stage, no
           ErrImagePull/500). Was down 2026-06-01 (#1119 ABORTED). Evidence-backed flip, mirrors the probe.
+
+  observability:
+    role: Grafana/Loki/Prometheus/Tempo stack (grafana.ethosengine.com) — playwright↔backend correlation
+    available: true
+    note: restored 2026-06-04 ~21:00Z (operator repaired grafana.db datasource uids — Grafana 13 makes
+          provisioning failures boot-fatal; crashlooped since the ethosengine reboot). Evidence-backed:
+          MCP list_datasources returns loki/prometheus/tempo/alertmanager with canonical uids; /api/health
+          200. Was connection-refused ≥15:30-20:30Z 2026-06-04. Correlation-dependent diagnostics declare
+          requires_env: [observability].
 
 # requires_env vocabulary used by tests/stories/gates (declare on the artifact):
 #   shem               — needs the shem multi-tenant canvas (cross-node)
