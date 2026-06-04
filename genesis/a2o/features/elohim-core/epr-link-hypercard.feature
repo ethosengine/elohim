@@ -25,5 +25,5 @@ Feature: EPR-links flip cards in place, preserving context
   Scenario: EPR-link right-click opens the context menu
     Given the user is viewing a page containing an <elohim-epr-link>
     When the user right-clicks the link
-    Then a context menu opens with Open, About this EPR, and Copy EPR link
+    Then a context menu opens including Open, About this EPR, and Copy EPR link
     And the menu can be navigated by keyboard (arrows, Enter, Escape)

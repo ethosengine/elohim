@@ -52,7 +52,7 @@ describe('<elohim-epr-link>', () => {
     await el.updateComplete;
 
     let navigated: { epr: string } | null = null;
-    el.addEventListener('navigate', (e) => {
+    el.addEventListener('navigate', e => {
       navigated = (e as CustomEvent<{ epr: string }>).detail;
     });
     const button = el.shadowRoot!.querySelector('button.anchor') as HTMLElement;
@@ -106,7 +106,7 @@ describe('<elohim-epr-link>', () => {
     await el.updateComplete;
 
     let received: { epr: string } | null = null;
-    el.addEventListener('about', (e) => {
+    el.addEventListener('about', e => {
       received = (e as CustomEvent<{ epr: string }>).detail;
     });
 
@@ -121,7 +121,7 @@ describe('<elohim-epr-link>', () => {
         detail: { id: 'about' },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     await el.updateComplete;
     expect(received).to.exist;
@@ -136,7 +136,7 @@ describe('<elohim-epr-link>', () => {
     await el.updateComplete;
 
     let navigated: { epr: string } | null = null;
-    el.addEventListener('navigate', (e) => {
+    el.addEventListener('navigate', e => {
       navigated = (e as CustomEvent<{ epr: string }>).detail;
     });
 
@@ -150,11 +150,85 @@ describe('<elohim-epr-link>', () => {
         detail: { id: 'open' },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     await el.updateComplete;
     expect(navigated).to.exist;
     expect(navigated!.epr).to.equal('epr:foo');
+  });
+
+  it('renders host-injected contextMenuItems instead of the default three', async () => {
+    const el = await fixture<ElohimEprLink>(html`
+      <elohim-epr-link epr="epr:foo" display="chip"></elohim-epr-link>
+    `);
+    el.setResolution(2, { title: 'Foo' });
+    el.contextMenuItems = [
+      { id: 'open', label: 'Open' },
+      { id: 'network', label: 'View network & resilience' },
+      { id: 'flag', label: 'Flag' },
+    ];
+    await el.updateComplete;
+
+    const button = el.shadowRoot!.querySelector('button.anchor') as HTMLElement;
+    button.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await el.updateComplete;
+
+    const menu = el.shadowRoot!.querySelector('elohim-context-menu')!;
+    await (menu as ElohimEprLink & { updateComplete: Promise<unknown> }).updateComplete;
+    const labels = [...menu.shadowRoot!.querySelectorAll('[role="menuitem"]')].map(li =>
+      li.textContent?.trim()
+    );
+    expect(labels).to.deep.equal(['Open', 'View network & resilience', 'Flag']);
+  });
+
+  it('re-emits epr-menu-select with id+epr for a host-injected selection', async () => {
+    const el = await fixture<ElohimEprLink>(html`
+      <elohim-epr-link epr="epr:foo" display="chip"></elohim-epr-link>
+    `);
+    el.setResolution(2, { title: 'Foo' });
+    el.contextMenuItems = [{ id: 'network', label: 'View network & resilience' }];
+    await el.updateComplete;
+
+    let received: { id: string; epr: string } | null = null;
+    el.addEventListener('epr-menu-select', e => {
+      received = (e as CustomEvent<{ id: string; epr: string }>).detail;
+    });
+
+    const button = el.shadowRoot!.querySelector('button.anchor') as HTMLElement;
+    button.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await el.updateComplete;
+
+    const menu = el.shadowRoot!.querySelector('elohim-context-menu')!;
+    menu.dispatchEvent(
+      new CustomEvent('item-select', {
+        detail: { id: 'network' },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await el.updateComplete;
+    expect(received).to.exist;
+    expect(received!.id).to.equal('network');
+    expect(received!.epr).to.equal('epr:foo');
+  });
+
+  it('renders the default MVP three when no contextMenuItems override is set', async () => {
+    const el = await fixture<ElohimEprLink>(html`
+      <elohim-epr-link epr="epr:foo" display="chip"></elohim-epr-link>
+    `);
+    el.setResolution(2, { title: 'Foo' });
+    await el.updateComplete;
+
+    const button = el.shadowRoot!.querySelector('button.anchor') as HTMLElement;
+    button.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await el.updateComplete;
+
+    const menu = el.shadowRoot!.querySelector('elohim-context-menu')!;
+    await (menu as ElohimEprLink & { updateComplete: Promise<unknown> }).updateComplete;
+    const labels = [...menu.shadowRoot!.querySelectorAll('[role="menuitem"]')].map(li =>
+      li.textContent?.trim()
+    );
+    expect(labels).to.deep.equal(['Open', 'About this EPR', 'Copy EPR link']);
   });
 
   it('uses resolver to advance to L3 on success', async () => {
@@ -163,11 +237,11 @@ describe('<elohim-epr-link>', () => {
     const el = await fixture<ElohimEprLink>(html`
       <elohim-epr-link display="inline"></elohim-epr-link>
     `);
-    el.resolver = async (_epr) => ({ title: 'Resolved Title' });
+    el.resolver = async _epr => ({ title: 'Resolved Title' });
     el.epr = 'epr:resolved-thing';
     await el.updateComplete;
     // One async tick for the promise in resolve() to settle
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
     await el.updateComplete;
     const button = el.shadowRoot!.querySelector('button.anchor');
     expect(button?.textContent?.trim()).to.equal('Resolved Title');
@@ -180,7 +254,7 @@ describe('<elohim-epr-link>', () => {
     el.resolver = async () => null;
     el.epr = 'epr:unreachable';
     await el.updateComplete;
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
     await el.updateComplete;
     const fallback = el.shadowRoot!.querySelector('elohim-mention-base');
     expect(fallback).to.exist;
@@ -195,7 +269,7 @@ describe('<elohim-epr-link>', () => {
 
     const button = el.shadowRoot!.querySelector('button.anchor') as HTMLElement;
     button.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true }),
+      new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true })
     );
     await el.updateComplete;
     const menu = el.shadowRoot!.querySelector('elohim-context-menu');
@@ -248,11 +322,14 @@ describe('<elohim-epr-link> — ua-prefs precondition gate', () => {
   afterEach(() => clearMediaQueries());
 
   it('forced-colors overrides use CSS system colors (CanvasText, ButtonFace, ButtonText)', () => {
-    const cssText = (
-      ElohimEprLink as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimEprLink as unknown as { styles: { cssText: string } }).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
+    // Substring containment on the CSS text after the forced-colors block — not
+    // Set membership (a Set built from a string iterates single characters, so
+    // .has('CanvasText') would always be false). Disable the prefer-set-has
+    // autofix, which would wrongly rewrite these String.includes calls to Set.has.
+    // eslint-disable-next-line unicorn/prefer-set-has
     const afterForced = cssText.slice(forcedIdx);
     const hasSystemColor =
       afterForced.includes('CanvasText') ||
@@ -279,9 +356,7 @@ describe('<elohim-epr-link> — ua-prefs precondition gate', () => {
 
 describe('<elohim-epr-link> — i18n precondition gate', () => {
   it('uses no physical CSS properties (only logical or non-positional)', () => {
-    const cssText = (
-      ElohimEprLink as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimEprLink as unknown as { styles: { cssText: string } }).styles.cssText;
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });
@@ -289,7 +364,9 @@ describe('<elohim-epr-link> — i18n precondition gate', () => {
   it('renders correctly in RTL document direction (he-IL)', async () => {
     const el = await renderInLocale<ElohimEprLink>(
       'he-IL',
-      html`<elohim-epr-link epr="epr:lamad-spa" display="chip"></elohim-epr-link>`,
+      html`
+        <elohim-epr-link epr="epr:lamad-spa" display="chip"></elohim-epr-link>
+      `
     );
     // Force to a visible level since no resolver is wired
     el.setResolution(2, { title: 'Lamad' });

@@ -564,3 +564,96 @@ export const SHEFA_RECIPROCITY = {
   NET: 'reciprocity-net',
   CAPACITY: 'reciprocity-capacity',
 } as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Elohim App — Shefa Topology drill-down + capacity affordances (Epic A:
+// clickable capacity bar + expandable detail panels). Append-only block; the
+// SHEFA_* blocks above are unchanged.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// my-cluster.component.html — clickable stacked storage capacity bar + the
+// totals panel it reveals when expanded.
+export const SHEFA_CLUSTER_CAPACITY = {
+  CAPACITY_BAR: 'my-cluster-capacity-bar',
+} as const;
+
+// device-tile.component.ts — per-device expandable detail panel (freshness,
+// hosting/projecting counts, peerId). The tile element itself (SHEFA_CLUSTER.
+// DEVICE_TILE = 'device-tile') is the role=button toggle, so EXPAND reuses it.
+export const DEVICE_TILE_DETAIL = {
+  EXPAND: 'device-tile',
+  DETAIL_PANEL: 'device-tile-detail-panel',
+  DETAIL_FRESHNESS: 'device-tile-detail-freshness',
+  DETAIL_HOSTING: 'device-tile-detail-hosting',
+  DETAIL_PROJECTING: 'device-tile-detail-projecting',
+  DETAIL_PEER_ID: 'device-tile-detail-peer-id',
+} as const;
+
+// peer-topology.component.ts — per-household expandable detail panel
+// (lastSyncSec, hosted-cid counts, critical-for-me/them flags).
+export const SHEFA_PEERS_DETAIL = {
+  EXPAND: 'peer-household-expand',
+  DETAIL_PANEL: 'peer-household-detail-panel',
+  DETAIL_LAST_SYNC: 'peer-detail-last-sync',
+  DETAIL_HOSTED_BY_THEM: 'peer-detail-hosted-by-them',
+  DETAIL_HOSTED_BY_ME: 'peer-detail-hosted-by-me',
+  DETAIL_CRITICAL_FOR_ME: 'peer-detail-critical-for-me',
+  DETAIL_CRITICAL_FOR_THEM: 'peer-detail-critical-for-them',
+} as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lane B — EPR relationship card + shefa network posture (append-only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// epr-relationship-card.component.ts — a typed, navigable relationship card
+// beneath a concept. Reach + resilience trust signals; the peers count is a
+// subtle distinct-peers badge rendered only when distinctPeers > 0.
+export const RELATIONSHIP_CARD = {
+  CARD: 'epr-relationship-card',
+  TYPE: 'epr-rel-card-type',
+  TITLE: 'epr-rel-card-title',
+  REACH: 'epr-rel-card-reach',
+  RESILIENCE: 'epr-rel-card-resilience',
+  PEERS: 'epr-rel-card-peers',
+} as const;
+
+// epr-relationships-panel.component.ts — groups relationship cards by type
+// (Prerequisites / This teaches / References) into per-type sections.
+export const RELATIONSHIP_PANEL = {
+  PANEL: 'epr-relationships-panel',
+  GROUP: 'epr-rel-group',
+} as const;
+
+// network-health-tab.component.html — P2P mesh posture surface mounted in the
+// shefa dashboard (/shefa/dashboard). The endpoint GET /api/v1/network/posture
+// is live; testids mirror the rendered posture cards.
+export const SHEFA_POSTURE = {
+  CARD: 'network-posture-card',
+  ACTIVE_PEERS: 'posture-active-peers',
+  HOUSEHOLDS_RECIPROCATING: 'posture-households-reciprocating',
+  ALWAYS_ON: 'posture-always-on',
+  COMPUTE: 'posture-compute',
+  STORAGE_PRESSURE: 'posture-storage-pressure',
+  HOUSEHOLD_BREAKDOWN: 'household-breakdown',
+} as const;
+
+// <elohim-epr-link> + nested <elohim-context-menu> (elohim-core Lit primitives).
+// These are blank-slate web components rendered in shadow DOM — they expose ARIA
+// roles, not data-testids (adding testids would brand the primitive). The EPR-link
+// hypercard steps pierce the shadow roots and assert by tag + role + label.
+export const EPR_LINK = {
+  // The host custom-element tag (light DOM).
+  HOST: 'elohim-epr-link',
+  // The interactive chip/button inside the host's shadow root.
+  ANCHOR: 'button.anchor',
+  // The nested context-menu custom element (opened on right-click / Shift+F10).
+  CONTEXT_MENU: 'elohim-context-menu',
+} as const;
+
+// <elohim-context-menu> shadow-DOM role selectors (no testids — role-based by design).
+export const CONTEXT_MENU = {
+  MENU_ROLE: '[role="menu"]',
+  ITEM_ROLE: '[role="menuitem"]',
+  // The three MVP labels asserted present by the right-click scenario.
+  MVP_LABELS: ['Open', 'About this EPR', 'Copy EPR link'],
+} as const;

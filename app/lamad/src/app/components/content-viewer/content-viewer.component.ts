@@ -279,6 +279,21 @@ export class ContentViewerComponent
       this.pathContext = context;
       this.hasReturnPath = context?.detourStack !== undefined && context.detourStack.length > 0;
     });
+
+    // Deep-link a tab via the route fragment, e.g. /resource/:id#network.
+    // The EPR-link context menu's "View network & resilience" action lands
+    // here directly on the resilience surface instead of the content tab.
+    // (Guard for partial ActivatedRoute mocks that omit `fragment`.)
+    this.route.fragment?.pipe(takeUntil(this.destroy$)).subscribe(fragment => {
+      if (
+        fragment === 'content' ||
+        fragment === 'trust' ||
+        fragment === 'governance' ||
+        fragment === 'network'
+      ) {
+        this.setActiveTab(fragment);
+      }
+    });
   }
 
   ngOnDestroy(): void {

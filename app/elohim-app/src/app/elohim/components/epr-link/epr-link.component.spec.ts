@@ -18,6 +18,8 @@ import { Router, RouterModule } from '@angular/router';
 
 import { of } from 'rxjs';
 
+import { type ContextMenuAction } from '@app/qahal';
+
 import { EprLinkComponent } from './epr-link.component';
 import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
 
@@ -102,5 +104,93 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     component.epr = 'epr:manifesto';
     fixture.detectChanges();
     expect(() => component.ngOnDestroy()).not.toThrow();
+  });
+
+  it('should inject the full action list as the Lit element contextMenuItems property', () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const lit = (fixture.nativeElement as HTMLElement).querySelector(
+      'elohim-epr-link',
+    ) as HTMLElement & { contextMenuItems?: { id: string }[] };
+    expect(Array.isArray(lit.contextMenuItems)).toBe(true);
+    const ids = lit.contextMenuItems!.map(i => i.id);
+    // MVP three lead, then the full Epic E set.
+    expect(ids.slice(0, 3)).toEqual(['open', 'about', 'copy']);
+    expect(ids).toContain('network');
+    expect(ids).toContain('steward');
+    expect(ids).toContain('flag');
+  });
+
+  it('should navigate to the resilience route with the network fragment on a "network" selection', async () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.dispatchEvent(
+      new CustomEvent('epr-menu-select', {
+        detail: { id: 'network', epr: 'epr:manifesto' },
+        bubbles: true,
+      }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(resolverSpy.resolve).toHaveBeenCalledWith('epr:manifesto');
+    expect(routerNavSpy).toHaveBeenCalledWith(['/resource', 'manifesto'], {
+      fragment: 'network',
+    });
+  });
+
+  it('should emit the governance output with a ContextMenuAction on a "flag" selection', () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const emitted: unknown[] = [];
+    component.governance.subscribe(a => emitted.push(a));
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.dispatchEvent(
+      new CustomEvent('epr-menu-select', {
+        detail: { id: 'flag', epr: 'epr:manifesto' },
+        bubbles: true,
+      }),
+    );
+
+    expect(emitted).toEqual([
+      { entityType: 'epr', entityId: 'epr:manifesto', action: 'flag' },
+    ]);
+  });
+
+  it('should map "feedback" to the open-feedback governance action', () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const emitted: ContextMenuAction[] = [];
+    component.governance.subscribe(a => emitted.push(a));
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.dispatchEvent(
+      new CustomEvent('epr-menu-select', {
+        detail: { id: 'feedback', epr: 'epr:manifesto' },
+        bubbles: true,
+      }),
+    );
+
+    expect(emitted[0].action).toBe('open-feedback');
+  });
+
+  it('should remove the epr-menu-select listener on destroy', () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const removeSpy = vi.spyOn(host, 'removeEventListener');
+    component.ngOnDestroy();
+
+    expect(removeSpy).toHaveBeenCalledWith(
+      'epr-menu-select',
+      expect.any(Function),
+    );
   });
 });

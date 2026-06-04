@@ -1290,7 +1290,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "<elohim-epr-link> — the protocol's HyperCard navigation primitive.\n\nProgressive loading (L1–L4): renders a sized skeleton instantly, fills\nin title/metadata as Loader resolves, falls back to preview if the\ntarget is unreachable.\n\nDefault click: emits 'navigate' with the EPR ref. Parent decides what\nto do (card-flip in place, or hard nav, depending on display variant).\n\nRight-click: opens <elohim-context-menu> with MVP items (Open / About\nthis EPR / Copy EPR link). Submenu items (View as..., Where this\nleads...) deferred per spec §7.4.\n\nResolution is decoupled from the loader: production wiring injects a\nresolver function via the `.resolver` property. For tests / Storybook,\ndirect manipulation of internal state (via `setResolution()`) is the\nsupported test seam.",
+          "description": "<elohim-epr-link> — the protocol's HyperCard navigation primitive.\n\nProgressive loading (L1–L4): renders a sized skeleton instantly, fills\nin title/metadata as Loader resolves, falls back to preview if the\ntarget is unreachable.\n\nDefault click: emits 'navigate' with the EPR ref. Parent decides what\nto do (card-flip in place, or hard nav, depending on display variant).\n\nRight-click: opens <elohim-context-menu>. The default menu is the MVP\nthree (Open / About this EPR / Copy EPR link); a host may inject a\nfuller action set via the `.contextMenuItems` property (e.g. the Epic E\nactions: View network & resilience, See relationships, Steward this\ncontent, Flag / Challenge / Open feedback). The element stays\nblank-slate: app-specific routing/governance/stewardship is NOT decided\nhere — every selection is re-emitted as `epr-menu-select` so the host\ncan act on ids it owns. Submenu items (View as..., Where this leads...)\ndeferred per spec §7.4.\n\nResolution is decoupled from the loader: production wiring injects a\nresolver function via the `.resolver` property. For tests / Storybook,\ndirect manipulation of internal state (via `setResolution()`) is the\nsupported test seam.",
           "name": "ElohimEprLink",
           "cssProperties": [
             {
@@ -1352,6 +1352,15 @@
             },
             {
               "kind": "field",
+              "name": "contextMenuItems",
+              "type": {
+                "text": "ContextMenuItem[] | null"
+              },
+              "default": "null",
+              "description": "Optional host-injected context-menu action set. When null, the default MVP three (Open / About this EPR / Copy EPR link) render — preserving standalone/Storybook usability."
+            },
+            {
+              "kind": "field",
               "name": "loadLevel",
               "type": {
                 "text": "EprLinkLoadLevel"
@@ -1379,13 +1388,12 @@
             },
             {
               "kind": "field",
-              "name": "menuItems",
+              "name": "defaultMenuItems",
               "type": {
                 "text": "ContextMenuItem[]"
               },
               "privacy": "private",
-              "readonly": true,
-              "default": "[ { id: 'open', label: 'Open' }, { id: 'about', label: 'About this EPR' }, { id: 'copy', label: 'Copy EPR link' }, ]"
+              "readonly": true
             },
             {
               "kind": "method",
@@ -1479,6 +1487,10 @@
             {
               "description": "{ detail: { epr: string } } when \"About this EPR\" is selected",
               "name": "about"
+            },
+            {
+              "description": "{ detail: { id: string, epr: string } } for EVERY context-menu selection, so the host can handle app-specific ids (network / relationships / steward / flag / challenge / feedback) it injected via `contextMenuItems`",
+              "name": "epr-menu-select"
             }
           ],
           "attributes": [
@@ -5496,6 +5508,12 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/contracts/omnibar.contract.ts",
+      "declarations": [],
+      "exports": []
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/capability/certainty.ts",
       "declarations": [
         {
@@ -5772,12 +5790,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/contracts/omnibar.contract.ts",
-      "declarations": [],
-      "exports": []
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/localize/runtime.ts",
       "declarations": [
         {
@@ -5977,79 +5989,6 @@
           "declaration": {
             "name": "Session",
             "module": "src/session/session.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Loader",
-          "members": [
-            {
-              "kind": "field",
-              "name": "verifyCid",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "resolve",
-              "return": {
-                "type": {
-                  "text": "Promise<LoaderResolution>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                },
-                {
-                  "name": "bytes",
-                  "type": {
-                    "text": "Uint8Array"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Loader",
-          "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
           }
         }
       ]
@@ -6342,6 +6281,79 @@
           "declaration": {
             "name": "measureLuminanceChanges",
             "module": "src/testing/ua-prefs.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
           }
         }
       ]
