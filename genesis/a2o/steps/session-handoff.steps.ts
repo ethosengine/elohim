@@ -63,8 +63,16 @@ Then(
     assert.ok(expiresAt > 0, 'Transfer token expiresAt is missing or zero');
     const now = Math.floor(Date.now() / 1000);
     const diff = expiresAt - now;
+    // expiresAt is stamped by the DOORWAY's clock; `now` is the runner's. A
+    // ≥1s cross-host skew reads as maxSeconds+1 (observed: "61s exceeds 60s"
+    // on genesis#1092). Allow a small bounded skew — the scenario's intent is
+    // "short-lived token", not sub-second cross-host clock agreement.
+    const CLOCK_SKEW_ALLOWANCE_S = 2;
     assert.ok(diff > 0, `Transfer token already expired (expiresAt=${expiresAt}, now=${now})`);
-    assert.ok(diff <= maxSeconds, `Transfer token expiry ${diff}s exceeds maximum ${maxSeconds}s`);
+    assert.ok(
+      diff <= maxSeconds + CLOCK_SKEW_ALLOWANCE_S,
+      `Transfer token expiry ${diff}s exceeds maximum ${maxSeconds}s (+${CLOCK_SKEW_ALLOWANCE_S}s skew allowance)`
+    );
   }
 );
 
