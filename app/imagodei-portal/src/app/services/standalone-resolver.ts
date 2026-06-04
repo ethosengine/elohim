@@ -12,6 +12,40 @@
  * adapter, not a business-logic layer.
  */
 
+import type { AuthorityResolution } from 'elohim-imagodei';
+
+/**
+ * Structural mirror of `LocalSessionView`
+ * (elohim/sdk/storage-client-ts/src/generated/LocalSessionView.ts) — the 201
+ * body of `POST /session/exchange`. Declared locally because the standalone
+ * portal does not depend on `@elohim/storage-client`; the shape is owned by
+ * Rust (ts-rs) and is read-only here. Session identity (`id`, `humanId`,
+ * `agentPubKey`) is assigned by the backend — the portal never generates it.
+ */
+export interface LocalSessionView {
+  id: string;
+  humanId: string;
+  agentPubKey: string;
+  doorwayUrl: string;
+  doorwayId: string | null;
+  identifier: string;
+  displayName: string | null;
+  profileImageHash: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastSyncedAt: string | null;
+  bootstrapUrl: string | null;
+}
+
+export interface SessionTokenOutcome {
+  ok: boolean;
+  /** HTTP status when the server answered (absent on a network/throw). */
+  status?: number;
+  /** The redeemed local session, present only on a 201. */
+  session?: LocalSessionView;
+}
+
 export interface ResolveOutcome {
   ok: boolean;
   doorwayUrl?: string;
@@ -93,6 +127,73 @@ export class StandaloneResolver {
       return { error };
     }
     return await resp.json() as LoginOutcome;
+  }
+
+  /**
+   * Consumes a doorway→steward portal handoff. The doorway issued an opaque,
+   * single-use `sessionToken` and redirected the browser here carrying it plus
+   * the issuer's origin (`doorwayUrl`). We redeem it at this steward's OWN
+   * storage backend (same-origin relative URL — never the issuer), which
+   * verifies the token against the issuer, mints a local peer-native session,
+   * and sets an httpOnly session cookie.
+   *
+   * The doorway owns token issuance; this steward's storage owns redemption and
+   * trust adjudication (403 when the issuer isn't trusted). This method only
+   * carries the values across the wire and reports the outcome — it computes no
+   * trust truth of its own.
+   *
+   * Returns `{ ok: true, session }` on 201; `{ ok: false, status }` on
+   * 401 (redeem failed / expired / replayed) or 403 (issuer not trusted);
+   * `{ ok: false }` with no status on a network error.
+   */
+  async loginWithSessionToken(
+    sessionToken: string,
+    doorwayUrl: string
+  ): Promise<SessionTokenOutcome> {
+    try {
+      const resp = await fetch('/session/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ sessionToken, doorwayUrl }),
+      });
+      if (resp.status !== 201) {
+        return { ok: false, status: resp.status };
+      }
+      const session = (await resp.json()) as LocalSessionView;
+      return { ok: true, status: resp.status, session };
+    } catch {
+      // Network error — conductor/storage unreachable. No status to report.
+      return { ok: false };
+    }
+  }
+
+  /**
+   * Discovers the active session's authority by calling `GET /auth/me`.
+   * `trustMode` is READ from the response, never configured — the same bundle
+   * runs in both doorway-host and peer-conductor modes and learns which from
+   * the wire. Returns null when unauthenticated (401) or unreachable, leaving
+   * the shell to render placeholder chrome / emit `authority-needed`.
+   */
+  async fetchAuthority(): Promise<AuthorityResolution | null> {
+    try {
+      const resp = await fetch('/auth/me', { credentials: 'include' });
+      if (!resp.ok) return null;
+      const data = (await resp.json()) as Record<string, unknown>;
+      const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};
+      return {
+        trustMode:
+          (data['trustMode'] as AuthorityResolution['trustMode'] | undefined) ?? 'doorway-host',
+        authority: {
+          label: (authorityData['label'] as string | undefined) ?? '',
+          id: authorityData['id'] as string | undefined,
+        },
+        flywheelHint: data['flywheelHint'] as boolean | undefined,
+        attestors: data['attestors'] as AuthorityResolution['attestors'] | undefined,
+      };
+    } catch {
+      return null;
+    }
   }
 
   /**

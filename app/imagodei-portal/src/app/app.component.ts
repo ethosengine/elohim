@@ -9,10 +9,21 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { StandaloneResolver, type ConsentContext } from './services/standalone-resolver';
+import {
+  readStewardHandoff,
+  runStewardLogin,
+  stripHandoffFromSearch,
+  type StewardLoginEffects,
+} from './services/steward-login-controller';
 import type { AuthorityResolution } from 'elohim-imagodei';
 
-type PortalMode = 'login' | 'consent';
+type PortalMode = 'login' | 'consent' | 'steward-login';
+// 'steward-login' is the transient "Connecting to your steward portal…" step;
+// the shell only knows 'resolve' | 'login' | 'consent' | 'callback', so while
+// mode is 'steward-login' we hold the shell on 'resolve' and render our own
+// connecting / failure copy in the primary slot.
 type PortalStep = 'resolve' | 'login' | 'consent' | 'callback';
+type StewardPhase = 'connecting' | 'failed' | 'unreachable';
 
 @Component({
   selector: 'imagodei-portal-root',
@@ -47,6 +58,27 @@ type PortalStep = 'resolve' | 'login' | 'consent' | 'callback';
           ></elohim-imagodei-login-card>
         </ng-container>
 
+        <ng-container *ngIf="mode() === 'steward-login'">
+          <div slot="primary" class="steward-login" role="status" aria-live="polite">
+            <ng-container *ngIf="stewardPhase() === 'connecting'">
+              <p class="steward-login__lead">Connecting to your steward portal…</p>
+              <p class="steward-login__detail">
+                We're handing your sign-in over to the conductor that holds your identity.
+              </p>
+            </ng-container>
+
+            <ng-container *ngIf="stewardPhase() !== 'connecting'">
+              <p class="steward-login__lead">{{ stewardMessage() }}</p>
+              <a
+                *ngIf="stewardReturnUrl()"
+                class="steward-login__return"
+                [href]="stewardReturnUrl()"
+                rel="noopener"
+              >Return to your doorway</a>
+            </ng-container>
+          </div>
+        </ng-container>
+
         <ng-container *ngIf="mode() === 'consent' && consentCtx() !== null">
           <elohim-imagodei-consent-card
             #consentCard
@@ -78,6 +110,29 @@ type PortalStep = 'resolve' | 'login' | 'consent' | 'callback';
       white-space: nowrap;
       border: 0;
     }
+
+    .steward-login {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      text-align: center;
+    }
+
+    .steward-login__lead {
+      margin: 0;
+      font-weight: 600;
+    }
+
+    .steward-login__detail {
+      margin: 0;
+      opacity: 0.75;
+      font-size: 0.875rem;
+    }
+
+    .steward-login__return {
+      align-self: center;
+      color: LinkText;
+    }
   `],
 })
 export class AppComponent implements OnInit, AfterViewInit {
@@ -88,6 +143,13 @@ export class AppComponent implements OnInit, AfterViewInit {
   identifier = signal<string>('');
   consentCtx = signal<ConsentContext | null>(null);
   errorMessage = signal<string>('');
+
+  /** Steward-handoff display phase; only meaningful while mode === 'steward-login'. */
+  stewardPhase = signal<StewardPhase>('connecting');
+  /** Non-scary copy shown on a failed/unreachable steward handoff. */
+  stewardMessage = signal<string>('');
+  /** The doorway origin to offer as a "return to your doorway" action. */
+  stewardReturnUrl = signal<string>('');
 
   /** Pre-fetched authority resolution from `GET /auth/me`. Null until fetch completes. */
   authority = signal<AuthorityResolution | null>(null);
@@ -102,44 +164,88 @@ export class AppComponent implements OnInit, AfterViewInit {
     // Failure is non-fatal — shell renders placeholder chrome and emits authority-needed.
     void this._prefetchAuthority();
 
-    const params = new URLSearchParams(window.location.search);
-    const isConsent = params.has('client_id') && params.has('claims');
+    const search = window.location.search;
 
-    if (isConsent) {
-      this.mode.set('consent');
-      this.step.set('consent');
-      try {
-        const ctx = await this.resolverService.prepareConsent({
-          clientId: params.get('client_id')!,
-          claims: (params.get('claims') ?? '').split(',').filter(Boolean),
-          redirectUri: params.get('redirect_uri') ?? '',
-          state: params.get('state') ?? '',
-        });
-        this.consentCtx.set(ctx);
-      } catch (e) {
-        this.errorMessage.set(e instanceof Error ? e.message : 'consent preparation failed');
+    // 1) Doorway→steward handoff. The doorway redirected us here with an opaque
+    //    session_token + the issuer origin. Redeem it before the normal flow.
+    const handoff = readStewardHandoff(search);
+    if (handoff) {
+      this.mode.set('steward-login');
+      this.stewardPhase.set('connecting');
+      const outcome = await runStewardLogin(
+        this.resolverService,
+        handoff,
+        search,
+        this._stewardEffects(),
+      );
+      if (outcome.status === 'authenticated') {
+        // The session landed; refreshAuthority + consent re-check already ran in
+        // the effects. If no consent was requested, fall back to the login chrome
+        // (the shell now reflects the authenticated peer-conductor authority).
+        if (this.mode() === 'steward-login') {
+          this.mode.set('login');
+          this.step.set('resolve');
+        }
+      } else {
+        this.stewardPhase.set(outcome.status === 'unreachable' ? 'unreachable' : 'failed');
+        this.stewardMessage.set(outcome.message);
+        this.stewardReturnUrl.set(outcome.returnToDoorwayUrl ?? handoff.doorwayUrl);
       }
+      return;
+    }
+
+    // 2) Direct OAuth consent request (no handoff).
+    await this._enterConsentIfRequested(search);
+  }
+
+  /** Effects seam handed to the steward-login controller. */
+  private _stewardEffects(): StewardLoginEffects {
+    return {
+      stripHandoffParams: (search: string) => {
+        // Strip ONLY the handoff params; preserve OAuth params for the consent
+        // flow. The opaque code must never linger in the address bar / history.
+        const cleaned = stripHandoffFromSearch(search);
+        const url = window.location.pathname + cleaned + window.location.hash;
+        window.history.replaceState(window.history.state, '', url);
+      },
+      refreshAuthority: () => this._prefetchAuthority(),
+      enterConsentIfRequested: (search: string) => this._enterConsentIfRequested(search),
+    };
+  }
+
+  /**
+   * If the URL carries an OAuth consent request (client_id + claims), prepare
+   * and enter the consent step. Shared by the direct-consent path and the
+   * post-handoff path so the OAuth params survive the steward hop.
+   */
+  private async _enterConsentIfRequested(search: string): Promise<void> {
+    const params = new URLSearchParams(search);
+    if (!(params.has('client_id') && params.has('claims'))) return;
+
+    this.mode.set('consent');
+    this.step.set('consent');
+    try {
+      const ctx = await this.resolverService.prepareConsent({
+        clientId: params.get('client_id')!,
+        claims: (params.get('claims') ?? '').split(',').filter(Boolean),
+        redirectUri: params.get('redirect_uri') ?? '',
+        state: params.get('state') ?? '',
+      });
+      this.consentCtx.set(ctx);
+    } catch (e) {
+      this.errorMessage.set(e instanceof Error ? e.message : 'consent preparation failed');
     }
   }
 
   private async _prefetchAuthority(): Promise<void> {
-    try {
-      const resp = await fetch('/auth/me', { credentials: 'include' });
-      if (!resp.ok) return;
-      const data = (await resp.json()) as Record<string, unknown>;
-      const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};
-      this.authority.set({
-        trustMode: (data['trustMode'] as AuthorityResolution['trustMode'] | undefined) ?? 'doorway-host',
-        authority: {
-          label: (authorityData['label'] as string | undefined) ?? '',
-          id: authorityData['id'] as string | undefined,
-        },
-        flywheelHint: data['flywheelHint'] as boolean | undefined,
-        attestors: data['attestors'] as AuthorityResolution['attestors'] | undefined,
-      });
-    } catch {
-      // Network error — leave authority null; shell will emit authority-needed.
+    // trustMode is DISCOVERED here from /auth/me, never configured — the same
+    // bundle runs in doorway-host and peer-conductor modes and learns which
+    // from the wire (peer-conductor after a successful steward handoff).
+    const authority = await this.resolverService.fetchAuthority();
+    if (authority) {
+      this.authority.set(authority);
     }
+    // Null ⇒ leave authority null; the shell emits authority-needed.
   }
 
   ngAfterViewInit(): void {

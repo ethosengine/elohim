@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "build": "ng build",
-    "start": "ng serve"
+    "start": "ng serve",
+    "test": "vitest run --config vite.config.ts",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit"
   },
   "dependencies": {
     "@angular/animations": "^19.2.18",
