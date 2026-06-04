@@ -307,6 +307,70 @@ async function main() {
     }
   }
 
+  // --- GATE MODE: codegen-manifest.mjs --gate <manifest> runs the ref check ONLY ---
+  // The generation of manifest-types.ts is owned by lamad:codegen (gospel:
+  // elohim/sdk/domains/lamad/CLAUDE.md — superset output, two distribution dirs).
+  // codegen-manifest.mjs's standalone role is the loader gate; --gate validates a
+  // manifest's quiltPolicy referential integrity without writing any output file.
+  {
+    const tmpDir = resolve(__dirname, '.quilt-gate-mode-check');
+    const contentTypesDir = resolve(tmpDir, 'manifest', 'content-types');
+    const codegenScript = resolve(__dirname, 'codegen-manifest.mjs');
+    try {
+      await mkdir(contentTypesDir, { recursive: true });
+      await writeFile(
+        resolve(contentTypesDir, 'photo.json'),
+        JSON.stringify({
+          description: 'A family photo album',
+          coupling: minimalCoupling(),
+          quiltPolicy: 'long-term-personl', // typo: missing 'a'
+        }),
+      );
+      await writeFile(
+        resolve(tmpDir, 'manifest.json'),
+        JSON.stringify({
+          id: 'bafkreigatemodetest',
+          name: 'gate-mode-test',
+          version: '1.0.0',
+          vocabulary: {
+            quiltPolicies: { 'long-term-personal': { defaultTierFloor: 'stocked' } },
+            contentTypes: { photo: { $ref: './manifest/content-types/photo.json' } },
+            observations: minimalObservations(),
+          },
+        }),
+      );
+
+      const bad = spawnSync(
+        process.execPath,
+        [codegenScript, '--gate', resolve(tmpDir, 'manifest.json')],
+        { encoding: 'utf8' },
+      );
+      assert(
+        bad.status === 1 && (bad.stderr ?? '').includes('long-term-personl'),
+        'Gate mode: --gate exits 1 on a dangling quiltPolicy ref, naming it',
+      );
+      if (bad.status !== 1) {
+        console.error(`  (gate exit=${bad.status}, stderr=${JSON.stringify(bad.stderr)})`);
+      }
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+
+    // Real manifest: the lamad manifest declares no quiltPolicies → gate passes clean.
+    const real = spawnSync(
+      process.execPath,
+      [codegenScript, '--gate', resolve(__dirname, '../../domains/lamad/manifest.json')],
+      { encoding: 'utf8' },
+    );
+    assert(
+      real.status === 0,
+      'Gate mode: --gate exits 0 on the real lamad manifest (no quilt declarations yet)',
+    );
+    if (real.status !== 0) {
+      console.error(`  (gate exit=${real.status}, stderr=${JSON.stringify(real.stderr)})`);
+    }
+  }
+
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exit(failures > 0 ? 1 : 0);
 }

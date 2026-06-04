@@ -19,6 +19,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateQuiltPolicyRefs } from '../../../schemas/scripts/lib/manifest-quilt-refs.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LAMAD_DIR = resolve(__dirname, '..');
@@ -434,6 +435,19 @@ async function loadSchema(refPath) {
 async function main() {
   const manifestRaw = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
   const manifest = await resolveRefs(manifestRaw, dirname(MANIFEST_PATH));
+
+  // Loader-enforced referential integrity (tiered-quilt §4 v0.2): this is the
+  // OWNING generator for manifest-types.ts, so a dangling quiltPolicy reference
+  // must fail generation loud here too — never silently not-apply. Shared check:
+  // elohim/sdk/schemas/scripts/lib/manifest-quilt-refs.mjs (unit-tested in
+  // test-manifest-quilt-policy.mjs).
+  const quiltRefErrors = validateQuiltPolicyRefs(manifest);
+  if (quiltRefErrors.length > 0) {
+    console.error('Manifest quilt-policy referential-integrity errors:');
+    for (const e of quiltRefErrors) console.error(`  - ${e}`);
+    process.exit(1);
+  }
+
   const contentTypes = manifest.vocabulary?.contentTypes || {};
   const contentFormats = manifest.vocabulary?.contentFormats || {};
 

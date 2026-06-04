@@ -22,17 +22,26 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../');
 
 const VERIFY = process.argv.includes('--verify');
+// --gate: validate-only mode — load + resolve the manifest and run the
+// quilt-policy referential-integrity gate, writing NO output. Generation of
+// the lamad manifest-types.ts is owned by lamad:codegen (superset output,
+// two distribution dirs — see elohim/sdk/domains/lamad/CLAUDE.md); this
+// script's standalone role on that manifest is the loader gate.
+const GATE_ONLY = process.argv.includes('--gate');
 const args = process.argv.filter((a) => !a.startsWith('--'));
 const manifestArg = args[2];
 const outputArg = args[3];
 
-if (!manifestArg || !outputArg) {
-  console.error('Usage: node codegen-manifest.mjs [--verify] <manifest-path> <output-path>');
+if (!manifestArg || (!outputArg && !GATE_ONLY)) {
+  console.error(
+    'Usage: node codegen-manifest.mjs [--verify] <manifest-path> <output-path>\n' +
+      '       node codegen-manifest.mjs --gate <manifest-path>',
+  );
   process.exit(1);
 }
 
 const manifestPath = resolve(REPO_ROOT, manifestArg);
-const outputPath = resolve(REPO_ROOT, outputArg);
+const outputPath = GATE_ONLY ? null : resolve(REPO_ROOT, outputArg);
 
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -103,6 +112,11 @@ async function main() {
     console.error('Manifest quilt-policy referential-integrity errors:');
     for (const e of quiltRefErrors) console.error(`  - ${e}`);
     process.exit(1);
+  }
+
+  if (GATE_ONLY) {
+    console.log(`GATE OK: ${relative(REPO_ROOT, manifestPath)} quilt-policy refs resolve`);
+    return;
   }
 
   const appName = manifest.name; // e.g. "lamad"
@@ -252,7 +266,8 @@ ${schemaEntries}
   }
 
   const header = `// AUTO-GENERATED from app manifest: ${relManifestPath}
-// DO NOT EDIT — regenerate with: pnpm run manifest:codegen
+// DO NOT EDIT — regenerate with the manifest's owning codegen
+// (lamad manifest: pnpm run lamad:codegen; generic: node elohim/sdk/schemas/scripts/codegen-manifest.mjs)
 `;
 
   // Remove trailing empty blocks
@@ -269,7 +284,7 @@ ${schemaEntries}
     }
     if (existing !== content) {
       console.error(
-        `FAIL: ${relative(REPO_ROOT, outputPath)} is stale. Run: pnpm run manifest:codegen`,
+        `FAIL: ${relative(REPO_ROOT, outputPath)} is stale. Regenerate with the manifest's owning codegen.`,
       );
       process.exit(1);
     }
