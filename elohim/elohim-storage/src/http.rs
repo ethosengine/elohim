@@ -82,6 +82,7 @@ use crate::views::{
     EconomicEventView,
     EprHeadInputView,
     EprHeadView,
+    ExchangeSessionTokenInputView,
     GateDecisionAttestationView,
     GateDecisionChallengeView,
     HumanView,
@@ -253,6 +254,27 @@ fn validate_schema_version_header(req: &Request<Incoming>) -> Result<Option<u32>
 /// resolve via `slug_index` or treat the identifier as a direct blob hash.
 fn is_content_address(identifier: &str) -> bool {
     identifier.starts_with("sha256-") && identifier.len() > 10
+}
+
+/// Extract the `elohim_session` cookie value from a request's `Cookie` header.
+///
+/// The header is a `; `-separated list of `name=value` pairs. Returns the
+/// first `elohim_session` value found, trimmed. `None` when the header is
+/// absent, unparseable, or carries no `elohim_session` pair. Used by
+/// `GET /auth/me` to project the cookie-named session (GAP-2b multi-session
+/// browser path) in preference to the single active session.
+fn extract_session_cookie(headers: &hyper::HeaderMap) -> Option<String> {
+    let cookie_header = headers.get(header::COOKIE)?.to_str().ok()?;
+    for pair in cookie_header.split(';') {
+        let pair = pair.trim();
+        if let Some(value) = pair.strip_prefix("elohim_session=") {
+            let value = value.trim();
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// SPA deep-link discrimination — the shared ROUTE/ASSET rule (§12.2 of the
@@ -1101,12 +1123,34 @@ impl HttpServer {
                 }
             }
 
+            // Steward-side portal session exchange (doorway → portal-handoff,
+            // GAP-2b). A browser redirected from a doorway login portal lands at
+            // the steward's portal-host origin carrying a single-use redemption
+            // token. Storage redeems the token back-channel against the *issuing*
+            // (TOFU-allowlisted) doorway and, on success, seeds a LocalSession +
+            // sets the elohim_session cookie. This is a steward-local browser
+            // surface reached at the portal-host origin — it is intentionally
+            // NOT declared in build_manifest() (never doorway-proxied).
+            (Method::POST, "/session/exchange") => {
+                if let Some(ref pool) = self.db_pool {
+                    self.handle_session_exchange(req, pool.clone()).await
+                } else {
+                    Ok(response::service_unavailable("Database not enabled"))
+                }
+            }
+
             // Auth identity endpoint: same wire shape as doorway's /auth/me so
             // the standalone peer OAuth portal bundle can consume either source
             // without knowing which transport is in play (spec §3.2 Transport β).
+            //
+            // When the request carries an `elohim_session` cookie naming an
+            // existing, active session, that session is projected (GAP-2b multi-
+            // session browser path). Otherwise the current single-active-session
+            // behavior is preserved exactly (Tauri-native compat must not change).
             (Method::GET, "/auth/me") => {
                 if let Some(ref pool) = self.db_pool {
-                    self.handle_auth_me(pool.clone()).await
+                    let cookie_session_id = extract_session_cookie(req.headers());
+                    self.handle_auth_me(pool.clone(), cookie_session_id).await
                 } else {
                     Ok(response::service_unavailable("Database not enabled"))
                 }
@@ -6572,6 +6616,150 @@ impl HttpServer {
         Ok(response::created(&LocalSessionView::from(session)))
     }
 
+    /// POST /session/exchange — steward-side portal session exchange (GAP-2b).
+    ///
+    /// A browser redirected from a doorway login portal lands at the steward's
+    /// portal-host origin carrying a single-use redemption token plus the
+    /// doorway URL that issued it. Storage:
+    ///   1. ALLOWLIST: the `doorwayUrl` must already appear (origin-normalized)
+    ///      in this steward's `local_sessions` history — the TOFU anti-spoofing
+    ///      boundary. Never redeem against an issuer named only by the request.
+    ///      Unknown issuer → 403.
+    ///   2. REDEEM: back-channel `POST {doorwayUrl}/auth/handoff/redeem`. A 401
+    ///      or any non-200 → 401 (invalid token); a network error → 502.
+    ///   3. SEED: on success, build a `CreateLocalSessionInput` from the redeemed
+    ///      snapshot + the *validated* doorway URL, create the session
+    ///      (deactivating priors, as `POST /session` does), and respond 201 with
+    ///      the `LocalSessionView` + `Set-Cookie: elohim_session=<id>`.
+    ///
+    /// Source of truth: the redemption token is Operational (single-use, ~5-min
+    /// TTL, issuer-side truth — never persisted here). The conductor's
+    /// `/auth/me` remains authority over doorway claims; this exchange only
+    /// SEEDS a LocalSession.
+    async fn handle_session_exchange(
+        &self,
+        req: Request<Incoming>,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+        let bytes = body.to_bytes();
+
+        let input: ExchangeSessionTokenInputView = match serde_json::from_slice(&bytes) {
+            Ok(v) => v,
+            Err(e) => {
+                return Ok(response::bad_request(&format!("Invalid JSON: {}", e)));
+            }
+        };
+
+        // The real redeem path uses storage's standard outbound reqwest client.
+        // The orchestration is factored into `exchange_session_with_redeem` so
+        // tests can inject a mock redeem without a live doorway.
+        self.exchange_session_with_redeem(pool, input, |doorway_url, token| {
+            Box::pin(async move {
+                crate::services::session_exchange::redeem_token_http(&doorway_url, &token).await
+            })
+        })
+        .await
+    }
+
+    /// Orchestrates the `/session/exchange` stages with an injectable redeem
+    /// step. `redeem` is `Fn(validated_doorway_url, session_token) -> Future<RedeemOutcome>`
+    /// so unit tests can drive the allowlist / create / cookie logic without a
+    /// live doorway. See [`handle_session_exchange`] for the wire contract.
+    async fn exchange_session_with_redeem<F, Fut>(
+        &self,
+        pool: DbPool,
+        input: ExchangeSessionTokenInputView,
+        redeem: F,
+    ) -> Result<Response<Full<Bytes>>, StorageError>
+    where
+        F: FnOnce(String, String) -> Fut,
+        Fut: std::future::Future<Output = crate::services::session_exchange::RedeemOutcome>,
+    {
+        use crate::services::session_exchange as ex;
+
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+        // --- Stage 1: TOFU allowlist -----------------------------------------
+        // The doorwayUrl is attacker-controllable; it MUST already appear in the
+        // steward's local_sessions history (the trust-on-first-use record).
+        let history = db::local_sessions::list_all_sessions(&mut conn)?;
+        let known = ex::known_doorway_urls(&history);
+        if !ex::is_doorway_allowlisted(&input.doorway_url, known.iter().map(String::as_str)) {
+            warn!(
+                doorway_url = %input.doorway_url,
+                "session/exchange rejected — issuer not in steward's doorway history (allowlist)"
+            );
+            return Ok(response::forbidden(&serde_json::json!({
+                "error": "doorway not recognized",
+                "detail": "The issuing doorway is not in this steward's session history. \
+                           Redemption is only attempted against previously-trusted doorways."
+            })));
+        }
+
+        // --- Stage 2: back-channel redeem ------------------------------------
+        let outcome = redeem(input.doorway_url.clone(), input.session_token.clone()).await;
+        let snapshot = match outcome {
+            ex::RedeemOutcome::Ok(snap) => *snap,
+            ex::RedeemOutcome::Invalid => {
+                info!(
+                    doorway_url = %input.doorway_url,
+                    "session/exchange — doorway rejected token (invalid_token)"
+                );
+                return Ok(Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(r#"{"error":"invalid_token"}"#)))
+                    .unwrap());
+            }
+            ex::RedeemOutcome::Upstream => {
+                warn!(
+                    doorway_url = %input.doorway_url,
+                    "session/exchange — issuing doorway unreachable (upstream failure)"
+                );
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_GATEWAY)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(r#"{"error":"doorway_unreachable"}"#)))
+                    .unwrap());
+            }
+        };
+
+        // --- Stage 3: seed the LocalSession + set cookie ---------------------
+        // Always stamp the session with the *validated* doorway URL, never with
+        // whatever the redeem response asserts about itself.
+        let create_input = ex::build_create_input(&snapshot, &input.doorway_url);
+        let session = db::local_sessions::create_session(&mut conn, create_input)?;
+        let session_id = session.id.clone();
+
+        info!(
+            session_id = %session_id,
+            human_id = %session.human_id,
+            doorway_url = %input.doorway_url,
+            "session/exchange — seeded LocalSession from doorway handoff"
+        );
+
+        let view = LocalSessionView::from(session);
+        let body_json = serde_json::to_string(&view).unwrap_or_else(|_| "{}".to_string());
+        Ok(Response::builder()
+            .status(StatusCode::CREATED)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(
+                header::SET_COOKIE,
+                format!(
+                    "elohim_session={}; HttpOnly; SameSite=Lax; Path=/",
+                    session_id
+                ),
+            )
+            .body(Full::new(Bytes::from(body_json)))
+            .unwrap())
+    }
+
     /// DELETE /session - Delete active session (logout)
     ///
     /// Deactivates and removes the currently active session.
@@ -6629,7 +6817,11 @@ impl HttpServer {
     /// Returns 200 + MeResponse on an active session, 401 + `{"error":…}` when
     /// no session exists (never returns a MeResponse body on the 401 path, to
     /// match doorway's contract).
-    async fn handle_auth_me(&self, pool: DbPool) -> Result<Response<Full<Bytes>>, StorageError> {
+    async fn handle_auth_me(
+        &self,
+        pool: DbPool,
+        cookie_session_id: Option<String>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
         #[derive(Debug, serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct AuthorityRef {
@@ -6664,12 +6856,32 @@ impl HttpServer {
             .get()
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
-        let Some(session) = db::local_sessions::get_active_session(&mut conn)? else {
-            return Ok(Response::builder()
-                .status(StatusCode::UNAUTHORIZED)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error":"no active session"}"#)))
-                .unwrap());
+        // Prefer the session named by an `elohim_session` cookie when the
+        // request carries one AND that session exists and is active (multi-
+        // session browser path, GAP-2b). Otherwise fall through to the single
+        // active session — Tauri-native compat must not change.
+        let cookie_session = match cookie_session_id {
+            Some(id) => match db::local_sessions::get_session_by_id(&mut conn, &id)? {
+                Some(s) if s.is_active == 1 => Some(s),
+                // Cookie names a missing or deactivated session — ignore it and
+                // fall back to the active-session behavior.
+                _ => None,
+            },
+            None => None,
+        };
+
+        let session = match cookie_session {
+            Some(s) => s,
+            None => {
+                let Some(active) = db::local_sessions::get_active_session(&mut conn)? else {
+                    return Ok(Response::builder()
+                        .status(StatusCode::UNAUTHORIZED)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(r#"{"error":"no active session"}"#)))
+                        .unwrap());
+                };
+                active
+            }
         };
 
         // Derive a human-readable conductor label from what we know about this
@@ -11163,6 +11375,331 @@ mod auth_me_tests {
             !route.auth_required,
             "/auth/me must not set auth_required at route level; \
              the handler returns 401 itself to match doorway's contract"
+        );
+    }
+}
+
+// =============================================================================
+// /session/exchange tests — GAP-2b (steward-side portal session exchange)
+//
+// Drive the allowlist / redeem / create / cookie stages via the injectable
+// `exchange_session_with_redeem` seam — no live doorway required. Plus the
+// /auth/me cookie-vs-active-session selection. These need a DB pool, so they
+// live in their own cfg(test) module under the default (non-iroh) feature set.
+// =============================================================================
+#[cfg(test)]
+mod session_exchange_tests {
+    use super::*;
+    use crate::db::local_sessions::CreateLocalSessionInput;
+    use crate::db::models::LocalSession;
+    use crate::services::session_exchange::{RedeemOutcome, RedeemSnapshot};
+    use crate::test_util::test_pool;
+    use http_body_util::BodyExt;
+
+    async fn test_server() -> HttpServer {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_db_pool(test_pool())
+    }
+
+    fn seed_session(pool: &DbPool, human_id: &str, doorway_url: &str) -> LocalSession {
+        let mut conn = pool.get().unwrap();
+        db::local_sessions::create_session(
+            &mut conn,
+            CreateLocalSessionInput {
+                id: None,
+                human_id: human_id.to_string(),
+                agent_pub_key: format!("key-{human_id}"),
+                doorway_url: doorway_url.to_string(),
+                doorway_id: None,
+                identifier: format!("{human_id}@alpha.elohim.host"),
+                display_name: None,
+                profile_image_hash: None,
+                bootstrap_url: None,
+            },
+        )
+        .unwrap()
+    }
+
+    fn snapshot() -> RedeemSnapshot {
+        RedeemSnapshot {
+            human_id: "matthew".into(),
+            agent_pub_key: "uhCAk_matthew".into(),
+            identifier: "matthew@alpha.elohim.host".into(),
+            display_name: Some("Matthew".into()),
+            doorway_id: Some("doorway-alpha".into()),
+            doorway_url: Some("https://alpha.elohim.host".into()),
+            permission_level: Some("standard".into()),
+        }
+    }
+
+    fn status_of(resp: &Response<Full<Bytes>>) -> StatusCode {
+        resp.status()
+    }
+
+    async fn body_json(resp: Response<Full<Bytes>>) -> serde_json::Value {
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    // (a) Unknown doorwayUrl → 403, redeem never invoked, no session created.
+    #[tokio::test]
+    async fn exchange_unknown_doorway_returns_403_and_never_redeems() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        // History only knows alpha; the request names a different origin.
+        seed_session(&pool, "matthew", "https://alpha.elohim.host");
+
+        let input = ExchangeSessionTokenInputView {
+            session_token: "tok".into(),
+            doorway_url: "https://evil.example.com".into(),
+        };
+
+        let redeem_called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = redeem_called.clone();
+        let resp = server
+            .exchange_session_with_redeem(pool.clone(), input, move |_url, _tok| {
+                let flag = flag.clone();
+                Box::pin(async move {
+                    flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                    RedeemOutcome::Ok(Box::new(snapshot()))
+                })
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(status_of(&resp), StatusCode::FORBIDDEN);
+        assert!(
+            !redeem_called.load(std::sync::atomic::Ordering::SeqCst),
+            "redeem must NOT run for a non-allowlisted issuer (anti-spoofing)"
+        );
+        // No new session created beyond the seeded one.
+        let mut conn = pool.get().unwrap();
+        assert_eq!(db::local_sessions::session_count(&mut conn).unwrap(), 1);
+    }
+
+    // (b) Allowlisted issuer + redeem 401 → 401, no session created.
+    #[tokio::test]
+    async fn exchange_allowlisted_but_invalid_token_returns_401_no_session() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        seed_session(&pool, "matthew", "https://alpha.elohim.host");
+
+        let input = ExchangeSessionTokenInputView {
+            session_token: "expired".into(),
+            // Different path on the SAME origin must still allowlist-match.
+            doorway_url: "https://alpha.elohim.host/auth/handoff".into(),
+        };
+
+        let resp = server
+            .exchange_session_with_redeem(pool.clone(), input, |_url, _tok| {
+                Box::pin(async move { RedeemOutcome::Invalid })
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(status_of(&resp), StatusCode::UNAUTHORIZED);
+        let json = body_json(resp).await;
+        assert_eq!(json["error"], "invalid_token");
+
+        // Still only the seeded session — the exchange created nothing.
+        let mut conn = pool.get().unwrap();
+        assert_eq!(db::local_sessions::session_count(&mut conn).unwrap(), 1);
+    }
+
+    // Upstream/network error on an allowlisted issuer → 502.
+    #[tokio::test]
+    async fn exchange_allowlisted_but_upstream_error_returns_502() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        seed_session(&pool, "matthew", "https://alpha.elohim.host");
+
+        let input = ExchangeSessionTokenInputView {
+            session_token: "tok".into(),
+            doorway_url: "https://alpha.elohim.host".into(),
+        };
+
+        let resp = server
+            .exchange_session_with_redeem(pool.clone(), input, |_url, _tok| {
+                Box::pin(async move { RedeemOutcome::Upstream })
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(status_of(&resp), StatusCode::BAD_GATEWAY);
+        let mut conn = pool.get().unwrap();
+        assert_eq!(db::local_sessions::session_count(&mut conn).unwrap(), 1);
+    }
+
+    // (c) Allowlisted + redeem 200 → 201, LocalSession row created with snapshot
+    //     fields + Set-Cookie header present (HttpOnly, SameSite=Lax, Path=/).
+    #[tokio::test]
+    async fn exchange_success_creates_session_with_cookie() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        let seeded = seed_session(&pool, "matthew", "https://alpha.elohim.host");
+
+        let input = ExchangeSessionTokenInputView {
+            session_token: "good-token".into(),
+            doorway_url: "https://alpha.elohim.host".into(),
+        };
+
+        let resp = server
+            .exchange_session_with_redeem(pool.clone(), input, |_url, _tok| {
+                Box::pin(async move { RedeemOutcome::Ok(Box::new(snapshot())) })
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(status_of(&resp), StatusCode::CREATED);
+
+        // Set-Cookie present with the security attributes the contract requires.
+        let set_cookie = resp
+            .headers()
+            .get(header::SET_COOKIE)
+            .expect("Set-Cookie must be present")
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert!(set_cookie.starts_with("elohim_session="));
+        assert!(set_cookie.contains("HttpOnly"));
+        assert!(set_cookie.contains("SameSite=Lax"));
+        assert!(set_cookie.contains("Path=/"));
+
+        let json = body_json(resp).await;
+        // Snapshot fields projected through LocalSessionView (camelCase).
+        assert_eq!(json["humanId"], "matthew");
+        assert_eq!(json["agentPubKey"], "uhCAk_matthew");
+        assert_eq!(json["identifier"], "matthew@alpha.elohim.host");
+        // Session stamped with the validated doorway URL.
+        assert_eq!(json["doorwayUrl"], "https://alpha.elohim.host");
+        assert_eq!(json["isActive"], true);
+        let new_id = json["id"].as_str().unwrap().to_string();
+
+        // A fresh row exists and the prior seeded session was deactivated.
+        let mut conn = pool.get().unwrap();
+        assert_eq!(db::local_sessions::session_count(&mut conn).unwrap(), 2);
+        let prior = db::local_sessions::get_session_by_id(&mut conn, &seeded.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(prior.is_active, 0, "prior session must be deactivated");
+        let created = db::local_sessions::get_session_by_id(&mut conn, &new_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(created.agent_pub_key, "uhCAk_matthew");
+        assert_eq!(created.is_active, 1);
+
+        // The Set-Cookie session id must name the created row.
+        assert!(set_cookie.contains(&new_id));
+    }
+
+    // (d) /auth/me WITH an elohim_session cookie naming a valid, active session
+    //     → that session is projected (not necessarily the single active one).
+    #[tokio::test]
+    async fn auth_me_with_cookie_projects_named_session() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        // Two sessions: creating the second deactivates the first. We then name
+        // the FIRST (deactivated) — confirming cookie selection is honored only
+        // for active sessions, and naming the active one projects it.
+        let first = seed_session(&pool, "susan", "https://alpha.elohim.host");
+        let second = seed_session(&pool, "matthew", "https://alpha.elohim.host");
+
+        // Cookie names the active (second) session.
+        let resp = server
+            .handle_auth_me(pool.clone(), Some(second.id.clone()))
+            .await
+            .unwrap();
+        assert_eq!(status_of(&resp), StatusCode::OK);
+        let json = body_json(resp).await;
+        assert_eq!(json["humanId"], "matthew");
+
+        // Cookie naming the DEACTIVATED first session must be ignored — falls
+        // back to the active session (matthew), never projecting a dead session.
+        let resp2 = server
+            .handle_auth_me(pool.clone(), Some(first.id.clone()))
+            .await
+            .unwrap();
+        assert_eq!(status_of(&resp2), StatusCode::OK);
+        let json2 = body_json(resp2).await;
+        assert_eq!(
+            json2["humanId"], "matthew",
+            "cookie naming a deactivated session must fall back to the active one"
+        );
+    }
+
+    // /auth/me with a cookie naming a NON-EXISTENT session → fall back to active.
+    #[tokio::test]
+    async fn auth_me_with_unknown_cookie_falls_back_to_active() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        seed_session(&pool, "matthew", "https://alpha.elohim.host");
+
+        let resp = server
+            .handle_auth_me(pool.clone(), Some("no-such-session".into()))
+            .await
+            .unwrap();
+        assert_eq!(status_of(&resp), StatusCode::OK);
+        let json = body_json(resp).await;
+        assert_eq!(json["humanId"], "matthew");
+    }
+
+    // (e) /auth/me WITHOUT a cookie → existing single-active-session behavior.
+    #[tokio::test]
+    async fn auth_me_without_cookie_uses_active_session() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        seed_session(&pool, "matthew", "https://alpha.elohim.host");
+
+        let resp = server.handle_auth_me(pool.clone(), None).await.unwrap();
+        assert_eq!(status_of(&resp), StatusCode::OK);
+        let json = body_json(resp).await;
+        assert_eq!(json["humanId"], "matthew");
+        assert_eq!(json["trustMode"], "peer-conductor");
+    }
+
+    // /auth/me with no sessions at all and no cookie → 401 (unchanged contract).
+    #[tokio::test]
+    async fn auth_me_no_session_returns_401() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        let resp = server.handle_auth_me(pool.clone(), None).await.unwrap();
+        assert_eq!(status_of(&resp), StatusCode::UNAUTHORIZED);
+    }
+
+    // Cookie-extraction helper unit coverage.
+    #[test]
+    fn extract_session_cookie_parses_pairs() {
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert(
+            header::COOKIE,
+            "foo=bar; elohim_session=abc123; baz=qux".parse().unwrap(),
+        );
+        assert_eq!(extract_session_cookie(&headers), Some("abc123".to_string()));
+
+        let mut none_headers = hyper::HeaderMap::new();
+        none_headers.insert(header::COOKIE, "foo=bar; baz=qux".parse().unwrap());
+        assert_eq!(extract_session_cookie(&none_headers), None);
+
+        let empty_headers = hyper::HeaderMap::new();
+        assert_eq!(extract_session_cookie(&empty_headers), None);
+    }
+
+    // /session/exchange must NOT be in build_manifest — it is a steward-local
+    // browser surface at the portal-host origin, never doorway-proxied.
+    #[test]
+    fn build_manifest_excludes_session_exchange() {
+        let manifest = build_manifest();
+        assert!(
+            !manifest
+                .routes
+                .iter()
+                .any(|r| r.path == "/session/exchange"),
+            "/session/exchange must NOT be declared in build_manifest() — it is \
+             reached at the portal-host origin, never doorway-proxied"
         );
     }
 }

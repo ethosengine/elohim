@@ -89,6 +89,7 @@ pub mod risk_alert;
 pub mod routing;
 pub mod schemaref_resolver;
 pub mod sealed_against_self;
+pub mod session_exchange; // GAP-2b — steward-side portal session exchange (doorway handoff redemption)
 pub mod sidecar_engine;
 pub mod signal_weight_registry;
 pub mod sla_service;

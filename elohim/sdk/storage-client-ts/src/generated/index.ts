@@ -137,6 +137,7 @@ export * from "./EprView";
 export * from "./EntryLinkView";
 export * from "./ExcessSupply";
 export * from "./ExchangeRateView";
+export * from "./ExchangeSessionTokenInputView";
 export * from "./Excludability";
 export * from "./FamilyCommunityProtectionStatusView";
 export * from "./FeatureRulesInput";

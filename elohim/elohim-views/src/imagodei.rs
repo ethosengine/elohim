@@ -198,6 +198,31 @@ pub struct LocalSessionView {
     pub bootstrap_url: Option<String>,
 }
 
+/// Input for the steward-side portal session exchange (GAP-2b).
+///
+/// `POST /session/exchange` body — a browser redirected from a doorway login
+/// portal lands at the steward's portal-host origin carrying a single-use
+/// redemption token plus the doorway URL that issued it. Storage redeems the
+/// token back-channel against the issuing doorway and, on success, seeds a
+/// `LocalSession` from the returned identity snapshot.
+///
+/// Source of truth: the redemption token is Operational (single-use, ~5-min
+/// TTL, issuer-side truth — never persisted here). The conductor's `/auth/me`
+/// remains the authority over doorway claims; this exchange only SEEDS a
+/// LocalSession, nothing more.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ExchangeSessionTokenInputView {
+    /// Single-use redemption token issued by the doorway login portal.
+    pub session_token: String,
+    /// The doorway origin that issued the token. MUST already appear (origin-
+    /// normalized) in this steward's prior `local_sessions` history — the TOFU
+    /// allowlist boundary. Never redeemed against an issuer named only by the
+    /// inbound request.
+    pub doorway_url: String,
+}
+
 /// Input for creating a relationship - camelCase API boundary type
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
