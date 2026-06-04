@@ -37,6 +37,12 @@ interface ExchangeSessionResponse {
   portalHostUrl?: string;
 }
 
+/** Wire shape returned by GET /auth/session-token (single-use mint). */
+interface SessionTokenMintResponse {
+  sessionToken: string;
+  expiresAt: number;
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -80,6 +86,31 @@ export class HandoffService {
     } catch {
       // Exchange failure is non-fatal — the guard will redirect to /identity/login.
       return false;
+    }
+  }
+
+  /**
+   * Mint a single-use session-transfer code from the doorway's existing
+   * GET /auth/session-token endpoint (Bearer-authenticated, 60s TTL, consumed
+   * exactly once by the receiving portal's back-channel redeem).
+   *
+   * Used by the "Manage from your steward →" redirect: the code rides the
+   * redirect URL instead of the JWT — the JWT must NEVER appear in a URL
+   * (history/referrer/log leakage). Returns null on any failure; callers must
+   * not fall back to placing the JWT on the URL.
+   */
+  async mintHandoffToken(): Promise<string | null> {
+    const bearer = this.auth.token();
+    if (!bearer) return null;
+    try {
+      const resp = await firstValueFrom(
+        this.http.get<SessionTokenMintResponse>('/auth/session-token', {
+          headers: { Authorization: `Bearer ${bearer}` },
+        })
+      );
+      return resp.sessionToken || null;
+    } catch {
+      return null;
     }
   }
 }

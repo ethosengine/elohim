@@ -51,6 +51,12 @@ interface AuthResponse {
   portalHostUrl?: string;
 }
 
+/** Response from GET /auth/session-token (single-use transfer-code mint). */
+interface SessionTokenResponse {
+  sessionToken: string;
+  expiresAt: number;
+}
+
 /** State machine for login flow */
 type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
 
@@ -327,20 +333,33 @@ export class ThresholdLoginComponent implements OnInit {
       // authoritative identity provider. Doorway becomes the relying party
       // here: hand the session to the portal host, which will complete the
       // OAuth code dance back at the original client_id.
+      //
+      // The redirect carries a single-use transfer code minted from the
+      // existing GET /auth/session-token endpoint — the doorway JWT must
+      // NEVER ride a URL (history/referrer/log leakage). The portal's
+      // storage redeems the code server-to-server via
+      // GET {doorway_url}/auth/exchange-session, so doorway_url rides along.
+      // If the mint fails, login falls through to the local path below
+      // rather than blocking the human.
       if (authResult.portalHostUrl) {
         this.state.set('authorizing');
-        const params = this.oauthParams();
-        const handoff = new URL(authResult.portalHostUrl);
-        handoff.searchParams.set('session_token', authResult.token);
-        if (params) {
-          handoff.searchParams.set('client_id', params.clientId);
-          handoff.searchParams.set('redirect_uri', params.redirectUri);
-          handoff.searchParams.set('response_type', params.responseType);
-          handoff.searchParams.set('state', params.state);
-          if (params.scope) handoff.searchParams.set('scope', params.scope);
+        const minted = await this.mintSessionToken(authResult.token);
+        if (minted) {
+          const params = this.oauthParams();
+          const handoff = new URL(authResult.portalHostUrl);
+          handoff.searchParams.set('session_token', minted);
+          handoff.searchParams.set('doorway_url', window.location.origin);
+          if (params) {
+            handoff.searchParams.set('client_id', params.clientId);
+            handoff.searchParams.set('redirect_uri', params.redirectUri);
+            handoff.searchParams.set('response_type', params.responseType);
+            handoff.searchParams.set('state', params.state);
+            if (params.scope) handoff.searchParams.set('scope', params.scope);
+          }
+          window.location.href = handoff.toString();
+          return;
         }
-        window.location.href = handoff.toString();
-        return;
+        console.warn('[threshold-login] session-token mint failed; continuing with local auth');
       }
 
       this.authState.storeToken(authResult.token);
@@ -371,6 +390,26 @@ export class ThresholdLoginComponent implements OnInit {
       })
     );
     return response;
+  }
+
+  /**
+   * Mint a single-use session-transfer code from the doorway's existing
+   * GET /auth/session-token endpoint (Bearer-authenticated, 60s TTL,
+   * consumed exactly once by the portal host's back-channel redeem).
+   * Returns null on any failure — the caller falls through to local auth
+   * rather than ever putting the JWT itself in a redirect URL.
+   */
+  private async mintSessionToken(token: string): Promise<string | null> {
+    try {
+      const response = await firstValueFrom(
+        this.http.get<SessionTokenResponse>('/auth/session-token', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      );
+      return response.sessionToken || null;
+    } catch {
+      return null;
+    }
   }
 
   private async authorizeOAuth(token: string, params: OAuthParams): Promise<void> {

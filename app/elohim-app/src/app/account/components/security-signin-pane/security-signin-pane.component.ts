@@ -1,9 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
 
-import { AuthService } from '@app/imagodei';
-
 import { AccountService } from '../../services/account.service';
+import { HandoffService } from '../../services/handoff.service';
 import { PortalHostDiscoveryService } from '../../services/portal-host-discovery.service';
 
 import { KeyListComponent } from './key-list/key-list.component';
@@ -30,7 +29,7 @@ const OAUTH_PASSTHROUGH_PARAMS = ['client_id', 'redirect_uri', 'response_type', 
 export class SecuritySigninPaneComponent {
   readonly account = inject(AccountService);
   private readonly portalHosts = inject(PortalHostDiscoveryService);
-  private readonly auth = inject(AuthService);
+  private readonly handoff = inject(HandoffService);
 
   /**
    * Display predicate for the "Manage from your steward →" redirect. True only
@@ -41,13 +40,25 @@ export class SecuritySigninPaneComponent {
 
   /**
    * Client-driven redirect to the peer-native portal host (the doorway does not
-   * 302). Carries the current session token as `session_token` and preserves any
-   * OAuth params already on the URL so an in-flight authorize dance survives the
-   * hop to the steward's portal.
+   * 302). Mints a single-use transfer code (GET /auth/session-token via
+   * HandoffService) and carries THAT as `session_token` — the doorway JWT must
+   * never ride a URL. The issuer origin rides along as `doorway_url` so the
+   * portal's storage can redeem the code server-to-server via
+   * GET {doorway_url}/auth/exchange-session. OAuth params already on the URL
+   * are preserved so an in-flight authorize dance survives the hop.
+   *
+   * If the mint fails, the human simply stays on the hosted view — we never
+   * fall back to placing the JWT on the URL.
    */
-  redirectToStewardPortal(): void {
+  async redirectToStewardPortal(): Promise<void> {
     const host = this.portalHosts.reachablePortalHost();
     if (!host) return;
+
+    const minted = await this.handoff.mintHandoffToken();
+    if (!minted) {
+      console.warn('[security-signin-pane] handoff mint failed; staying on hosted view');
+      return;
+    }
 
     const target = new URL(host.hostUrl);
 
@@ -57,8 +68,8 @@ export class SecuritySigninPaneComponent {
       if (value !== null) target.searchParams.set(key, value);
     }
 
-    const token = this.auth.token();
-    if (token) target.searchParams.set('session_token', token);
+    target.searchParams.set('session_token', minted);
+    target.searchParams.set('doorway_url', globalThis.location.origin);
 
     globalThis.location.href = target.toString();
   }

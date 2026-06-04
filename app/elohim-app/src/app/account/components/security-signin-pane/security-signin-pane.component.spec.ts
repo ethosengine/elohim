@@ -4,8 +4,8 @@ import { provideRouter } from '@angular/router';
 
 import { SecuritySigninPaneComponent } from './security-signin-pane.component';
 import { AccountService } from '../../services/account.service';
+import { HandoffService } from '../../services/handoff.service';
 import { RevocationService } from '../../services/revocation.service';
-import { AuthService } from '@app/imagodei';
 import type { AccountView, PortalHostView } from '@app/generated/account-view';
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,9 @@ describe('SecuritySigninPaneComponent', () => {
     error: ReturnType<typeof signal<string | null>>;
     refresh: () => Promise<void>;
   };
-  let mockAuthService: { token: ReturnType<typeof signal<string | null>> };
+  let mintResult: string | null;
+  let mintCalls: number;
+  let mockHandoffService: { mintHandoffToken: () => Promise<string | null> };
   let originalLocation: Location;
   let hrefSink: { href: string; origin: string };
 
@@ -76,7 +78,16 @@ describe('SecuritySigninPaneComponent', () => {
       error: signal<string | null>(null),
       refresh: async () => {},
     };
-    mockAuthService = { token: signal<string | null>('jwt-abc123') };
+    // Mint seam: the redirect must carry a single-use code minted via
+    // HandoffService (GET /auth/session-token) — never the JWT itself.
+    mintResult = 'minted-single-use-code';
+    mintCalls = 0;
+    mockHandoffService = {
+      mintHandoffToken: async () => {
+        mintCalls++;
+        return mintResult;
+      },
+    };
 
     // Stub globalThis.location so the client-driven redirect is observable and
     // does not navigate the jsdom page. The test URL carries OAuth params so we
@@ -98,7 +109,7 @@ describe('SecuritySigninPaneComponent', () => {
         provideRouter([]),
         { provide: AccountService, useValue: mockAccountService },
         { provide: RevocationService, useValue: mockRevocationService },
-        { provide: AuthService, useValue: mockAuthService },
+        { provide: HandoffService, useValue: mockHandoffService },
       ],
     }).compileComponents();
   });
@@ -215,7 +226,7 @@ describe('SecuritySigninPaneComponent', () => {
   });
 
   describe('portal-host redirect (click behavior)', () => {
-    function clickRedirect(): void {
+    async function clickRedirect(): Promise<void> {
       accountSignal.set(
         makeAccount({
           isSteward: true,
@@ -233,24 +244,37 @@ describe('SecuritySigninPaneComponent', () => {
         REDIRECT_TESTID,
       ) as HTMLButtonElement;
       btn.click();
+      // Let the async mint-then-redirect handler settle.
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
-    it('redirects to the portal host URL with the session token attached', () => {
-      clickRedirect();
+    it('redirects to the portal host URL with a MINTED single-use code, never the JWT', async () => {
+      await clickRedirect();
       const target = new URL(hrefSink.href);
       expect(`${target.origin}${target.pathname}`).toBe(
         'https://matthew.steward.example/account',
       );
-      expect(target.searchParams.get('session_token')).toBe('jwt-abc123');
+      expect(mintCalls).toBe(1);
+      expect(target.searchParams.get('session_token')).toBe('minted-single-use-code');
+      // The redeeming portal needs the issuer origin for the back-channel call.
+      expect(target.searchParams.get('doorway_url')).toBe('http://localhost:4200');
     });
 
-    it('preserves OAuth params present on the current URL', () => {
-      clickRedirect();
+    it('preserves OAuth params present on the current URL', async () => {
+      await clickRedirect();
       const target = new URL(hrefSink.href);
       expect(target.searchParams.get('client_id')).toBe('elohim-app');
       expect(target.searchParams.get('redirect_uri')).toBe('https://doorway.example/cb');
       expect(target.searchParams.get('response_type')).toBe('code');
       expect(target.searchParams.get('state')).toBe('xyz');
+    });
+
+    it('stays on the hosted view when the mint fails — JWT never falls back onto the URL', async () => {
+      mintResult = null;
+      const before = hrefSink.href;
+      await clickRedirect();
+      expect(mintCalls).toBe(1);
+      expect(hrefSink.href).toBe(before);
     });
   });
 });
