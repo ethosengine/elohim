@@ -356,6 +356,21 @@ pub struct OAuthTokenResponse {
     /// Custom: Doorway URL
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doorway_url: Option<String>,
+    /// Custom: First reachable portal host URL for this human, when the human
+    /// is a confirmed steward and at least one registered host responds to a
+    /// health probe. The OAuth-code consumer uses this to hand the session off
+    /// to the peer-native OAuth portal — doorway is the relying party, the
+    /// portal host is the identity provider. Mirrors `AuthResponse.portalHostUrl`
+    /// on the login path so both auth flows expose the same handoff hint.
+    ///
+    /// Emitted as camelCase `portalHostUrl` to match the login-path wire
+    /// contract the elohim-app callback already consumes. The RFC 6749 standard
+    /// fields above intentionally stay snake_case; this is additive metadata,
+    /// outside the RFC envelope. Omitted entirely when not a steward or when no
+    /// host is reachable (probe failure degrades silently to None).
+    #[serde(rename = "portalHostUrl")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub portal_host_url: Option<String>,
 }
 
 /// OAuth error response (RFC 6749 compliant).
@@ -3464,13 +3479,17 @@ async fn handle_token(
             Err(resp) => return resp,
         };
 
+        // Dev mode has no UserDoc to consult for stewardship; treat as
+        // non-steward so the probe is skipped and portal_host_url stays absent.
         return generate_oauth_token_response(
             &jwt,
             &state,
             "dev-human-id",
             "uhCAk-dev-mode-agent-key",
             "dev@example.com",
-        );
+            false,
+        )
+        .await;
     }
 
     // Look up authorization code in MongoDB
@@ -3588,13 +3607,38 @@ async fn handle_token(
         Err(resp) => return resp,
     };
 
+    // Derive stewardship from the substrate UserDoc — the OAuthSessionDoc does
+    // not carry it. This mirrors the login path, which reads UserDoc.is_steward
+    // before calling generate_auth_response. A lookup miss or error degrades to
+    // non-steward, so the portal-host probe is simply skipped and the token
+    // exchange is never blocked or delayed by an absent/erroring user record.
+    let is_steward = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+        Ok(users) => users
+            .find_one(doc! { "identifier": &session.identifier })
+            .await
+            .ok()
+            .flatten()
+            .map(|u| u.is_steward)
+            .unwrap_or(false),
+        Err(e) => {
+            warn!(
+                identifier = %session.identifier,
+                error = %e,
+                "OAuth token exchange: UserDoc lookup failed; treating as non-steward"
+            );
+            false
+        }
+    };
+
     generate_oauth_token_response(
         &jwt,
         &state,
         &session.human_id,
         &session.agent_pub_key,
         &session.identifier,
+        is_steward,
     )
+    .await
 }
 
 /// Generate a random authorization code.
@@ -3605,12 +3649,23 @@ fn generate_auth_code() -> String {
 }
 
 /// Generate OAuth token response with JWT.
-fn generate_oauth_token_response(
+///
+/// When `is_steward` is true, the function opportunistically probes the
+/// human's registered portal hosts (1 s timeout per host) and populates
+/// `portal_host_url` with the first reachable one. This mirrors the login
+/// path's `generate_auth_response` so the OAuth-code consumer can hand the
+/// session off to the peer-native portal exactly as the login consumer does.
+///
+/// A probe failure or timeout degrades silently to `None` — it MUST never
+/// error or delay-fail the token exchange (the OAuth `code`+`state` redirect
+/// contract is untouched by this additive metadata).
+async fn generate_oauth_token_response(
     jwt: &JwtValidator,
     state: &AppState,
     human_id: &str,
     agent_pub_key: &str,
     identifier: &str,
+    is_steward: bool,
 ) -> Response<BoxBody> {
     let doorway_id = state.args.doorway_id.clone();
     let doorway_url = state.args.doorway_url.clone();
@@ -3627,8 +3682,21 @@ fn generate_oauth_token_response(
         doorway_url: doorway_url.clone(),
         conductor_id: None,
         installed_app_id: None,
-        is_steward: false,
+        is_steward,
         has_local_conductor: false,
+    };
+
+    // Opportunistic portal-host probe for graduated stewards — same helper the
+    // login path uses. Non-stewards skip the probe entirely.
+    let portal_host_url = if is_steward {
+        let storage_base = state
+            .args
+            .storage_url
+            .as_deref()
+            .unwrap_or("http://127.0.0.1:8090");
+        probe_first_portal_host(storage_base, agent_pub_key).await
+    } else {
+        None
     };
 
     match jwt.generate_token(input) {
@@ -3651,6 +3719,7 @@ fn generate_oauth_token_response(
                     identifier: identifier.to_string(),
                     doorway_id,
                     doorway_url,
+                    portal_host_url,
                 },
             )
         }
@@ -4468,5 +4537,86 @@ mod tests {
         );
         // Falls back to generic placeholder when both absent
         assert_eq!(derive_label(None, None), "elohim.host");
+    }
+
+    /// GAP-1: When the OAuth `/auth/token` response is built for a graduated
+    /// steward whose portal host was reachable, the response JSON must carry
+    /// `portalHostUrl`. This mirrors the login path's `AuthResponse`
+    /// (which already populates `portalHostUrl` via `probe_first_portal_host`),
+    /// so the OAuth-code consumer can hand the session off to the peer-native
+    /// portal exactly as the login consumer does.
+    ///
+    /// Serialisation-contract test: it constructs the response struct directly
+    /// (the camelCase key is the wire contract the elohim-app callback reads).
+    /// Full handler coverage (MongoDB code lookup + UserDoc steward derivation)
+    /// lives in the sweettest / integration surface.
+    #[test]
+    fn oauth_token_response_carries_portal_host_url_for_steward() {
+        let resp = OAuthTokenResponse {
+            access_token: "jwt-token".into(),
+            token_type: "Bearer".into(),
+            expires_in: 3600,
+            refresh_token: None,
+            human_id: "human-matthew".into(),
+            agent_pub_key: "uhCAk-matthew".into(),
+            identifier: "matthew@alpha.elohim.host".into(),
+            doorway_id: Some("alpha-elohim-host".into()),
+            doorway_url: Some("https://alpha.elohim.host".into()),
+            portal_host_url: Some("https://matthew.steward.example".into()),
+        };
+
+        let json = serde_json::to_value(&resp).unwrap();
+
+        // The portal-host handoff hint must be present, camelCase, exactly as
+        // the login path's AuthResponse exposes it.
+        assert_eq!(
+            json["portalHostUrl"], "https://matthew.steward.example",
+            "steward token exchange must surface portalHostUrl for handoff"
+        );
+
+        // RFC 6749 standard fields must remain snake_case and intact — the
+        // portal_host_url addition is additive metadata only.
+        assert_eq!(json["access_token"], "jwt-token");
+        assert_eq!(json["token_type"], "Bearer");
+        assert_eq!(json["expires_in"], 3600);
+        assert_eq!(json["human_id"], "human-matthew");
+        assert_eq!(json["agent_pub_key"], "uhCAk-matthew");
+    }
+
+    /// GAP-1: A non-steward (or a steward whose portal host was unreachable)
+    /// produces `portal_host_url: None`, which `skip_serializing_if` must omit
+    /// from the wire entirely — the absent field signals "complete the session
+    /// locally" to the client, exactly as the login path does.
+    #[test]
+    fn oauth_token_response_omits_portal_host_url_for_non_steward() {
+        let resp = OAuthTokenResponse {
+            access_token: "jwt-token".into(),
+            token_type: "Bearer".into(),
+            expires_in: 3600,
+            refresh_token: None,
+            human_id: "human-susan".into(),
+            agent_pub_key: "uhCAk-susan".into(),
+            identifier: "susan@alpha.elohim.host".into(),
+            doorway_id: Some("alpha-elohim-host".into()),
+            doorway_url: Some("https://alpha.elohim.host".into()),
+            portal_host_url: None,
+        };
+
+        let json = serde_json::to_value(&resp).unwrap();
+
+        assert!(
+            json.get("portalHostUrl").is_none(),
+            "portalHostUrl must be omitted when None (skip_serializing_if)"
+        );
+        // Also assert the snake_case form is absent, guarding against a
+        // rename regression that would emit both or the wrong key.
+        assert!(
+            json.get("portal_host_url").is_none(),
+            "portal_host_url (snake_case) must never appear on the wire"
+        );
+
+        // RFC fields and the existing custom fields are unaffected.
+        assert_eq!(json["access_token"], "jwt-token");
+        assert_eq!(json["human_id"], "human-susan");
     }
 }
