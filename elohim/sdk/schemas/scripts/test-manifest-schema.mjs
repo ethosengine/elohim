@@ -182,6 +182,11 @@ async function main() {
   );
   ajv.addSchema(observationKindSchema, 'epr:observation-kind.schema.json');
 
+  const sessionLifecycleStateSchema = await loadJson(
+    resolve(__dirname, '../v1/enums/session-lifecycle-state.schema.json'),
+  );
+  ajv.addSchema(sessionLifecycleStateSchema, 'epr:enums/session-lifecycle-state.schema.json');
+
   const schema = await loadJson(
     resolve(__dirname, '../v1/manifest/app-manifest.schema.json'),
   );

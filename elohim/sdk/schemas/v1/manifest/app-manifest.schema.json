@@ -245,6 +245,21 @@
           "additionalProperties": {
             "$ref": "#/$defs/StagedIntentDeclaration"
           }
+        },
+        "quiltPolicies": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Optional. Named declarative storage-policy classes (tiered-quilt §4, amended 2026-06-04). Content types reference them by name via contentTypes.<type>.quiltPolicy. The policy NAME is the cost class — qualified as <pillar>/<name> in cost_class event columns. Declarations are advisory desired-state a peer-local TierController reconciles toward; never an imperative command, never below a pledge-backed floor. Empty {} is not a meaningful declaration.",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/QuiltPolicyDeclaration"
+          }
+        },
+        "quiltPolicyDefault": {
+          "type": "string",
+          "description": "Optional. Name of the quiltPolicies entry that applies to content types that declare no quiltPolicy of their own. MUST reference a declared vocabulary.quiltPolicies key — referential integrity is enforced by the manifest loader (scripts/lib/manifest-quilt-refs.mjs), not expressible in this schema."
         }
       },
       "additionalProperties": false
@@ -265,6 +280,10 @@
         "metadataSchema": {
           "type": "object",
           "description": "JSON Schema defining the metadata shape for this content type. Enables typed metadata access and codegen. Can be inline or use $ref to a companion schema file. The protocol validates this is a valid schema; the app validates its content."
+        },
+        "quiltPolicy": {
+          "type": "string",
+          "description": "Optional. Name of a vocabulary.quiltPolicies entry governing stewarded custody of this type's payload blobs (derived projections — thumbnails, indexes — are Category C cache-core territory, never quilt-governed). Referential integrity is loader-enforced; a dangling name fails validation loud."
         }
       },
       "additionalProperties": false
@@ -651,6 +670,48 @@
           "uniqueItems": true
         }
       }
+    },
+    "QuiltPolicyDeclaration": {
+      "title": "QuiltPolicyDeclaration",
+      "description": "A named declarative storage-policy class. Declares dynamics (floor + decay timings + draw QoS), not placement — the peer-local controller reconciles toward it and can veto (tier-below-floor-prevented). Spec: 2026-05-11-tiered-quilt-stewardship-design.md §4.",
+      "type": "object",
+      "required": ["defaultTierFloor"],
+      "properties": {
+        "defaultTierFloor": {
+          "type": "string",
+          "enum": ["drawn", "stocked-warm", "stocked", "shelved"],
+          "description": "Minimum custody temperature for this class (tier order: shelved < stocked < stocked-warm < drawn). 'drawn' = no custody guarantee. Matched against a steward's pledge at CommitmentFactory negotiation — never silently degraded."
+        },
+        "shelveAfter": {
+          "$ref": "#/$defs/QuiltDuration",
+          "description": "Inactivity window after which content may demote toward the shelved tier (above the floor)."
+        },
+        "holdWarmMin": {
+          "$ref": "#/$defs/QuiltDuration",
+          "description": "Minimum stocked-warm dwell after a draw. Grants are capped at pledge capacity (the donut clamp applies to soft fields)."
+        },
+        "drawLatencyBudget": {
+          "$ref": "#/$defs/QuiltDuration",
+          "description": "Declared time-to-first-byte SLA. A shelf destination that cannot meet it is invalid for this class at negotiation time (the Glacier-retrieval-class analog)."
+        },
+        "draw": {
+          "type": "string",
+          "enum": ["atomic", "streamed"],
+          "default": "atomic",
+          "description": "streamed = ranged/progressive draw (iroh bao verified ranges); first bytes flow while the tail re-stocks. Drivers that cannot range fall back to atomic and log — the draw never fails for this reason."
+        },
+        "preferDestinations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Ordered shelf/cellar destination URI templates (peer-cellar://, federated-dwelling://, external-archive://)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "QuiltDuration": {
+      "type": "string",
+      "pattern": "^[0-9]+(ms|s|m|h|d)$",
+      "description": "Compact duration literal: non-negative integer + unit (ms|s|m|h|d), e.g. \"5m\", \"30d\", \"2s\"."
     }
   }
 }
