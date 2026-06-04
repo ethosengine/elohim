@@ -5,9 +5,10 @@
  * Schema validates SHAPE; referential integrity is loader-enforced
  * (see lib/manifest-quilt-refs.mjs, tested below in the REF CHECKS section).
  */
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -237,6 +238,73 @@ async function main() {
     delete m.vocabulary.contentTypes['family-video'].quiltPolicy;
     const errs = validateQuiltPolicyRefs(m);
     assert(errs.length === 0, 'Ref check: manifest without any quilt vocabulary is clean (fully optional)');
+  }
+
+  // --- WIRING CHECK: codegen resolves $ref content-type stubs before checking quiltPolicy refs ---
+  // This exercises the full codegen-manifest.mjs path (resolveRefs → validateQuiltPolicyRefs).
+  // The old shallow resolver left vocabulary.contentTypes.<type> = {$ref:...} objects unresolved,
+  // so validateQuiltPolicyRefs silently skipped per-content-type checks on modular manifests.
+  // This fixture MUST fail if the resolver regresses to shallow: a modular manifest whose
+  // content-type $ref file declares a dangling quiltPolicy must exit codegen with code 1,
+  // naming the type and the dangling ref.
+  {
+    const tmpDir = resolve(__dirname, '.quilt-gate-wiring-check');
+    const contentTypesDir = resolve(tmpDir, 'manifest', 'content-types');
+    try {
+      await mkdir(contentTypesDir, { recursive: true });
+
+      // Content-type stub file — the quiltPolicy typo is IN THE $ref file, not inline.
+      // This is the exact shape that the old shallow resolver missed.
+      const photoStub = {
+        description: 'A family photo album',
+        coupling: minimalCoupling(),
+        quiltPolicy: 'long-term-personl', // typo: missing 'a'
+      };
+      await writeFile(
+        resolve(contentTypesDir, 'photo.json'),
+        JSON.stringify(photoStub),
+      );
+
+      // Manifest shell: quiltPolicies declares 'long-term-personal' (correct spelling);
+      // the photo content-type references 'long-term-personl' (typo) via $ref.
+      const manifestShell = {
+        id: 'bafkreiwiringtest',
+        name: 'wiring-test',
+        version: '1.0.0',
+        vocabulary: {
+          quiltPolicies: {
+            'long-term-personal': { defaultTierFloor: 'stocked' },
+          },
+          quiltPolicyDefault: 'long-term-personal',
+          contentTypes: {
+            photo: { $ref: './manifest/content-types/photo.json' },
+          },
+          observations: minimalObservations(),
+        },
+      };
+      await writeFile(resolve(tmpDir, 'manifest.json'), JSON.stringify(manifestShell));
+
+      const outPath = resolve(tmpDir, 'out.ts');
+      const codegenScript = resolve(__dirname, 'codegen-manifest.mjs');
+      const result = spawnSync(
+        process.execPath,
+        [codegenScript, resolve(tmpDir, 'manifest.json'), outPath],
+        { encoding: 'utf8' },
+      );
+
+      const exitedWithError = result.status === 1;
+      const stderrNames = (result.stderr ?? '').includes('photo') &&
+        (result.stderr ?? '').includes('long-term-personl');
+      assert(
+        exitedWithError && stderrNames,
+        'Wiring: codegen exits 1 on dangling quiltPolicy in $ref content-type stub, naming type and ref',
+      );
+      if (!exitedWithError || !stderrNames) {
+        console.error(`  (codegen exit=${result.status}, stderr=${JSON.stringify(result.stderr)})`);
+      }
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
   }
 
   console.log(`\n${passes} passed, ${failures} failed`);

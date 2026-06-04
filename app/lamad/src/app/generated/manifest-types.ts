@@ -1,5 +1,5 @@
 // AUTO-GENERATED from app manifest: elohim/sdk/domains/lamad/manifest.json
-// DO NOT EDIT — regenerate with: pnpm run lamad:codegen
+// DO NOT EDIT — regenerate with: pnpm run manifest:codegen
 
 export const LAMAD_CONTENT_TYPES = [
   'concept',
@@ -81,8 +81,6 @@ export const LAMAD_RENDERER_MAP: Record<string, string> = {
   'plaintext': 'MarkdownRendererComponent',
   'gherkin': 'GherkinRendererComponent',
   'sophia-quiz-json': 'SophiaRendererComponent',
-  'sophia': 'SophiaRendererComponent',
-  'perseus-quiz-json': 'SophiaRendererComponent',
   'html5-app': 'IframeRendererComponent',
   'video-embed': 'IframeRendererComponent',
   'epr-composite': 'PathViewerComponent',
