@@ -17,7 +17,6 @@ Feature: Household reciprocity — the M1 custody pair is named, not assumed
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
-    And elohim-storage is reachable at "E2E_STORAGE_URL"
 
   Scenario: Matthew and Jessica hold the M1 custody commitments for each other
     When I list active "custody-blob" commitments

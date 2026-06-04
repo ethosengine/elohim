@@ -573,9 +573,21 @@ interface CommitmentRow {
 const commitmentListKey = Symbol('resilience:commitmentList');
 
 When('I list active {string} commitments', async function (this: E2EWorld, action: string) {
-  const data = await storageGet(
-    `/api/v1/commitments?action=${encodeURIComponent(action)}&state=active`
+  // Query through the DOORWAY (manifest-routed /api/v1/commitments), not
+  // E2E_STORAGE_URL — the genesis API stage doesn't set the storage env var
+  // (browser stage only), and the doorway path is what users actually hit.
+  let doorwayUrl = '';
+  for (const [, d] of this.doorways) {
+    doorwayUrl = d.url;
+    break;
+  }
+  assert.ok(doorwayUrl, 'No doorway registered — did the Background step run?');
+  const { statusCode, body } = await request(
+    `${doorwayUrl}/api/v1/commitments?action=${encodeURIComponent(action)}&state=active`
   );
+  const text = await body.text();
+  assert.equal(statusCode, 200, `GET /api/v1/commitments failed: ${statusCode} ${text}`);
+  const data = JSON.parse(text) as Record<string, unknown>;
   // Service may return a bare array or an {items: []} envelope — accept both.
   const rows = Array.isArray(data)
     ? data
