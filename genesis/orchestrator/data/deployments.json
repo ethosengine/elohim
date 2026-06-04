@@ -44,6 +44,7 @@
     },
     {
       "$comment": "TEMPORARY BUMP (2026-05-05): jessica's edgenode OOM-flapping at 1536Mi limit (7 restarts in 26h, last OOMKilled 2026-05-05T18:43Z while serving content + handling app-WS authentication during a2o sweep). Cluster is also in scaled-down mode with shem decommissioned, so jessica picks up extra registration load via the hosted conductor pool (matthew/jessica/terrance is the only path for the 25 humans newly seeded by the iter-3 agencyPhase fix). Bumping 1536Mi → 3Gi to give ~2× headroom over observed RSS — same pattern as Terrance's 2026-04-21 chromebook bump (see Terrance's $comment block for the restoration chain). Restoration: when shem returns and the hosted-pool load drops back to baseline, restore to the device-recycled-laptop archetype floor at 512Mi/1536Mi.",
+      "$comment2": "SECOND BUMP (2026-06-04): OOMKilled again AT the 3Gi limit — Prometheus-verified (kube_pod_container_status_last_terminated_reason=OOMKilled, pod uid 077c96c0, restart ~21:30Z; prior pod uid 60f36d5d restarted ~17:20Z; pod replaced ~20:05Z by the edge deploy). Every OOM/DNS-gap window correlates 1:1 with the registration-class a2o failures (PROVISIONING_FAILED 'Name or service not known' on elohim-jessica-alpha-0 headless DNS) in genesis runs #1091 (17:05) and #1094 (20:18); runs in stable windows (#1092/#1093) pass the same scenarios. shem is STILL down so the 2026-05-05 restoration condition never arrived and jessica still carries hosted-pool registration load + post-merge a2o sweep load. 3Gi → 4Gi. Restoration chain unchanged (shem return → hosted-pool baseline → archetype floor). If 4Gi OOMs too, stop bumping and profile elohim-node for a leak (suspect list: inventory gossip, conductor pool churn).",
       "$recycledLaptopFloor": {
         "edgenodeMemoryRequest": "512Mi",
         "edgenodeMemoryLimit": "1536Mi",
@@ -63,8 +64,8 @@
         "edge",
         "performance"
       ],
-      "edgenodeMemoryRequest": "768Mi",
-      "edgenodeMemoryLimit": "3Gi",
+      "edgenodeMemoryRequest": "1Gi",
+      "edgenodeMemoryLimit": "4Gi",
       "edgenodeCpuRequest": "250m",
       "edgenodeCpuLimit": "2000m",
       "$cpuLimitBump": "2026-05-27: bumped 1000m → 2000m to give embedded-Holochain install_app + WASM-compile burst headroom. Daniel et al. CrashLoopBackOff under CPU starvation on shem (cpu=1, install_app times out admin-WS handshake). Floor restoration tied to: (a) shem CPU contention resolution (anti-affinity / topology spread), AND (b) elohim_storage::inventory InvalidHashFormat verifier fix landing (elohim/elohim-storage/src/p2p/inventory_gossip.rs:132 — accepts sha256-<hex> wire format). See genesis/docs/superpowers/sprints/2026-05-27-substrate-rea-task10-result.md"
