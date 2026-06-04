@@ -8,11 +8,15 @@
  * These types mirror the interfaces in elohim-library/projects/elohim-service/src/cache/types.ts
  */
 
-// Allow URL-based imports for runtime WASM loading
+// Allow URL-based imports for runtime WASM loading.
+/* eslint-disable import/no-extraneous-dependencies -- 'elohim-cache-core' is
+   the ambient module declared below (runtime-URL-loaded WASM), not a package
+   dependency; the re-export wires the URL alias to those ambient types. */
 declare module '/wasm/elohim-cache-core/elohim_cache_core.js' {
   export * from 'elohim-cache-core';
   export { default } from 'elohim-cache-core';
 }
+/* eslint-enable import/no-extraneous-dependencies */
 
 declare module 'elohim-cache-core' {
   /**

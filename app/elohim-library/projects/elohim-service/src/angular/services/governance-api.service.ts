@@ -283,7 +283,7 @@ export class GovernanceApiService implements IGovernance {
 
   async getAccumulationStatus(
     entityType: string,
-    entityId: string,
+    entityId: string
   ): Promise<AccumulationStatusView> {
     const emptyStatus: AccumulationStatusView = {
       entityType,
@@ -301,9 +301,9 @@ export class GovernanceApiService implements IGovernance {
     return firstValueFrom(
       this.http
         .get<AccumulationStatusView>(
-          `/api/v1/governance/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/accumulation`,
+          `/api/v1/governance/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/accumulation`
         )
-        .pipe(catchError(() => of(emptyStatus))),
+        .pipe(catchError(() => of(emptyStatus)))
     );
   }
 
@@ -319,7 +319,7 @@ export class GovernanceApiService implements IGovernance {
 
   async getMechanismSelection(
     entityType: string,
-    entityId: string,
+    entityId: string
   ): Promise<MechanismSelectionView> {
     const defaultSelection: MechanismSelectionView = {
       entityType,
@@ -338,9 +338,9 @@ export class GovernanceApiService implements IGovernance {
     return firstValueFrom(
       this.http
         .get<MechanismSelectionView>(
-          `/api/v1/governance/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/mechanism`,
+          `/api/v1/governance/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/mechanism`
         )
-        .pipe(catchError(() => of(defaultSelection))),
+        .pipe(catchError(() => of(defaultSelection)))
     );
   }
 
