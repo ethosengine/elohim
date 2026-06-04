@@ -9,11 +9,17 @@ Feature: Intimate-reach content within a household
   couple scope excludes him: stewardship is storage availability, never read
   access.
 
-  The serving gate enforcing this is live substrate today: epr_service's
-  check_reach_authorization serves intimate-reach content only to an agent with
-  a mutual, dual-consented intimate relationship to the steward. At-rest blind
-  custody - shards as amorphous, senseless bits under an encryption envelope
-  with per-recipient key wrapping - is the deferred sprint named in
+  The serving gate enforcing this is live substrate on the P2P RESOLVE PATH
+  ONLY: epr_service's check_reach_authorization (intimate branch: mutual,
+  dual-consented relationship) is invoked solely from the libp2p/iroh
+  transports via handle_resolve - the HTTP routes apply a coarser gate
+  (GET /db/content/{id} refuses anonymous but serves ANY authenticated caller;
+  /epr-head/{id} is provenance-only). Until HTTP-path reach enforcement lands
+  (backlog: http-reach-enforcement-gap), the read/refuse scenarios below keep
+  their wip tag - the step defs are real and bind, and fail honestly on this gap.
+  At-rest blind custody - shards as amorphous, senseless bits under an
+  encryption envelope with per-recipient key wrapping - is the deferred sprint
+  named in
   genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md;
   the scenarios capturing it are story-first (@wip @envisioned) until that
   substrate lands.
