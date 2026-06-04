@@ -62,7 +62,9 @@ Then('the content.entryPoint is {string}', function (this: DogfoodWorld, expecte
 Then('the blobHash is a sha256 hex string', function (this: DogfoodWorld) {
   const hash = this.fetchedNode?.blobHash;
   assert.equal(typeof hash, 'string');
-  assert.match(hash as string, /^[a-f0-9]{64}$/);
+  // Canonical blob-hash wire format is `sha256-<64 hex>` (storage vocabulary),
+  // not bare hex — the doorway serves blobHash with the algorithm prefix.
+  assert.match(hash as string, /^sha256-[a-f0-9]{64}$/);
 });
 
 When('I GET {string} from the doorway', async function (this: DogfoodWorld, path: string) {
