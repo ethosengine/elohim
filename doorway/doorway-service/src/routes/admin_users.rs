@@ -11,6 +11,7 @@
 //! - `PUT /admin/users/{id}/permission` - Change permission level
 //! - `PUT /admin/users/{id}/quota` - Update quota limits
 //! - `POST /admin/users/{id}/usage/reset` - Reset usage counters
+//! - `PUT /admin/users/{id}/steward` - **DEV/FIXTURE ONLY** force-grant stewardship (see handler)
 //!
 //! ## Authentication
 //!
@@ -477,6 +478,14 @@ pub struct SuccessResponse {
     pub message: String,
 }
 
+/// Response for the dev/fixture steward grant.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrantStewardResponse {
+    pub user_id: String,
+    pub is_steward: bool,
+}
+
 // =============================================================================
 // Mutation Request Types
 // =============================================================================
@@ -641,6 +650,15 @@ pub async fn handle_admin_users_request(
                 .and_then(|s| s.strip_suffix("/status"))
                 .unwrap_or("");
             handle_update_status(req, state, id).await
+        }
+
+        // PUT /admin/users/{id}/steward - DEV/FIXTURE ONLY force-grant stewardship
+        (Method::PUT, p) if p.ends_with("/steward") => {
+            let id = p
+                .strip_prefix('/')
+                .and_then(|s| s.strip_suffix("/steward"))
+                .unwrap_or("");
+            handle_grant_steward(req, state, id).await
         }
 
         // POST /admin/users/{id}/force-logout - Force logout
@@ -976,6 +994,156 @@ async fn handle_update_status(
         Ok(_) => error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND")),
         Err(e) => {
             warn!("Error updating user status: {}", e);
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            )
+        }
+    }
+}
+
+/// Guard the steward-grant surface behind dev mode.
+///
+/// Returns `Some(403)` when dev mode is OFF — the grant must NEVER be reachable
+/// on a production doorway (see `handle_grant_steward` for the invariant this
+/// surface deliberately bends). Returns `None` when dev mode is ON, meaning the
+/// caller may proceed to `require_admin` and the mutation.
+///
+/// Factored out so the gate is unit-testable without synthesizing a hyper
+/// `Request<Incoming>` (mirrors how `elohim_agent.rs` tests its auth decision
+/// against `ApiKeyValidator` rather than a full request).
+fn fixture_only_gate(state: &AppState) -> Option<Response<FullBody>> {
+    if state.args.dev_mode {
+        None
+    } else {
+        Some(error_response(
+            StatusCode::FORBIDDEN,
+            "steward grant is a dev/fixture surface",
+            Some("FIXTURE_ONLY"),
+        ))
+    }
+}
+
+/// PUT /admin/users/{id}/steward - **DEV/FIXTURE ONLY** force-grant stewardship.
+///
+/// # Invariant being deliberately bent
+///
+/// In production, `is_steward = true` is set ONLY via the key-proof
+/// confirm-stewardship flow: the user has exported and decrypted their custodial
+/// key (`CustodialKeyMaterial`) and proven they hold it. That flag is load-bearing
+/// — once `is_steward` is true the doorway treats the human as self-custodial: it
+/// stops holding their key in custody and the conductor pool may **deprovision**
+/// the hosted agent cell, because the user is asserted to be reachable on their
+/// own device.
+///
+/// This surface flips `is_steward = true` WITHOUT any key proof. It exists purely
+/// so a2o fixtures can stage a "graduated steward" without driving the full Tauri
+/// export/confirm dance. Because it skips the proof, it MUST NEVER be exposed with
+/// dev mode off — a grant here on a real doorway would mark a still-custodial human
+/// as self-custodial and invite deprovisioning of an agent the human cannot
+/// actually reach. The hard dev-mode gate below (checked FIRST, before auth and
+/// before any DB access) enforces that.
+async fn handle_grant_steward(
+    req: Request<Incoming>,
+    state: Arc<AppState>,
+    user_id: &str,
+) -> Response<FullBody> {
+    // (1) HARD dev-mode gate FIRST — before auth, before DB. This surface is a
+    //     fixture-only convenience and must be invisible on a prod doorway.
+    if let Some(forbidden) = fixture_only_gate(&state) {
+        return forbidden;
+    }
+
+    // (2) Admin authentication.
+    let admin_claims = match require_admin(&req, &state).await {
+        Ok(c) => c,
+        Err(resp) => return resp,
+    };
+
+    let mongo = match &state.mongo {
+        Some(m) => m,
+        None => {
+            return error_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Database not available",
+                Some("DB_UNAVAILABLE"),
+            )
+        }
+    };
+
+    let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("Error getting collection: {}", e);
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            );
+        }
+    };
+
+    let oid = match ObjectId::parse_str(user_id) {
+        Ok(o) => o,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "Invalid user ID",
+                Some("INVALID_ID"),
+            )
+        }
+    };
+
+    // (3) Load the user, mark steward (sets is_steward = true + stewardship_at via
+    //     the canonical mark_steward helper), and persist.
+    let mut user = match collection.find_one(doc! { "_id": oid }).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND"))
+        }
+        Err(e) => {
+            warn!("Error finding user: {}", e);
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            );
+        }
+    };
+
+    user.mark_steward();
+
+    let result = collection
+        .update_one(
+            doc! { "_id": oid },
+            doc! {
+                "$set": {
+                    "is_steward": true,
+                    "stewardship_at": user.stewardship_at,
+                    "metadata.updated_at": DateTime::now()
+                }
+            },
+        )
+        .await;
+
+    match result {
+        Ok(_) => {
+            info!(
+                "FIXTURE steward grant for user {} by admin {} (dev_mode — key-proof skipped)",
+                user_id, admin_claims.identifier
+            );
+            // (4) 200 with the fixture-grant shape.
+            json_response(
+                StatusCode::OK,
+                &GrantStewardResponse {
+                    user_id: user_id.to_string(),
+                    is_steward: true,
+                },
+            )
+        }
+        Err(e) => {
+            warn!("Error granting steward: {}", e);
             error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Database error",
@@ -1678,5 +1846,62 @@ pub async fn check_quota_if_user(
             bandwidth_exceeded: false,
             message: None,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Args;
+    use clap::Parser;
+
+    fn test_state(dev_mode: bool) -> AppState {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.dev_mode = dev_mode;
+        AppState::new(args)
+    }
+
+    /// Collect a `Response<FullBody>` body into a UTF-8 String (test helper).
+    async fn body_string(resp: Response<FullBody>) -> String {
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    /// dev_mode OFF ⇒ the steward-grant gate returns 403 FIXTURE_ONLY *before*
+    /// any auth or DB access. This is the production safety invariant: the
+    /// key-proof-skipping fixture surface must be invisible on a prod doorway.
+    #[tokio::test]
+    async fn grant_steward_gate_forbidden_when_dev_mode_off() {
+        let state = test_state(false);
+        let resp = fixture_only_gate(&state).expect("dev_mode off must produce a 403 response");
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+        let body = body_string(resp).await;
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(parsed["error"], "steward grant is a dev/fixture surface");
+        assert_eq!(parsed["code"], "FIXTURE_ONLY");
+    }
+
+    /// dev_mode ON ⇒ the gate is open (None), so the handler proceeds to
+    /// require_admin + the mutation.
+    #[test]
+    fn grant_steward_gate_open_when_dev_mode_on() {
+        let state = test_state(true);
+        assert!(
+            fixture_only_gate(&state).is_none(),
+            "dev_mode on must open the gate (return None)"
+        );
+    }
+
+    /// The success response serializes with camelCase `userId` + `isSteward`,
+    /// matching the documented PUT /admin/users/{id}/steward contract.
+    #[test]
+    fn grant_steward_response_wire_shape() {
+        let json = serde_json::to_string(&GrantStewardResponse {
+            user_id: "abc123".to_string(),
+            is_steward: true,
+        })
+        .unwrap();
+        assert_eq!(json, r#"{"userId":"abc123","isSteward":true}"#);
     }
 }
