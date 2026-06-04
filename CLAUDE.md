@@ -47,6 +47,8 @@ pnpm run schema:{test,validate,check-dna,codegen:ts}
 ```
 The `.husky/pre-push` hook auto-detects changed projects and runs their quality gates. Bypass with `git push --no-verify` (NOT `HUSKY=0` — `core.hooksPath=.husky` makes git invoke the hook directly, bypassing the npm wrapper that honors the `HUSKY` env var, so `HUSKY=0` is a no-op here; this doc-vs-behavior drift has cost shift time 4×).
 
+**Gates are tiered and PVC-pressure-aware (2026-06-04).** `sweettest-check` is an integration-layer gate: it runs by default only when the push targets `dev`/`main` (force elsewhere: `RUN_SWEETTEST=1`); CI's DNA pipeline is the backstop. Native Rust gates build into per-crate cargo-target-pool slots. Under disk pressure the hook reads `genesis/agentic/pool-policy.json`: at the soft watermark it reclaims first via `cargo-pool enforce --yes` (guarded — never touches the active family or flock'd slots); at the hard ceiling it defers heavy Rust gates with a `DEFERRED-BY-PVC` banner (`FORCE_HEAVY_GATES=1` overrides). The same policy backs a PreToolUse hook that DENIES heavy cargo commands at the hard ceiling and denies native-workspace cargo lacking `CARGO_TARGET_DIR` (DNA/WASM workspaces exempt — they must stay plain cargo).
+
 The hook has TWO project-detection paths that emit DIFFERENT names: manifest-driven (`graph-walker.mjs`, fine-grained names like `epr-ts`) and a grep fallback (coarser names like `elohim-epr`). When adding a sub-project to any `build-manifest.json` `gate.projects` map, also add a matching case to `run_gate`'s fallback `case` statement — a missing case hits the `*) Unknown project` default and aborts the whole push.
 
 ## Architecture

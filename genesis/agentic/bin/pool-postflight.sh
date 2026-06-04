@@ -36,8 +36,17 @@ if [ "$DRY" != "1" ]; then
   record_all_slot_watermarks >/dev/null 2>&1 || true
 fi
 
-# Optional cold-slot GC. Off by default; opt-in via env to avoid
-# surprising operators with disk activity at session-end.
+# Policy enforcement at session end — the deterministic eviction pass
+# (pool-policy.json: stale incrementals/hashes, dispositions, LRU budget).
+# Guarded inside enforce_pool: active families, live PIDs, and flock'd
+# slots are never touched, so a concurrent session's build is safe.
+# Escape hatch: CARGO_TARGET_POOL_NO_ENFORCE=1.
+if [ "$DRY" != "1" ] && [ "${CARGO_TARGET_POOL_NO_ENFORCE:-0}" != "1" ]; then
+  enforce_pool 1 1 >/dev/null 2>&1 || true
+fi
+
+# Legacy opt-in cold-slot GC (superseded by enforce; kept for operators who
+# pinned a custom GC window via env).
 if [ -n "${CARGO_TARGET_POOL_POSTFLIGHT_GC_DAYS:-}" ]; then
   GC_DAYS="$CARGO_TARGET_POOL_POSTFLIGHT_GC_DAYS"
   # Find slot dirs (4 levels deep: family/<f>/<ws>/<profile>) whose

@@ -753,6 +753,545 @@ clean_angular_caches() {
 }
 
 # ---------------------------------------------------------------------------
+# Pool policy (pool-policy.json) — the operator's standing eviction decisions,
+# committed to the repo so enforcement is deterministic. See the policy file's
+# _comment / _dispositions for semantics. All readers fail-soft to safe
+# defaults when the file is missing (e.g. on an old branch).
+
+POOL_POLICY_FILE="${CARGO_TARGET_POOL_POLICY:-$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/../pool-policy.json}"
+
+# policy_get <jq-expr> <default> — read one value from the policy file.
+policy_get() {
+  local expr="$1" default="${2:-}" v=""
+  if [ -f "$POOL_POLICY_FILE" ]; then
+    v="$(jq -r "$expr // empty" "$POOL_POLICY_FILE" 2>/dev/null)"
+  fi
+  echo "${v:-$default}"
+}
+
+policy_pool_max_gb() { policy_get '.pool_max_gb' 150; }
+policy_soft_pct()    { policy_get '.volume_soft_pct' 75; }
+policy_hard_pct()    { policy_get '.volume_hard_pct' 85; }
+policy_stale_days()  { policy_get '.stale_incremental_days' 3; }
+policy_hash_keep()   { policy_get '.artifact_hash_keep' 1; }
+policy_hash_min_mb() { policy_get '.artifact_min_mb' 64; }
+policy_hash_min_age_hours() { policy_get '.artifact_min_age_hours' 6; }
+
+# Disposition for a family, falling back to the "*" entry, then 'ttl'.
+policy_family_disposition() {
+  local fam="$1" v
+  v="$(policy_get ".families[\"$fam\"].disposition" '')"
+  [ -n "$v" ] && { echo "$v"; return; }
+  policy_get '.families["*"].disposition' 'ttl'
+}
+
+policy_family_ttl_days() {
+  local fam="$1" v
+  v="$(policy_get ".families[\"$fam\"].ttl_days" '')"
+  [ -n "$v" ] && { echo "$v"; return; }
+  policy_get '.families["*"].ttl_days' 7
+}
+
+policy_family_max_gb() { policy_get ".families[\"$1\"].max_gb" 0; }
+
+# ---------------------------------------------------------------------------
+# Enforce guards — what enforce_pool must never touch.
+
+# A slot is locked when a live cargo holds its advisory .cargo-lock. We test
+# with a non-blocking flock attempt: if we CANNOT take the lock, cargo holds
+# it. Never kill or starve a running build (see memory:
+# feedback_workflow_long_cargo_orphan_lock — orphaned-looking locks resolve
+# when the build finishes; the work lands on disk).
+slot_locked() {
+  local slot="${1:-}" prof lock
+  [ -n "$slot" ] || return 1
+  for prof in debug release; do
+    lock="$slot/$prof/.cargo-lock"
+    [ -f "$lock" ] || continue
+    if ! flock -n "$lock" true 2>/dev/null; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# A family is busy when any of its slots is locked, or any live process has
+# its CWD inside the family tree.
+family_busy() {
+  local fam="${1:-}" fd
+  [ -n "$fam" ] || return 1
+  fd="$POOL_ROOT/family/$fam"
+  [ -d "$fd" ] || return 1
+  local slot
+  while IFS= read -r slot; do
+    [ -n "$slot" ] || continue
+    if slot_locked "$slot"; then return 0; fi
+  done < <(list_slots_for_family "$fam")
+  local pid_dir cwd
+  for pid_dir in /proc/[0-9]*; do
+    cwd="$(readlink "$pid_dir/cwd" 2>/dev/null)" || continue
+    case "$cwd" in "$fd"|"$fd"/*) return 0 ;; esac
+  done
+  return 1
+}
+
+# Families that must never be touched by enforce: the main checkout's family
+# plus the family of every worktree that has a live subagent process.
+#
+# FAIL-SAFE (review C2): under detached HEAD (rebase/bisect/sha-checkout)
+# detect_family degrades to the directory basename ('elohim'), silently
+# UN-protecting the real warm family. If the checkout is detached and no
+# explicit family signal exists (env override or .family file), protect
+# EVERY family — enforce becomes hygiene-only for that window.
+protected_families() {
+  local fams="" f wt branch
+  branch="$(git -C "$POOL_PARENT_REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
+  if { [ -z "$branch" ] || [ "$branch" = "HEAD" ]; } \
+      && [ -z "${CARGO_TARGET_POOL_FAMILY:-}" ] \
+      && [ ! -f "$POOL_PARENT_REPO/.family" ]; then
+    list_families
+    return
+  fi
+  f="$(detect_family "$POOL_PARENT_REPO" 2>/dev/null || true)"
+  [ -n "$f" ] && fams="$fams $f"
+  if [ -d "$POOL_WORKTREES_DIR" ]; then
+    for wt in "$POOL_WORKTREES_DIR"/*; do
+      [ -d "$wt" ] || continue
+      if [ -n "$(find_active_subagent_pids "$wt" 2>/dev/null | head -1)" ]; then
+        f="$(detect_family "$wt" 2>/dev/null || true)"
+        [ -n "$f" ] && fams="$fams $f"
+      fi
+    done
+  fi
+  echo "$fams" | tr ' ' '\n' | sed '/^$/d' | sort -u
+}
+
+# All branches under <family>/* merged into dev (local AND origin-remote),
+# and dev itself resolvable. Conservative on every edge (review D1/D2):
+#   * any git invocation FAILURE → NOT merged (fail-closed, never treat an
+#     enumeration error as emptiness)
+#   * ZERO attributable <fam>/* branches is ambiguous — branches deleted
+#     post-merge (cold) vs a hyphen-form branch (fam-foo) this glob can't
+#     see (possibly hot). Disambiguate by tree activity: a fresh family is
+#     NOT evictable; only idle-a-week-plus counts as merged-and-gone.
+family_all_merged() {
+  local fam="${1:-}"
+  [ -n "$fam" ] || return 1
+  git -C "$POOL_PARENT_REPO" rev-parse --verify dev >/dev/null 2>&1 || return 1
+  local out_local out_remote
+  out_local="$(git -C "$POOL_PARENT_REPO" branch --list "$fam/*" 2>/dev/null)" || return 1
+  out_remote="$(git -C "$POOL_PARENT_REPO" branch -r --list "origin/$fam/*" 2>/dev/null)" || return 1
+  if [ -z "$out_local" ] && [ -z "$out_remote" ]; then
+    family_fresh_within_days "$fam" 7 && return 1
+    return 0
+  fi
+  local unm
+  unm="$(git -C "$POOL_PARENT_REPO" branch --list "$fam/*" --no-merged dev 2>/dev/null)" || return 1
+  if printf '%s\n' "$unm" | sed -E 's/^[*+ ]+ ?//' | grep -q .; then
+    return 1
+  fi
+  unm="$(git -C "$POOL_PARENT_REPO" branch -r --list "origin/$fam/*" --no-merged dev 2>/dev/null)" || return 1
+  if printf '%s\n' "$unm" | grep -q .; then
+    return 1
+  fi
+  return 0
+}
+
+# Any filesystem activity inside the family tree within $days?
+# (-print -quit short-circuits on the first fresh file.)
+family_fresh_within_days() {
+  local fam="$1" days="$2" fd="$POOL_ROOT/family/$fam"
+  [ -d "$fd" ] || return 1
+  [ -n "$(find "$fd" -mtime "-$days" -print -quit 2>/dev/null)" ]
+}
+
+# Freshest activity timestamp (epoch) for a slot — .cargo-lock is touched on
+# every build; fall back to marker files, then the dir itself.
+slot_age_epoch() {
+  local slot="$1" t=0 f m
+  for f in "$slot/debug/.cargo-lock" "$slot/release/.cargo-lock" \
+           "$slot/.last-build" "$slot/.peak-size"; do
+    [ -e "$f" ] || continue
+    m="$(stat -c %Y "$f" 2>/dev/null || echo 0)"
+    [ "${m:-0}" -gt "$t" ] && t="$m"
+  done
+  if [ "$t" -eq 0 ]; then
+    t="$(stat -c %Y "$slot" 2>/dev/null || echo 0)"
+  fi
+  echo "$t"
+}
+
+# ---------------------------------------------------------------------------
+# Stale artifact-hash GC — THE dominant reclaim (measured 2026-06-04: 71% of
+# a 321G pool was ~1GB DWARF-laden test/bin executables, most of them
+# SUPERSEDED build hashes cargo never collects; e.g. one slot held 13
+# distinct ~1GB elohim_storage-<hash> binaries).
+#
+# CORRECTNESS MODEL (adversarial-review hardened, 2026-06-04):
+# Stripping the -<16hex> hash from a filename does NOT identify a unique
+# cargo target — a [[bin]] and the package lib's unit-test executable can
+# share a name (elohim-storage does), and same-named integration tests can
+# exist across crates. "Newest by mtime" only proves supersession WITHIN one
+# target. So:
+#   * no-extension executables are grouped by stem + the first source path
+#     from their sibling .d file (src/main.rs vs src/lib.rs vs tests/x.rs
+#     distinguishes bin / lib-test / integration-test targets). Executables
+#     with no .d sibling are NEVER touched (unclassifiable → conservative).
+#   * files with st_nlink > 1 are NEVER deleted (cargo hardlink-uplifts the
+#     current bin/lib to the profile root — nlink>1 means "current").
+#   * files younger than $min_age_h hours are NEVER touched — closes the
+#     race where a just-built test binary is deleted between build and
+#     execution (the build lock is released before tests run, so
+#     slot_locked/family_busy cannot see the execution phase).
+#   * .rlib/.so dep artifacts keep the simple stem grouping (one lib target
+#     per crate); a wrong pick there costs one dep recompile, not an exec
+#     failure.
+#
+# Only files >= $min_mb are considered — bounds the find cost and the risk
+# surface to the artifacts that actually matter.
+#
+# Output: <bytes>\t<path>
+list_stale_artifact_hashes() {
+  local root="${1:-$POOL_ROOT/family}" keep="${2:-1}" min_mb="${3:-64}" min_age_h="${4:-6}"
+  [ -d "$root" ] || return 0
+  local min_age_min=$((min_age_h * 60))
+  find "$root" -type d -name deps 2>/dev/null \
+    | while IFS= read -r deps; do
+      find "$deps" -maxdepth 1 -type f -size "+${min_mb}M" -mmin "+${min_age_min}" \
+        -printf '%T@\t%s\t%n\t%p\n' 2>/dev/null \
+        | while IFS="$(printf '\t')" read -r mt sz nl p; do
+            local n cls stem src dfile
+            n="${p##*/}"
+            cls=""
+            case "$n" in
+              *.rlib) cls=".rlib"; n="${n%.rlib}" ;;
+              *.so)   cls=".so";   n="${n%.so}" ;;
+              *.*)    continue ;;   # .d/.rmeta/etc — not our mass
+            esac
+            case "$n" in
+              *-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f])
+                stem="${n%-*}" ;;
+              *) continue ;;        # no cargo hash suffix → skip
+            esac
+            src="-"
+            if [ -z "$cls" ]; then
+              # no-extension executable: disambiguate distinct targets via
+              # the .d sibling's first source path; no .d → never touch.
+              dfile="${p}.d"
+              [ -f "$dfile" ] || continue
+              src="$(sed -n '1s/^[^:]*: *//p' "$dfile" 2>/dev/null | awk '{print $1}')"
+              [ -n "$src" ] || continue
+            fi
+            printf '%s\t%s\t%s\t%s\t%s\n' "$mt" "$sz" "$nl" "${stem}${cls}|${src}" "$p"
+          done \
+        | sort -t"$(printf '\t')" -k4,4 -k1,1gr \
+        | awk -F'\t' -v keep="$keep" '{
+            if ($4!=prev) { prev=$4; kept=0 }
+            if ($3+0 > 1) { kept++; next }   # hardlink-uplifted = current → keep
+            if (kept < keep) { kept++; next } # newest singles → keep
+            print $2 "\t" $5
+          }'
+    done
+}
+
+stale_artifact_hash_bytes() {
+  list_stale_artifact_hashes "${1:-$POOL_ROOT/family}" "${2:-1}" "${3:-64}" "${4:-6}" \
+    | awk -F'\t' '{sum+=$1} END {print sum+0}'
+}
+
+# Prune stale artifact hashes under $root. yes=1 applies; else dry-run lines.
+prune_stale_artifact_hashes() {
+  local root="${1:-$POOL_ROOT/family}" keep="${2:-1}" min_mb="${3:-64}" min_age_h="${4:-6}" yes="${5:-0}"
+  list_stale_artifact_hashes "$root" "$keep" "$min_mb" "$min_age_h" \
+    | while IFS="$(printf '\t')" read -r bytes path; do
+      if [ "$yes" = "1" ]; then
+        rm -f "$path" 2>/dev/null && \
+          printf 'removed\t%s\t%s\n' "$(human_bytes "$bytes")" "$path"
+      else
+        printf 'would-remove\t%s\t%s\n' "$(human_bytes "$bytes")" "$path"
+      fi
+    done
+}
+
+# ---------------------------------------------------------------------------
+# enforce_pool — the deterministic pool reconciler (ccache semantics: bounded
+# cache, automatic eviction, no human in the loop). Policy comes from
+# pool-policy.json. Called by cargo-pool enforce, the SessionStart async hook
+# (clean-caches.sh), the Stop hook (pool-postflight.sh), and .husky/pre-push
+# under disk pressure.
+#
+# Unconditional hygiene (junk by definition — runs every time):
+#   1. stale incremental hash dirs   (> stale_incremental_days)
+#   2. stale artifact-hash copies    (keep newest K per stem; SKIPS protected
+#      and busy families — the active family's newest hash may be mid-use)
+#   3. legacy native targets outside the pool + stale node_modules
+# Disposition pass (the operator's standing decisions):
+#   4. evict-on-merge families whose <fam>/* branches are all merged;
+#      ttl families idle past ttl_days; keep-warm families trimmed to max_gb
+# Budget pass (useful-but-evictable warm caches, LRU):
+#   5. while pool > pool_max_gb OR volume > volume_soft_pct: evict the
+#      oldest unprotected unlocked slot (release profiles biased to go first)
+#
+# Guards at every destructive step: protected families (active session +
+# live-PID worktrees) are never touched; flock'd slots are never touched;
+# a pool-level flock makes concurrent enforce runs a no-op.
+#
+# enforce_pool <apply:0|1> <quiet:0|1>   (apply=0 → dry-run, prints plan)
+enforce_pool() {
+  local apply="${1:-0}" quiet="${2:-0}"
+  local say
+  if [ "$quiet" = "1" ]; then say() { :; }; else say() { echo "[enforce] $*"; }; fi
+
+  pool_init
+
+  # Concurrency: one enforce at a time, ever. fd 9 is explicitly closed on
+  # every return path (review D5: a leaked fd into a sourcing hook process
+  # would hold the advisory lock past the run, and a second in-process call
+  # re-exec'ing 9>> would silently drop the first one's lock).
+  exec 9>>"$POOL_ROOT/.enforce-lock" || { say "cannot open enforce lock"; return 0; }
+  if ! flock -n 9 2>/dev/null; then
+    say "another enforce is running — skipping"
+    exec 9>&-
+    return 0
+  fi
+
+  local protected
+  protected="$(protected_families | tr '\n' ' ' | sed 's/ $//')"
+  say "policy: pool<=$(policy_pool_max_gb)G vol<=$(policy_soft_pct)% (hard $(policy_hard_pct)%) | protected: ${protected:-none} | mode: $([ "$apply" = 1 ] && echo APPLY || echo dry-run)"
+
+  local freed=0 fam
+
+  # -- 1. stale incrementals ------------------------------------------------
+  local days b1
+  days="$(policy_stale_days)"
+  b1="$(stale_incremental_bytes "$days")"
+  if [ "${b1:-0}" -gt 0 ]; then
+    say "1 stale-incrementals (>${days}d): $(human_bytes "$b1")"
+    prune_stale_incrementals "$days" "$apply" | sed 's/^/[enforce]   /'
+    [ "$apply" = 1 ] && { freed=$((freed + b1)); enforce_log stale-incrementals "pool" "$b1"; }
+  else
+    say "1 stale-incrementals: clean"
+  fi
+
+  # -- 2. stale artifact hashes (unprotected, non-busy families only) -------
+  local keep min_mb min_age_h
+  keep="$(policy_hash_keep)"; min_mb="$(policy_hash_min_mb)"; min_age_h="$(policy_hash_min_age_hours)"
+  for fam in $(list_families); do
+    case " $protected " in *" $fam "*) say "2 hash-gc $fam: skipped (protected)"; continue ;; esac
+    if family_busy "$fam"; then say "2 hash-gc $fam: skipped (busy)"; continue; fi
+    local b2
+    b2="$(stale_artifact_hash_bytes "$POOL_ROOT/family/$fam" "$keep" "$min_mb" "$min_age_h")"
+    if [ "${b2:-0}" -gt 0 ]; then
+      say "2 hash-gc $fam: $(human_bytes "$b2") in superseded build hashes (>${min_age_h}h old, per-target grouped, hardlinked-current exempt)"
+      prune_stale_artifact_hashes "$POOL_ROOT/family/$fam" "$keep" "$min_mb" "$min_age_h" "$apply" | sed 's/^/[enforce]   /'
+      [ "$apply" = 1 ] && { freed=$((freed + b2)); enforce_log stale-hashes "$fam" "$b2"; }
+    fi
+  done
+
+  # -- 3. legacy targets + stale node_modules -------------------------------
+  local b3a b3b
+  b3a="$(legacy_native_bytes)"
+  if [ "${b3a:-0}" -gt 268435456 ]; then
+    say "3 legacy-targets: $(human_bytes "$b3a")"
+    clean_legacy_native_targets "$([ "$apply" = 1 ] && echo 0 || echo 1)" | sed 's/^/[enforce]   /'
+    [ "$apply" = 1 ] && { freed=$((freed + b3a)); enforce_log legacy-targets "repo" "$b3a"; }
+  fi
+  b3b="$(node_modules_stale_bytes)"
+  if [ "${b3b:-0}" -gt 268435456 ]; then
+    say "3 stale-node_modules: $(human_bytes "$b3b")"
+    clean_node_modules stale "$([ "$apply" = 1 ] && echo 0 || echo 1)" | sed 's/^/[enforce]   /'
+    [ "$apply" = 1 ] && { freed=$((freed + b3b)); enforce_log stale-node-modules "repo" "$b3b"; }
+  fi
+
+  # -- 4. dispositions -------------------------------------------------------
+  for fam in $(list_families); do
+    case " $protected " in *" $fam "*) continue ;; esac
+    if family_busy "$fam"; then say "4 $fam: skipped (busy)"; continue; fi
+    local disp fd fb
+    disp="$(policy_family_disposition "$fam")"
+    fd="$POOL_ROOT/family/$fam"
+    case "$disp" in
+      evict-on-merge)
+        if family_all_merged "$fam"; then
+          fb="$(dir_disk_bytes "$fd")"
+          say "4 $fam: evict-on-merge — all $fam/* branches merged ($(human_bytes "$fb"))"
+          if [ "$apply" = 1 ]; then
+            rm -rf "$fd" && { freed=$((freed + fb)); enforce_log evict-on-merge "$fam" "$fb"; }
+          fi
+        fi
+        ;;
+      ttl)
+        local ttl
+        ttl="$(policy_family_ttl_days "$fam")"
+        if ! family_fresh_within_days "$fam" "$ttl"; then
+          fb="$(dir_disk_bytes "$fd")"
+          say "4 $fam: ttl — idle >${ttl}d ($(human_bytes "$fb"))"
+          if [ "$apply" = 1 ]; then
+            rm -rf "$fd" && { freed=$((freed + fb)); enforce_log ttl-evict "$fam" "$fb"; }
+          fi
+        fi
+        ;;
+      keep-warm)
+        local cap
+        cap="$(policy_family_max_gb "$fam")"
+        if [ "${cap:-0}" -gt 0 ]; then
+          trim_family_to_gb "$fam" "$cap" "$apply" "$quiet"
+        fi
+        ;;
+      pin) : ;;
+    esac
+  done
+
+  # -- 5. LRU budget trim ----------------------------------------------------
+  # Evicts oldest unprotected slots until pool <= pool_max_gb AND volume <=
+  # soft_pct. keep-warm/pin families are exempt (their size is governed by
+  # their own max_gb trim in step 4). Dry-run simulates: removed slots go on
+  # a skip-list and the volume %% is recomputed from simulated freed bytes.
+  local pool_b max_b pct soft
+  pool_b="$(pool_disk_bytes)"
+  max_b=$(( $(policy_pool_max_gb) * 1073741824 ))
+  soft="$(policy_soft_pct)"
+  local vol_total_kb vol_used_kb sim_freed=0
+  vol_total_kb="$(df -P "$POOL_PARENT_REPO" 2>/dev/null | awk 'NR==2 {print $2}')"
+  vol_used_kb="$(df -P "$POOL_PARENT_REPO" 2>/dev/null | awk 'NR==2 {print $3}')"
+  local lru_guard=0 lru_skip=""
+  while :; do
+    if [ "$apply" = 1 ] || [ -z "${vol_total_kb:-}" ] || [ "${vol_total_kb:-0}" -le 0 ]; then
+      pct="$(disk_pct_used)"
+    else
+      # dry-run: simulate — subtract planned frees from the df snapshot
+      pct=$(( (vol_used_kb - sim_freed / 1024) * 100 / vol_total_kb ))
+    fi
+    [ "${pool_b:-0}" -le "$max_b" ] && [ "${pct:-0}" -le "$soft" ] && break
+    lru_guard=$((lru_guard + 1)); [ "$lru_guard" -gt 50 ] && break
+    local victim
+    victim="$(pick_lru_slot "$protected" "$lru_skip")"
+    if [ -z "$victim" ]; then
+      say "5 budget still exceeded (pool $(human_bytes "$pool_b"), vol ${pct:-?}%) but no evictable slots remain (keep-warm/pin/protected/locked exempt)"
+      break
+    fi
+    local vb
+    vb="$(dir_disk_bytes "$victim")"
+    lru_skip="$lru_skip
+$victim"
+    # TOCTOU recheck (review D3): a cargo may have taken the slot between
+    # pick and now (the du above can take seconds on a big slot).
+    if slot_locked "$victim"; then
+      say "5 lru-evict: $victim — became locked, skipping"
+      continue
+    fi
+    say "5 lru-evict: $victim ($(human_bytes "$vb"))"
+    if [ "$apply" = 1 ]; then
+      rm -rf "$victim" && { freed=$((freed + vb)); pool_b=$((pool_b - vb)); enforce_log lru-evict "$victim" "$vb"; }
+    else
+      pool_b=$((pool_b - vb)); sim_freed=$((sim_freed + vb))
+    fi
+  done
+
+  # Stamp pool size for cheap readers (cargo-disk-guard.py, status).
+  if [ "$apply" = 1 ]; then
+    pool_disk_bytes > "$POOL_ROOT/.pool-size-bytes" 2>/dev/null || true
+  fi
+
+  if [ "$apply" = 1 ]; then
+    say "done — freed $(human_bytes "$freed"); volume now $(disk_human_summary) ($(disk_pct_used)%)"
+  else
+    say "done — dry-run plan above (apply with: cargo-pool enforce --yes); volume currently $(disk_human_summary) ($(disk_pct_used)%)"
+  fi
+  enforce_log summary "pool" "$freed" "apply=$apply"
+  exec 9>&-
+  return 0
+}
+
+# Trim a keep-warm family down to its max_gb: release slots first (oldest
+# first), then oldest dev slots. Locked slots are skipped. The FRESHEST slot
+# always survives — "keep-warm" means the primary warm cache is never
+# evicted, even when it alone exceeds the cap (the cap then becomes
+# best-effort; profile shrink is the durable fix for oversized slots).
+trim_family_to_gb() {
+  local fam="$1" cap_gb="$2" apply="${3:-0}" quiet="${4:-0}"
+  local say
+  if [ "$quiet" = "1" ]; then say() { :; }; else say() { echo "[enforce] $*"; }; fi
+  local fd="$POOL_ROOT/family/$fam"
+  [ -d "$fd" ] || return 0
+  local cap_b=$((cap_gb * 1073741824))
+  local size
+  size="$(dir_disk_bytes "$fd")"
+  [ "${size:-0}" -le "$cap_b" ] && return 0
+  # Identify the freshest slot — the one keep-warm exists to protect.
+  local freshest="" freshest_t=0 s t
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    t="$(slot_age_epoch "$s")"
+    if [ "${t:-0}" -gt "$freshest_t" ]; then freshest_t="$t"; freshest="$s"; fi
+  done < <(list_slots_for_family "$fam")
+  say "4 $fam: keep-warm over cap ($(human_bytes "$size") > ${cap_gb}G) — trimming (freshest slot kept: ${freshest:-none})"
+  local slot
+  while IFS= read -r slot; do
+    [ -n "$slot" ] || continue
+    [ "${size:-0}" -le "$cap_b" ] && break
+    [ "$slot" = "$freshest" ] && continue
+    if slot_locked "$slot"; then continue; fi
+    local sb
+    sb="$(dir_disk_bytes "$slot")"
+    say "4 $fam: trim $slot ($(human_bytes "$sb"))"
+    if [ "$apply" = 1 ]; then
+      rm -rf "$slot" && { size=$((size - sb)); enforce_log keep-warm-trim "$slot" "$sb"; }
+    else
+      size=$((size - sb))
+    fi
+  done < <(
+    # order: release profile slots oldest-first, then dev slots oldest-first
+    for s in $(list_slots_for_family "$fam"); do
+      printf '%s\t%s\t%s\n' "$(case "$s" in */release) echo 0 ;; *) echo 1 ;; esac)" "$(slot_age_epoch "$s")" "$s"
+    done | sort -t"$(printf '\t')" -k1,1n -k2,2n | cut -f3
+  )
+  if [ "${size:-0}" -gt "$cap_b" ]; then
+    say "4 $fam: still over cap after trim ($(human_bytes "$size") > ${cap_gb}G) — freshest slot preserved by keep-warm; shrink it via build profiles, not eviction"
+  fi
+}
+
+# Oldest unprotected, unlocked slot across all families. Release-profile
+# slots are biased to evict first (treated as 30d older). keep-warm and pin
+# families are exempt — their size is governed by their own disposition.
+# $2 (optional): newline-separated skip-list of already-chosen victims
+# (dry-run simulation support).
+pick_lru_slot() {
+  local protected=" ${1:-} " skip="${2:-}"
+  local best="" best_t=9999999999 fam slot t disp
+  for fam in $(list_families); do
+    case "$protected" in *" $fam "*) continue ;; esac
+    disp="$(policy_family_disposition "$fam")"
+    case "$disp" in keep-warm|pin) continue ;; esac
+    # Same busy-guard as steps 2/4 (review D3): a momentarily-unlocked but
+    # actively-used family must not lose slots to the budget pass.
+    if family_busy "$fam"; then continue; fi
+    while IFS= read -r slot; do
+      [ -n "$slot" ] || continue
+      case "$skip" in *"$slot"*) continue ;; esac
+      if slot_locked "$slot"; then continue; fi
+      t="$(slot_age_epoch "$slot")"
+      case "$slot" in */release) t=$((t - 2592000)) ;; esac
+      if [ "${t:-0}" -lt "$best_t" ]; then best_t="$t"; best="$slot"; fi
+    done < <(list_slots_for_family "$fam")
+  done
+  echo "$best"
+}
+
+# Append one JSON enforcement record to pool.log.
+enforce_log() {
+  local action="$1" target="$2" bytes="${3:-0}" note="${4:-}"
+  local line
+  line="$(jq -nc \
+    --arg ts "$(now_iso)" --arg event enforce \
+    --arg action "$action" --arg target "$target" \
+    --argjson bytes "${bytes:-0}" --arg note "$note" \
+    '{ts:$ts,event:$event,action:$action,target:$target,bytes:$bytes} as $b
+     | if ($note | length) > 0 then $b + {note:$note} else $b end' 2>/dev/null)" || return 0
+  echo "$line" >> "$(pool_log_path)" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
 # Uncommitted-orphan scan — worktrees with dirty status AND no active
 # subagent. These are crash-recovery candidates: fmt drift from a dead
 # agent, half-finished work after a workspace restart, etc. Don't auto-

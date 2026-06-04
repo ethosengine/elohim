@@ -1,0 +1,25 @@
+{
+  "_comment": "Pool eviction policy — the operator's standing decisions, codified once so enforcement is deterministic (ccache semantics: bounded cache, automatic eviction). Consumed by pool-lib.sh enforce_pool / cargo-pool enforce, the SessionStart/Stop hooks, the cargo-disk-guard PreToolUse hook, and .husky/pre-push pressure strategy. Decided 2026-06-04 (operator-confirmed: merge-aware dispositions, 150G/75/85 budget, full gate enforcement). Evidence basis: genesis/docs — 71% of the pool was stale ~1GB DWARF test binaries; see memory project_rust_build_footprint_anatomy.",
+  "pool_max_gb": 150,
+  "volume_soft_pct": 75,
+  "volume_hard_pct": 85,
+  "stale_incremental_days": 3,
+  "artifact_hash_keep": 1,
+  "artifact_min_mb": 64,
+  "artifact_min_age_hours": 6,
+  "families": {
+    "shift": { "disposition": "evict-on-merge" },
+    "sprint": { "disposition": "evict-on-merge" },
+    "dev": { "disposition": "keep-warm", "max_gb": 60 },
+    "e2e": { "disposition": "ttl", "ttl_days": 14 },
+    "design": { "disposition": "ttl", "ttl_days": 14 },
+    "elohim": { "disposition": "ttl", "ttl_days": 14 },
+    "*": { "disposition": "ttl", "ttl_days": 7 }
+  },
+  "_dispositions": {
+    "evict-on-merge": "auto-evicted when EVERY local+remote branch under <family>/* is merged into dev AND no live worktree/PIDs reference the family. Active session's family is always protected regardless.",
+    "keep-warm": "never fully evicted; trimmed to max_gb (release slots first, then oldest dev slots) when over.",
+    "ttl": "evicted after ttl_days with no filesystem activity anywhere in the family tree.",
+    "pin": "never touched by enforce (operator-manual only)."
+  }
+}

@@ -87,6 +87,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/cargo-disk-guard.py\"",
+            "timeout": 5000
+          },
+          {
+            "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/rust-holochain-validation.py\"",
             "timeout": 3000
           },

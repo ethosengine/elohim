@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
 # Pre-push hook: Runs project-specific checks before allowing push.
 # Bypass ALL gates:        HUSKY=0 git push   (or: git push --no-verify)
-# Skip ONLY sweettest:     SKIP_SWEETTEST=1 git push
-#   (drops the slow Holochain-conductor compile-check; keeps fmt/clippy/unit
-#    tests. CI still runs sweettest as a backstop. Use when iterating on
-#    zome/sweettest source and the cold cross-conductor `cargo check` is too
-#    slow to pay on every push.)
+# Skip ONLY sweettest:     SKIP_SWEETTEST=1 git push      (on dev pushes)
+# Force sweettest:         RUN_SWEETTEST=1 git push       (on non-dev pushes)
+# Force heavy gates:       FORCE_HEAVY_GATES=1 git push   (under PVC pressure)
+#
+# TIERED TESTING (2026-06-04): sweettest-check is an INTEGRATION-layer gate —
+# it compiles the full Holochain conductor, which is high-value at the
+# integration boundary and a velocity-killer on every feature push. Default:
+# it runs only when the push target is dev/main (where the orchestrator also
+# builds); on feature/sprint/shift pushes it is deferred with a notice. CI's
+# DNA pipeline (--run-ignored all) remains the backstop either way.
+# Unit-layer gates (fmt/clippy/unit tests/lint) always run.
+#
+# PVC-PRESSURE STRATEGY (2026-06-04): before running gates the hook reads
+# genesis/agentic/pool-policy.json + df. At the soft watermark it first runs
+# `cargo-pool enforce --yes` (guarded reclaim — never touches this push's
+# family or any flock'd slot); at the hard ceiling it DEFERS heavy Rust gates
+# with a loud DEFERRED-BY-PVC banner naming each one, instead of cold-building
+# tens of GB mid-push and starving the volume. FORCE_HEAVY_GATES=1 overrides.
 #
 # Honor HUSKY=0 — git config core.hooksPath points at .husky/ directly,
 # so the husky shim (which normally handles this) is not in the call path.
@@ -63,28 +76,54 @@ PNPM_HOME="${PNPM_HOME:-/nix/xdg/cache/pnpm}"
 
 ZERO_SHA="0000000000000000000000000000000000000000"
 
-# ── sweettest pooled target slot (L3 — keep the compile-check warm) ──
-# The sweettest compile-check builds the entire Holochain conductor. If it
-# builds into the in-tree elohim/holochain/tests/sweettest/target/, that dir
-# is a NATIVE_WORKSPACES legacy target that `cargo-pool legacy-targets --clean`
-# reclaims under disk pressure — wiping the warm cache and forcing the next
-# pre-push into a cold multi-minute check. Redirecting CARGO_TARGET_DIR into
-# the cargo-target-pool slot (the same place every other native workspace
-# builds) keeps it under the gentle incremental GC instead, AND stops it
-# leaving a stray in-tree target/ behind.
+# ── pooled target slots (L3 — keep gate builds warm AND bounded) ──
+# Gate builds that land in-tree become "legacy targets" that cleanup reclaims
+# under disk pressure (wiping warm caches → cold multi-minute rebuilds), and
+# they balloon the PVC outside pool policy. Redirect every native Rust gate
+# into its cargo-target-pool slot — the same place every other native build
+# lands, governed by pool-policy.json + `cargo-pool enforce`.
 #
-# Inlined (not sourced from pool-lib.sh — that file sets `set -u`, unsafe here).
-# Formula mirrors pool-lib.sh slot_path(); fail-open (empty → in-tree default).
-sweettest_pool_slot() {
+# Inlined (not sourced from pool-lib.sh — that file's callers set `set -u`,
+# unsafe here). Formula mirrors pool-lib.sh slot_path(); fail-open (empty →
+# in-tree default). Do NOT swap this for dynamic `cargo-pool key` — it
+# mis-keys storage and offers slots for DNA workspaces that must stay
+# un-redirected (hc dna pack canonicalizes ./target).
+# Family detection — mirrors pool-lib.sh detect_family (env override →
+# .family file → branch with feat/fix/chore/worktree- prefix strip → first
+# [-/] token, lowercased). Keeping these in sync matters: a drifted family
+# here would build gates into a slot the pool's protection logic doesn't
+# associate with this push (review C8).
+detect_push_family() {
+  if [ -n "${CARGO_TARGET_POOL_FAMILY:-}" ]; then
+    echo "$CARGO_TARGET_POOL_FAMILY"; return 0
+  fi
+  local top
+  top="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
+  if [ -f "$top/.family" ]; then
+    tr -d '[:space:]' < "$top/.family"; return 0
+  fi
+  local branch
+  branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
+  [ -n "$branch" ] && [ "$branch" != "HEAD" ] || return 1
+  case "$branch" in
+    feat/*|feature/*|fix/*|chore/*) branch="${branch#*/}" ;;
+    worktree-*) branch="${branch#worktree-}" ;;
+  esac
+  echo "${branch%%[-/]*}" | tr '[:upper:]' '[:lower:]'
+}
+
+gate_pool_slot() {
+  local ws_rel="$1"
   local root="${CARGO_TARGET_POOL_ROOT:-/projects/.cargo-target-pool}"
   [ -d "$root/family" ] || return 1
-  local branch family
-  branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
-  [ -n "$branch" ] || return 1
-  family="$(echo "${branch%%[-/]*}" | tr '[:upper:]' '[:lower:]')"
+  local family flat
+  family="$(detect_push_family)" || return 1
   [ -n "$family" ] || return 1
-  echo "$root/family/$family/elohim__holochain__tests__sweettest/dev"
+  flat="$(echo "$ws_rel" | tr '/' '_' | sed 's/__*/__/g')"
+  echo "$root/family/$family/$flat/dev"
 }
+
+sweettest_pool_slot() { gate_pool_slot "elohim/holochain/tests/sweettest"; }
 
 # ── Lockfile Consistency Check ────────────────────────────────────
 # Catch uncommitted lockfile changes that would break CI's --frozen-lockfile
@@ -97,11 +136,15 @@ fi
 # ── Change Detection ──────────────────────────────────────────────
 
 CHANGED=""
+PUSH_TARGETS=""
 while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
   # Skip delete pushes
   if [ "$LOCAL_SHA" = "$ZERO_SHA" ]; then
     continue
   fi
+
+  # Track push targets — sweettest tiering keys off "is this the dev push?"
+  PUSH_TARGETS="$PUSH_TARGETS $REMOTE_REF"
 
   # Determine what changed
   if [ "$REMOTE_SHA" = "$ZERO_SHA" ]; then
@@ -323,22 +366,133 @@ fi
 # Trim leading space
 PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
 
+# ── Lockstep project filter ───────────────────────────────────────
+# The gate loop pairs PROJECTS with MANIFEST_DIRS POSITIONALLY
+# (`set -- $MANIFEST_DIRS; PROJECT_DIR="$1"; shift`). Removing an entry
+# from PROJECTS without removing its paired dir mis-maps every later
+# project onto the wrong directory (e.g. drop elohim-storage and
+# schema-dna suddenly runs inside elohim/elohim-storage). ALL filters
+# below MUST go through this helper. (Positional params are
+# function-local in POSIX sh, so the `set --` here cannot clobber the
+# script's own.)
+drop_project() {
+  DROP_NAME="$1"
+  NEW_P=""
+  NEW_D=""
+  if [ "$USE_MANIFEST" = true ]; then
+    set -- $MANIFEST_DIRS
+  fi
+  for p in $PROJECTS; do
+    if [ "$USE_MANIFEST" = true ]; then
+      d="${1:-}"
+      [ "$#" -gt 0 ] && shift
+    else
+      d=""
+    fi
+    [ "$p" = "$DROP_NAME" ] && continue
+    NEW_P="$NEW_P $p"
+    [ -n "$d" ] && NEW_D="$NEW_D $d"
+  done
+  PROJECTS=$(echo "$NEW_P" | sed 's/^ //')
+  if [ "$USE_MANIFEST" = true ]; then
+    MANIFEST_DIRS=$(echo "$NEW_D" | sed 's/^ //')
+  fi
+}
+
 # ── Selective gate skip (SKIP_SWEETTEST) ──────────────────────────
 # Drop ONLY the sweettest compile-check while keeping every other gate.
 # CI still runs sweettest as a backstop, so this trades a local pre-CI
 # catch for push speed — narrower than the all-or-nothing HUSKY=0.
 if [ "${SKIP_SWEETTEST-}" = "1" ] && echo "$PROJECTS" | grep -qw "sweettest-check"; then
-  NEW_PROJECTS=""
-  for p in $PROJECTS; do
-    [ "$p" = "sweettest-check" ] && continue
-    NEW_PROJECTS="$NEW_PROJECTS $p"
-  done
-  PROJECTS=$(echo "$NEW_PROJECTS" | sed 's/^ //')
+  drop_project "sweettest-check"
   echo "[pre-push] SKIP_SWEETTEST=1 — skipping sweettest compile-check (CI still runs it)."
+fi
+
+# ── Sweettest tiering (integration layer) ─────────────────────────
+# sweettest-check compiles the full Holochain conductor — keep it at the
+# integration boundary (push to dev/main), not on every feature push.
+# RUN_SWEETTEST=1 forces it anywhere; CI's DNA pipeline is the backstop.
+if echo "$PROJECTS" | grep -qw "sweettest-check" && [ "${RUN_SWEETTEST-}" != "1" ]; then
+  IS_INTEGRATION_PUSH=0
+  for ref in $PUSH_TARGETS; do
+    case "$ref" in
+      refs/heads/dev|refs/heads/main) IS_INTEGRATION_PUSH=1 ;;
+    esac
+  done
+  if [ "$IS_INTEGRATION_PUSH" = "0" ]; then
+    drop_project "sweettest-check"
+    echo "[pre-push] sweettest-check: integration-layer gate — deferred (push target is not dev/main)."
+    echo "           It runs on the dev push; CI DNA pipeline is the backstop. Force now: RUN_SWEETTEST=1 git push"
+  fi
 fi
 
 # No project source changes — let it through
 if [ -z "$PROJECTS" ]; then
+  exit 0
+fi
+
+# ── PVC-pressure strategy (policy-driven) ─────────────────────────
+# Budget from genesis/agentic/pool-policy.json (fail-soft defaults). At the
+# soft watermark: reclaim first via the guarded enforce ladder (it never
+# touches this push's family or any slot a live cargo holds). At the hard
+# ceiling: defer heavy Rust gates with a loud banner instead of cold-building
+# tens of GB mid-push. FORCE_HEAVY_GATES=1 overrides the deferral.
+REPO_TOP="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+POOL_POLICY="$REPO_TOP/genesis/agentic/pool-policy.json"
+SOFT_PCT=75; HARD_PCT=85
+if command -v jq >/dev/null 2>&1 && [ -f "$POOL_POLICY" ]; then
+  SOFT_PCT=$(jq -r '.volume_soft_pct // 75' "$POOL_POLICY" 2>/dev/null || echo 75)
+  HARD_PCT=$(jq -r '.volume_hard_pct // 85' "$POOL_POLICY" 2>/dev/null || echo 85)
+fi
+# df wrapped in `|| true` INSIDE the substitution: under `sh -e` + pipefail a
+# failing df would otherwise abort the entire hook (review C3) — a trailing
+# `|| echo` after the pipe can't help, pipefail already failed the assignment.
+DISK_PCT=$({ df -P /projects 2>/dev/null || true; } | awk 'NR==2 {gsub("%","",$5); print $5}')
+HEAVY_GATES="elohim-storage epr-storage doorway steward-node elohim-compute elohim-epr sweettest-check domain-types"
+
+if [ -n "${DISK_PCT:-}" ] && [ "$DISK_PCT" -ge "$SOFT_PCT" ] && [ "${CARGO_TARGET_POOL_NO_ENFORCE:-0}" != "1" ]; then
+  CARGO_POOL_BIN="$REPO_TOP/genesis/agentic/bin/cargo-pool"
+  if [ -x "$CARGO_POOL_BIN" ]; then
+    echo "[pre-push] disk at ${DISK_PCT}% >= soft ${SOFT_PCT}% — reclaiming via pool policy before gates..."
+    # Export the pushing family explicitly (review D4): if this push runs
+    # from a checkout outside .claude/worktrees, protected_families would
+    # otherwise not associate the pushing branch's family with a live
+    # session — the env override makes the protection authoritative.
+    PUSH_FAMILY="$(detect_push_family 2>/dev/null || true)"
+    if command -v timeout >/dev/null 2>&1; then
+      CARGO_TARGET_POOL_FAMILY="${PUSH_FAMILY:-}" timeout 300 bash "$CARGO_POOL_BIN" enforce --yes --quiet 2>/dev/null || true
+    else
+      CARGO_TARGET_POOL_FAMILY="${PUSH_FAMILY:-}" bash "$CARGO_POOL_BIN" enforce --yes --quiet 2>/dev/null || true
+    fi
+    DISK_PCT=$({ df -P /projects 2>/dev/null || true; } | awk 'NR==2 {gsub("%","",$5); print $5}')
+    echo "[pre-push] disk now at ${DISK_PCT:-?}%"
+  fi
+fi
+
+if [ -n "${DISK_PCT:-}" ] && [ "$DISK_PCT" -ge "$HARD_PCT" ] && [ "${FORCE_HEAVY_GATES-}" != "1" ]; then
+  DEFERRED=""
+  for h in $HEAVY_GATES; do
+    if echo "$PROJECTS" | grep -qw "$h"; then
+      DEFERRED="$DEFERRED $h"
+      drop_project "$h"   # lockstep: keeps MANIFEST_DIRS pairing intact
+    fi
+  done
+  if [ -n "$DEFERRED" ]; then
+    echo ""
+    echo "!!============================================================!!"
+    echo "!! DEFERRED-BY-PVC: disk at ${DISK_PCT}% >= hard ${HARD_PCT}% ceiling"
+    echo "!! Heavy Rust gates NOT run:$DEFERRED"
+    echo "!! CI remains the backstop on dev. To run them now:"
+    echo "!!   bash genesis/agentic/bin/cargo-pool enforce --yes   # reclaim"
+    echo "!!   FORCE_HEAVY_GATES=1 git push                        # override"
+    echo "!!============================================================!!"
+    echo ""
+  fi
+fi
+
+# Re-check: pressure deferral may have emptied the project list.
+if [ -z "$PROJECTS" ]; then
+  echo "[pre-push] all detected gates deferred — push allowed (CI backstop)."
   exit 0
 fi
 
@@ -353,6 +507,24 @@ run_gate() {
   PROJECT_DIR="$2"
 
   cd "$PROJECT_DIR" || return 1
+
+  # L3 (all native Rust gates): build into the pooled slot so gate builds
+  # are bounded by pool policy instead of ballooning in-tree. Subshell-scoped
+  # (run_gate is invoked as `(run_gate ...)`), so the export cannot leak to
+  # other gates. Resolves genesis/data/timeline/backlog/prepush-cargo-target-pool.md.
+  GATE_WS=""
+  case "$PROJECT_NAME" in
+    elohim-storage|epr-storage) GATE_WS="elohim/elohim-storage" ;;
+    doorway)                    GATE_WS="doorway/doorway-service" ;;
+    steward-node)               GATE_WS="steward/node" ;;
+  esac
+  if [ -n "$GATE_WS" ]; then
+    GATE_SLOT="$(gate_pool_slot "$GATE_WS" 2>/dev/null || true)"
+    if [ -n "${GATE_SLOT:-}" ] && mkdir -p "$GATE_SLOT" 2>/dev/null; then
+      export CARGO_TARGET_DIR="$GATE_SLOT"
+      echo "  [$PROJECT_NAME] pooled target: $GATE_SLOT"
+    fi
+  fi
 
   # Schema checks run pnpm scripts directly — no justfile needed
   if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "cargo-coverage" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ] || [ "$PROJECT_NAME" = "elements-codegen" ] || [ "$PROJECT_NAME" = "pipeline-list-fresh" ]; then

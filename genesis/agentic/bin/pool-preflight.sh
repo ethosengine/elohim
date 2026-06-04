@@ -84,17 +84,17 @@ case "$DISK_STATUS" in
     DISK_BANNER="$(cat <<BANNER
 
 !! CRITICAL DISK PRESSURE: $DISK_SUMMARY (${DISK_PCT}% used). RUN CLEANUP NOW:
-   bash genesis/agentic/bin/cargo-pool prune --stale-incrementals --yes
-   bash genesis/agentic/bin/cargo-pool legacy-targets --clean --yes
-   bash genesis/agentic/bin/cargo-pool prune --older-than 7d --yes
+   bash genesis/agentic/bin/cargo-pool enforce --yes
+   (policy-driven ladder: genesis/agentic/pool-policy.json — the SessionStart
+    async hook also runs this; heavy cargo is DENIED at the hard ceiling)
 BANNER
 )"
     ;;
   warn)
     DISK_BANNER="$(cat <<BANNER
 
-!  Disk pressure: $DISK_SUMMARY (${DISK_PCT}% used). Consider cleanup:
-   bash genesis/agentic/bin/cargo-pool prune --stale-incrementals --yes
+!  Disk pressure: $DISK_SUMMARY (${DISK_PCT}% used). Reclaim per policy:
+   bash genesis/agentic/bin/cargo-pool enforce --yes
 BANNER
 )"
     ;;
@@ -215,6 +215,7 @@ redirect target/; hc dna pack canonicalizes ./target.
 Worktree stewardship: $COUNT_REMOVED removed (merged-clean), $COUNT_ORPHAN logged orphan/dirty, $COUNT_LEFT left untouched (active or unclassified).
 
 Operator commands:
+  cargo-pool enforce [--yes]      # policy reconciler (pool-policy.json) — dry-run by default
   cargo-pool status               # families table + pressure indicators
   cargo-pool steward --dry-run    # preview stewardship without applying
   cargo-pool key                  # print slot path for current PWD

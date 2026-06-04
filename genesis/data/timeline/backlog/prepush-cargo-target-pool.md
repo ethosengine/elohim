@@ -7,7 +7,8 @@ title: "Pre-push hook bypasses the cargo-target-pool — no per-crate CARGO_TARG
 slug: "prepush-cargo-target-pool"
 written: "2026-06-02"
 author: "cartographer"
-status: "proposed"
+status: "resolved"
+resolved: "2026-06-04"
 priority: "medium"
 area: "cargo"
 recurrence: 1
@@ -57,3 +58,16 @@ hazard — concurrent agents must not share a slot (`feedback_multi_agent_pvc_pa
 ## Acceptance
 
 A multi-crate pre-push uses per-crate pooled target dirs and no longer ENOSPCs.
+
+## Resolution (2026-06-04)
+
+`.husky/pre-push` now has `gate_pool_slot <ws_rel>` (generalizing the sweettest-only
+`sweettest_pool_slot`) and `run_gate` exports a per-crate pooled `CARGO_TARGET_DIR` for
+elohim-storage / epr-storage / doorway / steward-node gates (subshell-scoped, fail-open,
+explicit ws_rel constants — NOT dynamic `cargo-pool key`, which mis-keys storage). Beyond
+the original ask, the hook is now PVC-pressure-aware: it reads
+`genesis/agentic/pool-policy.json`, runs the guarded `cargo-pool enforce --yes` reclaim at
+the soft watermark, and defers heavy Rust gates with a DEFERRED-BY-PVC banner at the hard
+ceiling (FORCE_HEAVY_GATES=1 overrides). ENOSPC mid-push is now structurally prevented from
+both directions: builds land in policy-bounded slots, and pushes that can't fit defer
+instead of starving the volume.

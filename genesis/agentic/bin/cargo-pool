@@ -37,16 +37,29 @@ Usage:
   cargo-pool node-modules [--clean [--stale|--all]] [--yes]
   cargo-pool angular-cache [--clean] [--older-than-days N] [--yes]
   cargo-pool watermark [show|update]
+  cargo-pool enforce [--yes] [--quiet]
   cargo-pool prune family <name> [--yes]
   cargo-pool prune --older-than <duration> [--yes]
   cargo-pool prune --stale-incrementals [--older-than-days N] [--yes]
   cargo-pool log [-n N]
   cargo-pool orphans
 
+enforce — deterministic policy reconciler (ccache semantics). Reads
+  genesis/agentic/pool-policy.json and runs the full eviction ladder:
+  stale incrementals → superseded artifact hashes → legacy targets /
+  stale node_modules → family dispositions (evict-on-merge / ttl /
+  keep-warm trim) → LRU slot eviction until under budget. Guarded:
+  never touches the active session's family, live-PID worktree
+  families, or any slot whose .cargo-lock is held by a running cargo.
+  Default is a dry-run plan; --yes applies. Wired into SessionStart
+  (async), Stop, and .husky/pre-push pressure strategy.
+
 Env:
   CARGO_TARGET_POOL_ROOT       (default /projects/.cargo-target-pool)
   POOL_PARENT_REPO             (default $CLAUDE_PROJECT_DIR or /projects/elohim)
   CARGO_TARGET_POOL_FAMILY     override family detection in `key`
+  CARGO_TARGET_POOL_POLICY     override policy file path
+  CARGO_TARGET_POOL_NO_ENFORCE=1  hooks skip auto-enforce (escape hatch)
 
 Design: genesis/docs/plans/cargo-target-pool-design.md
 EOF
@@ -252,6 +265,21 @@ cmd_prune() {
       return 2
       ;;
   esac
+}
+
+cmd_enforce() {
+  local apply=0 quiet=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --yes|-y)  apply=1; shift ;;
+      --quiet|-q) quiet=1; shift ;;
+      --dry-run) apply=0; shift ;;
+      *) echo "unknown flag: $1" >&2
+         echo "usage: cargo-pool enforce [--yes] [--quiet]" >&2
+         return 2 ;;
+    esac
+  done
+  enforce_pool "$apply" "$quiet"
 }
 
 cmd_legacy_targets() {
@@ -500,6 +528,7 @@ case "$cmd" in
   status)         cmd_status "$@" ;;
   steward)        cmd_steward "$@" ;;
   key)            cmd_key "$@" ;;
+  enforce)        cmd_enforce "$@" ;;
   prune)          cmd_prune "$@" ;;
   legacy-targets) cmd_legacy_targets "$@" ;;
   node-modules)   cmd_node_modules "$@" ;;
