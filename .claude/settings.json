@@ -35,6 +35,17 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pickup-semantic-surfacing.py\" --event prompt",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "*",
@@ -43,6 +54,16 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-memory.py\"",
             "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Grep|Glob|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pickup-semantic-surfacing.py\" --event tool",
+            "timeout": 15000
           }
         ]
       },

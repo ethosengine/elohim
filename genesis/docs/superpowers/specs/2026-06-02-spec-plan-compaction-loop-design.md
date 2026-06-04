@@ -6,7 +6,7 @@ created: 2026-06-02
 tier: design-spec
 class: process-meta
 process_subdomain: doc-lifecycle
-topic: [memory, compaction, lifecycle, decompose, stasis, comet, history, trajectory, born-linked, mempalace, no-dumping-grounds]
+topic: [memory, compaction, lifecycle, decompose, stasis, comet, history, trajectory, born-linked, mempalace, no-dumping-grounds, pickup, session-surfacing, hooks]
 cites:
   - unified-memory-loop-design | the loop this rides while correcting its single stasis metric to the three-zone comet shape | sha256:99100efd20d10129
   - memory-lifecycle-design | the product seed supplying the compact/merge/memorialize primitives this loop dogfoods for docs | sha256:b6545e6548573fa4
@@ -14,6 +14,7 @@ cites:
   - verification-result-index-design | the state store whose verification results gate when a spec may self-dissolve | sha256:8d6b292dafc4a44e
   - genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md
   - .claude/scripts/memory-kit/LIFECYCLE.md
+  - converge-skill-design | the session-start what's-next moment whose manual surfacing step the PICKUP fire point (§4b) makes deterministic | sha256:3034b991de8d3d87
 refines:
   - genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md  # rides its loop machinery; corrects its stasis metric + history model
 derived_from:
@@ -34,6 +35,7 @@ proposed_corrections:
 spawned_backlog:
   - placement-enforcement hook (.claude/hooks/, NOT YET BUILT)
   - delivery-status-poll (delivery-status-distribution.py SessionStart wiring, NOT YET BUILT)
+  - pickup-semantic-surfacing hook (§4b — .claude/hooks/pickup-semantic-surfacing.py + settings.json UserPromptSubmit/PreToolUse wiring, BUILT 2026-06-04; gate paths verified by synthetic stdin tests, live-session efficacy pending next session start)
 ---
 
 # Spec/Plan Compaction Loop
@@ -178,7 +180,7 @@ applied):
   curator, not an archivist; `.claude/archive/` is demoted to genuine memorialized deep-archive (story-pointer
   retrievable) only — never a sink at the end of the loop.
 
-## 3. The loop spine — two deterministic fire points
+## 3. The loop spine — two deterministic fire points (plus a read-only PICKUP fire)
 
 The discipline is a **closed loop with two deterministic fire points** bracketing the superpowers lifecycle.
 The FRONT fires when a brainstorm opens; the BACK fires when a plan's work concludes. The one-time burndown of
@@ -186,6 +188,11 @@ the existing active pile (§9) is just the BACK fire point run in batch over alr
 unified-memory-loop tells you *what state the corpus is in and who to dispatch*; this spec tells you *what fires
 when a brainstorm opens and when a plan's work concludes* — and enforces that the answer is born-linked at the
 front and zero-residue at the back.
+
+*(2026-06-04)* A third, **read-only** fire point — **PICKUP (§4b)** — covers the moment neither bracket
+touches: a session re-opening on prior work ("where are we at with X?"). It surfaces semantic recall
+deterministically at pickup-time but holds no lifecycle authority — it creates nothing and dissolves nothing,
+so the two-point bracket model below is unchanged.
 
 ```
                        ┌──────────────────────────────────────────────────────────┐
@@ -348,6 +355,89 @@ a permanent one. Once the No-Dumping-Grounds law (§10.3) holds **workspace-wide
 junk-drawer, every store curated — then "cleaned surface" *is* "whole workspace," and pointing ingestion at
 everything becomes coherent rather than reckless. That convergence is the steady state the loop earns: the scope
 restriction exists precisely *because* the workspace is not yet clean, and it dissolves the moment it is.
+
+## 4b. PICKUP fire point — session-pickup semantic surfacing (harness-gated, read-only)
+
+*(Added 2026-06-04. Numbered 4b, not 5, so every existing §4.x/§5.x prose cite in `brainstorm.md`,
+`CLAUDE.md`, and sibling specs stays valid.)*
+
+The FRONT fires when a brainstorm opens; the BACK fires when work concludes. **Nothing fired when a session
+re-opened.** The evidence instance (2026-06-03): the operator started a session with *"Where are we at in
+delivering … light up the topology …?"* — a pickup-shaped prompt that routed straight to `Skill(deliver)`,
+whose Step-1 context gather is **all lexical** (8 grep/glob locations, no recall lens). The `/converge` spec
+already names this exact moment — *"session-start UX: human asks 'what's next?'"* — as step 3 of its cycle,
+but the surfacing there is manual: it happens only if the agent thinks to dispatch a MemPalace-equipped
+subagent. The PICKUP fire makes it deterministic, the same way `prep-brainstorm.py` made FRONT surfacing
+deterministic. (The concept seed predates this section: the agentic-context-graph memory called today's
+SessionStart hook "the un-positioned, un-weighted prototype" and prescribed *"many sharp position-aware
+hooks"* — PICKUP is the first position-aware one. See the dogfood note below for why that memory is cited by
+description, not by path.)
+
+### 4b.1 Two harness surfaces, one session gate
+
+The harness has no native "session pickup" event, so PICKUP composes two hook surfaces around one
+once-per-session gate (flag file per parent-PID, the `pre-tool-memory.py` pattern):
+
+- **Primary — `UserPromptSubmit`** (the only surface that sees the raw prompt before the model frames an
+  approach). Eligible only on **prompts 1–3 of a session** (counter flag; a late-session "resume" already has
+  context — injecting would be noise). Fires on a **pickup-vocabulary regex**: `where (are|were) we`,
+  `pick(ing)? up`, `resume`, `continue (with|from|where)`, `status of`, `what'?s next`,
+  `where did we leave`, `catch me up`, `state of (the|our)` — **plus slash pickups**
+  `^/(deliver|shift|converge|plan)\b`, which gives those wrappers the semantic lens with zero per-wrapper
+  edits (their handles — `/deliver light-up-the-topology` — are excellent embedding input). `/brainstorm` is
+  **excluded**: it owns its own FRONT seam (§4.1) and would double-fire.
+- **Fallback net — `PreToolUse` on `Grep|Glob|Agent`**, firing only when **(a)** no injection happened yet,
+  **(b)** it is the session's *first* search-shaped tool call, and **(c)** the session is still inside the
+  first-3-prompt window. A fresh session whose first move is *search* is the pickup shape the regex missed;
+  the net's query material is the stashed first prompt **plus the distilled tool pattern** (often better
+  embedding input than the raw prompt). Accepted cost: a fresh non-pickup session that opens with a search
+  also gets surfaced — one-time ~3 s and topically-relevant neighbors; the cosine floor (§4b.3) mutes the
+  truly-irrelevant case.
+
+Both surfaces inject **at most once per session, combined.**
+
+### 4b.2 CLI engine, not MCP — a load-bearing fact
+
+The MemPalace **MCP server is not wired into the main session** (it is per-subagent: historian / librarian /
+cartographer / storyteller). A `ToolSearch select:mempalace_search` in the main loop returns nothing — this
+brainstorm hit that wall directly. The §4.1 FRONT lens works because skills can dispatch equipped subagents;
+a *deterministic hook* cannot. So PICKUP shells to the CLI:
+
+```bash
+python3 .claude/scripts/memory-kit/mempalace-currency.py --status   # staleness first: pure stdlib, ms
+mempalace --palace <repo>/.mempalace/palace search "<query>"        # measured ~3 s wall
+```
+
+The ~3 s cost is exactly why the gates exist: once per session, never per prompt. Hook timeout: 15 000 ms.
+
+### 4b.3 Injection contract
+
+- **Cosine floor:** top hit < 0.35 → **silent no-op** (exit 0, nothing injected). Noise is worse than nothing.
+- **Header carries currency, always:** `PICKUP SURFACING (semantic recall — fresh)` or
+  `(… — DEGRADED: index N file(s) behind front-link, last mine <date>)`. Degraded is **surfaced, never
+  silent, never skipped** — the §4.4 staleness-guard discipline applied at pickup-time.
+- **Body:** top-4 hits — source path, room, cosine, ≤2-line snippet each. Budget ≤ ~1.2 k tokens.
+- **Footer rule line:** *"Recall hints, not truth — verify each source against disk before acting on it."*
+  This is the Stale-Memory-Override guard, and it earned its place immediately (next note).
+
+### 4b.4 Read-only discipline + dogfood evidence
+
+PICKUP **surfaces; it never binds.** It creates nothing, dissolves nothing, and does not apply the Step-2
+composition rule — if a pickup escalates into design work, FRONT fires with its full rule as today. It is a
+recall lens at the loop's third natural moment, not a third lifecycle authority.
+
+The designing brainstorm itself proved both halves of the contract: **(the gap)** the 2026-06-03 pickup
+prompt got zero semantic recall on a topic with rich palace coverage; **(the staleness guard)** the semantic
+lens for *this very section* surfaced `project_agentic_context_graph_model.md` — the concept seed — which
+**no longer exists on disk**; it survives only in the 92-files-behind index. Presented without the DEGRADED
+banner, that hit would have been a live citation to a deleted file. The banner is not decoration; it is the
+difference between recall and hallucinated authority.
+
+**Landed as (2026-06-04):** `.claude/hooks/pickup-semantic-surfacing.py` (one script, `--event prompt|tool`,
+stdin JSON per surface) + two `settings.json` entries (`UserPromptSubmit`; `PreToolUse` matcher
+`Grep|Glob|Agent`). Gate paths (window, once-per-session, `/brainstorm` exclusion, no-stash net refusal,
+dedupe) verified by synthetic stdin tests on build day; the original 2026-06-03 gap-prompt replayed against
+the live palace and surfaced the resilience-profile badge/icon design plans under the DEGRADED banner.
 
 ## 5. BACK fire point — self-dissolve to zero residue
 
