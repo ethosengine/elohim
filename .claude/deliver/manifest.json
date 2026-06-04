@@ -53,7 +53,7 @@
       "deliverables_cited": [
         "login-form-domain-scoped: threshold-login.component.ts onIdentifierChange strips '@<domain>' segment + pattern attr + reframed hint; verified via Playwright (3/3 scenarios, 14/14 steps, exit=0)"
       ],
-      "verdict_note": "First active.alpha mintage. Single fresh-trigger render via local Playwright against doorway-app:8081. All 3 scenarios pass; 2 of 3 carry @elohim-visually-validated tag; screenshot at the promised surface shows input cleanly stripped of '@alpha.elohim.host', the '@<hostname>' suffix decoration intact, and the federated-doorway hint link present. Behavior is hostname-portable (gatewayDomain() strips 'doorway-' prefix in production, echoes hostname in dev). Three other features in this delivery handle remain at 'pending' verdict — step-defs unwritten. Graduation to active.beta requires a second consecutive delivered verdict (one fresh-trigger)."
+      "verdict_note": "First active.alpha mintage. Single fresh-trigger render via local Playwright against doorway-app:8081. All 3 scenarios pass; 2 of 3 carry @elohim-visually-validated tag; screenshot at the promised surface shows input cleanly stripped of '@alpha.elohim.host', the '@<hostname>' suffix decoration intact, and the federated-doorway hint link present. Behavior is hostname-portable (gatewayDomain() strips 'doorway-' prefix in production, echoes hostname in dev). Three other features in this delivery handle remain at 'pending' verdict \u2014 step-defs unwritten. Graduation to active.beta requires a second consecutive delivered verdict (one fresh-trigger)."
     },
     {
       "feature_path": "genesis/a2o/features/auth/steward-login-portal-handoff.feature",
@@ -86,7 +86,7 @@
         "context-label-hosted-steward-not-visitor: AGENCY_STAGES['hosted-steward'] + agency.service consumes HostingAccountService.account.isSteward",
         "agency-progression-coherent-with-a2o: 4 new feature files authored (threshold-login-domain-scoping, steward-login-portal-handoff, agency-context-labels, agency-pipeline-coherence)"
       ],
-      "verdict_note": "Iter-1 of /deliver on hosted-steward-portal-handoff. Substrate (Rust AuthResponse + agency.service + threshold-login form behavior) landed and verified via cargo check (clean) + tsc --noEmit (clean for touched files). Four canonical a2o feature files authored under genesis/a2o/features/auth/ — step 3a existence gate PASSED. Three of the four features carry @elohim-visually-validated tags on headline scenarios. However: (1) no step-defs yet — Cucumber skips all 4; (2) no fresh-trigger render — local `pnpm hc:start` stack failed at DNA build due to root-owned `elohim/holochain/target` and `.cargo-target-pool/family/dev/` slot dirs (legacy artifact from prior runs as root). Per SKILL step 3a tuple-to-state ladder, ambiguous tuple (scenarios-exist + zero-passing + screenshot-absent) → `pending`. Operator-action needed: `sudo chown -R 1234:1234 <target dirs>` OR trigger CI build via [build:elohim-genesis] empty commit. Next /deliver iteration on this handle should complete iter-2 (single fresh-trigger render) + iter-3 (second render) to mint `active.alpha`."
+      "verdict_note": "Iter-1 of /deliver on hosted-steward-portal-handoff. Substrate (Rust AuthResponse + agency.service + threshold-login form behavior) landed and verified via cargo check (clean) + tsc --noEmit (clean for touched files). Four canonical a2o feature files authored under genesis/a2o/features/auth/ \u2014 step 3a existence gate PASSED. Three of the four features carry @elohim-visually-validated tags on headline scenarios. However: (1) no step-defs yet \u2014 Cucumber skips all 4; (2) no fresh-trigger render \u2014 local `pnpm hc:start` stack failed at DNA build due to root-owned `elohim/holochain/target` and `.cargo-target-pool/family/dev/` slot dirs (legacy artifact from prior runs as root). Per SKILL step 3a tuple-to-state ladder, ambiguous tuple (scenarios-exist + zero-passing + screenshot-absent) \u2192 `pending`. Operator-action needed: `sudo chown -R 1234:1234 <target dirs>` OR trigger CI build via [build:elohim-genesis] empty commit. Next /deliver iteration on this handle should complete iter-2 (single fresh-trigger render) + iter-3 (second render) to mint `active.alpha`."
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/recovery-shamir-optional.feature",
@@ -115,12 +115,66 @@
       },
       "deliverables_cited": [
         "T19-22: ShamirShareCodec swarm-wired, share-assembler + custody manifest landed (substrate-tier)",
-        "T23: optionality enforcement audit — recovery succeeds without Shamir custody",
+        "T23: optionality enforcement audit \u2014 recovery succeeds without Shamir custody",
         "T24: Angular UX audit confirmed grandma-standard contracts (no seed material visible; no Path A/B selector; graceful degradation)",
-        "T26: recovery-shamir-optional.feature authored with 4 scenarios — all tagged @wip pending M5 step-def wiring",
-        "T28 step 1-4: sweettest + storage tests + schema codegen + zero TODO markers — operator-verified locally (1377/1377 storage tests pass)"
+        "T26: recovery-shamir-optional.feature authored with 4 scenarios \u2014 all tagged @wip pending M5 step-def wiring",
+        "T28 step 1-4: sweettest + storage tests + schema codegen + zero TODO markers \u2014 operator-verified locally (1377/1377 storage tests pass)"
       ],
-      "verdict_note": "Recovery M4 sprint is substrate-tier completion. The four scenarios in recovery-shamir-optional.feature are all tagged @wip — no step definitions exist (per find genesis/a2o/steps: only recovery-cross-stack.steps.ts present, nothing for shamir-share or custodian dial). Cucumber profile would skip all 4. visualValidation 2x2 matrix is empty. No @elohim-visually-validated tag on any scenario. The canonical promise is INVISIBILITY (T24 grandma-standard: 'the user never sees the choice and never sees raw key material') — there is no positive UI affordance to screenshot. Per SKILL step 3a tuple-to-state ladder: ambiguous → pending. /deliver cannot mint active.* on substrate-only work whose UI-falsifier is itself absence-of-UI. Two operator-gated next steps belong to the human: (a) T28 step 5 — push origin dev + watch orchestrator for SUCCESS×2 (substrate-correctness proof on CI); (b) M5 cycle — wire step-defs against the recovery-coordinator service so /deliver can run cucumber against rendered UX and mint a real verdict. The manifest entry is pending until M5 wiring lands; the auto-poller can read this as 'substrate-landed, awaiting UI integration'."
+      "verdict_note": "Recovery M4 sprint is substrate-tier completion. The four scenarios in recovery-shamir-optional.feature are all tagged @wip \u2014 no step definitions exist (per find genesis/a2o/steps: only recovery-cross-stack.steps.ts present, nothing for shamir-share or custodian dial). Cucumber profile would skip all 4. visualValidation 2x2 matrix is empty. No @elohim-visually-validated tag on any scenario. The canonical promise is INVISIBILITY (T24 grandma-standard: 'the user never sees the choice and never sees raw key material') \u2014 there is no positive UI affordance to screenshot. Per SKILL step 3a tuple-to-state ladder: ambiguous \u2192 pending. /deliver cannot mint active.* on substrate-only work whose UI-falsifier is itself absence-of-UI. Two operator-gated next steps belong to the human: (a) T28 step 5 \u2014 push origin dev + watch orchestrator for SUCCESS\u00d72 (substrate-correctness proof on CI); (b) M5 cycle \u2014 wire step-defs against the recovery-coordinator service so /deliver can run cucumber against rendered UX and mint a real verdict. The manifest entry is pending until M5 wiring lands; the auto-poller can read this as 'substrate-landed, awaiting UI integration'."
+    },
+    {
+      "feature_path": "genesis/a2o/features/elohim-core/epr-link-hypercard.feature",
+      "story_slug": null,
+      "backlog_slug": "light-up-topology-visual-verification",
+      "delivery_status": "active.alpha",
+      "regression_from": null,
+      "verdict_iteration": "iter1",
+      "verdict_timestamp": "2026-06-04T02:45:10Z",
+      "sprint_result_path": ".claude/shifts/2026-06-04-light-up-topology-visual-verification.sprint-result.md",
+      "evidence": {
+        "gherkin_scenarios_passing": 3,
+        "gherkin_scenarios_failing": 0,
+        "visual_validation": {
+          "validated_passing": 0,
+          "validated_regressed": 0,
+          "pending_passing": 3,
+          "pending_failing": 0
+        },
+        "screenshot_path": "genesis/a2o/reports/screenshots/elohim-core-epr-link-hypercard/context-menu-OPEN--Matthew.png",
+        "fresh_trigger_confirmed": true,
+        "root_cause_path": null
+      },
+      "deliverables_cited": [
+        "Epic E: wire <elohim-context-menu> into EprLinkComponent (open on right-click/long-press), populate its ContextMenuItem[] with EPR actions \u2014 view, navigate-to-Network/resilience tab, steward/replicate, see-relationships, governance",
+        "the 3 @wip @browser-only scenarios in epr-link-hypercard.feature (chip resolve, unreachable-preview, right-click context menu)"
+      ]
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/observable-distribution.feature",
+      "story_slug": null,
+      "backlog_slug": "light-up-topology-visual-verification",
+      "delivery_status": "active.alpha",
+      "regression_from": null,
+      "verdict_iteration": "iter1",
+      "verdict_timestamp": "2026-06-04T02:45:10Z",
+      "sprint_result_path": ".claude/shifts/2026-06-04-light-up-topology-visual-verification.sprint-result.md",
+      "evidence": {
+        "gherkin_scenarios_passing": 2,
+        "gherkin_scenarios_failing": 0,
+        "visual_validation": {
+          "validated_passing": 0,
+          "validated_regressed": 0,
+          "pending_passing": 2,
+          "pending_failing": 0
+        },
+        "screenshot_path": "genesis/a2o/reports/screenshots/resilience-observable-distribution/operator-can-see-their-household-device-cluster--Matthew.png",
+        "fresh_trigger_confirmed": true,
+        "root_cause_path": null
+      },
+      "deliverables_cited": [
+        "Epic A: MyClusterComponent /shefa/cluster + PeerTopologyComponent /shefa/peers; free/used rendered as a clickable bar (not <dl> text); peer/device cards gain drill-down",
+        "de-@wip household-scale scenarios: 'Operator can see their household device cluster' + 'Doorway operator dashboard topology tab is reachable' (both green 2026-06-04, @requires:shem siblings stay HELD)"
+      ]
     }
   ]
 }

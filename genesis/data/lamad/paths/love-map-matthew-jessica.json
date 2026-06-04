@@ -1,0 +1,57 @@
+{
+  "id": "love-map-matthew-jessica",
+  "version": "1.0.0",
+  "title": "Kept Between Us: Matthew and Jessica's Love Map",
+  "description": "A couple-scoped path where two partners map what they are learning about each other - the kind of knowing that belongs to the dyad and to no one else",
+  "purpose": "Build mutual understanding between partners through shared reflection - content whose reach is intimate: readable and writable by the couple, stewarded as opaque bytes by everyone else",
+  "createdBy": "human-matthew-manager",
+  "contributors": ["human-matthew-manager", "human-jessica-spouse"],
+  "createdAt": "2026-06-04T00:00:00.000Z",
+  "updatedAt": "2026-06-04T00:00:00.000Z",
+  "reach": "intimate",
+  "visibility": "intimate",
+  "participantIds": ["human-matthew-manager", "human-jessica-spouse"],
+  "isEmergent": true,
+  "requiredAttestations": ["attestation-spouse-matthew-jessica"],
+  "requiresMutualAttestation": true,
+  "chapters": [
+    {
+      "id": "chapter-1-what-we-already-know",
+      "title": "What We Already Know",
+      "description": "Shared ground - the household, the work, the years already mapped together",
+      "order": 1,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "content",
+          "resourceId": "care-economy-visibility",
+          "stepTitle": "Making Care Visible",
+          "stepNarrative": "Start where the household economy actually runs - in the care work you both carry and rarely name.",
+          "learningObjectives": [
+            "Name the care work each partner carries in the household",
+            "Agree on what deserves to be visible between you - and only between you"
+          ],
+          "optional": false,
+          "completionCriteria": ["Read and discuss together"],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "shared"
+        },
+        {
+          "order": 2,
+          "stepType": "reflection",
+          "resourceId": "manifesto",
+          "stepTitle": "What We Keep Between Us",
+          "stepNarrative": "Some maps are drawn for the commons. This one is not. Reflect together on what intimacy means when your words are also bytes on someone else's device.",
+          "learningObjectives": [
+            "Understand reach 'intimate' as the couple's boundary, enforced by the substrate",
+            "Trust that stewardship of your bytes never means access to your words"
+          ],
+          "optional": false,
+          "completionCriteria": ["Reflect together"],
+          "estimatedTime": "20 minutes",
+          "teachingPartner": "shared"
+        }
+      ]
+    }
+  ]
+}
