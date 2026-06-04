@@ -1379,6 +1379,66 @@ mod shakeout_tests {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Portal-handoff routing contract (GAP-2)
+//
+// The steward portal-handoff reuses the EXISTING session-transfer pair —
+// GET /auth/session-token (Bearer-authenticated single-use mint) and
+// GET /auth/exchange-session (atomic consume → identity + portalHostUrl) —
+// rather than minting a parallel mechanism. These paths MUST stay auth-owned,
+// or they fall through to the EPR router and 404 (the exact bug commit
+// 37c822d1c fixed for /auth/portal). The steward's storage redeems the code
+// server-to-server via GET {doorway}/auth/exchange-session?session_token=…
+//
+// This module is intentionally SEPARATE from `shakeout_tests` above (the frozen
+// oracle of the 2026-05-31 routing shakeout shift, which must not be edited).
+// ─────────────────────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod handoff_routing_tests {
+    use super::*;
+
+    #[test]
+    fn session_token_mint_is_auth_owned() {
+        // GET /auth/session-token must reach the auth dispatch, not the EPR router.
+        assert!(is_auth_owned_path("/auth/session-token"));
+    }
+
+    #[test]
+    fn exchange_session_redeem_is_auth_owned() {
+        // GET /auth/exchange-session must reach the auth dispatch, not the EPR
+        // router — the steward portal-handoff's server-to-server redeem depends
+        // on this route resolving from any caller.
+        assert!(is_auth_owned_path("/auth/exchange-session"));
+    }
+
+    #[test]
+    fn handoff_paths_strip_query() {
+        // exchange-session is always called with the code in the query string.
+        assert!(is_auth_owned_path("/auth/session-token?from=login"));
+        assert!(is_auth_owned_path(
+            "/auth/exchange-session?session_token=abc"
+        ));
+    }
+
+    #[test]
+    fn handoff_paths_are_service_paths() {
+        // is_service_path delegates to is_auth_owned_path for /auth/*; both
+        // paths must classify as service paths so the EPR router does not shadow
+        // them when a root projection (url_path="/") is registered.
+        assert!(is_service_path("/auth/session-token"));
+        assert!(is_service_path("/auth/exchange-session"));
+    }
+
+    #[test]
+    fn unrelated_handoff_lookalike_not_owned() {
+        // Guard the un-shadow boundary: a non-registered /auth/* lookalike must
+        // still fall through to the EPR router (stays false), exactly as
+        // /auth/portal does.
+        assert!(!is_auth_owned_path("/auth/session-token-extra"));
+        assert!(!is_auth_owned_path("/auth/exchange-session/extra"));
+    }
+}
+
 /// Dispatch a request to a projected EPR (B13).
 ///
 /// MVP scope (§8.1 + §8.2):
