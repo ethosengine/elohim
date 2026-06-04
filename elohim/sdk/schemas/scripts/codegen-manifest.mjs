@@ -46,34 +46,55 @@ function formatTsConst(name, values) {
 }
 
 /**
- * Resolve $ref fields one level deep in a plain object. Manifests split into
- * sub-files use { "$ref": "./manifest/foo.json" } at each concern's key; this
- * codegen reads those fields directly and must resolve them before processing.
- * Handles top-level fields AND fields nested one level inside `vocabulary`.
+ * Recursively resolve $ref pointers in a JSON value.
+ *
+ * Only inlines $refs that point to modular manifest sub-files — i.e. refs
+ * starting with "./manifest/" or "../" (the convention used by modular
+ * app manifests split into a sibling `manifest/` directory). This is the
+ * same filter as elohim/sdk/domains/lamad/scripts/codegen.mjs resolveRefs(),
+ * intentionally shared so both scripts resolve the same set of refs:
+ *
+ *   Resolved   — "./manifest/content-types/concept.json"  (modular sub-file)
+ *   Resolved   — "./manifest/content-formats.json"         (modular sub-file)
+ *   NOT resolved — "./schemas/concept-metadata.schema.json" (JSON Schema $ref,
+ *                  for AJV, not for codegen data loading)
+ *   NOT resolved — "#/$defs/..." (JSON Pointer fragment, AJV only)
+ *
+ * The previous shallow two-pass implementation (resolveRefs + resolveManifestRefs)
+ * only resolved top-level fields and one level inside `vocabulary`, missing
+ * content-type stubs like vocabulary.contentTypes.concept = {$ref: ...}.
+ * This caused validateQuiltPolicyRefs to silently skip per-content-type
+ * quiltPolicy checks on any modular manifest.
+ *
+ * @param {*} value      Any JSON value
+ * @param {string} baseDir  Absolute directory the current document was loaded from
+ * @returns {Promise<*>} The value with modular-manifest $refs inlined
  */
-async function resolveRefs(obj, baseDir) {
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== null && typeof value === 'object' && '$ref' in value && !Array.isArray(value)) {
-      const refPath = resolve(baseDir, value['$ref']);
-      const refRaw = await readFile(refPath, 'utf8');
-      obj[key] = JSON.parse(refRaw);
-    }
+async function resolveRefs(value, baseDir) {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    return Promise.all(value.map((v) => resolveRefs(v, baseDir)));
   }
-}
-
-async function resolveManifestRefs(manifest, manifestDir) {
-  await resolveRefs(manifest, manifestDir);
-  if (manifest.vocabulary && typeof manifest.vocabulary === 'object') {
-    await resolveRefs(manifest.vocabulary, manifestDir);
+  if (
+    typeof value.$ref === 'string' &&
+    (value.$ref.startsWith('./manifest/') || value.$ref.startsWith('../'))
+  ) {
+    const refPath = resolve(baseDir, value.$ref);
+    const raw = JSON.parse(await readFile(refPath, 'utf8'));
+    return resolveRefs(raw, dirname(refPath));
   }
+  const out = {};
+  for (const [k, v] of Object.entries(value)) {
+    out[k] = await resolveRefs(v, baseDir);
+  }
+  return out;
 }
 
 async function main() {
   const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw);
-
-  // Resolve $ref fields (modular manifests split into sub-files)
-  await resolveManifestRefs(manifest, dirname(manifestPath));
+  // Resolve $ref fields recursively (modular manifests split into sub-files at
+  // any depth: top-level, vocabulary, content-type stubs, etc.)
+  const manifest = await resolveRefs(JSON.parse(raw), dirname(manifestPath));
 
   // Loader-enforced referential integrity (tiered-quilt §4 v0.2): a dangling
   // quiltPolicy reference must fail codegen loud, never silently not-apply.
