@@ -18,6 +18,15 @@ shift_objective: |
 
 # Design-session prompt — Household collective as a first-class qahal story
 
+> **SESSION RAN 2026-06-04 — outputs:** umbrella seed
+> `genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md`
+> + formation spec
+> `genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md`
+> + held theses `dwelling-first-class-entity.md`, `household-mobility-seams.md`,
+> `capability-arc-stewardship-gradient.md`, `witnessed-records-reach-flywheel.md`.
+> The fork is settled (emergent + marked interim fixtures); the agenda below is
+> covered by the spec's §1 decision table.
+
 ## The operator's framing (verbatim intent, 2026-06-04)
 
 > This is an example of a foundational hub/collective story that has to have 1st-class
