@@ -899,6 +899,48 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
   throw lastErr ?? new Error('seedContent: unknown failure');
 }
 
+/**
+ * Stamp `p2pPublishedAt` on freshly-seeded content so it passes the storage
+ * `require_provenance` read gate (`dht_anchor_hash IS NOT NULL OR
+ * p2p_published_at IS NOT NULL` — content_diesel.rs). The drain loop is the
+ * canonical writer in a peered stack, but household/local stacks have no DHT
+ * peers, so without this stamp the bulk-seeded rows stay invisible to every
+ * external read (the local-stack DHT-anchor gap). We PATCH per id rather than
+ * extend the bulk-create input so the create path stays untouched.
+ *
+ * Best-effort: a failed stamp is logged but does not abort seeding (the drain
+ * loop may still publish later in a peered stack). Mirrors seedContent's
+ * batch/catch structure.
+ */
+async function stampProvenance(ids: string[]): Promise<{ stamped: number; failed: number }> {
+  if (DRY_RUN || ids.length === 0) {
+    return { stamped: DRY_RUN ? ids.length : 0, failed: 0 };
+  }
+
+  const publishedAt = new Date().toISOString();
+  let stamped = 0;
+  let failed = 0;
+
+  for (const id of ids) {
+    try {
+      const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p2pPublishedAt: publishedAt }),
+      });
+      if (response.ok) {
+        stamped++;
+      } else {
+        failed++;
+      }
+    } catch {
+      failed++;
+    }
+  }
+
+  return { stamped, failed };
+}
+
 /** Count total items across a sections tree (for logging) */
 function countItems(sections: Section[]): number {
   let count = 0;
@@ -1129,7 +1171,15 @@ async function main() {
         totalSkipped += result.skipped;
         totalErrors.push(...result.errors);
 
-        console.log(`   Batch ${batchNum}/${totalBatches}: ${result.inserted} inserted, ${result.skipped} skipped`);
+        // Stamp p2pPublishedAt so the seeded rows pass the provenance read gate
+        // even on peerless household/local stacks (the DHT-anchor gap). Stamp
+        // every id in the batch — already-present rows (skipped) re-stamp
+        // harmlessly (PATCH is idempotent), and we don't get a per-id inserted
+        // list back from the bulk endpoint.
+        const stamp = await stampProvenance(batch.map(c => c.id));
+        const stampNote = stamp.failed > 0 ? `, ${stamp.failed} stamp-failed` : '';
+
+        console.log(`   Batch ${batchNum}/${totalBatches}: ${result.inserted} inserted, ${result.skipped} skipped${stampNote}`);
       } catch (err) {
         console.error(`   Batch ${batchNum}/${totalBatches} failed: ${err}`);
         totalErrors.push(`Batch ${batchNum}: ${err}`);
@@ -1186,7 +1236,10 @@ async function main() {
       totalInserted += result.inserted;
       totalSkipped += result.skipped;
       totalErrors.push(...result.errors);
-      console.log(`   ${result.inserted} paths inserted, ${result.skipped} skipped`);
+      // Paths are content too — stamp provenance so they clear the read gate.
+      const stamp = await stampProvenance(pathContentInputs.map(p => p.id));
+      const stampNote = stamp.failed > 0 ? `, ${stamp.failed} stamp-failed` : '';
+      console.log(`   ${result.inserted} paths inserted, ${result.skipped} skipped${stampNote}`);
     } catch (err) {
       console.error(`   Path seeding failed: ${err}`);
       totalErrors.push(`Paths: ${err}`);

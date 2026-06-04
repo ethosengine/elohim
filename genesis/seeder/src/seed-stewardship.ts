@@ -74,6 +74,15 @@ interface StewardRatio {
   ratio: number;
 }
 
+/**
+ * Composite key for a single (content, steward) allocation. Idempotency is
+ * (content,steward)-granular — see StewardshipClient.getContentWithAllocations.
+ * MUST match the key shape produced there (`${contentId}::${stewardPresenceId}`).
+ */
+function allocationKey(contentId: string, stewardPresenceId: string): string {
+  return `${contentId}::${stewardPresenceId}`;
+}
+
 // =============================================================================
 // Category-to-Steward Affinity Mapping
 //
@@ -319,6 +328,17 @@ class StewardshipClient extends DoorwayClient {
     return content.map((c) => c.id);
   }
 
+  /**
+   * Returns the set of EXISTING (content, steward) allocations, keyed by the
+   * `${contentId}::${stewardPresenceId}` composite. Per-steward granularity
+   * (not content-granular) is required because a content item can be
+   * partially allocated — some of its category-expected stewards present,
+   * others missing. The storage bulk handler counts an already-existing
+   * (content,steward) pair as `failed` (uniqueness violation surfaces as Err;
+   * http.rs handle_bulk_create_allocations), so re-POSTing existing pairs both
+   * pollutes the failure count and wastes round-trips. The caller diffs
+   * against this set to POST only the genuinely-missing pairs.
+   */
   async getContentWithAllocations(): Promise<Set<string>> {
     const response = await this.fetch('/db/allocations?active_only=true&limit=10000', {
       method: 'GET',
@@ -335,8 +355,8 @@ class StewardshipClient extends DoorwayClient {
     const allocBody = (await response.json()) as unknown;
     const allocations = (
       Array.isArray(allocBody) ? allocBody : ((allocBody as { items?: unknown[] }).items ?? [])
-    ) as Array<{ contentId: string }>;
-    return new Set(allocations.map((a) => a.contentId));
+    ) as Array<{ contentId: string; stewardPresenceId: string }>;
+    return new Set(allocations.map((a) => `${a.contentId}::${a.stewardPresenceId}`));
   }
 
   async presenceExists(presenceId: string): Promise<boolean> {
@@ -600,12 +620,13 @@ async function main() {
   }
   console.log();
 
-  // Step 5: Get content that already has allocations
+  // Step 5: Get existing (content, steward) allocation pairs. Idempotency is
+  // per-steward, not per-content: a content item may be partially allocated.
   console.log('Checking existing allocations...');
-  let contentWithAllocations: Set<string>;
+  let existingAllocations: Set<string>;
   try {
-    contentWithAllocations = await client.getContentWithAllocations();
-    console.log(`   Found ${contentWithAllocations.size} content items with existing allocations`);
+    existingAllocations = await client.getContentWithAllocations();
+    console.log(`   Found ${existingAllocations.size} existing (content, steward) allocations`);
   } catch (error) {
     console.error(`   ERROR: Failed to get allocations: ${error}`);
     process.exit(1);
@@ -624,24 +645,32 @@ async function main() {
   }
   console.log();
 
-  // Step 7: Build allocations for content without existing ones
-  const contentNeedingAllocations = allContentIds.filter((id) => !contentWithAllocations.has(id));
-  console.log(`Building allocations for ${contentNeedingAllocations.length} content items...`);
-
-  if (contentNeedingAllocations.length === 0) {
-    console.log('   All content already has allocations, nothing to do');
-    console.log();
-    console.log('Done!');
-    return;
-  }
-
+  // Step 7: Build the MISSING (content, steward) allocation pairs.
+  //
+  // Per-steward idempotency: a content item is re-visited whenever ANY of its
+  // category-expected stewards lacks an allocation (partial allocation), and we
+  // POST only the pairs that don't already exist. The storage bulk handler
+  // counts an already-existing pair as `failed` (uniqueness Err →
+  // http.rs:5793-5796), so resending existing pairs would inflate the failure
+  // count and waste round-trips — we diff against `existingAllocations` instead.
   const allocations: CreateAllocationInput[] = [];
+  // Content items that gained at least one new (content, steward) pair — drives
+  // the Step 9 affinity seeding (mirrors the per-steward diff, see below).
+  const contentNeedingAllocations: string[] = [];
 
-  for (const contentId of contentNeedingAllocations) {
+  for (const contentId of allContentIds) {
     const category = categoryMap.get(contentId);
     const stewards = getStewardAllocations(contentId, category);
 
-    for (const steward of stewards) {
+    const missingStewards = stewards.filter(
+      (steward) => !existingAllocations.has(allocationKey(contentId, steward.presenceId))
+    );
+    if (missingStewards.length === 0) {
+      continue; // Fully allocated for every expected steward — skip.
+    }
+    contentNeedingAllocations.push(contentId);
+
+    for (const steward of missingStewards) {
       allocations.push({
         contentId: contentId,
         stewardPresenceId: steward.presenceId,
@@ -663,9 +692,21 @@ async function main() {
     }
   }
 
-  console.log(`   Generated ${allocations.length} allocation records`);
   console.log(
-    `   Average stewards per item: ${(allocations.length / contentNeedingAllocations.length).toFixed(1)}`
+    `Building allocations for ${contentNeedingAllocations.length} content items ` +
+      `(${allContentIds.length} total; ${allContentIds.length - contentNeedingAllocations.length} fully allocated)...`
+  );
+
+  if (allocations.length === 0) {
+    console.log('   All content already has every expected steward allocated, nothing to do');
+    console.log();
+    console.log('Done!');
+    return;
+  }
+
+  console.log(`   Generated ${allocations.length} missing allocation records`);
+  console.log(
+    `   Average new stewards per item: ${(allocations.length / contentNeedingAllocations.length).toFixed(1)}`
   );
   console.log();
 
