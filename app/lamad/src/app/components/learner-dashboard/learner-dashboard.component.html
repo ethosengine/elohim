@@ -95,7 +95,7 @@
       <h2>Active Paths</h2>
       <div *ngIf="profile.paths.inProgress.length === 0" class="empty-state">
         <p>No paths in progress</p>
-        <a routerLink="/lamad" class="btn btn-primary" data-testid="dashboard-explore-paths">
+        <a routerLink="/" class="btn btn-primary" data-testid="dashboard-explore-paths">
           Explore Paths
         </a>
       </div>
@@ -107,7 +107,7 @@
         <div class="path-progress-track">
           <div class="path-progress-fill" [style.width.%]="path.progressPercent"></div>
         </div>
-        <a [routerLink]="['/lamad/path', path.pathId]" class="btn btn-sm">Continue</a>
+        <a [routerLink]="['/path', path.pathId]" class="btn btn-sm">Continue</a>
       </div>
     </section>
 
@@ -170,7 +170,7 @@
 <div *ngIf="!isLoading && !profile" class="dashboard-empty">
   <h1>My Learning</h1>
   <p>Start exploring to build your learning profile.</p>
-  <a routerLink="/lamad" class="btn btn-primary" data-testid="dashboard-empty-explore">
+  <a routerLink="/" class="btn btn-primary" data-testid="dashboard-empty-explore">
     Explore Paths
   </a>
 </div>

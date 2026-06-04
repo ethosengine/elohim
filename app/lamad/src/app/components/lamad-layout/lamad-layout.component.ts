@@ -70,6 +70,10 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
   }
 
   private checkIfHomePage(): void {
-    this.isHomePage = this.router.url === '/lamad' || this.router.url === '/lamad/';
+    // router.url is already base-stripped (bundle served with <base href="/lamad/">),
+    // so the home route is the bare '/'. Tolerate a trailing query string and the
+    // empty string the Router reports before the first navigation commits.
+    this.isHomePage =
+      this.router.url === '/' || this.router.url === '' || this.router.url.startsWith('/?');
   }
 }

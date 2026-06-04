@@ -76,21 +76,21 @@ export class LamadNotFoundComponent implements OnInit {
    * Navigate to Lamad home
    */
   goToLamadHome(): void {
-    void this.router.navigate(['/lamad']);
+    void this.router.navigate(['/']);
   }
 
   /**
    * Navigate to search
    */
   goToSearch(): void {
-    void this.router.navigate(['/lamad/search']);
+    void this.router.navigate(['/search']);
   }
 
   /**
    * Navigate to explorer
    */
   goToExplore(): void {
-    void this.router.navigate(['/lamad/explore']);
+    void this.router.navigate(['/explore']);
   }
 
   /**

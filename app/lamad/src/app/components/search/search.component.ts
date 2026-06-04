@@ -174,9 +174,11 @@ export class SearchComponent implements OnInit {
   getNodeRoute(result: SearchResult): string[] {
     // Route paths to path overview, content to content viewer
     if (result.contentType === 'path') {
-      return ['/lamad/paths', result.id];
+      return ['/path', result.id];
     }
-    return ['/lamad/content', result.id];
+    // TODO(#12-6 Slice 2): direct content is a cross-bundle target (shell /resource) —
+    // replace with BundleRouteContext claims / universal /epr route per spec §12.3.
+    return ['/resource', result.id];
   }
 
   getNodeTypeIcon(type: string): string {

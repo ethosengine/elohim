@@ -111,7 +111,7 @@
                   <p class="resume-reason">{{ resumePoint.reason }}</p>
                 </div>
                 <a
-                  [routerLink]="['/lamad/path', resumePoint.pathId, 'step', resumePoint.stepIndex]"
+                  [routerLink]="['/path', resumePoint.pathId, 'step', resumePoint.stepIndex]"
                   class="resume-action"
                   data-testid="profile-resume-continue"
                 >
@@ -130,7 +130,7 @@
                   <p class="resume-reason">{{ resumePoint.reason }}</p>
                 </div>
                 <a
-                  routerLink="/lamad"
+                  routerLink="/"
                   class="resume-action resume-action--explore"
                   data-testid="profile-resume-browse"
                 >
@@ -204,7 +204,7 @@
                 <span class="stat-label">Learner Level</span>
               </div>
             </div>
-            <a routerLink="/lamad/me" class="dashboard-link" data-testid="profile-dashboard-link">
+            <a routerLink="/me" class="dashboard-link" data-testid="profile-dashboard-link">
               View Full Dashboard
               <span class="material-icons">arrow_forward</span>
             </a>
@@ -292,7 +292,7 @@
             <span class="empty-icon material-icons">route</span>
             <h3>No paths started yet</h3>
             <p>Start a learning path to track your progress here.</p>
-            <a routerLink="/lamad" class="btn-primary" data-testid="profile-browse-paths">
+            <a routerLink="/" class="btn-primary" data-testid="profile-browse-paths">
               Browse Paths
             </a>
           </div>
@@ -330,7 +330,7 @@
                       </span>
                     </div>
                     <a
-                      [routerLink]="['/lamad/path', path.pathId, 'step', path.currentStepIndex]"
+                      [routerLink]="['/path', path.pathId, 'step', path.currentStepIndex]"
                       class="path-card-action"
                     >
                       Continue
@@ -378,7 +378,7 @@
                       }
                     </div>
                     <a
-                      [routerLink]="['/lamad/path', path.pathId]"
+                      [routerLink]="['/path', path.pathId]"
                       class="path-card-action path-card-action--review"
                     >
                       Review
@@ -416,7 +416,7 @@
                       </span>
                     </div>
                     <a
-                      [routerLink]="['/lamad/path', path.pathId]"
+                      [routerLink]="['/path', path.pathId]"
                       class="path-card-action path-card-action--start"
                     >
                       Start Path
@@ -448,7 +448,7 @@
             <span class="empty-icon material-icons">timeline</span>
             <h3>Your journey begins here</h3>
             <p>Start exploring content to see your learning timeline.</p>
-            <a routerLink="/lamad" class="btn-primary" data-testid="profile-start-exploring">
+            <a routerLink="/" class="btn-primary" data-testid="profile-start-exploring">
               Start Exploring
             </a>
           </div>
@@ -480,8 +480,8 @@
                     <a
                       [routerLink]="
                         event.resourceType === 'path'
-                          ? ['/lamad/path', event.resourceId]
-                          : ['/lamad/content', event.resourceId]
+                          ? ['/path', event.resourceId]
+                          : ['/content', event.resourceId]
                       "
                       class="timeline-event-link"
                     >

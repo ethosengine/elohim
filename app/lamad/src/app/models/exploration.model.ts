@@ -25,7 +25,7 @@ import { ContentNode, ContentRelationshipType } from './content-node.model';
 /**
  * GraphExplorationQuery - Parameters for exploring the knowledge graph.
  *
- * Maps to route: /lamad/explore?focus={resourceId}&depth={1|2|3}&relationship={type}&view={graph|list|tree}
+ * Maps to route: /explore?focus={resourceId}&depth={1|2|3}&relationship={type}&view={graph|list|tree}
  */
 export interface GraphExplorationQuery {
   /** Center point of exploration - the resource ID to explore from */
@@ -68,7 +68,7 @@ export interface GraphExplorationQuery {
 /**
  * PathfindingQuery - Parameters for finding paths between resources.
  *
- * Maps to route: /lamad/explore?from={resourceA}&to={resourceB}&algorithm={shortest|semantic}
+ * Maps to route: /explore?from={resourceA}&to={resourceB}&algorithm={shortest|semantic}
  */
 export interface PathfindingQuery {
   /** Starting resource ID */

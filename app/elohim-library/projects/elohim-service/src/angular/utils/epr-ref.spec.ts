@@ -141,7 +141,7 @@ describe('EprRef', () => {
           tier: 'head',
           fragment: { type: 'step', value: '2' },
         })
-      ).toEqual(['/lamad/path', 'elohim-protocol', 'step', '2']);
+      ).toEqual(['/path', 'elohim-protocol', 'step', '2']);
     });
 
     it('returns null for blob tier', () => {

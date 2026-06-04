@@ -61,10 +61,16 @@ pub fn compute_peer_capacity(
         fragmentation_estimate: 0.0,
     };
 
+    // Saturate, never wrap: a plain `as u8` cast truncates mod 256, so a pledge
+    // against unknown capacity (total_raw_bytes=0 → denominator 1) wrapped the
+    // worst possible over-pledge into a garbage pct that could read compliant
+    // (storage-tier review 2026-06-04, finding #1). 255 means "≥255% saturated".
     let total_for_pct = total_raw_bytes.max(1);
-    let current_dwelling_pct = ((pledged_dwelling * 100) / total_for_pct) as u8;
-    let current_collective_pct = ((pledged_collective * 100) / total_for_pct) as u8;
-    let current_commons_pct = ((pledged_commons * 100) / total_for_pct) as u8;
+    let pct_of_total =
+        |pledged: u64| -> u8 { (pledged.saturating_mul(100) / total_for_pct).min(255) as u8 };
+    let current_dwelling_pct = pct_of_total(pledged_dwelling);
+    let current_collective_pct = pct_of_total(pledged_collective);
+    let current_commons_pct = pct_of_total(pledged_commons);
     let current_free_pct = 100u8
         .saturating_sub(current_dwelling_pct)
         .saturating_sub(current_collective_pct)
@@ -460,6 +466,41 @@ mod tests {
             view.ratio_compliance.effective_ratios.dwelling_pct as u8,
             r.dwelling_pct
         );
+    }
+
+    /// Storage-tier review 2026-06-04, finding #1: a pledge against a peer with
+    /// no known raw capacity (`total_raw_bytes == 0` — the documented remote
+    /// default until a system-sample lands) must surface as an AboveCeiling
+    /// donut violation. The pre-fix `as u8` cast wrapped the percentage mod 256
+    /// (5 GB * 100 / 1 ≡ 0), so the worst possible over-pledge silently read
+    /// `compliant_with_donut: true`.
+    #[test]
+    fn pledge_with_unknown_capacity_is_violation_not_wrapped_compliant() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        // 5 GB dwelling pledge; deliberately NO system-sample observation.
+        insert_replicates_dwelling(
+            &mut conn,
+            "comm-nocap",
+            "peer:nocap",
+            "active",
+            "hub:B",
+            ProviderRole::StewardMutual,
+            5_000_000_000,
+        );
+        let view = compute_peer_capacity(&mut conn, "peer:nocap").unwrap();
+        assert!(
+            !view.ratio_compliance.compliant_with_donut,
+            "a pledge with zero known capacity must not read donut-compliant"
+        );
+        assert!(
+            view.ratio_compliance.violations.iter().any(|v| {
+                v.tier == Tier::Dwelling && v.violation_kind == ViolationKind::AboveCeiling
+            }),
+            "expected an AboveCeiling violation on the Dwelling tier"
+        );
+        // Percentage saturates at the type ceiling instead of wrapping mod 256.
+        assert_eq!(view.ratio_compliance.current_ratios.dwelling_pct, 255);
     }
 
     // --- reader 1: total_raw_bytes from latest system-sample observation ----

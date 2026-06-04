@@ -11,7 +11,7 @@ describe('PathContextService', () => {
     stepIndex: 2,
     totalSteps: 10,
     chapterTitle: 'Introduction',
-    returnRoute: ['/lamad/path', 'test-path', 'step', '2'],
+    returnRoute: ['/path', 'test-path', 'step', '2'],
     detourStack: [],
   };
 
@@ -89,7 +89,7 @@ describe('PathContextService', () => {
         pathTitle: 'Nested Path',
         stepIndex: 0,
         totalSteps: 5,
-        returnRoute: ['/lamad/path', 'nested-path', 'step', '0'],
+        returnRoute: ['/path', 'nested-path', 'step', '0'],
       });
 
       expect(service.currentContext?.pathId).toBe('nested-path');
@@ -173,7 +173,7 @@ describe('PathContextService', () => {
       service.enterPath(getMockPathContext());
       service.updatePosition(5);
       expect(service.currentContext?.returnRoute).toEqual([
-        '/lamad/path',
+        '/path',
         'test-path',
         'step',
         '5',
@@ -289,7 +289,7 @@ describe('PathContextService', () => {
         pathTitle: 'Nested Path',
         stepIndex: 0,
         totalSteps: 5,
-        returnRoute: ['/lamad/path', 'nested-path', 'step', '0'],
+        returnRoute: ['/path', 'nested-path', 'step', '0'],
       };
       service.enterPath(nestedContext);
 
@@ -454,7 +454,7 @@ describe('PathContextService', () => {
         pathTitle: 'Path 2',
         stepIndex: 0,
         totalSteps: 5,
-        returnRoute: ['/lamad/path', 'path-2', 'step', '0'],
+        returnRoute: ['/path', 'path-2', 'step', '0'],
       });
 
       expect((service as any).contextStack.length).toBe(2);

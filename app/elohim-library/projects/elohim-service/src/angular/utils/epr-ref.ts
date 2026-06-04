@@ -156,7 +156,8 @@ export function eprToRoute(ref: EprRef): string[] | null {
   if (ref.tier === 'blob') return null;
 
   if (ref.fragment?.type === 'step') {
-    return ['/lamad/path', ref.id, 'step', ref.fragment.value];
+    // TODO(#12-6 Slice 2): replace with BundleRouteContext claims — spec §12.3.
+    return ['/path', ref.id, 'step', ref.fragment.value];
   }
 
   // Path detection: IDs ending with -path or known path IDs

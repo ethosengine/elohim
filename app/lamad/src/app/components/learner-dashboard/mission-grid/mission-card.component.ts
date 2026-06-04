@@ -42,7 +42,7 @@ import type { DashboardPathEntry } from '../../../models/learner-mastery-profile
         </svg>
         <div class="progress-text">{{ path.progressPercent }}%</div>
       </div>
-      <a [routerLink]="['/lamad/path', path.pathId]" class="continue-link">Continue Learning</a>
+      <a [routerLink]="['/path', path.pathId]" class="continue-link">Continue Learning</a>
     </div>
   `,
   styles: [

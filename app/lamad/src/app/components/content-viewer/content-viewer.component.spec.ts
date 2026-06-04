@@ -395,17 +395,17 @@ describe('ContentViewerComponent', () => {
 
     it('should navigate to related content', () => {
       component.viewRelatedContent(mockRelatedNode);
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/content', 'related-1']);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/content', 'related-1']);
     });
 
     it('should navigate to path', () => {
       component.navigateToPath('path-1', 2);
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/path', 'path-1', 'step', 2]);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/path', 'path-1', 'step', 2]);
     });
 
     it('should navigate back to home', () => {
       component.backToHome();
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad']);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/']);
     });
   });
 
@@ -719,15 +719,15 @@ describe('ContentViewerComponent', () => {
         pathTitle: 'Test Path',
         stepIndex: 2,
         totalSteps: 10,
-        returnRoute: ['/lamad/path', 'test-path', 'step', '2'],
+        returnRoute: ['/path', 'test-path', 'step', '2'],
         detourStack: [],
       };
-      pathContextServiceSpy.returnToPath.mockReturnValue(['/lamad/path', 'test-path', 'step', '2']);
+      pathContextServiceSpy.returnToPath.mockReturnValue(['/path', 'test-path', 'step', '2']);
 
       component.returnToPath();
 
       expect(pathContextServiceSpy.returnToPath).toHaveBeenCalled();
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path', 'step', '2']);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/path', 'test-path', 'step', '2']);
     });
 
     it('should not navigate if no return path', () => {
@@ -783,7 +783,7 @@ describe('ContentViewerComponent', () => {
         })
       );
       expect(routerSpy.navigate).toHaveBeenCalledWith(
-        ['/lamad/explore'],
+        ['/explore'],
         expect.objectContaining({
           queryParams: expect.objectContaining({
             focus: 'current-node',

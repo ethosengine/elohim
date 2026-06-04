@@ -71,7 +71,7 @@ describe('LessonViewComponent', () => {
     stepIndex: 2,
     totalSteps: 10,
     chapterTitle: 'Introduction',
-    returnRoute: ['/lamad/path', 'test-path', 'step', '2'],
+    returnRoute: ['/path', 'test-path', 'step', '2'],
     detourStack: [],
   };
 

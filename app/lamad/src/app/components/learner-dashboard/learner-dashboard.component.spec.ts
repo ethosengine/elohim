@@ -187,7 +187,7 @@ describe('LearnerDashboardComponent', () => {
       fixture.detectChanges();
       profileSubject.next(null);
       fixture.detectChanges();
-      const link = fixture.debugElement.query(By.css('.dashboard-empty a[routerLink="/lamad"]'));
+      const link = fixture.debugElement.query(By.css('.dashboard-empty a[routerLink="/"]'));
       expect(link).toBeTruthy();
     });
   });

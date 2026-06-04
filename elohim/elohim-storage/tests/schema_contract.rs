@@ -3364,6 +3364,7 @@ fn epr_projection_view_cached_mode_matches_schema() {
         reach: "commons".into(),
         base_href: "/lamad/".into(),
         entry_file: "index.html".into(),
+        spa_fallback: true,
         redirects_from: vec!["/learn".into(), "/study".into()],
         preview_epr_ref: None,
         gate_hints: vec![GateHintRef {
@@ -3383,6 +3384,9 @@ fn epr_projection_view_cached_mode_matches_schema() {
     // schema lists it in `required` indirectly via oneOf[null | $ref].
     // Confirm mode serializes correctly.
     assert_eq!(json["mode"], serde_json::json!("cached"));
+    // spaFallback rides the wire as a required boolean (§12.2 SPA deep-link
+    // fallback); confirm it serializes for the default-true bundle case.
+    assert_eq!(json["spaFallback"], serde_json::json!(true));
     // Confirm doorwayId satisfies the "^doorway:" pattern constraint.
     assert!(
         json["doorwayId"].as_str().unwrap().starts_with("doorway:"),
@@ -3414,6 +3418,12 @@ fn epr_projection_view_steward_direct_populated_matches_schema() {
         reach: "qahal:dawn-runners".into(),
         base_href: "/elohim-app/".into(),
         entry_file: "index.html".into(),
+        // Non-default false — the explicit opt-out of SPA fallback (§12.2). This
+        // is wired end-to-end: doorway is contract-authoritative and propagates
+        // the opt-out to storage's convention-level safety net via
+        // `?spaFallback=0` (see dispatch_to_projected_epr + handle_app_request's
+        // app_request_route_miss_respects_spa_fallback_opt_out test).
+        spa_fallback: false,
         redirects_from: vec![],
         preview_epr_ref: Some(
             "bafyreib2vq7previewEPR01234567890123456789012345678901234567".into(),
@@ -3457,6 +3467,8 @@ fn epr_projection_view_steward_direct_populated_matches_schema() {
         json["stewardDirectEndpoint"]["peerId"],
         serde_json::json!("12D3KooWShemBlade02")
     );
+    // Confirm the non-default spaFallback = false serializes on the wire.
+    assert_eq!(json["spaFallback"], serde_json::json!(false));
 
     validate_against_schema("views/epr-projection-view.schema.json", &json);
 }

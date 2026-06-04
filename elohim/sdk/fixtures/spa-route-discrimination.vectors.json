@@ -1,0 +1,21 @@
+{
+  "description": "Shared ROUTE/ASSET discrimination test vectors — §12.2 of genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md. Rule: a sub-path is a ROUTE iff its FINAL segment contains no '.'; otherwise ASSET. Consumed via include_str! by BOTH doorway-service (derive_app_subpath tests) and elohim-storage (handle_app_request fallback tests) — the two-layer drift guard. Edit here, never fork per-crate copies.",
+  "rule": "final path segment contains no dot => ROUTE (spa-fallback eligible); else ASSET (honest 404 on miss)",
+  "vectors": [
+    { "subPath": "path/foundations-christian-technology", "kind": "route", "note": "canonical deep link — the motivating failure" },
+    { "subPath": "path/foundations-christian-technology/step/2", "kind": "route", "note": "step deep link" },
+    { "subPath": "lamad/path/foundations-christian-technology", "kind": "route", "note": "legacy doubled prefix — must serve shell so the designed not-found renders" },
+    { "subPath": "concept/fair-exchange", "kind": "route", "note": "spec §5.1 scenario A shape" },
+    { "subPath": "explore", "kind": "route", "note": "single-segment route" },
+    { "subPath": "me", "kind": "route", "note": "short route" },
+    { "subPath": "main-7J5AOAQZ.js", "kind": "asset", "note": "hashed bundle file — miss is a real deploy bug, never mask" },
+    { "subPath": "styles-4RUGOMD3.css", "kind": "asset", "note": "hashed stylesheet" },
+    { "subPath": "favicon.ico", "kind": "asset", "note": "classic asset" },
+    { "subPath": "assets/img/logo.svg", "kind": "asset", "note": "nested asset" },
+    { "subPath": "media/file.name.with.dots.png", "kind": "asset", "note": "multi-dot final segment" },
+    { "subPath": "v1.2/release-notes", "kind": "route", "note": "dot in NON-final segment does not make it an asset" },
+    { "subPath": ".well-known/assetlinks.json", "kind": "asset", "note": "dotted final segment under dotted dir" },
+    { "subPath": "search", "kind": "route", "note": "route that collides with a common word" },
+    { "subPath": "path/slug-with.dot", "kind": "asset", "note": "edge: dotted final segment classifies as asset by rule — content ids must not contain dots (documented constraint)" }
+  ]
+}

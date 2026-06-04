@@ -118,6 +118,7 @@ mod tests {
                 format!("{}/", url_path)
             },
             entry_file: "index.html".into(),
+            spa_fallback: true,
             redirects_from: vec![],
             preview_epr_ref: None,
             gate_hints: vec![],

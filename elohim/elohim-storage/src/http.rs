@@ -1051,7 +1051,8 @@ impl HttpServer {
             // HTML5 App serving: /apps/{slug}/{file_path}
             (Method::GET, p) if p.starts_with("/apps/") => {
                 if self.db_pool.is_some() {
-                    self.handle_app_request(&path).await
+                    let query = req.uri().query().unwrap_or("");
+                    self.handle_app_request(&path, query).await
                 } else {
                     Ok(Response::builder()
                         .status(StatusCode::SERVICE_UNAVAILABLE)
@@ -4354,7 +4355,11 @@ impl HttpServer {
     ///
     /// Fast path (cache hit): O(1) index lookup + disk read. No DB, no ZIP, no pool.
     /// Slow path (cache miss): DB query + ZIP extract + cache all files + serve.
-    async fn handle_app_request(&self, path: &str) -> Result<Response<Full<Bytes>>, StorageError> {
+    async fn handle_app_request(
+        &self,
+        path: &str,
+        query: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
         use std::io::Read;
         use zip::ZipArchive;
 
@@ -4363,6 +4368,26 @@ impl HttpServer {
         let (identifier, file_path) = match remainder.find('/') {
             Some(pos) => (&remainder[..pos], &remainder[pos + 1..]),
             None => (remainder, "index.html"),
+        };
+
+        // SPA deep-link fallback opt-out (§12.2). The storage safety net serves
+        // a ROUTE miss's index.html by convention (Class C) — this is what makes
+        // tauri-direct deep links work with no doorway in the loop, so the
+        // DEFAULT is on. The doorway is contract-authoritative for `spa_fallback`
+        // (a field on the project-epr commitment); when a projection sets it
+        // false, doorway appends `?spaFallback=0` to the storage proxy URL,
+        // propagating its authoritative opt-out down to this convention layer so
+        // the two layers stay consistent. Any value other than 0/false/no keeps
+        // the default-on behaviour.
+        let spa_fallback = {
+            let params: std::collections::HashMap<String, String> =
+                url::form_urlencoded::parse(query.as_bytes())
+                    .into_owned()
+                    .collect();
+            !matches!(
+                params.get("spaFallback").map(String::as_str),
+                Some("0") | Some("false") | Some("no")
+            )
         };
 
         if identifier.is_empty() {
@@ -4375,6 +4400,9 @@ impl HttpServer {
                 .unwrap());
         }
 
+        // Percent-encoded traversal sequences (%2E%2E etc.) need no extra handling here:
+        // the path is matched against ZIP entry names verbatim (never decoded, never used
+        // to construct a filesystem path), so an encoded `..` simply fails to match.
         if file_path.contains("..") || file_path.contains('\0') || file_path.starts_with('/') {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
@@ -4424,8 +4452,9 @@ impl HttpServer {
                 // current but this sub-path isn't a file in it — a ROUTE miss
                 // serves the cached index.html so the SPA router renders. An
                 // ASSET miss (or absent cached index.html) falls through to
-                // re-extraction, which produces the honest 404.
-                if is_spa_route_subpath(file_path) {
+                // re-extraction, which produces the honest 404. `spa_fallback`
+                // off (doorway opt-out via ?spaFallback=0) skips the fallback.
+                if spa_fallback && is_spa_route_subpath(file_path) {
                     if let Some(index_html) = cache.get_file(cache_key, "index.html").await {
                         debug!(identifier = %identifier, file_path = %file_path, "Cache HIT — SPA fallback index.html");
                         let mut builder = Response::builder()
@@ -4478,8 +4507,8 @@ impl HttpServer {
                 // SPA deep-link fallback (§12.2) on the coalesced path: a ROUTE
                 // miss serves the cached index.html; an ASSET miss (or absent
                 // cached index.html) falls through to extract ourselves so the
-                // honest 404 surfaces.
-                if is_spa_route_subpath(file_path) {
+                // honest 404 surfaces. `spa_fallback` off skips the fallback.
+                if spa_fallback && is_spa_route_subpath(file_path) {
                     if let Some(index_html) = cache.get_file(cache_key, "index.html").await {
                         debug!(identifier = %identifier, file_path = %file_path, "Cache HIT (after wait) — SPA fallback index.html");
                         let mut builder = Response::builder()
@@ -4638,8 +4667,9 @@ impl HttpServer {
             None => {
                 // SPA deep-link fallback (§12.2): a ROUTE miss serves the
                 // bundle's own index.html so the SPA router renders; an ASSET
-                // miss (or absent index.html) stays an honest 404.
-                if is_spa_route_subpath(normalized_path) {
+                // miss (or absent index.html) stays an honest 404. `spa_fallback`
+                // off (doorway opt-out via ?spaFallback=0) skips the fallback.
+                if spa_fallback && is_spa_route_subpath(normalized_path) {
                     if let Some(index_html) = index_html_data {
                         info!(
                             identifier = %identifier,
@@ -10813,10 +10843,12 @@ mod tests {
     fn is_spa_route_subpath_edge_cases() {
         // Routes: no dot in the final segment.
         assert!(is_spa_route_subpath("explore"));
-        assert!(is_spa_route_subpath("path/foundations-christian-technology/step/2"));
+        assert!(is_spa_route_subpath(
+            "path/foundations-christian-technology/step/2"
+        ));
         assert!(is_spa_route_subpath("v1.2/release-notes")); // dot in NON-final segment
         assert!(is_spa_route_subpath("")); // bare/empty → route-eligible
-        // Assets: dot in the final segment.
+                                           // Assets: dot in the final segment.
         assert!(!is_spa_route_subpath("main-7J5AOAQZ.js"));
         assert!(!is_spa_route_subpath("assets/img/logo.svg"));
         assert!(!is_spa_route_subpath("media/file.name.with.dots.png"));
@@ -10842,10 +10874,11 @@ mod tests {
             let mut zw = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
             // Stored (no compression) — independent of the `deflate` feature on
             // the write side; ZipArchive reads either method on extraction.
-            let opts = SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Stored);
+            let opts =
+                SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
             zw.start_file("index.html", opts).unwrap();
-            zw.write_all(b"<!doctype html><title>shell</title>").unwrap();
+            zw.write_all(b"<!doctype html><title>shell</title>")
+                .unwrap();
             zw.start_file("main-7J5AOAQZ.js", opts).unwrap();
             zw.write_all(b"console.log('app')").unwrap();
             zw.finish().unwrap();
@@ -10864,7 +10897,10 @@ mod tests {
     async fn app_request_route_miss_serves_index_html_fallback() {
         let (server, cid) = spa_bundle_server().await;
         let resp = server
-            .handle_app_request(&format!("/apps/{cid}/path/foundations-christian-technology"))
+            .handle_app_request(
+                &format!("/apps/{cid}/path/foundations-christian-technology"),
+                "",
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -10877,12 +10913,34 @@ mod tests {
         assert!(body.starts_with(b"<!doctype html>"));
     }
 
+    /// ROUTE miss with the doorway opt-out (`?spaFallback=0`, the wire form of a
+    /// `spa_fallback=false` projection) → the safety net is suppressed and the
+    /// ROUTE miss surfaces the honest 404 instead of index.html. This is the
+    /// two-layer consistency guard: doorway is contract-authoritative for
+    /// `spa_fallback`; storage's convention-level fallback honours the opt-out
+    /// when doorway propagates it. End-to-end of the `spa_fallback=false` flow.
+    #[tokio::test]
+    async fn app_request_route_miss_respects_spa_fallback_opt_out() {
+        let (server, cid) = spa_bundle_server().await;
+        let resp = server
+            .handle_app_request(
+                &format!("/apps/{cid}/path/foundations-christian-technology"),
+                "spaFallback=0",
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert!(resp.headers().get("X-SPA-Fallback").is_none());
+        let body = body_bytes(resp).await;
+        assert!(body.starts_with(b"{\"error\""));
+    }
+
     /// ASSET miss → today's 404 JSON, never masked by index.html.
     #[tokio::test]
     async fn app_request_asset_miss_stays_404() {
         let (server, cid) = spa_bundle_server().await;
         let resp = server
-            .handle_app_request(&format!("/apps/{cid}/main-DEADBEEF.js"))
+            .handle_app_request(&format!("/apps/{cid}/main-DEADBEEF.js"), "")
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -10897,7 +10955,7 @@ mod tests {
     async fn app_request_existing_file_served_verbatim() {
         let (server, cid) = spa_bundle_server().await;
         let resp = server
-            .handle_app_request(&format!("/apps/{cid}/main-7J5AOAQZ.js"))
+            .handle_app_request(&format!("/apps/{cid}/main-7J5AOAQZ.js"), "")
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);

@@ -23,7 +23,7 @@ import { PathContext, DetourInfo } from '../models/exploration-context.model';
  *   pathTitle: 'Introduction to Governance',
  *   stepIndex: 3,
  *   totalSteps: 10,
- *   returnRoute: ['/lamad/path', 'governance-intro', 'step', '3']
+ *   returnRoute: ['/path', 'governance-intro', 'step', '3']
  * });
  *
  * // When user clicks "explore related"
@@ -129,7 +129,7 @@ export class PathContextService {
     if (chapterTitle !== undefined) {
       current.chapterTitle = chapterTitle;
     }
-    current.returnRoute = ['/lamad/path', current.pathId, 'step', String(stepIndex)];
+    current.returnRoute = ['/path', current.pathId, 'step', String(stepIndex)];
 
     this.activeContext$.next(current);
   }
@@ -226,11 +226,11 @@ export class PathContextService {
     const breadcrumbs: BreadcrumbItem[] = [
       {
         label: 'Paths',
-        route: ['/lamad'],
+        route: ['/'],
       },
       {
         label: current.pathTitle,
-        route: ['/lamad/path', current.pathId],
+        route: ['/path', current.pathId],
       },
     ];
 

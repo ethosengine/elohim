@@ -32,7 +32,7 @@ pub enum ViolationKind {
     KeyRotationStale,
     CommitmentRevoked,
     CommitmentNotFound,
-    ConstitutionalRatioBreach,  // Sprint 3
+    ConstitutionalRatioBreach, // Sprint 3
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, Default, PartialEq, Eq)]

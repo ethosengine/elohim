@@ -1190,9 +1190,32 @@ pub(crate) fn is_auth_owned_path(path: &str) -> bool {
     AUTH_OWNED_PATHS.contains(&bare)
 }
 
+/// True iff `sub` is a ROUTE (SPA deep-link, fallback-eligible) rather than an
+/// ASSET. The shared discrimination rule (§12.2 of the pillar-EPR decomposition
+/// spec): a sub-path is a ROUTE iff its FINAL segment contains no `.`; otherwise
+/// it is an ASSET and a miss must stay an honest 404 (a missing hashed bundle
+/// file is a real deploy bug, never masked by index.html).
+///
+/// Shared test vectors live at
+/// `elohim/sdk/fixtures/spa-route-discrimination.vectors.json` and are consumed
+/// by both this crate and elohim-storage's fallback — the two-layer drift guard.
+pub(crate) fn is_spa_route_subpath(sub: &str) -> bool {
+    !sub.rsplit('/').next().unwrap_or(sub).contains('.')
+}
+
 /// Derive the storage sub-path for an EPR projection from the request path, the
 /// projection's `url_path` prefix, and its `entry_file` (used on bare hits).
-pub(crate) fn derive_app_subpath(request_path: &str, url_path: &str, entry_file: &str) -> String {
+///
+/// With `spa_fallback` true, extension-less deep ROUTES (per
+/// [`is_spa_route_subpath`]) resolve to `entry_file` so the SPA bootstraps and
+/// its client-side router handles the deep link. ASSET sub-paths always pass
+/// through verbatim so honest 404s surface. See spec §12.2.
+pub(crate) fn derive_app_subpath(
+    request_path: &str,
+    url_path: &str,
+    entry_file: &str,
+    spa_fallback: bool,
+) -> String {
     let sub = if url_path == "/" {
         request_path.trim_start_matches('/')
     } else {
@@ -1201,7 +1224,9 @@ pub(crate) fn derive_app_subpath(request_path: &str, url_path: &str, entry_file:
             .unwrap_or(request_path)
             .trim_start_matches('/')
     };
-    if sub.is_empty() {
+    // Serve entry_file for the bare mount hit and for fallback-eligible deep
+    // ROUTES; ASSET sub-paths (and routes with fallback off) pass through.
+    if sub.is_empty() || (spa_fallback && is_spa_route_subpath(sub)) {
         entry_file.to_string()
     } else {
         sub.to_string()
@@ -1262,34 +1287,95 @@ mod shakeout_tests {
     }
 
     // ── derive_app_subpath — projection url_path → storage sub-path ───────────
+    // All cases pass spa_fallback explicitly; the ROUTE/ASSET behavior is the
+    // §12.2 contract (extension-less deep routes → entry_file when fallback on).
     #[test]
     fn shakeout_subpath_root_bare_uses_entry_file() {
-        assert_eq!(derive_app_subpath("/", "/", "index.html"), "index.html");
-    }
-    #[test]
-    fn shakeout_subpath_root_asset() {
-        assert_eq!(derive_app_subpath("/main.js", "/", "index.html"), "main.js");
-    }
-    #[test]
-    fn shakeout_subpath_prefix_bare_uses_entry_file() {
         assert_eq!(
-            derive_app_subpath("/lamad", "/lamad", "index.html"),
+            derive_app_subpath("/", "/", "index.html", true),
             "index.html"
         );
     }
     #[test]
-    fn shakeout_subpath_prefix_strips_nested() {
+    fn shakeout_subpath_root_asset() {
+        // main.js is an ASSET (dotted final segment) → passes through verbatim.
         assert_eq!(
-            derive_app_subpath("/lamad/concept/x", "/lamad", "index.html"),
+            derive_app_subpath("/main.js", "/", "index.html", true),
+            "main.js"
+        );
+    }
+    #[test]
+    fn shakeout_subpath_prefix_bare_uses_entry_file() {
+        assert_eq!(
+            derive_app_subpath("/lamad", "/lamad", "index.html", true),
+            "index.html"
+        );
+    }
+    #[test]
+    fn shakeout_subpath_prefix_route_falls_back_to_entry_file() {
+        // concept/x is a ROUTE (no dot in final segment); with spa_fallback on
+        // it resolves to entry_file so the SPA bootstraps and routes client-side.
+        assert_eq!(
+            derive_app_subpath("/lamad/concept/x", "/lamad", "index.html", true),
+            "index.html"
+        );
+    }
+    #[test]
+    fn shakeout_subpath_prefix_route_verbatim_when_fallback_off() {
+        // Same ROUTE, but spa_fallback off → verbatim pass-through (no SPA serve).
+        assert_eq!(
+            derive_app_subpath("/lamad/concept/x", "/lamad", "index.html", false),
             "concept/x"
         );
     }
     #[test]
     fn shakeout_subpath_prefix_single_asset() {
+        // main.js is an ASSET → verbatim even with spa_fallback on.
         assert_eq!(
-            derive_app_subpath("/lamad/main.js", "/lamad", "index.html"),
+            derive_app_subpath("/lamad/main.js", "/lamad", "index.html", true),
             "main.js"
         );
+    }
+
+    // ── is_spa_route_subpath — the shared ROUTE/ASSET rule, vector-driven ──────
+    #[derive(serde::Deserialize)]
+    struct RouteVector {
+        #[serde(rename = "subPath")]
+        sub_path: String,
+        kind: String,
+        #[allow(dead_code)]
+        note: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct RouteVectorFile {
+        vectors: Vec<RouteVector>,
+    }
+
+    #[test]
+    fn shakeout_is_spa_route_agrees_with_shared_vectors() {
+        // The ONE shared test-vector table (two-layer drift guard, §12.2). Both
+        // this crate and elohim-storage's fallback consume it via include_str!.
+        let raw = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../elohim/sdk/fixtures/spa-route-discrimination.vectors.json"
+        ));
+        let file: RouteVectorFile =
+            serde_json::from_str(raw).expect("shared spa-route vector fixture must parse");
+        assert!(!file.vectors.is_empty(), "vector fixture must not be empty");
+        for v in &file.vectors {
+            let expected_route = match v.kind.as_str() {
+                "route" => true,
+                "asset" => false,
+                other => panic!("unknown vector kind {:?} for {:?}", other, v.sub_path),
+            };
+            assert_eq!(
+                is_spa_route_subpath(&v.sub_path),
+                expected_route,
+                "ROUTE/ASSET disagreement for {:?} (expected kind={})",
+                v.sub_path,
+                v.kind
+            );
+        }
     }
 }
 
@@ -1357,11 +1443,29 @@ async fn dispatch_to_projected_epr(
     };
 
     // Derive the storage sub-path from the projection prefix and request path.
-    let sub_path = derive_app_subpath(request_path, &projection.url_path, &projection.entry_file);
+    let sub_path = derive_app_subpath(
+        request_path,
+        &projection.url_path,
+        &projection.entry_file,
+        projection.spa_fallback,
+    );
 
     // Proxy to storage's /apps/{epr_id}/{sub_path} — the existing bundle-serving surface.
     // Storage's slug_index and AppFileCacheService handle caching; doorway proxies, not owns.
-    let storage_apps_path = format!("{}/apps/{}/{}", storage_url, projection.epr_id, sub_path);
+    //
+    // Doorway is contract-authoritative for `spa_fallback` (§12.2). Storage's
+    // safety-net fallback defaults ON (so tauri-direct deep links work with no
+    // doorway in the loop). When this projection opts out, propagate the
+    // decision via `?spaFallback=0` so storage's convention layer honours it and
+    // the two layers stay consistent.
+    let storage_apps_path = if projection.spa_fallback {
+        format!("{}/apps/{}/{}", storage_url, projection.epr_id, sub_path)
+    } else {
+        format!(
+            "{}/apps/{}/{}?spaFallback=0",
+            storage_url, projection.epr_id, sub_path
+        )
+    };
 
     tracing::debug!(
         request_path = %request_path,

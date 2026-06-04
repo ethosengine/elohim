@@ -142,13 +142,13 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
   returnToPath(): void {
     if (this.returnContext) {
       void this.router.navigate([
-        '/lamad/path',
+        '/path',
         this.returnContext.pathId,
         'step',
         this.returnContext.stepIndex,
       ]);
     } else {
-      void this.router.navigate(['/lamad']);
+      void this.router.navigate(['/']);
     }
   }
 

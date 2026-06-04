@@ -182,14 +182,14 @@ describe('LamadHomeComponent', () => {
   it('should navigate to path on goToPath', () => {
     component.goToPath('test-path');
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path']);
+    expect(router.navigate).toHaveBeenCalledWith(['/path', 'test-path']);
   });
 
   it('should start featured path at step 0', () => {
     fixture.detectChanges();
     component.startFeaturedPath();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'elohim-protocol', 'step', 0]);
+    expect(router.navigate).toHaveBeenCalledWith(['/path', 'elohim-protocol', 'step', 0]);
   });
 
   it('should not navigate if no featured path', () => {
@@ -202,19 +202,19 @@ describe('LamadHomeComponent', () => {
   it('should navigate to explore view', () => {
     component.goToExplore();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/explore']);
+    expect(router.navigate).toHaveBeenCalledWith(['/explore']);
   });
 
   it('should navigate to search', () => {
     component.goToSearch();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/search']);
+    expect(router.navigate).toHaveBeenCalledWith(['/search']);
   });
 
   it('should navigate to dashboard', () => {
     component.goToDashboard();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/me']);
+    expect(router.navigate).toHaveBeenCalledWith(['/me']);
   });
 
   it('should get difficulty class', () => {
@@ -241,7 +241,7 @@ describe('LamadHomeComponent', () => {
 
     expect(component.viewMode).toBe('explore');
     expect(localStorageSetItem).toHaveBeenCalledWith('lamad-view-mode', 'explore');
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/explore']);
+    expect(router.navigate).toHaveBeenCalledWith(['/explore']);
   });
 
   it('should load saved view mode from localStorage', () => {

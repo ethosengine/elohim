@@ -16,6 +16,19 @@ describe('App Routes', () => {
     expect(lamadRoute).toBeUndefined();
   });
 
+  // TODO(#12-6 Slice 2): the shell has no top-level `path`/`path/:id` route —
+  // `path`-shaped EPR routes minted by eprToRoute()/resolveInContext() (e.g.
+  // `['/path', id]`, spec §12.3) render only inside the lamad bundle (base href
+  // `/lamad/`). From the shell they hit the `**` catch-all. This is a tracked
+  // Slice-2 deferral (BundleRouteContext claims + `/epr/{id}` resolver), NOT a
+  // regression: the prior `/lamad/path` literal was equally unreachable here.
+  // This canary pins the absence so a stray shell `path` route (or a regression
+  // that silently makes these links "work" by accident) is caught.
+  it('should NOT have a top-level path route (lamad-bundle-only until Slice 2 /epr resolver)', () => {
+    const pathRoute = routes.find(r => r.path === 'path' || r.path?.startsWith('path/'));
+    expect(pathRoute).toBeUndefined();
+  });
+
   it('should have correct number of routes', () => {
     // home, community, shefa, identity, account, doorway, avodah,
     // auth/callback, deliver/:slug, resource/:resourceId, map, resolve,

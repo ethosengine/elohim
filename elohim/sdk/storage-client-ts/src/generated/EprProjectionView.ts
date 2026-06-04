@@ -51,6 +51,14 @@ baseHref: string,
  */
 entryFile: string, 
 /**
+ * Serve `entry_file` for extension-less deep routes (SPA deep-link
+ * fallback). Defaults `true` for bundle EPRs. See spec §12.2 of
+ * `genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md`
+ * — a sub-path is a ROUTE (fallback-eligible) iff its final segment
+ * contains no `.`; otherwise it is an ASSET and a miss stays an honest 404.
+ */
+spaFallback: boolean, 
+/**
  * Additional URL paths that redirect to url_path (legacy aliases).
  */
 redirectsFrom: Array<string>, 

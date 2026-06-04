@@ -35,6 +35,13 @@ pub struct EprProjectionView {
     pub base_href: String,
     /// Entry file relative to base_href (e.g. "index.html").
     pub entry_file: String,
+    /// Serve `entry_file` for extension-less deep routes (SPA deep-link
+    /// fallback). Defaults `true` for bundle EPRs. See spec §12.2 of
+    /// `genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md`
+    /// — a sub-path is a ROUTE (fallback-eligible) iff its final segment
+    /// contains no `.`; otherwise it is an ASSET and a miss stays an honest 404.
+    #[serde(default = "crate::shared::default_true")]
+    pub spa_fallback: bool,
     /// Additional URL paths that redirect to url_path (legacy aliases).
     pub redirects_from: Vec<String>,
     /// EPR CID of a preview / draft build, surfaced alongside the stable build.
@@ -136,6 +143,7 @@ mod tests {
             reach: "commons".into(),
             base_href: "/lamad/".into(),
             entry_file: "index.html".into(),
+            spa_fallback: true,
             redirects_from: vec![],
             preview_epr_ref: None,
             gate_hints: vec![],
@@ -150,6 +158,32 @@ mod tests {
         assert!(json.contains("\"urlPath\":\"/lamad\""));
         assert!(json.contains("\"mode\":\"cached\""));
         assert!(json.contains("\"baseHref\":\"/lamad/\""));
+        assert!(json.contains("\"spaFallback\":true"));
+    }
+
+    #[test]
+    fn projection_view_spa_fallback_defaults_true_when_absent() {
+        // Wire payloads from pre-spaFallback seeds omit the field; serde default
+        // must fill `true` so existing bundle projections stay SPA-eligible.
+        let json = r#"{
+            "commitmentId": "abc",
+            "eprId": "lamad-spa",
+            "doorwayId": "doorway:alpha-elohim-host",
+            "urlPath": "/lamad",
+            "mode": "cached",
+            "reach": "commons",
+            "baseHref": "/lamad/",
+            "entryFile": "index.html",
+            "redirectsFrom": [],
+            "previewEprRef": null,
+            "gateHints": [],
+            "deadEnd": false,
+            "stewardDirectEndpoint": null,
+            "seededAt": "2026-05-25T00:00:00Z",
+            "seededBy": "12D3Koo..."
+        }"#;
+        let view: EprProjectionView = serde_json::from_str(json).unwrap();
+        assert!(view.spa_fallback, "spaFallback must default to true");
     }
 
     #[test]

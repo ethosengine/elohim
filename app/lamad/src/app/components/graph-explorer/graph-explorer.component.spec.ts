@@ -485,7 +485,7 @@ describe('GraphExplorerComponent', () => {
 
       component.returnToPath();
 
-      expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path', 'step', 3]);
+      expect(router.navigate).toHaveBeenCalledWith(['/path', 'test-path', 'step', 3]);
     });
 
     it('should navigate to lamad home if no return context', () => {
@@ -496,7 +496,7 @@ describe('GraphExplorerComponent', () => {
 
       component.returnToPath();
 
-      expect(router.navigate).toHaveBeenCalledWith(['/lamad']);
+      expect(router.navigate).toHaveBeenCalledWith(['/']);
     });
   });
 

@@ -57,7 +57,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   private readonly FEATURED_PATH_LIMIT = 6;
 
   /** Base route for path navigation */
-  private readonly PATH_ROUTE = '/lamad/path';
+  private readonly PATH_ROUTE = '/path';
 
   featuredPath: PathIndexEntry | null = null;
   activeFocus: CurrentFocus | null = null;
@@ -235,21 +235,21 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    * Navigate to explore/map view
    */
   goToExplore(): void {
-    void this.router.navigate(['/lamad/explore']);
+    void this.router.navigate(['/explore']);
   }
 
   /**
    * Navigate to search
    */
   goToSearch(): void {
-    void this.router.navigate(['/lamad/search']);
+    void this.router.navigate(['/search']);
   }
 
   /**
    * Navigate to learner dashboard
    */
   goToDashboard(): void {
-    void this.router.navigate(['/lamad/me']);
+    void this.router.navigate(['/me']);
   }
 
   /**
@@ -287,7 +287,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
     // If explore mode, navigate to graph explorer
     if (mode === 'explore') {
-      void this.router.navigate(['/lamad/explore']);
+      void this.router.navigate(['/explore']);
     }
   }
 }

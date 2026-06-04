@@ -343,21 +343,21 @@ describe('PathOverviewComponent', () => {
     fixture.detectChanges();
     component.beginJourney();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path', 'step', 0]);
+    expect(router.navigate).toHaveBeenCalledWith(['/path', 'test-path', 'step', 0]);
   });
 
   it('should continue journey from current step', () => {
     fixture.detectChanges();
     component.continueJourney();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path', 'step', 2]);
+    expect(router.navigate).toHaveBeenCalledWith(['/path', 'test-path', 'step', 2]);
   });
 
   it('should navigate to specific accessible step', () => {
     fixture.detectChanges();
     component.goToStep(1);
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path', 'step', 1]);
+    expect(router.navigate).toHaveBeenCalledWith(['/path', 'test-path', 'step', 1]);
   });
 
   it('should not navigate to locked step', () => {
@@ -370,7 +370,7 @@ describe('PathOverviewComponent', () => {
   it('should navigate to home', () => {
     component.goHome();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad']);
+    expect(router.navigate).toHaveBeenCalledWith(['/']);
   });
 
   it('should get difficulty display', () => {

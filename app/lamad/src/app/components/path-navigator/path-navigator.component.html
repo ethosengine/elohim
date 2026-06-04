@@ -2,6 +2,7 @@
   class="path-player-container focused-view-container"
   [class.sidebar-collapsed]="!sidebarOpen"
   [class.focused-view-active]="isFocusedView"
+  data-testid="path-navigator"
 >
   <!-- PATH TOOLING: Mobile Toggle -->
   <button
@@ -29,7 +30,7 @@
   <aside class="path-sidebar">
     <div class="sidebar-header">
       <a
-        [routerLink]="['/lamad/path', pathId]"
+        [routerLink]="['/path', pathId]"
         class="back-link"
         data-testid="path-nav-back-overview"
       >
@@ -143,9 +144,9 @@
       <!-- PATH TOOLING: Breadcrumbs (Chapter > Module > Section > Concept) -->
       <nav class="breadcrumbs main-breadcrumbs" aria-label="Breadcrumb navigation">
         <div class="breadcrumb-trail">
-          <a routerLink="/lamad" data-testid="path-nav-breadcrumb-home">Territory</a>
+          <a routerLink="/" data-testid="path-nav-breadcrumb-home">Territory</a>
           <span class="separator">/</span>
-          <a [routerLink]="['/lamad/path', pathId]" data-testid="path-nav-breadcrumb-path">
+          <a [routerLink]="['/path', pathId]" data-testid="path-nav-breadcrumb-path">
             {{ path?.title }}
           </a>
           @if (lessonContext) {
@@ -201,7 +202,7 @@
                 <button
                   type="button"
                   class="btn btn-primary"
-                  [routerLink]="['/lamad/path', stepView.nestedPath.id]"
+                  [routerLink]="['/path', stepView.nestedPath.id]"
                 >
                   Start Sub-Journey
                 </button>

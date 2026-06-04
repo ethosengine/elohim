@@ -22,8 +22,8 @@ describe('LamadNotFoundComponent', () => {
 
     router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
-    // Mock the url property
-    Object.defineProperty(router, 'url', { value: '/lamad/some/invalid/path', writable: true });
+    // Mock the url property (router.url is post-base-strip; bundle served at /lamad/)
+    Object.defineProperty(router, 'url', { value: '/some/invalid/path', writable: true });
 
     fixture = TestBed.createComponent(LamadNotFoundComponent);
     component = fixture.componentInstance;
@@ -35,7 +35,7 @@ describe('LamadNotFoundComponent', () => {
 
   it('should set attempted URL on init', () => {
     fixture.detectChanges();
-    expect(component.attemptedUrl).toBe('/lamad/some/invalid/path');
+    expect(component.attemptedUrl).toBe('/some/invalid/path');
   });
 
   it('should update SEO with noIndex on init', () => {
@@ -50,14 +50,14 @@ describe('LamadNotFoundComponent', () => {
   });
 
   it('should detect path resource type', () => {
-    Object.defineProperty(router, 'url', { value: '/lamad/path/invalid-id', writable: true });
+    Object.defineProperty(router, 'url', { value: '/path/invalid-id', writable: true });
     fixture.detectChanges();
 
     expect(component.resourceType).toBe('path');
   });
 
   it('should detect resource type for /resource/ URLs', () => {
-    Object.defineProperty(router, 'url', { value: '/lamad/resource/invalid-id', writable: true });
+    Object.defineProperty(router, 'url', { value: '/resource/invalid-id', writable: true });
     fixture.detectChanges();
 
     expect(component.resourceType).toBe('resource');
@@ -80,17 +80,17 @@ describe('LamadNotFoundComponent', () => {
 
   it('should navigate to lamad home', () => {
     component.goToLamadHome();
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad']);
+    expect(router.navigate).toHaveBeenCalledWith(['/']);
   });
 
   it('should navigate to search', () => {
     component.goToSearch();
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/search']);
+    expect(router.navigate).toHaveBeenCalledWith(['/search']);
   });
 
   it('should navigate to explore', () => {
     component.goToExplore();
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/explore']);
+    expect(router.navigate).toHaveBeenCalledWith(['/explore']);
   });
 
   it('should go back', () => {

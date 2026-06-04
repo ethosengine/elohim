@@ -373,6 +373,7 @@ mod tests {
             reach: "commons".into(),
             base_href: "/lamad/".into(),
             entry_file: "index.html".into(),
+            spa_fallback: true,
             redirects_from: vec![],
             preview_epr_ref: None,
             gate_hints: vec![],

@@ -697,6 +697,13 @@ fn commitment_to_projection_view(c: ReaCommitment) -> Result<EprProjectionView, 
             .and_then(|v| v.as_str())
             .unwrap_or("index.html")
             .to_string(),
+        // Defaults true (bundle-EPR SPA deep-link fallback) when the seed omits
+        // the field — matches the serde default on EprProjectionView and the
+        // schema default. See spec §12.2.
+        spa_fallback: metadata
+            .get("spaFallback")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
         redirects_from: metadata
             .get("redirectsFrom")
             .and_then(|v| serde_json::from_value(v.clone()).ok())

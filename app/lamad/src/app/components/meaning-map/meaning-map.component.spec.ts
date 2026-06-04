@@ -193,7 +193,7 @@ describe('MeaningMapComponent', () => {
       const node = { ...mockNodes[0], affinity: 0.5, affinityLevel: 'medium' as const };
       component.viewContent(node);
 
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/content', 'node-1']);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/content', 'node-1']);
     }));
   });
 

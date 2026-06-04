@@ -967,7 +967,7 @@ export class ContentViewerComponent
    * Navigate to a path that contains this content
    */
   navigateToPath(pathId: string, stepIndex: number): void {
-    void this.router.navigate(['/lamad/path', pathId, 'step', stepIndex]);
+    void this.router.navigate(['/path', pathId, 'step', stepIndex]);
   }
 
   /**
@@ -1029,14 +1029,14 @@ export class ContentViewerComponent
    * Navigate to related content
    */
   viewRelatedContent(node: ContentNode): void {
-    void this.router.navigate(['/lamad/content', node.id]);
+    void this.router.navigate(['/content', node.id]);
   }
 
   /**
    * Navigate back to lamad home
    */
   backToHome(): void {
-    void this.router.navigate(['/lamad']);
+    void this.router.navigate(['/']);
   }
 
   /**
@@ -1254,7 +1254,7 @@ export class ContentViewerComponent
     }
 
     // Navigate to graph explorer
-    void this.router.navigate(['/lamad/explore'], {
+    void this.router.navigate(['/explore'], {
       queryParams: {
         focus: this.nodeId,
         ...(this.pathContext

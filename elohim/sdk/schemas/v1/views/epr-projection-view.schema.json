@@ -17,6 +17,7 @@
     "redirectsFrom",
     "gateHints",
     "deadEnd",
+    "spaFallback",
     "seededAt",
     "seededBy"
   ],
@@ -74,6 +75,11 @@
     "deadEnd": {
       "type": "boolean",
       "description": "True when this projection is intentionally terminal — no outbound gate hints should be followed after arriving here."
+    },
+    "spaFallback": {
+      "type": "boolean",
+      "default": true,
+      "description": "Serve the projection's entry file for extension-less deep routes (SPA fallback). Defaults true for bundle EPRs."
     },
     "stewardDirectEndpoint": {
       "oneOf": [

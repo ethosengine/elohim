@@ -172,7 +172,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   private readonly agentService: ILamadAgent = inject(LAMAD_AGENT);
 
   /** Base route for path navigation */
-  private readonly PATH_ROUTE = '/lamad/path';
+  private readonly PATH_ROUTE = '/path';
 
   /** localStorage key for resume position */
   private readonly RESUME_KEY_PREFIX = 'lamad-resume-';
@@ -409,7 +409,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * Go back to home
    */
   goHome(): void {
-    void this.router.navigate(['/lamad']);
+    void this.router.navigate(['/']);
   }
 
   /**

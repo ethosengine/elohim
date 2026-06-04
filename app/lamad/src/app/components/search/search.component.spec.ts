@@ -159,7 +159,8 @@ describe('SearchComponent', () => {
 
       const route = component.getNodeRoute(result);
 
-      expect(route).toEqual(['/lamad/content', 'test-id']);
+      // Cross-bundle target (shell /resource) — TODO(#12-6 Slice 2): claims rewrite per spec §12.3.
+      expect(route).toEqual(['/resource', 'test-id']);
     });
   });
 

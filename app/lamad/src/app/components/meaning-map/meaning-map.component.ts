@@ -184,7 +184,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Navigate to content viewer
    */
   viewContent(node: ContentNodeWithAffinity): void {
-    void this.router.navigate(['/lamad/content', node.id]);
+    void this.router.navigate(['/content', node.id]);
   }
 
   /**

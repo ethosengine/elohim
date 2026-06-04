@@ -232,6 +232,7 @@ export const DASHBOARD = {
 
 // Path navigator (elohim-app: path-navigator.component.html)
 export const PATH_NAV = {
+  ROOT: 'path-navigator', // root container — render-verifies the step navigator mounted
   SIDEBAR_TOGGLE: 'path-nav-sidebar-toggle',
   BACK_OVERVIEW: 'path-nav-back-overview',
   SIDEBAR_COLLAPSE: 'path-nav-sidebar-collapse',
@@ -246,6 +247,7 @@ export const PATH_NAV = {
 
 // Path overview (elohim-app: path-overview.component.html)
 export const PATH_OVERVIEW = {
+  ROOT: 'path-overview', // root container — render-verifies the path overview mounted
   BACK_ALL_PATHS: 'overview-back-all-paths',
   BACK_HOME: 'overview-back-home',
   BEGIN_JOURNEY: 'overview-begin-journey',
@@ -325,6 +327,7 @@ export const GRAPH = {
 
 // Not found (elohim-app: lamad-not-found.component.html)
 export const NOT_FOUND = {
+  ROOT: 'lamad-not-found', // root container — render-verifies the DESIGNED not-found page (not raw JSON)
   BROWSE_PATHS: 'not-found-browse-paths',
   SEARCH: 'not-found-search',
   EXPLORE: 'not-found-explore',
@@ -644,8 +647,13 @@ export const SHEFA_POSTURE = {
 export const EPR_LINK = {
   // The host custom-element tag (light DOM).
   HOST: 'elohim-epr-link',
-  // The interactive chip/button inside the host's shadow root.
+  // The interactive chip/button inside the host's shadow root (L2/L3 resolved).
   ANCHOR: 'button.anchor',
+  // The L4/unreachable fallback: the host renders <elohim-mention-base> (the
+  // `fallback` part) instead of the live anchor when the EPR can't be resolved.
+  FALLBACK: 'elohim-mention-base',
+  // The visible marker dot inside the fallback chip (role=presentation).
+  FALLBACK_MARK: '[part="fallback-mark"]',
   // The nested context-menu custom element (opened on right-click / Shift+F10).
   CONTEXT_MENU: 'elohim-context-menu',
 } as const;

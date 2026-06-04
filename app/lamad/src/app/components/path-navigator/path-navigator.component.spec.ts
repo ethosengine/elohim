@@ -243,7 +243,7 @@ describe('PathNavigatorComponent', () => {
     fixture.detectChanges();
     component.goToPrevious();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path', 'step', 0]);
+    expect(router.navigate).toHaveBeenCalledWith(['/path', 'test-path', 'step', 0]);
   });
 
   it('should not navigate to previous if hasPrevious is false', () => {
@@ -257,7 +257,7 @@ describe('PathNavigatorComponent', () => {
     fixture.detectChanges();
     component.goToNext();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path', 'step', 2]);
+    expect(router.navigate).toHaveBeenCalledWith(['/path', 'test-path', 'step', 2]);
   });
 
   it('should not navigate to next if hasNext is false', () => {
@@ -271,7 +271,7 @@ describe('PathNavigatorComponent', () => {
     fixture.detectChanges();
     component.goToPathOverview();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path']);
+    expect(router.navigate).toHaveBeenCalledWith(['/path', 'test-path']);
   });
 
   it('should cycle through Bloom levels on markComplete', () => {
@@ -570,7 +570,7 @@ describe('PathNavigatorComponent', () => {
 
       component.goToConcept(2);
 
-      expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'hierarchical-path', 'step', 2]);
+      expect(router.navigate).toHaveBeenCalledWith(['/path', 'hierarchical-path', 'step', 2]);
     });
   });
 
@@ -605,7 +605,7 @@ describe('PathNavigatorComponent', () => {
         })
       );
       expect(router.navigate).toHaveBeenCalledWith(
-        ['/lamad/explore'],
+        ['/explore'],
         expect.objectContaining({
           queryParams: expect.objectContaining({
             focus: 'node-2',
@@ -771,7 +771,7 @@ describe('PathNavigatorComponent', () => {
       expect(context.pathId).toBe('test-path');
       expect(context.pathTitle).toBe('Test Path');
       expect(context.stepIndex).toBe(1);
-      expect(context.returnRoute).toEqual(['/lamad/path', 'test-path', 'step', '1']);
+      expect(context.returnRoute).toEqual(['/path', 'test-path', 'step', '1']);
     });
   });
 

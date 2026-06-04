@@ -141,7 +141,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   private readonly FOCUSED_VIEW_MODE_CLASS = 'focused-view-mode';
 
   /** Base route for path navigation */
-  private readonly PATH_ROUTE = '/lamad/path';
+  private readonly PATH_ROUTE = '/path';
 
   /** localStorage key prefix for resume position */
   private readonly RESUME_KEY_PREFIX = 'lamad-resume-';
@@ -889,7 +889,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
 
     // Navigate to graph explorer with context
     this.router
-      .navigate(['/lamad/explore'], {
+      .navigate(['/explore'], {
         queryParams: {
           focus: contentId,
           fromPath: this.pathId,

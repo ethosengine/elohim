@@ -84,7 +84,10 @@ impl SequenceAllocator {
 /// Gather per-blob hints for the given set of hashes.
 ///
 /// For each hash, joins the `content` projection on `blob_hash` to derive:
-/// - `epr_kind`: `content_format` (advisory content class).
+/// - `epr_kind`: the canonical EprKind entry-type string — always `"Content"`
+///   for rows sourced from the `content` projection. Must stay in the
+///   `scope_filter.epr_kinds` schema vocabulary (EprKind names), NOT the lamad
+///   `content_format` vocabulary (storage-tier review 2026-06-04, finding #2).
 /// - `size_bytes`: `content_size_bytes` (uncompressed byte count).
 /// - `recipient_hub_id`: the author's owning hub via `hub_resolver::resolve_owning_hub`,
 ///   which returns the canonical `collective:{hash}` CID when available, else the slug.
@@ -110,15 +113,14 @@ pub fn gather_hints(conn: &mut diesel::SqliteConnection, hashes: &[BlobAddress])
     let hash_strs: Vec<&str> = hashes.iter().map(|a| a.as_str()).collect();
 
     // One query for all matching content rows — avoids N+1.
-    let rows: Vec<(String, String, Option<i32>, Option<String>)> = match ct::content
+    let rows: Vec<(String, Option<i32>, Option<String>)> = match ct::content
         .filter(ct::blob_hash.eq_any(&hash_strs))
         .select((
             ct::blob_hash.assume_not_null(),
-            ct::content_format,
             ct::content_size_bytes,
             ct::created_by,
         ))
-        .load::<(String, String, Option<i32>, Option<String>)>(conn)
+        .load::<(String, Option<i32>, Option<String>)>(conn)
     {
         Ok(r) => r,
         Err(e) => {
@@ -132,7 +134,7 @@ pub fn gather_hints(conn: &mut diesel::SqliteConnection, hashes: &[BlobAddress])
     };
 
     let mut hints = Vec::with_capacity(rows.len());
-    for (blob_hash, content_format, size_bytes, created_by) in rows {
+    for (blob_hash, size_bytes, created_by) in rows {
         let Ok(address) = BlobAddress::new(blob_hash.clone()) else {
             continue;
         };
@@ -155,7 +157,14 @@ pub fn gather_hints(conn: &mut diesel::SqliteConnection, hashes: &[BlobAddress])
             }
         });
 
-        let epr_kind = Some(content_format);
+        // Canonical EprKind entry-type, NOT content_format: the scorer matches
+        // this against commitment scope_filter.epr_kinds, whose schema enum is
+        // EprKind names ("Content", "Manifest", …). Everything in the content
+        // projection is a Content entry.
+        let epr_kind = Some(
+            crate::services::epr_kind::kind_canonical_str(elohim_epr::EprKind::Content)
+                .to_string(),
+        );
         let size: Option<u64> = size_bytes.map(|s| s.max(0) as u64);
 
         // Sparse: skip hint if nothing useful is populated.
@@ -398,12 +407,38 @@ mod tests {
 
         assert_eq!(hints.len(), 1);
         let h = &hints[0];
-        assert_eq!(h.epr_kind.as_deref(), Some("sophia-quiz-json"));
+        // EprKind entry-type, regardless of the row's content_format
+        // (storage-tier review 2026-06-04, finding #2).
+        assert_eq!(h.epr_kind.as_deref(), Some("Content"));
         assert_eq!(h.size_bytes, Some(8192));
         assert!(h.recipient_hub_id.is_none(), "no author → no hub");
         assert!(
             h.tier.is_none(),
             "tier always None (TierController deferred)"
+        );
+    }
+
+    /// Storage-tier review 2026-06-04, finding #2: the hint's `epr_kind` must
+    /// be the canonical EprKind entry-type string ("Content"), NOT the lamad
+    /// `content_format` ("markdown", "sophia-quiz-json", …). Commitment
+    /// `scope_filter.epr_kinds` is schema-constrained to EprKind names
+    /// (replicates-dwelling scope_filter enum), so a content_format value can
+    /// never match a schema-valid scope filter — every scoped blob scored Skip
+    /// and commitment-driven replication silently fetched nothing.
+    #[test]
+    fn gather_hints_emits_canonical_epr_kind_not_content_format() {
+        let pool = test_db_pool();
+        let mut conn = pool.get().expect("conn");
+        // Use 'd' — valid lowercase hex char not used in other gather_hints tests.
+        let hash = sha256_wire('d');
+        seed_content_with_blob(&mut conn, &hash, "markdown", Some(1024), None);
+        let addr = BlobAddress::new(hash).unwrap();
+        let hints = gather_hints(&mut conn, &[addr]);
+        assert_eq!(hints.len(), 1);
+        assert_eq!(
+            hints[0].epr_kind.as_deref(),
+            Some("Content"),
+            "hint epr_kind must be the EprKind entry-type, not content_format"
         );
     }
 
@@ -488,7 +523,7 @@ mod tests {
             Some("collective:uhCkkHintsTest001"),
             "recipient_hub_id resolved via hub_resolver"
         );
-        assert_eq!(h.epr_kind.as_deref(), Some("markdown"));
+        assert_eq!(h.epr_kind.as_deref(), Some("Content"));
         assert_eq!(h.size_bytes, Some(4096));
     }
 

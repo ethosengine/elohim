@@ -126,7 +126,7 @@ describe('EprResolverService', () => {
       const result = service.resolveInContext('epr:rea-foundations', 'my-path', steps);
       expect(result.resolution).toBe('in-path');
       expect(result.stepIndex).toBe(1);
-      expect(result.route).toEqual(['/lamad/path', 'my-path', 'step', '1']);
+      expect(result.route).toEqual(['/path', 'my-path', 'step', '1']);
     });
 
     it('resolves to standalone when no path context', () => {
@@ -151,7 +151,7 @@ describe('EprResolverService', () => {
       );
       expect(result.resolution).toBe('cross-path');
       expect(result.crossPath).toEqual({ pathId: 'other-path', stepIndex: 3 });
-      expect(result.route).toEqual(['/lamad/path', 'other-path', 'step', '3']);
+      expect(result.route).toEqual(['/path', 'other-path', 'step', '3']);
     });
 
     it('prefers in-path over cross-path', () => {
@@ -181,7 +181,7 @@ describe('EprResolverService', () => {
       // epr:elohim-protocol#step/2 has a path fragment
       const result = service.resolveInContext('epr:elohim-protocol#step/2', null, []);
       expect(result.resolution).toBe('standalone');
-      expect(result.route).toEqual(['/lamad/path', 'elohim-protocol', 'step', '2']);
+      expect(result.route).toEqual(['/path', 'elohim-protocol', 'step', '2']);
     });
   });
 });

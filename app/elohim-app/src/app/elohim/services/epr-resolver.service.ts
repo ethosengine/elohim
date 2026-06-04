@@ -189,7 +189,8 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
       const stepIndex = currentSteps.findIndex(s => s.resourceId === targetId);
       if (stepIndex >= 0) {
         return {
-          route: ['/lamad/path', currentPathId, 'step', String(stepIndex)],
+          // TODO(#12-6 Slice 2): replace with BundleRouteContext claims — spec §12.3.
+          route: ['/path', currentPathId, 'step', String(stepIndex)],
           resolution: 'in-path',
           stepIndex,
         };
@@ -200,7 +201,8 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
     if (crossPathMatches && crossPathMatches.length > 0) {
       const match = crossPathMatches[0];
       return {
-        route: ['/lamad/path', match.pathId, 'step', String(match.stepIndex)],
+        // TODO(#12-6 Slice 2): replace with BundleRouteContext claims — spec §12.3.
+        route: ['/path', match.pathId, 'step', String(match.stepIndex)],
         resolution: 'cross-path',
         crossPath: match,
       };
