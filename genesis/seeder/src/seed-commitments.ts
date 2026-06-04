@@ -100,6 +100,8 @@ export interface CustodyPair {
   receiverArchetype: Archetype;
   blobHash: string;       // raw hex (no prefix), or full "sha256-<hex>"
   blobSizeBytes: number;
+  /** Formation provenance marker — present only on interim fixtures. */
+  fixture?: string;
 }
 
 interface CommitmentBody {
@@ -154,6 +156,7 @@ export function buildCustodyCommitmentBody(pair: CustodyPair): CommitmentBody {
       blobHash: blob,
       providerHumanId: pair.providerHumanId,
       receiverHumanId: pair.receiverHumanId,
+      ...(pair.fixture ? { fixture: pair.fixture, retireAt: 'ceremony-landing' } : {}),
     },
   };
 }
@@ -162,32 +165,58 @@ export function buildCustodyCommitmentBody(pair: CustodyPair): CommitmentBody {
 // Default M1 pair set
 // =============================================================================
 
-const M1_DEFAULT_BLOB_HASH = process.env.M1_BLOB_HASH || '';
-const M1_DEFAULT_BLOB_SIZE = parseInt(process.env.M1_BLOB_SIZE_BYTES || '0', 10);
+/**
+ * Build the default M1 custody pair set (reads env at call time so tests can
+ * set process.env before invoking — the function is only called from main or
+ * from tests, never at module initialisation).
+ */
+export function defaultM1Pairs(): CustodyPair[] {
+  const blobHash = process.env.M1_BLOB_HASH || '';
+  const blobSizeBytes = parseInt(process.env.M1_BLOB_SIZE_BYTES || '0', 10);
 
-function defaultM1Pairs(): CustodyPair[] {
-  if (!M1_DEFAULT_BLOB_HASH || M1_DEFAULT_BLOB_SIZE <= 0) {
+  if (!blobHash || blobSizeBytes <= 0) {
     console.error(
       'ERROR: M1_BLOB_HASH and M1_BLOB_SIZE_BYTES must be set (or pass CUSTODY_PAIRS_JSON).',
     );
     process.exit(1);
   }
+
+  const m1 = { blobHash, blobSizeBytes };
+  const fixture = { ...m1, fixture: 'formation-output' as const };
+
   return [
+    // M1 named-pair flag (anti-drift, stays after fixture retirement)
     {
-      providerHumanId: 'human-matthew-manager',
-      providerArchetype: 'desktop',
-      receiverHumanId: 'human-jessica-spouse',
-      receiverArchetype: 'desktop',
-      blobHash: M1_DEFAULT_BLOB_HASH,
-      blobSizeBytes: M1_DEFAULT_BLOB_SIZE,
+      providerHumanId: 'human-matthew-manager', providerArchetype: 'desktop',
+      receiverHumanId: 'human-jessica-spouse', receiverArchetype: 'desktop',
+      ...m1,
     },
     {
-      providerHumanId: 'human-jessica-spouse',
-      providerArchetype: 'desktop',
-      receiverHumanId: 'human-matthew-manager',
-      receiverArchetype: 'desktop',
-      blobHash: M1_DEFAULT_BLOB_HASH,
-      blobSizeBytes: M1_DEFAULT_BLOB_SIZE,
+      providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
+      receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
+      ...m1,
+    },
+    // INTERIM FIXTURES (2026-06-04 fork: emergent + marked fixtures) — retired at
+    // ceremony landing (stage-1 plan Task 10). Loud provenance via metadata.
+    {
+      providerHumanId: 'human-matthew-manager', providerArchetype: 'desktop',
+      receiverHumanId: 'human-james-student', receiverArchetype: 'mobile',
+      ...fixture,
+    },
+    {
+      providerHumanId: 'human-james-student', providerArchetype: 'mobile',
+      receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
+      ...fixture,
+    },
+    {
+      providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
+      receiverHumanId: 'human-james-student', receiverArchetype: 'mobile',
+      ...fixture,
+    },
+    {
+      providerHumanId: 'human-james-student', providerArchetype: 'mobile',
+      receiverHumanId: 'human-jessica-spouse', receiverArchetype: 'desktop',
+      ...fixture,
     },
   ];
 }
