@@ -646,8 +646,16 @@ async function main() {
         contentId: contentId,
         stewardPresenceId: steward.presenceId,
         allocationRatio: steward.ratio,
-        allocationMethod: 'affinity',
-        contributionType: 'steward',
+        // Storage validates these against fixed enums (db/models.rs):
+        //   allocation_methods = manual|computed|negotiated  → 'computed' (ratios ARE
+        //     affinity-computed by this seeder); 'affinity' is rejected.
+        //   contribution_types = original_creator|editor|translator|curator|maintainer|
+        //     inherited → 'curator' (a steward curates); 'steward' is rejected.
+        // BACKLOG: enrich the storage enums with domain-accurate `affinity`/`steward`
+        // (manifesto vocabulary) so the wire values match the story — storage change,
+        // edge-rebuild window. See sprint-result backlog.
+        allocationMethod: 'computed',
+        contributionType: 'curator',
         note: category
           ? `Affinity-based stewardship for ${category} content`
           : 'Bootstrap steward assignment - uncategorized content',

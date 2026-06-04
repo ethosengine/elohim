@@ -24,8 +24,8 @@ Feature: Content Stewardship Allocation
   Scenario: Stewardship reflects human affinities
     When I query stewardship allocations for public-observer content
     Then Eve should have the highest allocation ratio
-    And her allocation method should be "affinity"
-    And her contribution type should be "steward"
+    And her allocation method should be "computed"
+    And her contribution type should be "curator"
 
   @affinity
   Scenario: Faith content stewarded by pastoral affinity
@@ -46,8 +46,8 @@ Feature: Content Stewardship Allocation
   Scenario: Uncategorized content falls back to bootstrap steward
     When I query stewardship allocations for content with no matching category
     Then Matthew should be the sole steward with ratio 1.0
-    And the allocation method should be "affinity"
-    And the contribution type should be "steward"
+    And the allocation method should be "computed"
+    And the contribution type should be "curator"
 
   # ============================================================================
   # No one is a creator
