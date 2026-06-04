@@ -26,7 +26,44 @@ import { PeerTopologyService } from '../../services/peer-topology.service';
         </div>
 
         @for (edge of v.edges; track edge.householdId) {
-          <app-peer-household-card [edge]="edge"></app-peer-household-card>
+          <div
+            class="peer-row"
+            role="button"
+            tabindex="0"
+            data-testid="peer-household-expand"
+            [attr.aria-expanded]="isExpanded(edge.householdId)"
+            [attr.aria-label]="
+              (edge.displayName ?? edge.householdId) +
+              '. Activate to ' +
+              (isExpanded(edge.householdId) ? 'collapse' : 'expand') +
+              ' household details.'
+            "
+            (click)="toggleExpanded(edge.householdId)"
+            (keydown.enter)="toggleExpanded(edge.householdId)"
+            (keydown.space)="toggleExpanded(edge.householdId); $event.preventDefault()"
+          >
+            <app-peer-household-card [edge]="edge"></app-peer-household-card>
+            @if (isExpanded(edge.householdId)) {
+              <dl class="peer-detail" data-testid="peer-household-detail-panel">
+                <dt>Last sync</dt>
+                <dd data-testid="peer-detail-last-sync">
+                  {{ edge.lastSyncSec != null ? edge.lastSyncSec + 's ago' : 'never' }}
+                </dd>
+                <dt>They host of mine</dt>
+                <dd data-testid="peer-detail-hosted-by-them">{{ edge.myCidsHostedByThem }}</dd>
+                <dt>I host of theirs</dt>
+                <dd data-testid="peer-detail-hosted-by-me">{{ edge.theirCidsHostedByMe }}</dd>
+                <dt>Critical for me</dt>
+                <dd data-testid="peer-detail-critical-for-me">
+                  {{ edge.isCriticalForMe ? 'yes' : 'no' }}
+                </dd>
+                <dt>I am critical for them</dt>
+                <dd data-testid="peer-detail-critical-for-them">
+                  {{ edge.iAmCriticalForThem ? 'yes' : 'no' }}
+                </dd>
+              </dl>
+            }
+          </div>
         }
 
         @if (v.resilienceCliffs.length > 0) {
@@ -61,6 +98,29 @@ import { PeerTopologyService } from '../../services/peer-topology.service';
       .cliff {
         color: var(--health-critical, #c30);
       }
+      .peer-row {
+        cursor: pointer;
+      }
+      .peer-row:focus-visible {
+        outline: 2px solid var(--focus-ring, #1a73e8);
+        outline-offset: 2px;
+      }
+      .peer-detail {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.1rem 0.75rem;
+        margin: 0 0 0.5rem 0.5rem;
+        padding-left: 0.5rem;
+        border-left: 2px solid #ddd;
+        font-size: 0.8rem;
+      }
+      .peer-detail dt {
+        font-weight: 600;
+        color: var(--text-secondary, #666);
+      }
+      .peer-detail dd {
+        margin: 0;
+      }
       pre {
         font-size: 0.75rem;
         background: #f6f6f6;
@@ -73,6 +133,7 @@ import { PeerTopologyService } from '../../services/peer-topology.service';
 export class PeerTopologyComponent implements OnInit, OnDestroy {
   protected readonly topology = inject(PeerTopologyService);
   protected readonly showDetails = signal(false);
+  private readonly expandedHouseholds = signal<ReadonlySet<string>>(new Set());
   private stopPolling?: () => void;
 
   ngOnInit(): void {
@@ -90,5 +151,21 @@ export class PeerTopologyComponent implements OnInit, OnDestroy {
 
   toggleDetails(): void {
     this.showDetails.update(v => !v);
+  }
+
+  isExpanded(householdId: string): boolean {
+    return this.expandedHouseholds().has(householdId);
+  }
+
+  toggleExpanded(householdId: string): void {
+    this.expandedHouseholds.update(prev => {
+      const next = new Set(prev);
+      if (next.has(householdId)) {
+        next.delete(householdId);
+      } else {
+        next.add(householdId);
+      }
+      return next;
+    });
   }
 }

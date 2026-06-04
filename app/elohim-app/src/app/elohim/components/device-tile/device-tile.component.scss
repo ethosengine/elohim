@@ -3,6 +3,12 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.25rem 0;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring, #1a73e8);
+    outline-offset: 2px;
+  }
 
   &.offline {
     opacity: 0.55;
@@ -27,6 +33,30 @@
   .status {
     font-size: 0.85rem;
     color: var(--text-secondary, #666);
+  }
+}
+
+.device-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.1rem 0.75rem;
+  margin: 0.25rem 0 0.5rem 1rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--device-offline, #888);
+  font-size: 0.8rem;
+
+  dt {
+    font-weight: 600;
+    color: var(--text-secondary, #666);
+  }
+
+  dd {
+    margin: 0;
+  }
+
+  .peer-id {
+    font-family: monospace;
+    word-break: break-all;
   }
 }
 

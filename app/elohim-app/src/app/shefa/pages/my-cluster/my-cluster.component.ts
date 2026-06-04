@@ -25,6 +25,7 @@ import type { MyClusterView } from '@app/generated/my-cluster-view';
 export class MyClusterComponent implements OnInit, OnDestroy {
   protected readonly cluster = inject(ClusterService);
   protected readonly showDetails = signal(false);
+  protected readonly capacityExpanded = signal(false);
   private stopPolling?: () => void;
 
   ngOnInit(): void {
@@ -42,6 +43,27 @@ export class MyClusterComponent implements OnInit, OnDestroy {
 
   toggleDetails(): void {
     this.showDetails.update(v => !v);
+  }
+
+  toggleCapacity(): void {
+    this.capacityExpanded.update(v => !v);
+  }
+
+  /**
+   * Width percentage (0–100) of the "used" segment of the cluster capacity bar,
+   * computed from observed used/total bytes only. Guards against a zero total
+   * (Epic B data may read 0) so the bar never divides by zero.
+   */
+  usedPct(totals: MyClusterView['totals']): number {
+    const total = totals.storageTotalBytes;
+    if (!Number.isFinite(total) || total <= 0) return 0;
+    const used = Math.max(0, Math.min(totals.storageUsedBytes, total));
+    return (used / total) * 100;
+  }
+
+  /** Remaining (free) width percentage of the capacity bar. */
+  freePct(totals: MyClusterView['totals']): number {
+    return 100 - this.usedPct(totals);
   }
 
   onlineCount(devices: MyClusterView['devices']): number {

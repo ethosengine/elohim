@@ -18,20 +18,51 @@
       }
     </div>
 
-    <dl class="totals" data-testid="my-cluster-totals">
-      <dt>Storage</dt>
-      <dd>
-        {{ formatBytes(v.totals.storageUsedBytes) }} of
-        {{ formatBytes(v.totals.storageTotalBytes) }} used
-      </dd>
-      <dt>Hosting</dt>
-      <dd>
-        {{ formatBytes(v.totals.externalCommittedBytes) }} for friends · they host
-        {{ formatBytes(reciprocityInBytes(v.totals.reciprocityNetBytes)) }} of mine
-      </dd>
-      <dt>Status</dt>
-      <dd data-testid="my-cluster-status">{{ statusText(v) }}</dd>
-    </dl>
+    <div
+      class="capacity-bar"
+      data-testid="my-cluster-capacity-bar"
+      role="button"
+      tabindex="0"
+      [attr.aria-expanded]="capacityExpanded()"
+      [attr.aria-label]="
+        'Storage ' +
+        formatBytes(v.totals.storageUsedBytes) +
+        ' of ' +
+        formatBytes(v.totals.storageTotalBytes) +
+        ' used. Activate to ' +
+        (capacityExpanded() ? 'collapse' : 'expand') +
+        ' cluster totals.'
+      "
+      (click)="toggleCapacity()"
+      (keydown.enter)="toggleCapacity()"
+      (keydown.space)="toggleCapacity(); $event.preventDefault()"
+    >
+      <span
+        class="capacity-bar__segment capacity-bar__segment--used"
+        [style.width.%]="usedPct(v.totals)"
+      ></span>
+      <span
+        class="capacity-bar__segment capacity-bar__segment--free"
+        [style.width.%]="freePct(v.totals)"
+      ></span>
+    </div>
+
+    @if (capacityExpanded()) {
+      <dl class="totals" data-testid="my-cluster-totals">
+        <dt>Storage</dt>
+        <dd>
+          {{ formatBytes(v.totals.storageUsedBytes) }} of
+          {{ formatBytes(v.totals.storageTotalBytes) }} used
+        </dd>
+        <dt>Hosting</dt>
+        <dd>
+          {{ formatBytes(v.totals.externalCommittedBytes) }} for friends · they host
+          {{ formatBytes(reciprocityInBytes(v.totals.reciprocityNetBytes)) }} of mine
+        </dd>
+        <dt>Status</dt>
+        <dd data-testid="my-cluster-status">{{ statusText(v) }}</dd>
+      </dl>
+    }
 
     <button type="button" (click)="toggleDetails()" data-testid="my-cluster-show-details-toggle">
       [{{ showDetails() ? 'hide' : 'show' }} details]

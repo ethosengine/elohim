@@ -73,6 +73,103 @@ describe('MyClusterComponent', () => {
     expect(tiles.length).toBe(2);
   });
 
+  it('renders a clickable capacity bar with used/free segments sized from totals', async () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/cluster').flush({
+      agentCid: 'agent_M',
+      devices: [{ peerId: 'P1', archetype: 'node', online: true, freshness: { state: 'live' } }],
+      totals: {
+        // 25 GB used of 100 GB total => 25% used / 75% free.
+        storageUsedBytes: 25_000_000_000,
+        storageTotalBytes: 100_000_000_000,
+        externalCommittedBytes: 0,
+        reciprocityNetBytes: 0,
+      },
+      freshness: { state: 'live' },
+    });
+    await flushAsync();
+    fixture.detectChanges();
+    const bar = fixture.nativeElement.querySelector('[data-testid="my-cluster-capacity-bar"]');
+    expect(bar).toBeTruthy();
+    expect(bar.getAttribute('role')).toBe('button');
+    expect(bar.getAttribute('tabindex')).toBe('0');
+    const used = bar.querySelector('.capacity-bar__segment--used') as HTMLElement;
+    const free = bar.querySelector('.capacity-bar__segment--free') as HTMLElement;
+    expect(used.style.width).toBe('25%');
+    expect(free.style.width).toBe('75%');
+  });
+
+  it('guards against a zero total — used segment is 0% (no NaN)', async () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/cluster').flush({
+      agentCid: 'agent_M',
+      devices: [{ peerId: 'P1', archetype: 'node', online: true, freshness: { state: 'live' } }],
+      totals: {
+        storageUsedBytes: 0,
+        storageTotalBytes: 0,
+        externalCommittedBytes: 0,
+        reciprocityNetBytes: 0,
+      },
+      freshness: { state: 'live' },
+    });
+    await flushAsync();
+    fixture.detectChanges();
+    const bar = fixture.nativeElement.querySelector('[data-testid="my-cluster-capacity-bar"]');
+    const used = bar.querySelector('.capacity-bar__segment--used') as HTMLElement;
+    const free = bar.querySelector('.capacity-bar__segment--free') as HTMLElement;
+    expect(used.style.width).toBe('0%');
+    expect(free.style.width).toBe('100%');
+  });
+
+  it('toggles the totals detail panel when the capacity bar is clicked', async () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/cluster').flush({
+      agentCid: 'agent_M',
+      devices: [{ peerId: 'P1', archetype: 'node', online: true, freshness: { state: 'live' } }],
+      totals: {
+        storageUsedBytes: 1,
+        storageTotalBytes: 2,
+        externalCommittedBytes: 0,
+        reciprocityNetBytes: 0,
+      },
+      freshness: { state: 'live' },
+    });
+    await flushAsync();
+    fixture.detectChanges();
+    const bar = fixture.nativeElement.querySelector('[data-testid="my-cluster-capacity-bar"]');
+    // Collapsed by default.
+    expect(fixture.nativeElement.querySelector('[data-testid="my-cluster-totals"]')).toBeNull();
+    expect(bar.getAttribute('aria-expanded')).toBe('false');
+    bar.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="my-cluster-totals"]')).toBeTruthy();
+    expect(bar.getAttribute('aria-expanded')).toBe('true');
+    bar.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="my-cluster-totals"]')).toBeNull();
+  });
+
+  it('toggles the totals detail panel on Enter keydown', async () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/cluster').flush({
+      agentCid: 'agent_M',
+      devices: [{ peerId: 'P1', archetype: 'node', online: true, freshness: { state: 'live' } }],
+      totals: {
+        storageUsedBytes: 1,
+        storageTotalBytes: 2,
+        externalCommittedBytes: 0,
+        reciprocityNetBytes: 0,
+      },
+      freshness: { state: 'live' },
+    });
+    await flushAsync();
+    fixture.detectChanges();
+    const bar = fixture.nativeElement.querySelector('[data-testid="my-cluster-capacity-bar"]');
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="my-cluster-totals"]')).toBeTruthy();
+  });
+
   it('marks offline devices with the offline class', async () => {
     fixture.detectChanges();
     const req = http.expectOne('/api/v1/cluster');

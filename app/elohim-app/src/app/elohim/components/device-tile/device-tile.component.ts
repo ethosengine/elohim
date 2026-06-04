@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, signal } from '@angular/core';
 
 import type { MyClusterView } from '@app/generated/my-cluster-view';
 
@@ -30,7 +30,21 @@ const ARCHETYPE_LABEL: Record<DeviceArchetype, string> = {
       class="tile"
       [class.online]="device.online"
       [class.offline]="!device.online"
+      [class.expanded]="expanded()"
       data-testid="device-tile"
+      role="button"
+      tabindex="0"
+      [attr.aria-expanded]="expanded()"
+      [attr.aria-label]="
+        archetypeLabel(device.archetype) +
+        (device.displayName ? ' (' + device.displayName + ')' : '') +
+        '. Activate to ' +
+        (expanded() ? 'collapse' : 'expand') +
+        ' device details.'
+      "
+      (click)="toggle()"
+      (keydown.enter)="toggle()"
+      (keydown.space)="toggle(); $event.preventDefault()"
     >
       <span class="dot" data-testid="device-tile-dot"></span>
       <span class="label" data-testid="device-tile-archetype-label">
@@ -71,12 +85,41 @@ const ARCHETYPE_LABEL: Record<DeviceArchetype, string> = {
         </section>
       }
     </div>
+    @if (expanded()) {
+      <dl class="device-detail" data-testid="device-tile-detail-panel">
+        <dt>Freshness</dt>
+        <dd data-testid="device-tile-detail-freshness">
+          {{ device.freshness.state
+          }}{{
+            device.freshness.staleSinceMs != null
+              ? ' · ' + staleAgo(device.freshness.staleSinceMs)
+              : ''
+          }}
+        </dd>
+        @if (device.hostingCount != null) {
+          <dt>Hosting</dt>
+          <dd data-testid="device-tile-detail-hosting">{{ device.hostingCount }} files</dd>
+        }
+        @if (device.projectingCount != null) {
+          <dt>Projecting</dt>
+          <dd data-testid="device-tile-detail-projecting">{{ device.projectingCount }} files</dd>
+        }
+        <dt>Peer ID</dt>
+        <dd class="peer-id" data-testid="device-tile-detail-peer-id">{{ device.peerId }}</dd>
+      </dl>
+    }
   `,
   styleUrls: ['./device-tile.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DeviceTileComponent {
   @Input({ required: true }) device!: DeviceSummary;
+
+  protected readonly expanded = signal(false);
+
+  toggle(): void {
+    this.expanded.update(v => !v);
+  }
 
   archetypeLabel(a: DeviceArchetype): string {
     return ARCHETYPE_LABEL[a];

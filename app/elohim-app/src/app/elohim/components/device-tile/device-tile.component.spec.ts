@@ -86,4 +86,53 @@ describe('DeviceTileComponent', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('.compute-triptych')).toBeNull();
   });
+
+  it('exposes the tile as a keyboard-operable button (role + tabindex + aria-expanded)', () => {
+    fixture.componentInstance.device = mk();
+    fixture.detectChanges();
+    const tile = fixture.nativeElement.querySelector('[data-testid="device-tile"]');
+    expect(tile?.getAttribute('role')).toBe('button');
+    expect(tile?.getAttribute('tabindex')).toBe('0');
+    expect(tile?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('expands and collapses the detail panel on click, flipping aria-expanded', () => {
+    fixture.componentInstance.device = mk({
+      peerId: 'peer-xyz',
+      hostingCount: 12,
+      projectingCount: 3,
+    });
+    fixture.detectChanges();
+    const tile = fixture.nativeElement.querySelector('[data-testid="device-tile"]');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="device-tile-detail-panel"]')
+    ).toBeNull();
+    tile.click();
+    fixture.detectChanges();
+    const panel = fixture.nativeElement.querySelector('[data-testid="device-tile-detail-panel"]');
+    expect(panel).toBeTruthy();
+    expect(tile.getAttribute('aria-expanded')).toBe('true');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="device-tile-detail-peer-id"]')?.textContent
+    ).toContain('peer-xyz');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="device-tile-detail-hosting"]')?.textContent
+    ).toContain('12');
+    tile.click();
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="device-tile-detail-panel"]')
+    ).toBeNull();
+  });
+
+  it('expands the detail panel on Space keydown', () => {
+    fixture.componentInstance.device = mk({ peerId: 'peer-kbd' });
+    fixture.detectChanges();
+    const tile = fixture.nativeElement.querySelector('[data-testid="device-tile"]');
+    tile.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="device-tile-detail-panel"]')
+    ).toBeTruthy();
+  });
 });
