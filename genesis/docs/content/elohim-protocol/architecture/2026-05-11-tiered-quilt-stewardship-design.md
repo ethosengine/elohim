@@ -9,6 +9,11 @@ pillar coupling: elohim (substrate primitive), infrastructure (storage tiering p
 informed-by:
   - genesis/graphos/vocabulary.md (quilt, pantry, stock, draw, shard, RS(N,K))
   - Phase 11 gate #2 — iroh-canonical `/blob` for BLAKE3-capable callers (hot plane)
+cites:
+  - genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-delivery-master.md
+  - genesis/docs/content/elohim-protocol/architecture/2026-03-26-app-manifest-sdk-boundary-design.md
+  - mutual-storage-replication-dwelling-hub-design | pledge-tier mechanism + donut clamp that the §4 amendment's negotiation gate extends — closes its floor-via-declaration gap one layer up | sha256:5596799dbb456bc2
+  - app-manifest-staged-intents-design | manifest-substrate precedent the quiltPolicies extension follows (shape-vs-vocabulary boundary; substrate-landed/feature-held); its ceremony-id typo trap motivates validator-enforced referential integrity | sha256:98e0a6576d9a197a
 informs:
   - All future quilt-stewardship sprint specs (the 8-wave roadmap)
   - All future REA event emissions tied to quilt movement between temperature classes (drawn / stocked-warm / stocked / shelved)
@@ -23,9 +28,9 @@ memory_anchors:
 
 # Tiered Quilt Stewardship — Design
 
-**Version:** 0.1
+**Version:** 0.2 (§4 App-manifest extension amended 2026-06-04: declarative quilt-policy classes, pledge clamp, ComputeSignals contract, SDK warm/release, cache seam)
 **Status:** Draft (post-brainstorm, pre-implementation)
-**Last updated:** 2026-05-11
+**Last updated:** 2026-06-04
 **Owner:** Matthew (operator decisions); spec drafted in brainstorm session 2026-05-11
 **Vocabulary:** `genesis/graphos/vocabulary.md` (quilt, pantry, stock, draw, shard, RS(N,K))
 
@@ -474,40 +479,166 @@ self-reporting is the protocol's preferred posture.
 | `unresponsive-steward` (new) | derived from commitments-vs-served-draws over rolling window | accounting cadence |
 | `commitment-expiring` (new) | derived from commitments where `has_end - now < threshold` | scanner cadence |
 
-### App-manifest extension
+### App-manifest extension — declarative quilt-policy classes (amended 2026-06-04)
+
+> **Amendment (2026-06-04, brainstorm session).** Supersedes the original single
+> app-level `quilt_policy` block. Three changes: (1) policies become **named
+> classes** referenced per content type; (2) the policy **name IS the cost
+> class** (`cost_class_hint` retired — one vocabulary, not three; see the
+> 2026-06-04 storage-tier review, where exactly this drift killed scoped
+> replication at the gossip wire); (3) two streaming-QoS fields and an SDK
+> warm/release contract close the S3-parity gaps (Glacier retrieval classes,
+> progressive restore, anticipatory warming).
+
+#### Modeling levels (what is declared where)
+
+| Level | Mechanism | Semantics | Analog |
+|---|---|---|---|
+| Hard guarantee | DHT `custody-quilt` commitment `tier_floor`, pledge-backed | must-hold; breach → attestation + restitution | trait *bound* |
+| Declared behavior | manifest `quiltPolicies` named class, referenced per contentType | desired-state the controller reconciles toward | trait *impl* / `@Cacheable` ergonomics |
+| Runtime nudge | SDK `warm()` / `release()` | imperative bias *into* the classifier, never a direct transition | method call |
+| Reconciler | `HeuristicClassifier(floor, signals, manifest, archetype)` | pure; `floor ≤ result ≤ stocked-warm`; peer-local veto stands | the runtime weaver |
+| Operator defaults | archetype + `policy.toml` | fallback when nothing declares | framework defaults |
+
+The manifest is **advisory desired-state, not an interceptor**: a peer-local
+TierController reconciles toward it and can veto (`tier-below-floor-prevented`),
+per P1 (storage as reconciliation controller).
+
+#### Named policy classes
+
+Pillar manifests declare a `vocabulary.quiltPolicies` map of named profiles;
+content types reference them by name. The substrate validates the **shape**;
+the pillar owns the **names and values** (the established manifest boundary —
+the manifest stays an EPR: content-addressed, versioned, governed).
 
 ```json
-{
-  "quilt_policy": {
-    "default_tier_floor": "stocked",
-    "shelve_after": "5m",
-    "hold_warm_min": "0s",
-    "prefer_destinations": [
-      "external-archive://minio/sccache-elohim",
-      "peer-cellar://household/{any}"
-    ],
-    "cost_class_hint": "ephemeral-build-cache"
+"vocabulary": {
+  "quiltPolicies": {
+    "long-term-personal": {
+      "defaultTierFloor": "stocked",
+      "shelveAfter": "30d",
+      "holdWarmMin": "7d",
+      "preferDestinations": [
+        "federated-dwelling://family/{family-id}",
+        "peer-cellar://household/{any}",
+        "external-archive://minio/family-cold"
+      ]
+    },
+    "ephemeral-build-cache": {
+      "defaultTierFloor": "stocked",
+      "shelveAfter": "5m",
+      "holdWarmMin": "0s",
+      "preferDestinations": ["external-archive://minio/sccache-elohim"]
+    },
+    "streaming-media-library": {
+      "defaultTierFloor": "shelved",
+      "holdWarmMin": "2h",
+      "shelveAfter": "7d",
+      "drawLatencyBudget": "2s",
+      "draw": "streamed",
+      "preferDestinations": ["peer-cellar://household/{any}"]
+    }
+  },
+  "quiltPolicyDefault": "long-term-personal",
+  "contentTypes": {
+    "photo-album":  { "quiltPolicy": "long-term-personal" },
+    "family-video": { "quiltPolicy": "streaming-media-library" }
   }
 }
 ```
 
-A grandmother's photo album would declare:
+- **Resolution precedence:** `contentType.quiltPolicy` → `quiltPolicyDefault` →
+  archetype defaults → node `policy.toml`.
+- **Cost class = qualified policy name** (`<pillar>/<policyName>`) in the
+  `cost_class` event column, so shefa aggregates network-wide without
+  collisions.
+- **Referential integrity is validator-enforced, not schema-string-trusted**: a
+  `quiltPolicy` reference naming no declared policy **fails manifest validation
+  loud** — deliberately closing the staged-intents "typo passes validation,
+  fails later" trap rather than re-minting it.
+- **`drawLatencyBudget`** (declared time-to-first-byte SLA): a shelf
+  destination that cannot meet the budget is invalid for that policy class at
+  negotiation time — the Glacier-retrieval-class analog.
+- **`draw: "atomic" | "streamed"`**: streamed = ranged/progressive draw (iroh
+  bao verified ranges); first bytes flow while the tail re-stocks. A driver
+  that cannot range falls back to atomic and logs; the draw never fails for
+  this reason. The video-library motion is native: floor at `shelved`, a draw
+  promotes, `holdWarmMin` carries the viewing session, `shelveAfter` cools it
+  back — the policy declares **dynamics, not placement**.
 
-```json
-{
-  "quilt_policy": {
-    "default_tier_floor": "stocked",
-    "shelve_after": "30d",
-    "hold_warm_min": "7d",
-    "prefer_destinations": [
-      "federated-dwelling://family/{family-id}",
-      "peer-cellar://household/{any}",
-      "external-archive://minio/family-cold"
-    ],
-    "cost_class_hint": "long-term-personal"
-  }
-}
+#### The pledge clamp (floors are matched, never silently degraded)
+
+Tier order: `shelved < stocked < stocked-warm < drawn`. Three enforcement
+points:
+
+1. **Manifest-load (static):** shape + reference integrity + durations parse;
+   *warn* when a declared floor exceeds what any pledge class can back.
+2. **Negotiation (the gate):** `CommitmentFactory` accepts a stewardship
+   commitment **only if the steward's active pledge tier backs ≥ the declared
+   floor** — "manifest governs" (§6) extended with *pledge governs above
+   manifest*. This closes the Sprint-3 "floor-via-declaration without backing
+   pledge" gap one layer up, by construction (donut economics: declare within
+   the walls, never above).
+3. **Unsatisfiable floors are NOT silently clamped down** (that would re-mint
+   the same hole): content stocks at best effort and a `placement_gaps` row
+   (`gap_kind="tier-below-floor"`, §4 signal mapping) keeps the gap visible
+   until a backing steward appears. The clamp applies to the *soft* fields
+   only: `holdWarmMin` and `warm()` grants are capped at pledge capacity.
+
+#### Compute-reporting → classifier signal contract
+
+`HeuristicClassifier` consumes a typed `ComputeSignals` input sourced from
+`elohim-compute` — the formal seam (this spec's §2 "rides on top of the
+compute-reporting surface", made concrete; as of the 2026-06-04 review NO tier
+or placement decision reads a compute-report signal — the planes are built in
+parallel and never join until this contract lands):
+
+| elohim-compute source | Signal | Effect on `desired_tier` |
+|---|---|---|
+| `ResourceSnapshot` disk avail/total | `capacity_pressure` | high → demotion bias (shelve sooner), never below floor |
+| `ResourceSnapshot` load/memory | `controller_backoff` | under load, lengthen cadence — no tier churn while busy |
+| `PeerHealthRegistry` | `swarm_confidence(cid)` | few healthy holders → bias *against* local demotion (feeds the pre-transition reach probe) |
+| `RequestCounters` | corroborates `draw_rate` | promotion bias on real demand |
+
+**Staleness rule:** every signal carries `observed_at`; older than 2× the
+archetype-tuned controller cadence → decays to *neutral*, and neutral never
+triggers a transition on its own. No new polling loops.
+
+#### SDK tier-policy API (the surface §2 names, now specified)
+
+```ts
+storage.warm(cid, { until?: Duration }): Promise<{ granted: Duration }>  // bias toward stocked-warm; may grant less
+storage.release(cid): Promise<void>                                      // drop the bias early; never below floor
 ```
+
+Both are **signals into the classifier, not transitions** — the veto
+architecture holds; an app spamming `warm()` cannot melt a node (grants capped
+at pledge capacity, the classifier still arbitrates).
+
+#### Non-goals — the cache seam (quilt ≠ redis)
+
+`quiltPolicies` govern **stewarded content custody** only: blobs with floors,
+pledges, breach attestations, REA accounting. Ephemeral operational state —
+sessions, counters, hot indexes, pub/sub — is **Category C**: rebuildable,
+pledge-free, governed by `elohim-cache-core` device-derived budgets/TTL and the
+gossip/signal plane, metered by `ComputeReport` cache extensions. **`drawn` is
+the handoff**: when content is drawn, custody hands the bytes to the
+operational layer. Never assign a `tier_floor` to rebuildable state — and never
+let the two vocabularies blur (cache budgets are the *older, simpler* tiering
+vocabulary this spec supersedes *for stewardship only*).
+
+Below the contentType, the substrate already subcomposes by **role within the
+type**: the payload blob carries the quilt policy; derived projections
+(thumbnails, indexes) carry cache budgets.
+
+#### Landing shape
+
+Substrate lands now, household-testable (schema extension + referential
+validator + codegen + fixture tests: valid manifest / typo'd reference / bad
+duration / floor-above-any-pledge); the consuming TierController/
+HeuristicClassifier remain the separate epic — "substrate LANDED, feature HELD
+on the unbuilt consumer," the staged-intents precedent. A2O scenario scaffold:
+`genesis/a2o/features/storage/declared-storage-policy.feature`.
 
 ---
 
@@ -761,7 +892,9 @@ dashboards.
 | `LocalDeviceDriver` priority math | `elohim-storage/src/tier/drivers/local_device_test.rs` | per-tier weight + eviction order |
 | `LocalHardwareTieredDriver` device selection | `elohim-storage/src/tier/drivers/local_hardware_tiered_test.rs` | device routing + degraded path |
 | `ExternalArchiveDriver` two-phase commit | `elohim-storage/src/tier/drivers/external_archive_test.rs` | partition during phase 1 + retention |
-| Manifest hint resolution | `elohim-storage/src/tier/manifest_test.rs` | precedence: app → archetype → policy.toml |
+| Manifest hint resolution | `elohim-storage/src/tier/manifest_test.rs` | precedence: contentType → app default → archetype → policy.toml |
+| `quiltPolicies` referential integrity | manifest validator tests (sdk schemas) | typo'd `quiltPolicy` ref fails loud; bad duration; floor-above-any-pledge warns |
+| Pledge clamp at negotiation | `elohim-storage/src/tier/commitment_test.rs` | floor > pledge-backed ceiling → commitment rejected; soft fields capped |
 | `quilt_tier_state` reconstruction on boot | `elohim-storage/tests/tier_state_reconstruction.rs` | rebuild from BlobStore + BlobMetadata |
 
 ### Band 2: Integration (multi-peer, real DHT + libp2p)
