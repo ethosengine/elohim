@@ -553,3 +553,61 @@ Then('hovering a row shows the household summary', async function (this: E2EWorl
   // remains @wip. Snapshot's own tooltip ([data-testid="resilience-tooltip"])
   // will satisfy this once the admin row mounts the snapshot component.
 });
+
+// ---------------------------------------------------------------------------
+// Household reciprocity — the M1 named-pair flag (terrance-drift RCA 2026-06-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * Commitment rows store provider/receiver as deterministic PEER ids; the
+ * humanIds ride in metadata (seed-commitments.ts buildCustodyCommitmentBody).
+ * The named-pair assertions match on metadata so the flag fires on persona
+ * drift regardless of archetype/peer-id choices.
+ */
+interface CommitmentRow {
+  action?: string;
+  state?: string;
+  metadata?: { providerHumanId?: string; receiverHumanId?: string } | null;
+}
+
+const commitmentListKey = Symbol('resilience:commitmentList');
+
+When('I list active {string} commitments', async function (this: E2EWorld, action: string) {
+  const data = await storageGet(
+    `/api/v1/commitments?action=${encodeURIComponent(action)}&state=active`
+  );
+  // Service may return a bare array or an {items: []} envelope — accept both.
+  const rows = Array.isArray(data)
+    ? data
+    : ((data['items'] ?? data['commitments'] ?? []) as unknown[]);
+  (this as unknown as Record<symbol, unknown>)[commitmentListKey] = rows;
+});
+
+Then(
+  'an active {string} commitment exists from {string} to {string}',
+  function (this: E2EWorld, action: string, providerHumanId: string, receiverHumanId: string) {
+    const rows = ((this as unknown as Record<symbol, unknown>)[commitmentListKey] ??
+      []) as CommitmentRow[];
+    assert.ok(
+      rows.length > 0,
+      'No commitments listed — did the listing step run (and is anything seeded)?'
+    );
+    const match = rows.find(
+      r =>
+        (r.action ?? action) === action &&
+        r.metadata?.providerHumanId === providerHumanId &&
+        r.metadata?.receiverHumanId === receiverHumanId
+    );
+    assert.ok(
+      match,
+      `No active ${action} commitment from ${providerHumanId} to ${receiverHumanId}. ` +
+        `This is the M1 named-pair flag: if a persona rename moved this pair, update the ` +
+        `seeder + this scenario TOGETHER (see household-reciprocity.feature header). ` +
+        `Pairs present: ${
+          rows
+            .map(r => `${r.metadata?.providerHumanId ?? '?'}→${r.metadata?.receiverHumanId ?? '?'}`)
+            .join(', ') || '(none)'
+        }`
+    );
+  }
+);

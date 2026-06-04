@@ -1,0 +1,339 @@
+diff --git a/elohim/elohim-storage/src/db/rea_commitments.rs b/elohim/elohim-storage/src/db/rea_commitments.rs
+index 4b12f3de6..2d3ed4332 100644
+--- a/elohim/elohim-storage/src/db/rea_commitments.rs
++++ b/elohim/elohim-storage/src/db/rea_commitments.rs
+@@ -187,6 +187,74 @@ pub fn get_commitments_for_agent(
+         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+ }
+ 
++/// Commitment states that count as an *active provide commitment* for the
++/// resilience precondition. The seeder + reconcile path persist custody-blob
++/// commitments as `"active"`; `"accepted"` / `"in-progress"` cover the
++/// ValueFlows lifecycle states between proposal and fulfilment. Excludes
++/// `"proposed"` (not yet committed), `"cancelled"`, `"terminated"`, `"finished"`.
++const ACTIVE_PROVIDE_STATES: [&str; 3] = ["active", "accepted", "in-progress"];
++
++/// Reach tag used for a provide commitment that carries no explicit reach scope.
++///
++/// Custody-blob commitments (the resilience mesh's bread and butter) store no
++/// reach column — only `action="custody-blob"` and `resource_classified_as`
++/// (a `sha256-…` blob hash). The resilience scenarios ingest *commons-reach*
++/// content and the custody mesh hosts it, so hosting a blob == a `"commons"`
++/// provide commitment. See `DeliveryPeer::commitments` for the full rationale.
++const DEFAULT_PROVIDE_REACH: &str = "commons";
++
++/// Return the distinct reach tags a peer/agent actively PROVIDES.
++///
++/// Used by `/api/v1/peers/delivery` to enrich each `DeliveryPeer.commitments`,
++/// which the a2o resilience precondition tests as `commitments.includes(reach)`
++/// (e.g. `"commons"`).
++///
++/// Selection: rows where `provider = provider_id`, `h_app_id` matches the app,
++/// and `state ∈ {active, accepted, in-progress}`.
++///
++/// Reach derivation per row: if `in_scope_of` carries an explicit `reach:<class>`
++/// scope, that `<class>` is used verbatim; otherwise the row contributes the
++/// default `"commons"` reach (custody-of-a-commons-blob). The returned vector is
++/// deduplicated and order-stable (first occurrence wins). Empty when the
++/// provider has no active provide commitments.
++pub fn active_provide_reaches(
++    conn: &mut SqliteConnection,
++    ctx: &AppContext,
++    provider_id: &str,
++) -> Result<Vec<String>, StorageError> {
++    let rows: Vec<Option<String>> = rea_commitments::table
++        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
++        .filter(rea_commitments::provider.eq(provider_id))
++        .filter(rea_commitments::state.eq_any(ACTIVE_PROVIDE_STATES))
++        .select(rea_commitments::in_scope_of)
++        .load::<Option<String>>(conn)
++        .map_err(|e| StorageError::Internal(format!("Provide-reach query failed: {}", e)))?;
++
++    let mut seen = std::collections::HashSet::new();
++    let reaches = rows
++        .into_iter()
++        .map(|scope| reach_from_scope(scope.as_deref()))
++        .filter(|r| seen.insert(r.clone()))
++        .collect();
++
++    Ok(reaches)
++}
++
++/// Derive a reach tag from a commitment's `in_scope_of` value.
++///
++/// Recognises an explicit `reach:<class>` scope (single value or one element of
++/// a `|`-separated scope string); otherwise falls back to [`DEFAULT_PROVIDE_REACH`].
++fn reach_from_scope(scope: Option<&str>) -> String {
++    let Some(scope) = scope else {
++        return DEFAULT_PROVIDE_REACH.to_string();
++    };
++    scope
++        .split('|')
++        .find_map(|part| part.trim().strip_prefix("reach:"))
++        .map(|class| class.to_string())
++        .unwrap_or_else(|| DEFAULT_PROVIDE_REACH.to_string())
++}
++
+ // ============================================================================
+ // Write Operations
+ // ============================================================================
+@@ -757,6 +825,167 @@ fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError>
+     Ok((format!("doorway:{}", doorway_raw), epr_id))
+ }
+ 
++#[cfg(test)]
++mod provide_reach_tests {
++    use super::*;
++    use crate::db::models::NewReaCommitment;
++    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
++
++    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
++
++    fn setup() -> SqliteConnection {
++        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
++        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
++        conn
++    }
++
++    /// Insert a commitment row with explicit control over state + in_scope_of —
++    /// `create_commitment` always forces state="proposed", which these tests
++    /// need to bypass to exercise the active-state filter.
++    #[allow(clippy::too_many_arguments)]
++    fn insert(
++        conn: &mut SqliteConnection,
++        ctx: &AppContext,
++        id: &str,
++        provider: &str,
++        state: &str,
++        in_scope_of: Option<&str>,
++    ) {
++        let row = NewReaCommitment {
++            id,
++            h_app_id: &ctx.h_app_id,
++            action: "custody-blob",
++            provider,
++            receiver: "receiver-peer",
++            resource_conforms_to: Some("blob"),
++            resource_classified_as: Some("sha256-deadbeef"),
++            resource_quantity_value: Some(1024.0),
++            resource_quantity_unit: Some("B"),
++            effort_quantity_value: None,
++            effort_quantity_unit: None,
++            has_beginning: None,
++            has_end: None,
++            due: None,
++            clause_of: None,
++            in_scope_of,
++            medium_of_exchange_id: None,
++            state,
++            finished: 0,
++            note: None,
++            metadata_json: None,
++            dht_anchor_hash: None,
++        };
++        diesel::insert_into(rea_commitments::table)
++            .values(&row)
++            .execute(conn)
++            .expect("insert commitment");
++    }
++
++    /// Seeded active custody-blob (no scope) → "commons" reach exposed.
++    #[test]
++    fn active_custody_blob_yields_commons() {
++        let mut conn = setup();
++        let ctx = AppContext::default_lamad();
++        insert(&mut conn, &ctx, "c1", "peer-A", "active", None);
++
++        let reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
++        assert_eq!(reaches, vec!["commons"]);
++    }
++
++    /// Unknown / non-providing peer → empty.
++    #[test]
++    fn unknown_provider_yields_empty() {
++        let mut conn = setup();
++        let ctx = AppContext::default_lamad();
++        insert(&mut conn, &ctx, "c1", "peer-A", "active", None);
++
++        let reaches = active_provide_reaches(&mut conn, &ctx, "peer-NOBODY").unwrap();
++        assert!(reaches.is_empty());
++    }
++
++    /// `proposed` (and other inactive) states are excluded from the active set.
++    #[test]
++    fn proposed_state_excluded() {
++        let mut conn = setup();
++        let ctx = AppContext::default_lamad();
++        insert(&mut conn, &ctx, "c1", "peer-A", "proposed", None);
++        insert(&mut conn, &ctx, "c2", "peer-A", "cancelled", None);
++
++        let reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
++        assert!(reaches.is_empty(), "non-active states must not contribute");
++    }
++
++    /// `accepted` and `in-progress` count as active provide states.
++    #[test]
++    fn accepted_and_in_progress_count() {
++        let mut conn = setup();
++        let ctx = AppContext::default_lamad();
++        insert(&mut conn, &ctx, "c1", "peer-A", "accepted", None);
++        insert(&mut conn, &ctx, "c2", "peer-B", "in-progress", None);
++
++        assert_eq!(
++            active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap(),
++            vec!["commons"]
++        );
++        assert_eq!(
++            active_provide_reaches(&mut conn, &ctx, "peer-B").unwrap(),
++            vec!["commons"]
++        );
++    }
++
++    /// Explicit `reach:<class>` scope overrides the default and is deduplicated.
++    #[test]
++    fn explicit_reach_scope_used_and_deduped() {
++        let mut conn = setup();
++        let ctx = AppContext::default_lamad();
++        // Two rows with the SAME explicit reach → one distinct tag.
++        insert(
++            &mut conn,
++            &ctx,
++            "c1",
++            "peer-A",
++            "active",
++            Some("reach:household"),
++        );
++        insert(
++            &mut conn,
++            &ctx,
++            "c2",
++            "peer-A",
++            "active",
++            Some("doorway:alpha|reach:household"),
++        );
++        // A third row with default (no scope) → adds "commons".
++        insert(&mut conn, &ctx, "c3", "peer-A", "active", None);
++
++        let mut reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
++        reaches.sort();
++        assert_eq!(reaches, vec!["commons", "household"]);
++    }
++
++    /// App scoping: a commitment under a different h_app_id is not visible.
++    #[test]
++    fn app_scoped() {
++        let mut conn = setup();
++        let ctx = AppContext::default_lamad();
++        let other = AppContext::new("other-app");
++        insert(&mut conn, &other, "c1", "peer-A", "active", None);
++
++        let reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
++        assert!(reaches.is_empty(), "other-app commitment must be invisible");
++    }
++
++    #[test]
++    fn reach_from_scope_variants() {
++        assert_eq!(reach_from_scope(None), "commons");
++        assert_eq!(reach_from_scope(Some("reach:qahal")), "qahal");
++        assert_eq!(reach_from_scope(Some("doorway:x|reach:family")), "family");
++        // No reach: marker → default.
++        assert_eq!(reach_from_scope(Some("doorway:x|epr:y")), "commons");
++        assert_eq!(reach_from_scope(Some("")), "commons");
++    }
++}
++
+ #[cfg(test)]
+ mod projection_resolver_tests {
+     use super::*;
+diff --git a/elohim/elohim-storage/src/http.rs b/elohim/elohim-storage/src/http.rs
+index 6f0080f9a..928a78016 100644
+--- a/elohim/elohim-storage/src/http.rs
++++ b/elohim/elohim-storage/src/http.rs
+@@ -2361,7 +2361,37 @@ impl HttpServer {
+     #[cfg(feature = "p2p")]
+     async fn handle_delivery_peers(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+         if let Some(ref handle) = self.p2p_handle {
+-            let peers = handle.delivery_peers();
++            let mut peers = handle.delivery_peers();
++
++            // Request-time enrichment (soft-fail): the discovery path can't reach
++            // the DB, so we resolve each peer's owning household hub and its
++            // active provide-commitment reach tags here. The a2o resilience
++            // precondition counts distinct `householdId`s among peers whose
++            // `commitments` include the requested reach (e.g. "commons") — see
++            // genesis/a2o/steps/resilience.steps.ts. Any DB/lookup error degrades
++            // that peer to None/empty; it never fails the endpoint.
++            if let Some(ref pool) = self.db_pool {
++                let app_ctx = crate::db::AppContext::default_lamad();
++                let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
++                if let Ok(mut conn) = pool.get() {
++                    for peer in peers.iter_mut() {
++                        peer.household_id =
++                            crate::services::hub_resolver::resolve_peer_dwelling_hub(
++                                &mut conn,
++                                &peer.peer_id,
++                                &now_iso,
++                            )
++                            .unwrap_or(None);
++                        peer.commitments = crate::db::rea_commitments::active_provide_reaches(
++                            &mut conn,
++                            &app_ctx,
++                            &peer.peer_id,
++                        )
++                        .unwrap_or_default();
++                    }
++                }
++            }
++
+             let json = serde_json::to_string(&peers).map_err(|e| {
+                 StorageError::Internal(format!("Failed to serialize delivery peers: {}", e))
+             })?;
+diff --git a/elohim/elohim-storage/src/p2p/mod.rs b/elohim/elohim-storage/src/p2p/mod.rs
+index a6bed1a14..107b627d2 100644
+--- a/elohim/elohim-storage/src/p2p/mod.rs
++++ b/elohim/elohim-storage/src/p2p/mod.rs
+@@ -312,6 +312,33 @@ pub struct DeliveryPeer {
+     pub last_seen: u64,
+     /// HTTP port for direct file serving (default 8090)
+     pub http_port: u16,
++    /// Owning household hub id for this peer, when an active identity binding
++    /// resolves it (`peer_id → agent_cid → household → collective`). `None` when
++    /// the peer has no active binding or the bound agent has no household.
++    ///
++    /// Discovery (mDNS/identify) cannot populate this — it requires a DB read —
++    /// so the gossip-construction path leaves it `None` and the
++    /// `/api/v1/peers/delivery` HTTP handler enriches it at request time
++    /// (soft-fail: any error degrades to `None`, never a 500).
++    #[serde(default)]
++    pub household_id: Option<String>,
++    /// Distinct active provide-commitment reach tags this peer PROVIDES.
++    ///
++    /// Derived (request-time, in the HTTP handler) from `rea_commitments` rows
++    /// where `provider = peer_id` and the commitment is active. The string set
++    /// is the commitment's *reach scope* so the a2o resilience precondition can
++    /// test `commitments.includes("commons")` (see
++    /// `genesis/a2o/steps/resilience.steps.ts`). Decision: custody-blob
++    /// commitments carry no explicit reach column — the seeder
++    /// (`buildCustodyCommitmentBody`) stores only `action`,
++    /// `resource_classified_as = sha256-…`, and a note — so a custody-of-a-blob
++    /// commitment maps to the `"commons"` reach (the resilience scenarios ingest
++    /// commons-reach content and the custody mesh hosts it). When a commitment
++    /// DOES carry an explicit reach (via `in_scope_of`, e.g. a `reach:<class>`
++    /// scope), that class is used verbatim instead. Empty when the peer provides
++    /// no active commitments. See the handler for the full derivation.
++    #[serde(default)]
++    pub commitments: Vec<String>,
+ }
+ use crate::sync::{DocStore, StreamTracker, SyncManager};
+ use elohim_cache_core::extraction::ExtractionCache;
+@@ -4172,6 +4199,10 @@ impl P2PNode {
+                             capabilities: vec!["serves_compressed".to_string()],
+                             last_seen: now_ms,
+                             http_port,
++                            // Enriched at request time by the HTTP handler — the
++                            // discovery path has no DB access.
++                            household_id: None,
++                            commitments: Vec::new(),
+                         });
+                 }
+             }

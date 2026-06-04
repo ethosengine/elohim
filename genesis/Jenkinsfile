@@ -1811,7 +1811,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 sh """#!/bin/bash
                                     set -euo pipefail
                                     echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED CUSTODY COMMITMENTS (M1 matthew↔jessica pair)"
+                                    echo "SEED CUSTODY COMMITMENTS (M1 default pair set — seeder prints the actual pairs)"
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "Doorway: ${doorwayHost}"
                                     echo "Blob:    ${blobHash} (${blobSize} bytes)"

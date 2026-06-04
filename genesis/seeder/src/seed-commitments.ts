@@ -18,13 +18,76 @@
  *     CUSTODY_PAIRS_JSON=./pairs.json npx tsx src/seed-commitments.ts
  *
  * If CUSTODY_PAIRS_JSON is not set, falls back to the M1 default pair set
- * (matthew-desktop ↔ terrance-desktop, both directions, one blob).
+ * (matthew-desktop ↔ jessica-desktop, both directions, one blob — the
+ * in-household pair; restored 2026-06-04 after the two-sweep divergent
+ * rename RCA: the timothy→terrance seeder sweep and the timothy→jessica
+ * Jenkinsfile sweep chose different successors, and no validation tied
+ * the seeded pair to the documented story. The named-pair a2o scenario in
+ * features/resilience/household-reciprocity.feature is the standing flag.)
  */
 
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DoorwayClient } from './doorway-client.js';
 import { deterministicPeerId, type Archetype } from './peer-id.js';
+
+// =============================================================================
+// Suspended-persona guard
+// =============================================================================
+
+/**
+ * Fail-fast when a custody pair references a persona suspended in
+ * deployments.json. This is the flag that was MISSING during the 2026-06-04
+ * terrance-drift RCA: the seeder silently seeded custody pairs for a persona
+ * whose deployment was suspended (dead data, zero complaint), letting a
+ * divergent persona-rename sweep sit unnoticed for three weeks.
+ * deployments.json already gates deploy + seed-humans + a2o tests; custody-pair
+ * seeding now respects it too.
+ *
+ * Mirrors loadSuspendedNames() in seed-humans.ts. Fail-open on an unreadable
+ * registry (partial availability is the steady state); fail-FAST on a readable
+ * registry that suspends a referenced persona.
+ */
+function loadSuspendedHumanPrefixes(): Set<string> {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const jsonPath = resolve(here, '../../orchestrator/data/deployments.json');
+    const raw = readFileSync(jsonPath, 'utf-8');
+    const data = JSON.parse(raw) as { humans?: { name: string; suspended?: boolean }[] };
+    const suspended = new Set<string>();
+    for (const h of data.humans ?? []) {
+      if (h.suspended) suspended.add(`human-${h.name.toLowerCase()}`);
+    }
+    return suspended;
+  } catch {
+    return new Set();
+  }
+}
+
+/** Exit 1 when any pair references a suspended persona (exported for tests). */
+export function assertPairsNotSuspended(
+  pairs: CustodyPair[],
+  suspended: Set<string>
+): string[] {
+  const offenders = [
+    ...new Set(
+      pairs
+        .flatMap(p => [p.providerHumanId, p.receiverHumanId])
+        .filter(id => [...suspended].some(prefix => id.startsWith(prefix)))
+    ),
+  ];
+  if (offenders.length > 0) {
+    console.error(
+      `ERROR: custody pair(s) reference SUSPENDED persona(s): ${offenders.join(', ')}.\n` +
+        `deployments.json suspends them — seeding custody for non-deployed peers is dead data.\n` +
+        `Fix the pair set (or un-suspend the persona) before seeding.`
+    );
+    process.exit(1);
+  }
+  return offenders;
+}
 
 // =============================================================================
 // Types
@@ -113,13 +176,13 @@ function defaultM1Pairs(): CustodyPair[] {
     {
       providerHumanId: 'human-matthew-manager',
       providerArchetype: 'desktop',
-      receiverHumanId: 'human-terrance-tutor',
+      receiverHumanId: 'human-jessica-spouse',
       receiverArchetype: 'desktop',
       blobHash: M1_DEFAULT_BLOB_HASH,
       blobSizeBytes: M1_DEFAULT_BLOB_SIZE,
     },
     {
-      providerHumanId: 'human-terrance-tutor',
+      providerHumanId: 'human-jessica-spouse',
       providerArchetype: 'desktop',
       receiverHumanId: 'human-matthew-manager',
       receiverArchetype: 'desktop',
@@ -200,6 +263,9 @@ if (isMain) {
   const pairs: CustodyPair[] = pairsJsonPath
     ? (JSON.parse(readFileSync(pairsJsonPath, 'utf-8')) as CustodyPair[])
     : defaultM1Pairs();
+
+  // The terrance-drift flag: never seed custody for suspended personas.
+  assertPairsNotSuspended(pairs, loadSuspendedHumanPrefixes());
 
   const client = new CommitmentClient({ baseUrl: doorwayUrl, apiKey });
 
