@@ -255,6 +255,24 @@ fn is_content_address(identifier: &str) -> bool {
     identifier.starts_with("sha256-") && identifier.len() > 10
 }
 
+/// SPA deep-link discrimination — the shared ROUTE/ASSET rule (§12.2 of the
+/// pillar-EPR decomposition spec): a requested sub-path is a **ROUTE** iff its
+/// FINAL segment contains no `.`; otherwise it is an **ASSET**.
+///
+/// Routes are fallback-eligible — on a bundle miss `handle_app_request` serves
+/// the bundle's own `index.html` so the SPA router can render the designed
+/// experience. Asset misses stay honest 404s — a missing hashed bundle file is
+/// a real deploy bug and MUST surface, never be masked by index.html.
+///
+/// Mirrors doorway-service's `derive_app_subpath` discriminator; both crates
+/// drive this off the one shared test-vector table
+/// (`sdk/fixtures/spa-route-discrimination.vectors.json`) — the two-layer drift
+/// guard.
+fn is_spa_route_subpath(sub: &str) -> bool {
+    let final_segment = sub.rsplit('/').next().unwrap_or(sub);
+    !final_segment.contains('.')
+}
+
 /// Fetch the `blob_hash` for a content row by its stable id (slug), respecting
 /// the same provenance gate (`require_provenance = true`) that
 /// `derive_epr_head` uses for HTTP callers.
@@ -4402,6 +4420,30 @@ impl HttpServer {
                     }
                     return Ok(builder.body(Full::new(Bytes::from(data))).unwrap());
                 }
+                // SPA deep-link fallback (§12.2): the bundle is cached and
+                // current but this sub-path isn't a file in it — a ROUTE miss
+                // serves the cached index.html so the SPA router renders. An
+                // ASSET miss (or absent cached index.html) falls through to
+                // re-extraction, which produces the honest 404.
+                if is_spa_route_subpath(file_path) {
+                    if let Some(index_html) = cache.get_file(cache_key, "index.html").await {
+                        debug!(identifier = %identifier, file_path = %file_path, "Cache HIT — SPA fallback index.html");
+                        let mut builder = Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "text/html")
+                            .header(header::CONTENT_LENGTH, index_html.len())
+                            .header(header::CACHE_CONTROL, "public, max-age=3600")
+                            .header("X-Cache", "HIT")
+                            .header("X-SPA-Fallback", "1")
+                            .header("X-Content-Address", hash.as_str());
+                        if let Some(ref slug) = resolved_slug {
+                            builder = builder
+                                .header("X-Slug", slug.as_str())
+                                .header("X-Content-Slug", slug.as_str());
+                        }
+                        return Ok(builder.body(Full::new(Bytes::from(index_html))).unwrap());
+                    }
+                }
             }
         }
 
@@ -4432,6 +4474,31 @@ impl HttpServer {
                             .header("X-Content-Slug", slug.as_str());
                     }
                     return Ok(builder.body(Full::new(Bytes::from(data))).unwrap());
+                }
+                // SPA deep-link fallback (§12.2) on the coalesced path: a ROUTE
+                // miss serves the cached index.html; an ASSET miss (or absent
+                // cached index.html) falls through to extract ourselves so the
+                // honest 404 surfaces.
+                if is_spa_route_subpath(file_path) {
+                    if let Some(index_html) = cache.get_file(cache_key, "index.html").await {
+                        debug!(identifier = %identifier, file_path = %file_path, "Cache HIT (after wait) — SPA fallback index.html");
+                        let mut builder = Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "text/html")
+                            .header(header::CONTENT_LENGTH, index_html.len())
+                            .header(header::CACHE_CONTROL, "public, max-age=3600")
+                            .header("X-Cache", "HIT-COALESCED")
+                            .header("X-SPA-Fallback", "1");
+                        if let Some(ref hash) = cached_blob_hash {
+                            builder = builder.header("X-Content-Address", hash.as_str());
+                        }
+                        if let Some(ref slug) = resolved_slug {
+                            builder = builder
+                                .header("X-Slug", slug.as_str())
+                                .header("X-Content-Slug", slug.as_str());
+                        }
+                        return Ok(builder.body(Full::new(Bytes::from(index_html))).unwrap());
+                    }
                 }
                 // Extraction failed or file not found — fall through to extract ourselves
             }
@@ -4525,6 +4592,10 @@ impl HttpServer {
 
         let mut all_files: Vec<(String, Vec<u8>)> = Vec::new();
         let mut requested_file_data: Option<Vec<u8>> = None;
+        // Capture the bundle's own index.html for the SPA deep-link fallback
+        // (§12.2): on a ROUTE miss we serve it instead of 404. Same matching
+        // idiom (exact name or `/`-suffix) as the requested-file lookup below.
+        let mut index_html_data: Option<Vec<u8>> = None;
         let normalized_path = file_path.trim_start_matches('/');
 
         for i in 0..archive.len() {
@@ -4543,6 +4614,11 @@ impl HttpServer {
                     {
                         requested_file_data = Some(contents.clone());
                     }
+                    if index_html_data.is_none()
+                        && (name == "index.html" || name.ends_with("/index.html"))
+                    {
+                        index_html_data = Some(contents.clone());
+                    }
                     all_files.push((name, contents));
                 }
             }
@@ -4560,6 +4636,32 @@ impl HttpServer {
         let contents = match requested_file_data {
             Some(data) => data,
             None => {
+                // SPA deep-link fallback (§12.2): a ROUTE miss serves the
+                // bundle's own index.html so the SPA router renders; an ASSET
+                // miss (or absent index.html) stays an honest 404.
+                if is_spa_route_subpath(normalized_path) {
+                    if let Some(index_html) = index_html_data {
+                        info!(
+                            identifier = %identifier,
+                            file_path = %file_path,
+                            "Serving SPA fallback index.html for route miss (extracted)"
+                        );
+                        let mut builder = Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "text/html")
+                            .header(header::CONTENT_LENGTH, index_html.len())
+                            .header(header::CACHE_CONTROL, "public, max-age=3600")
+                            .header("X-Cache", "MISS")
+                            .header("X-SPA-Fallback", "1")
+                            .header("X-Content-Address", &blob_hash);
+                        if let Some(ref slug) = resolved_slug {
+                            builder = builder
+                                .header("X-Slug", slug.as_str())
+                                .header("X-Content-Slug", slug.as_str());
+                        }
+                        return Ok(builder.body(Full::new(Bytes::from(index_html))).unwrap());
+                    }
+                }
                 return Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -10373,6 +10475,31 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/graphql — graph-native GraphQL viewer (CozoDB-backed).
+        // Consumed by elohim-app topology surfaces (ClusterService viewer-hub
+        // query under `useGraphqlTopology`). Identity-scoped resolvers read the
+        // agentCid variable, so the edge requires a bearer like /api/v1/cluster.
+        // Without this manifest entry the doorway proxy 404s the route and the
+        // cluster page falls into its error branch.
+        // =====================================================================
+        .route(
+            Route::post("/api/v1/graphql")
+                .handler("graphql_viewer")
+                .auth_required()
+                .rate_limit(60)
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/placement-gaps — resilience placement-gap projection reads.
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/placement-gaps")
+                .handler("get_placement_gaps")
+                .auth_required()
+                .cache_ttl(15)
+                .build(),
+        )
+        // =====================================================================
         // /lamad/* — SSR-eligible routes (Task 12)
         //
         // These paths are declared with `render: "angular-ssr"`. Doorway
@@ -10523,6 +10650,15 @@ mod tests {
             paths.contains(&"/api/v1/vf-graphql"),
             "missing /api/v1/vf-graphql (Wave 3 M1)"
         );
+        // Graph-native viewer + placement-gaps — topology surfaces proxy path
+        assert!(
+            paths.contains(&"/api/v1/graphql"),
+            "missing /api/v1/graphql (graph-native viewer; cluster page GraphQL path)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/placement-gaps"),
+            "missing /api/v1/placement-gaps (resilience projection)"
+        );
         // Multi-collective collaboration EPR M1 — qahal routes (Task 11)
         assert!(
             paths.contains(&"/api/v1/collective"),
@@ -10615,6 +10751,159 @@ mod tests {
         );
         // Verify blob proxy points to /blob
         assert_eq!(manifest.blob_proxy.unwrap().base_path, "/blob");
+    }
+
+    // -- SPA deep-link fallback: ROUTE/ASSET discrimination (§12.2) --
+    //
+    // `is_spa_route_subpath` is the storage half of the two-layer drift guard.
+    // It MUST agree with doorway-service's `derive_app_subpath` discriminator,
+    // so both drive off the ONE shared test-vector table. Editing the rule here
+    // without updating the fixture (or vice versa) breaks this test.
+
+    /// Shared fixture mirror — kept minimal: just the fields this crate reads.
+    #[derive(serde::Deserialize)]
+    struct SpaVector {
+        #[serde(rename = "subPath")]
+        sub_path: String,
+        kind: String,
+        note: String,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct SpaVectorTable {
+        vectors: Vec<SpaVector>,
+    }
+
+    /// Table-driven over the shared cross-crate fixture (the two-layer drift
+    /// guard). Each vector asserts ROUTE => fallback-eligible, ASSET => honest
+    /// 404.
+    #[test]
+    fn is_spa_route_subpath_matches_shared_vectors() {
+        const FIXTURE: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../sdk/fixtures/spa-route-discrimination.vectors.json"
+        ));
+        let table: SpaVectorTable =
+            serde_json::from_str(FIXTURE).expect("shared spa-route fixture must parse");
+        assert!(
+            !table.vectors.is_empty(),
+            "shared spa-route fixture must carry vectors"
+        );
+
+        for v in &table.vectors {
+            let expected_route = match v.kind.as_str() {
+                "route" => true,
+                "asset" => false,
+                other => panic!("unexpected vector kind {other:?} for {:?}", v.sub_path),
+            };
+            assert_eq!(
+                is_spa_route_subpath(&v.sub_path),
+                expected_route,
+                "vector {:?} (kind={}) misclassified — {}",
+                v.sub_path,
+                v.kind,
+                v.note,
+            );
+        }
+    }
+
+    /// Direct edge-case assertions independent of the fixture, documenting the
+    /// rule's boundaries (final-segment-only; non-final dots are irrelevant).
+    #[test]
+    fn is_spa_route_subpath_edge_cases() {
+        // Routes: no dot in the final segment.
+        assert!(is_spa_route_subpath("explore"));
+        assert!(is_spa_route_subpath("path/foundations-christian-technology/step/2"));
+        assert!(is_spa_route_subpath("v1.2/release-notes")); // dot in NON-final segment
+        assert!(is_spa_route_subpath("")); // bare/empty → route-eligible
+        // Assets: dot in the final segment.
+        assert!(!is_spa_route_subpath("main-7J5AOAQZ.js"));
+        assert!(!is_spa_route_subpath("assets/img/logo.svg"));
+        assert!(!is_spa_route_subpath("media/file.name.with.dots.png"));
+        assert!(!is_spa_route_subpath(".well-known/assetlinks.json"));
+    }
+
+    /// Build a minimal SPA bundle ZIP (index.html + one hashed asset) and store
+    /// it; returns `(server, content_address)`. No extraction_cache configured,
+    /// so `handle_app_request` goes straight through the fresh-extraction path
+    /// and the content-address identifier bypasses slug/DB resolution.
+    async fn spa_bundle_server() -> (HttpServer, String) {
+        use std::io::Write as _;
+        use zip::write::SimpleFileOptions;
+
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+
+        let mut buf = Vec::new();
+        {
+            let mut zw = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+            // Stored (no compression) — independent of the `deflate` feature on
+            // the write side; ZipArchive reads either method on extraction.
+            let opts = SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            zw.start_file("index.html", opts).unwrap();
+            zw.write_all(b"<!doctype html><title>shell</title>").unwrap();
+            zw.start_file("main-7J5AOAQZ.js", opts).unwrap();
+            zw.write_all(b"console.log('app')").unwrap();
+            zw.finish().unwrap();
+        }
+        let hash = blob_store.store(&buf).await.unwrap().hash;
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
+        (server, hash)
+    }
+
+    async fn body_bytes(resp: Response<Full<Bytes>>) -> Bytes {
+        resp.into_body().collect().await.unwrap().to_bytes()
+    }
+
+    /// ROUTE miss → 200 + the bundle's index.html + `X-SPA-Fallback: 1`.
+    #[tokio::test]
+    async fn app_request_route_miss_serves_index_html_fallback() {
+        let (server, cid) = spa_bundle_server().await;
+        let resp = server
+            .handle_app_request(&format!("/apps/{cid}/path/foundations-christian-technology"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.headers().get("X-SPA-Fallback").unwrap(), "1");
+        assert_eq!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/html"
+        );
+        let body = body_bytes(resp).await;
+        assert!(body.starts_with(b"<!doctype html>"));
+    }
+
+    /// ASSET miss → today's 404 JSON, never masked by index.html.
+    #[tokio::test]
+    async fn app_request_asset_miss_stays_404() {
+        let (server, cid) = spa_bundle_server().await;
+        let resp = server
+            .handle_app_request(&format!("/apps/{cid}/main-DEADBEEF.js"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert!(resp.headers().get("X-SPA-Fallback").is_none());
+        let body = body_bytes(resp).await;
+        assert!(body.starts_with(b"{\"error\""));
+    }
+
+    /// An exact-named bundle file (here the hashed JS asset that DOES exist) is
+    /// still served verbatim — the fallback fires only on a miss.
+    #[tokio::test]
+    async fn app_request_existing_file_served_verbatim() {
+        let (server, cid) = spa_bundle_server().await;
+        let resp = server
+            .handle_app_request(&format!("/apps/{cid}/main-7J5AOAQZ.js"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(resp.headers().get("X-SPA-Fallback").is_none());
+        let body = body_bytes(resp).await;
+        assert_eq!(&body[..], b"console.log('app')");
     }
 }
 

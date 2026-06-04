@@ -880,7 +880,16 @@ impl Viewer {
     }
 
     /// Federated hub view: devices, totals, and freshness for this agent.
+    ///
+    /// Graph-native first — parity with REST `/api/v1/cluster` (api/cluster.rs):
+    /// the CozoDB build needs neither the relational pool nor a live p2p swarm,
+    /// so local no-p2p runs resolve instead of erroring on missing Federator.
     async fn hub(&self, ctx: &Context<'_>) -> FieldResult<HubView> {
+        if let Ok(engine) = ctx.data::<Arc<GraphEngine>>() {
+            let view = crate::graph_views::shefa::cluster::build(engine, &self.agent_cid)
+                .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+            return Ok(HubView::from(view));
+        }
         let pool = ctx.data::<DbPool>()?;
         let federator = ctx.data::<Arc<Federator>>()?;
         let view = crate::services::cluster_view::aggregate_my_cluster_view(
@@ -896,6 +905,12 @@ impl Viewer {
     /// Peer topology view: reciprocation edges, resilience cliffs, and freshness
     /// for households this agent exchanges with.
     async fn peers(&self, ctx: &Context<'_>) -> FieldResult<PeerTopology> {
+        // Graph-native first — parity with REST /api/v1/peer-topology.
+        if let Ok(engine) = ctx.data::<Arc<GraphEngine>>() {
+            let view = crate::graph_views::shefa::peer_topology::build(engine, &self.agent_cid)
+                .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+            return Ok(PeerTopology::from(view));
+        }
         let pool = ctx.data::<DbPool>()?;
         let federator = ctx.data::<Arc<Federator>>()?;
         let view = crate::services::peer_topology_view::aggregate_peer_topology_view(

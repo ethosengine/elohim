@@ -80,17 +80,20 @@ pub async fn handle(
             .unwrap());
     };
 
-    // Build schema with whatever context is available. When pool or federator is
-    // absent, viewer.hub will return a resolver error instead of a 503.
-    let schema = match (pool, federator) {
-        (Some(p), Some(f)) => build_schema(Arc::clone(engine), p.clone(), Arc::clone(f)),
-        _ => {
-            // Fallback: build without pool/federator — existing EPR resolvers still work;
-            // viewer.hub will return "requested extension is not available" error.
-            Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
-                .data(Arc::clone(engine))
-                .finish()
+    // Build schema with whatever context is available — each piece independently.
+    // (The previous all-or-nothing match dropped the POOL whenever the federator
+    // was absent, which broke pool-only resolvers like viewer.reciprocity on
+    // local no-p2p runs even though the pool was right there.)
+    let schema = {
+        let mut builder =
+            Schema::build(QueryRoot, EmptyMutation, EmptySubscription).data(Arc::clone(engine));
+        if let Some(p) = pool {
+            builder = builder.data(p.clone());
         }
+        if let Some(f) = federator {
+            builder = builder.data(Arc::clone(f));
+        }
+        builder.finish()
     };
 
     match method {
