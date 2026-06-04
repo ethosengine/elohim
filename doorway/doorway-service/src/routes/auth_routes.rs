@@ -1939,6 +1939,36 @@ async fn handle_account(
 
     let claims = result.claims.unwrap();
 
+    // In dev mode without MongoDB, synthesize the account context from the
+    // verified claims (same pattern as the dev-mode register/login flows).
+    // Keeps the operator dashboard's auth guard (which probes /auth/account)
+    // exercisable on a local stack that runs no Mongo.
+    if state.args.dev_mode && state.mongo.is_none() {
+        return json_response(
+            StatusCode::OK,
+            &AccountResponse {
+                human_id: claims.human_id.clone(),
+                identifier: claims.identifier.clone(),
+                permission_level: claims.permission_level.to_string(),
+                storage_bytes: 0,
+                storage_limit: 0,
+                storage_percent: 0.0,
+                projection_queries: 0,
+                daily_query_limit: 0,
+                queries_percent: 0.0,
+                bandwidth_bytes: 0,
+                daily_bandwidth_limit: 0,
+                bandwidth_percent: 0.0,
+                conductor_id: None,
+                is_steward: false,
+                stewardship_at: None,
+                key_exported: false,
+                created_at: None,
+                last_login_at: None,
+            },
+        );
+    }
+
     // Look up full user doc from MongoDB
     let mongo = match &state.mongo {
         Some(m) => m,
