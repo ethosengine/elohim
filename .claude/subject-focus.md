@@ -4,7 +4,7 @@
 # the box. A capability going down narrows a subject — its focus, why, and options are shown below.
 # Source of truth: genesis/manifests/cluster-state.yaml + the a2o held/ tree (via scope-reconcile).
 
-substrate: available [harbor-registry, household-nodes]   unavailable [alpha-cluster-6peer(degraded), shem(false)]
+substrate: available [harbor-registry, household-nodes, observability]   unavailable [alpha-cluster-6peer(degraded), shem(false)]
 
 FAIR-GAME subjects (7) — no narrowing, everything in focus:
   browser · doorway · elohim-core · peer-oauth-portal · protocol · ssr · storage
@@ -12,15 +12,24 @@ FAIR-GAME subjects (7) — no narrowing, everything in focus:
 NARROWED subjects (10) — a capability is down; focus + options per subject:
 
 ### auth   ⚠ narrowed — shem down
-  IN FOCUS  : 21 live feature(s), fully testable on available compute
-              · genesis/a2o/features/auth/agency-context-labels.feature
-              · genesis/a2o/features/auth/agency-pipeline-coherence.feature
-              · genesis/a2o/features/auth/auth-lifecycle.feature
-              · genesis/a2o/features/auth/conductor-pool-recovery.feature
-              · genesis/a2o/features/auth/fixture-humans.feature
-              · genesis/a2o/features/auth/operator-onboarding.feature
-              · … +15 more
+  IN FOCUS  : 12 live feature(s), fully testable on available compute
+              · genesis/a2o/features/auth/reach-commons.feature
+              · genesis/a2o/features/auth/recovery/recovery-m5-defender-role-gate.feature
+              · genesis/a2o/features/auth/recovery/recovery-m5-doorway-handoff-to-steward.feature
+              · genesis/a2o/features/auth/recovery/recovery-m5-list-my-keys.feature
+              · genesis/a2o/features/auth/recovery/recovery-m5-lost-key-entry.feature
+              · genesis/a2o/features/auth/recovery/recovery-m5-portal-host-discovery.feature
+              · … +6 more
+  MIXED     : agency-context-labels.feature — 1 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : agency-pipeline-coherence.feature — 1 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : auth-lifecycle.feature — 2 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : conductor-pool-recovery.feature — 1 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : fixture-humans.feature — 4 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : operator-onboarding.feature — 1 scenario(s) need shem (runtime-skipped, NOT failed)
   MIXED     : recovery-shamir-optional.feature — 3 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : revocation-emergency-quorum.feature — 1 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : steward-login-portal-handoff.feature — 1 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : user-management.feature — 4 scenario(s) need shem (runtime-skipped, NOT failed)
   HELD      : auth/recovery/cross-stack/recovery-cross-stack-transport.feature — needs shem · returns when shem available
   HELD      : auth/recovery/freeze-floor-blocks-intimate-rotation.feature — needs shem · returns when shem available
   HELD      : auth/recovery/intimate-quorum-happy-path.feature — needs shem · returns when shem available
@@ -55,14 +64,14 @@ NARROWED subjects (10) — a capability is down; focus + options per subject:
   BASELINE/PIVOT: /shift or /brainstorm scoped to delivery's in-focus slice; to pivot, pick a FAIR-GAME subject above
 
 ### deployment   ⚠ narrowed — shem down
-  IN FOCUS  : 9 live feature(s), fully testable on available compute
+  IN FOCUS  : 10 live feature(s), fully testable on available compute
               · genesis/a2o/features/deployment/conductor-admin-reachability.feature
               · genesis/a2o/features/deployment/doorway-self-registration.feature
+              · genesis/a2o/features/deployment/hub-topology.feature
               · genesis/a2o/features/deployment/human-device-mapping.feature
               · genesis/a2o/features/deployment/ingress-body-size-budget.feature
               · genesis/a2o/features/deployment/p2p-validation.feature
-              · genesis/a2o/features/deployment/peer-diversity.feature
-              · … +3 more
+              · … +4 more
   MIXED     : compute-commitment-bounds.feature — 1 scenario(s) need shem (runtime-skipped, NOT failed)
   MIXED     : conductor-visibility.feature — 2 scenario(s) need shem (runtime-skipped, NOT failed)
   HELD      : deployment/persona-testnet-validation.feature — needs shem · returns when shem available
@@ -82,10 +91,10 @@ NARROWED subjects (10) — a capability is down; focus + options per subject:
   BASELINE/PIVOT: /shift or /brainstorm scoped to elohim's in-focus slice; to pivot, pick a FAIR-GAME subject above
 
 ### federation   ⚠ narrowed — alpha-cluster-6peer, shem down
-  IN FOCUS  : 1 live feature(s), fully testable on available compute
-              · genesis/a2o/features/federation/shard-tracking.feature
-  MIXED     : epr-cross-peer-resolution.feature — 2 scenario(s) need shem (runtime-skipped, NOT failed)
+  IN FOCUS  : 0 live feature(s), fully testable on available compute
+  MIXED     : epr-cross-peer-resolution.feature — 9 scenario(s) need shem (runtime-skipped, NOT failed)
   MIXED     : peer-advertisement.feature — 9 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : shard-tracking.feature — 3 scenario(s) need shem (runtime-skipped, NOT failed)
   HELD      : federation/cross-doorway-content.feature — needs shem · returns when shem available
   HELD      : federation/cross-mesh-discovery.feature — needs alpha-cluster-6peer,shem · returns when alpha-cluster-6peer,shem available
   WHY       : alpha-cluster-6peer unavailable — 6-peer alpha soak cluster (adam+matthew bootstrap pair); shem unavailable — multi-tenant live P2P canvas — the cross-node proving ground
@@ -93,28 +102,32 @@ NARROWED subjects (10) — a capability is down; focus + options per subject:
   BASELINE/PIVOT: /shift or /brainstorm scoped to federation's in-focus slice; to pivot, pick a FAIR-GAME subject above
 
 ### lamad   ⚠ narrowed — shem down
-  IN FOCUS  : 5 live feature(s), fully testable on available compute
-              · genesis/a2o/features/lamad/assessment-completion-feedback.feature
+  IN FOCUS  : 6 live feature(s), fully testable on available compute
               · genesis/a2o/features/lamad/attention-analytics.feature
+              · genesis/a2o/features/lamad/deep-link-delivery.feature
               · genesis/a2o/features/lamad/epr-link-navigation.feature
               · genesis/a2o/features/lamad/learning-journey.feature
+              · genesis/a2o/features/lamad/love-map-negotiation.feature
               · genesis/a2o/features/lamad/path-adaptation.feature
+  MIXED     : assessment-completion-feedback.feature — 6 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : intimate-reach-household.feature — 2 scenario(s) need shem (runtime-skipped, NOT failed)
   HELD      : lamad/know-thyself-discovery.feature — needs shem · returns when shem available
-  HELD      : lamad/love-map-negotiation.feature — needs shem · returns when shem available
   WHY       : shem unavailable — multi-tenant live P2P canvas — the cross-node proving ground
   OPTIONS   : (a) work the in-focus + any household scenarios now  (b) expand the plate: scope-reconcile.py --set shem=on --apply  (c) pivot to a fair-game subject
   BASELINE/PIVOT: /shift or /brainstorm scoped to lamad's in-focus slice; to pivot, pick a FAIR-GAME subject above
 
 ### qahal   ⚠ narrowed — shem down
-  IN FOCUS  : 1 live feature(s), fully testable on available compute
+  IN FOCUS  : 2 live feature(s), fully testable on available compute
               · genesis/a2o/features/qahal/collective-governance.feature
+              · genesis/a2o/features/qahal/household-formation.feature
   HELD      : qahal/feedback-dialogue-panel.feature — needs shem · returns when shem available
   WHY       : shem unavailable — multi-tenant live P2P canvas — the cross-node proving ground
   OPTIONS   : (a) work the in-focus + any household scenarios now  (b) expand the plate: scope-reconcile.py --set shem=on --apply  (c) pivot to a fair-game subject
   BASELINE/PIVOT: /shift or /brainstorm scoped to qahal's in-focus slice; to pivot, pick a FAIR-GAME subject above
 
 ### resilience   ⚠ narrowed — shem down
-  IN FOCUS  : 1 live feature(s), fully testable on available compute
+  IN FOCUS  : 2 live feature(s), fully testable on available compute
+              · genesis/a2o/features/resilience/household-reciprocity.feature
               · genesis/a2o/features/resilience/substrate-reconciliation.feature
   MIXED     : observable-distribution.feature — 2 scenario(s) need shem (runtime-skipped, NOT failed)
   WHY       : shem unavailable — multi-tenant live P2P canvas — the cross-node proving ground
@@ -123,7 +136,7 @@ NARROWED subjects (10) — a capability is down; focus + options per subject:
 
 ### shefa   ⚠ narrowed — shem down
   IN FOCUS  : 0 live feature(s), fully testable on available compute
-  MIXED     : human-resilience.feature — 6 scenario(s) need shem (runtime-skipped, NOT failed)
+  MIXED     : human-resilience.feature — 2 scenario(s) need shem (runtime-skipped, NOT failed)
   MIXED     : m1-matthew-terrance-delivery.feature — 2 scenario(s) need shem (runtime-skipped, NOT failed)
   WHY       : shem unavailable — multi-tenant live P2P canvas — the cross-node proving ground
   OPTIONS   : (a) work the in-focus + any household scenarios now  (b) expand the plate: scope-reconcile.py --set shem=on --apply  (c) pivot to a fair-game subject

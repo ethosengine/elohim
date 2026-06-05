@@ -2,14 +2,14 @@
   "schema_version": 1,
   "entries": {
     "feedback_cargo_resolution_vs_compilation": {
-      "hits": 11,
+      "hits": 12,
       "last_changed": "CLAUDE.md",
-      "last_signal_at": "2026-06-03T15:25:40Z"
+      "last_signal_at": "2026-06-04T14:31:57Z"
     },
     "feedback_dev_branch_no_pr": {
-      "hits": 11,
+      "hits": 12,
       "last_changed": "CLAUDE.md",
-      "last_signal_at": "2026-06-03T15:25:40Z"
+      "last_signal_at": "2026-06-04T14:31:57Z"
     },
     "feedback_subagent_scope_guardrails": {
       "hits": 6,
@@ -62,9 +62,9 @@
       "last_signal_at": "2026-06-03T12:35:05Z"
     },
     "feedback_a2o_is_human_experience_not_dev_bugs": {
-      "hits": 59,
-      "last_changed": "genesis/a2o/features/federation/cross-doorway-content.feature",
-      "last_signal_at": "2026-06-03T12:46:09Z"
+      "hits": 83,
+      "last_changed": "genesis/a2o/features/elohim-core/chrome-preferences.feature",
+      "last_signal_at": "2026-06-05T15:13:19Z"
     },
     "feedback_research_before_brainstorming": {
       "hits": 4,
@@ -87,9 +87,9 @@
       "last_signal_at": "2026-06-02T21:19:35Z"
     },
     "project_memory_cites_edge": {
-      "hits": 8,
+      "hits": 10,
       "last_changed": ".claude/scripts/memory-kit/memory-coherence-audit.py",
-      "last_signal_at": "2026-06-03T02:35:44Z"
+      "last_signal_at": "2026-06-05T15:57:38Z"
     },
     "feedback_pipeline_work_separate_from_sprint": {
       "hits": 1,
@@ -102,9 +102,9 @@
       "last_signal_at": "2026-06-03T00:24:35Z"
     },
     "feedback_overnight_shift_jenkins_is_workhorse": {
-      "hits": 1,
-      "last_changed": ".claude/commands/shift.md",
-      "last_signal_at": "2026-06-03T00:24:35Z"
+      "hits": 2,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
     },
     "feedback_shells_need_timeouts": {
       "hits": 1,
@@ -137,19 +137,19 @@
       "last_signal_at": "2026-06-03T02:38:00Z"
     },
     "feedback_check_helm_chart_status_before_runbooks": {
-      "hits": 2,
-      "last_changed": "genesis/manifests/humans/james-son.yaml",
-      "last_signal_at": "2026-06-03T12:00:43Z"
+      "hits": 4,
+      "last_changed": "genesis/manifests/cluster-state.yaml",
+      "last_signal_at": "2026-06-03T18:41:13Z"
     },
     "feedback_verify_cluster_state_before_runbook": {
-      "hits": 2,
-      "last_changed": "genesis/manifests/humans/james-son.yaml",
-      "last_signal_at": "2026-06-03T12:00:43Z"
+      "hits": 4,
+      "last_changed": "genesis/manifests/cluster-state.yaml",
+      "last_signal_at": "2026-06-03T18:41:13Z"
     },
     "feedback_no_kubectl_from_dev_env": {
-      "hits": 2,
-      "last_changed": "genesis/manifests/humans/james-son.yaml",
-      "last_signal_at": "2026-06-03T12:00:43Z"
+      "hits": 4,
+      "last_changed": "genesis/manifests/cluster-state.yaml",
+      "last_signal_at": "2026-06-03T18:41:13Z"
     },
     "project_alpha_topology_bootstrap_pair": {
       "hits": 3,
@@ -422,9 +422,119 @@
       "last_signal_at": "2026-06-03T15:26:54Z"
     },
     "feedback_signature_changes_grep_callers": {
+      "hits": 35,
+      "last_changed": "doorway/doorway-service/src/routes/admin_users.rs",
+      "last_signal_at": "2026-06-04T17:44:40Z"
+    },
+    "feedback_cascade_halt_masks_failures": {
       "hits": 1,
-      "last_changed": "steward/node/ARCHITECTURE.md",
-      "last_signal_at": "2026-06-03T15:26:54Z"
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "project_devspace_disk_cleanup_procedure": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "project_sprint_branch_not_orchestrator_indexed": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "feedback_jenkins_checkout_layers_and_job_alias": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "feedback_cargo_target_dir_for_native_builds": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "feedback_multi_agent_pvc_pacing": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "feedback_jenkinsfile_safe_directory_required": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "feedback_orchestrator_abort_baseline_rollback": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "feedback_pvc_threshold_and_recovery": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "project_ci_playwright_image": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "feedback_sccache_cache_corruption_recovery": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "project_storybook_in_ethosengine_namespace": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "project_orchestrator_soft_skip_not_provisioned": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "feedback_dockerfile_target_completeness": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "project_jenkins_mcp_anonymous_mode": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "project_pre_dispatch_hard_fail_post_dispatch_unstable": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/Jenkinsfile",
+      "last_signal_at": "2026-06-03T16:51:31Z"
+    },
+    "feedback_schema_first_ioc": {
+      "hits": 4,
+      "last_changed": "elohim/elohim-storage/tests/schema_contract.rs",
+      "last_signal_at": "2026-06-04T03:27:46Z"
+    },
+    "feedback_orchestrator_glob_replace_order": {
+      "hits": 10,
+      "last_changed": "doorway/doorway-service/src/server/http.rs",
+      "last_signal_at": "2026-06-04T05:25:20Z"
+    },
+    "project_m5_reframe_auth_portal_convergence": {
+      "hits": 3,
+      "last_changed": "doorway/doorway-app/src/app/components/login/threshold-login.component.ts",
+      "last_signal_at": "2026-06-04T06:17:28Z"
+    },
+    "feedback_husky_bypass_for_ci_only_changes": {
+      "hits": 2,
+      "last_changed": ".husky/pre-push",
+      "last_signal_at": "2026-06-04T15:01:16Z"
+    },
+    "feedback_pipe_tail_masks_exit_code": {
+      "hits": 2,
+      "last_changed": ".husky/pre-push",
+      "last_signal_at": "2026-06-04T15:01:16Z"
+    },
+    "project_hub_archetype_abstraction": {
+      "hits": 1,
+      "last_changed": "genesis/data/collectives/collectives.json",
+      "last_signal_at": "2026-06-05T02:38:54Z"
     }
   }
 }

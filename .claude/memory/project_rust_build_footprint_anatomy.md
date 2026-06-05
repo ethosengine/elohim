@@ -19,7 +19,7 @@ metadata:
 
 **How to apply:**
 1. Immediate pressure → eviction outranks everything: auto-evict merged families + stale-hash GC (sprint prune reclaimed 92.9G same day).
-2. Durable per-slot fix → `[profile.dev] debug="line-tables-only"` + `[profile.dev.package."*"] debug=0` copy-pasted into each standalone native crate (storage, doorway, steward/node, sweettest — they can't share a workspace profile; RUSTFLAGS divergence + links=sqlite3 conflict). Estimated 60-75% off — **UNVALIDATED, run the cheap experiment on doorway-service first** before budgeting.
+2. Durable per-slot fix → **LANDED 2026-06-04** in root `.cargo/config.toml` (single point — config.toml reaches all native workspaces+worktrees; the standalone crates can't share a workspace profile due to RUSTFLAGS divergence + links=sqlite3 conflict). **VALIDATED** on doorway-service cold `--all-targets`: debug=2 → 9.50G; line-tables-only → 5.44G (−43%, builds faster); +deps debug=false → 4.07G (**−57%**, the committed config). The earlier 60-75% estimate was optimistic. Temporary full-debug escape: `CARGO_PROFILE_DEV_DEBUG=2`.
 3. Pool is ext4: cross-family same-hash artifacts are true duplicate inodes; cargo artifacts are write-once → a guarded `jdupes -L` hardlink pass is safe and orthogonal to all other levers.
 4. Structural: consolidate integration-test targets (each tests/*.rs file = one statically-linked ~1GB binary).
 5. Framework consumers: ship compiled .dna/.happ + conductor/doorway binaries (holonix model) = framework disk ≈ 0; ship lean profiles in templates (Bevy model). A zome-only consumer never builds the native storage test suite — but their WASM path (in-tree holochain target = 14G) is UNPROFILED; open item.
