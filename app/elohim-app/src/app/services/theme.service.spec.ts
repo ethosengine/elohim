@@ -66,4 +66,18 @@ describe('ThemeService', () => {
     window.removeEventListener('elohim-theme-changed', onEvent);
     expect(detail).toEqual({ theme: 'light' });
   });
+
+  it('adopts a cross-tab storage event without dispatching elohim-theme-changed', () => {
+    let events = 0;
+    const onEvent = (): void => {
+      events += 1;
+    };
+    window.addEventListener('elohim-theme-changed', onEvent);
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'elohim-theme', newValue: 'dark' }),
+    );
+    window.removeEventListener('elohim-theme-changed', onEvent);
+    expect(service.getCurrentTheme()).toBe('dark');
+    expect(events).toBe(0); // adoptExternal never re-dispatches
+  });
 });

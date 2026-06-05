@@ -113,8 +113,8 @@ export class ThemeService {
    */
   private loadTheme(): void {
     try {
-      const savedTheme = localStorage.getItem('elohim-theme') as Theme;
-      if (savedTheme && ['light', 'dark', 'device'].includes(savedTheme)) {
+      const savedTheme = localStorage.getItem('elohim-theme');
+      if (this.isValidTheme(savedTheme)) {
         this.setTheme(savedTheme);
       } else {
         this.setTheme('device');
