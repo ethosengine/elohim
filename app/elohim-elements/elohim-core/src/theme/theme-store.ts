@@ -33,6 +33,7 @@ type Subscriber = (theme: ElohimTheme) => void;
 
 export class ThemeStore {
   private _theme: ElohimTheme = 'device';
+  private _destroyed = false;
   private subscribers = new Set<Subscriber>();
   private readonly _onStorage: (e: StorageEvent) => void;
   private readonly _onThemeChange: (e: Event) => void;
@@ -60,6 +61,7 @@ export class ThemeStore {
    * The module singleton (getThemeStore()) is intentionally never destroyed.
    */
   destroy(): void {
+    this._destroyed = true;
     if (typeof window !== 'undefined') {
       window.removeEventListener('storage', this._onStorage);
       window.removeEventListener(THEME_CHANGE_EVENT, this._onThemeChange);
@@ -79,7 +81,7 @@ export class ThemeStore {
   }
 
   set(theme: ElohimTheme): void {
-    if (!isTheme(theme) || theme === this._theme) return;
+    if (this._destroyed || !isTheme(theme) || theme === this._theme) return;
     this._theme = theme;
     this.applyToDocument(theme);
     this.persist(theme);
@@ -104,7 +106,7 @@ export class ThemeStore {
 
   /** External change (other tab/island): apply + notify, never re-persist/dispatch. */
   private adopt(theme: ElohimTheme): void {
-    if (theme === this._theme) return;
+    if (this._destroyed || theme === this._theme) return;
     this._theme = theme;
     this.applyToDocument(theme);
     this.subscribers.forEach((s) => s(theme));

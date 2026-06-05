@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing';
 
+import { clearMediaQueries, setMediaQuery } from '../testing/ua-prefs.js';
 import {
   THEME_CHANGE_EVENT,
   THEME_STORAGE_KEY,
@@ -120,6 +121,44 @@ describe('ThemeStore', () => {
     );
     expect(store.theme).to.equal('device'); // unchanged
     // store is already destroyed; afterEach calling destroy() again is safe (idempotent)
+  });
+
+  it('destroy() guards set() — calling set() after destroy() leaves theme and document unchanged', () => {
+    store = new ThemeStore();
+    store.set('light'); // confirmed live before destroy
+    expect(store.theme).to.equal('light');
+    store.destroy();
+    store.set('dark'); // must be a no-op
+    expect(store.theme).to.equal('light'); // store.theme unchanged
+    expect(document.body.getAttribute('data-theme')).to.equal('light'); // document unchanged
+    // store is already destroyed; afterEach calling destroy() again is safe (idempotent)
+  });
+
+  describe('effectiveTheme — device branch', () => {
+    afterEach(() => {
+      clearMediaQueries();
+    });
+
+    it("resolves 'dark' when prefers-color-scheme is dark", () => {
+      setMediaQuery('prefers-color-scheme', 'dark');
+      store = new ThemeStore(); // default theme = 'device'
+      expect(store.theme).to.equal('device');
+      expect(store.effectiveTheme).to.equal('dark');
+    });
+
+    it("resolves 'light' when prefers-color-scheme is light", () => {
+      setMediaQuery('prefers-color-scheme', 'light');
+      store = new ThemeStore();
+      expect(store.theme).to.equal('device');
+      expect(store.effectiveTheme).to.equal('light');
+    });
+
+    it('effectiveTheme returns the explicit value (not matchMedia) when theme is not device', () => {
+      setMediaQuery('prefers-color-scheme', 'dark');
+      store = new ThemeStore();
+      store.set('light');
+      expect(store.effectiveTheme).to.equal('light'); // explicit wins; matchMedia says dark
+    });
   });
 });
 
