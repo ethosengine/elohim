@@ -19,6 +19,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateQuiltPolicyRefs } from '../../../schemas/scripts/lib/manifest-quilt-refs.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DOMAIN_DIR = resolve(__dirname, '..');
@@ -346,6 +347,17 @@ async function loadSchema(refPath) {
 
 async function main() {
   const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
+
+  // Loader-enforced referential integrity (tiered-quilt §4 v0.2): every
+  // contentTypes.<type>.quiltPolicy and vocabulary.quiltPolicyDefault MUST name
+  // a declared vocabulary.quiltPolicies key. Fails codegen loud on a dangling ref.
+  const quiltRefErrors = validateQuiltPolicyRefs(manifest);
+  if (quiltRefErrors.length > 0) {
+    console.error('Manifest quilt-policy referential-integrity errors:');
+    for (const e of quiltRefErrors) console.error(`  - ${e}`);
+    process.exit(1);
+  }
+
   const contentTypes = manifest.vocabulary?.contentTypes || {};
 
   // --- Collect metadata schemas ---

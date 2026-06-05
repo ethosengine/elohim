@@ -7,6 +7,7 @@
     "contentTypes": {
       "collective": {
         "description": "A community or group with governance structure. Category A (DHT-notarized). The organizational unit for governance, stewardship, and social belonging.",
+        "quiltPolicy": "household",
         "metadataSchema": { "$ref": "./schemas/collective-metadata.schema.json" },
         "coupling": {
           "knowledge": {
@@ -375,6 +376,18 @@
         "resourceType": "relationship"
       }
     },
+    "quiltPolicies": {
+      "household": {
+        "defaultTierFloor": "stocked",
+        "shelveAfter": "90d",
+        "holdWarmMin": "7d",
+        "preferDestinations": [
+          "peer-cellar://household/{any}",
+          "federated-dwelling://family/{family-id}"
+        ]
+      }
+    },
+    "quiltPolicyDefault": "household",
     "observations": {
       "governance-health": {
         "description": "Governance decisions produce outcomes aligned with collective purpose",
