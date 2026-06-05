@@ -103,6 +103,8 @@ export type { ElohimTheme } from './theme/theme-store.js';
 
 export { ElohimThemeToggle } from './elohim-theme-toggle.js';
 
+export { ElohimLangPicker } from './elohim-lang-picker.js';
+
 export {
   LocaleStore,
   getLocaleStore,

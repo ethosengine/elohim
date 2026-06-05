@@ -15,6 +15,7 @@ import { ElohimNavigator } from './elohim-navigator.js';
 import { ElohimContentAnalytics } from './elohim-content-analytics.js';
 import { ElohimEprPopover } from './elohim-epr-popover.js';
 import { ElohimThemeToggle } from './elohim-theme-toggle.js';
+import { ElohimLangPicker } from './elohim-lang-picker.js';
 
 // Registration lives here, not on the ElohimButton class via @customElement,
 // to keep ./index.ts truly side-effect-free. Importing from 'elohim-core'
@@ -97,4 +98,8 @@ if (!customElements.get('elohim-epr-popover')) {
 
 if (!customElements.get('elohim-theme-toggle')) {
   customElements.define('elohim-theme-toggle', ElohimThemeToggle);
+}
+
+if (!customElements.get('elohim-lang-picker')) {
+  customElements.define('elohim-lang-picker', ElohimLangPicker);
 }
