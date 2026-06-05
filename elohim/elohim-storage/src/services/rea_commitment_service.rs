@@ -84,7 +84,7 @@ impl ReaCommitmentService {
     ) -> Result<ReaCommitmentView, StorageError> {
         let hc = hc_lamad.ok_or_else(|| {
             StorageError::Conductor(
-                "lamad bridge unavailable — required for project-epr commitments".into(),
+                "lamad bridge unavailable — required for anchored commitment actions".into(),
             )
         })?;
 
@@ -227,8 +227,8 @@ impl ReaCommitmentService {
         // routing its update to the zome would error "no commitment found";
         // SQL stays authoritative for unanchored rows.
         if CONDUCTOR_SOFT_ACTIONS.contains(&existing.action.as_str())
+            && existing.dht_anchor_hash.is_some() // correctness: unanchored rows have no DHT entry
             && hc_lamad.is_some()
-            && existing.dht_anchor_hash.is_some()
         {
             return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;
         }

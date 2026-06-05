@@ -312,6 +312,33 @@ pub struct DeliveryPeer {
     pub last_seen: u64,
     /// HTTP port for direct file serving (default 8090)
     pub http_port: u16,
+    /// Owning household hub id for this peer, when an active identity binding
+    /// resolves it (`peer_id → agent_cid → household → collective`). `None` when
+    /// the peer has no active binding or the bound agent has no household.
+    ///
+    /// Discovery (mDNS/identify) cannot populate this — it requires a DB read —
+    /// so the gossip-construction path leaves it `None` and the
+    /// `/api/v1/peers/delivery` HTTP handler enriches it at request time
+    /// (soft-fail: any error degrades to `None`, never a 500).
+    #[serde(default)]
+    pub household_id: Option<String>,
+    /// Distinct active provide-commitment reach tags this peer PROVIDES.
+    ///
+    /// Derived (request-time, in the HTTP handler) from `rea_commitments` rows
+    /// where `provider = peer_id` and the commitment is active. The string set
+    /// is the commitment's *reach scope* so the a2o resilience precondition can
+    /// test `commitments.includes("commons")` (see
+    /// `genesis/a2o/steps/resilience.steps.ts`). Decision: custody-blob
+    /// commitments carry no explicit reach column — the seeder
+    /// (`buildCustodyCommitmentBody`) stores only `action`,
+    /// `resource_classified_as = sha256-…`, and a note — so a custody-of-a-blob
+    /// commitment maps to the `"commons"` reach (the resilience scenarios ingest
+    /// commons-reach content and the custody mesh hosts it). When a commitment
+    /// DOES carry an explicit reach (via `in_scope_of`, e.g. a `reach:<class>`
+    /// scope), that class is used verbatim instead. Empty when the peer provides
+    /// no active commitments. See the handler for the full derivation.
+    #[serde(default)]
+    pub commitments: Vec<String>,
 }
 use crate::sync::{DocStore, StreamTracker, SyncManager};
 use elohim_cache_core::extraction::ExtractionCache;
@@ -4172,6 +4199,10 @@ impl P2PNode {
                             capabilities: vec!["serves_compressed".to_string()],
                             last_seen: now_ms,
                             http_port,
+                            // Enriched at request time by the HTTP handler — the
+                            // discovery path has no DB access.
+                            household_id: None,
+                            commitments: Vec::new(),
                         });
                 }
             }

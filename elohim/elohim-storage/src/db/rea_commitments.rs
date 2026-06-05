@@ -187,6 +187,74 @@ pub fn get_commitments_for_agent(
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
+/// Commitment states that count as an *active provide commitment* for the
+/// resilience precondition. The seeder + reconcile path persist custody-blob
+/// commitments as `"active"`; `"accepted"` / `"in-progress"` cover the
+/// ValueFlows lifecycle states between proposal and fulfilment. Excludes
+/// `"proposed"` (not yet committed), `"cancelled"`, `"terminated"`, `"finished"`.
+const ACTIVE_PROVIDE_STATES: [&str; 3] = ["active", "accepted", "in-progress"];
+
+/// Reach tag used for a provide commitment that carries no explicit reach scope.
+///
+/// Custody-blob commitments (the resilience mesh's bread and butter) store no
+/// reach column — only `action="custody-blob"` and `resource_classified_as`
+/// (a `sha256-…` blob hash). The resilience scenarios ingest *commons-reach*
+/// content and the custody mesh hosts it, so hosting a blob == a `"commons"`
+/// provide commitment. See `DeliveryPeer::commitments` for the full rationale.
+const DEFAULT_PROVIDE_REACH: &str = "commons";
+
+/// Return the distinct reach tags a peer/agent actively PROVIDES.
+///
+/// Used by `/api/v1/peers/delivery` to enrich each `DeliveryPeer.commitments`,
+/// which the a2o resilience precondition tests as `commitments.includes(reach)`
+/// (e.g. `"commons"`).
+///
+/// Selection: rows where `provider = provider_id`, `h_app_id` matches the app,
+/// and `state ∈ {active, accepted, in-progress}`.
+///
+/// Reach derivation per row: if `in_scope_of` carries an explicit `reach:<class>`
+/// scope, that `<class>` is used verbatim; otherwise the row contributes the
+/// default `"commons"` reach (custody-of-a-commons-blob). The returned vector is
+/// deduplicated and order-stable (first occurrence wins). Empty when the
+/// provider has no active provide commitments.
+pub fn active_provide_reaches(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    provider_id: &str,
+) -> Result<Vec<String>, StorageError> {
+    let rows: Vec<Option<String>> = rea_commitments::table
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        .filter(rea_commitments::provider.eq(provider_id))
+        .filter(rea_commitments::state.eq_any(ACTIVE_PROVIDE_STATES))
+        .select(rea_commitments::in_scope_of)
+        .load::<Option<String>>(conn)
+        .map_err(|e| StorageError::Internal(format!("Provide-reach query failed: {}", e)))?;
+
+    let mut seen = std::collections::HashSet::new();
+    let reaches = rows
+        .into_iter()
+        .map(|scope| reach_from_scope(scope.as_deref()))
+        .filter(|r| seen.insert(r.clone()))
+        .collect();
+
+    Ok(reaches)
+}
+
+/// Derive a reach tag from a commitment's `in_scope_of` value.
+///
+/// Recognises an explicit `reach:<class>` scope (single value or one element of
+/// a `|`-separated scope string); otherwise falls back to [`DEFAULT_PROVIDE_REACH`].
+fn reach_from_scope(scope: Option<&str>) -> String {
+    let Some(scope) = scope else {
+        return DEFAULT_PROVIDE_REACH.to_string();
+    };
+    scope
+        .split('|')
+        .find_map(|part| part.trim().strip_prefix("reach:"))
+        .map(|class| class.to_string())
+        .unwrap_or_else(|| DEFAULT_PROVIDE_REACH.to_string())
+}
+
 // ============================================================================
 // Write Operations
 // ============================================================================
@@ -414,7 +482,7 @@ pub const PROJECT_EPR_ACTION: &str = "project-epr";
 /// accepts it. Mishpat-discriminated actions (delegates-compute,
 /// replicates-dwelling) are NOT here: they need a mishpat-role client
 /// (stage-2 work).
-pub const CONDUCTOR_SOFT_ACTIONS: [&str; 1] = ["custody-blob"];
+pub const CONDUCTOR_SOFT_ACTIONS: &[&str] = &["custody-blob"];
 
 /// Build the canonical in_scope_of value for an operate-doorway commitment.
 ///
@@ -764,6 +832,167 @@ fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError>
         .ok_or_else(|| StorageError::Internal(format!("Scope missing 'epr:' prefix: {}", scope)))?
         .to_string();
     Ok((format!("doorway:{}", doorway_raw), epr_id))
+}
+
+#[cfg(test)]
+mod provide_reach_tests {
+    use super::*;
+    use crate::db::models::NewReaCommitment;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    /// Insert a commitment row with explicit control over state + in_scope_of —
+    /// `create_commitment` always forces state="proposed", which these tests
+    /// need to bypass to exercise the active-state filter.
+    #[allow(clippy::too_many_arguments)]
+    fn insert(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        id: &str,
+        provider: &str,
+        state: &str,
+        in_scope_of: Option<&str>,
+    ) {
+        let row = NewReaCommitment {
+            id,
+            h_app_id: &ctx.h_app_id,
+            action: "custody-blob",
+            provider,
+            receiver: "receiver-peer",
+            resource_conforms_to: Some("blob"),
+            resource_classified_as: Some("sha256-deadbeef"),
+            resource_quantity_value: Some(1024.0),
+            resource_quantity_unit: Some("B"),
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of,
+            medium_of_exchange_id: None,
+            state,
+            finished: 0,
+            note: None,
+            metadata_json: None,
+            dht_anchor_hash: None,
+        };
+        diesel::insert_into(rea_commitments::table)
+            .values(&row)
+            .execute(conn)
+            .expect("insert commitment");
+    }
+
+    /// Seeded active custody-blob (no scope) → "commons" reach exposed.
+    #[test]
+    fn active_custody_blob_yields_commons() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        insert(&mut conn, &ctx, "c1", "peer-A", "active", None);
+
+        let reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
+        assert_eq!(reaches, vec!["commons"]);
+    }
+
+    /// Unknown / non-providing peer → empty.
+    #[test]
+    fn unknown_provider_yields_empty() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        insert(&mut conn, &ctx, "c1", "peer-A", "active", None);
+
+        let reaches = active_provide_reaches(&mut conn, &ctx, "peer-NOBODY").unwrap();
+        assert!(reaches.is_empty());
+    }
+
+    /// `proposed` (and other inactive) states are excluded from the active set.
+    #[test]
+    fn proposed_state_excluded() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        insert(&mut conn, &ctx, "c1", "peer-A", "proposed", None);
+        insert(&mut conn, &ctx, "c2", "peer-A", "cancelled", None);
+
+        let reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
+        assert!(reaches.is_empty(), "non-active states must not contribute");
+    }
+
+    /// `accepted` and `in-progress` count as active provide states.
+    #[test]
+    fn accepted_and_in_progress_count() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        insert(&mut conn, &ctx, "c1", "peer-A", "accepted", None);
+        insert(&mut conn, &ctx, "c2", "peer-B", "in-progress", None);
+
+        assert_eq!(
+            active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap(),
+            vec!["commons"]
+        );
+        assert_eq!(
+            active_provide_reaches(&mut conn, &ctx, "peer-B").unwrap(),
+            vec!["commons"]
+        );
+    }
+
+    /// Explicit `reach:<class>` scope overrides the default and is deduplicated.
+    #[test]
+    fn explicit_reach_scope_used_and_deduped() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        // Two rows with the SAME explicit reach → one distinct tag.
+        insert(
+            &mut conn,
+            &ctx,
+            "c1",
+            "peer-A",
+            "active",
+            Some("reach:household"),
+        );
+        insert(
+            &mut conn,
+            &ctx,
+            "c2",
+            "peer-A",
+            "active",
+            Some("doorway:alpha|reach:household"),
+        );
+        // A third row with default (no scope) → adds "commons".
+        insert(&mut conn, &ctx, "c3", "peer-A", "active", None);
+
+        let mut reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
+        reaches.sort();
+        assert_eq!(reaches, vec!["commons", "household"]);
+    }
+
+    /// App scoping: a commitment under a different h_app_id is not visible.
+    #[test]
+    fn app_scoped() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        let other = AppContext::new("other-app");
+        insert(&mut conn, &other, "c1", "peer-A", "active", None);
+
+        let reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
+        assert!(reaches.is_empty(), "other-app commitment must be invisible");
+    }
+
+    #[test]
+    fn reach_from_scope_variants() {
+        assert_eq!(reach_from_scope(None), "commons");
+        assert_eq!(reach_from_scope(Some("reach:qahal")), "qahal");
+        assert_eq!(reach_from_scope(Some("doorway:x|reach:family")), "family");
+        // No reach: marker → default.
+        assert_eq!(reach_from_scope(Some("doorway:x|epr:y")), "commons");
+        assert_eq!(reach_from_scope(Some("")), "commons");
+    }
 }
 
 #[cfg(test)]

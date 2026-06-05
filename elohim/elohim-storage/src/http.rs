@@ -2361,7 +2361,37 @@ impl HttpServer {
     #[cfg(feature = "p2p")]
     async fn handle_delivery_peers(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         if let Some(ref handle) = self.p2p_handle {
-            let peers = handle.delivery_peers();
+            let mut peers = handle.delivery_peers();
+
+            // Request-time enrichment (soft-fail): the discovery path can't reach
+            // the DB, so we resolve each peer's owning household hub and its
+            // active provide-commitment reach tags here. The a2o resilience
+            // precondition counts distinct `householdId`s among peers whose
+            // `commitments` include the requested reach (e.g. "commons") — see
+            // genesis/a2o/steps/resilience.steps.ts. Any DB/lookup error degrades
+            // that peer to None/empty; it never fails the endpoint.
+            if let Some(ref pool) = self.db_pool {
+                let app_ctx = crate::db::AppContext::default_lamad();
+                let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                if let Ok(mut conn) = pool.get() {
+                    for peer in peers.iter_mut() {
+                        peer.household_id =
+                            crate::services::hub_resolver::resolve_peer_dwelling_hub(
+                                &mut conn,
+                                &peer.peer_id,
+                                &now_iso,
+                            )
+                            .unwrap_or(None);
+                        peer.commitments = crate::db::rea_commitments::active_provide_reaches(
+                            &mut conn,
+                            &app_ctx,
+                            &peer.peer_id,
+                        )
+                        .unwrap_or_default();
+                    }
+                }
+            }
+
             let json = serde_json::to_string(&peers).map_err(|e| {
                 StorageError::Internal(format!("Failed to serialize delivery peers: {}", e))
             })?;
