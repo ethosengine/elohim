@@ -1083,7 +1083,7 @@ pub enum LinkTypes {
     HasMember,              // Collective -> Member CID (any kind)
     HasMembership,          // Collective -> Membership entry (full metadata)
     StewardOf,              // Person/Collective CID -> Collective (role-filtered)
-    CharterAnchor,          // Anchor("collective:<cid>") -> Collective
+    CharterAnchor,          // Anchor("collective:<cid>") -> Collective; ALSO Anchor("invite-consumed", <nonce>) -> Collective (household-invite replay guard — distinct anchor base, queries never overlap)
     AttestationOnAgreement, // CollabAgreement -> attesting Collective (tag = collective CID bytes)
     CollabInstantiated, // CollabAgreement -> instantiated Collab-Qahal Collective (unit tag, single per agreement)
     MembershipForAgreement, // CollabAgreement -> Membership entries

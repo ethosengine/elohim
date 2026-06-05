@@ -125,6 +125,21 @@ async fn affirm_membership_happy_path_then_replay_rejected() -> Result<()> {
         )
         .await;
 
+    // Baseline: before any affirm, the founder should be the only member.
+    settle(&c0, &c1, [&cell0, &cell1]).await?;
+    let baseline: Vec<holochain_types::prelude::Record> = c0
+        .call(
+            &cell0.zome(ZOME),
+            "list_memberships_for_collective",
+            collective_hash.clone(),
+        )
+        .await;
+    assert_eq!(
+        baseline.len(),
+        1,
+        "create_collective should have minted exactly the founder membership"
+    );
+
     // Member (agent 1) affirms with the token — authored by THEIR agent.
     settle(&c0, &c1, [&cell0, &cell1]).await?;
     let _membership_hash: ActionHash = c1

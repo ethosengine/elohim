@@ -656,6 +656,11 @@ fn invite_payload_of(token: &HouseholdInviteToken) -> HouseholdInvitePayload {
 /// link / seeder memory) — it is deliberately NOT a DHT entity (entity model:
 /// Category C; the durable proof of invitation is the resulting Membership's
 /// sponsor chain).
+///
+/// NOTE: a "steward" role token expands governance authority — any current
+/// Steward can mint further Stewards with no quorum. Acceptable for the
+/// household rubric (founding family); collective rubrics that need M-of-N
+/// steward admission must gate issuance at a higher layer.
 #[hdk_extern]
 pub fn issue_household_invite(
     input: IssueHouseholdInviteInput,
@@ -695,6 +700,10 @@ pub fn affirm_membership(input: AffirmMembershipInput) -> ExternResult<ActionHas
     let token = input.token;
 
     // 1. Expiry.
+    // sys_time() is the AFFIRMER's local conductor clock — a hostile affirmer
+    // controls their own clock, so expiry is a convenience gate, not a
+    // cryptographically enforced boundary. Acceptable here: the affirmer is
+    // the invited family member, not an adversary of the invite they hold.
     let now_micros = sys_time()?.as_micros();
     if now_micros > token.expires_at_micros {
         return Err(wasm_error!("invite token expired"));
@@ -716,6 +725,18 @@ pub fn affirm_membership(input: AffirmMembershipInput) -> ExternResult<ActionHas
 
     // 4. Replay guard: consumed-nonce anchor. Coordinator-side by design —
     //    integrity validators are pure-data here (no link traversal allowed).
+    //
+    // KNOWN LIMITATION (concurrent-affirm window): the check-then-create below
+    // is not atomic across the DHT. Two conductors affirming the SAME token
+    // near-simultaneously can both pass the emptiness check and commit two
+    // Membership entries for the same (member_cid, collective_cid). This guard
+    // is strict against sequential REPLAYS, best-effort against true races.
+    // Downstream is safe: the storage projection dedupes — collective_participations
+    // carries UNIQUE(h_app_id, collective_id, human_id) and create_participation
+    // upserts on that key — so a raced duplicate collapses to one row.
+    //
+    // Nonce uniqueness is DNA-scoped (anchor keyed on nonce alone); accidental
+    // cross-collective collision is negligible at the 32-hex-char convention.
     let consumed_anchor = StringAnchor::new("invite-consumed", &token.nonce);
     let consumed_anchor_hash = hash_entry(&EntryTypes::StringAnchor(consumed_anchor.clone()))?;
     let collective_hash = decode_collective_cid_to_action(&token.collective_cid)?;
