@@ -4,7 +4,7 @@ id: omnibar-consolidation-epr-native-links-design
 status: Draft
 class: ui-truth-layer
 domain: D-epr-apps
-topic: [omnibar, protocol-omni, page-chrome, epr-link, navigation, debug-bar, theme, locale, i18n, a11y, ua-prefs, elohim-core, lamad]
+topic: [omnibar, protocol-omni, page-chrome, epr-link, navigation, debug-bar, serving-context, theme, locale, i18n, a11y, ua-prefs, elohim-core, lamad]
 cites:
   - genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
   - elohim-sdk-epr-app-boundaries-sprint-kickoff | SDK-boundary canon whose app-bootstrap/app-manifest workstreams this chrome work composes with — Tier-5 delivery-seam vocabulary and the manifest-as-canonical constraint | sha256:9776d193efcabc84
@@ -34,6 +34,7 @@ Design session: 2026-06-05. Parent canon: the pillar-EPR-decomposition design
 | Cross-bundle anchor form | **Plain `href` (the projected EPR address) + interceptor handoff**, not `<elohim-epr-link>` everywhere. EPR-link's HyperCard card-flip is for content resolution; crossing a bundle boundary requires a bundle boot, and the doorway-projected URL *is* the EPR-native address. `routerLink` is reserved for same-bundle routes. |
 | Debug-bar | **Deprecated and deleted.** Its concerns (env identity, log level, backend-config affordance) lift into `app-protocol-omni` as an **optional, trust-framed env-context segment** (see §5). |
 | Env segment posture | **Opt-in (`showEnvContext`, default `false`), trust-framed.** Renders inside the EPR group, adjacent to the identifier, contextualizing *this EPR view* ("you're viewing this EPR through the alpha environment"). Prod or opt-out → renders nothing. The trust surface never cries wolf. |
+| Serving-context dimension | **`ServingContext` — a dimension orthogonal to reach** capturing the system state an EPR is projected through: `{ tier, logLevel, buildId, variant? }`. The env segment renders this interface, not hardcoded fields. `buildId` = CI-substituted `gitHash` (already real, `Jenkinsfile:761-763`). `variant` is reserved — EPR-natively a variant is *which `project-epr` commitment / bundle CID served you* (blue/green & A/B legible without k8s vocabulary). Substrate home (doorway headers sibling to `X-Reach`; projection variant metadata) is captured follow-up §9.7. |
 | Theme plumbing | **Shared theme store in elohim-core speaking the exact `ThemeService` contract** (`localStorage['elohim-theme']`, `body[data-theme]` + `theme-*` class, device→light→dark cycle). Any toggle anywhere stays in sync across bundles and tabs. |
 | Theme toggle surfaces | **Omnibar opt-in + navigator restore.** `<elohim-default-omnibar show-theme-toggle>` (default off — landing keeps its floating toggle); `<elohim-navigator>` regains the toggle dropped by the Lit migration (profile tray + visitor inline); `app-protocol-omni [showThemeToggle]` opt-in, default off. |
 | Language vs a11y split | **Language gets an omnibar opt-in picker; a11y stays UA-native.** The web platform has no per-site language switcher and `@lit/localize` is wired but unreachable; conversely a11y signals (reduced-motion, contrast, color-scheme, font scaling) are UA-owned AND already enforced by the ua-prefs element gate. Deep per-person a11y overrides are the settings-palette placeholder's job (follow-up). |
@@ -48,6 +49,10 @@ No DHT, diesel, or doorway-route changes anywhere in this design — UI truth-la
 | ThemePreference | Operational (C) | `localStorage['elohim-theme']` (device-scoped) | Deliberately device-level: appearance follows the device/OS, matching existing `ThemeService`. Reconstruction = default `device` + UA signal. |
 | LocalePreference | Operational (C) + existing field | `localStorage['elohim-locale']`; `SessionHuman.locale` when a session exists | No new entity — we *set* a `SessionHuman` field that exists today and is never written. BCP-47 codes; lit-localize registry is canonical. |
 | CrossBundleNavHandoff | Operational (C) | sessionStorage (extends `elohim.session-nav-stack.v1`) | Back-affordance survives the bundle boundary. Reconstruction = empty stack (cosmetic loss). |
+
+`ServingContext` (§5) is a read-only view-model over existing build/config values —
+nothing persisted, no entity. Its eventual substrate home (doorway provenance
+headers, projection variant metadata — §9.7) re-runs this gate when designed.
 
 ## 3. Architecture overview
 
@@ -134,25 +139,51 @@ Pre-navigation, the interceptor/EprNavService appends to the existing
 bundle boot) so protocol-omni's back affordance works across the boundary.
 Session identity already rides the `elohim_session` cookie — no work needed.
 
-## 5. Env context — optional, trust-framed segment of the EPR group
+## 5. Serving context — optional, trust-framed segment of the EPR group
 
-The omni-toolbar is the protocol's address bar; environment state is **provenance
-context for this EPR view**, not a developer ornament.
+The omni-toolbar is the protocol's address bar. Reach answers *how far the content
+extends* (audience dimension); resilience answers *how well it is stewarded*
+(custody dimension, ◉ placeholder); this section adds a third, **orthogonal
+dimension**: **serving context** — *through what system state is this EPR being
+projected to you?* Environment tier, log level, build identity, and deployment
+variant are facets of that one dimension, not separate ornaments.
+
+### 5.1 The interface (view-model only)
+
+```ts
+export interface ServingContext {
+  tier?: 'development' | 'alpha' | 'staging' | 'production'; // system level
+  logLevel?: string;   // diagnostic verbosity
+  buildId?: string;    // short gitHash today → bundle CID when the substrate header lands
+  variant?: string;    // RESERVED — which projection served you (blue/green, A/B)
+}
+```
+
+Sourced today from `AppConfig`: `ConfigService` gains a `gitHash` passthrough —
+the value is already CI-substituted into the environment files
+(`Jenkinsfile:761-763`); prod mode adds it to `/assets/config.json`. `variant`
+has no source yet: at the protocol layer a variant is *which `project-epr`
+commitment / bundle CID served you* — two live variants are two projection
+commitments over different bundle addresses — so the facet fills from substrate
+provenance when §9.7 lands, never from k8s deployment vocabulary.
+
+### 5.2 The segment
 
 - `app-protocol-omni` gains `showEnvContext = input<boolean>(false)` — **opt-in,
   default off**. The elohim-app shell template enables it (the surface where
   debug-bar lived). Other consumers never see it.
-- When enabled AND env ∈ {staging, alpha} (from `ConfigService`, same gate
-  debug-bar used): the env state renders **inside the EPR group, adjacent to the
-  identifier** — `EPR elohim-host-landing · alpha` — as a button
-  (`data-testid="protocol-omni-env"`) with
-  `title`/`aria-label`: "You're viewing this EPR through the **alpha** environment
-  (log: debug) — backend details". Click → `/doorway/elohim` (intra-bundle
-  `routerLink`).
+- When enabled AND `tier ∈ {development, alpha, staging}`: present facets render
+  **inside the EPR group, adjacent to the identifier** —
+  `EPR elohim-host-landing · alpha · 3cc9da6` — as a button
+  (`data-testid="protocol-omni-env"`) whose `title`/`aria-label` enumerates every
+  present facet in trust language: "You're viewing this EPR through the **alpha**
+  environment · build 3cc9da6 · log: debug — backend details". Click →
+  `/doorway/elohim` (intra-bundle `routerLink`).
 - Collapsed chip gets an amber ring (`--omni-env-ring`) only when enabled +
   non-prod.
 - Production, or opt-out: **nothing renders, no tint** — the trust surface never
-  cries wolf.
+  cries wolf. (Relaxing `buildId` to show on prod is deliberately deferred until
+  the substrate header makes it doorway-attested rather than self-reported.)
 - `debug-bar` component deleted: component files + spec, `home.component.html`
   usage + import, home's render test. Its three env-gating unit tests migrate to
   `protocol-omni.component.spec.ts`.
@@ -227,16 +258,17 @@ a2o scenarios committed with the implementation:
 | Scenario | Feature file |
 |---|---|
 | Learner clicks "📚 Lamad" on the landing footer and arrives — no 404; back affordance returns across the boundary | `features/browser/navigation-browser.feature` (extend) |
-| Env context: default-off · alpha-enabled presentation (EPR-adjacent, trust framing) · prod-silent | `features/protocol/protocol-omni.feature` (extend) |
+| Serving context: default-off · alpha-enabled presentation (EPR-adjacent; tier + buildId + logLevel facets enumerated) · prod-silent | `features/protocol/protocol-omni.feature` (extend) |
 | Theme choice persists across the app boundary (proves shared-key contract) | new `features/elohim-core/chrome-preferences.feature` |
 | Switching to Hebrew flips chrome RTL and persists | same file |
 
 Unit coverage: interceptor (modified-click passthrough, capture beats routerLink,
 `ownsPath` branching, idempotent install, fails-open), ThemeStore
 (cycle/persist/apply/cross-tab/cross-island), both new elements through the three
-precondition gates (axe; RTL/logical properties; no-transition), protocol-omni env
-gating ×3 (alpha/staging/prod) + opt-out, EprNavService branching, navigator
-restored-toggle rendering (tray + visitor).
+precondition gates (axe; RTL/logical properties; no-transition), protocol-omni
+serving-context gating ×4 (development/alpha/staging/prod) + opt-out + facet
+enumeration, EprNavService branching, navigator restored-toggle rendering (tray +
+visitor).
 
 Error posture: interceptor never blocks default navigation on error; storage
 failures silent; locale bundle failure → `en`.
@@ -254,6 +286,13 @@ failures silent; locale bundle failure → `en`.
    `<elohim-lang-picker>` (graphos-designer lane).
 6. **Resilience indicator wiring** (`elohim-resilience-snapshot` into
    protocol-omni) — pre-existing placeholder, untouched here.
+7. **ServingContext substrate home** — doorway emits serving-context provenance
+   headers sibling to `X-Content-Address`/`X-Reach` (e.g. `X-Build-Id`,
+   `X-Bundle-Address`, `X-Variant` from projection-commitment metadata);
+   `EprProjectionView` extension re-runs the p2p-design-gate. The omnibar
+   `buildId` then upgrades from self-reported `gitHash` to doorway-attested
+   bundle address (and may earn prod visibility); `variant` gains its source.
+   rust-architect lane.
 
 ## 10. File inventory
 
@@ -261,13 +300,15 @@ failures silent; locale bundle failure → `en`.
 `elohim-core/src/theme/theme-store.ts`, `elohim-core/src/elohim-theme-toggle.ts`,
 `elohim-core/src/elohim-lang-picker.ts` (+ specs, + Library A stories, + registry
 entries), `app/elohim-app/src/app/elohim/services/epr-nav.service.ts` (+ spec),
+`app/elohim-app/src/app/elohim/models/serving-context.model.ts`,
 `genesis/a2o/features/elohim-core/chrome-preferences.feature`.
 
 **Modified** — `elohim-page-chrome.ts` (auto-install), `elohim-default-omnibar.ts`
 (two opt-in attributes), `elohim-navigator.ts` (toggle restore + tray lang),
-`protocol-omni.component.{ts,html,css,spec}` (env context + theme opt-in),
-`theme.service.ts` (sync listeners), `app.component.ts` (interceptor install),
-14 sweep files, `app.routes.spec.ts`, `navigation-browser.feature`,
+`protocol-omni.component.{ts,html,css,spec}` (serving-context segment + theme
+opt-in), `config.service.ts` (+`gitHash` in `AppConfig`; prod `config.json`
+shape), `theme.service.ts` (sync listeners), `app.component.ts` (interceptor
+install), 14 sweep files, `app.routes.spec.ts`, `navigation-browser.feature`,
 `protocol-omni.feature`.
 
 **Deleted** — `components/debug-bar/*` (4 files) + its usage in
