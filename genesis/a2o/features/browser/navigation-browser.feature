@@ -21,3 +21,10 @@ Feature: Browser Navigation Health
     When Matthew navigates to "/identity/profile" in the browser
     Then the page should load successfully
     And there should be no console errors
+
+  Scenario: Footer Lamad link crosses the bundle boundary without a 404
+    When Matthew navigates to "/" in the browser
+    And Matthew clicks the element with testid "footer-lamad-link"
+    Then the page should load successfully
+    And the page should display the main content
+    And there should be no console errors

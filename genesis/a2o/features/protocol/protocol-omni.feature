@@ -29,3 +29,10 @@ Feature: ProtocolOmniComponent makes protocol context legible at the top of the 
     And I click the element [data-testid="protocol-omni-chip"]
     Then the element [data-testid="protocol-omni-toolbar"] is visible
     And the element [data-testid="protocol-omni-epr"] text contains "elohim-host-landing"
+
+  @browser-only
+  Scenario: The serving-context segment contextualizes the EPR on non-production environments
+    When I open the landing page in a browser
+    And I click the element [data-testid="protocol-omni-chip"]
+    Then the element [data-testid="protocol-omni-env"] is visible
+    And the element [data-testid="protocol-omni-env"] text contains "alpha"
