@@ -10,12 +10,13 @@ process_subdomain: memory
 derived_from:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md  # the comet (dogfood breadcrumb — lineage, NOT a domain claim; see history/2026-06-02-d4-name-collision)
 cites:
-  - scope-tree-reconciler-design | the file-moving reconciler that depends on these content-addressed cites to move safely | sha256:1f7847ac624b0df7
-  - spec-plan-compaction-loop-design | the compaction loop whose path cites this upgrades to slug+fingerprint with a dissolution gate | sha256:958940bdf5a41b40
-  - unified-memory-loop-design | the loop this adds a cites_legacy scoreboard dimension and cite discipline to | sha256:99100efd20d10129
+  - scope-tree-reconciler-design | the file-moving reconciler that depends on these content-addressed cites to move safely | sha256:1f7847ac624b0df7 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md
+  - spec-plan-compaction-loop-design | the compaction loop whose path cites this upgrades to slug+fingerprint with a dissolution gate | sha256:958940bdf5a41b40 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md
+  - unified-memory-loop-design | the loop this adds a cites_legacy scoreboard dimension and cite discipline to | sha256:99100efd20d10129 | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md
   - .claude/scripts/memory-kit/memory-coherence-audit.py
   - .claude/skills/epr-content-addressing/SKILL.md
-  - placement | the contract whose three doc homes these content-addressed links survive moves between | sha256:f84d7cb16bea9379
+  - placement | the contract whose three doc homes these content-addressed links survive moves between | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md
+  - managed-surface-edit-discipline-design | the 2026-06-05 sibling: edit-time registry + PRE/POST hooks that enforce this discipline at the surface (see §9.1) | sha256:80a33cc48810e061 | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md
 refines:
   - genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md  # upgrades its path-based cites: to content-addressed; adds the dissolution-time hard gate
 proposed_amendments:
@@ -141,6 +142,30 @@ Per-agent emphasis: **librarian** owns the audit + stasis `cites` discipline + t
 
 - **In:** the link envelope, doc `id:` slugs, the audit upgrade, `cite-gen`, soft/hard enforcement, the migration workflow, stasis-loop + agent + memory-kit wiring.
 - **Out:** the scope-tree-reconciler's move-mechanics (its own spec); generalizing slugs into full DHT-notarized EPRs (these are internal planning artifacts — we adopt the EPR *reference model*, not its reach/REA/governance legs); a hard pre-push hook (rejected — friction; the BACK-fire gate + stasis drain cover it).
+
+### 9.1 Scope amendment (2026-06-05) — gospel surfaces, the materialized locator, the deliberate refresh
+
+Three deltas landed after the original scope (forensic: the gospel-cites episode — an agent hand-wrote
+slug-only cites into CLAUDE.mds because every enforcement surface hardcoded the doc-root scope, and the
+operator's correct "the tooling exists" expectation had no edit-time surface to land on):
+
+- **Gospel CLAUDE.mds join the graph.** Id-declaring `CLAUDE.md` files repo-wide (vendored/dot dirs
+  pruned) are slug-index members (`cite_graph.extend_index_with_gospels`); membership is OPT-IN by
+  declaring `id:` — the wide walk admits nothing accidental. ALL graph consumers (`cite-gen`
+  `--seal/--seal-all`, `cite-propagate`, `cites-migrate`, `memory-coherence-audit`, the
+  `cite-seal-signal` hook) answer membership through ONE registry — `_lib.managed_surfaces` — so scope
+  is defined once, never re-hardcoded per tool. genesis/data entity docs deliberately stay plain-path.
+- **`path:` — the materialized locator.** The second tool-managed envelope field (after `status:`):
+  every envelope carries its slug→path resolution as an inline CACHE so an agent follows a cite with a
+  plain read, no resolver run. Stamped at mint (`emit`/`--into`/`--seal`), refreshed by every
+  `cite-propagate` pass — a move self-heals on the next pass; a dead slug keeps its last path as a
+  forensic breadcrumb. The slug stays identity; the fingerprint stays drift-truth; the path is only cache.
+- **`--refresh` — the deliberate stale-dequeue.** `status: stale` is a re-verify QUEUE, and `--into`
+  deliberately never auto-blesses drift. After re-verifying the citing doc's claims against the moved-on
+  target, `cite-gen --refresh <doc>` re-blesses fingerprints (+ status + path) in one deliberate act.
+
+The edit-time enforcement (PreToolUse discipline injection) and the full surface registry live in the
+sibling spec: `managed-surface-edit-discipline-design` (cited above).
 
 ## 10. Decomposition (gap-items)
 

@@ -215,6 +215,16 @@ Design: `genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-de
 
 `.claude/hooks/claude-md-drift-signal.py` (matcher: `Edit|Write`, timeout 2s) accumulates drift signal for `claude-md-audit` (section 5). Best-effort: never blocks the tool call. See section 5 for the layered-compute design.
 
+### PreToolUse Managed-Surface Context Hook
+
+`.claude/hooks/managed-surface-context.py` (matcher: `Edit|Write`, timeout 3s) injects a managed-memory
+surface's discipline + exact tooling BEFORE an edit lands on it — gospel CLAUDE.mds, specs/plans, doc-roots,
+memory entries, a2o features, stories, skills/agents, the axis manifests. Scope comes from
+`_lib/managed_surfaces.py`, the single edit-time registry (surface class → discipline → tooling → cite-graph
+membership) that `cite-seal-signal.py` and the cite-gen/migrate sweeps also consult — scope is defined once,
+never re-hardcoded per tool. Fires once per (file, process tree); fail-open. Design:
+`genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md`.
+
 ### PostToolUse Memory-Coherence Signal Hook
 
 `.claude/hooks/memory-coherence-signal.py` (matcher: `Edit|Write`, timeout 2s) is the in-flight accumulator for `memory-coherence-audit` (section 8). When an edited file matches a memory entry's `cites:` glob (via the cached `.claude/memory-kit/cites-index.json`), it bumps that entry's counter in `.claude/memory-kit/memory-coherence-drift.json`. The librarian surfaces accumulated counts during `/hygiene-sweep` ("N entries cite code that changed since last verified") and resets them. Best-effort; never blocks. If the index doesn't exist yet, the hook is dormant until the first `memory-coherence-audit.py` run builds it.

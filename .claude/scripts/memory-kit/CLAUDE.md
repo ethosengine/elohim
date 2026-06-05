@@ -114,12 +114,15 @@ scripts (this dir)  cleanup-{scan,apply}.py              ← archive stale specs
                     skill-audit.py                       ← always-loaded skill descriptions
                     claude-md-audit.py                   ← CLAUDE.md drift + fit + missing + opted-out
                     memory-coherence-audit.py            ← memory↔code cites: edge; DEAD-CITE/CITE-CANDIDATE; builds cites-index
-                    _lib/                                ← shared helpers (paths, store, frontmatter, drift_score)
+                    cite-{gen,describe,propagate}.py + cites-migrate.py ← content-addressed cite envelopes (slug|desc|sha256|status:|path:)
+                    _lib/                                ← shared helpers (paths, store, frontmatter, drift_score, cite_graph, managed_surfaces)
 
 hooks               .claude/hooks/pre-tool-memory.py     ← PreToolUse * — injects MEMORY.md across subagents
+                    .claude/hooks/managed-surface-context.py    ← PreToolUse Edit/Write — injects a managed surface's discipline+tooling BEFORE the edit (_lib/managed_surfaces registry)
                     .claude/hooks/claude-md-drift-signal.py     ← PostToolUse Edit/Write — counters
                     .claude/hooks/claude-md-structural-signal.py ← PostToolUse Bash — mv/cp/rm signal
                     .claude/hooks/memory-coherence-signal.py    ← PostToolUse Edit/Write — bumps a memory entry when edited code matches its cites:
+                    .claude/hooks/cite-seal-signal.py           ← PostToolUse Edit/Write — born-linked nudge on graph members (doc-roots + gospel CLAUDE.mds) with cite debt
 
 skills              .claude/skills/memory-kit/SKILL.md   ← user-facing toolkit doc
                     .claude/skills/converge/SKILL.md     ← future-projection synthesis
