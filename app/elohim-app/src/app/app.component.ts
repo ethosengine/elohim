@@ -60,6 +60,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private isDestroyed = false;
   private holochainInitialized = false;
+  /** Teardown for the capture-phase EPR link interceptor installed in ngOnInit. */
+  private eprInterceptorCleanup: (() => void) | null = null;
 
   private readonly router = inject(Router);
 
@@ -104,7 +106,7 @@ export class AppComponent implements OnInit, OnDestroy {
     // Cross-bundle anchors (e.g. /lamad) are EPR-native: capture-phase
     // interception beats stale routerLink 404s; ownsPath derives from the
     // live router config. Explicit install wins over page-chrome's default.
-    installEprLinkInterceptor({
+    this.eprInterceptorCleanup = installEprLinkInterceptor({
       explicit: true,
       ownsPath: p => this.eprNav.ownsPath(p),
       beforeCrossBundle: () => this.eprNav.recordHandoff(),
@@ -178,6 +180,8 @@ export class AppComponent implements OnInit, OnDestroy {
       clearTimeout(this.retryTimeoutId);
       this.retryTimeoutId = null;
     }
+    // Remove the capture-phase EPR link interceptor listener
+    this.eprInterceptorCleanup?.();
     // Clean up Tauri event listeners
     this.tauriAuth.destroy();
   }
