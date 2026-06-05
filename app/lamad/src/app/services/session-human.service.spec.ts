@@ -263,9 +263,12 @@ describe('SessionHumanService', () => {
   });
 
   describe('Upgrade Prompts (M-AGGR-1 substrate-driven)', () => {
-    it('should return empty from getActiveUpgradePrompts', () => {
-      // M-AGGR-1: prompts are now substrate-derived via UpgradePromptView.
-      expect(service.getActiveUpgradePrompts()).toEqual([]);
+    it('derives no prompts client-side (M-AGGR-1)', () => {
+      // M-AGGR-1 Phase H removed getActiveUpgradePrompts: active prompts are
+      // substrate-derived (GET /api/v1/identity/{agentId}/upgrade-prompts →
+      // UpgradePromptView). The service keeps only dismissal bookkeeping.
+      expect((service as unknown as Record<string, unknown>)['getActiveUpgradePrompts']).toBeUndefined();
+      expect(service.getDismissedPromptIds()).toEqual([]);
     });
 
     it('should record dismissal in localStorage', () => {
@@ -374,7 +377,8 @@ describe('SessionHumanService', () => {
       service.resetSession();
       const session = service.getSession();
       expect(session?.stats.nodesViewed).toBe(0);
-      expect(service.getActiveUpgradePrompts().length).toBe(0);
+      // M-AGGR-1: prompt state owned by the service is dismissal bookkeeping only
+      expect(service.getDismissedPromptIds()).toEqual([]);
     });
   });
 });

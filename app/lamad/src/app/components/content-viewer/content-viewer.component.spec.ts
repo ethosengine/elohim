@@ -1084,18 +1084,17 @@ describe('ContentViewerComponent', () => {
       });
     }));
 
-    it('degrades gracefully when governance API fails', fakeAsync(async () => {
+    it('degrades gracefully when governance API fails', async () => {
       governanceApiSpy.getMechanismSelection.mockRejectedValue(new Error('Network error'));
       governanceApiSpy.getAccumulationStatus.mockRejectedValue(new Error('Network error'));
 
       fixture.detectChanges();
-      tick();
       await fixture.whenStable();
 
       expect(component.mechanismSelection).toBeNull();
       expect(component.accumulationStatus).toBeNull();
       expect(component.isLoadingGovernanceViews).toBe(false);
-    }));
+    });
   });
 
   describe('EPR relationships', () => {

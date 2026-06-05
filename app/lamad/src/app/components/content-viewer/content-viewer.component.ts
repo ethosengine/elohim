@@ -809,29 +809,37 @@ export class ContentViewerComponent
    *
    * Both are wired to the Lit element in wireGovernanceLitElements().
    */
-  private async loadGovernanceViews(nodeId: string): Promise<void> {
+  private loadGovernanceViews(nodeId: string): Promise<void> {
     this.isLoadingGovernanceViews = true;
-    try {
-      const [mechanismView, accumulationView] = await Promise.all([
-        this.governanceApi.getMechanismSelection('content', nodeId),
-        this.governanceApi.getAccumulationStatus('content', nodeId),
-      ]);
-      this.mechanismSelection = {
-        level: mechanismView.level as 0 | 1 | 2,
-        renderTarget: mechanismView.renderTarget as 'angular' | 'psephos',
-      };
-      this.accumulationStatus = {
-        readyForSensemaking: accumulationView.readyForSensemaking,
-        controversyDetected: accumulationView.controversyDetected,
-        settled: accumulationView.settled,
-      };
-    } catch {
-      // Governance views are supplemental — silently degrade
-      this.mechanismSelection = null;
-      this.accumulationStatus = null;
-    } finally {
-      this.isLoadingGovernanceViews = false;
-    }
+    // .then/.catch (NOT native await): zone.js checks for uncaught rejections
+    // at the end of its microtask drain, but native `await` attaches its
+    // handler via a separate V8 thenable-job that runs after the drain — so a
+    // rejection arriving within the drain gets false-flagged as "Uncaught (in
+    // promise)" even though the catch below consumes it. Synchronous handler
+    // attachment closes that race for every caller.
+    return Promise.all([
+      this.governanceApi.getMechanismSelection('content', nodeId),
+      this.governanceApi.getAccumulationStatus('content', nodeId),
+    ])
+      .then(([mechanismView, accumulationView]) => {
+        this.mechanismSelection = {
+          level: mechanismView.level as 0 | 1 | 2,
+          renderTarget: mechanismView.renderTarget as 'angular' | 'psephos',
+        };
+        this.accumulationStatus = {
+          readyForSensemaking: accumulationView.readyForSensemaking,
+          controversyDetected: accumulationView.controversyDetected,
+          settled: accumulationView.settled,
+        };
+      })
+      .catch(() => {
+        // Governance views are supplemental — silently degrade
+        this.mechanismSelection = null;
+        this.accumulationStatus = null;
+      })
+      .finally(() => {
+        this.isLoadingGovernanceViews = false;
+      });
   }
 
   /**
