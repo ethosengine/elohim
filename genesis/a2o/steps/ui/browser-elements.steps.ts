@@ -119,6 +119,25 @@ When(
   }
 );
 
+/**
+ * Named-persona click on a data-testid element.
+ * Looks up the device by persona name, waits for visibility, then clicks.
+ *
+ * Example: When Matthew clicks the element with testid "footer-lamad-link"
+ */
+When(
+  '{word} clicks the element with testid {string}',
+  async function (this: E2EWorld, persona: string, testid: string) {
+    const human = this.getHuman(persona);
+    const device = human.devices.find(d => d.type === 'playwright') as PlaywrightDevice | undefined;
+    assert.ok(device, `${persona} has no Playwright device. Is E2E_DEVICE_MODE=playwright?`);
+    const el = device.page.locator(`[data-testid="${testid}"]`).first();
+    await el.waitFor({ state: 'visible', timeout: VISIBLE_TIMEOUT });
+    await el.click();
+    await device.page.waitForLoadState('networkidle');
+  }
+);
+
 Then(
   /^the element \[data-testid="([^"]+)"\] text contains "([^"]+)"$/,
   async function (this: E2EWorld, testid: string, expected: string) {

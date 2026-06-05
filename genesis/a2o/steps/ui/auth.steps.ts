@@ -169,20 +169,6 @@ When(
 );
 
 /**
- * Click a data-testid element in the browser.
- *
- * Example: When Matthew clicks the element with testid "footer-lamad-link"
- */
-When(
-  '{word} clicks the element with testid {string}',
-  async function (this: E2EWorld, _persona: string, testid: string) {
-    const device = requirePlaywrightDevice(this, _persona);
-    await device.page.click(`[data-testid="${testid}"]`);
-    await device.page.waitForLoadState('networkidle');
-  }
-);
-
-/**
  * Logout through the browser UI.
  *
  * Clicks the profile bubble in the header to open the dropdown menu,
