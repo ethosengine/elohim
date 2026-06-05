@@ -3,12 +3,16 @@ import {
   ChangeDetectionStrategy,
   CUSTOM_ELEMENTS_SCHEMA,
   Component,
+  DestroyRef,
   OnInit,
   computed,
+  effect,
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 
 import 'elohim-core/register';
@@ -80,6 +84,20 @@ export class ProtocolOmniComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly configService = inject(ConfigService);
   private readonly resilienceService = inject(ResilienceService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  constructor() {
+    // Trust surface: a CID change invalidates the snapshot immediately —
+    // never show resource A's resilience claim while viewing resource B.
+    // Refetch eagerly only while the toolbar is open; otherwise stay lazy.
+    effect(() => {
+      const cid = this.contentId();
+      if (cid === this.resilienceFetchedCid) return;
+      this.resilienceFetchedCid = null;
+      this.resilience.set(null);
+      if (untracked(this.expanded)) this.loadResilience();
+    });
+  }
 
   readonly back = computed(() => this.nav.back());
   readonly forward = computed(() => this.nav.forward());
@@ -153,13 +171,22 @@ export class ProtocolOmniComponent implements OnInit {
     const cid = this.contentId();
     if (cid === this.resilienceFetchedCid) return;
     this.resilienceFetchedCid = cid;
-    this.resilienceService.getSnapshot(cid).subscribe({
-      next: snap => this.resilience.set(snap),
-      error: () => {
-        this.resilienceFetchedCid = null;
-        this.resilience.set(null);
-      },
-    });
+    this.resilienceService
+      .getSnapshot(cid)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        // Late responses for a superseded CID must not clobber the current
+        // one — only apply when this fetch is still the wanted snapshot.
+        next: snap => {
+          if (this.resilienceFetchedCid === cid) this.resilience.set(snap);
+        },
+        error: () => {
+          if (this.resilienceFetchedCid === cid) {
+            this.resilienceFetchedCid = null;
+            this.resilience.set(null);
+          }
+        },
+      });
   }
 
   collapse(): void {

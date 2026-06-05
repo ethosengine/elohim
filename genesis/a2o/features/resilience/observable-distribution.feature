@@ -180,7 +180,7 @@ Feature: Observable + contract-aware auto-distribute
     When I open the EPR resource page for "content-alpha"
     And I expand the protocol omni toolbar
     Then the omni resilience segment renders a live resilience icon
-    And the resilience icon has class "status-protected" or "status-partial"
+    And the omni resilience icon has class "status-protected" or "status-partial"
     And the omni resilience tooltip mentions stewarding collectives
 
   @wip @resilience-p1

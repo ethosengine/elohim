@@ -381,4 +381,29 @@ describe('ProtocolOmniComponent resilience segment', () => {
     expect(tooltip?.textContent).toContain('2 commitment-backed');
     expect(tooltip?.textContent).toContain('5 peers online');
   });
+
+  it('refetches for the new CID when contentId changes while expanded (no stale claim)', () => {
+    const { fixture, getSnapshot, expand } = setup();
+    expand();
+    expect(getSnapshot).toHaveBeenCalledWith('test-cid');
+    fixture.componentRef.setInput('contentId', 'next-cid');
+    fixture.detectChanges();
+    expect(getSnapshot).toHaveBeenCalledTimes(2);
+    expect(getSnapshot).toHaveBeenLastCalledWith('next-cid');
+  });
+
+  it('drops the stale snapshot back to the neutral glyph when contentId changes while collapsed', () => {
+    const { fixture, getSnapshot, expand, collapse, liveIcon, segment } = setup();
+    expand();
+    expect(liveIcon()).not.toBeNull();
+    collapse();
+    fixture.componentRef.setInput('contentId', 'next-cid');
+    fixture.detectChanges();
+    // Stale claim cleared immediately; fetch stays lazy until next expansion.
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+    expand();
+    expect(liveIcon() ?? segment()?.textContent).toBeTruthy();
+    expect(getSnapshot).toHaveBeenCalledTimes(2);
+    expect(getSnapshot).toHaveBeenLastCalledWith('next-cid');
+  });
 });

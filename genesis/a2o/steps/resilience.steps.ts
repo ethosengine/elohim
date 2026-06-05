@@ -503,10 +503,40 @@ Then('the omni resilience segment renders a live resilience icon', async functio
 });
 
 /**
+ * Omni-scoped variant of the class assertion: on /resource/{id} TWO
+ * resilience-icon instances can coexist (protocol-omni topbar + the
+ * content-viewer header). The unscoped step's `.first()` could match the
+ * wrong one, so omni scenarios assert through the PROTOCOL_OMNI.RESILIENCE
+ * wrapper explicitly.
+ */
+Then(
+  'the omni resilience icon has class {string} or {string}',
+  async function (this: E2EWorld, classA: string, classB: string) {
+    const device = findPwDevice(this);
+    if (!device) {
+      assert.fail(NO_PW_DEVICE);
+    }
+    const icon = device.page
+      .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE}"] [data-testid="resilience-icon"]`)
+      .first();
+    await icon.waitFor({ state: 'visible', timeout: 15_000 });
+    const raw = (await icon.getAttribute('class')) ?? '';
+    const classes = raw.split(/\s+/).filter(Boolean);
+    assert.ok(
+      classes.includes(classA) || classes.includes(classB),
+      `Expected omni resilience-icon to have class "${classA}" or "${classB}"; ` +
+        `got [${classes.join(', ')}]`
+    );
+  }
+);
+
+/**
  * Assert that the omni resilience tooltip names the stewarding-collective
  * count. The icon-density tooltip renders "{N} collectives · …" (see
  * resilience-snapshot.component.html) — the headline is collectives, not
- * peers, because the household/collective is the resilience unit.
+ * peers, because the household/collective is the resilience unit. The
+ * tooltip is CSS-hidden until hover, so this hovers the icon first and
+ * waits for visibility — matching what a human actually does.
  */
 Then(
   'the omni resilience tooltip mentions stewarding collectives',
@@ -515,10 +545,15 @@ Then(
     if (!device) {
       assert.fail(NO_PW_DEVICE);
     }
+    const icon = device.page
+      .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE}"] [data-testid="resilience-icon"]`)
+      .first();
+    await icon.waitFor({ state: 'visible', timeout: 15_000 });
+    await icon.hover();
     const tooltip = device.page
       .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE}"] [data-testid="resilience-tooltip"]`)
       .first();
-    await tooltip.waitFor({ state: 'attached', timeout: 15_000 });
+    await tooltip.waitFor({ state: 'visible', timeout: 5_000 });
     const text = ((await tooltip.textContent()) ?? '').trim();
     // Bounded \d{1,9} to avoid super-linear backtracking on adversarial input.
     assert.match(
