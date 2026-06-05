@@ -16,14 +16,26 @@ import {
 // `resetThemeStoreInstance()` in afterEach to prevent that leakage.
 
 describe('ThemeStore', () => {
+  let store: ThemeStore | undefined;
+  const extraStores: ThemeStore[] = [];
+
   beforeEach(() => {
     localStorage.removeItem(THEME_STORAGE_KEY);
     document.body.removeAttribute('data-theme');
     document.body.classList.remove('theme-light', 'theme-dark', 'theme-device');
   });
 
+  afterEach(() => {
+    store?.destroy();
+    store = undefined;
+    for (const s of extraStores) {
+      s.destroy();
+    }
+    extraStores.length = 0;
+  });
+
   it('defaults to device when nothing is persisted', () => {
-    const store = new ThemeStore();
+    store = new ThemeStore();
     expect(store.theme).to.equal('device');
     expect(document.body.getAttribute('data-theme')).to.equal('device');
     expect(document.body.classList.contains('theme-device')).to.be.true;
@@ -31,13 +43,17 @@ describe('ThemeStore', () => {
 
   it('loads a persisted valid theme and ignores garbage', () => {
     localStorage.setItem(THEME_STORAGE_KEY, 'dark');
-    expect(new ThemeStore().theme).to.equal('dark');
+    const s1 = new ThemeStore();
+    extraStores.push(s1);
+    expect(s1.theme).to.equal('dark');
     localStorage.setItem(THEME_STORAGE_KEY, 'neon');
-    expect(new ThemeStore().theme).to.equal('device');
+    const s2 = new ThemeStore();
+    extraStores.push(s2);
+    expect(s2.theme).to.equal('device');
   });
 
   it('cycles device → light → dark → device', () => {
-    const store = new ThemeStore();
+    store = new ThemeStore();
     store.cycle();
     expect(store.theme).to.equal('light');
     store.cycle();
@@ -47,7 +63,7 @@ describe('ThemeStore', () => {
   });
 
   it('set() applies body class + data attribute and persists (the exact ThemeService contract)', () => {
-    const store = new ThemeStore();
+    store = new ThemeStore();
     store.set('light');
     expect(document.body.getAttribute('data-theme')).to.equal('light');
     expect(document.body.classList.contains('theme-light')).to.be.true;
@@ -56,7 +72,7 @@ describe('ThemeStore', () => {
   });
 
   it('notifies subscribers and dispatches the change event exactly once per set()', () => {
-    const store = new ThemeStore();
+    store = new ThemeStore();
     const seen: ElohimTheme[] = [];
     let events = 0;
     const onEvent = (): void => {
@@ -73,7 +89,7 @@ describe('ThemeStore', () => {
   });
 
   it('adopts an external change event without re-dispatching (no loops)', () => {
-    const store = new ThemeStore();
+    store = new ThemeStore();
     let events = 0;
     const onEvent = (): void => {
       events += 1;
@@ -88,7 +104,7 @@ describe('ThemeStore', () => {
   });
 
   it('resolves effectiveTheme for explicit themes', () => {
-    const store = new ThemeStore();
+    store = new ThemeStore();
     store.set('dark');
     expect(store.effectiveTheme).to.equal('dark');
     store.set('light');
@@ -96,13 +112,14 @@ describe('ThemeStore', () => {
   });
 
   it('destroy() removes window listeners so a destroyed instance stops reacting', () => {
-    const store = new ThemeStore();
+    store = new ThemeStore();
     store.destroy();
     // After destroy, dispatching an external change event must NOT update the store
     window.dispatchEvent(
       new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme: 'dark' } }),
     );
     expect(store.theme).to.equal('device'); // unchanged
+    // store is already destroyed; afterEach calling destroy() again is safe (idempotent)
   });
 });
 
