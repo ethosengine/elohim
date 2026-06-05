@@ -163,9 +163,9 @@ type CellId = [Uint8Array, Uint8Array];
 
 /**
  * Resolve a role's provisioned cell_id from an AppInfo. Returns null when the
- * role is absent (e.g. an app installed without the lamad cell) so the caller
- * can soft-skip — never throws on a missing role, only on a present-but-
- * unprovisioned one (which is a genuine config error).
+ * role is absent (no cells array) OR when the role key is present but no cell
+ * is provisioned yet — both cases let the caller decide (imagodei null → fatal
+ * throw in connectToConductor; lamad null → one-line warn + continue).
  *
  * @holochain/client returns two possible cell shapes depending on version:
  *   { type: "provisioned", value: { cell_id: [...] } }  — newer
@@ -184,7 +184,8 @@ function cellForRole(matchingApp: AppInfo, role: string): CellId | null {
       return (c['provisioned'] as Record<string, unknown>)['cell_id'] as CellId;
     }
   }
-  throw new Error(`App '${matchingApp.installed_app_id}' ${role} cell is not provisioned`);
+  // Role key present but no cell is provisioned — return null so the caller decides.
+  return null;
 }
 
 interface ConductorSession {
@@ -234,10 +235,13 @@ async function connectToConductor(
     const imagodeiCell = cellForRole(matchingApp, 'imagodei');
     if (!imagodeiCell) {
       await adminWs.client.close();
-      throw new Error(`App '${matchingApp.installed_app_id}' has no imagodei cells`);
+      throw new Error(`App '${matchingApp.installed_app_id}' imagodei cell is not provisioned`);
     }
     // lamad cell is optional — custody calls soft-skip when it's absent.
     const lamadCell = cellForRole(matchingApp, 'lamad');
+    if (!lamadCell) {
+      console.warn(`  [!] ${matchingApp.installed_app_id}: lamad cell not provisioned — custody will be skipped for this peer`);
+    }
 
     // Authorize signing credentials for whatever cells we resolved.
     await adminWs.authorizeSigningCredentials(imagodeiCell);
@@ -377,8 +381,51 @@ function encodeActionHash(returned: unknown): string {
 }
 
 // =============================================================================
+// Projection probe — check if the household collective already exists
+// =============================================================================
+
+const PROBE_TIMEOUT_MS = 5000;
+
+/**
+ * Query the storage/doorway projection to find an existing `family-dowell`
+ * collective cid. Returns the cid string (e.g. `collective:uhCkk...`) if the
+ * collective is already present, or `null` on probe miss / error (caller then
+ * falls through to create_collective as normal).
+ *
+ * Soft-fails on all network / JSON errors — a probe failure never aborts seeding.
+ */
+export async function resolveExistingCollectiveCid(baseUrl: string): Promise<string | null> {
+  const url = `${baseUrl.replace(/\/$/, '')}/db/collectives/family-dowell`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const headers: Record<string, string> = {};
+    if (process.env.DOORWAY_API_KEY) {
+      headers['Authorization'] = `Bearer ${process.env.DOORWAY_API_KEY}`;
+    }
+    const res = await fetch(url, { signal: controller.signal, headers });
+    if (!res.ok) {
+      return null;
+    }
+    const json = (await res.json()) as Record<string, unknown>;
+    const cid = json['collectiveCid'] ?? json['collective_cid'];
+    if (typeof cid === 'string' && cid.startsWith('collective:')) {
+      return cid;
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// =============================================================================
 // Main
 // =============================================================================
+
+// Module-level sessions reference so the fatal catch can best-effort close.
+let activeSessions: Map<string, MemberSession> = new Map();
 
 async function main(): Promise<void> {
   const conductorUrlsRaw = process.env.CONDUCTOR_URLS ?? '';
@@ -409,6 +456,7 @@ async function main(): Promise<void> {
   // -- Bind conductors to members ------------------------------------------
   console.log('Binding conductors to household members:');
   const sessions = await findMemberSessions(conductorUrls, appIdPrefix);
+  activeSessions = sessions as typeof activeSessions;
   console.log('');
 
   const founder = HOUSEHOLD_MEMBERS[0];
@@ -432,26 +480,43 @@ async function main(): Promise<void> {
 
   const affirmed = new Set<string>([founder.humanId]); // founder is steward-affirmed by create_collective
 
-  // -- 1. Founder creates the household collective -------------------------
+  // -- 1. Founder creates (or reuses) the household collective -------------
   let collectiveCid: string;
-  try {
-    const collectiveHash = await founderSession.session.appWs.callZome({
-      cell_id: founderSession.session.imagodeiCell,
-      zome_name: 'imagodei',
-      fn_name: 'create_collective',
-      payload: {
-        charter: buildHouseholdCharter(),
-        display_name: 'Dowell Family',
-        // Deterministic salt → identical entry hash on re-run → DHT-idempotent.
-        salt,
-      },
-    });
-    collectiveCid = `collective:${encodeActionHash(collectiveHash)}`;
-    console.log(`[+] collective created: ${collectiveCid}`);
-  } catch (err) {
-    console.error(`FATAL: create_collective failed: ${err instanceof Error ? err.message : err}`);
-    await closeAll();
-    process.exit(1);
+
+  // Projection probe: if STORAGE_URL or DOORWAY_URL is set, check whether the
+  // collective already exists before minting a second one.
+  const probeBase = process.env.STORAGE_URL ?? process.env.DOORWAY_URL ?? '';
+  let probedCid: string | null = null;
+  if (probeBase) {
+    probedCid = await resolveExistingCollectiveCid(probeBase);
+  }
+
+  if (probedCid) {
+    collectiveCid = probedCid;
+    console.log(`[=] reusing existing household collective ${collectiveCid}`);
+  } else {
+    try {
+      const collectiveHash = await founderSession.session.appWs.callZome({
+        cell_id: founderSession.session.imagodeiCell,
+        zome_name: 'imagodei',
+        fn_name: 'create_collective',
+        payload: {
+          charter: buildHouseholdCharter(),
+          display_name: 'Dowell Family',
+          // NOTE: create_entry mints a fresh ActionHash per run — re-running WITHOUT the
+          // projection probe creates a SECOND collective (old memberships/custody orphan
+          // under the prior cid; the SQL slug-merge re-stamps to the newest). The probe
+          // above is what makes CI re-runs convergent; keep it healthy.
+          salt,
+        },
+      });
+      collectiveCid = `collective:${encodeActionHash(collectiveHash)}`;
+      console.log(`[+] collective created: ${collectiveCid}`);
+    } catch (err) {
+      console.error(`FATAL: create_collective failed: ${err instanceof Error ? err.message : err}`);
+      await closeAll();
+      process.exit(1);
+    }
   }
 
   // -- 2. Invite + affirm each non-founder member -------------------------
@@ -515,6 +580,7 @@ async function main(): Promise<void> {
   const minor = HOUSEHOLD_MEMBERS.find(m => m.minor);
   if (minor && affirmed.has(minor.humanId)) {
     try {
+      // NOTE: grant ids embed a timestamp — a re-run mints a new grant entry (bounded noise, latest-wins semantics downstream).
       await founderSession.session.appWs.callZome({
         cell_id: founderSession.session.imagodeiCell,
         zome_name: 'imagodei',
@@ -587,6 +653,8 @@ async function main(): Promise<void> {
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.includes('already') || msg.includes('duplicate')) {
+            // NOTE: the zome has no duplicate guard today — this branch is forward-compat;
+            // convergence is provided by the SQL projection upserting on the deterministic id.
             custodyOk += 1;
             console.log(`  [=] custody ${provider.humanId} -> ${receiver.humanId} (idempotent)`);
           } else {
@@ -629,8 +697,16 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(err => {
+  main().catch(async err => {
     console.error('FATAL:', err instanceof Error ? err.stack ?? err.message : err);
+    // Best-effort close any sessions that were opened before the fatal error.
+    for (const s of activeSessions.values()) {
+      try {
+        await s.session.appWs.client.close();
+      } catch {
+        // ignore close errors during fatal cleanup
+      }
+    }
     process.exit(1);
   });
 }

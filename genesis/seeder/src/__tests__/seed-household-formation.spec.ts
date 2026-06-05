@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   buildHouseholdCharter, buildCeremonyCustodyInput, HOUSEHOLD_MEMBERS,
+  resolveExistingCollectiveCid,
 } from '../seed-household-formation.js';
 
 describe('buildHouseholdCharter', () => {
@@ -34,5 +35,62 @@ describe('HOUSEHOLD_MEMBERS', () => {
       'human-matthew-manager', 'human-jessica-spouse', 'human-james-student',
     ]);
     expect(HOUSEHOLD_MEMBERS[2].minor).toBe(true);
+  });
+});
+
+describe('resolveExistingCollectiveCid', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns the cid when collectiveCid is present and starts with collective:', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ collectiveCid: 'collective:uhCkkABCDEF' }),
+    }));
+    const result = await resolveExistingCollectiveCid('https://doorway.example.host');
+    expect(result).toBe('collective:uhCkkABCDEF');
+  });
+
+  it('returns null when collectiveCid is null', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ collectiveCid: null }),
+    }));
+    const result = await resolveExistingCollectiveCid('https://doorway.example.host');
+    expect(result).toBeNull();
+  });
+
+  it('returns null on a non-OK response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+    }));
+    const result = await resolveExistingCollectiveCid('https://doorway.example.host');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when fetch throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
+    const result = await resolveExistingCollectiveCid('https://doorway.example.host');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when cid does not start with collective:', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ collectiveCid: 'uhCkkBadPrefix' }),
+    }));
+    const result = await resolveExistingCollectiveCid('https://doorway.example.host');
+    expect(result).toBeNull();
+  });
+
+  it('also handles the snake_case collective_cid field', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ collective_cid: 'collective:uhCkkSNAKE' }),
+    }));
+    const result = await resolveExistingCollectiveCid('https://doorway.example.host');
+    expect(result).toBe('collective:uhCkkSNAKE');
   });
 });
