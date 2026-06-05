@@ -125,9 +125,4 @@ describe('HomeComponent', () => {
     expect(compiled.querySelector('app-footer')).toBeTruthy();
   });
 
-  it('should render debug bar', () => {
-    fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('app-debug-bar')).toBeTruthy();
-  });
 });

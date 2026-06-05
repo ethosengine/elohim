@@ -7,7 +7,6 @@ import { ConfigService } from '../../services/config.service';
 import { DomInteractionService } from '../../services/dom-interaction.service';
 import { CallToActionComponent } from '../call-to-action/call-to-action.component';
 import { CrisisComponent } from '../crisis/crisis.component';
-import { DebugBarComponent } from '../debug-bar/debug-bar.component';
 import { DesignPrinciplesComponent } from '../design-principles/design-principles.component';
 import { ElohimHostComponent } from '../elohim-host/elohim-host.component';
 import { FooterComponent } from '../footer/footer.component';
@@ -20,7 +19,6 @@ import { VisionComponent } from '../vision/vision.component';
   selector: 'app-home',
   standalone: true,
   imports: [
-    DebugBarComponent,
     HeroComponent,
     CrisisComponent,
     VisionComponent,
