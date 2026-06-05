@@ -4,8 +4,16 @@ import {
   THEME_CHANGE_EVENT,
   THEME_STORAGE_KEY,
   ThemeStore,
+  getThemeStore,
+  resetThemeStoreInstance,
   type ElohimTheme,
 } from './theme-store.js';
+
+// NOTE: Tests use `new ThemeStore()` directly and do NOT call `getThemeStore()`
+// in the main suite. The singleton is module-scoped and persists across test
+// cases — calling `getThemeStore()` without a matching `resetThemeStoreInstance()`
+// in afterEach would pollute subsequent tests. The singleton test below uses
+// `resetThemeStoreInstance()` in afterEach to prevent that leakage.
 
 describe('ThemeStore', () => {
   beforeEach(() => {
@@ -85,5 +93,38 @@ describe('ThemeStore', () => {
     expect(store.effectiveTheme).to.equal('dark');
     store.set('light');
     expect(store.effectiveTheme).to.equal('light');
+  });
+
+  it('destroy() removes window listeners so a destroyed instance stops reacting', () => {
+    const store = new ThemeStore();
+    store.destroy();
+    // After destroy, dispatching an external change event must NOT update the store
+    window.dispatchEvent(
+      new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme: 'dark' } }),
+    );
+    expect(store.theme).to.equal('device'); // unchanged
+  });
+});
+
+describe('getThemeStore singleton', () => {
+  afterEach(() => {
+    // Always reset so the singleton does not pollute tests that follow
+    resetThemeStoreInstance();
+    localStorage.removeItem(THEME_STORAGE_KEY);
+    document.body.removeAttribute('data-theme');
+    document.body.classList.remove('theme-light', 'theme-dark', 'theme-device');
+  });
+
+  it('returns the same instance on repeated calls (identity contract)', () => {
+    const a = getThemeStore();
+    const b = getThemeStore();
+    expect(a).to.equal(b);
+  });
+
+  it('returns a fresh instance after resetThemeStoreInstance()', () => {
+    const a = getThemeStore();
+    resetThemeStoreInstance();
+    const b = getThemeStore();
+    expect(a).to.not.equal(b);
   });
 });

@@ -34,19 +34,37 @@ type Subscriber = (theme: ElohimTheme) => void;
 export class ThemeStore {
   private _theme: ElohimTheme = 'device';
   private subscribers = new Set<Subscriber>();
+  private readonly _onStorage: (e: StorageEvent) => void;
+  private readonly _onThemeChange: (e: Event) => void;
 
   constructor() {
     this._theme = this.load();
     this.applyToDocument(this._theme);
+    this._onStorage = (e: StorageEvent): void => {
+      if (e.key === THEME_STORAGE_KEY && isTheme(e.newValue)) this.adopt(e.newValue);
+    };
+    this._onThemeChange = (e: Event): void => {
+      const t = (e as CustomEvent<{ theme?: unknown }>).detail?.theme;
+      if (isTheme(t)) this.adopt(t);
+    };
     if (typeof window !== 'undefined') {
-      window.addEventListener('storage', (e: StorageEvent) => {
-        if (e.key === THEME_STORAGE_KEY && isTheme(e.newValue)) this.adopt(e.newValue);
-      });
-      window.addEventListener(THEME_CHANGE_EVENT, (e: Event) => {
-        const t = (e as CustomEvent<{ theme?: unknown }>).detail?.theme;
-        if (isTheme(t)) this.adopt(t);
-      });
+      window.addEventListener('storage', this._onStorage);
+      window.addEventListener(THEME_CHANGE_EVENT, this._onThemeChange);
     }
+  }
+
+  /**
+   * Remove all window listeners and clear subscribers.
+   * Call from a web component's disconnectedCallback (or in tests) to avoid
+   * listener accumulation on short-lived instances.
+   * The module singleton (getThemeStore()) is intentionally never destroyed.
+   */
+  destroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', this._onStorage);
+      window.removeEventListener(THEME_CHANGE_EVENT, this._onThemeChange);
+    }
+    this.subscribers.clear();
   }
 
   get theme(): ElohimTheme {
@@ -124,4 +142,19 @@ let instance: ThemeStore | null = null;
 export function getThemeStore(): ThemeStore {
   instance ??= new ThemeStore();
   return instance;
+}
+
+/**
+ * Reset the module-level singleton — FOR TESTS ONLY.
+ *
+ * Tests MUST use `new ThemeStore()` directly and never call `getThemeStore()`,
+ * because the singleton is module-scoped and persists across test cases.
+ * If a test does call `getThemeStore()`, call `resetThemeStoreInstance()` in
+ * afterEach to prevent the polluted singleton from leaking into later tests.
+ *
+ * @internal
+ */
+export function resetThemeStoreInstance(): void {
+  instance?.destroy();
+  instance = null;
 }
