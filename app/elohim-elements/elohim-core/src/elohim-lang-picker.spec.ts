@@ -2,8 +2,19 @@ import { elementUpdated, expect, fixture, html } from '@open-wc/testing';
 import axe from 'axe-core';
 
 import './register.js';
+import {
+  assertThemeContrast,
+  assertThemeReactivity,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 import { ElohimLangPicker as PickerClass } from './elohim-lang-picker.js';
-import { LOCALE_STORAGE_KEY, getLocaleStore, resetLocaleStoreInstance } from './localize/locale-store.js';
+import {
+  LOCALE_STORAGE_KEY,
+  getLocaleStore,
+  resetLocaleStoreInstance,
+} from './localize/locale-store.js';
 
 describe('<elohim-lang-picker>', () => {
   beforeEach(() => {
@@ -20,14 +31,18 @@ describe('<elohim-lang-picker>', () => {
   });
 
   it('renders a select with the three locales in native script', async () => {
-    const el = await fixture<ElohimLangPicker>(html`<elohim-lang-picker></elohim-lang-picker>`);
+    const el = await fixture<ElohimLangPicker>(html`
+      <elohim-lang-picker></elohim-lang-picker>
+    `);
     const options = [...el.shadowRoot!.querySelectorAll('option')];
-    expect(options.map((o) => o.value)).to.deep.equal(['en', 'es', 'he']);
-    expect(options.map((o) => o.textContent?.trim())).to.deep.equal(['English', 'Español', 'עברית']);
+    expect(options.map(o => o.value)).to.deep.equal(['en', 'es', 'he']);
+    expect(options.map(o => o.textContent?.trim())).to.deep.equal(['English', 'Español', 'עברית']);
   });
 
   it('selecting a locale drives the store, document lang/dir, and persists', async () => {
-    const el = await fixture<ElohimLangPicker>(html`<elohim-lang-picker></elohim-lang-picker>`);
+    const el = await fixture<ElohimLangPicker>(html`
+      <elohim-lang-picker></elohim-lang-picker>
+    `);
     const select = el.shadowRoot!.querySelector<HTMLSelectElement>('select')!;
     select.value = 'he';
     select.dispatchEvent(new Event('change'));
@@ -38,9 +53,11 @@ describe('<elohim-lang-picker>', () => {
   });
 
   it('dispatches locale-changed with the new locale', async () => {
-    const el = await fixture<ElohimLangPicker>(html`<elohim-lang-picker></elohim-lang-picker>`);
+    const el = await fixture<ElohimLangPicker>(html`
+      <elohim-lang-picker></elohim-lang-picker>
+    `);
     let detail: { locale?: string } | null = null;
-    el.addEventListener('locale-changed', (e) => {
+    el.addEventListener('locale-changed', e => {
       detail = (e as CustomEvent<{ locale: string }>).detail;
     });
     const select = el.shadowRoot!.querySelector<HTMLSelectElement>('select')!;
@@ -50,10 +67,40 @@ describe('<elohim-lang-picker>', () => {
   });
 
   it('passes the a11y gate (axe)', async () => {
-    const el = await fixture<ElohimLangPicker>(html`<elohim-lang-picker></elohim-lang-picker>`);
+    const el = await fixture<ElohimLangPicker>(html`
+      <elohim-lang-picker></elohim-lang-picker>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.be.empty;
   });
 });
 
 import type { ElohimLangPicker } from './elohim-lang-picker.js';
+
+describe('<elohim-lang-picker> — theme-contrast gate', () => {
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark', 'tokens-light', 'tokens-dark'];
+
+  for (const cell of CELLS) {
+    it(`picker passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<HTMLElement>(
+        html`
+          <elohim-lang-picker></elohim-lang-picker>
+        `,
+        cell
+      );
+      await (el as { updateComplete?: Promise<unknown> }).updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
+
+  it('picker reacts to the theme (frozen-chain canary)', async () => {
+    await assertThemeReactivity<HTMLElement>(
+      () =>
+        html`
+          <elohim-lang-picker></elohim-lang-picker>
+        `,
+      el => el.shadowRoot!.querySelector('select')
+    );
+  });
+});

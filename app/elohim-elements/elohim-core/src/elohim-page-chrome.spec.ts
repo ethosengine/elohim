@@ -6,6 +6,7 @@ import { ElohimPageChrome as ElohimPageChromeClass } from './elohim-page-chrome.
 import { ElohimDefaultOmnibar as ElohimDefaultOmnibarClass } from './elohim-default-omnibar.js';
 import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
 import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
+import { assertThemeContrast, axeScanStrict, themeFixture, type ThemeCell } from './testing/theme-contrast.js';
 
 // ---------------------------------------------------------------------------
 // <elohim-page-chrome>
@@ -330,4 +331,28 @@ describe('<elohim-default-omnibar> opt-in controls', () => {
     `);
     expect(el.shadowRoot!.querySelector('[part="user"]')).to.exist;
   });
+});
+
+describe('<elohim-page-chrome> — theme-contrast gate', () => {
+  // page-chrome is a pure layout wrapper (no themed surface of its own — the
+  // omnibar slot + main slot carry all color), so the reactivity canary is
+  // intentionally omitted; contrast runs over slotted content + the nested
+  // default omnibar.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark', 'tokens-light', 'tokens-dark'];
+
+  for (const cell of CELLS) {
+    it(`chrome with slotted content passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<HTMLElement>(
+        html`
+          <elohim-page-chrome>
+            <p>page body text</p>
+          </elohim-page-chrome>
+        `,
+        cell
+      );
+      await (el as { updateComplete?: Promise<unknown> }).updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });
