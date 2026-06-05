@@ -1,5 +1,4 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { Router } from '@angular/router';
 
 import { of, timer } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -22,7 +21,6 @@ describe('ElohimPresenceService', () => {
   let service: ElohimPresenceService;
   let mockAgentService: any;
   let mockBannerService: any;
-  let mockRouter: any;
   let mockEprNav: any;
   let mockPathRecommendation: any;
   let mockLearnerContext: any;
@@ -74,11 +72,6 @@ describe('ElohimPresenceService', () => {
       unregisterProvider: vi.fn(),
     };
 
-    mockRouter = {
-      navigate: vi.fn(),
-    };
-    mockRouter.navigate.mockReturnValue(Promise.resolve(true));
-
     mockEprNav = {
       navigate: vi.fn(),
       ownsPath: vi.fn(),
@@ -103,7 +96,6 @@ describe('ElohimPresenceService', () => {
         ElohimPresenceService,
         { provide: ElohimAgentService, useValue: mockAgentService },
         { provide: BannerService, useValue: mockBannerService },
-        { provide: Router, useValue: mockRouter },
         { provide: PathRecommendationService, useValue: mockPathRecommendation },
         { provide: LearnerContextService, useValue: mockLearnerContext },
         {

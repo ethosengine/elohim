@@ -17,7 +17,7 @@ import { Router } from '@angular/router';
 
 import { environment } from '../../../environments/environment';
 
-import { EprNavService } from './../../elohim/services/epr-nav.service';
+import { EprNavService } from '../../elohim/services/epr-nav.service';
 import { AuthService } from './auth.service';
 import { DoorwayRegistryService } from './doorway-registry.service';
 

@@ -11,7 +11,6 @@
  */
 
 import { Injectable, OnDestroy, inject } from '@angular/core';
-import { Router } from '@angular/router';
 
 import { map, switchMap } from 'rxjs/operators';
 
@@ -47,7 +46,6 @@ const CAPABILITY_SPIRAL: ElohimCapability = 'spiral-detection';
 export class ElohimPresenceService implements BannerNoticeProvider, OnDestroy {
   readonly providerId = PROVIDER_ID;
 
-  private readonly router = inject(Router);
   private readonly eprNav = inject(EprNavService);
   private readonly moments$ = new BehaviorSubject<ElohimPresenceMoment[]>([]);
   private readonly sessionCost$ = new BehaviorSubject<ElohimComputationCost>({

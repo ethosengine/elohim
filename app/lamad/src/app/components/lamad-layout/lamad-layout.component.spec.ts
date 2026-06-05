@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { LamadLayoutComponent } from './lamad-layout.component';
 import { provideRouter } from '@angular/router';
+import { Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { ELOHIM_CLIENT, GOVERNANCE, CONTENT_ATTESTATION } from '@elohim/service';
 import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
@@ -39,6 +40,7 @@ describe('LamadLayoutComponent', () => {
         {
           provide: DataLoaderService,
           useValue: {
+            checkReadiness: vi.fn().mockReturnValue(of(true)),
             getContentIndex: vi.fn().mockReturnValue(of({ nodes: [] })),
             getContent: vi.fn(),
           },
@@ -53,5 +55,69 @@ describe('LamadLayoutComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  // =========================================================================
+  // onNavigatorNavigate
+  // =========================================================================
+
+  describe('onNavigatorNavigate', () => {
+    let router: Router;
+    let navigateSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      router = TestBed.inject(Router);
+      navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should call router.navigateByUrl with stripped path for lamad-owned route', () => {
+      const event = new CustomEvent('navigator-navigate', {
+        detail: { route: '/lamad/path/x' },
+      });
+      component.onNavigatorNavigate(event);
+      expect(navigateSpy).toHaveBeenCalledWith('/path/x');
+    });
+
+    it('should call router.navigateByUrl with "/" for bare /lamad route', () => {
+      const event = new CustomEvent('navigator-navigate', {
+        detail: { route: '/lamad' },
+      });
+      component.onNavigatorNavigate(event);
+      expect(navigateSpy).toHaveBeenCalledWith('/');
+    });
+
+    it('should call location.assign for cross-bundle route', () => {
+      const assignSpy = vi.fn();
+      vi.stubGlobal('location', { ...globalThis.location, assign: assignSpy });
+
+      try {
+        const event = new CustomEvent('navigator-navigate', {
+          detail: { route: '/identity/login' },
+        });
+        component.onNavigatorNavigate(event);
+        expect(assignSpy).toHaveBeenCalledWith('/identity/login');
+        expect(navigateSpy).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('should do nothing when event has no detail.route', () => {
+      const assignSpy = vi.fn();
+      vi.stubGlobal('location', { ...globalThis.location, assign: assignSpy });
+
+      try {
+        const event = new CustomEvent('navigator-navigate', { detail: {} });
+        component.onNavigatorNavigate(event);
+        expect(navigateSpy).not.toHaveBeenCalled();
+        expect(assignSpy).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
   });
 });
