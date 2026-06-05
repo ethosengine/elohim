@@ -46,7 +46,9 @@ describe('epr-link-interceptor', () => {
   });
 
   async function clickAnchor(href: string, mod: Partial<MouseEventInit> = {}): Promise<MouseEvent> {
-    const a = await fixture<HTMLAnchorElement>(html`<a href=${href}>link</a>`);
+    const a = await fixture<HTMLAnchorElement>(html`
+      <a href=${href}>link</a>
+    `);
     const ev = new MouseEvent('click', { bubbles: true, cancelable: true, composed: true, ...mod });
     a.dispatchEvent(ev);
     return ev;
@@ -90,7 +92,9 @@ describe('epr-link-interceptor', () => {
     bubbleReached = false;
 
     // _blank target
-    const blank = await fixture<HTMLAnchorElement>(html`<a href="/lamad" target="_blank">x</a>`);
+    const blank = await fixture<HTMLAnchorElement>(html`
+      <a href="/lamad" target="_blank">x</a>
+    `);
     const evBlank = new MouseEvent('click', { bubbles: true, cancelable: true });
     blank.dispatchEvent(evBlank);
     expect(assigned).to.be.empty;
@@ -99,7 +103,9 @@ describe('epr-link-interceptor', () => {
     bubbleReached = false;
 
     // download attribute
-    const dl = await fixture<HTMLAnchorElement>(html`<a href="/lamad" download>x</a>`);
+    const dl = await fixture<HTMLAnchorElement>(html`
+      <a href="/lamad" download>x</a>
+    `);
     const evDl = new MouseEvent('click', { bubbles: true, cancelable: true });
     dl.dispatchEvent(evDl);
     expect(assigned).to.be.empty;
@@ -115,7 +121,9 @@ describe('epr-link-interceptor', () => {
     bubbleReached = false;
 
     // data-epr-bypass attribute
-    const bypass = await fixture<HTMLAnchorElement>(html`<a href="/lamad" data-epr-bypass>x</a>`);
+    const bypass = await fixture<HTMLAnchorElement>(html`
+      <a href="/lamad" data-epr-bypass>x</a>
+    `);
     const evBy = new MouseEvent('click', { bubbles: true, cancelable: true });
     bypass.dispatchEvent(evBy);
     expect(assigned).to.be.empty;
@@ -124,7 +132,7 @@ describe('epr-link-interceptor', () => {
 
   it('calls beforeCrossBundle instead of the default handoff when provided', async () => {
     let called: string | null = null;
-    install({ ownsPath: () => false, beforeCrossBundle: (href) => (called = href) });
+    install({ ownsPath: () => false, beforeCrossBundle: href => (called = href) });
     await clickAnchor('/lamad?x=1');
     expect(called).to.equal('/lamad?x=1');
     expect(sessionStorage.getItem(NAV_STACK_KEY)).to.be.null;
@@ -136,11 +144,15 @@ describe('epr-link-interceptor', () => {
   it('explicit install replaces a default install; default never replaces', () => {
     const u1 = installEprLinkInterceptor({ assign: () => undefined });
     const u2 = installEprLinkInterceptor({ assign: () => undefined }); // default vs existing → no-op handle
-    const u3 = installEprLinkInterceptor({ explicit: true, ownsPath: () => true, assign: () => undefined });
+    const u3 = installEprLinkInterceptor({
+      explicit: true,
+      ownsPath: () => true,
+      assign: () => undefined,
+    });
     u2(); // must be safe and must NOT remove the active explicit install
     u3();
     u1();
-    expect(window.__elohimEprLinkInterceptor).to.be.undefined;
+    expect(globalThis.__elohimEprLinkInterceptor).to.be.undefined;
   });
 
   it('recordCrossBundleHandoff caps the stack at 32 entries', () => {

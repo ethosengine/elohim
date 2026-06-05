@@ -566,6 +566,7 @@ describe('<elohim-compute-tile> — ua-prefs precondition gate', () => {
       }
     ).styles.cssText;
     const fcStart = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const snippet = cssText.slice(fcStart, fcStart + 500);
     expect(snippet).to.include('Canvas');
     expect(snippet).to.include('CanvasText');

@@ -93,11 +93,7 @@ export class ElohimPageChrome extends LitElement {
     const slot = e.target as HTMLSlotElement;
     const assigned = slot
       .assignedNodes({ flatten: true })
-      .filter(
-        (n) =>
-          n.nodeType === Node.ELEMENT_NODE ||
-          (n.textContent?.trim().length ?? 0) > 0,
-      );
+      .filter(n => n.nodeType === Node.ELEMENT_NODE || (n.textContent?.trim().length ?? 0) > 0);
     this.hasSlottedOmnibar = assigned.length > 0;
   }
 }

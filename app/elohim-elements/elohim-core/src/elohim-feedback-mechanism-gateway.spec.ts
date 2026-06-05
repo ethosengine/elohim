@@ -18,86 +18,90 @@ describe('<elohim-feedback-mechanism-gateway>', () => {
   });
 
   it('shows loading state when loading=true', async () => {
-    const el = await fixture<ElohimFeedbackMechanismGateway>(
-      html`<elohim-feedback-mechanism-gateway
-        loading
-      ></elohim-feedback-mechanism-gateway>`,
-    );
+    const el = await fixture<ElohimFeedbackMechanismGateway>(html`
+      <elohim-feedback-mechanism-gateway loading></elohim-feedback-mechanism-gateway>
+    `);
     const loading = el.shadowRoot?.querySelector('[data-testid="gateway-loading"]');
     expect(loading).to.exist;
     expect(loading?.textContent).to.contain('Loading governance');
   });
 
   it('shows loading state when selection is null', async () => {
-    const el = await fixture<ElohimFeedbackMechanismGateway>(
-      html`<elohim-feedback-mechanism-gateway></elohim-feedback-mechanism-gateway>`,
-    );
+    const el = await fixture<ElohimFeedbackMechanismGateway>(html`
+      <elohim-feedback-mechanism-gateway></elohim-feedback-mechanism-gateway>
+    `);
     const loading = el.shadowRoot?.querySelector('[data-testid="gateway-loading"]');
     expect(loading).to.exist;
   });
 
   it('renders reactions slot for level 1 angular selection', async () => {
-    const el = await fixture<ElohimFeedbackMechanismGateway>(
-      html`<elohim-feedback-mechanism-gateway
-        .selection=${{ level: 1, renderTarget: 'angular' }}
-      >
+    const el = await fixture<ElohimFeedbackMechanismGateway>(html`
+      <elohim-feedback-mechanism-gateway .selection=${{ level: 1, renderTarget: 'angular' }}>
         <div slot="reactions" data-testid="reactions-slot-content">Reactions</div>
-      </elohim-feedback-mechanism-gateway>`,
-    );
+      </elohim-feedback-mechanism-gateway>
+    `);
 
     const slot = el.shadowRoot?.querySelector('slot[name="reactions"]');
     expect(slot).to.exist;
   });
 
   it('renders context-menu slot for level 0 angular selection', async () => {
-    const el = await fixture<ElohimFeedbackMechanismGateway>(
-      html`<elohim-feedback-mechanism-gateway
-        .selection=${{ level: 0, renderTarget: 'angular' }}
-      >
+    const el = await fixture<ElohimFeedbackMechanismGateway>(html`
+      <elohim-feedback-mechanism-gateway .selection=${{ level: 0, renderTarget: 'angular' }}>
         <div slot="context-menu">Menu</div>
-      </elohim-feedback-mechanism-gateway>`,
-    );
+      </elohim-feedback-mechanism-gateway>
+    `);
     const slot = el.shadowRoot?.querySelector('slot[name="context-menu"]');
     expect(slot).to.exist;
   });
 
   it('renders psephos slot for psephos render target', async () => {
-    const el = await fixture<ElohimFeedbackMechanismGateway>(
-      html`<elohim-feedback-mechanism-gateway
-        .selection=${{ level: 3, renderTarget: 'psephos' }}
-      >
+    const el = await fixture<ElohimFeedbackMechanismGateway>(html`
+      <elohim-feedback-mechanism-gateway .selection=${{ level: 3, renderTarget: 'psephos' }}>
         <div slot="psephos">Ballot</div>
-      </elohim-feedback-mechanism-gateway>`,
-    );
+      </elohim-feedback-mechanism-gateway>
+    `);
     const slot = el.shadowRoot?.querySelector('slot[name="psephos"]');
     expect(slot).to.exist;
   });
 
   it('shows sensemaking badge when readyForSensemaking=true', async () => {
-    const el = await fixture<ElohimFeedbackMechanismGateway>(
-      html`<elohim-feedback-mechanism-gateway
+    const el = await fixture<ElohimFeedbackMechanismGateway>(html`
+      <elohim-feedback-mechanism-gateway
         .selection=${{ level: 1, renderTarget: 'angular' }}
-        .accumulationStatus=${{ readyForSensemaking: true, controversyDetected: false, settled: false }}
-      ></elohim-feedback-mechanism-gateway>`,
-    );
+        .accumulationStatus=${{
+          readyForSensemaking: true,
+          controversyDetected: false,
+          settled: false,
+        }}
+      ></elohim-feedback-mechanism-gateway>
+    `);
     const badge = el.shadowRoot?.querySelector('[data-testid="sensemaking-link"]');
     expect(badge).to.exist;
   });
 
   it('dispatches sensemaking-navigate event when sensemaking badge is clicked', async () => {
-    const el = await fixture<ElohimFeedbackMechanismGateway>(
-      html`<elohim-feedback-mechanism-gateway
+    const el = await fixture<ElohimFeedbackMechanismGateway>(html`
+      <elohim-feedback-mechanism-gateway
         entity-type="content"
         entity-id="test-id"
         .selection=${{ level: 1, renderTarget: 'angular' }}
-        .accumulationStatus=${{ readyForSensemaking: true, controversyDetected: false, settled: false }}
-      ></elohim-feedback-mechanism-gateway>`,
-    );
+        .accumulationStatus=${{
+          readyForSensemaking: true,
+          controversyDetected: false,
+          settled: false,
+        }}
+      ></elohim-feedback-mechanism-gateway>
+    `);
 
     let navigated = false;
-    el.addEventListener('sensemaking-navigate', () => { navigated = true; });
+    el.addEventListener('sensemaking-navigate', () => {
+      navigated = true;
+    });
 
-    const badge = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="sensemaking-link"]');
+    const badge = el.shadowRoot?.querySelector<HTMLButtonElement>(
+      '[data-testid="sensemaking-link"]'
+    );
     badge?.click();
 
     expect(navigated).to.be.true;
@@ -105,26 +109,34 @@ describe('<elohim-feedback-mechanism-gateway>', () => {
 
   it('calls onNavigateToSensemaking callback when provided', async () => {
     let called = false;
-    const callback = () => { called = true; };
+    const callback = () => {
+      called = true;
+    };
 
-    const el = await fixture<ElohimFeedbackMechanismGateway>(
-      html`<elohim-feedback-mechanism-gateway
+    const el = await fixture<ElohimFeedbackMechanismGateway>(html`
+      <elohim-feedback-mechanism-gateway
         .selection=${{ level: 1, renderTarget: 'angular' }}
-        .accumulationStatus=${{ readyForSensemaking: true, controversyDetected: false, settled: false }}
+        .accumulationStatus=${{
+          readyForSensemaking: true,
+          controversyDetected: false,
+          settled: false,
+        }}
         .onNavigateToSensemaking=${callback}
-      ></elohim-feedback-mechanism-gateway>`,
-    );
+      ></elohim-feedback-mechanism-gateway>
+    `);
 
-    const badge = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="sensemaking-link"]');
+    const badge = el.shadowRoot?.querySelector<HTMLButtonElement>(
+      '[data-testid="sensemaking-link"]'
+    );
     badge?.click();
 
     expect(called).to.be.true;
   });
 
   it('passes axe-core a11y scan in loading state', async () => {
-    const el = await fixture<ElohimFeedbackMechanismGateway>(
-      html`<elohim-feedback-mechanism-gateway loading></elohim-feedback-mechanism-gateway>`,
-    );
+    const el = await fixture<ElohimFeedbackMechanismGateway>(html`
+      <elohim-feedback-mechanism-gateway loading></elohim-feedback-mechanism-gateway>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -162,13 +174,15 @@ describe('<elohim-feedback-mechanism-gateway> — theme-contrast gate', () => {
   for (const cell of CELLS) {
     it(`passes contrast in ${cell}`, async () => {
       const { el } = await themeFixture<ElohimFeedbackMechanismGateway>(
-        html`<elohim-feedback-mechanism-gateway
-          entity-type="content"
-          entity-id="test-id"
-          .selection=${selection}
-          .accumulationStatus=${accumulationStatus}
-        ></elohim-feedback-mechanism-gateway>`,
-        cell,
+        html`
+          <elohim-feedback-mechanism-gateway
+            entity-type="content"
+            entity-id="test-id"
+            .selection=${selection}
+            .accumulationStatus=${accumulationStatus}
+          ></elohim-feedback-mechanism-gateway>
+        `,
+        cell
       );
       await el.updateComplete;
       assertThemeContrast(el);

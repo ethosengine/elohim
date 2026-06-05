@@ -18,46 +18,46 @@ describe('<elohim-reaction-bar>', () => {
   });
 
   it('renders with default permitted reactions', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar></elohim-reaction-bar>`,
-    );
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar></elohim-reaction-bar>
+    `);
     const bar = el.shadowRoot?.querySelector('[data-testid="reaction-moved"]');
     expect(bar).to.exist;
   });
 
   it('respects custom constraints permittedTypes', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar
         .constraints=${{ permittedTypes: ['grateful', 'inspired'] }}
-      ></elohim-reaction-bar>`,
-    );
+      ></elohim-reaction-bar>
+    `);
     expect(el.shadowRoot?.querySelector('[data-testid="reaction-grateful"]')).to.exist;
     expect(el.shadowRoot?.querySelector('[data-testid="reaction-moved"]')).to.be.null;
   });
 
   it('shows reaction count badge when showCounts is true and count > 0', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar
         .counts=${[{ type: 'moved', count: 5 }]}
         .showCounts=${true}
-      ></elohim-reaction-bar>`,
-    );
+      ></elohim-reaction-bar>
+    `);
     const count = el.shadowRoot?.querySelector('.reaction-count');
     expect(count?.textContent?.trim()).to.equal('5');
   });
 
   it('hides label in compact mode', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar compact></elohim-reaction-bar>`,
-    );
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar compact></elohim-reaction-bar>
+    `);
     const label = el.shadowRoot?.querySelector('.reaction-label');
     expect(label).to.be.null;
   });
 
   it('dispatches reaction-submit event when a reaction button is clicked', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar entity-type="content" entity-id="test-123"></elohim-reaction-bar>`,
-    );
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar entity-type="content" entity-id="test-123"></elohim-reaction-bar>
+    `);
 
     let submitted: unknown = null;
     el.addEventListener('reaction-submit', (e: Event) => {
@@ -71,12 +71,9 @@ describe('<elohim-reaction-bar>', () => {
   });
 
   it('dispatches reaction-remove when a user reaction is clicked again (toggle)', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar
-        entity-id="test-123"
-        .userReactions=${['moved']}
-      ></elohim-reaction-bar>`,
-    );
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar entity-id="test-123" .userReactions=${['moved']}></elohim-reaction-bar>
+    `);
 
     let removed: unknown = null;
     el.addEventListener('reaction-remove', (e: Event) => {
@@ -90,8 +87,8 @@ describe('<elohim-reaction-bar>', () => {
   });
 
   it('shows mediation dialog for mediated reactions', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar
         .constraints=${{
           permittedTypes: ['uncomfortable'],
           mediatedTypes: [
@@ -102,11 +99,11 @@ describe('<elohim-reaction-bar>', () => {
             },
           ],
         }}
-      ></elohim-reaction-bar>`,
-    );
+      ></elohim-reaction-bar>
+    `);
 
     const btn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="reaction-uncomfortable"]',
+      '[data-testid="reaction-uncomfortable"]'
     );
     btn?.click();
     await elementUpdated(el);
@@ -117,8 +114,8 @@ describe('<elohim-reaction-bar>', () => {
   });
 
   it('closes mediation dialog on cancel', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar
         .constraints=${{
           permittedTypes: ['uncomfortable'],
           mediatedTypes: [
@@ -129,17 +126,17 @@ describe('<elohim-reaction-bar>', () => {
             },
           ],
         }}
-      ></elohim-reaction-bar>`,
-    );
+      ></elohim-reaction-bar>
+    `);
 
     const btn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="reaction-uncomfortable"]',
+      '[data-testid="reaction-uncomfortable"]'
     );
     btn?.click();
     await elementUpdated(el);
 
     const cancel = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="mediation-cancel-btn"]',
+      '[data-testid="mediation-cancel-btn"]'
     );
     cancel?.click();
     await elementUpdated(el);
@@ -149,13 +146,13 @@ describe('<elohim-reaction-bar>', () => {
 
   it('calls onReactionSubmit callback when provided', async () => {
     let callbackEvent: unknown = null;
-    const onSubmit = (e: unknown) => { callbackEvent = e; };
+    const onSubmit = (e: unknown) => {
+      callbackEvent = e;
+    };
 
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar
-        .onReactionSubmit=${onSubmit}
-      ></elohim-reaction-bar>`,
-    );
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar .onReactionSubmit=${onSubmit}></elohim-reaction-bar>
+    `);
 
     const btn = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="reaction-moved"]');
     btn?.click();
@@ -164,25 +161,25 @@ describe('<elohim-reaction-bar>', () => {
   });
 
   it('marks user reactions as aria-pressed=true', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar .userReactions=${['grateful']}></elohim-reaction-bar>`,
-    );
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar .userReactions=${['grateful']}></elohim-reaction-bar>
+    `);
     const btn = el.shadowRoot?.querySelector('[data-testid="reaction-grateful"]');
     expect(btn?.getAttribute('aria-pressed')).to.equal('true');
   });
 
   it('marks non-user reactions as aria-pressed=false', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar></elohim-reaction-bar>`,
-    );
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar></elohim-reaction-bar>
+    `);
     const btn = el.shadowRoot?.querySelector('[data-testid="reaction-moved"]');
     expect(btn?.getAttribute('aria-pressed')).to.equal('false');
   });
 
   it('passes axe-core a11y scan', async () => {
-    const el = await fixture<ElohimReactionBar>(
-      html`<elohim-reaction-bar></elohim-reaction-bar>`,
-    );
+    const el = await fixture<ElohimReactionBar>(html`
+      <elohim-reaction-bar></elohim-reaction-bar>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -215,6 +212,7 @@ describe('<elohim-reaction-bar> — ua-prefs precondition gate', () => {
     const cssText = (ElohimReactionBarClass as { styles: { cssText: string } }).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const afterForced = cssText.slice(forcedIdx);
     const hasSystemColor =
       afterForced.includes('ButtonFace') ||
@@ -236,11 +234,13 @@ describe('<elohim-reaction-bar> — theme-contrast gate', () => {
       // labels plus a GrayText count badge ("5") via showCounts. Mediation
       // overlay stays closed (no mediated click), matching the default view.
       const { el } = await themeFixture<ElohimReactionBar>(
-        html`<elohim-reaction-bar
-          .counts=${[{ type: 'moved', count: 5 }]}
-          .showCounts=${true}
-        ></elohim-reaction-bar>`,
-        cell,
+        html`
+          <elohim-reaction-bar
+            .counts=${[{ type: 'moved', count: 5 }]}
+            .showCounts=${true}
+          ></elohim-reaction-bar>
+        `,
+        cell
       );
       await el.updateComplete;
       assertThemeContrast(el);

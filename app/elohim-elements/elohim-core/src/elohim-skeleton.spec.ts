@@ -19,7 +19,9 @@ describe('<elohim-skeleton>', () => {
   });
 
   it('renders with default width, height, and radius', async () => {
-    const el = await fixture<ElohimSkeleton>(html`<elohim-skeleton></elohim-skeleton>`);
+    const el = await fixture<ElohimSkeleton>(html`
+      <elohim-skeleton></elohim-skeleton>
+    `);
     expect(el).to.exist;
     expect(el.width).to.equal('100%');
     expect(el.height).to.equal('1rem');
@@ -35,33 +37,43 @@ describe('<elohim-skeleton>', () => {
   });
 
   it('updates inline style when width property changes', async () => {
-    const el = await fixture<ElohimSkeleton>(html`<elohim-skeleton></elohim-skeleton>`);
+    const el = await fixture<ElohimSkeleton>(html`
+      <elohim-skeleton></elohim-skeleton>
+    `);
     el.width = '320px';
     await elementUpdated(el);
     expect(el.style.width).to.equal('320px');
   });
 
   it('updates inline style when height property changes', async () => {
-    const el = await fixture<ElohimSkeleton>(html`<elohim-skeleton></elohim-skeleton>`);
+    const el = await fixture<ElohimSkeleton>(html`
+      <elohim-skeleton></elohim-skeleton>
+    `);
     el.height = '3rem';
     await elementUpdated(el);
     expect(el.style.height).to.equal('3rem');
   });
 
   it('updates --elohim-skeleton-radius custom property when radius changes', async () => {
-    const el = await fixture<ElohimSkeleton>(html`<elohim-skeleton></elohim-skeleton>`);
+    const el = await fixture<ElohimSkeleton>(html`
+      <elohim-skeleton></elohim-skeleton>
+    `);
     el.radius = '8px';
     await elementUpdated(el);
     expect(el.style.getPropertyValue('--elohim-skeleton-radius')).to.equal('8px');
   });
 
   it('has shadowRoot', async () => {
-    const el = await fixture<ElohimSkeleton>(html`<elohim-skeleton></elohim-skeleton>`);
+    const el = await fixture<ElohimSkeleton>(html`
+      <elohim-skeleton></elohim-skeleton>
+    `);
     expect(el.shadowRoot).to.exist;
   });
 
   it('passes axe-core a11y scan in default state', async () => {
-    const el = await fixture<ElohimSkeleton>(html`<elohim-skeleton></elohim-skeleton>`);
+    const el = await fixture<ElohimSkeleton>(html`
+      <elohim-skeleton></elohim-skeleton>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -112,6 +124,7 @@ describe('<elohim-skeleton> — ua-prefs precondition gate', () => {
     expect(cssText).to.contain('forced-colors: active');
     // At minimum one system color is referenced inside the forced-colors block
     const forcedIdx = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const afterForced = cssText.slice(forcedIdx);
     const hasSystemColor =
       afterForced.includes('ButtonFace') ||
@@ -149,7 +162,9 @@ describe('<elohim-skeleton> — theme-contrast gate', () => {
   for (const cell of CELLS) {
     it(`passes contrast in ${cell}`, async () => {
       const { el } = await themeFixture<ElohimSkeleton>(
-        html`<elohim-skeleton width="200px" height="48px"></elohim-skeleton>`,
+        html`
+          <elohim-skeleton width="200px" height="48px"></elohim-skeleton>
+        `,
         cell
       );
       await el.updateComplete;

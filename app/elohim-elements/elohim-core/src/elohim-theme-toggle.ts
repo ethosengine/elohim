@@ -35,7 +35,7 @@ import { getThemeStore, type ElohimTheme } from './theme/theme-store.js';
  * @capabilityStates empty:n/a, loading:n/a, error:n/a, stale:n/a, contested:n/a, offline:n/a, unauthorized:n/a
  */
 export class ElohimThemeToggle extends LitElement {
-  private _store = getThemeStore();
+  private readonly _store = getThemeStore();
 
   @state() private _theme: ElohimTheme = this._store.theme;
 
@@ -97,7 +97,7 @@ export class ElohimThemeToggle extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this._unsub = this._store.subscribe((t) => {
+    this._unsub = this._store.subscribe(t => {
       this._theme = t;
     });
     this._theme = this._store.theme;
@@ -124,7 +124,7 @@ export class ElohimThemeToggle extends LitElement {
         detail: { theme: this._store.theme },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -132,9 +132,13 @@ export class ElohimThemeToggle extends LitElement {
     const label = this._label();
     return html`
       <button part="button" type="button" aria-label=${label} title=${label} @click=${this._cycle}>
-        <span part="icon" aria-hidden="true">${this._store.effectiveTheme === 'dark' ? '🌙' : '☀️'}</span>
+        <span part="icon" aria-hidden="true">
+          ${this._store.effectiveTheme === 'dark' ? '🌙' : '☀️'}
+        </span>
         ${this._theme === 'device'
-          ? html`<span part="auto-indicator" aria-hidden="true">A</span>`
+          ? html`
+              <span part="auto-indicator" aria-hidden="true">A</span>
+            `
           : nothing}
       </button>
     `;

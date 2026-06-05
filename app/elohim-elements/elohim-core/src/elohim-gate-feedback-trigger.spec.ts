@@ -18,19 +18,21 @@ describe('<elohim-gate-feedback-trigger>', () => {
   });
 
   it('renders the trigger button', async () => {
-    const el = await fixture<ElohimGateFeedbackTrigger>(
-      html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-    );
+    const el = await fixture<ElohimGateFeedbackTrigger>(html`
+      <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+    `);
     const btn = el.shadowRoot?.querySelector('[data-testid="feedback-trigger-btn"]');
     expect(btn).to.exist;
   });
 
   it('opens dropdown menu when trigger is clicked', async () => {
-    const el = await fixture<ElohimGateFeedbackTrigger>(
-      html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-    );
+    const el = await fixture<ElohimGateFeedbackTrigger>(html`
+      <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+    `);
 
-    const btn = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="feedback-trigger-btn"]');
+    const btn = el.shadowRoot?.querySelector<HTMLButtonElement>(
+      '[data-testid="feedback-trigger-btn"]'
+    );
     btn?.click();
     await elementUpdated(el);
 
@@ -39,18 +41,18 @@ describe('<elohim-gate-feedback-trigger>', () => {
   });
 
   it('closes menu and opens modal when menu item is clicked', async () => {
-    const el = await fixture<ElohimGateFeedbackTrigger>(
-      html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-    );
+    const el = await fixture<ElohimGateFeedbackTrigger>(html`
+      <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+    `);
 
     const triggerBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-trigger-btn"]',
+      '[data-testid="feedback-trigger-btn"]'
     );
     triggerBtn?.click();
     await elementUpdated(el);
 
     const flagItem = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-menu-item-flag"]',
+      '[data-testid="feedback-menu-item-flag"]'
     );
     flagItem?.click();
     await elementUpdated(el);
@@ -64,18 +66,18 @@ describe('<elohim-gate-feedback-trigger>', () => {
   });
 
   it('modal title matches selected feedback type', async () => {
-    const el = await fixture<ElohimGateFeedbackTrigger>(
-      html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-    );
+    const el = await fixture<ElohimGateFeedbackTrigger>(html`
+      <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+    `);
 
     const triggerBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-trigger-btn"]',
+      '[data-testid="feedback-trigger-btn"]'
     );
     triggerBtn?.click();
     await elementUpdated(el);
 
     const challengeItem = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-menu-item-challenge"]',
+      '[data-testid="feedback-menu-item-challenge"]'
     );
     challengeItem?.click();
     await elementUpdated(el);
@@ -85,47 +87,47 @@ describe('<elohim-gate-feedback-trigger>', () => {
   });
 
   it('submit button is disabled when textarea is empty', async () => {
-    const el = await fixture<ElohimGateFeedbackTrigger>(
-      html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-    );
+    const el = await fixture<ElohimGateFeedbackTrigger>(html`
+      <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+    `);
 
     const triggerBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-trigger-btn"]',
+      '[data-testid="feedback-trigger-btn"]'
     );
     triggerBtn?.click();
     await elementUpdated(el);
 
     const feedbackItem = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-menu-item-feedback"]',
+      '[data-testid="feedback-menu-item-feedback"]'
     );
     feedbackItem?.click();
     await elementUpdated(el);
 
     const submitBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-modal-submit"]',
+      '[data-testid="feedback-modal-submit"]'
     );
     expect(submitBtn?.hasAttribute('disabled')).to.be.true;
   });
 
   it('closes modal when close button is clicked', async () => {
-    const el = await fixture<ElohimGateFeedbackTrigger>(
-      html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-    );
+    const el = await fixture<ElohimGateFeedbackTrigger>(html`
+      <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+    `);
 
     const triggerBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-trigger-btn"]',
+      '[data-testid="feedback-trigger-btn"]'
     );
     triggerBtn?.click();
     await elementUpdated(el);
 
     const feedbackItem = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-menu-item-feedback"]',
+      '[data-testid="feedback-menu-item-feedback"]'
     );
     feedbackItem?.click();
     await elementUpdated(el);
 
     const closeBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-modal-close"]',
+      '[data-testid="feedback-modal-close"]'
     );
     closeBtn?.click();
     await elementUpdated(el);
@@ -134,9 +136,9 @@ describe('<elohim-gate-feedback-trigger>', () => {
   });
 
   it('dispatches feedback-submit event', async () => {
-    const el = await fixture<ElohimGateFeedbackTrigger>(
-      html`<elohim-gate-feedback-trigger content-id="test-123"></elohim-gate-feedback-trigger>`,
-    );
+    const el = await fixture<ElohimGateFeedbackTrigger>(html`
+      <elohim-gate-feedback-trigger content-id="test-123"></elohim-gate-feedback-trigger>
+    `);
 
     let submitted: unknown = null;
     el.addEventListener('feedback-submit', (e: Event) => {
@@ -144,19 +146,19 @@ describe('<elohim-gate-feedback-trigger>', () => {
     });
 
     const triggerBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-trigger-btn"]',
+      '[data-testid="feedback-trigger-btn"]'
     );
     triggerBtn?.click();
     await elementUpdated(el);
 
     const feedbackItem = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-menu-item-feedback"]',
+      '[data-testid="feedback-menu-item-feedback"]'
     );
     feedbackItem?.click();
     await elementUpdated(el);
 
     const textarea = el.shadowRoot?.querySelector<HTMLTextAreaElement>(
-      '[data-testid="feedback-modal-textarea"]',
+      '[data-testid="feedback-modal-textarea"]'
     );
     if (textarea) {
       textarea.value = 'This is my feedback text';
@@ -165,7 +167,7 @@ describe('<elohim-gate-feedback-trigger>', () => {
     await elementUpdated(el);
 
     const submitBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="feedback-modal-submit"]',
+      '[data-testid="feedback-modal-submit"]'
     );
     submitBtn?.click();
 
@@ -173,17 +175,17 @@ describe('<elohim-gate-feedback-trigger>', () => {
   });
 
   it('trigger button has aria-label', async () => {
-    const el = await fixture<ElohimGateFeedbackTrigger>(
-      html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-    );
+    const el = await fixture<ElohimGateFeedbackTrigger>(html`
+      <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+    `);
     const btn = el.shadowRoot?.querySelector('[data-testid="feedback-trigger-btn"]');
     expect(btn?.getAttribute('aria-label')).to.equal('Governance feedback');
   });
 
   it('passes axe-core a11y scan', async () => {
-    const el = await fixture<ElohimGateFeedbackTrigger>(
-      html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-    );
+    const el = await fixture<ElohimGateFeedbackTrigger>(html`
+      <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -217,8 +219,10 @@ describe('<elohim-gate-feedback-trigger> — theme-contrast gate', () => {
   for (const cell of CELLS) {
     it(`trigger button passes contrast in ${cell}`, async () => {
       const { el } = await themeFixture<ElohimGateFeedbackTrigger>(
-        html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-        cell,
+        html`
+          <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+        `,
+        cell
       );
       await el.updateComplete;
       assertThemeContrast(el);
@@ -227,8 +231,10 @@ describe('<elohim-gate-feedback-trigger> — theme-contrast gate', () => {
 
     it(`open menu passes contrast in ${cell}`, async () => {
       const { el } = await themeFixture<ElohimGateFeedbackTrigger>(
-        html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
-        cell,
+        html`
+          <elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>
+        `,
+        cell
       );
       await el.updateComplete;
       el.shadowRoot

@@ -20,12 +20,16 @@
  *
  * Binding lives in the TEST fixture only — blank-slate discipline holds.
  */
+/* eslint-disable import/no-extraneous-dependencies */
 import { fixture } from '@open-wc/testing';
 import axe from 'axe-core';
 import Color from 'colorjs.io';
+/* eslint-enable import/no-extraneous-dependencies */
 import { html, type TemplateResult } from 'lit';
 
 export type ThemeCell = 'system-light' | 'system-dark' | 'tokens-light' | 'tokens-dark';
+
+const DATA_THEME = 'data-theme';
 
 export interface ThemeFixtureResult<T extends Element> {
   el: T;
@@ -89,16 +93,16 @@ export async function themeFixture<T extends Element>(
     styleEl.textContent = await loadTokenCss();
     document.head.append(styleEl);
     // Mirror the store's dual-write contract exactly (html authority + body compat).
-    const prevHtml = root.getAttribute('data-theme');
-    const prevBody = document.body.getAttribute('data-theme');
-    root.setAttribute('data-theme', scheme);
-    document.body.setAttribute('data-theme', scheme);
+    const prevHtml = root.getAttribute(DATA_THEME);
+    const prevBody = document.body.getAttribute(DATA_THEME);
+    root.setAttribute(DATA_THEME, scheme);
+    document.body.setAttribute(DATA_THEME, scheme);
     cleanups.add(() => {
       styleEl.remove();
-      if (prevHtml === null) root.removeAttribute('data-theme');
-      else root.setAttribute('data-theme', prevHtml);
-      if (prevBody === null) document.body.removeAttribute('data-theme');
-      else document.body.setAttribute('data-theme', prevBody);
+      if (prevHtml === null) root.removeAttribute(DATA_THEME);
+      else root.setAttribute(DATA_THEME, prevHtml);
+      if (prevBody === null) document.body.removeAttribute(DATA_THEME);
+      else document.body.setAttribute(DATA_THEME, prevBody);
     });
   }
 
@@ -107,15 +111,11 @@ export async function themeFixture<T extends Element>(
   // cells use the honest UA pair under the requested scheme.
   const pageBg = tokens ? 'var(--lamad-bg-primary)' : 'Canvas';
   const pageFg = tokens ? 'var(--lamad-text-primary)' : 'CanvasText';
-  const wrapper = await fixture<HTMLDivElement>(
-    html`
-      <div
-        style="color-scheme: ${scheme}; background: ${pageBg}; color: ${pageFg}; padding: 8px;"
-      >
-        ${template}
-      </div>
-    `
-  );
+  const wrapper = await fixture<HTMLDivElement>(html`
+    <div style="color-scheme: ${scheme}; background: ${pageBg}; color: ${pageFg}; padding: 8px;">
+      ${template}
+    </div>
+  `);
   const el = wrapper.firstElementChild as T;
   disableMotion(wrapper);
   return { el, wrapper, cell };
@@ -210,7 +210,7 @@ function cumulativeOpacity(el: Element): number {
   let o = 1;
   let cur: Element | null = el;
   while (cur) {
-    o *= parseFloat(getComputedStyle(cur).opacity || '1');
+    o *= Number.parseFloat(getComputedStyle(cur).opacity || '1');
     cur = flattenedParent(cur);
   }
   return o;
@@ -257,10 +257,7 @@ function* walkTextNodes(rootEl: Element): Generator<{ text: string; el: Element 
 function isInactiveControl(el: Element): boolean {
   let cur: Element | null = el;
   while (cur) {
-    if (
-      cur.hasAttribute('disabled') ||
-      cur.getAttribute('aria-disabled') === 'true'
-    ) {
+    if (cur.hasAttribute('disabled') || cur.getAttribute('aria-disabled') === 'true') {
       return true;
     }
     cur = flattenedParent(cur);
@@ -270,11 +267,11 @@ function isInactiveControl(el: Element): boolean {
 
 function requiredRatio(el: Element, text: string): number {
   const cs = getComputedStyle(el);
-  const size = parseFloat(cs.fontSize);
-  const weight = parseInt(cs.fontWeight, 10) || 400;
+  const size = Number.parseFloat(cs.fontSize);
+  const weight = Number.parseInt(cs.fontWeight, 10) || 400;
   const large = size >= 24 || (size >= 18.667 && weight >= 700);
-  if (!HAS_LETTERS_OR_DIGITS.test(text)) return 3.0; // symbol glyph in a control → 1.4.11
-  return large ? 3.0 : 4.5;
+  if (!HAS_LETTERS_OR_DIGITS.test(text)) return 3; // symbol glyph in a control → 1.4.11
+  return large ? 3 : 4.5;
 }
 
 function describePath(el: Element): string {
@@ -283,7 +280,10 @@ function describePath(el: Element): string {
   while (cur && parts.length < 5) {
     const part = cur.getAttribute?.('part');
     const cls = typeof cur.className === 'string' ? cur.className.split(/\s+/)[0] : '';
-    parts.unshift(part ? `[part=${part}]` : cls ? `.${cls}` : cur.localName);
+    let label = cur.localName;
+    if (part) label = `[part=${part}]`;
+    else if (cls) label = `.${cls}`;
+    parts.unshift(label);
     cur = flattenedParent(cur);
   }
   return parts.join(' > ');

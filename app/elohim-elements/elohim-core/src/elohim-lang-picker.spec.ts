@@ -96,10 +96,9 @@ describe('<elohim-lang-picker> — theme-contrast gate', () => {
 
   it('picker reacts to the theme (frozen-chain canary)', async () => {
     await assertThemeReactivity<HTMLElement>(
-      () =>
-        html`
-          <elohim-lang-picker></elohim-lang-picker>
-        `,
+      () => html`
+        <elohim-lang-picker></elohim-lang-picker>
+      `,
       el => el.shadowRoot!.querySelector('select')
     );
   });

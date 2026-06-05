@@ -138,11 +138,10 @@ describe('theme-contrast helper', () => {
   it('assertThemeReactivity catches a frozen element', async () => {
     let thrown = false;
     try {
-      await assertThemeReactivity(
-        () =>
-          html`
-            <tc-frozen></tc-frozen>
-          `
+      await assertThemeReactivity<TcFrozen>(
+        () => html`
+          <tc-frozen></tc-frozen>
+        `
       );
     } catch {
       thrown = true;
@@ -152,10 +151,9 @@ describe('theme-contrast helper', () => {
 
   it('assertThemeReactivity passes a token-bound element', async () => {
     await assertThemeReactivity(
-      () =>
-        html`
-          <tc-reactive></tc-reactive>
-        `
+      () => html`
+        <tc-reactive></tc-reactive>
+      `
     );
   });
 });

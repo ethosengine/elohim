@@ -6,7 +6,12 @@ import { ElohimPageChrome as ElohimPageChromeClass } from './elohim-page-chrome.
 import { ElohimDefaultOmnibar as ElohimDefaultOmnibarClass } from './elohim-default-omnibar.js';
 import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
 import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
-import { assertThemeContrast, axeScanStrict, themeFixture, type ThemeCell } from './testing/theme-contrast.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 // ---------------------------------------------------------------------------
 // <elohim-page-chrome>
@@ -110,6 +115,7 @@ describe('<elohim-page-chrome> — ua-prefs precondition gate', () => {
     ).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const forcedSection = cssText.slice(forcedIdx);
     const hasSystemColor = /Canvas|CanvasText|ButtonText/.test(forcedSection);
     expect(hasSystemColor).to.be.true;
@@ -236,6 +242,7 @@ describe('<elohim-default-omnibar> — ua-prefs precondition gate', () => {
     ).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const forcedSection = cssText.slice(forcedIdx);
     const hasSystemColor = /Canvas|CanvasText|LinkText|ButtonText/.test(forcedSection);
     expect(hasSystemColor).to.be.true;

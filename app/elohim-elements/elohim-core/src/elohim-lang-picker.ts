@@ -37,7 +37,7 @@ import {
  * @capabilityStates empty:n/a, loading:n/a, error:n/a, stale:n/a, contested:n/a, offline:n/a, unauthorized:n/a
  */
 export class ElohimLangPicker extends LitElement {
-  private _store = getLocaleStore();
+  private readonly _store = getLocaleStore();
 
   @state() private _locale: ElohimLocale = this._store.locale;
 
@@ -61,7 +61,8 @@ export class ElohimLangPicker extends LitElement {
       font: inherit;
       color: var(--elohim-lang-picker-fg, inherit);
       background: var(--elohim-lang-picker-bg, transparent);
-      border: 1px solid var(--elohim-lang-picker-border, color-mix(in oklch, currentColor 25%, transparent));
+      border: 1px solid
+        var(--elohim-lang-picker-border, color-mix(in oklch, currentColor 25%, transparent));
       border-radius: 0.35rem;
       padding-block: 0.15rem;
       padding-inline: 0.35rem;
@@ -94,7 +95,7 @@ export class ElohimLangPicker extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this._unsub = this._store.subscribe((l) => {
+    this._unsub = this._store.subscribe(l => {
       this._locale = l;
     });
     this._locale = this._store.locale;
@@ -113,7 +114,7 @@ export class ElohimLangPicker extends LitElement {
         detail: { locale: value },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -123,11 +124,11 @@ export class ElohimLangPicker extends LitElement {
         <span class="visually-hidden">${msg('Language')}</span>
         <select part="select" @change=${this._onChange} .value=${this._locale}>
           ${SUPPORTED_LOCALES.map(
-            (l) => html`
+            l => html`
               <option value=${l} ?selected=${l === this._locale} lang=${l}>
                 ${LOCALE_LABELS[l]}
               </option>
-            `,
+            `
           )}
         </select>
       </label>

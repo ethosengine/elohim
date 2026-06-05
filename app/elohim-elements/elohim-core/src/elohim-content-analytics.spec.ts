@@ -2,9 +2,12 @@ import { elementUpdated, expect, fixture, html } from '@open-wc/testing';
 import axe from 'axe-core';
 
 import './register.js';
-import type { ElohimContentAnalytics } from './elohim-content-analytics.js';
+import type {
+  ElohimContentAnalytics,
+  ContentAnalyticsLoader,
+  ContentAnalyticsMetrics,
+} from './elohim-content-analytics.js';
 import { ElohimContentAnalytics as AnalyticsClass } from './elohim-content-analytics.js';
-import type { ContentAnalyticsLoader, ContentAnalyticsMetrics } from './elohim-content-analytics.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
 import {
   assertThemeContrast,
@@ -25,9 +28,9 @@ describe('<elohim-content-analytics>', () => {
   });
 
   it('renders the container and title', async () => {
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics></elohim-content-analytics>
+    `);
     const container = el.shadowRoot?.querySelector('[data-testid="content-analytics"]');
     expect(container).to.exist;
   });
@@ -35,15 +38,15 @@ describe('<elohim-content-analytics>', () => {
   it('shows loading state while fetching', async () => {
     let resolve!: (m: ContentAnalyticsMetrics | null) => void;
     const loader: ContentAnalyticsLoader = {
-      load: () => new Promise(r => { resolve = r; }),
+      load: () =>
+        new Promise(r => {
+          resolve = r;
+        }),
     };
 
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
-        content-id="test-node"
-        .loader=${loader}
-      ></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics content-id="test-node" .loader=${loader}></elohim-content-analytics>
+    `);
 
     // Wait for loadAnalytics() to set isLoading=true and Lit to re-render
     await elementUpdated(el);
@@ -61,12 +64,9 @@ describe('<elohim-content-analytics>', () => {
       load: async () => FIXTURE_METRICS,
     };
 
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
-        content-id="test-node"
-        .loader=${loader}
-      ></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics content-id="test-node" .loader=${loader}></elohim-content-analytics>
+    `);
 
     // Wait for first render + updated() to fire loadAnalytics()
     await elementUpdated(el);
@@ -89,12 +89,9 @@ describe('<elohim-content-analytics>', () => {
       load: async () => null,
     };
 
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
-        content-id="test-node"
-        .loader=${loader}
-      ></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics content-id="test-node" .loader=${loader}></elohim-content-analytics>
+    `);
 
     await new Promise(r => setTimeout(r, 10));
     await elementUpdated(el);
@@ -106,15 +103,14 @@ describe('<elohim-content-analytics>', () => {
 
   it('shows error state when loader rejects', async () => {
     const loader: ContentAnalyticsLoader = {
-      load: async () => { throw new Error('network failure'); },
+      load: async () => {
+        throw new Error('network failure');
+      },
     };
 
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
-        content-id="test-node"
-        .loader=${loader}
-      ></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics content-id="test-node" .loader=${loader}></elohim-content-analytics>
+    `);
 
     await new Promise(r => setTimeout(r, 10));
     await elementUpdated(el);
@@ -126,16 +122,19 @@ describe('<elohim-content-analytics>', () => {
   it('renders pre-loaded metrics when metrics prop is set (no loader call)', async () => {
     let loaderCalled = false;
     const loader: ContentAnalyticsLoader = {
-      load: async () => { loaderCalled = true; return null; },
+      load: async () => {
+        loaderCalled = true;
+        return null;
+      },
     };
 
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics
         content-id="test-node"
         .loader=${loader}
         .metrics=${FIXTURE_METRICS}
-      ></elohim-content-analytics>`,
-    );
+      ></elohim-content-analytics>
+    `);
 
     await elementUpdated(el);
 
@@ -148,15 +147,15 @@ describe('<elohim-content-analytics>', () => {
     // Use a deferred loader so we can attach the event listener before load resolves
     let loaderResolve!: (m: ContentAnalyticsMetrics | null) => void;
     const loader: ContentAnalyticsLoader = {
-      load: () => new Promise(r => { loaderResolve = r; }),
+      load: () =>
+        new Promise(r => {
+          loaderResolve = r;
+        }),
     };
 
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
-        content-id="test-node"
-        .loader=${loader}
-      ></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics content-id="test-node" .loader=${loader}></elohim-content-analytics>
+    `);
 
     // Attach event listener before resolving the loader
     let loadedMetrics: unknown = null;
@@ -177,18 +176,20 @@ describe('<elohim-content-analytics>', () => {
     // Use a deferred loader so we can attach the event listener before load resolves
     let loaderResolve!: (m: ContentAnalyticsMetrics | null) => void;
     const loader: ContentAnalyticsLoader = {
-      load: () => new Promise(r => { loaderResolve = r; }),
+      load: () =>
+        new Promise(r => {
+          loaderResolve = r;
+        }),
     };
 
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
-        content-id="test-node"
-        .loader=${loader}
-      ></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics content-id="test-node" .loader=${loader}></elohim-content-analytics>
+    `);
 
     let errorFired = false;
-    el.addEventListener('analytics-error', () => { errorFired = true; });
+    el.addEventListener('analytics-error', () => {
+      errorFired = true;
+    });
 
     // Resolve with null to trigger error
     loaderResolve(null);
@@ -200,22 +201,18 @@ describe('<elohim-content-analytics>', () => {
   });
 
   it('shows the note text', async () => {
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
-        .metrics=${FIXTURE_METRICS}
-      ></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics .metrics=${FIXTURE_METRICS}></elohim-content-analytics>
+    `);
 
     const note = el.shadowRoot?.querySelector('[part="note"]');
     expect(note?.textContent).to.contain('protocol-native');
   });
 
   it('passes axe-core a11y scan in metrics state', async () => {
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
-        .metrics=${FIXTURE_METRICS}
-      ></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics .metrics=${FIXTURE_METRICS}></elohim-content-analytics>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -223,15 +220,15 @@ describe('<elohim-content-analytics>', () => {
   it('passes axe-core a11y scan in loading state', async () => {
     let resolve!: (m: ContentAnalyticsMetrics | null) => void;
     const loader: ContentAnalyticsLoader = {
-      load: () => new Promise(r => { resolve = r; }),
+      load: () =>
+        new Promise(r => {
+          resolve = r;
+        }),
     };
 
-    const el = await fixture<ElohimContentAnalytics>(
-      html`<elohim-content-analytics
-        content-id="node"
-        .loader=${loader}
-      ></elohim-content-analytics>`,
-    );
+    const el = await fixture<ElohimContentAnalytics>(html`
+      <elohim-content-analytics content-id="node" .loader=${loader}></elohim-content-analytics>
+    `);
 
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
@@ -257,8 +254,10 @@ describe('<elohim-content-analytics> — ua-prefs gate', () => {
     const cssText = (AnalyticsClass as { styles: { cssText: string } }).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const idx = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const after = cssText.slice(idx);
-    expect(after.includes('Canvas') || after.includes('CanvasText') || after.includes('GrayText')).to.be.true;
+    expect(after.includes('Canvas') || after.includes('CanvasText') || after.includes('GrayText'))
+      .to.be.true;
   });
 });
 
@@ -270,8 +269,10 @@ describe('<elohim-content-analytics> — theme-contrast gate', () => {
   for (const cell of CELLS) {
     it(`passes contrast in ${cell}`, async () => {
       const { el } = await themeFixture<ElohimContentAnalytics>(
-        html`<elohim-content-analytics .metrics=${FIXTURE_METRICS}></elohim-content-analytics>`,
-        cell,
+        html`
+          <elohim-content-analytics .metrics=${FIXTURE_METRICS}></elohim-content-analytics>
+        `,
+        cell
       );
       await el.updateComplete;
       assertThemeContrast(el);

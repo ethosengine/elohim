@@ -165,7 +165,8 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
       gap: 0.25rem;
       padding-block: 0.25rem;
       padding-inline: 0.5rem;
-      border: 1px solid var(--elohim-reaction-btn-border, color-mix(in oklch, currentColor 25%, transparent));
+      border: 1px solid
+        var(--elohim-reaction-btn-border, color-mix(in oklch, currentColor 25%, transparent));
       border-radius: var(--elohim-reaction-btn-radius, 1rem);
       background: var(--elohim-reaction-btn-bg, Canvas);
       color: var(--elohim-reaction-btn-fg, CanvasText);
@@ -250,7 +251,8 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
     }
 
     .mediation-alt-btn {
-      border: 1px solid var(--elohim-reaction-btn-border, color-mix(in oklch, currentColor 25%, transparent));
+      border: 1px solid
+        var(--elohim-reaction-btn-border, color-mix(in oklch, currentColor 25%, transparent));
       background: Canvas;
     }
 
@@ -261,7 +263,8 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
     }
 
     .mediation-cancel-btn {
-      border: 1px solid var(--elohim-reaction-btn-border, color-mix(in oklch, currentColor 25%, transparent));
+      border: 1px solid
+        var(--elohim-reaction-btn-border, color-mix(in oklch, currentColor 25%, transparent));
       background: transparent;
     }
 
@@ -392,21 +395,25 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
               </span>
               ${this.compact
                 ? nothing
-                : html`<span class="reaction-label" part="label">${label}</span>`}
+                : html`
+                    <span class="reaction-label" part="label">${label}</span>
+                  `}
               ${this.showCounts && count > 0
-                ? html`<span class="reaction-count" part="count">${count}</span>`
+                ? html`
+                    <span class="reaction-count" part="count">${count}</span>
+                  `
                 : nothing}
               ${mediated
-                ? html`<span class="mediation-indicator" aria-hidden="true">*</span>`
+                ? html`
+                    <span class="mediation-indicator" aria-hidden="true">*</span>
+                  `
                 : nothing}
             </button>
           `;
         })}
       </div>
 
-      ${this.showMediationDialog && this.mediationConfig
-        ? this.renderMediationDialog()
-        : nothing}
+      ${this.showMediationDialog && this.mediationConfig ? this.renderMediationDialog() : nothing}
     `;
   }
 
@@ -449,7 +456,7 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
                       >
                         ${REACTION_ICONS[alt]} ${REACTION_LABELS[alt]}
                       </button>
-                    `,
+                    `
                   )}
                 `
               : nothing}
@@ -478,7 +485,7 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
   private handleReactionClick(
     type: EmotionalReactionType,
     mediated: boolean,
-    mediationConfig: MediatedReaction | undefined,
+    mediationConfig: MediatedReaction | undefined
   ): void {
     // Toggle: if user already reacted, remove
     if (this.isUserReaction(type)) {
@@ -487,7 +494,7 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
           detail: { type, entityId: this.entityId },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
       return;
     }
@@ -525,7 +532,7 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
         detail: proceedEvent,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
 
     if (proceed) {
@@ -561,7 +568,7 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
         detail: event,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

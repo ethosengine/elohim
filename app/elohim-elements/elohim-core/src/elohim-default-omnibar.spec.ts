@@ -37,10 +37,9 @@ describe('<elohim-default-omnibar> — theme-contrast gate', () => {
 
   it('omnibar reacts to the theme (frozen-chain canary)', async () => {
     await assertThemeReactivity<ElohimDefaultOmnibar>(
-      () =>
-        html`
-          <elohim-default-omnibar></elohim-default-omnibar>
-        `
+      () => html`
+        <elohim-default-omnibar></elohim-default-omnibar>
+      `
     );
   });
 });

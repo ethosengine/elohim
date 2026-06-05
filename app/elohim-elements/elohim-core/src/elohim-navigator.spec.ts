@@ -346,10 +346,9 @@ describe('<elohim-navigator> — theme-contrast gate', () => {
 
   it('chrome reacts to the theme (frozen-chain canary)', async () => {
     await assertThemeReactivity<ElohimNavigator>(
-      () =>
-        html`
-          <elohim-navigator></elohim-navigator>
-        `,
+      () => html`
+        <elohim-navigator></elohim-navigator>
+      `,
       el => el.shadowRoot!.querySelector('.nav')
     );
   });

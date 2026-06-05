@@ -18,37 +18,33 @@ describe('<elohim-graduated-feedback>', () => {
   });
 
   it('renders the scale label for the default context (usefulness)', async () => {
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback></elohim-graduated-feedback>`,
-    );
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback></elohim-graduated-feedback>
+    `);
     const label = el.shadowRoot?.querySelector('.feedback-label');
     expect(label?.textContent).to.contain('useful');
   });
 
   it('renders correct scale positions for accuracy context', async () => {
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback context="accuracy"></elohim-graduated-feedback>`,
-    );
-    const falseBtn = el.shadowRoot?.querySelector(
-      '[data-testid="position-false"]',
-    );
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback context="accuracy"></elohim-graduated-feedback>
+    `);
+    const falseBtn = el.shadowRoot?.querySelector('[data-testid="position-false"]');
     expect(falseBtn).to.exist;
-    const accurateBtn = el.shadowRoot?.querySelector(
-      '[data-testid="position-accurate"]',
-    );
+    const accurateBtn = el.shadowRoot?.querySelector('[data-testid="position-accurate"]');
     expect(accurateBtn).to.exist;
   });
 
   it('shows intensity slider after position selection', async () => {
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback></elohim-graduated-feedback>`,
-    );
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback></elohim-graduated-feedback>
+    `);
 
     // No intensity section before selection
     expect(el.shadowRoot?.querySelector('[data-testid="intensity-slider"]')).to.be.null;
 
     const usefulBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="position-useful"]',
+      '[data-testid="position-useful"]'
     );
     usefulBtn?.click();
     await elementUpdated(el);
@@ -57,14 +53,14 @@ describe('<elohim-graduated-feedback>', () => {
   });
 
   it('shows submit button after position selection', async () => {
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback></elohim-graduated-feedback>`,
-    );
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback></elohim-graduated-feedback>
+    `);
 
     expect(el.shadowRoot?.querySelector('[data-testid="submit-feedback-btn"]')).to.be.null;
 
     const usefulBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="position-useful"]',
+      '[data-testid="position-useful"]'
     );
     usefulBtn?.click();
     await elementUpdated(el);
@@ -73,13 +69,13 @@ describe('<elohim-graduated-feedback>', () => {
   });
 
   it('requires reasoning for negative positions (index <= 0.25)', async () => {
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback></elohim-graduated-feedback>`,
-    );
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback></elohim-graduated-feedback>
+    `);
 
     // "Not Useful" is index 0
     const notUsefulBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="position-not-useful"]',
+      '[data-testid="position-not-useful"]'
     );
     notUsefulBtn?.click();
     await elementUpdated(el);
@@ -88,15 +84,15 @@ describe('<elohim-graduated-feedback>', () => {
     expect(textarea).to.exist;
 
     const submitBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="submit-feedback-btn"]',
+      '[data-testid="submit-feedback-btn"]'
     );
     expect(submitBtn?.hasAttribute('disabled')).to.be.true;
   });
 
   it('dispatches feedback-submit event on submit', async () => {
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback></elohim-graduated-feedback>`,
-    );
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback></elohim-graduated-feedback>
+    `);
 
     let submitted: unknown = null;
     el.addEventListener('feedback-submit', (e: Event) => {
@@ -104,13 +100,13 @@ describe('<elohim-graduated-feedback>', () => {
     });
 
     const usefulBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="position-useful"]',
+      '[data-testid="position-useful"]'
     );
     usefulBtn?.click();
     await elementUpdated(el);
 
     const submitBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="submit-feedback-btn"]',
+      '[data-testid="submit-feedback-btn"]'
     );
     submitBtn?.click();
 
@@ -119,20 +115,22 @@ describe('<elohim-graduated-feedback>', () => {
 
   it('calls onSubmit callback when provided', async () => {
     let callbackData: unknown = null;
-    const onSubmit = (data: unknown) => { callbackData = data; };
+    const onSubmit = (data: unknown) => {
+      callbackData = data;
+    };
 
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback .onSubmit=${onSubmit}></elohim-graduated-feedback>`,
-    );
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback .onSubmit=${onSubmit}></elohim-graduated-feedback>
+    `);
 
     const usefulBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="position-useful"]',
+      '[data-testid="position-useful"]'
     );
     usefulBtn?.click();
     await elementUpdated(el);
 
     const submitBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="submit-feedback-btn"]',
+      '[data-testid="submit-feedback-btn"]'
     );
     submitBtn?.click();
 
@@ -140,29 +138,29 @@ describe('<elohim-graduated-feedback>', () => {
   });
 
   it('shows community distribution bar when distribution + totalResponses are set', async () => {
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback
         .distribution=${{ Useful: 3, Transformative: 1 }}
         .totalResponses=${4}
         .showAggregates=${true}
-      ></elohim-graduated-feedback>`,
-    );
+      ></elohim-graduated-feedback>
+    `);
     expect(el.shadowRoot?.querySelector('.distribution-bar')).to.exist;
   });
 
   it('resets form on reset button click', async () => {
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback .hasSubmitted=${true}></elohim-graduated-feedback>`,
-    );
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback .hasSubmitted=${true}></elohim-graduated-feedback>
+    `);
 
     const usefulBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="position-useful"]',
+      '[data-testid="position-useful"]'
     );
     usefulBtn?.click();
     await elementUpdated(el);
 
     const resetBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="reset-feedback-btn"]',
+      '[data-testid="reset-feedback-btn"]'
     );
     resetBtn?.click();
     await elementUpdated(el);
@@ -172,9 +170,9 @@ describe('<elohim-graduated-feedback>', () => {
   });
 
   it('passes axe-core a11y scan in default state', async () => {
-    const el = await fixture<ElohimGraduatedFeedback>(
-      html`<elohim-graduated-feedback></elohim-graduated-feedback>`,
-    );
+    const el = await fixture<ElohimGraduatedFeedback>(html`
+      <elohim-graduated-feedback></elohim-graduated-feedback>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -182,7 +180,8 @@ describe('<elohim-graduated-feedback>', () => {
 
 describe('<elohim-graduated-feedback> — i18n precondition gate', () => {
   it('uses only logical CSS properties', () => {
-    const cssText = (ElohimGraduatedFeedbackClass as { styles: { cssText: string } }).styles.cssText;
+    const cssText = (ElohimGraduatedFeedbackClass as { styles: { cssText: string } }).styles
+      .cssText;
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });
@@ -190,20 +189,25 @@ describe('<elohim-graduated-feedback> — i18n precondition gate', () => {
 
 describe('<elohim-graduated-feedback> — ua-prefs precondition gate', () => {
   it('no animations declared without media guard', () => {
-    const cssText = (ElohimGraduatedFeedbackClass as { styles: { cssText: string } }).styles.cssText;
+    const cssText = (ElohimGraduatedFeedbackClass as { styles: { cssText: string } }).styles
+      .cssText;
     expect(cssText).to.not.contain('@keyframes');
   });
 
   it('forced-colors overrides present', () => {
-    const cssText = (ElohimGraduatedFeedbackClass as { styles: { cssText: string } }).styles.cssText;
+    const cssText = (ElohimGraduatedFeedbackClass as { styles: { cssText: string } }).styles
+      .cssText;
     expect(cssText).to.contain('forced-colors: active');
     const idx = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const after = cssText.slice(idx);
-    expect(after.includes('ButtonFace') || after.includes('Canvas') || after.includes('Highlight')).to.be.true;
+    expect(after.includes('ButtonFace') || after.includes('Canvas') || after.includes('Highlight'))
+      .to.be.true;
   });
 
   it('coarse-pointer touch targets present for position buttons', () => {
-    const cssText = (ElohimGraduatedFeedbackClass as { styles: { cssText: string } }).styles.cssText;
+    const cssText = (ElohimGraduatedFeedbackClass as { styles: { cssText: string } }).styles
+      .cssText;
     expect(cssText).to.contain('pointer: coarse');
   });
 });
@@ -216,15 +220,15 @@ describe('<elohim-graduated-feedback> — theme-contrast gate', () => {
   for (const cell of CELLS) {
     it(`passes contrast in ${cell}`, async () => {
       const { el } = await themeFixture<ElohimGraduatedFeedback>(
-        html`<elohim-graduated-feedback></elohim-graduated-feedback>`,
-        cell,
+        html`
+          <elohim-graduated-feedback></elohim-graduated-feedback>
+        `,
+        cell
       );
       await el.updateComplete;
       // Select a position to reveal the selected button (hex bg + CanvasText),
       // intensity slider label, and submit button — the text-bearing states.
-      el.shadowRoot
-        ?.querySelector<HTMLButtonElement>('[data-testid="position-useful"]')
-        ?.click();
+      el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="position-useful"]')?.click();
       await el.updateComplete;
       assertThemeContrast(el);
       await axeScanStrict(el);

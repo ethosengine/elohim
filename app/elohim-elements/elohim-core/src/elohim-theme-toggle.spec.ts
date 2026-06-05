@@ -129,10 +129,9 @@ describe('<elohim-theme-toggle> — theme-contrast gate', () => {
 
   it('toggle reacts to the theme (frozen-chain canary)', async () => {
     await assertThemeReactivity<InstanceType<typeof ToggleClass>>(
-      () =>
-        html`
-          <elohim-theme-toggle></elohim-theme-toggle>
-        `,
+      () => html`
+        <elohim-theme-toggle></elohim-theme-toggle>
+      `,
       el => el.shadowRoot!.querySelector('button')
     );
   });

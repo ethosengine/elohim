@@ -46,10 +46,10 @@ describe('LocaleStore', () => {
     const onEvent = (): void => {
       events += 1;
     };
-    window.addEventListener(LOCALE_CHANGE_EVENT, onEvent);
+    globalThis.addEventListener(LOCALE_CHANGE_EVENT, onEvent);
     store.set('he');
     store.set('he'); // no-op
-    window.removeEventListener(LOCALE_CHANGE_EVENT, onEvent);
+    globalThis.removeEventListener(LOCALE_CHANGE_EVENT, onEvent);
     expect(store.locale).to.equal('he');
     expect(localStorage.getItem(LOCALE_STORAGE_KEY)).to.equal('he');
     expect(document.documentElement.lang).to.equal('he');
@@ -63,9 +63,9 @@ describe('LocaleStore', () => {
     const onEvent = (): void => {
       events += 1;
     };
-    window.addEventListener(LOCALE_CHANGE_EVENT, onEvent);
-    window.dispatchEvent(new CustomEvent(LOCALE_CHANGE_EVENT, { detail: { locale: 'es' } }));
-    window.removeEventListener(LOCALE_CHANGE_EVENT, onEvent);
+    globalThis.addEventListener(LOCALE_CHANGE_EVENT, onEvent);
+    globalThis.dispatchEvent(new CustomEvent(LOCALE_CHANGE_EVENT, { detail: { locale: 'es' } }));
+    globalThis.removeEventListener(LOCALE_CHANGE_EVENT, onEvent);
     expect(store.locale).to.equal('es');
     expect(events).to.equal(1);
   });

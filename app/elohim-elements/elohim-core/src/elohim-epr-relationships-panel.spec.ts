@@ -21,23 +21,23 @@ const SAMPLE_RELATIONSHIPS = [
 describe('<elohim-epr-relationships-panel>', () => {
   it('is defined in the custom element registry', () => {
     expect(customElements.get('elohim-epr-relationships-panel')).to.equal(
-      ElohimEprRelationshipsPanelClass,
+      ElohimEprRelationshipsPanelClass
     );
   });
 
   it('renders nothing when relationships array is empty', async () => {
-    const el = await fixture<ElohimEprRelationshipsPanel>(
-      html`<elohim-epr-relationships-panel></elohim-epr-relationships-panel>`,
-    );
+    const el = await fixture<ElohimEprRelationshipsPanel>(html`
+      <elohim-epr-relationships-panel></elohim-epr-relationships-panel>
+    `);
     expect(el.shadowRoot?.querySelector('[data-testid="epr-relationships-panel"]')).to.be.null;
   });
 
   it('renders groups when relationships are provided', async () => {
-    const el = await fixture<ElohimEprRelationshipsPanel>(
-      html`<elohim-epr-relationships-panel
+    const el = await fixture<ElohimEprRelationshipsPanel>(html`
+      <elohim-epr-relationships-panel
         .relationships=${SAMPLE_RELATIONSHIPS}
-      ></elohim-epr-relationships-panel>`,
-    );
+      ></elohim-epr-relationships-panel>
+    `);
     const panel = el.shadowRoot?.querySelector('[data-testid="epr-relationships-panel"]');
     expect(panel).to.exist;
     const groups = el.shadowRoot?.querySelectorAll('[data-testid="epr-rel-group"]');
@@ -50,11 +50,9 @@ describe('<elohim-epr-relationships-panel>', () => {
       { type: 'PREREQUISITE', target: 'epr:b' },
       { type: 'TEACHES', target: 'epr:c' },
     ];
-    const el = await fixture<ElohimEprRelationshipsPanel>(
-      html`<elohim-epr-relationships-panel
-        .relationships=${rels}
-      ></elohim-epr-relationships-panel>`,
-    );
+    const el = await fixture<ElohimEprRelationshipsPanel>(html`
+      <elohim-epr-relationships-panel .relationships=${rels}></elohim-epr-relationships-panel>
+    `);
     const groups = el.shadowRoot?.querySelectorAll('[data-testid="epr-rel-group"]');
     expect(groups?.[0]?.getAttribute('data-type')).to.equal('PREREQUISITE');
     expect(groups?.[1]?.getAttribute('data-type')).to.equal('TEACHES');
@@ -62,21 +60,21 @@ describe('<elohim-epr-relationships-panel>', () => {
   });
 
   it('renders relationship cards with correct target labels', async () => {
-    const el = await fixture<ElohimEprRelationshipsPanel>(
-      html`<elohim-epr-relationships-panel
+    const el = await fixture<ElohimEprRelationshipsPanel>(html`
+      <elohim-epr-relationships-panel
         .relationships=${[{ type: 'PREREQUISITE', target: 'epr:intro' }]}
-      ></elohim-epr-relationships-panel>`,
-    );
+      ></elohim-epr-relationships-panel>
+    `);
     const card = el.shadowRoot?.querySelector('[data-testid="epr-relationship-card"]');
     expect(card?.textContent).to.contain('epr:intro');
   });
 
   it('dispatches epr-navigate event when card is clicked', async () => {
-    const el = await fixture<ElohimEprRelationshipsPanel>(
-      html`<elohim-epr-relationships-panel
+    const el = await fixture<ElohimEprRelationshipsPanel>(html`
+      <elohim-epr-relationships-panel
         .relationships=${[{ type: 'PREREQUISITE', target: 'epr:intro' }]}
-      ></elohim-epr-relationships-panel>`,
-    );
+      ></elohim-epr-relationships-panel>
+    `);
 
     let navigatedTarget: string | null = null;
     el.addEventListener('epr-navigate', (e: Event) => {
@@ -84,7 +82,7 @@ describe('<elohim-epr-relationships-panel>', () => {
     });
 
     const card = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="epr-relationship-card"]',
+      '[data-testid="epr-relationship-card"]'
     );
     card?.click();
 
@@ -93,17 +91,19 @@ describe('<elohim-epr-relationships-panel>', () => {
 
   it('calls navigator callback instead of dispatching event when navigator is set', async () => {
     let callbackTarget: string | null = null;
-    const navigator = (t: string) => { callbackTarget = t; };
+    const navigator = (t: string) => {
+      callbackTarget = t;
+    };
 
-    const el = await fixture<ElohimEprRelationshipsPanel>(
-      html`<elohim-epr-relationships-panel
+    const el = await fixture<ElohimEprRelationshipsPanel>(html`
+      <elohim-epr-relationships-panel
         .relationships=${[{ type: 'PREREQUISITE', target: 'epr:intro' }]}
         .navigator=${navigator}
-      ></elohim-epr-relationships-panel>`,
-    );
+      ></elohim-epr-relationships-panel>
+    `);
 
     const card = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="epr-relationship-card"]',
+      '[data-testid="epr-relationship-card"]'
     );
     card?.click();
 
@@ -111,9 +111,9 @@ describe('<elohim-epr-relationships-panel>', () => {
   });
 
   it('reacts to relationships property changes', async () => {
-    const el = await fixture<ElohimEprRelationshipsPanel>(
-      html`<elohim-epr-relationships-panel></elohim-epr-relationships-panel>`,
-    );
+    const el = await fixture<ElohimEprRelationshipsPanel>(html`
+      <elohim-epr-relationships-panel></elohim-epr-relationships-panel>
+    `);
     expect(el.shadowRoot?.querySelector('[data-testid="epr-relationships-panel"]')).to.be.null;
 
     el.relationships = SAMPLE_RELATIONSHIPS;
@@ -123,11 +123,11 @@ describe('<elohim-epr-relationships-panel>', () => {
   });
 
   it('passes axe-core a11y scan with relationships', async () => {
-    const el = await fixture<ElohimEprRelationshipsPanel>(
-      html`<elohim-epr-relationships-panel
+    const el = await fixture<ElohimEprRelationshipsPanel>(html`
+      <elohim-epr-relationships-panel
         .relationships=${SAMPLE_RELATIONSHIPS}
-      ></elohim-epr-relationships-panel>`,
-    );
+      ></elohim-epr-relationships-panel>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -135,9 +135,8 @@ describe('<elohim-epr-relationships-panel>', () => {
 
 describe('<elohim-epr-relationships-panel> — i18n precondition gate', () => {
   it('uses only logical CSS properties (no physical margin/padding)', () => {
-    const cssText = (
-      ElohimEprRelationshipsPanelClass as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimEprRelationshipsPanelClass as { styles: { cssText: string } }).styles
+      .cssText;
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });
@@ -145,20 +144,19 @@ describe('<elohim-epr-relationships-panel> — i18n precondition gate', () => {
 
 describe('<elohim-epr-relationships-panel> — ua-prefs precondition gate', () => {
   it('CSS does not contain transitions or animations outside media guards', () => {
-    const cssText = (
-      ElohimEprRelationshipsPanelClass as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimEprRelationshipsPanelClass as { styles: { cssText: string } }).styles
+      .cssText;
     // No animations declared at all — still mode
     expect(cssText).to.not.contain('animation:');
     expect(cssText).to.not.contain('@keyframes');
   });
 
   it('forced-colors overrides use CSS system colors', () => {
-    const cssText = (
-      ElohimEprRelationshipsPanelClass as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimEprRelationshipsPanelClass as { styles: { cssText: string } }).styles
+      .cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const afterForced = cssText.slice(forcedIdx);
     const hasSystemColor =
       afterForced.includes('ButtonFace') ||
@@ -177,10 +175,12 @@ describe('<elohim-epr-relationships-panel> — theme-contrast gate', () => {
   for (const cell of CELLS) {
     it(`passes contrast in ${cell}`, async () => {
       const { el } = await themeFixture<ElohimEprRelationshipsPanel>(
-        html`<elohim-epr-relationships-panel
-          .relationships=${SAMPLE_RELATIONSHIPS}
-        ></elohim-epr-relationships-panel>`,
-        cell,
+        html`
+          <elohim-epr-relationships-panel
+            .relationships=${SAMPLE_RELATIONSHIPS}
+          ></elohim-epr-relationships-panel>
+        `,
+        cell
       );
       await el.updateComplete;
       assertThemeContrast(el);

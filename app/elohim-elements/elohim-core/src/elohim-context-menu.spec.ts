@@ -105,7 +105,9 @@ describe('<elohim-context-menu>', () => {
       <elohim-context-menu .items=${ITEMS} open></elohim-context-menu>
     `);
     let closeFired = false;
-    el.addEventListener('close', () => { closeFired = true; });
+    el.addEventListener('close', () => {
+      closeFired = true;
+    });
     const menu = el.shadowRoot!.querySelector('[role="menu"]') as HTMLElement;
     menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await elementUpdated(el);
@@ -281,23 +283,23 @@ describe('<elohim-context-menu> — ua-prefs precondition gate', () => {
   afterEach(() => clearMediaQueries());
 
   it('fold-down animation is wrapped in (prefers-reduced-motion: no-preference)', () => {
-    const cssText = (
-      ElohimContextMenu as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimContextMenu as unknown as { styles: { cssText: string } }).styles
+      .cssText;
     expect(cssText).to.contain('prefers-reduced-motion');
     // The animation keyframe should only appear inside that media query block
     const motionIdx = cssText.indexOf('prefers-reduced-motion: no-preference');
     expect(motionIdx).to.be.greaterThan(-1);
+
     const afterMotion = cssText.slice(motionIdx);
     expect(afterMotion).to.contain('elohim-menu-fold-down');
   });
 
   it('forced-colors overrides use CSS system colors (Canvas, CanvasText, Highlight, HighlightText)', () => {
-    const cssText = (
-      ElohimContextMenu as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimContextMenu as unknown as { styles: { cssText: string } }).styles
+      .cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const afterForced = cssText.slice(forcedIdx);
     const hasSystemColor =
       afterForced.includes('Canvas') ||
@@ -322,9 +324,8 @@ describe('<elohim-context-menu> — ua-prefs precondition gate', () => {
 
 describe('<elohim-context-menu> — i18n precondition gate', () => {
   it('uses no physical CSS properties (only logical or non-positional)', () => {
-    const cssText = (
-      ElohimContextMenu as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimContextMenu as unknown as { styles: { cssText: string } }).styles
+      .cssText;
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });
@@ -332,7 +333,9 @@ describe('<elohim-context-menu> — i18n precondition gate', () => {
   it('renders correctly in RTL document direction (he-IL)', async () => {
     const el = await renderInLocale<ElohimContextMenu>(
       'he-IL',
-      html`<elohim-context-menu .items=${ITEMS} open></elohim-context-menu>`
+      html`
+        <elohim-context-menu .items=${ITEMS} open></elohim-context-menu>
+      `
     );
     expect(el).to.exist;
     expect(document.documentElement.getAttribute('dir')).to.equal('rtl');
@@ -361,7 +364,9 @@ describe('<elohim-context-menu> — theme-contrast gate', () => {
   for (const cell of CELLS) {
     it(`passes contrast in ${cell}`, async () => {
       const { el } = await themeFixture<ElohimContextMenu>(
-        html`<elohim-context-menu .items=${THEME_ITEMS} open></elohim-context-menu>`,
+        html`
+          <elohim-context-menu .items=${THEME_ITEMS} open></elohim-context-menu>
+        `,
         cell
       );
       await el.updateComplete;

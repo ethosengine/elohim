@@ -19,7 +19,9 @@ describe('<elohim-mention-base>', () => {
   });
 
   it('renders with default (empty) prop values', async () => {
-    const el = await fixture<ElohimMentionBase>(html`<elohim-mention-base></elohim-mention-base>`);
+    const el = await fixture<ElohimMentionBase>(html`
+      <elohim-mention-base></elohim-mention-base>
+    `);
     expect(el).to.exist;
     expect(el.epr).to.equal('');
     expect(el.label).to.equal('');
@@ -37,7 +39,10 @@ describe('<elohim-mention-base>', () => {
 
   it('renders the label when provided', async () => {
     const el = await fixture<ElohimMentionBase>(html`
-      <elohim-mention-base epr="epr:content:abc123" label="Introduction to Lamad"></elohim-mention-base>
+      <elohim-mention-base
+        epr="epr:content:abc123"
+        label="Introduction to Lamad"
+      ></elohim-mention-base>
     `);
     const labelSpan = el.shadowRoot!.querySelector('.label');
     expect(labelSpan!.textContent!.trim()).to.equal('Introduction to Lamad');
@@ -45,7 +50,10 @@ describe('<elohim-mention-base>', () => {
 
   it('renders the epr id span alongside label when label is provided', async () => {
     const el = await fixture<ElohimMentionBase>(html`
-      <elohim-mention-base epr="epr:content:abc123" label="Introduction to Lamad"></elohim-mention-base>
+      <elohim-mention-base
+        epr="epr:content:abc123"
+        label="Introduction to Lamad"
+      ></elohim-mention-base>
     `);
     const idSpan = el.shadowRoot!.querySelector('.id');
     expect(idSpan).to.exist;
@@ -79,7 +87,9 @@ describe('<elohim-mention-base>', () => {
   });
 
   it('renders empty chip gracefully when both epr and title are empty (empty state)', async () => {
-    const el = await fixture<ElohimMentionBase>(html`<elohim-mention-base></elohim-mention-base>`);
+    const el = await fixture<ElohimMentionBase>(html`
+      <elohim-mention-base></elohim-mention-base>
+    `);
     // The chip container should still render, title span shows empty string
     const chip = el.shadowRoot!.querySelector('.chip');
     expect(chip).to.exist;
@@ -105,14 +115,19 @@ describe('<elohim-mention-base>', () => {
 
   it('passes axe-core a11y scan with label and epr', async () => {
     const el = await fixture<ElohimMentionBase>(html`
-      <elohim-mention-base epr="epr:content:abc123" label="Introduction to Lamad"></elohim-mention-base>
+      <elohim-mention-base
+        epr="epr:content:abc123"
+        label="Introduction to Lamad"
+      ></elohim-mention-base>
     `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
 
   it('passes axe-core a11y scan in empty state', async () => {
-    const el = await fixture<ElohimMentionBase>(html`<elohim-mention-base></elohim-mention-base>`);
+    const el = await fixture<ElohimMentionBase>(html`
+      <elohim-mention-base></elohim-mention-base>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -129,6 +144,7 @@ describe('<elohim-mention-base> — ua-prefs precondition gate', () => {
     ).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
+    // eslint-disable-next-line unicorn/prefer-set-has -- string scan, not membership lookup
     const afterForced = cssText.slice(forcedIdx);
     const hasSystemColor =
       afterForced.includes('Canvas') ||

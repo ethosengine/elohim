@@ -98,7 +98,12 @@ export type {
   ReachContext,
 } from './contracts/omnibar.contract.js';
 
-export { ThemeStore, getThemeStore, THEME_STORAGE_KEY, THEME_CHANGE_EVENT } from './theme/theme-store.js';
+export {
+  ThemeStore,
+  getThemeStore,
+  THEME_STORAGE_KEY,
+  THEME_CHANGE_EVENT,
+} from './theme/theme-store.js';
 export type { ElohimTheme } from './theme/theme-store.js';
 
 export {

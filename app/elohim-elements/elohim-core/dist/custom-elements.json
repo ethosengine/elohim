@@ -1179,6 +1179,10 @@
               "name": "--elohim-omnibar-bg"
             },
             {
+              "description": "Override foreground (default: inherit)",
+              "name": "--elohim-omnibar-fg"
+            },
+            {
               "description": "Override bottom border color",
               "name": "--elohim-omnibar-border"
             }
@@ -3180,6 +3184,26 @@
             },
             {
               "kind": "method",
+              "name": "readableOn",
+              "privacy": "private",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "hex",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ],
+              "description": "Luminance-picked readable fg for a SELECTED position's fixed scale hex.\n`CanvasText` was theme-blind here: dark-scheme white on the lighter scale\nhexes (e.g. usefulness blue #3498db) computed 3.15:1. The scale colors\nare element-owned semantics (not theme tokens), so the readable pair is\nderived, not bound. White passes 4.5:1 below L≈0.1833; black above."
+            },
+            {
+              "kind": "method",
               "name": "renderAggregates",
               "privacy": "private"
             },
@@ -3761,6 +3785,10 @@
               "name": "--elohim-nav-tray-bg"
             },
             {
+              "description": "Dropdown tray foreground",
+              "name": "--elohim-nav-tray-fg"
+            },
+            {
               "description": "Dropdown tray border",
               "name": "--elohim-nav-tray-border"
             },
@@ -3773,12 +3801,44 @@
               "name": "--elohim-nav-search-bg"
             },
             {
+              "description": "Search input foreground",
+              "name": "--elohim-nav-search-fg"
+            },
+            {
               "description": "Search input border",
               "name": "--elohim-nav-search-border"
             },
             {
               "description": "Search input border radius",
               "name": "--elohim-nav-search-radius"
+            },
+            {
+              "description": "Destructive tray-item foreground",
+              "name": "--elohim-nav-danger-fg"
+            },
+            {
+              "description": "Info banner background",
+              "name": "--elohim-nav-banner-info-bg"
+            },
+            {
+              "description": "Info banner foreground",
+              "name": "--elohim-nav-banner-info-fg"
+            },
+            {
+              "description": "Warning banner background",
+              "name": "--elohim-nav-banner-warning-bg"
+            },
+            {
+              "description": "Warning banner foreground",
+              "name": "--elohim-nav-banner-warning-fg"
+            },
+            {
+              "description": "Error banner background",
+              "name": "--elohim-nav-banner-error-bg"
+            },
+            {
+              "description": "Error banner foreground",
+              "name": "--elohim-nav-banner-error-fg"
             }
           ],
           "cssParts": [
@@ -6476,6 +6536,130 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/session/session.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Session",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "isAuthenticated",
+              "type": {
+                "text": "boolean"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "refreshFromCookies",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to session changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "readCookie",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string | null"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "name",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "shallowEquals",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "boolean"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                },
+                {
+                  "name": "b",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Session",
+          "declaration": {
+            "name": "Session",
+            "module": "src/session/session.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/localize/locale-store.ts",
       "declarations": [
         {
@@ -6823,203 +7007,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/session/session.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Session",
-          "members": [
-            {
-              "kind": "field",
-              "name": "_currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "privacy": "private",
-              "default": "null"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "isAuthenticated",
-              "type": {
-                "text": "boolean"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "refreshFromCookies",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to session changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "readCookie",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "string | null"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "name",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "shallowEquals",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "boolean"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "a",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                },
-                {
-                  "name": "b",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Session",
-          "declaration": {
-            "name": "Session",
-            "module": "src/session/session.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Loader",
-          "members": [
-            {
-              "kind": "field",
-              "name": "verifyCid",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "resolve",
-              "return": {
-                "type": {
-                  "text": "Promise<LoaderResolution>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                },
-                {
-                  "name": "bytes",
-                  "type": {
-                    "text": "Uint8Array"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Loader",
-          "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/testing/a11y.ts",
       "declarations": [
         {
@@ -7196,7 +7183,176 @@
           "name": "*",
           "declaration": {
             "name": "*",
+            "module": "src/testing/theme-contrast.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
             "module": "src/testing/ua-prefs.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/testing/theme-contrast.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "themeFixture",
+          "return": {
+            "type": {
+              "text": "Promise<ThemeFixtureResult<T>>"
+            }
+          },
+          "parameters": [
+            {
+              "name": "template",
+              "type": {
+                "text": "TemplateResult"
+              }
+            },
+            {
+              "name": "cell",
+              "type": {
+                "text": "ThemeCell"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "contrastRatio",
+          "return": {
+            "type": {
+              "text": "number"
+            }
+          },
+          "parameters": [
+            {
+              "name": "fgCss",
+              "type": {
+                "text": "string"
+              }
+            },
+            {
+              "name": "bgCss",
+              "type": {
+                "text": "string"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "assertThemeContrast",
+          "return": {
+            "type": {
+              "text": "ContrastFinding[]"
+            }
+          },
+          "parameters": [
+            {
+              "name": "el",
+              "type": {
+                "text": "Element"
+              }
+            },
+            {
+              "name": "opts",
+              "default": "{}",
+              "type": {
+                "text": "{ ignore?: (finding: ContrastFinding) => boolean }"
+              }
+            }
+          ],
+          "description": "Walk every visible text node in the flattened tree; assert WCAG contrast.\nThrows with a full findings report on any failure; returns the audited\nsamples (pass + fail) for optional further assertions."
+        },
+        {
+          "kind": "function",
+          "name": "assertThemeReactivity",
+          "return": {
+            "type": {
+              "text": "Promise<void>"
+            }
+          },
+          "parameters": [
+            {
+              "name": "templateFactory",
+              "type": {
+                "text": "() => TemplateResult"
+              }
+            },
+            {
+              "name": "probe",
+              "default": "el => el as unknown as Element",
+              "type": {
+                "text": "(el: T) => Element | null | undefined"
+              }
+            }
+          ],
+          "description": "Render the SAME template under tokens-light and tokens-dark; assert the\nprobed surface's computed colors differ. Catches frozen var-chains (C1):\na binding declared on :root substitutes against :root-level token values,\nso overrides that cascade anywhere BELOW :root never reach it."
+        },
+        {
+          "kind": "function",
+          "name": "axeScanStrict",
+          "return": {
+            "type": {
+              "text": "Promise<void>"
+            }
+          },
+          "parameters": [
+            {
+              "name": "el",
+              "type": {
+                "text": "Element"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "themeFixture",
+          "declaration": {
+            "name": "themeFixture",
+            "module": "src/testing/theme-contrast.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "contrastRatio",
+          "declaration": {
+            "name": "contrastRatio",
+            "module": "src/testing/theme-contrast.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "assertThemeContrast",
+          "declaration": {
+            "name": "assertThemeContrast",
+            "module": "src/testing/theme-contrast.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "assertThemeReactivity",
+          "declaration": {
+            "name": "assertThemeReactivity",
+            "module": "src/testing/theme-contrast.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "axeScanStrict",
+          "declaration": {
+            "name": "axeScanStrict",
+            "module": "src/testing/theme-contrast.ts"
           }
         }
       ]
@@ -7558,6 +7714,79 @@
           "declaration": {
             "name": "getThemeStore",
             "module": "src/theme/theme-store.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
           }
         }
       ]
