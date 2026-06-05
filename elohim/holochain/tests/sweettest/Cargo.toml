@@ -89,6 +89,11 @@ path = "src/tests/stake_class_gate.rs"
 name = "qahal_collab_t0_test"
 path = "src/tests/qahal_collab_t0_test.rs"
 
+# Household formation ceremony T0: issue_household_invite + affirm_membership.
+[[test]]
+name = "qahal_formation_test"
+path = "src/tests/qahal_formation_test.rs"
+
 [[test]]
 name = "rea_commitment_replication"
 path = "src/tests/rea_commitment_replication.rs"

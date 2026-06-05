@@ -587,3 +587,173 @@ fn validate_share_allocation_json(json: &str, claimed_tribute: f64) -> ExternRes
     }
     Ok(())
 }
+
+// =============================================================================
+// Household formation — recognition-of-the-given membership flow
+// Spec: genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md §4.1
+// The graduated flow (request/attest) is the sibling path; this is affirmation:
+// the relationship pre-exists, the substrate witnesses, it does not gate.
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct IssueHouseholdInviteInput {
+    pub collective_cid: String,
+    /// "steward" | "contributor" | "observer"
+    pub role: String,
+    pub expires_at_micros: i64,
+    /// Caller-supplied randomness (32 hex chars by convention, like salt).
+    /// The replay guard is keyed on this nonce.
+    pub nonce: String,
+}
+
+/// The unsigned portion — exactly what the issuer signs and the affirmer verifies.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HouseholdInvitePayload {
+    pub collective_cid: String,
+    pub role: String,
+    pub sponsor_cid: String,
+    pub expires_at_micros: i64,
+    pub nonce: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HouseholdInviteToken {
+    pub collective_cid: String,
+    pub role: String,
+    pub sponsor_cid: String,
+    pub expires_at_micros: i64,
+    pub nonce: String,
+    pub issuer_pubkey: AgentPubKey,
+    pub signature: Signature,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AffirmMembershipInput {
+    pub token: HouseholdInviteToken,
+}
+
+fn parse_role(role: &str) -> ExternResult<MembershipRole> {
+    match role {
+        "steward" => Ok(MembershipRole::Steward),
+        "contributor" => Ok(MembershipRole::Contributor),
+        "observer" => Ok(MembershipRole::Observer),
+        other => Err(wasm_error!("unknown membership role: {}", other)),
+    }
+}
+
+fn invite_payload_of(token: &HouseholdInviteToken) -> HouseholdInvitePayload {
+    HouseholdInvitePayload {
+        collective_cid: token.collective_cid.clone(),
+        role: token.role.clone(),
+        sponsor_cid: token.sponsor_cid.clone(),
+        expires_at_micros: token.expires_at_micros,
+        nonce: token.nonce.clone(),
+    }
+}
+
+/// Issue a single-use, signed, TTL'd household invite. Caller must be a current
+/// Steward of the collective. The token travels OUT-OF-BAND (QR / LAN / deep
+/// link / seeder memory) — it is deliberately NOT a DHT entity (entity model:
+/// Category C; the durable proof of invitation is the resulting Membership's
+/// sponsor chain).
+#[hdk_extern]
+pub fn issue_household_invite(
+    input: IssueHouseholdInviteInput,
+) -> ExternResult<HouseholdInviteToken> {
+    if input.nonce.len() < 16 {
+        return Err(wasm_error!("invite nonce must be at least 16 chars"));
+    }
+    let issuer_pubkey = agent_info()?.agent_initial_pubkey;
+    let issuer_cid = encode_agent_cid(&issuer_pubkey);
+    require_caller_is_steward_of(&issuer_cid, &input.collective_cid)?;
+
+    let payload = HouseholdInvitePayload {
+        collective_cid: input.collective_cid,
+        role: input.role,
+        sponsor_cid: issuer_cid,
+        expires_at_micros: input.expires_at_micros,
+        nonce: input.nonce,
+    };
+    let signature = sign(issuer_pubkey.clone(), &payload)?;
+    Ok(HouseholdInviteToken {
+        collective_cid: payload.collective_cid,
+        role: payload.role,
+        sponsor_cid: payload.sponsor_cid,
+        expires_at_micros: payload.expires_at_micros,
+        nonce: payload.nonce,
+        issuer_pubkey,
+        signature,
+    })
+}
+
+/// Affirm membership in a household collective — the recognition-of-the-given
+/// flow. The CALLER's own agent authors the Membership (their identity is
+/// theirs from day one); the token's sponsor chain carries the issuer's side
+/// of the mutual witness. Replay-guarded via a consumed-nonce anchor link.
+#[hdk_extern]
+pub fn affirm_membership(input: AffirmMembershipInput) -> ExternResult<ActionHash> {
+    let token = input.token;
+
+    // 1. Expiry.
+    let now_micros = sys_time()?.as_micros();
+    if now_micros > token.expires_at_micros {
+        return Err(wasm_error!("invite token expired"));
+    }
+
+    // 2. Issuer authority: the signer must be a CURRENT Steward of the collective.
+    let issuer_cid = encode_agent_cid(&token.issuer_pubkey);
+    if issuer_cid != token.sponsor_cid {
+        return Err(wasm_error!("token sponsor_cid does not match issuer key"));
+    }
+    require_caller_is_steward_of(&issuer_cid, &token.collective_cid)?;
+
+    // 3. Signature over the canonical payload.
+    let payload = invite_payload_of(&token);
+    let valid = verify_signature(token.issuer_pubkey.clone(), token.signature.clone(), &payload)?;
+    if !valid {
+        return Err(wasm_error!("invite token signature invalid"));
+    }
+
+    // 4. Replay guard: consumed-nonce anchor. Coordinator-side by design —
+    //    integrity validators are pure-data here (no link traversal allowed).
+    let consumed_anchor = StringAnchor::new("invite-consumed", &token.nonce);
+    let consumed_anchor_hash = hash_entry(&EntryTypes::StringAnchor(consumed_anchor.clone()))?;
+    let collective_hash = decode_collective_cid_to_action(&token.collective_cid)?;
+    let existing = {
+        let q = LinkQuery::try_new(consumed_anchor_hash.clone(), LinkTypes::CharterAnchor)?;
+        get_links(q, GetStrategy::default())?
+    };
+    if !existing.is_empty() {
+        return Err(wasm_error!("invite token already consumed"));
+    }
+    create_entry(&EntryTypes::StringAnchor(consumed_anchor))?;
+    create_link(
+        consumed_anchor_hash,
+        collective_hash.clone(),
+        LinkTypes::CharterAnchor,
+        (),
+    )?;
+
+    // 5. The Membership — authored by the AFFIRMER's agent.
+    let block_height = current_block_height()?;
+    let member_cid = encode_agent_cid(&agent_info()?.agent_initial_pubkey);
+    let membership = Membership {
+        member_cid,
+        member_kind: MemberKind::Person,
+        collective_cid: token.collective_cid,
+        role: parse_role(&token.role)?,
+        sponsor_cid: Some(token.sponsor_cid),
+        joined_at_block_height: block_height,
+        withdrawn_at_block_height: None,
+    };
+    let membership_hash = create_entry(&EntryTypes::Membership(membership))?;
+    create_link(
+        collective_hash,
+        membership_hash.clone(),
+        LinkTypes::HasMembership,
+        (),
+    )?;
+    // post_commit's existing to_app_option::<Membership>() arm emits
+    // MembershipCommitted — no signal code needed here.
+    Ok(membership_hash)
+}
