@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { esbuildPlugin } from '@web/dev-server-esbuild';
 import { playwrightLauncher } from '@web/test-runner-playwright';
 
@@ -51,12 +55,37 @@ export default axe;
   };
 }
 
+// The theme-contrast gate injects the REAL token + binding sources as its
+// fixture (theme-authority spec §4.1: never a copied fixture that can drift).
+// Both files are plain CSS in .scss clothing (no SCSS syntax). The binding
+// file lives outside the wtr rootDir (app/lamad/src/), so serve both at
+// virtual URLs — same precedent as axeCoreShim's SHIM_URL.
+const PKG_DIR = dirname(fileURLToPath(import.meta.url));
+const THEME_FIXTURE_FILES = {
+  '/__elohim__/tokens.css': resolve(PKG_DIR, 'tokens.scss'),
+  '/__elohim__/chrome-binding.css': resolve(PKG_DIR, '../../lamad/src/_chrome-binding.scss'),
+};
+
+function themeFixtureFiles() {
+  return {
+    name: 'theme-fixture-files',
+    serve(context) {
+      const src = THEME_FIXTURE_FILES[context.path];
+      if (src) {
+        return { body: readFileSync(src, 'utf8'), type: 'css' };
+      }
+      return undefined;
+    },
+  };
+}
+
 export default {
   files: 'src/**/*.spec.ts',
   nodeResolve: true,
   browsers: [playwrightLauncher({ product: 'chromium' })],
   plugins: [
     axeCoreShim(),
+    themeFixtureFiles(),
     esbuildPlugin({
       ts: true,
       target: 'es2022',
