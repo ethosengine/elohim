@@ -2,12 +2,20 @@
 //
 // CSS custom properties form the protocol's runtime design substrate.
 // The dark theme is the default; `prefers-color-scheme: light` overrides at
-// the OS level; `body[data-theme='light'|'dark']` provides a manual override
-// for theme-toggle UX.
+// the OS level; `:root[data-theme='light'|'dark']` provides a manual override
+// for theme-toggle UX (set on documentElement by ThemeStore/ThemeService —
+// the html-rooted theme authority; body carries a compat copy).
 //
 // Harvested verbatim from app/elohim-app/src/styles.css (lines 12-118, 537-665).
 
 :root {
+  /* The UA must agree with the token palette (theme-authority spec D-2):
+     dark is the default scheme, exactly as the dark palette is the default
+     below. System colors (Canvas, CanvasText, LinkText, …) follow
+     color-scheme, never data-theme — without this line they stay light
+     while the tokens go dark (the 2026-06-05 regression class C2). */
+  color-scheme: dark;
+
   /* Space theme colors - Dark Mode (Default) */
   --space-black: #000000;
   --atmosphere-dark: #0a0a0a;
@@ -53,6 +61,13 @@
   --lamad-warning: #f59e0b;
   --lamad-info: #3b82f6;
 
+  /* On-accent pair (theme-authority spec D-3): accent-primary #6366f1 cannot
+     carry ANY small text at 4.5:1 (even pure white computes 4.47:1).
+     Small-text-on-accent surfaces (profile bubble, toggle badge) bind to the
+     emphasis pair instead; accent-primary stays for non-text accent uses. */
+  --lamad-accent-emphasis: #4f46e5;
+  --lamad-on-accent: #ffffff;
+
   /* ============================================================================
      Responsive Breakpoints
      ============================================================================
@@ -68,6 +83,8 @@
 /* Light Theme - Activates based on device preference */
 @media (prefers-color-scheme: light) {
   :root {
+    color-scheme: light;
+
     /* Sky theme colors - Light Mode */
     --space-black: #e3f2fd;
     --atmosphere-dark: #bbdefb;
@@ -112,14 +129,22 @@
     --lamad-success: #059669;
     --lamad-warning: #d97706;
     --lamad-info: #2563eb;
+
+    --lamad-accent-emphasis: #4f46e5;
+    --lamad-on-accent: #ffffff;
   }
 }
 
 /* Manual Theme Overrides - These take precedence over media queries.
-   Applied by the theme-toggle component setting body[data-theme]. */
+   Applied by ThemeStore/ThemeService setting data-theme on documentElement
+   (the AUTHORITY — chrome var-chains are declared on :root and substitute at
+   :root, so the override MUST cascade on the same element; a body-level
+   override can never reach them) and on body (legacy compat for the shell's
+   body[data-theme] descendant selectors). */
 
 /* Light Theme Override - Applied when user manually selects light theme */
-body[data-theme='light'] {
+:root[data-theme='light'] {
+  color-scheme: light;
   --space-black: #e3f2fd;
   --atmosphere-dark: #bbdefb;
   --atmosphere-mid: #90caf9;
@@ -159,12 +184,16 @@ body[data-theme='light'] {
   --lamad-success: #059669;
   --lamad-warning: #d97706;
   --lamad-info: #2563eb;
+
+  --lamad-accent-emphasis: #4f46e5;
+  --lamad-on-accent: #ffffff;
 }
 
 /* Dark Theme Override - Applied when user manually selects dark theme.
    Dark is already the default; this re-asserts it so the manual choice
    sticks even if the OS preference flips to light. */
-body[data-theme='dark'] {
+:root[data-theme='dark'] {
+  color-scheme: dark;
   --space-black: #000000;
   --atmosphere-dark: #0a0a0a;
   --atmosphere-mid: #1a1a2e;
@@ -204,4 +233,7 @@ body[data-theme='dark'] {
   --lamad-success: #10b981;
   --lamad-warning: #f59e0b;
   --lamad-info: #3b82f6;
+
+  --lamad-accent-emphasis: #4f46e5;
+  --lamad-on-accent: #ffffff;
 }
