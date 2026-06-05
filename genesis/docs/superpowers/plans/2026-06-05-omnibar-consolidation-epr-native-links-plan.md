@@ -2448,7 +2448,9 @@ git add app/elohim-app/src/app/elohim/services/epr-nav.service.ts app/elohim-app
 git commit -m "feat(app): EprNavService (router-config-derived ownsPath) + explicit shell install of the epr-link interceptor"
 ```
 
----### Task 13: Link sweep (all first-party cross-bundle sites)
+---
+
+### Task 13: Link sweep (all first-party cross-bundle sites)
 
 **Files (elohim-app):**
 - Modify: `src/app/components/footer/footer.component.{html,ts}`
