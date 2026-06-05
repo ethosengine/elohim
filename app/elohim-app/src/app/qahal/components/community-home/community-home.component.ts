@@ -60,7 +60,7 @@ import { RouterModule } from '@angular/router';
       </div>
 
       <div class="navigation">
-        <a routerLink="/lamad" class="nav-link">📚 Explore Lamad (Content)</a>
+        <a href="/lamad" class="nav-link">📚 Explore Lamad (Content)</a>
         <a routerLink="/shefa" class="nav-link secondary">✨ View Shefa (Economy)</a>
       </div>
     </div>

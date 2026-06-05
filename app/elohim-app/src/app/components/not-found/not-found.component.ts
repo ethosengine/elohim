@@ -5,6 +5,7 @@ import 'elohim-core/register';
 
 // @coverage: 100.0% (2026-02-24)
 
+import { EprNavService } from '../../elohim/services/epr-nav.service';
 import { SeoService } from '../../services/seo.service';
 
 /**
@@ -27,6 +28,7 @@ import { SeoService } from '../../services/seo.service';
 export class NotFoundComponent implements OnInit {
   private readonly seoService = inject(SeoService);
   private readonly router = inject(Router);
+  private readonly eprNav = inject(EprNavService);
 
   /** The attempted URL path */
   attemptedUrl = '';
@@ -56,7 +58,7 @@ export class NotFoundComponent implements OnInit {
    * Navigate to Lamad learning platform
    */
   goToLamad(): void {
-    void this.router.navigate(['/lamad']);
+    this.eprNav.navigate('/lamad');
   }
 
   /**

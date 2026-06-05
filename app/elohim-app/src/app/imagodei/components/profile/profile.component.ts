@@ -19,6 +19,7 @@ import { takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
 
+import { EprNavService } from '@app/elohim/services/epr-nav.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import {
   type UpdateProfileRequest,
@@ -85,6 +86,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   private readonly sessionHumanService = inject(SessionHumanService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly eprNav = inject(EprNavService);
   private readonly destroy$ = new Subject<void>();
 
   // ==========================================================================
@@ -358,7 +360,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   // ==========================================================================
 
   navigateToDiscovery(): void {
-    void this.router.navigate(['/lamad/discovery']);
+    this.eprNav.navigate('/lamad/discovery');
   }
 
   navigateToResource(contentNodeId: string): void {

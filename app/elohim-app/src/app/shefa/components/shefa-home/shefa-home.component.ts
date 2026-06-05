@@ -176,7 +176,7 @@ const RECOGNITION_POINTS_UNIT = 'recognition-points';
       <div class="dashboard-actions" *ngIf="!loading()">
         <button class="action-btn primary" (click)="refreshData()">🔄 Refresh Data</button>
         <button class="action-btn" (click)="testConnection()">🔌 Test Connection</button>
-        <a routerLink="/lamad" class="action-btn">📚 Explore Lamad</a>
+        <a href="/lamad" class="action-btn">📚 Explore Lamad</a>
       </div>
 
       <!-- Error State -->

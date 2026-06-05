@@ -1,6 +1,5 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -16,7 +15,7 @@ export interface BuildInfo {
 
 @Component({
   selector: 'app-footer',
-  imports: [RouterLink],
+  imports: [],
   templateUrl: './footer.component.html',
   styleUrl: './footer.component.css',
 })

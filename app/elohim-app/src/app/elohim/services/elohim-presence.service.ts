@@ -25,6 +25,7 @@ import {
 
 import { BannerService } from './banner.service';
 import { ElohimAgentService } from './elohim-agent.service';
+import { EprNavService } from './epr-nav.service';
 
 import type { BannerNotice, BannerNoticeProvider } from '../models/banner-notice.model';
 import type {
@@ -47,6 +48,7 @@ export class ElohimPresenceService implements BannerNoticeProvider, OnDestroy {
   readonly providerId = PROVIDER_ID;
 
   private readonly router = inject(Router);
+  private readonly eprNav = inject(EprNavService);
   private readonly moments$ = new BehaviorSubject<ElohimPresenceMoment[]>([]);
   private readonly sessionCost$ = new BehaviorSubject<ElohimComputationCost>({
     tokensProcessed: 0,
@@ -264,10 +266,10 @@ export class ElohimPresenceService implements BannerNoticeProvider, OnDestroy {
 
     const pathId = moment.metadata?.['recommendedPathId'] as string | undefined;
     if (pathId) {
-      void this.router.navigate(['/lamad/path', pathId]);
+      this.eprNav.navigate(['/lamad/path', pathId]);
     } else {
       // Fallback: navigate to path catalog
-      void this.router.navigate(['/lamad']);
+      this.eprNav.navigate('/lamad');
     }
 
     this.dismissNotice(noticeId);

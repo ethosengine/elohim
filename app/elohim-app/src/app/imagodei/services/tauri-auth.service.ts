@@ -17,6 +17,7 @@ import { Router } from '@angular/router';
 
 import { environment } from '../../../environments/environment';
 
+import { EprNavService } from './../../elohim/services/epr-nav.service';
 import { AuthService } from './auth.service';
 import { DoorwayRegistryService } from './doorway-registry.service';
 
@@ -123,6 +124,7 @@ export class TauriAuthService {
   private readonly router = inject(Router);
   private readonly authService = inject(AuthService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
+  private readonly eprNav = inject(EprNavService);
 
   // State signals
   readonly status = signal<TauriAuthStatus>('idle');
@@ -392,7 +394,7 @@ export class TauriAuthService {
       this.authService.setTauriSession(session);
 
       // Navigate to main app
-      void this.router.navigate(['/lamad']);
+      this.eprNav.navigate('/lamad');
     } catch (err) {
       this.status.set('error');
       this.errorMessage.set(err instanceof Error ? err.message : 'Authentication failed');

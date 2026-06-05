@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
+import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 
 // @coverage: 52.9% (2026-02-24)
 
@@ -18,7 +18,7 @@ import { RendererInitializerService } from '../../renderers/renderer-initializer
 @Component({
   selector: 'app-lamad-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, FormsModule],
+  imports: [CommonModule, RouterOutlet, FormsModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './lamad-layout.component.html',
   styleUrls: ['./lamad-layout.component.css'],
@@ -75,5 +75,20 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
     // empty string the Router reports before the first navigation commits.
     this.isHomePage =
       this.router.url === '/' || this.router.url === '' || this.router.url.startsWith('/?');
+  }
+
+  /**
+   * Navigator routes are protocol-absolute. Lamad-owned ones go through this
+   * bundle's router (base-href '/lamad/' is stripped); everything else is a
+   * cross-bundle handoff to the doorway-projected address.
+   */
+  onNavigatorNavigate(event: Event): void {
+    const route = (event as CustomEvent<{ route?: string }>).detail?.route;
+    if (!route) return;
+    if (route === '/lamad' || route.startsWith('/lamad/')) {
+      void this.router.navigateByUrl(route.slice('/lamad'.length) || '/');
+    } else {
+      globalThis.location.assign(route);
+    }
   }
 }

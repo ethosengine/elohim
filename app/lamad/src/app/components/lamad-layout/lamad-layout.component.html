@@ -1,6 +1,6 @@
 <div class="lamad-container">
   <!-- Elohim Navigator (unified header — Lit element from elohim-core) -->
-  <elohim-navigator [attr.context]="'lamad'" [attr.show-search]="true">
+  <elohim-navigator [attr.context]="'lamad'" [attr.show-search]="true" (navigate)="onNavigatorNavigate($event)">
     <!-- Loading State -->
     <div *ngIf="!isReady" class="loading-state">
       <div class="spinner"></div>
@@ -17,7 +17,7 @@
   <footer class="lamad-footer">
     <p>
       Lamad Learning Platform | Where Understanding is Earned |
-      <a routerLink="/" class="footer-link">Powered by Elohim Protocol</a>
+      <a href="/" class="footer-link" data-testid="lamad-footer-home-link">Powered by Elohim Protocol</a>
     </p>
   </footer>
 </div>

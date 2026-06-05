@@ -7,6 +7,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 
+import { EprNavService } from '../../elohim/services/epr-nav.service';
 import { TauriAuthService } from './tauri-auth.service';
 import { AuthService } from './auth.service';
 import { DoorwayRegistryService } from './doorway-registry.service';
@@ -17,6 +18,7 @@ describe('TauriAuthService', () => {
   let mockRouter: any;
   let mockAuthService: any;
   let mockDoorwayRegistry: any;
+  let mockEprNav: any;
   let mockTauriWindow: any;
   let fetchSpy: Mock;
   let originalWindow: any;
@@ -66,6 +68,13 @@ describe('TauriAuthService', () => {
       selected: vi.fn().mockReturnValue(mockDoorway),
     };
 
+    // Mock EprNavService
+    mockEprNav = {
+      navigate: vi.fn(),
+      ownsPath: vi.fn(),
+      recordHandoff: vi.fn(),
+    };
+
     // Mock Tauri window - will be set by individual tests as needed
     mockTauriWindow = {
       __TAURI__: {
@@ -85,6 +94,10 @@ describe('TauriAuthService', () => {
         { provide: Router, useValue: mockRouter },
         { provide: AuthService, useValue: mockAuthService },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
+        {
+          provide: EprNavService,
+          useValue: mockEprNav,
+        },
       ],
     });
 
@@ -360,7 +373,7 @@ describe('TauriAuthService', () => {
 
       expect(service.status()).toBe('authenticated');
       expect(service.currentSession()).toBeTruthy();
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad']);
+      expect(mockEprNav.navigate).toHaveBeenCalledWith('/lamad');
     });
 
     it('should handle token exchange failure', async () => {

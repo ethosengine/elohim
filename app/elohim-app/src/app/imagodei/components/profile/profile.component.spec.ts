@@ -4,6 +4,7 @@ import { signal } from '@angular/core';
 
 import { of } from 'rxjs';
 
+import { EprNavService } from '@app/elohim/services/epr-nav.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
@@ -25,6 +26,7 @@ describe('ProfileComponent', () => {
   let mockAgencyService: any;
   let mockDiscoveryService: any;
   let mockRouter: any;
+  let mockEprNav: any;
 
   const mockProfile: HumanProfile = {
     id: 'human-123',
@@ -127,6 +129,8 @@ describe('ProfileComponent', () => {
     mockRouter = { navigate: vi.fn() };
     mockRouter.navigate.mockReturnValue(Promise.resolve(true));
 
+    mockEprNav = { navigate: vi.fn(), ownsPath: vi.fn(), recordHandoff: vi.fn() };
+
     await TestBed.configureTestingModule({
       imports: [ProfileComponent],
       providers: [
@@ -161,6 +165,10 @@ describe('ProfileComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: { queryParams: of({}), snapshot: { fragment: null } },
+        },
+        {
+          provide: EprNavService,
+          useValue: mockEprNav,
         },
       ],
     }).compileComponents();
@@ -292,7 +300,7 @@ describe('ProfileComponent', () => {
     it('should navigate to discovery', () => {
       component.navigateToDiscovery();
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/discovery']);
+      expect(mockEprNav.navigate).toHaveBeenCalledWith('/lamad/discovery');
     });
 
     it('should navigate to resource by contentNodeId', () => {

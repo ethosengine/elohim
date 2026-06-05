@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 
+import { EprNavService } from '../../elohim/services/epr-nav.service';
 import { SeoService } from '../../services/seo.service';
 
 import { NotFoundComponent } from './not-found.component';
@@ -10,6 +11,7 @@ describe('NotFoundComponent', () => {
   let component: NotFoundComponent;
   let fixture: ComponentFixture<NotFoundComponent>;
   let seoServiceSpy: any;
+  let eprNavSpy: any;
   let router: Router;
 
   beforeEach(async () => {
@@ -17,9 +19,19 @@ describe('NotFoundComponent', () => {
       updateSeo: vi.fn(),
     };
 
+    eprNavSpy = {
+      navigate: vi.fn(),
+      ownsPath: vi.fn(),
+      recordHandoff: vi.fn(),
+    };
+
     await TestBed.configureTestingModule({
       imports: [NotFoundComponent],
-      providers: [provideRouter([]), { provide: SeoService, useValue: seoServiceSpy }],
+      providers: [
+        provideRouter([]),
+        { provide: SeoService, useValue: seoServiceSpy },
+        { provide: EprNavService, useValue: eprNavSpy },
+      ],
     }).compileComponents();
 
     router = TestBed.inject(Router);
@@ -58,7 +70,7 @@ describe('NotFoundComponent', () => {
 
   it('should navigate to lamad', () => {
     component.goToLamad();
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad']);
+    expect(eprNavSpy.navigate).toHaveBeenCalledWith('/lamad');
   });
 
   it('should go back', () => {

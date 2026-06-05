@@ -142,7 +142,7 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
             Engage with content, practice assessments, and complete paths to earn participation
             points. Your learning activity fuels the network.
           </p>
-          <a routerLink="/lamad" class="action-link">
+          <a href="/lamad" class="action-link">
             <span class="material-icons">arrow_forward</span>
             Explore Learning Paths
           </a>

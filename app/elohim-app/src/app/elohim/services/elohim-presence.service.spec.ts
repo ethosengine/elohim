@@ -13,6 +13,7 @@ import {
 import { BannerService } from './banner.service';
 import { ElohimAgentService } from './elohim-agent.service';
 import { ElohimPresenceService } from './elohim-presence.service';
+import { EprNavService } from './epr-nav.service';
 
 import type { ElohimResponse } from '../models/elohim-agent.model';
 import { vi } from 'vitest';
@@ -22,6 +23,7 @@ describe('ElohimPresenceService', () => {
   let mockAgentService: any;
   let mockBannerService: any;
   let mockRouter: any;
+  let mockEprNav: any;
   let mockPathRecommendation: any;
   let mockLearnerContext: any;
 
@@ -77,6 +79,12 @@ describe('ElohimPresenceService', () => {
     };
     mockRouter.navigate.mockReturnValue(Promise.resolve(true));
 
+    mockEprNav = {
+      navigate: vi.fn(),
+      ownsPath: vi.fn(),
+      recordHandoff: vi.fn(),
+    };
+
     mockPathRecommendation = {
       getTopRecommendation: vi.fn(),
       getRecommendations: vi.fn(),
@@ -98,6 +106,10 @@ describe('ElohimPresenceService', () => {
         { provide: Router, useValue: mockRouter },
         { provide: PathRecommendationService, useValue: mockPathRecommendation },
         { provide: LearnerContextService, useValue: mockLearnerContext },
+        {
+          provide: EprNavService,
+          useValue: mockEprNav,
+        },
       ],
     });
 
@@ -480,7 +492,7 @@ describe('ElohimPresenceService', () => {
       const noticeId = notices[0].id;
       service.handleAction(noticeId, 'view-path');
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/path', 'node-1']);
+      expect(mockEprNav.navigate).toHaveBeenCalledWith(['/lamad/path', 'node-1']);
     }));
 
     it('should dismiss the moment after navigating', fakeAsync(() => {
@@ -510,7 +522,7 @@ describe('ElohimPresenceService', () => {
       const momentId = moments[0].id;
       service.handleAction(momentId, 'view-path');
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad']);
+      expect(mockEprNav.navigate).toHaveBeenCalledWith('/lamad');
     }));
 
     it('should include recommendedPathId in discovery moment metadata', fakeAsync(() => {
@@ -552,7 +564,7 @@ describe('ElohimPresenceService', () => {
       const noticeId = notices[0].id;
       service.handleAction(noticeId, 'view-path');
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/path', 'know-thyself-path']);
+      expect(mockEprNav.navigate).toHaveBeenCalledWith(['/lamad/path', 'know-thyself-path']);
     }));
   });
 
