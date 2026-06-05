@@ -2,9 +2,23 @@
  *
  * ONE concern: map the blank-slate Lit chrome's published @cssprop surface
  * onto the lamad token palette. Nothing else belongs in this file.
- * Custom-property chains resolve at the consuming element, so
- * body[data-theme] overrides of --lamad-* flow through automatically —
- * the chrome follows the theme toggle.
+ *
+ * RESOLUTION MODEL (the 2026-06-05 dark-mode regression root cause): a custom
+ * property's var() references substitute at computed-value time ON THE
+ * ELEMENT WHERE THE DECLARATION IS SPECIFIED — :root here. Theme overrides
+ * therefore MUST also cascade on :root (tokens.scss :root[data-theme],
+ * written to documentElement by ThemeStore/ThemeService). A body-level
+ * override can never reach these chains.
+ *
+ * PAIRING RULE: every *-bg bound here is paired with a *-fg from the same
+ * palette row — never leave a bound surface with an unbound foreground
+ * (that gap is what put light-scheme system colors on dark token surfaces).
+ *
+ * VALUE SHAPES: --elohim-nav-border / -tray-border / -search-border are
+ * consumed as WHOLE border shorthands by the element — bind `1px solid
+ * <color>`, never a bare color (a bare color invalidates the declaration and
+ * silently drops the border). --elohim-omnibar-border and
+ * --elohim-lang-picker-border are color slots — bind bare colors.
  *
  * This file migrates WHOLESALE to the shippable graphos-tokens artifact
  * when it ships (see genesis/data/timeline/backlog/
@@ -14,22 +28,31 @@
   /* <elohim-navigator> */
   --elohim-nav-bg: var(--lamad-bg-secondary);
   --elohim-nav-fg: var(--lamad-text-primary);
-  --elohim-nav-border: var(--lamad-border);
-  --elohim-nav-bubble-bg: var(--lamad-accent-primary);
-  --elohim-nav-bubble-fg: var(--lamad-text-primary);
+  --elohim-nav-border: 1px solid var(--lamad-border);
+  --elohim-nav-bubble-bg: var(--lamad-accent-emphasis);
+  --elohim-nav-bubble-fg: var(--lamad-on-accent);
   --elohim-nav-tray-bg: var(--lamad-bg-secondary);
-  --elohim-nav-tray-border: var(--lamad-border);
+  --elohim-nav-tray-fg: var(--lamad-text-primary);
+  --elohim-nav-tray-border: 1px solid var(--lamad-border);
   --elohim-nav-search-bg: var(--lamad-bg-tertiary);
-  --elohim-nav-search-border: var(--lamad-border);
+  --elohim-nav-search-fg: var(--lamad-text-primary);
+  --elohim-nav-search-border: 1px solid var(--lamad-border-hover);
+  --elohim-nav-banner-info-bg: var(--lamad-bg-tertiary);
+  --elohim-nav-banner-info-fg: var(--lamad-text-primary);
+  --elohim-nav-banner-warning-bg: var(--lamad-warning);
+  --elohim-nav-banner-warning-fg: #1c1300;
+  --elohim-nav-banner-error-bg: #7f1d1d;
+  --elohim-nav-banner-error-fg: #fef2f2;
 
   /* <elohim-page-chrome> + <elohim-default-omnibar> */
   --elohim-omnibar-bg: var(--lamad-bg-secondary);
+  --elohim-omnibar-fg: var(--lamad-text-primary);
   --elohim-omnibar-border: var(--lamad-border);
 
   /* <elohim-theme-toggle> */
   --elohim-theme-toggle-fg: var(--lamad-text-primary);
-  --elohim-theme-toggle-badge-bg: var(--lamad-accent-primary);
-  --elohim-theme-toggle-badge-fg: var(--lamad-text-primary);
+  --elohim-theme-toggle-badge-bg: var(--lamad-accent-emphasis);
+  --elohim-theme-toggle-badge-fg: var(--lamad-on-accent);
 
   /* <elohim-lang-picker> */
   --elohim-lang-picker-fg: var(--lamad-text-primary);

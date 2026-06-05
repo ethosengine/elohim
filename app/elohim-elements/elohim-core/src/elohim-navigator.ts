@@ -119,11 +119,20 @@ const DEFAULT_CONTEXT_APPS: ElohimContextAppConfig[] = [
  * @cssprop --elohim-nav-bubble-bg - Profile bubble background
  * @cssprop --elohim-nav-bubble-fg - Profile bubble foreground
  * @cssprop --elohim-nav-tray-bg - Dropdown tray background
+ * @cssprop --elohim-nav-tray-fg - Dropdown tray foreground
  * @cssprop --elohim-nav-tray-border - Dropdown tray border
  * @cssprop --elohim-nav-tray-shadow - Dropdown tray shadow
  * @cssprop --elohim-nav-search-bg - Search input background
+ * @cssprop --elohim-nav-search-fg - Search input foreground
  * @cssprop --elohim-nav-search-border - Search input border
  * @cssprop --elohim-nav-search-radius - Search input border radius
+ * @cssprop --elohim-nav-danger-fg - Destructive tray-item foreground
+ * @cssprop --elohim-nav-banner-info-bg - Info banner background
+ * @cssprop --elohim-nav-banner-info-fg - Info banner foreground
+ * @cssprop --elohim-nav-banner-warning-bg - Warning banner background
+ * @cssprop --elohim-nav-banner-warning-fg - Warning banner foreground
+ * @cssprop --elohim-nav-banner-error-bg - Error banner background
+ * @cssprop --elohim-nav-banner-error-fg - Error banner foreground
  *
  * @csspart nav - The root navigation bar
  * @csspart identity-section - The left identity section
@@ -204,7 +213,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       );
       border-radius: var(--elohim-nav-search-radius, 999px);
       background: var(--elohim-nav-search-bg, Canvas);
-      color: CanvasText;
+      color: var(--elohim-nav-search-fg, CanvasText);
       font: inherit;
       font-size: 0.875rem;
     }
@@ -246,7 +255,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       font: inherit;
       font-size: 0.875rem;
       font-weight: 500;
-      color: CanvasText;
+      color: var(--elohim-nav-fg, CanvasText);
       display: flex;
       align-items: center;
       gap: 0.25rem;
@@ -292,19 +301,24 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       cursor: pointer;
       font: inherit;
       font-size: 0.875rem;
-      color: CanvasText;
+      color: var(--elohim-nav-tray-fg, CanvasText);
       border-radius: 0.25rem;
       min-block-size: 44px;
     }
 
     .tray-item:hover,
     .tray-item:focus-visible {
-      background: color-mix(in oklch, Canvas 90%, CanvasText);
+      /* theme-correct hover: derive from the BOUND tray pair, not raw system colors */
+      background: color-mix(
+        in oklch,
+        var(--elohim-nav-tray-bg, Canvas) 88%,
+        var(--elohim-nav-tray-fg, CanvasText)
+      );
       outline: none;
     }
 
     .tray-item.danger {
-      color: LinkText;
+      color: var(--elohim-nav-danger-fg, LinkText);
     }
 
     .tray-divider {
@@ -337,7 +351,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
 
     .context-app-tagline {
       font-size: 0.75rem;
-      opacity: 0.6;
+      opacity: 0.75; /* 0.6 left no light-mode headroom (4.63:1 vs 4.5 floor) */
     }
 
     .banner {
@@ -351,15 +365,22 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
     }
 
     .banner-info {
-      background: color-mix(in oklch, Canvas 90%, LinkText);
+      background: var(--elohim-nav-banner-info-bg, color-mix(in oklch, Canvas 90%, LinkText));
+      color: var(--elohim-nav-banner-info-fg, CanvasText);
     }
 
+    /* warning/error were color-mix(in oklch, Canvas 85%, Canvas) — a no-op
+       (severity rendered identical to the page). Mark/MarkText is the only
+       system pair with highlight semantics; the binding layer overrides with
+       real severity colors. */
     .banner-warning {
-      background: color-mix(in oklch, Canvas 85%, Canvas);
+      background: var(--elohim-nav-banner-warning-bg, Mark);
+      color: var(--elohim-nav-banner-warning-fg, MarkText);
     }
 
     .banner-error {
-      background: color-mix(in oklch, Canvas 85%, Canvas);
+      background: var(--elohim-nav-banner-error-bg, Mark);
+      color: var(--elohim-nav-banner-error-fg, MarkText);
     }
 
     .banner-dismiss {
@@ -367,7 +388,9 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       border: none;
       cursor: pointer;
       padding: 0.25rem;
-      color: GrayText;
+      /* inherit the banner's severity-paired fg — GrayText is the DISABLED
+         color and fails 3:1 on bound banner surfaces (active control) */
+      color: inherit;
       min-block-size: 44px;
       min-inline-size: 44px;
     }
@@ -462,7 +485,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
   private _renderIdentifierRow() {
     if (!this.identifier) return nothing;
     return html`
-      <div style="opacity: 0.6; font-size: 0.8em;">${this.identifier}</div>
+      <div style="opacity: 0.75; font-size: 0.8em;">${this.identifier}</div>
     `;
   }
 

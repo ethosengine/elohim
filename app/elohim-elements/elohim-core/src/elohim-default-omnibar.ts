@@ -15,6 +15,7 @@ import { Session, type CurrentUserView } from './session/session.js';
  * @element elohim-default-omnibar
  *
  * @cssprop --elohim-omnibar-bg     - Override background (default: blend of Canvas + currentColor)
+ * @cssprop --elohim-omnibar-fg     - Override foreground (default: inherit)
  * @cssprop --elohim-omnibar-border - Override bottom border color
  *
  * @csspart brand     - The brand mark span
@@ -36,7 +37,7 @@ import { Session, type CurrentUserView } from './session/session.js';
  * @capabilityStates empty:n/a, loading:n/a, error:n/a, stale:n/a, contested:n/a, offline:n/a, unauthorized:designed
  */
 export class ElohimDefaultOmnibar extends LitElement {
-  private _session = new Session();
+  private readonly _session = new Session();
 
   @state() private _user: CurrentUserView | null = this._session.currentUser;
 
@@ -45,7 +46,7 @@ export class ElohimDefaultOmnibar extends LitElement {
 
   private _unsub?: () => void;
 
-  private _visibilityHandler = () => {
+  private readonly _visibilityHandler = () => {
     if (!document.hidden) this._session.refreshFromCookies();
   };
 
@@ -57,7 +58,9 @@ export class ElohimDefaultOmnibar extends LitElement {
       padding-block: 0.5rem;
       padding-inline: 1rem;
       background: var(--elohim-omnibar-bg, color-mix(in oklch, Canvas 92%, currentColor));
-      border-block-end: 1px solid var(--elohim-omnibar-border, color-mix(in oklch, currentColor 12%, transparent));
+      color: var(--elohim-omnibar-fg, inherit);
+      border-block-end: 1px solid
+        var(--elohim-omnibar-border, color-mix(in oklch, currentColor 12%, transparent));
     }
 
     :host([hidden]) {
@@ -102,7 +105,7 @@ export class ElohimDefaultOmnibar extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this._unsub = this._session.subscribe((u) => {
+    this._unsub = this._session.subscribe(u => {
       this._user = u;
     });
     document.addEventListener('visibilitychange', this._visibilityHandler);
@@ -118,12 +121,24 @@ export class ElohimDefaultOmnibar extends LitElement {
     return html`
       <span class="brand" part="brand">elohim.host</span>
       <span class="end" part="end">
-        ${this.showLangPicker ? html`<elohim-lang-picker></elohim-lang-picker>` : nothing}
-        ${this.showThemeToggle ? html`<elohim-theme-toggle></elohim-theme-toggle>` : nothing}
+        ${this.showLangPicker
+          ? html`
+              <elohim-lang-picker></elohim-lang-picker>
+            `
+          : nothing}
+        ${this.showThemeToggle
+          ? html`
+              <elohim-theme-toggle></elohim-theme-toggle>
+            `
+          : nothing}
         <span class="user" part="user">
           ${this._user
-            ? html`<span part="user-name">${this._user.humanId}</span>`
-            : html`<a href="/auth/signin">sign in</a>`}
+            ? html`
+                <span part="user-name">${this._user.humanId}</span>
+              `
+            : html`
+                <a href="/auth/signin">sign in</a>
+              `}
         </span>
       </span>
     `;

@@ -331,10 +331,35 @@ export async function assertThemeReactivity<T extends Element>(
  * axe with the silent-incomplete trap closed: violations AND color-contrast
  * incompletes must both be empty (an incomplete means contrast was never
  * actually measured — shadow/slot/transparent-stack cases).
+ *
+ * Excused incomplete classes — abstentions the load-bearing
+ * assertThemeContrast walk already covers (it measures every visible text
+ * node, symbols included, with colorjs.io parsing every CSS Color 4
+ * serialization):
+ *  - `colorParse`       : axe-core 4.11's parser rejects Chrome's
+ *    achromatic-hue serialization (`oklch(L C none)`, produced by e.g.
+ *    `color-mix(in oklch, Canvas 92%, currentColor)`)
+ *  - `nonBmp` / `shortTextContent` : axe abstains on glyph-only content
+ *    (▾, ×) — content classification, not an unmeasured pair
+ * Geometry/stack incompletes (bgImage, gradient, obscured, …) remain hard
+ * failures because nothing else measured them.
  */
+const EXCUSED_INCOMPLETE_KEYS = new Set(['colorParse', 'nonBmp', 'shortTextContent']);
+
 export async function axeScanStrict(el: Element): Promise<void> {
   const results = await axe.run(el as HTMLElement);
-  const contrastIncomplete = results.incomplete.filter(r => r.id === 'color-contrast');
+  const contrastIncomplete = results.incomplete
+    .filter(r => r.id === 'color-contrast')
+    .map(r => ({
+      ...r,
+      nodes: r.nodes.filter(
+        n =>
+          !n.any.every(check =>
+            EXCUSED_INCOMPLETE_KEYS.has((check.data as { messageKey?: string })?.messageKey ?? '')
+          )
+      ),
+    }))
+    .filter(r => r.nodes.length > 0);
   if (results.violations.length > 0 || contrastIncomplete.length > 0) {
     throw new Error(
       `axeScanStrict: ${results.violations.length} violation(s), ` +

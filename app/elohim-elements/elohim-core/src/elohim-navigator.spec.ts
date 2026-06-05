@@ -5,6 +5,13 @@ import './register.js';
 import type { ElohimNavigator } from './elohim-navigator.js';
 import { ElohimNavigator as NavigatorClass } from './elohim-navigator.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  assertThemeReactivity,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 describe('<elohim-navigator>', () => {
   it('is defined in the custom element registry', () => {
@@ -12,43 +19,43 @@ describe('<elohim-navigator>', () => {
   });
 
   it('renders the nav element with role navigation', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
     const nav = el.shadowRoot?.querySelector('nav[aria-label]');
     expect(nav).to.exist;
   });
 
   it('renders context switcher button', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
     const btn = el.shadowRoot?.querySelector('[part="context-switcher-btn"]');
     expect(btn).to.exist;
   });
 
   it('renders profile bubble button', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
     const bubble = el.shadowRoot?.querySelector('[data-testid="profile-bubble"]');
     expect(bubble).to.exist;
   });
 
   it('shows the active context app name in the switcher', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator context="shefa"></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator context="shefa"></elohim-navigator>
+    `);
     const switcher = el.shadowRoot?.querySelector('[part="context-switcher-btn"]');
     expect(switcher?.textContent).to.contain('Shefa');
   });
 
   it('opens context switcher dropdown on click', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
     const switcherBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[part="context-switcher-btn"]',
+      '[part="context-switcher-btn"]'
     );
     switcherBtn?.click();
     await elementUpdated(el);
@@ -58,9 +65,9 @@ describe('<elohim-navigator>', () => {
   });
 
   it('dispatches navigate event when a context app is selected', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
 
     let navigatedRoute: string | null = null;
     el.addEventListener('navigate', (e: Event) => {
@@ -68,13 +75,13 @@ describe('<elohim-navigator>', () => {
     });
 
     const switcherBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[part="context-switcher-btn"]',
+      '[part="context-switcher-btn"]'
     );
     switcherBtn?.click();
     await elementUpdated(el);
 
     const shefaApp = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="context-app-shefa"]',
+      '[data-testid="context-app-shefa"]'
     );
     shefaApp?.click();
 
@@ -83,20 +90,22 @@ describe('<elohim-navigator>', () => {
 
   it('calls onNavigate callback instead of dispatching event when set', async () => {
     let callbackRoute: string | null = null;
-    const onNavigate = (route: string) => { callbackRoute = route; };
+    const onNavigate = (route: string) => {
+      callbackRoute = route;
+    };
 
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator .onNavigate=${onNavigate}></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator .onNavigate=${onNavigate}></elohim-navigator>
+    `);
 
     const switcherBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[part="context-switcher-btn"]',
+      '[part="context-switcher-btn"]'
     );
     switcherBtn?.click();
     await elementUpdated(el);
 
     const shefaApp = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="context-app-shefa"]',
+      '[data-testid="context-app-shefa"]'
     );
     shefaApp?.click();
 
@@ -104,28 +113,28 @@ describe('<elohim-navigator>', () => {
   });
 
   it('renders search input when showSearch=true', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator show-search></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator show-search></elohim-navigator>
+    `);
     const searchInput = el.shadowRoot?.querySelector('[part="search-input"]');
     expect(searchInput).to.exist;
   });
 
   it('hides search input when showSearch=false', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator .showSearch=${false}></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator .showSearch=${false}></elohim-navigator>
+    `);
     const searchInput = el.shadowRoot?.querySelector('[part="search-input"]');
     expect(searchInput).to.be.null;
   });
 
   it('shows profile tray when profile bubble is clicked', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator .isAuthenticated=${true} display-name="Alice"></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator .isAuthenticated=${true} display-name="Alice"></elohim-navigator>
+    `);
 
     const bubble = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="profile-bubble"]',
+      '[data-testid="profile-bubble"]'
     );
     bubble?.click();
     await elementUpdated(el);
@@ -135,12 +144,12 @@ describe('<elohim-navigator>', () => {
   });
 
   it('shows sign-in menu items when not authenticated', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator .isAuthenticated=${false}></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator .isAuthenticated=${false}></elohim-navigator>
+    `);
 
     const bubble = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="profile-bubble"]',
+      '[data-testid="profile-bubble"]'
     );
     bubble?.click();
     await elementUpdated(el);
@@ -150,15 +159,17 @@ describe('<elohim-navigator>', () => {
   });
 
   it('dispatches logout event when logout is triggered', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator .isAuthenticated=${true}></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator .isAuthenticated=${true}></elohim-navigator>
+    `);
 
     let loggedOut = false;
-    el.addEventListener('logout', () => { loggedOut = true; });
+    el.addEventListener('logout', () => {
+      loggedOut = true;
+    });
 
     const bubble = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="profile-bubble"]',
+      '[data-testid="profile-bubble"]'
     );
     bubble?.click();
     await elementUpdated(el);
@@ -170,21 +181,21 @@ describe('<elohim-navigator>', () => {
   });
 
   it('renders banner notices', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator
         .banners=${[{ id: 'b1', message: 'System notice', severity: 'info' }]}
-      ></elohim-navigator>`,
-    );
+      ></elohim-navigator>
+    `);
     const banner = el.shadowRoot?.querySelector('[data-testid="banner-b1"]');
     expect(banner?.textContent).to.contain('System notice');
   });
 
   it('dispatches banner-dismiss event on dismiss click', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator
         .banners=${[{ id: 'b1', message: 'Notice', severity: 'info' }]}
-      ></elohim-navigator>`,
-    );
+      ></elohim-navigator>
+    `);
 
     let dismissedId: string | null = null;
     el.addEventListener('banner-dismiss', (e: Event) => {
@@ -192,7 +203,7 @@ describe('<elohim-navigator>', () => {
     });
 
     const dismissBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
-      '[data-testid="banner-b1"] button',
+      '[data-testid="banner-b1"] button'
     );
     dismissBtn?.click();
 
@@ -200,9 +211,9 @@ describe('<elohim-navigator>', () => {
   });
 
   it('passes axe-core a11y scan', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -235,19 +246,23 @@ describe('<elohim-navigator> preferences (theme/lang restore)', () => {
   });
 
   it('shows the inline theme toggle for visitors', async () => {
-    const el = await fixture<ElohimNavigator>(html`<elohim-navigator></elohim-navigator>`);
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
     expect(el.shadowRoot!.querySelector('[data-testid="nav-theme-inline"]')).to.exist;
   });
 
   it('hides the inline toggle when authenticated (tray owns it)', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator .isAuthenticated=${true}></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator .isAuthenticated=${true}></elohim-navigator>
+    `);
     expect(el.shadowRoot!.querySelector('[data-testid="nav-theme-inline"]')).to.not.exist;
   });
 
   it('renders theme + language rows in the profile tray', async () => {
-    const el = await fixture<ElohimNavigator>(html`<elohim-navigator></elohim-navigator>`);
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
     el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="profile-bubble"]')!.click();
     await elementUpdated(el);
     expect(el.shadowRoot!.querySelector('[data-testid="nav-theme-toggle"]')).to.exist;
@@ -255,9 +270,9 @@ describe('<elohim-navigator> preferences (theme/lang restore)', () => {
   });
 
   it('show-preferences=false suppresses the tray rows', async () => {
-    const el = await fixture<ElohimNavigator>(
-      html`<elohim-navigator .showPreferences=${false}></elohim-navigator>`,
-    );
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator .showPreferences=${false}></elohim-navigator>
+    `);
     el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="profile-bubble"]')!.click();
     await elementUpdated(el);
     expect(el.shadowRoot!.querySelector('[data-testid="nav-theme-toggle"]')).to.not.exist;
@@ -266,12 +281,75 @@ describe('<elohim-navigator> preferences (theme/lang restore)', () => {
   it('tray theme row cycles the shared store and keeps the tray open', async () => {
     const { getThemeStore } = await import('./theme/theme-store.js');
     getThemeStore().set('device');
-    const el = await fixture<ElohimNavigator>(html`<elohim-navigator></elohim-navigator>`);
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
     el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="profile-bubble"]')!.click();
     await elementUpdated(el);
     el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="nav-theme-toggle"]')!.click();
     await elementUpdated(el);
     expect(getThemeStore().theme).to.equal('light');
     expect(el.shadowRoot!.querySelector('[part="profile-tray"]')).to.exist;
+  });
+});
+
+describe('<elohim-navigator> — theme-contrast gate', () => {
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark', 'tokens-light', 'tokens-dark'];
+
+  for (const cell of CELLS) {
+    it(`visitor chrome passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimNavigator>(
+        html`
+          <elohim-navigator
+            .banners=${[{ id: 'b1', message: 'Maintenance notice', severity: 'info' as const }]}
+          ></elohim-navigator>
+        `,
+        cell
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+
+    it(`authenticated profile tray passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimNavigator>(
+        html`
+          <elohim-navigator
+            .isAuthenticated=${true}
+            .displayName=${'Matthew'}
+            .identifier=${'matthew@elohim.host'}
+          ></elohim-navigator>
+        `,
+        cell
+      );
+      await el.updateComplete;
+      el.shadowRoot!.querySelector<HTMLButtonElement>('.profile-bubble')!.click();
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+
+    it(`context tray passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimNavigator>(
+        html`
+          <elohim-navigator></elohim-navigator>
+        `,
+        cell
+      );
+      await el.updateComplete;
+      el.shadowRoot!.querySelector<HTMLButtonElement>('.context-switcher-btn')!.click();
+      await el.updateComplete;
+      assertThemeContrast(el);
+    });
+  }
+
+  it('chrome reacts to the theme (frozen-chain canary)', async () => {
+    await assertThemeReactivity<ElohimNavigator>(
+      () =>
+        html`
+          <elohim-navigator></elohim-navigator>
+        `,
+      el => el.shadowRoot!.querySelector('.nav')
+    );
   });
 });
