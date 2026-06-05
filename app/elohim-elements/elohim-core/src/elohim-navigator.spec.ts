@@ -229,6 +229,11 @@ describe('<elohim-navigator> — ua-prefs gate', () => {
 });
 
 describe('<elohim-navigator> preferences (theme/lang restore)', () => {
+  afterEach(async () => {
+    const { resetThemeStoreInstance } = await import('./theme/theme-store.js');
+    resetThemeStoreInstance();
+  });
+
   it('shows the inline theme toggle for visitors', async () => {
     const el = await fixture<ElohimNavigator>(html`<elohim-navigator></elohim-navigator>`);
     expect(el.shadowRoot!.querySelector('[data-testid="nav-theme-inline"]')).to.exist;
