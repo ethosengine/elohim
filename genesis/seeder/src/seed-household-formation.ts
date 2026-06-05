@@ -1,0 +1,636 @@
+#!/usr/bin/env npx tsx
+/**
+ * Seed: household formation ceremony (Stage 1, rung-3 realism).
+ * Spec: genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md §3, §6.
+ *
+ * REALISM RUNG: 3 (conductor-zome-as-agent). Every act below is authored by the
+ * persona's OWN conductor agent. Genesis data = "this family ran the ceremony."
+ * Ordering: AFTER seed-conductor-identities + seed-agent-bindings.
+ *
+ * Choreography (spec §3):
+ *   1. matthew (founder) `create_collective` (household charter) on HIS conductor.
+ *   2. for each non-founder member: matthew `issue_household_invite` on HIS
+ *      conductor; the member `affirm_membership` on THEIR conductor.
+ *   3. if james (minor) affirmed: matthew `create_stewardship_grant` over james
+ *      on HIS conductor (parental authority, age-bounded device policy).
+ *   4. each affirmed member authors a `custody-blob` commitment toward every
+ *      other affirmed member via `content_store.create_rea_commitment` on the
+ *      PROVIDER's own conductor (lamad cell). Self-skips when M1 blob env unset.
+ *
+ * Env: CONDUCTOR_URLS (comma-separated app WS urls), INSTALLED_APP_ID prefix
+ * (default 'elohim'), M1_BLOB_HASH + M1_BLOB_SIZE_BYTES (custody payload;
+ * custody layer self-skips when absent), HOUSEHOLD_SALT (32 hex; deterministic
+ * default), HOUSEHOLD_NONCE_PREFIX (default 'genesis').
+ *
+ * Exit codes (partial-readiness aware, mirrors the sibling seeders):
+ *   0 — complete: triad affirmed, no custody failures
+ *   2 — partial: < 3 affirmed OR at least one custody write failed
+ *   1 — fatal: no conductors / founder collective creation failed
+ */
+
+import { writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import {
+  AdminWebsocket,
+  AppWebsocket,
+  encodeHashToBase64,
+  type AppInfo,
+} from '@holochain/client';
+import { deterministicPeerId, type Archetype } from './peer-id.js';
+
+// =============================================================================
+// Canonical household triad
+// =============================================================================
+
+export interface HouseholdMember {
+  humanId: string;
+  archetype: Archetype;
+  role: 'steward' | 'contributor';
+  minor: boolean;
+}
+
+/**
+ * The canonical Dowell-family triad, founder first. Order is load-bearing:
+ * the founder (index 0) creates the collective; everyone else affirms against
+ * the founder's invite.
+ */
+export const HOUSEHOLD_MEMBERS: HouseholdMember[] = [
+  { humanId: 'human-matthew-manager', archetype: 'desktop', role: 'steward', minor: false },
+  { humanId: 'human-jessica-spouse', archetype: 'desktop', role: 'steward', minor: false },
+  { humanId: 'human-james-student', archetype: 'mobile', role: 'contributor', minor: true },
+];
+
+// =============================================================================
+// Pure builders (exported for unit tests)
+// =============================================================================
+
+/**
+ * The household charter JSON. `kind`/`rubric` select the recognition-of-given
+ * membership-acquisition flow; `slugAlias` ties the collective to the
+ * `family-dowell` story (validation scenarios + collectives.json).
+ */
+export function buildHouseholdCharter(): string {
+  return JSON.stringify({ kind: 'household', rubric: 'recognition-of-given', slugAlias: 'family-dowell' });
+}
+
+export interface CeremonyCustodyParams {
+  providerHumanId: string;
+  providerArchetype: Archetype;
+  receiverHumanId: string;
+  receiverArchetype: Archetype;
+  blobHash: string;
+  blobSizeBytes: number;
+  collectiveCid: string;
+}
+
+/**
+ * Snake_case `shefa_types::CreateReaCommitmentInput` for a single ceremony
+ * custody-blob pair (conductor boundary — MessagePack maps, NOT camelCase HTTP).
+ *
+ * `id` is a deterministic content-address of (provider_peer, receiver_peer,
+ * blob_hash) so re-runs produce identical ids (DHT-level idempotent). The pair
+ * is scoped to the household collective via `in_scope_of`, and carries
+ * `seedGeneration: 'ceremony'` provenance so views can distinguish ceremony
+ * output from the retiring interim fixtures (spec §7).
+ *
+ * NOTE: `resource_conforms_to` is intentionally absent — it is not a field on
+ * the DNA wire struct (`shefa_types::CreateReaCommitmentInput`); the zome sets
+ * it to `None` itself.
+ */
+export function buildCeremonyCustodyInput(p: CeremonyCustodyParams) {
+  const provider = deterministicPeerId(p.providerHumanId, p.providerArchetype);
+  const receiver = deterministicPeerId(p.receiverHumanId, p.receiverArchetype);
+  const idDigest = createHash('sha256')
+    .update(`${provider}|${receiver}|${p.blobHash}`)
+    .digest('hex')
+    .slice(0, 16);
+  return {
+    id: `custody-blob-${idDigest}`,
+    action: 'custody-blob',
+    provider,
+    receiver,
+    resource_classified_as: [p.blobHash],
+    resource_quantity_value: p.blobSizeBytes,
+    resource_quantity_unit: 'B',
+    in_scope_of: [p.collectiveCid],
+    note: `household custody: ${p.providerHumanId} -> ${p.receiverHumanId}`,
+    metadata_json: JSON.stringify({
+      seedGeneration: 'ceremony',
+      blobHash: p.blobHash,
+      providerHumanId: p.providerHumanId,
+      receiverHumanId: p.receiverHumanId,
+    }),
+  };
+}
+
+// =============================================================================
+// Holochain plumbing (copied verbatim from seed-conductor-identities.ts,
+// parameterized over the cell ROLE so this script can resolve both the
+// imagodei cell — formation calls — and the lamad cell — custody zome calls).
+// =============================================================================
+
+const CONNECT_TIMEOUT_MS = parseInt(process.env.CONDUCTOR_CONNECT_TIMEOUT_MS ?? '10000', 10);
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Derive admin WebSocket URL from app WebSocket URL.
+ * Convention (socat in K8s): admin port = app port - 1 (4445 app → 4444 admin).
+ */
+function toAdminUrl(appUrl: string): string {
+  const u = new URL(appUrl);
+  const appPort = parseInt(u.port, 10);
+  if (isNaN(appPort)) {
+    throw new Error(`Cannot derive admin port from app URL: ${appUrl}`);
+  }
+  u.port = String(appPort - 1);
+  return u.toString();
+}
+
+type CellId = [Uint8Array, Uint8Array];
+
+/**
+ * Resolve a role's provisioned cell_id from an AppInfo. Returns null when the
+ * role is absent (e.g. an app installed without the lamad cell) so the caller
+ * can soft-skip — never throws on a missing role, only on a present-but-
+ * unprovisioned one (which is a genuine config error).
+ *
+ * @holochain/client returns two possible cell shapes depending on version:
+ *   { type: "provisioned", value: { cell_id: [...] } }  — newer
+ *   { provisioned: { cell_id: [...] } }                 — older
+ */
+function cellForRole(matchingApp: AppInfo, role: string): CellId | null {
+  const cells = matchingApp.cell_info[role];
+  if (!cells || cells.length === 0) {
+    return null;
+  }
+  for (const cell of cells as unknown[]) {
+    const c = cell as Record<string, unknown>;
+    if (c['type'] === 'provisioned' && c['value']) {
+      return (c['value'] as Record<string, unknown>)['cell_id'] as CellId;
+    } else if (c['provisioned']) {
+      return (c['provisioned'] as Record<string, unknown>)['cell_id'] as CellId;
+    }
+  }
+  throw new Error(`App '${matchingApp.installed_app_id}' ${role} cell is not provisioned`);
+}
+
+interface ConductorSession {
+  appWs: AppWebsocket;
+  imagodeiCell: CellId;
+  lamadCell: CellId | null;
+  appInfo: AppInfo;
+}
+
+/**
+ * Connect to a conductor and find an installed app starting with the prefix.
+ * Returns null if no matching app is found (this conductor isn't for us).
+ * Resolves BOTH the imagodei cell (required — formation calls) and the lamad
+ * cell (optional — custody zome calls; null → custody soft-skips for that peer).
+ */
+async function connectToConductor(
+  appUrl: string,
+  appIdPrefix: string,
+): Promise<ConductorSession | null> {
+  const adminUrl = toAdminUrl(appUrl);
+
+  let adminWs: AdminWebsocket;
+  try {
+    adminWs = await withTimeout(
+      AdminWebsocket.connect({
+        url: new URL(adminUrl),
+        wsClientOptions: { origin: 'http://localhost' },
+      }),
+      CONNECT_TIMEOUT_MS,
+      `Admin connect ${adminUrl}`,
+    );
+  } catch (err) {
+    throw new Error(
+      `Admin connect failed (${adminUrl}): ${err instanceof Error ? err.message : err}`,
+    );
+  }
+
+  try {
+    const apps = await adminWs.listApps({});
+    const matchingApp = apps.find(a => a.installed_app_id.startsWith(appIdPrefix));
+
+    if (!matchingApp) {
+      await adminWs.client.close();
+      return null;
+    }
+
+    const imagodeiCell = cellForRole(matchingApp, 'imagodei');
+    if (!imagodeiCell) {
+      await adminWs.client.close();
+      throw new Error(`App '${matchingApp.installed_app_id}' has no imagodei cells`);
+    }
+    // lamad cell is optional — custody calls soft-skip when it's absent.
+    const lamadCell = cellForRole(matchingApp, 'lamad');
+
+    // Authorize signing credentials for whatever cells we resolved.
+    await adminWs.authorizeSigningCredentials(imagodeiCell);
+    if (lamadCell) {
+      await adminWs.authorizeSigningCredentials(lamadCell);
+    }
+
+    const tokenResult = await adminWs.issueAppAuthenticationToken({
+      installed_app_id: matchingApp.installed_app_id,
+      single_use: true,
+      expiry_seconds: 300,
+    });
+
+    await adminWs.client.close();
+
+    const appWs = await withTimeout(
+      AppWebsocket.connect({
+        url: new URL(appUrl),
+        token: tokenResult.token,
+        wsClientOptions: { origin: 'http://localhost' },
+      }),
+      CONNECT_TIMEOUT_MS,
+      `App connect ${appUrl}`,
+    );
+
+    return { appWs, imagodeiCell, lamadCell, appInfo: matchingApp };
+  } catch (err) {
+    try {
+      await adminWs.client.close();
+    } catch {
+      // ignore close errors
+    }
+    throw err;
+  }
+}
+
+// =============================================================================
+// Session discovery — match conductors to household members by their Human id
+// =============================================================================
+
+interface MemberSession {
+  member: HouseholdMember;
+  conductorUrl: string;
+  session: ConductorSession;
+}
+
+interface GetMyHumanResult {
+  human?: { id?: string } | null;
+}
+
+/**
+ * Walk every conductor URL, read its agent's Human profile (imagodei.get_my_human),
+ * and bind the first conductor whose Human id matches each household member.
+ * Sessions that match no member are closed; matched sessions stay open for the
+ * ceremony.
+ */
+async function findMemberSessions(
+  conductorUrls: string[],
+  appIdPrefix: string,
+): Promise<Map<string, MemberSession>> {
+  const found = new Map<string, MemberSession>();
+  const wantById = new Map(HOUSEHOLD_MEMBERS.map(m => [m.humanId, m]));
+
+  for (const conductorUrl of conductorUrls) {
+    let session: ConductorSession | null = null;
+    try {
+      session = await connectToConductor(conductorUrl, appIdPrefix);
+    } catch (err) {
+      console.error(
+        `  [X] connect (${conductorUrl}): ${err instanceof Error ? err.message : err}`,
+      );
+      continue;
+    }
+    if (!session) {
+      continue;
+    }
+
+    let humanId: string | undefined;
+    try {
+      const result = (await session.appWs.callZome({
+        cell_id: session.imagodeiCell,
+        zome_name: 'imagodei',
+        fn_name: 'get_my_human',
+        payload: null,
+      })) as GetMyHumanResult | null;
+      humanId = result?.human?.id ?? undefined;
+    } catch (err) {
+      console.error(
+        `  [X] get_my_human (${conductorUrl}): ${err instanceof Error ? err.message : err}`,
+      );
+    }
+
+    const member = humanId ? wantById.get(humanId) : undefined;
+    if (member && !found.has(member.humanId)) {
+      found.set(member.humanId, { member, conductorUrl, session });
+      console.log(`  [=] ${member.humanId.padEnd(22)} ${conductorUrl}`);
+    } else {
+      // Not a member we need (or already bound) — release the session.
+      try {
+        await session.appWs.client.close();
+      } catch {
+        // ignore close errors
+      }
+    }
+  }
+
+  return found;
+}
+
+// =============================================================================
+// Hash → canonical display-string encoding finding
+// =============================================================================
+//
+// callZome for create_collective returns the Collective's ActionHash. The
+// @holochain/client (0.20) decoder returns a HoloHash as a Uint8Array, NOT the
+// canonical "uhCkk..." base64 display string. The Rust side encodes the cid as
+// `format!("collective:{hash}")` where `{hash}` is the ActionHash's Display impl
+// (canonical base64). To make our `collective:<cid>` match the Rust display form
+// (so `in_scope_of` scoping + anchor lookups line up), we MUST run the returned
+// bytes through `encodeHashToBase64` — concatenating the raw Uint8Array would
+// yield a comma-joined byte string and silently break scope matching.
+function encodeActionHash(returned: unknown): string {
+  if (returned instanceof Uint8Array) {
+    return encodeHashToBase64(returned);
+  }
+  // Some decoders hand back { hash: Uint8Array } or already-encoded strings.
+  if (typeof returned === 'string') {
+    return returned;
+  }
+  if (returned && typeof returned === 'object') {
+    const h = (returned as Record<string, unknown>)['hash'];
+    if (h instanceof Uint8Array) {
+      return encodeHashToBase64(h);
+    }
+  }
+  throw new Error(`create_collective returned an un-encodable hash: ${typeof returned}`);
+}
+
+// =============================================================================
+// Main
+// =============================================================================
+
+async function main(): Promise<void> {
+  const conductorUrlsRaw = process.env.CONDUCTOR_URLS ?? '';
+  const appIdPrefix = process.env.INSTALLED_APP_ID ?? 'elohim';
+  const salt = process.env.HOUSEHOLD_SALT ?? 'f00df00df00df00df00df00df00df00d';
+  const noncePrefix = process.env.HOUSEHOLD_NONCE_PREFIX ?? 'genesis';
+  const blobHash = process.env.M1_BLOB_HASH ?? '';
+  const blobSizeBytes = parseInt(process.env.M1_BLOB_SIZE_BYTES ?? '0', 10);
+
+  const conductorUrls = conductorUrlsRaw
+    .split(',')
+    .map(u => u.trim())
+    .filter(Boolean);
+
+  console.log('=== Seed Household Formation (ceremony, rung 3) ===\n');
+  console.log(`App ID prefix: ${appIdPrefix}`);
+  console.log(
+    `Conductors:    ${conductorUrls.length > 0 ? conductorUrls.join(', ') : '(none — set CONDUCTOR_URLS)'}`,
+  );
+  console.log('');
+
+  if (conductorUrls.length === 0) {
+    console.error('ERROR: CONDUCTOR_URLS is not set. Set it to comma-separated conductor app WebSocket URLs.');
+    console.error('  Example: CONDUCTOR_URLS=ws://elohim-adam-alpha:4445,ws://elohim-eve-alpha:4445');
+    process.exit(1);
+  }
+
+  // -- Bind conductors to members ------------------------------------------
+  console.log('Binding conductors to household members:');
+  const sessions = await findMemberSessions(conductorUrls, appIdPrefix);
+  console.log('');
+
+  const founder = HOUSEHOLD_MEMBERS[0];
+  const founderSession = sessions.get(founder.humanId);
+
+  const closeAll = async () => {
+    for (const s of sessions.values()) {
+      try {
+        await s.session.appWs.client.close();
+      } catch {
+        // ignore close errors
+      }
+    }
+  };
+
+  if (!founderSession) {
+    console.error(`FATAL: no conductor found for the founder (${founder.humanId}).`);
+    await closeAll();
+    process.exit(1);
+  }
+
+  const affirmed = new Set<string>([founder.humanId]); // founder is steward-affirmed by create_collective
+
+  // -- 1. Founder creates the household collective -------------------------
+  let collectiveCid: string;
+  try {
+    const collectiveHash = await founderSession.session.appWs.callZome({
+      cell_id: founderSession.session.imagodeiCell,
+      zome_name: 'imagodei',
+      fn_name: 'create_collective',
+      payload: {
+        charter: buildHouseholdCharter(),
+        display_name: 'Dowell Family',
+        // Deterministic salt → identical entry hash on re-run → DHT-idempotent.
+        salt,
+      },
+    });
+    collectiveCid = `collective:${encodeActionHash(collectiveHash)}`;
+    console.log(`[+] collective created: ${collectiveCid}`);
+  } catch (err) {
+    console.error(`FATAL: create_collective failed: ${err instanceof Error ? err.message : err}`);
+    await closeAll();
+    process.exit(1);
+  }
+
+  // -- 2. Invite + affirm each non-founder member -------------------------
+  for (const member of HOUSEHOLD_MEMBERS.slice(1)) {
+    const memberSession = sessions.get(member.humanId);
+    if (!memberSession) {
+      console.error(`  [X] ${member.humanId}: no conductor bound — cannot affirm`);
+      continue;
+    }
+
+    // Founder issues a single-use signed invite on HIS conductor.
+    let token: unknown;
+    try {
+      const nonce = createHash('sha256')
+        .update(`${noncePrefix}:${member.humanId}`)
+        .digest('hex')
+        .slice(0, 32);
+      token = await founderSession.session.appWs.callZome({
+        cell_id: founderSession.session.imagodeiCell,
+        zome_name: 'imagodei',
+        fn_name: 'issue_household_invite',
+        payload: {
+          collective_cid: collectiveCid,
+          role: member.role,
+          expires_at_micros: (Date.now() + 24 * 3600 * 1000) * 1000,
+          nonce,
+        },
+      });
+    } catch (err) {
+      console.error(
+        `  [X] issue_household_invite for ${member.humanId}: ${err instanceof Error ? err.message : err}`,
+      );
+      continue;
+    }
+
+    // Member affirms on THEIR conductor (their agent authors the Membership).
+    try {
+      await memberSession.session.appWs.callZome({
+        cell_id: memberSession.session.imagodeiCell,
+        zome_name: 'imagodei',
+        fn_name: 'affirm_membership',
+        payload: { token },
+      });
+      affirmed.add(member.humanId);
+      console.log(`  [+] ${member.humanId} affirmed (${member.role})`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('already consumed')) {
+        // Idempotent re-run — the nonce anchor already exists, so the prior
+        // affirmation stands.
+        affirmed.add(member.humanId);
+        console.log(`  [=] ${member.humanId} already affirmed (idempotent re-run)`);
+      } else {
+        console.error(`  [X] affirm_membership for ${member.humanId}: ${msg}`);
+      }
+    }
+  }
+  console.log('');
+
+  // -- 3. Parental StewardshipGrant over the minor (james) ----------------
+  const minor = HOUSEHOLD_MEMBERS.find(m => m.minor);
+  if (minor && affirmed.has(minor.humanId)) {
+    try {
+      await founderSession.session.appWs.callZome({
+        cell_id: founderSession.session.imagodeiCell,
+        zome_name: 'imagodei',
+        fn_name: 'create_stewardship_grant',
+        payload: {
+          subject_id: minor.humanId,
+          authority_basis: 'parental',
+          evidence_hash: null,
+          verified_by: 'household-formation-ceremony',
+          content_filtering: true,
+          time_limits: true,
+          feature_restrictions: true,
+          activity_monitoring: true,
+          policy_delegation: false,
+          delegatable: false,
+          expires_in_days: 365,
+          review_in_days: 90,
+        },
+      });
+      console.log(`[+] stewardship grant: ${founder.humanId} -> ${minor.humanId} (parental)`);
+    } catch (err) {
+      console.warn(
+        `[!] create_stewardship_grant (non-fatal): ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+  console.log('');
+
+  // -- 4. Custody mesh: every affirmed provider → every other affirmed ----
+  let custodyOk = 0;
+  let custodyFail = 0;
+
+  const haveBlob = blobHash.length > 0 && blobSizeBytes > 0;
+  if (!haveBlob) {
+    console.warn('[!] M1_BLOB_HASH / M1_BLOB_SIZE_BYTES unset — skipping custody mesh.');
+  } else {
+    const affirmedMembers = HOUSEHOLD_MEMBERS.filter(m => affirmed.has(m.humanId));
+    for (const provider of affirmedMembers) {
+      const providerSession = sessions.get(provider.humanId);
+      if (!providerSession) {
+        continue;
+      }
+      const lamadCell = providerSession.session.lamadCell;
+      if (!lamadCell) {
+        console.warn(`  [!] ${provider.humanId}: no lamad cell — custody soft-skipped`);
+        continue;
+      }
+      for (const receiver of affirmedMembers) {
+        if (receiver.humanId === provider.humanId) {
+          continue;
+        }
+        const input = buildCeremonyCustodyInput({
+          providerHumanId: provider.humanId,
+          providerArchetype: provider.archetype,
+          receiverHumanId: receiver.humanId,
+          receiverArchetype: receiver.archetype,
+          blobHash,
+          blobSizeBytes,
+          collectiveCid,
+        });
+        try {
+          await providerSession.session.appWs.callZome({
+            cell_id: lamadCell,
+            zome_name: 'content_store',
+            fn_name: 'create_rea_commitment',
+            payload: input,
+          });
+          custodyOk += 1;
+          console.log(`  [+] custody ${provider.humanId} -> ${receiver.humanId}`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('already') || msg.includes('duplicate')) {
+            custodyOk += 1;
+            console.log(`  [=] custody ${provider.humanId} -> ${receiver.humanId} (idempotent)`);
+          } else {
+            custodyFail += 1;
+            console.error(`  [X] custody ${provider.humanId} -> ${receiver.humanId}: ${msg}`);
+          }
+        }
+      }
+    }
+  }
+  console.log('');
+
+  // -- 5. Write result artifact + exit ------------------------------------
+  const partial = affirmed.size < HOUSEHOLD_MEMBERS.length || custodyFail > 0;
+  const report = {
+    schemaVersion: 1,
+    seededAt: new Date().toISOString(),
+    script: 'seed-household-formation',
+    collectiveCid,
+    affirmed: [...affirmed],
+    custodyOk,
+    custodyFail,
+    partial,
+  };
+
+  const resultsFile = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'seed-results-household-formation.json');
+  try {
+    writeFileSync(resultsFile, JSON.stringify(report, null, 2));
+  } catch (e) {
+    console.error(`WARN: could not write ${resultsFile}:`, e);
+  }
+
+  console.log(
+    `=== Results: ${affirmed.size}/${HOUSEHOLD_MEMBERS.length} affirmed, custody ok=${custodyOk} fail=${custodyFail} ===`,
+  );
+
+  await closeAll();
+
+  process.exit(partial ? 2 : 0);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(err => {
+    console.error('FATAL:', err instanceof Error ? err.stack ?? err.message : err);
+    process.exit(1);
+  });
+}

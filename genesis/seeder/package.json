@@ -57,6 +57,8 @@
     "seed:nodes:dev": "STORAGE_URL='https://storage-alpha.elohim.host' npx tsx src/seed-nodes.ts",
     "seed:commitments": "npx tsx src/seed-commitments.ts",
     "seed:commitments:dev": "DOORWAY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-commitments.ts",
+    "seed:household": "npx tsx src/seed-household-formation.ts",
+    "seed:household:dev": "CONDUCTOR_URLS='ws://localhost:4445' npx tsx src/seed-household-formation.ts",
     "seed:test-admin": "npx tsx src/seed-test-admin.ts",
     "seed:test-admin:dev": "ADMIN_PROXY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-test-admin.ts",
     "generate:devices": "tsx src/generate-devices-json.ts",
