@@ -1195,6 +1195,10 @@
             {
               "description": "The authenticated user's humanId (present only when signed in)",
               "name": "user-name"
+            },
+            {
+              "description": "The inline-end cluster (controls + user area)",
+              "name": "end"
             }
           ],
           "members": [
@@ -1214,6 +1218,24 @@
             },
             {
               "kind": "field",
+              "name": "showThemeToggle",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "attribute": "show-theme-toggle"
+            },
+            {
+              "kind": "field",
+              "name": "showLangPicker",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "attribute": "show-lang-picker"
+            },
+            {
+              "kind": "field",
               "name": "_unsub",
               "type": {
                 "text": "() => void | undefined"
@@ -1224,6 +1246,26 @@
               "kind": "field",
               "name": "_visibilityHandler",
               "privacy": "private"
+            }
+          ],
+          "attributes": [
+            {
+              "description": "Opt-in: render <elohim-theme-toggle> in the end cluster",
+              "name": "show-theme-toggle",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "fieldName": "showThemeToggle"
+            },
+            {
+              "description": "Opt-in: render <elohim-lang-picker> in the end cluster",
+              "name": "show-lang-picker",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "fieldName": "showLangPicker"
             }
           ],
           "superclass": {
@@ -3379,6 +3421,146 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-lang-picker.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-lang-picker> — per-site language override the web platform doesn't\nprovide natively. Drives the shared LocaleStore (lit-localize setLocale +\ndocument lang/dir + localStorage persistence). Native <select> for\nbuilt-in keyboard + screen-reader semantics.",
+          "name": "ElohimLangPicker",
+          "cssProperties": [
+            {
+              "description": "select background (default: transparent)",
+              "name": "--elohim-lang-picker-bg"
+            },
+            {
+              "description": "select foreground (default: inherit)",
+              "name": "--elohim-lang-picker-fg"
+            },
+            {
+              "description": "select border color",
+              "name": "--elohim-lang-picker-border"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "the (visually hidden) label wrapper",
+              "name": "label"
+            },
+            {
+              "description": "the locale select",
+              "name": "select"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "_store",
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_unsub",
+              "type": {
+                "text": "() => void | undefined"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "method",
+              "name": "_onChange",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "e",
+                  "type": {
+                    "text": "Event"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "name": "locale-changed",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "detail: { locale } after the user selects"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-lang-picker",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimLangPicker",
+          "declaration": {
+            "name": "ElohimLangPicker",
+            "module": "src/elohim-lang-picker.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-mention-base.ts",
       "declarations": [
         {
@@ -3548,7 +3730,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "<elohim-navigator> — unified cross-pillar navigation primitive.\n\nImplements the \"Google Account\" navigation pattern:\n- Identity layer (profile bubble) with profile tray\n- Context app switcher (pillar tray)\n- Optional search bar\n- Banner notices\n\nAll routing is done by emitting events or calling callbacks. The element\nholds no router state itself — callers handle navigation.\n\nMigrated from ElohimNavigatorComponent (app/elohim-app/elohim).",
+          "description": "<elohim-navigator> — unified cross-pillar navigation primitive.\n\nImplements the \"Google Account\" navigation pattern:\n- Identity layer (profile bubble) with profile tray\n- Context app switcher (pillar tray)\n- Optional search bar\n- Banner notices\n- Theme toggle (visitor inline via `elohim-theme-toggle`; tray row for all users)\n- Language selector row in the profile tray\n\nAll routing is done by emitting events or calling callbacks. The element\nholds no router state itself — callers handle navigation.\n\nMigrated from ElohimNavigatorComponent (app/elohim-app/elohim).",
           "name": "ElohimNavigator",
           "cssProperties": [
             {
@@ -3765,6 +3947,48 @@
             },
             {
               "kind": "field",
+              "name": "showPreferences",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "true",
+              "description": "Render the theme/language rows in the profile tray (restore of the pre-Lit-migration toggle; on by default).",
+              "attribute": "show-preferences"
+            },
+            {
+              "kind": "field",
+              "name": "_theme",
+              "type": {
+                "text": "ElohimTheme"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_unsubTheme",
+              "type": {
+                "text": "() => void | undefined"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_unsubLocale",
+              "type": {
+                "text": "() => void | undefined"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
               "name": "showProfileTray",
               "type": {
                 "text": "boolean"
@@ -3789,6 +4013,31 @@
               },
               "privacy": "private",
               "default": "''"
+            },
+            {
+              "kind": "method",
+              "name": "cyclePreferenceTheme",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "cyclePreferenceLocale",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "_renderPreferenceTrayRows",
+              "privacy": "private"
             },
             {
               "kind": "method",
@@ -3958,6 +4207,15 @@
           ],
           "attributes": [
             {
+              "type": {
+                "text": "boolean"
+              },
+              "description": "Render the theme/language rows in the profile tray (restore of the pre-Lit-migration toggle; on by default).",
+              "name": "show-preferences",
+              "default": "true",
+              "fieldName": "showPreferences"
+            },
+            {
               "name": "context",
               "type": {
                 "text": "ElohimContextApp"
@@ -4120,6 +4378,14 @@
               "default": "false"
             },
             {
+              "kind": "field",
+              "name": "_uninstallInterceptor",
+              "type": {
+                "text": "() => void | undefined"
+              },
+              "privacy": "private"
+            },
+            {
               "kind": "method",
               "name": "_onOmnibarSlotChange",
               "privacy": "private",
@@ -4175,7 +4441,7 @@
               "stale": "n/a",
               "contested": "n/a",
               "offline": "n/a",
-              "unauthorized": "n/a"
+              "unauthorized": "n/a\n\nAuto-installs the EPR link interceptor (cross-bundle anchor handling) on connect."
             }
           }
         }
@@ -4830,6 +5096,160 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-theme-toggle.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-theme-toggle> — cycles the device-scoped theme preference\n(device → light → dark) through the shared ThemeStore. Pure\nsense-and-respond: renders current state, forwards the user's intent to\nthe store; the theming itself happens via body[data-theme] + CSS cascade.",
+          "name": "ElohimThemeToggle",
+          "cssProperties": [
+            {
+              "description": "button background (default: transparent)",
+              "name": "--elohim-theme-toggle-bg"
+            },
+            {
+              "description": "button foreground (default: inherit)",
+              "name": "--elohim-theme-toggle-fg"
+            },
+            {
+              "description": "button border color (default: transparent)",
+              "name": "--elohim-theme-toggle-border"
+            },
+            {
+              "description": "auto badge background (default: ButtonFace)",
+              "name": "--elohim-theme-toggle-badge-bg"
+            },
+            {
+              "description": "auto badge foreground (default: ButtonText)",
+              "name": "--elohim-theme-toggle-badge-fg"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "the toggle button",
+              "name": "button"
+            },
+            {
+              "description": "the sun/moon glyph",
+              "name": "icon"
+            },
+            {
+              "description": "the \"A\" badge shown in device (auto) mode",
+              "name": "auto-indicator"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "_store",
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_theme",
+              "type": {
+                "text": "ElohimTheme"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_unsub",
+              "type": {
+                "text": "() => void | undefined"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "method",
+              "name": "_label",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "_cycle",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "theme-changed",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "detail: { theme } after the user cycles"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-theme-toggle",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "standard",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimThemeToggle",
+          "declaration": {
+            "name": "ElohimThemeToggle",
+            "module": "src/elohim-theme-toggle.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/index.ts",
       "declarations": [],
       "exports": [
@@ -5368,6 +5788,158 @@
             "name": "ReachContext",
             "module": "./contracts/omnibar.contract.js"
           }
+        },
+        {
+          "kind": "js",
+          "name": "ThemeStore",
+          "declaration": {
+            "name": "ThemeStore",
+            "module": "./theme/theme-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getThemeStore",
+          "declaration": {
+            "name": "getThemeStore",
+            "module": "./theme/theme-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "THEME_STORAGE_KEY",
+          "declaration": {
+            "name": "THEME_STORAGE_KEY",
+            "module": "./theme/theme-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "THEME_CHANGE_EVENT",
+          "declaration": {
+            "name": "THEME_CHANGE_EVENT",
+            "module": "./theme/theme-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimTheme",
+          "declaration": {
+            "name": "ElohimTheme",
+            "module": "./theme/theme-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "installEprLinkInterceptor",
+          "declaration": {
+            "name": "installEprLinkInterceptor",
+            "module": "./navigation/epr-link-interceptor.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "recordCrossBundleHandoff",
+          "declaration": {
+            "name": "recordCrossBundleHandoff",
+            "module": "./navigation/epr-link-interceptor.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "baseHrefOwnsPath",
+          "declaration": {
+            "name": "baseHrefOwnsPath",
+            "module": "./navigation/epr-link-interceptor.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "EprLinkInterceptorOptions",
+          "declaration": {
+            "name": "EprLinkInterceptorOptions",
+            "module": "./navigation/epr-link-interceptor.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimThemeToggle",
+          "declaration": {
+            "name": "ElohimThemeToggle",
+            "module": "./elohim-theme-toggle.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimLangPicker",
+          "declaration": {
+            "name": "ElohimLangPicker",
+            "module": "./elohim-lang-picker.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LocaleStore",
+          "declaration": {
+            "name": "LocaleStore",
+            "module": "./localize/locale-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getLocaleStore",
+          "declaration": {
+            "name": "getLocaleStore",
+            "module": "./localize/locale-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "detectLocale",
+          "declaration": {
+            "name": "detectLocale",
+            "module": "./localize/locale-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SUPPORTED_LOCALES",
+          "declaration": {
+            "name": "SUPPORTED_LOCALES",
+            "module": "./localize/locale-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_LABELS",
+          "declaration": {
+            "name": "LOCALE_LABELS",
+            "module": "./localize/locale-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_STORAGE_KEY",
+          "declaration": {
+            "name": "LOCALE_STORAGE_KEY",
+            "module": "./localize/locale-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_CHANGE_EVENT",
+          "declaration": {
+            "name": "LOCALE_CHANGE_EVENT",
+            "module": "./localize/locale-store.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimLocale",
+          "declaration": {
+            "name": "ElohimLocale",
+            "module": "./localize/locale-store.js"
+          }
         }
       ]
     },
@@ -5502,6 +6074,22 @@
           "declaration": {
             "name": "ElohimEprPopover",
             "module": "/src/elohim-epr-popover.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-theme-toggle",
+          "declaration": {
+            "name": "ElohimThemeToggle",
+            "module": "/src/elohim-theme-toggle.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-lang-picker",
+          "declaration": {
+            "name": "ElohimLangPicker",
+            "module": "/src/elohim-lang-picker.js"
           }
         }
       ]
@@ -5790,6 +6378,271 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/localize/locale-store.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "LOCALE_STORAGE_KEY",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale'"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_CHANGE_EVENT",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale-changed'"
+        },
+        {
+          "kind": "variable",
+          "name": "SUPPORTED_LOCALES",
+          "type": {
+            "text": "[sourceLocale, ...targetLocales]"
+          },
+          "default": "[sourceLocale, ...targetLocales]"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_LABELS",
+          "type": {
+            "text": "Readonly<Record<ElohimLocale, string>>"
+          },
+          "default": "{ en: 'English', es: 'Español', he: 'עברית', }",
+          "description": "Native-script labels — intentionally NOT localized (each language names itself)."
+        },
+        {
+          "kind": "function",
+          "name": "detectLocale",
+          "return": {
+            "type": {
+              "text": "ElohimLocale"
+            }
+          },
+          "description": "navigator.language 'es-MX' → 'es' when supported, else the en source locale."
+        },
+        {
+          "kind": "class",
+          "description": "",
+          "name": "LocaleStore",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_destroyed",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "_onStorage",
+              "type": {
+                "text": "(e: StorageEvent) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "_onLocaleChange",
+              "type": {
+                "text": "(e: Event) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "destroy",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getLocaleStore()) is intentionally never destroyed."
+            },
+            {
+              "kind": "field",
+              "name": "locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "set",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to locale changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "adopt",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
+                  }
+                }
+              ],
+              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
+            },
+            {
+              "kind": "method",
+              "name": "applyToDocument",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "ElohimLocale | null"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "getLocaleStore",
+          "return": {
+            "type": {
+              "text": "LocaleStore"
+            }
+          },
+          "description": "Module-level singleton — all islands in a document share one store."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "LOCALE_STORAGE_KEY",
+          "declaration": {
+            "name": "LOCALE_STORAGE_KEY",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_CHANGE_EVENT",
+          "declaration": {
+            "name": "LOCALE_CHANGE_EVENT",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SUPPORTED_LOCALES",
+          "declaration": {
+            "name": "SUPPORTED_LOCALES",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_LABELS",
+          "declaration": {
+            "name": "LOCALE_LABELS",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "detectLocale",
+          "declaration": {
+            "name": "detectLocale",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LocaleStore",
+          "declaration": {
+            "name": "LocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getLocaleStore",
+          "declaration": {
+            "name": "getLocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/localize/runtime.ts",
       "declarations": [
         {
@@ -5865,6 +6718,90 @@
           "declaration": {
             "name": "smokeGreeting",
             "module": "src/localize/source-locale.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/navigation/epr-link-interceptor.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "recordCrossBundleHandoff",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "cid",
+              "default": "''"
+            }
+          ],
+          "description": "Append a handoff entry to the shared session-nav-stack — the same\nsessionStorage shape elohim-app's SessionNavStackService reads, so the\nprotocol-omni back affordance survives the bundle boundary."
+        },
+        {
+          "kind": "function",
+          "name": "baseHrefOwnsPath",
+          "return": {
+            "type": {
+              "text": "boolean"
+            }
+          },
+          "parameters": [
+            {
+              "name": "path",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Default ownsPath: prefix match against this bundle's <base href>. A \"/\"\nbase owns everything — the shell (base \"/\") installs explicitly with a\nrouter-aware predicate instead of relying on this heuristic."
+        },
+        {
+          "kind": "function",
+          "name": "installEprLinkInterceptor",
+          "return": {
+            "type": {
+              "text": "() => void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "options",
+              "default": "{}",
+              "type": {
+                "text": "EprLinkInterceptorOptions"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "recordCrossBundleHandoff",
+          "declaration": {
+            "name": "recordCrossBundleHandoff",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "baseHrefOwnsPath",
+          "declaration": {
+            "name": "baseHrefOwnsPath",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "installEprLinkInterceptor",
+          "declaration": {
+            "name": "installEprLinkInterceptor",
+            "module": "src/navigation/epr-link-interceptor.ts"
           }
         }
       ]
@@ -6281,6 +7218,257 @@
           "declaration": {
             "name": "measureLuminanceChanges",
             "module": "src/testing/ua-prefs.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/theme/theme-store.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "THEME_STORAGE_KEY",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-theme'"
+        },
+        {
+          "kind": "variable",
+          "name": "THEME_CHANGE_EVENT",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-theme-changed'"
+        },
+        {
+          "kind": "class",
+          "description": "",
+          "name": "ThemeStore",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_theme",
+              "type": {
+                "text": "ElohimTheme"
+              },
+              "privacy": "private",
+              "default": "'device'"
+            },
+            {
+              "kind": "field",
+              "name": "_destroyed",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "_onStorage",
+              "type": {
+                "text": "(e: StorageEvent) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "_onThemeChange",
+              "type": {
+                "text": "(e: Event) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "destroy",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getThemeStore()) is intentionally never destroyed."
+            },
+            {
+              "kind": "field",
+              "name": "theme",
+              "type": {
+                "text": "ElohimTheme"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "effectiveTheme",
+              "type": {
+                "text": "'light' | 'dark'"
+              },
+              "description": "The theme actually in effect ('device' resolved against the UA signal).",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "set",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "cycle",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to theme changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "adopt",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ],
+              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
+            },
+            {
+              "kind": "method",
+              "name": "applyToDocument",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "persist",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "theme",
+                  "type": {
+                    "text": "ElohimTheme"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "ElohimTheme"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "getThemeStore",
+          "return": {
+            "type": {
+              "text": "ThemeStore"
+            }
+          },
+          "description": "Module-level singleton — all islands in a document share one store."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "THEME_STORAGE_KEY",
+          "declaration": {
+            "name": "THEME_STORAGE_KEY",
+            "module": "src/theme/theme-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "THEME_CHANGE_EVENT",
+          "declaration": {
+            "name": "THEME_CHANGE_EVENT",
+            "module": "src/theme/theme-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ThemeStore",
+          "declaration": {
+            "name": "ThemeStore",
+            "module": "src/theme/theme-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getThemeStore",
+          "declaration": {
+            "name": "getThemeStore",
+            "module": "src/theme/theme-store.ts"
           }
         }
       ]

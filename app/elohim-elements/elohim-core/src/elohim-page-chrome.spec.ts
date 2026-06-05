@@ -271,6 +271,10 @@ describe('<elohim-default-omnibar> — i18n precondition gate', () => {
 // ---------------------------------------------------------------------------
 
 describe('<elohim-page-chrome> interceptor auto-install', () => {
+  afterEach(() => {
+    window.__elohimEprLinkInterceptor?.uninstall?.();
+  });
+
   it('installs the epr-link interceptor on connect and removes it on disconnect', async () => {
     expect(window.__elohimEprLinkInterceptor).to.be.undefined;
     const el = await fixture(html`<elohim-page-chrome><p>x</p></elohim-page-chrome>`);

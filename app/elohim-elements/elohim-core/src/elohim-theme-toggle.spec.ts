@@ -3,13 +3,17 @@ import axe from 'axe-core';
 
 import './register.js';
 import { ElohimThemeToggle as ToggleClass } from './elohim-theme-toggle.js';
-import { THEME_STORAGE_KEY, getThemeStore } from './theme/theme-store.js';
+import { THEME_STORAGE_KEY, getThemeStore, resetThemeStoreInstance } from './theme/theme-store.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
 
 describe('<elohim-theme-toggle>', () => {
   beforeEach(() => {
     localStorage.removeItem(THEME_STORAGE_KEY);
     getThemeStore().set('device');
+  });
+
+  afterEach(() => {
+    resetThemeStoreInstance();
   });
 
   it('is defined in the custom element registry', () => {

@@ -10,6 +10,7 @@
 1. **graphos ships a token artifact** (e.g. `@elohim/graphos-tokens` css/scss): brand palettes (Linen light / Indigo Night dark) + per-pillar `--elohim-{pillar}-*` and chrome `--elohim-nav-*`/`--elohim-omnibar-*` bindings — decorator inlines in Library B migrate to consuming it (graphos-designer lane).
 2. **Runbook §4.X bundle-styling contract**: every new bundle's checklist gains "import elohim-core tokens + graphos binding artifact in styles.scss; never duplicate token definitions" (runbook is co-owned — coordinate with its current editors).
 3. **De-duplicate**: when the artifact ships, elohim-app/src/styles.css and elohim-core/tokens.scss reconcile to one source; lamad's interim chrome-binding block deletes.
+4. **Mint an on-accent token** — the chrome binding puts --lamad-text-primary on accent surfaces (nav bubble, toggle badge); light-mode contrast computes ≈3.0:1, exactly at the WCAG 1.4.11 threshold with no headroom. The graphos-tokens artifact should define --lamad-on-accent (near-white) and the binding layer should consume it.
 
 ## Pointers
 - Audit evidence: omnibar-consolidation spec §9.8 (2026-06-05)

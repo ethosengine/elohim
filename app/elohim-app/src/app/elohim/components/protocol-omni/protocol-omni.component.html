@@ -28,6 +28,7 @@
       data-testid="protocol-omni-back"
       (click)="navigateBack()"
       [attr.title]="b.label || 'Back'"
+      [attr.aria-label]="b.label || 'Back'"
     >
       &larr; {{ b.label || 'Back' }}
     </button>
@@ -74,6 +75,7 @@
       data-testid="protocol-omni-forward"
       (click)="navigateForward()"
       [attr.title]="f.label || 'Forward'"
+      [attr.aria-label]="f.label || 'Forward'"
     >
       {{ f.label || 'Forward' }} &rarr;
     </button>

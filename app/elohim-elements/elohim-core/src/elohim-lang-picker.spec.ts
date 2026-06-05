@@ -3,12 +3,16 @@ import axe from 'axe-core';
 
 import './register.js';
 import { ElohimLangPicker as PickerClass } from './elohim-lang-picker.js';
-import { LOCALE_STORAGE_KEY, getLocaleStore } from './localize/locale-store.js';
+import { LOCALE_STORAGE_KEY, getLocaleStore, resetLocaleStoreInstance } from './localize/locale-store.js';
 
 describe('<elohim-lang-picker>', () => {
   beforeEach(() => {
     localStorage.removeItem(LOCALE_STORAGE_KEY);
     getLocaleStore().set('en');
+  });
+
+  afterEach(() => {
+    resetLocaleStoreInstance();
   });
 
   it('is defined in the custom element registry', () => {

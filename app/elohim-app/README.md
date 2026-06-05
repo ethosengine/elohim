@@ -10,7 +10,7 @@ To start a local development server, run:
 npm start
 ```
 
-To start with staging configuration (enables debug-bar and other staging features):
+To start with staging configuration (enables the protocol-omni serving-context segment (env badge) and other staging features):
 
 ```bash
 npm run start:staging
@@ -53,7 +53,7 @@ The application uses runtime configuration loaded from `/assets/config.json`. Av
 
 Local development uses Angular environment files in `src/environments/`:
 - `environment.ts` - Default development configuration
-- `environment.staging.ts` - Staging configuration (enables debug-bar)
+- `environment.staging.ts` - Staging configuration (enables the protocol-omni serving-context segment (env badge))
 - `environment.prod.ts` - Production configuration
 
 Use `npm run start:staging` to run locally with staging features enabled.
