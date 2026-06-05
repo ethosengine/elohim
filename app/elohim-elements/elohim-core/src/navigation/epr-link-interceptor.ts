@@ -91,8 +91,7 @@ function findAnchor(e: MouseEvent): HTMLAnchorElement | null {
 export function installEprLinkInterceptor(options: EprLinkInterceptorOptions = {}): () => void {
   if (typeof document === 'undefined') return () => undefined;
 
-  const g = globalThis as typeof globalThis & Window;
-  const existing = g.__elohimEprLinkInterceptor;
+  const existing = (globalThis as unknown as Window).__elohimEprLinkInterceptor;
   if (existing) {
     if (!options.explicit) return () => undefined; // default never disturbs the active install
     existing.uninstall();
@@ -135,10 +134,13 @@ export function installEprLinkInterceptor(options: EprLinkInterceptorOptions = {
   document.addEventListener('click', onClick, true);
   const uninstall = (): void => {
     document.removeEventListener('click', onClick, true);
-    if (g.__elohimEprLinkInterceptor?.uninstall === uninstall) {
-      delete g.__elohimEprLinkInterceptor;
+    if ((globalThis as unknown as Window).__elohimEprLinkInterceptor?.uninstall === uninstall) {
+      delete (globalThis as unknown as Window).__elohimEprLinkInterceptor;
     }
   };
-  g.__elohimEprLinkInterceptor = { uninstall, explicit: options.explicit ?? false };
+  (globalThis as unknown as Window).__elohimEprLinkInterceptor = {
+    uninstall,
+    explicit: options.explicit ?? false,
+  };
   return uninstall;
 }
