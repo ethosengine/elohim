@@ -7,7 +7,7 @@ class: process-meta
 process_subdomain: memory
 sprint: bootstrap
 cites:
-  - semantic-computable-links-design | the design spec this plan implements — slug+desc+fingerprint envelope cites the tools generate, resolve, and verify | sha256:91622260b60e4f33 | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
+  - semantic-computable-links-design | the design spec this plan implements — slug+desc+fingerprint envelope cites the tools generate, resolve, and verify | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
   - .claude/scripts/memory-kit/memory-coherence-audit.py
   - .claude/scripts/_lib/frontmatter.py
   - .claude/scripts/memory-kit/decompose.py

@@ -16,7 +16,7 @@ cites:
   - .claude/scripts/memory-kit/memory-coherence-audit.py
   - .claude/skills/epr-content-addressing/SKILL.md
   - placement | the contract whose three doc homes these content-addressed links survive moves between | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md
-  - managed-surface-edit-discipline-design | the 2026-06-05 sibling: edit-time registry + PRE/POST hooks that enforce this discipline at the surface (see §9.1) | sha256:80a33cc48810e061 | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md
+  - managed-surface-edit-discipline-design | the 2026-06-05 sibling: edit-time registry + PRE/POST hooks that enforce this discipline at the surface (see §9.1) | sha256:e5afb16c974b109b | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md
 refines:
   - genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md  # upgrades its path-based cites: to content-addressed; adds the dissolution-time hard gate
 proposed_amendments:
@@ -151,10 +151,12 @@ operator's correct "the tooling exists" expectation had no edit-time surface to 
 
 - **Gospel CLAUDE.mds join the graph.** Id-declaring `CLAUDE.md` files repo-wide (vendored/dot dirs
   pruned) are slug-index members (`cite_graph.extend_index_with_gospels`); membership is OPT-IN by
-  declaring `id:` — the wide walk admits nothing accidental. ALL graph consumers (`cite-gen`
-  `--seal/--seal-all`, `cite-propagate`, `cites-migrate`, `memory-coherence-audit`, the
-  `cite-seal-signal` hook) answer membership through ONE registry — `_lib.managed_surfaces` — so scope
-  is defined once, never re-hardcoded per tool. genesis/data entity docs deliberately stay plain-path.
+  declaring `id:` — the wide walk admits nothing accidental. The gospel walk-scope lives in ONE
+  authority function — `cite_graph.is_gospel_claude_md` (+ `GOSPEL_EXCLUDE_DIRS`) — called directly by
+  the batch tools (`cite-gen --seal/--seal-all`, `cite-propagate`, `cites-migrate`,
+  `memory-coherence-audit`) and fronted by the `_lib.managed_surfaces` registry for the hook layer
+  (`cite-seal-signal`, `managed-surface-context`). Scope is defined once, never re-hardcoded per tool;
+  genesis/data entity docs deliberately stay plain-path.
 - **`path:` — the materialized locator.** The second tool-managed envelope field (after `status:`):
   every envelope carries its slug→path resolution as an inline CACHE so an agent follows a cite with a
   plain read, no resolver run. Stamped at mint (`emit`/`--into`/`--seal`), refreshed by every

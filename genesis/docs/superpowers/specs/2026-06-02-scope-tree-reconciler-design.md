@@ -18,7 +18,7 @@ cites:
   - unified-memory-loop-design | the loop machinery this reconciler plugs the narrow-plate scope discipline into | sha256:99100efd20d10129 | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md
   - .claude/skills/epr-content-addressing/SKILL.md
   - genesis/Jenkinsfile
-  - semantic-computable-links-design | the slug-resolving cite system this depends on so file moves stay HELD not DEAD | sha256:91622260b60e4f33 | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
+  - semantic-computable-links-design | the slug-resolving cite system this depends on so file moves stay HELD not DEAD | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
 depends_on:
   - genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md  # moves are unsafe until cites resolve by slug (HELD-CITE, not DEAD-CITE)
 refines:

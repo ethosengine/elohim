@@ -5,7 +5,7 @@ description: CLAUDE.md/spec/plan/doc edits flow through the memkit cite tooling 
 metadata:
   type: feedback
 cites:
-  - managed-surface-edit-discipline-design | the durable home of this lesson — registry design, forensic, and the open gap-items | sha256:80a33cc48810e061 | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md
+  - managed-surface-edit-discipline-design | the durable home of this lesson — registry design, forensic, and the open gap-items | sha256:e5afb16c974b109b | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md
   - .claude/scripts/_lib/managed_surfaces.py
 ---
 

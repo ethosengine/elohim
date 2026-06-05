@@ -156,9 +156,11 @@ _INLINE_COMMENT = re.compile(r"\s+#(\s.*)?$")
 
 
 def parse_cite(s: str) -> dict:
-    """One cite string -> {ref, legacy_path, desc, fingerprint, status}. Legacy path-string (no '|') ->
-    ref=path, legacy_path=True. Strips a trailing YAML inline comment (the minimal frontmatter parser
-    keeps `- path   # note` as one string)."""
+    """One cite string -> {ref, legacy_path, desc, fingerprint, status, path}. Legacy path-string (no '|')
+    -> ref=path, legacy_path=True. Strips a trailing YAML inline comment (the minimal frontmatter parser
+    keeps `- path   # note` as one string). NOTE: a desc segment starting with 'status:' or 'path:' is
+    consumed as that keyed field, not as desc — fine for the tool-generated corpus (descs derive from
+    titles), one more reason envelopes are never hand-written."""
     raw = _INLINE_COMMENT.sub("", (s or "").strip()).strip()
     if "|" not in raw:
         is_path = ("/" in raw) or raw.endswith(_PATH_EXTS)
