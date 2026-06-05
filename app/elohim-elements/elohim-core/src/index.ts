@@ -101,6 +101,8 @@ export type {
 export { ThemeStore, getThemeStore, THEME_STORAGE_KEY, THEME_CHANGE_EVENT } from './theme/theme-store.js';
 export type { ElohimTheme } from './theme/theme-store.js';
 
+export { ElohimThemeToggle } from './elohim-theme-toggle.js';
+
 export {
   LocaleStore,
   getLocaleStore,

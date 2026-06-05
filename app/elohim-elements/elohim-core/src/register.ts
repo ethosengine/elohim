@@ -14,6 +14,7 @@ import { ElohimGateFeedbackTrigger } from './elohim-gate-feedback-trigger.js';
 import { ElohimNavigator } from './elohim-navigator.js';
 import { ElohimContentAnalytics } from './elohim-content-analytics.js';
 import { ElohimEprPopover } from './elohim-epr-popover.js';
+import { ElohimThemeToggle } from './elohim-theme-toggle.js';
 
 // Registration lives here, not on the ElohimButton class via @customElement,
 // to keep ./index.ts truly side-effect-free. Importing from 'elohim-core'
@@ -92,4 +93,8 @@ if (!customElements.get('elohim-content-analytics')) {
 
 if (!customElements.get('elohim-epr-popover')) {
   customElements.define('elohim-epr-popover', ElohimEprPopover);
+}
+
+if (!customElements.get('elohim-theme-toggle')) {
+  customElements.define('elohim-theme-toggle', ElohimThemeToggle);
 }
