@@ -11,7 +11,7 @@ Feature: Chrome preferences follow the person across EPR-app boundaries
   Scenario: Theme choice persists across the app boundary
     When Matthew navigates to "/lamad" in the browser
     And Matthew clicks the element with testid "nav-theme-inline"
-    And Matthew clicks the element with testid "footer-lamad-link"
+    And Matthew clicks the element with testid "lamad-footer-home-link"
     Then the body data-theme attribute equals the chosen theme
     And there should be no console errors
 
