@@ -62,7 +62,11 @@ export type {
   ElevationRequest,
   RelationshipAttestationType,
 } from './human-consent.model';
-export { RELATIONSHIP_ATTESTATION_TYPES, requiresMutualAttestation, canElevate } from './human-consent.model';
+export {
+  RELATIONSHIP_ATTESTATION_TYPES,
+  requiresMutualAttestation,
+  canElevate,
+} from './human-consent.model';
 
 // Banner notification system
 export * from './banner-notice.model';
@@ -88,7 +92,10 @@ export * from '@elohim/service/angular/models/open-graph.model';
 export * from './verifiable-credential.model';
 
 // Gated Response — migrated to @elohim/service (Slice 2.1)
-export { isGatedResponse, extractGateFromResponse } from '@elohim/service/angular/models/gated-response.model';
+export {
+  isGatedResponse,
+  extractGateFromResponse,
+} from '@elohim/service/angular/models/gated-response.model';
 export type { GatedResponse } from '@elohim/service/angular/models/gated-response.model';
 
 // Zome Wire Types - Centralized Holochain zome response types

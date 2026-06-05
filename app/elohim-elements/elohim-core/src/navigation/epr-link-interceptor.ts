@@ -56,7 +56,7 @@ export function recordCrossBundleHandoff(cid = ''): void {
   try {
     const raw = sessionStorage.getItem(NAV_STACK_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    const stack = Array.isArray(parsed) ? parsed : [];
+    const stack: unknown[] = Array.isArray(parsed) ? parsed : [];
     const entry = {
       url: location.pathname + location.search,
       cid,
@@ -91,14 +91,15 @@ function findAnchor(e: MouseEvent): HTMLAnchorElement | null {
 export function installEprLinkInterceptor(options: EprLinkInterceptorOptions = {}): () => void {
   if (typeof document === 'undefined') return () => undefined;
 
-  const existing = window.__elohimEprLinkInterceptor;
+  const g = globalThis as typeof globalThis & Window;
+  const existing = g.__elohimEprLinkInterceptor;
   if (existing) {
     if (!options.explicit) return () => undefined; // default never disturbs the active install
     existing.uninstall();
   }
 
   const ownsPath = options.ownsPath ?? baseHrefOwnsPath;
-  const assign = options.assign ?? ((href: string) => window.location.assign(href));
+  const assign = options.assign ?? ((href: string) => globalThis.location.assign(href));
 
   const onClick = (e: MouseEvent): void => {
     try {
@@ -134,10 +135,10 @@ export function installEprLinkInterceptor(options: EprLinkInterceptorOptions = {
   document.addEventListener('click', onClick, true);
   const uninstall = (): void => {
     document.removeEventListener('click', onClick, true);
-    if (window.__elohimEprLinkInterceptor?.uninstall === uninstall) {
-      delete window.__elohimEprLinkInterceptor;
+    if (g.__elohimEprLinkInterceptor?.uninstall === uninstall) {
+      delete g.__elohimEprLinkInterceptor;
     }
   };
-  window.__elohimEprLinkInterceptor = { uninstall, explicit: options.explicit ?? false };
+  g.__elohimEprLinkInterceptor = { uninstall, explicit: options.explicit ?? false };
   return uninstall;
 }

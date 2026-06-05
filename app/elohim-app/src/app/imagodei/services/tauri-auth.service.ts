@@ -16,8 +16,8 @@ import { Router } from '@angular/router';
 // @coverage: 55.8% (2026-02-24)
 
 import { environment } from '../../../environments/environment';
-
 import { EprNavService } from '../../elohim/services/epr-nav.service';
+
 import { AuthService } from './auth.service';
 import { DoorwayRegistryService } from './doorway-registry.service';
 

@@ -1206,6 +1206,7 @@
               "kind": "field",
               "name": "_session",
               "privacy": "private",
+              "readonly": true,
               "default": "new Session()"
             },
             {
@@ -1245,7 +1246,8 @@
             {
               "kind": "field",
               "name": "_visibilityHandler",
-              "privacy": "private"
+              "privacy": "private",
+              "readonly": true
             }
           ],
           "attributes": [
@@ -3455,7 +3457,8 @@
             {
               "kind": "field",
               "name": "_store",
-              "privacy": "private"
+              "privacy": "private",
+              "readonly": true
             },
             {
               "kind": "field",
@@ -3897,7 +3900,7 @@
               "type": {
                 "text": "ElohimContextAppConfig[]"
               },
-              "default": "[ { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true }, { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true }, { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true }, { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true }, { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true }, ]",
+              "default": "[ { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true, }, { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true, }, { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true, }, { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true, }, { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true }, ]",
               "description": "List of context apps to show"
             },
             {
@@ -4033,6 +4036,16 @@
                   "text": "void"
                 }
               }
+            },
+            {
+              "kind": "method",
+              "name": "_renderIdentifierRow",
+              "privacy": "private"
+            },
+            {
+              "kind": "method",
+              "name": "_renderProfileTrayContent",
+              "privacy": "private"
             },
             {
               "kind": "method",
@@ -5142,7 +5155,8 @@
             {
               "kind": "field",
               "name": "_store",
-              "privacy": "private"
+              "privacy": "private",
+              "readonly": true
             },
             {
               "kind": "field",
@@ -6378,6 +6392,90 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/navigation/epr-link-interceptor.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "recordCrossBundleHandoff",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "cid",
+              "default": "''"
+            }
+          ],
+          "description": "Append a handoff entry to the shared session-nav-stack — the same\nsessionStorage shape elohim-app's SessionNavStackService reads, so the\nprotocol-omni back affordance survives the bundle boundary."
+        },
+        {
+          "kind": "function",
+          "name": "baseHrefOwnsPath",
+          "return": {
+            "type": {
+              "text": "boolean"
+            }
+          },
+          "parameters": [
+            {
+              "name": "path",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Default ownsPath: prefix match against this bundle's <base href>. A \"/\"\nbase owns everything — the shell (base \"/\") installs explicitly with a\nrouter-aware predicate instead of relying on this heuristic."
+        },
+        {
+          "kind": "function",
+          "name": "installEprLinkInterceptor",
+          "return": {
+            "type": {
+              "text": "() => void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "options",
+              "default": "{}",
+              "type": {
+                "text": "EprLinkInterceptorOptions"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "recordCrossBundleHandoff",
+          "declaration": {
+            "name": "recordCrossBundleHandoff",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "baseHrefOwnsPath",
+          "declaration": {
+            "name": "baseHrefOwnsPath",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "installEprLinkInterceptor",
+          "declaration": {
+            "name": "installEprLinkInterceptor",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/localize/locale-store.ts",
       "declarations": [
         {
@@ -6449,6 +6547,7 @@
               "kind": "field",
               "name": "subscribers",
               "privacy": "private",
+              "readonly": true,
               "default": "new Set<Subscriber>()"
             },
             {
@@ -6724,90 +6823,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/navigation/epr-link-interceptor.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "recordCrossBundleHandoff",
-          "return": {
-            "type": {
-              "text": "void"
-            }
-          },
-          "parameters": [
-            {
-              "name": "cid",
-              "default": "''"
-            }
-          ],
-          "description": "Append a handoff entry to the shared session-nav-stack — the same\nsessionStorage shape elohim-app's SessionNavStackService reads, so the\nprotocol-omni back affordance survives the bundle boundary."
-        },
-        {
-          "kind": "function",
-          "name": "baseHrefOwnsPath",
-          "return": {
-            "type": {
-              "text": "boolean"
-            }
-          },
-          "parameters": [
-            {
-              "name": "path",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Default ownsPath: prefix match against this bundle's <base href>. A \"/\"\nbase owns everything — the shell (base \"/\") installs explicitly with a\nrouter-aware predicate instead of relying on this heuristic."
-        },
-        {
-          "kind": "function",
-          "name": "installEprLinkInterceptor",
-          "return": {
-            "type": {
-              "text": "() => void"
-            }
-          },
-          "parameters": [
-            {
-              "name": "options",
-              "default": "{}",
-              "type": {
-                "text": "EprLinkInterceptorOptions"
-              }
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "recordCrossBundleHandoff",
-          "declaration": {
-            "name": "recordCrossBundleHandoff",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "baseHrefOwnsPath",
-          "declaration": {
-            "name": "baseHrefOwnsPath",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "installEprLinkInterceptor",
-          "declaration": {
-            "name": "installEprLinkInterceptor",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/session/session.ts",
       "declarations": [
         {
@@ -6926,6 +6941,79 @@
           "declaration": {
             "name": "Session",
             "module": "src/session/session.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
           }
         }
       ]
@@ -7269,6 +7357,7 @@
               "kind": "field",
               "name": "subscribers",
               "privacy": "private",
+              "readonly": true,
               "default": "new Set<Subscriber>()"
             },
             {
@@ -7469,79 +7558,6 @@
           "declaration": {
             "name": "getThemeStore",
             "module": "src/theme/theme-store.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Loader",
-          "members": [
-            {
-              "kind": "field",
-              "name": "verifyCid",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "resolve",
-              "return": {
-                "type": {
-                  "text": "Promise<LoaderResolution>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                },
-                {
-                  "name": "bytes",
-                  "type": {
-                    "text": "Uint8Array"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Loader",
-          "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
           }
         }
       ]

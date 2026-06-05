@@ -6,6 +6,9 @@ import { BehaviorSubject, Observable } from 'rxjs';
 
 export type Theme = 'light' | 'dark' | 'device';
 
+const THEME_STORAGE_KEY = 'elohim-theme';
+const THEME_CHANGE_EVENT = 'elohim-theme-changed';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -21,12 +24,12 @@ export class ThemeService {
 
     // Cross-island/tab sync: Lit's ThemeStore (elohim-core) speaks the same
     // contract; adopt its changes without re-dispatching (no loops).
-    window.addEventListener('storage', (e: StorageEvent) => {
-      if (e.key === 'elohim-theme' && this.isValidTheme(e.newValue)) {
+    globalThis.addEventListener('storage', (e: StorageEvent) => {
+      if (e.key === THEME_STORAGE_KEY && this.isValidTheme(e.newValue)) {
         this.adoptExternal(e.newValue);
       }
     });
-    window.addEventListener('elohim-theme-changed', (e: Event) => {
+    globalThis.addEventListener(THEME_CHANGE_EVENT, (e: Event) => {
       const theme = (e as CustomEvent<{ theme?: unknown }>).detail?.theme;
       if (this.isValidTheme(theme)) this.adoptExternal(theme);
     });
@@ -63,7 +66,7 @@ export class ThemeService {
     this.currentTheme$.next(theme);
     this.applyTheme(theme);
     this.saveTheme(theme);
-    window.dispatchEvent(new CustomEvent('elohim-theme-changed', { detail: { theme } }));
+    globalThis.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme } }));
   }
 
   /**
@@ -96,7 +99,7 @@ export class ThemeService {
    */
   private saveTheme(theme: Theme): void {
     try {
-      localStorage.setItem('elohim-theme', theme);
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
       // localStorage write failure is non-critical
     }
@@ -113,7 +116,7 @@ export class ThemeService {
    */
   private loadTheme(): void {
     try {
-      const savedTheme = localStorage.getItem('elohim-theme');
+      const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
       if (this.isValidTheme(savedTheme)) {
         this.setTheme(savedTheme);
       } else {

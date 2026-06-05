@@ -1,21 +1,21 @@
 import { ElohimButton } from './elohim-button.js';
 import { ElohimComputeTile } from './elohim-compute-tile.js';
-import { ElohimSkeleton } from './elohim-skeleton.js';
-import { ElohimMentionBase } from './elohim-mention-base.js';
-import { ElohimPageChrome } from './elohim-page-chrome.js';
-import { ElohimDefaultOmnibar } from './elohim-default-omnibar.js';
+import { ElohimContentAnalytics } from './elohim-content-analytics.js';
 import { ElohimContextMenu } from './elohim-context-menu.js';
+import { ElohimDefaultOmnibar } from './elohim-default-omnibar.js';
 import { ElohimEprLink } from './elohim-epr-link.js';
+import { ElohimEprPopover } from './elohim-epr-popover.js';
 import { ElohimEprRelationshipsPanel } from './elohim-epr-relationships-panel.js';
-import { ElohimReactionBar } from './elohim-reaction-bar.js';
-import { ElohimGraduatedFeedback } from './elohim-graduated-feedback.js';
 import { ElohimFeedbackMechanismGateway } from './elohim-feedback-mechanism-gateway.js';
 import { ElohimGateFeedbackTrigger } from './elohim-gate-feedback-trigger.js';
-import { ElohimNavigator } from './elohim-navigator.js';
-import { ElohimContentAnalytics } from './elohim-content-analytics.js';
-import { ElohimEprPopover } from './elohim-epr-popover.js';
-import { ElohimThemeToggle } from './elohim-theme-toggle.js';
+import { ElohimGraduatedFeedback } from './elohim-graduated-feedback.js';
 import { ElohimLangPicker } from './elohim-lang-picker.js';
+import { ElohimMentionBase } from './elohim-mention-base.js';
+import { ElohimNavigator } from './elohim-navigator.js';
+import { ElohimPageChrome } from './elohim-page-chrome.js';
+import { ElohimReactionBar } from './elohim-reaction-bar.js';
+import { ElohimSkeleton } from './elohim-skeleton.js';
+import { ElohimThemeToggle } from './elohim-theme-toggle.js';
 
 // Registration lives here, not on the ElohimButton class via @customElement,
 // to keep ./index.ts truly side-effect-free. Importing from 'elohim-core'

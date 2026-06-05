@@ -48,7 +48,7 @@ type Subscriber = (locale: ElohimLocale) => void;
 export class LocaleStore {
   private _locale: ElohimLocale;
   private _destroyed = false;
-  private subscribers = new Set<Subscriber>();
+  private readonly subscribers = new Set<Subscriber>();
   private readonly _onStorage: (e: StorageEvent) => void;
   private readonly _onLocaleChange: (e: Event) => void;
 
@@ -62,9 +62,9 @@ export class LocaleStore {
       const l = (e as CustomEvent<{ locale?: unknown }>).detail?.locale;
       if (isSupported(l)) this.adopt(l);
     };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', this._onStorage);
-      window.addEventListener(LOCALE_CHANGE_EVENT, this._onLocaleChange);
+    if ('window' in globalThis) {
+      globalThis.addEventListener('storage', this._onStorage);
+      globalThis.addEventListener(LOCALE_CHANGE_EVENT, this._onLocaleChange);
     }
   }
 
@@ -76,9 +76,9 @@ export class LocaleStore {
    */
   destroy(): void {
     this._destroyed = true;
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('storage', this._onStorage);
-      window.removeEventListener(LOCALE_CHANGE_EVENT, this._onLocaleChange);
+    if ('window' in globalThis) {
+      globalThis.removeEventListener('storage', this._onStorage);
+      globalThis.removeEventListener(LOCALE_CHANGE_EVENT, this._onLocaleChange);
     }
     this.subscribers.clear();
   }
@@ -96,10 +96,10 @@ export class LocaleStore {
     } catch {
       // non-critical
     }
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(LOCALE_CHANGE_EVENT, { detail: { locale } }));
+    if ('window' in globalThis) {
+      globalThis.dispatchEvent(new CustomEvent(LOCALE_CHANGE_EVENT, { detail: { locale } }));
     }
-    this.subscribers.forEach((s) => s(locale));
+    this.subscribers.forEach(s => s(locale));
   }
 
   /** Subscribe to locale changes. Returns an unsubscribe function. */
@@ -115,7 +115,7 @@ export class LocaleStore {
     if (this._destroyed || locale === this._locale) return;
     this._locale = locale;
     this.applyToDocument(locale);
-    this.subscribers.forEach((s) => s(locale));
+    this.subscribers.forEach(s => s(locale));
   }
 
   private applyToDocument(locale: ElohimLocale): void {

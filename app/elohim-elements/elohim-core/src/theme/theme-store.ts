@@ -34,7 +34,7 @@ type Subscriber = (theme: ElohimTheme) => void;
 export class ThemeStore {
   private _theme: ElohimTheme = 'device';
   private _destroyed = false;
-  private subscribers = new Set<Subscriber>();
+  private readonly subscribers = new Set<Subscriber>();
   private readonly _onStorage: (e: StorageEvent) => void;
   private readonly _onThemeChange: (e: Event) => void;
 
@@ -48,9 +48,9 @@ export class ThemeStore {
       const t = (e as CustomEvent<{ theme?: unknown }>).detail?.theme;
       if (isTheme(t)) this.adopt(t);
     };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', this._onStorage);
-      window.addEventListener(THEME_CHANGE_EVENT, this._onThemeChange);
+    if ('window' in globalThis) {
+      globalThis.addEventListener('storage', this._onStorage);
+      globalThis.addEventListener(THEME_CHANGE_EVENT, this._onThemeChange);
     }
   }
 
@@ -62,9 +62,9 @@ export class ThemeStore {
    */
   destroy(): void {
     this._destroyed = true;
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('storage', this._onStorage);
-      window.removeEventListener(THEME_CHANGE_EVENT, this._onThemeChange);
+    if ('window' in globalThis) {
+      globalThis.removeEventListener('storage', this._onStorage);
+      globalThis.removeEventListener(THEME_CHANGE_EVENT, this._onThemeChange);
     }
     this.subscribers.clear();
   }
@@ -76,8 +76,8 @@ export class ThemeStore {
   /** The theme actually in effect ('device' resolved against the UA signal). */
   get effectiveTheme(): 'light' | 'dark' {
     if (this._theme !== 'device') return this._theme;
-    if (typeof window === 'undefined' || !window.matchMedia) return 'light';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (!('window' in globalThis) || !globalThis.matchMedia) return 'light';
+    return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
   set(theme: ElohimTheme): void {
@@ -85,10 +85,10 @@ export class ThemeStore {
     this._theme = theme;
     this.applyToDocument(theme);
     this.persist(theme);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme } }));
+    if ('window' in globalThis) {
+      globalThis.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme } }));
     }
-    this.subscribers.forEach((s) => s(theme));
+    this.subscribers.forEach(s => s(theme));
   }
 
   cycle(): void {
@@ -109,7 +109,7 @@ export class ThemeStore {
     if (this._destroyed || theme === this._theme) return;
     this._theme = theme;
     this.applyToDocument(theme);
-    this.subscribers.forEach((s) => s(theme));
+    this.subscribers.forEach(s => s(theme));
   }
 
   private applyToDocument(theme: ElohimTheme): void {

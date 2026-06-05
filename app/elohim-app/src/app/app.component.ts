@@ -6,16 +6,17 @@ import { filter } from 'rxjs/operators';
 
 import { installEprLinkInterceptor } from 'elohim-core';
 
+import { BlobBootstrapService } from '@app/lamad/services/blob-bootstrap.service';
+
 import { environment } from '../environments/environment';
 
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 import { ProtocolOmniComponent } from './elohim/components/protocol-omni/protocol-omni.component';
-import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { EprNavService } from './elohim/services/epr-nav.service';
+import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { ProtocolRouteContextService } from './elohim/services/protocol-route-context.service';
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
-import { BlobBootstrapService } from '@app/lamad/services/blob-bootstrap.service';
 
 // @coverage: 88.4% (2026-02-24)
 

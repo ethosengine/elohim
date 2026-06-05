@@ -39,8 +39,8 @@ describe('<elohim-page-chrome>', () => {
     const slot = el.shadowRoot!.querySelector('slot[name="omnibar"]') as HTMLSlotElement;
     const assigned = slot
       .assignedNodes({ flatten: true })
-      .filter((n) => n.nodeType === Node.ELEMENT_NODE);
-    expect(assigned.some((n) => (n as HTMLElement).id === 'custom-bar')).to.be.true;
+      .filter(n => n.nodeType === Node.ELEMENT_NODE);
+    expect(assigned.some(n => (n as HTMLElement).id === 'custom-bar')).to.be.true;
     const defaultBar = el.shadowRoot!.querySelector('elohim-default-omnibar');
     expect(defaultBar!.hasAttribute('hidden')).to.be.true;
   });
@@ -84,7 +84,7 @@ describe('<elohim-page-chrome>', () => {
     `);
     const mainSlot = el.shadowRoot!.querySelector('slot:not([name])') as HTMLSlotElement;
     const assigned = mainSlot.assignedNodes({ flatten: true });
-    expect(assigned.some((n) => (n as HTMLElement).id === 'pg')).to.be.true;
+    expect(assigned.some(n => (n as HTMLElement).id === 'pg')).to.be.true;
   });
 
   it('passes axe-core a11y scan in default state', async () => {
@@ -113,7 +113,6 @@ describe('<elohim-page-chrome> — ua-prefs precondition gate', () => {
     const hasSystemColor =
       afterForced.includes('Canvas') ||
       afterForced.includes('CanvasText') ||
-      afterForced.includes('ButtonText') ||
       afterForced.includes('ButtonText');
     expect(hasSystemColor).to.be.true;
   });
@@ -141,7 +140,9 @@ describe('<elohim-page-chrome> — i18n precondition gate', () => {
   it('renders correctly in RTL document direction (he-IL)', async () => {
     const el = await renderInLocale(
       'he-IL',
-      html`<elohim-page-chrome><p>תוכן</p></elohim-page-chrome>`
+      html`
+        <elohim-page-chrome><p>תוכן</p></elohim-page-chrome>
+      `
     );
     expect(el).to.exist;
     expect(document.documentElement.getAttribute('dir')).to.equal('rtl');
@@ -167,7 +168,9 @@ describe('<elohim-default-omnibar>', () => {
   });
 
   it('renders a sign-in link when anonymous (no session cookie)', async () => {
-    const el = await fixture(html`<elohim-default-omnibar></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar></elohim-default-omnibar>
+    `);
     const link = el.shadowRoot!.querySelector('a[href="/auth/signin"]');
     expect(link).to.exist;
     expect(link!.textContent!.trim()).to.equal('sign in');
@@ -177,7 +180,9 @@ describe('<elohim-default-omnibar>', () => {
     document.cookie = `elohim_session=${encodeURIComponent(
       JSON.stringify({ humanId: 'matthew', capabilities: [], reach: 'authenticated' })
     )}; path=/`;
-    const el = await fixture(html`<elohim-default-omnibar></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar></elohim-default-omnibar>
+    `);
     const userNameEl = el.shadowRoot!.querySelector('[part="user-name"]');
     expect(userNameEl).to.exist;
     expect(userNameEl!.textContent!.trim()).to.equal('matthew');
@@ -187,19 +192,25 @@ describe('<elohim-default-omnibar>', () => {
     document.cookie = `elohim_session=${encodeURIComponent(
       JSON.stringify({ humanId: 'jessica', capabilities: ['pilot'], reach: 'authenticated' })
     )}; path=/`;
-    const el = await fixture(html`<elohim-default-omnibar></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar></elohim-default-omnibar>
+    `);
     const link = el.shadowRoot!.querySelector('a[href="/auth/signin"]');
     expect(link).to.be.null;
   });
 
   it('exposes brand and user as named parts', async () => {
-    const el = await fixture(html`<elohim-default-omnibar></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar></elohim-default-omnibar>
+    `);
     expect(el.shadowRoot!.querySelector('[part="brand"]')).to.exist;
     expect(el.shadowRoot!.querySelector('[part="user"]')).to.exist;
   });
 
   it('passes axe-core a11y scan when anonymous', async () => {
-    const el = await fixture(html`<elohim-default-omnibar></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar></elohim-default-omnibar>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -208,7 +219,9 @@ describe('<elohim-default-omnibar>', () => {
     document.cookie = `elohim_session=${encodeURIComponent(
       JSON.stringify({ humanId: 'james', capabilities: [], reach: 'authenticated' })
     )}; path=/`;
-    const el = await fixture(html`<elohim-default-omnibar></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar></elohim-default-omnibar>
+    `);
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -235,7 +248,9 @@ describe('<elohim-default-omnibar> — ua-prefs precondition gate', () => {
   });
 
   it('passes the photosensitive-flash analyzer (no luminance flicker)', async () => {
-    const el = await fixture(html`<elohim-default-omnibar></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar></elohim-default-omnibar>
+    `);
     const result = await measureLuminanceChanges(el, { sampleMs: 600, sampleHz: 30 });
     expect(result.exceedsThreshold).to.be.false;
   });
@@ -255,7 +270,9 @@ describe('<elohim-default-omnibar> — i18n precondition gate', () => {
   it('renders correctly in RTL document direction (he-IL)', async () => {
     const el = await renderInLocale(
       'he-IL',
-      html`<elohim-default-omnibar></elohim-default-omnibar>`
+      html`
+        <elohim-default-omnibar></elohim-default-omnibar>
+      `
     );
     expect(el).to.exist;
     expect(document.documentElement.getAttribute('dir')).to.equal('rtl');
@@ -272,16 +289,18 @@ describe('<elohim-default-omnibar> — i18n precondition gate', () => {
 
 describe('<elohim-page-chrome> interceptor auto-install', () => {
   afterEach(() => {
-    window.__elohimEprLinkInterceptor?.uninstall?.();
+    globalThis.__elohimEprLinkInterceptor?.uninstall?.();
   });
 
   it('installs the epr-link interceptor on connect and removes it on disconnect', async () => {
-    expect(window.__elohimEprLinkInterceptor).to.be.undefined;
-    const el = await fixture(html`<elohim-page-chrome><p>x</p></elohim-page-chrome>`);
-    expect(window.__elohimEprLinkInterceptor).to.exist;
-    expect(window.__elohimEprLinkInterceptor!.explicit).to.be.false;
+    expect(globalThis.__elohimEprLinkInterceptor).to.be.undefined;
+    const el = await fixture(html`
+      <elohim-page-chrome><p>x</p></elohim-page-chrome>
+    `);
+    expect(globalThis.__elohimEprLinkInterceptor).to.exist;
+    expect(globalThis.__elohimEprLinkInterceptor!.explicit).to.be.false;
     el.remove();
-    expect(window.__elohimEprLinkInterceptor).to.be.undefined;
+    expect(globalThis.__elohimEprLinkInterceptor).to.be.undefined;
   });
 });
 
@@ -291,23 +310,31 @@ describe('<elohim-page-chrome> interceptor auto-install', () => {
 
 describe('<elohim-default-omnibar> opt-in controls', () => {
   it('renders no controls by default', async () => {
-    const el = await fixture(html`<elohim-default-omnibar></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar></elohim-default-omnibar>
+    `);
     expect(el.shadowRoot!.querySelector('elohim-theme-toggle')).to.not.exist;
     expect(el.shadowRoot!.querySelector('elohim-lang-picker')).to.not.exist;
   });
 
   it('renders the theme toggle with show-theme-toggle', async () => {
-    const el = await fixture(html`<elohim-default-omnibar show-theme-toggle></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar show-theme-toggle></elohim-default-omnibar>
+    `);
     expect(el.shadowRoot!.querySelector('elohim-theme-toggle')).to.exist;
   });
 
   it('renders the lang picker with show-lang-picker', async () => {
-    const el = await fixture(html`<elohim-default-omnibar show-lang-picker></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar show-lang-picker></elohim-default-omnibar>
+    `);
     expect(el.shadowRoot!.querySelector('elohim-lang-picker')).to.exist;
   });
 
   it('keeps the user part rendered alongside controls', async () => {
-    const el = await fixture(html`<elohim-default-omnibar show-theme-toggle show-lang-picker></elohim-default-omnibar>`);
+    const el = await fixture(html`
+      <elohim-default-omnibar show-theme-toggle show-lang-picker></elohim-default-omnibar>
+    `);
     expect(el.shadowRoot!.querySelector('[part="user"]')).to.exist;
   });
 });

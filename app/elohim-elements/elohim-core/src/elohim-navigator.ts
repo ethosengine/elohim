@@ -37,10 +37,38 @@ export interface ElohimNavigatorBannerItem {
 }
 
 const DEFAULT_CONTEXT_APPS: ElohimContextAppConfig[] = [
-  { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true },
-  { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true },
-  { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true },
-  { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true },
+  {
+    id: 'lamad',
+    name: 'Lamad',
+    icon: '📚',
+    route: '/lamad',
+    tagline: 'Learning & Content',
+    available: true,
+  },
+  {
+    id: 'community',
+    name: 'Qahal',
+    icon: '👥',
+    route: '/community',
+    tagline: 'Community & Governance',
+    available: true,
+  },
+  {
+    id: 'shefa',
+    name: 'Shefa',
+    icon: '✨',
+    route: '/shefa',
+    tagline: 'Economics of Flourishing',
+    available: true,
+  },
+  {
+    id: 'avodah',
+    name: 'Avodah',
+    icon: '🔨',
+    route: '/avodah',
+    tagline: 'Work & Stewardship',
+    available: true,
+  },
   { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true },
 ];
 
@@ -136,7 +164,10 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       padding-inline: 1rem;
       background: var(--elohim-nav-bg, Canvas);
       color: var(--elohim-nav-fg, CanvasText);
-      border-block-end: var(--elohim-nav-border, 1px solid color-mix(in oklch, currentColor 15%, transparent));
+      border-block-end: var(
+        --elohim-nav-border,
+        1px solid color-mix(in oklch, currentColor 15%, transparent)
+      );
       position: relative;
     }
 
@@ -167,7 +198,10 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       max-inline-size: 480px;
       padding-block: 0.375rem;
       padding-inline: 0.75rem;
-      border: var(--elohim-nav-search-border, 1px solid color-mix(in oklch, currentColor 25%, transparent));
+      border: var(
+        --elohim-nav-search-border,
+        1px solid color-mix(in oklch, currentColor 25%, transparent)
+      );
       border-radius: var(--elohim-nav-search-radius, 999px);
       background: var(--elohim-nav-search-bg, Canvas);
       color: CanvasText;
@@ -228,9 +262,12 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       position: absolute;
       inset-block-start: calc(100% + 0.25rem);
       background: var(--elohim-nav-tray-bg, Canvas);
-      border: var(--elohim-nav-tray-border, 1px solid color-mix(in oklch, currentColor 20%, transparent));
+      border: var(
+        --elohim-nav-tray-border,
+        1px solid color-mix(in oklch, currentColor 20%, transparent)
+      );
       border-radius: 0.5rem;
-      box-shadow: var(--elohim-nav-tray-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
+      box-shadow: var(--elohim-nav-tray-shadow, 0 4px 16px rgb(0 0 0 / 15%));
       z-index: 100;
       min-inline-size: 200px;
       padding: 0.5rem;
@@ -272,7 +309,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
 
     .tray-divider {
       block-size: 1px;
-      background: color-mix(in oklch, currentColor 15%, transparent);
+      background: color-mix(in oklch, currentcolor 15%, transparent);
       margin-block: 0.25rem;
       margin-inline: 0.5rem;
     }
@@ -313,9 +350,17 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       font-size: 0.875rem;
     }
 
-    .banner-info { background: color-mix(in oklch, Canvas 90%, LinkText); }
-    .banner-warning { background: color-mix(in oklch, Canvas 85%, Canvas); }
-    .banner-error { background: color-mix(in oklch, Canvas 85%, Canvas); }
+    .banner-info {
+      background: color-mix(in oklch, Canvas 90%, LinkText);
+    }
+
+    .banner-warning {
+      background: color-mix(in oklch, Canvas 85%, Canvas);
+    }
+
+    .banner-error {
+      background: color-mix(in oklch, Canvas 85%, Canvas);
+    }
 
     .banner-dismiss {
       background: none;
@@ -370,7 +415,8 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
   @property({ attribute: false }) contextApps: ElohimContextAppConfig[] = DEFAULT_CONTEXT_APPS;
   @property({ attribute: false }) banners: ElohimNavigatorBannerItem[] = [];
   @property({ attribute: false }) onNavigate: ((route: string) => void) | null = null;
-  @property({ attribute: false }) onSearch: ((query: string, context: string) => void) | null = null;
+  @property({ attribute: false }) onSearch: ((query: string, context: string) => void) | null =
+    null;
   @property({ attribute: false }) onLogout: (() => void) | null = null;
   @property({ attribute: false }) onBannerDismiss: ((id: string) => void) | null = null;
 
@@ -389,10 +435,10 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this._unsubTheme = getThemeStore().subscribe((t) => {
+    this._unsubTheme = getThemeStore().subscribe(t => {
       this._theme = t;
     });
-    this._unsubLocale = getLocaleStore().subscribe((l) => {
+    this._unsubLocale = getLocaleStore().subscribe(l => {
       this._locale = l;
     });
   }
@@ -410,6 +456,65 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
   private cyclePreferenceLocale(): void {
     const i = SUPPORTED_LOCALES.indexOf(this._locale);
     getLocaleStore().set(SUPPORTED_LOCALES[(i + 1) % SUPPORTED_LOCALES.length] as ElohimLocale);
+  }
+
+  // eslint-disable-next-line sonarjs/function-return-type -- html template and nothing are both valid Lit renderables
+  private _renderIdentifierRow() {
+    if (!this.identifier) return nothing;
+    return html`
+      <div style="opacity: 0.6; font-size: 0.8em;">${this.identifier}</div>
+    `;
+  }
+
+  private _renderProfileTrayContent() {
+    if (this.isAuthenticated) {
+      return html`
+        <div style="padding: 0.5rem 0.75rem; font-size: 0.875rem;">
+          <div style="font-weight: 600;">${this.displayName}</div>
+          ${this._renderIdentifierRow()}
+        </div>
+        <div class="tray-divider"></div>
+        <button
+          class="tray-item"
+          type="button"
+          role="menuitem"
+          data-testid="nav-identity-profile"
+          @click=${() => this.navigate('/identity/profile')}
+        >
+          Identity Profile
+        </button>
+        <div class="tray-divider"></div>
+        <button
+          class="tray-item danger"
+          type="button"
+          role="menuitem"
+          data-testid="nav-logout"
+          @click=${this.handleLogout}
+        >
+          Sign out
+        </button>
+      `;
+    }
+    return html`
+      <button
+        class="tray-item"
+        type="button"
+        role="menuitem"
+        data-testid="nav-login"
+        @click=${() => this.navigate('/identity/login')}
+      >
+        Sign in
+      </button>
+      <button
+        class="tray-item"
+        type="button"
+        role="menuitem"
+        data-testid="nav-register"
+        @click=${() => this.navigate('/identity/register')}
+      >
+        Register
+      </button>
+    `;
   }
 
   // eslint-disable-next-line sonarjs/function-return-type -- html template and nothing() are both valid Lit renderable; explicit union type loses readability
@@ -465,7 +570,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
                 &times;
               </button>
             </div>
-          `,
+          `
         )}
 
         <nav class="nav" part="nav" aria-label="Protocol navigation">
@@ -512,7 +617,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
                               </div>
                             </div>
                           </button>
-                        `,
+                        `
                       )}
                     </div>
                   `
@@ -543,7 +648,9 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
 
           <div class="actions-section" part="actions-section">
             ${!this.isAuthenticated && this.showPreferences
-              ? html`<elohim-theme-toggle data-testid="nav-theme-inline"></elohim-theme-toggle>`
+              ? html`
+                  <elohim-theme-toggle data-testid="nav-theme-inline"></elohim-theme-toggle>
+                `
               : nothing}
             <div style="position: relative;">
               <button
@@ -567,56 +674,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
                       role="menu"
                       aria-label="Profile menu"
                     >
-                      ${this.isAuthenticated
-                        ? html`
-                            <div style="padding: 0.5rem 0.75rem; font-size: 0.875rem;">
-                              <div style="font-weight: 600;">${this.displayName}</div>
-                              ${this.identifier
-                                ? html`<div style="opacity: 0.6; font-size: 0.8em;">${this.identifier}</div>`
-                                : nothing}
-                            </div>
-                            <div class="tray-divider"></div>
-                            <button
-                              class="tray-item"
-                              type="button"
-                              role="menuitem"
-                              data-testid="nav-identity-profile"
-                              @click=${() => this.navigate('/identity/profile')}
-                            >
-                              Identity Profile
-                            </button>
-                            <div class="tray-divider"></div>
-                            <button
-                              class="tray-item danger"
-                              type="button"
-                              role="menuitem"
-                              data-testid="nav-logout"
-                              @click=${this.handleLogout}
-                            >
-                              Sign out
-                            </button>
-                          `
-                        : html`
-                            <button
-                              class="tray-item"
-                              type="button"
-                              role="menuitem"
-                              data-testid="nav-login"
-                              @click=${() => this.navigate('/identity/login')}
-                            >
-                              Sign in
-                            </button>
-                            <button
-                              class="tray-item"
-                              type="button"
-                              role="menuitem"
-                              data-testid="nav-register"
-                              @click=${() => this.navigate('/identity/register')}
-                            >
-                              Register
-                            </button>
-                          `}
-                      ${this._renderPreferenceTrayRows()}
+                      ${this._renderProfileTrayContent()} ${this._renderPreferenceTrayRows()}
                     </div>
                   `
                 : nothing}
@@ -646,7 +704,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       this.onNavigate(route);
     } else {
       this.dispatchEvent(
-        new CustomEvent('navigate', { detail: { route }, bubbles: true, composed: true }),
+        new CustomEvent('navigate', { detail: { route }, bubbles: true, composed: true })
       );
     }
   }
@@ -659,7 +717,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
         detail: { open: this.showProfileTray },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -671,7 +729,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
         detail: { open: this.showContextSwitcher },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -691,7 +749,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
         detail: { query: this.searchQuery, context: this.context },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -712,7 +770,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
         detail: { id },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }
