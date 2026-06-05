@@ -109,11 +109,8 @@ describe('<elohim-page-chrome> — ua-prefs precondition gate', () => {
     ).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
-    const afterForced = cssText.slice(forcedIdx);
-    const hasSystemColor =
-      afterForced.includes('Canvas') ||
-      afterForced.includes('CanvasText') ||
-      afterForced.includes('ButtonText');
+    const forcedSection = cssText.slice(forcedIdx);
+    const hasSystemColor = /Canvas|CanvasText|ButtonText/.test(forcedSection);
     expect(hasSystemColor).to.be.true;
   });
 
@@ -238,12 +235,8 @@ describe('<elohim-default-omnibar> — ua-prefs precondition gate', () => {
     ).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
     const forcedIdx = cssText.indexOf('forced-colors: active');
-    const afterForced = cssText.slice(forcedIdx);
-    const hasSystemColor =
-      afterForced.includes('Canvas') ||
-      afterForced.includes('CanvasText') ||
-      afterForced.includes('LinkText') ||
-      afterForced.includes('ButtonText');
+    const forcedSection = cssText.slice(forcedIdx);
+    const hasSystemColor = /Canvas|CanvasText|LinkText|ButtonText/.test(forcedSection);
     expect(hasSystemColor).to.be.true;
   });
 
