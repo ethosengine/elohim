@@ -336,6 +336,11 @@ pub struct CollectiveProjectedSignal {
     pub founder_agent_cid: String,
     /// Present when this Collective was instantiated from a `CollabAgreement`.
     pub anchor_agreement_cid: Option<String>,
+    /// Full charter string from the Collective entry. Carried so the projector
+    /// can derive household-ness (governance_layer='family') and the slug
+    /// alias; `None` for legacy senders.
+    #[serde(default)]
+    pub charter: Option<String>,
 }
 
 /// Payload for `DnaSignal::MembershipProjected`.

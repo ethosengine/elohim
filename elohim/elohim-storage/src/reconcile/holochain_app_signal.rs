@@ -267,11 +267,11 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
 
         // Wave 2 T5: project a Collective DHT entry into the `collectives` table.
         //
-        // The canonical Collective CID is `collective:{action_hash}`. The
-        // `governance_layer` default for live collectives is "community" —
-        // household-ness (governance_layer = "family") is steward/seed-set via
-        // `CreateCollectiveInput`, never DNA-derived. The DNA Collective entry
-        // carries no `governance_layer` field; stewards set it post-coherence.
+        // The canonical Collective CID is `collective:{action_hash}`. The full
+        // `charter` rides along so the projector can derive household-ness
+        // (governance_layer = "family") and the slug alias from a
+        // `{"kind":"household", "slugAlias": ...}` charter (formation spec
+        // §5.4). Non-household charters project as "community" as before.
         ImagodeiSignal::CollectiveCommitted {
             action_hash,
             collective,
@@ -284,6 +284,7 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
                 display_name: collective.display_name,
                 founder_agent_cid: collective.founder_agent_cid,
                 anchor_agreement_cid: collective.anchor_agreement_cid,
+                charter: Some(collective.charter),
             }))
         }
 
@@ -1087,6 +1088,31 @@ mod tests {
                 assert_eq!(sig.display_name, "Dowell Family");
                 assert_eq!(sig.founder_agent_cid, "agent:uhCAkFounderPubKey0001");
                 assert!(sig.anchor_agreement_cid.is_none());
+            }
+            other => panic!("expected CollectiveProjected, got {other:?}"),
+        }
+    }
+
+    /// Household formation §5.4: the Collective `charter` rides through the
+    /// translation so the projector can derive governance_layer='family' and
+    /// the slug alias from a `{"kind":"household", ...}` charter.
+    #[test]
+    fn collective_committed_carries_charter_through_translation() {
+        let mut value = collective_committed_value();
+        value["payload"]["collective"]["charter"] = serde_json::Value::String(
+            r#"{"kind":"household","rubric":"recognition-of-given","slugAlias":"family-dowell"}"#
+                .to_string(),
+        );
+        let bytes = to_msgpack(&value);
+        let dns = try_decode_and_translate(&bytes, None).expect("should translate");
+        match dns {
+            DnaSignal::CollectiveProjected(c) => {
+                assert_eq!(
+                    c.charter.as_deref(),
+                    Some(
+                        r#"{"kind":"household","rubric":"recognition-of-given","slugAlias":"family-dowell"}"#
+                    )
+                );
             }
             other => panic!("expected CollectiveProjected, got {other:?}"),
         }

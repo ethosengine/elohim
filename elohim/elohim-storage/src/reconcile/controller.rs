@@ -720,13 +720,68 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         // canonical h_app_id is "lamad" (the elohim protocol app). Callers that
         // need a different scope should extend this with a configurable field.
         let ctx = AppContext::new("lamad");
+
+        // Household coherence (2026-06-04 formation spec §5.4): a charter that
+        // declares {"kind":"household"} projects as governance_layer='family',
+        // and a declared slugAlias merges onto the pre-coherence seed row
+        // (one household, one row — slug is the display alias, CID canonical).
+        #[derive(serde::Deserialize, Default)]
+        struct CharterHints {
+            #[serde(default)]
+            kind: Option<String>,
+            #[serde(default, rename = "slugAlias")]
+            slug_alias: Option<String>,
+        }
+        let hints: CharterHints = signal
+            .charter
+            .as_deref()
+            .and_then(|c| serde_json::from_str(c).ok())
+            .unwrap_or_default();
+        let is_household = hints.kind.as_deref() == Some("household");
+        let layer = if is_household {
+            crate::db::models::governance_layers::FAMILY.to_string()
+        } else {
+            crate::db::models::governance_layers::COMMUNITY.to_string()
+        };
+
+        // Slug-alias merge: if a row already exists under the alias id, stamp
+        // it instead of creating a duplicate.
+        if let Some(alias) = hints.slug_alias.as_deref() {
+            use crate::db::diesel_schema::collectives;
+            use diesel::prelude::*;
+            let stamped = diesel::update(
+                collectives::table
+                    .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                    .filter(collectives::id.eq(alias)),
+            )
+            .set((
+                collectives::collective_cid.eq(Some(signal.collective_cid.as_str())),
+                collectives::slug.eq(Some(alias)),
+                collectives::governance_layer.eq(&layer),
+            ))
+            .execute(&mut conn)
+            .unwrap_or(0);
+            if stamped > 0 {
+                debug!(
+                    collective_cid = %signal.collective_cid,
+                    alias = %alias,
+                    "household collective merged onto pre-coherence row"
+                );
+                return Ok(());
+            }
+        }
+
         let input = CreateCollectiveInput {
             id: signal.collective_cid.clone(),
             name: signal.display_name.clone(),
             description: None,
-            governance_layer: crate::db::models::governance_layers::COMMUNITY.to_string(),
+            governance_layer: layer,
             constitutional_parent_id: None,
-            reach: "community".to_string(),
+            reach: if is_household {
+                "trusted".to_string()
+            } else {
+                "community".to_string()
+            },
             metadata_json: None,
             created_by: Some(signal.founder_agent_cid.clone()),
             // collective_cid is set to the canonical CID so the resolver can
@@ -1706,6 +1761,7 @@ mod tests {
             display_name: "Wave 2 Test Collective".to_string(),
             founder_agent_cid: "agent:uhCAkFounder0001".to_string(),
             anchor_agreement_cid: None,
+            charter: None,
         };
 
         let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::CollectiveProjected(
@@ -1754,6 +1810,7 @@ mod tests {
             display_name: "Idempotent Collective".to_string(),
             founder_agent_cid: "agent:uhCAkFounder0002".to_string(),
             anchor_agreement_cid: None,
+            charter: None,
         };
 
         // Send the same signal twice.
@@ -1780,6 +1837,89 @@ mod tests {
         );
     }
 
+    /// Household formation §5.4: a `{"kind":"household", "slugAlias": ...}`
+    /// charter projects governance_layer='family' and MERGES onto the
+    /// pre-coherence seed row (one household, one row — slug is the display
+    /// alias, CID canonical) rather than creating a duplicate.
+    #[tokio::test]
+    async fn household_charter_sets_family_governance_and_merges_slug_alias() {
+        use crate::db::collectives::{create_collective, CreateCollectiveInput};
+        use crate::db::context::AppContext;
+        use crate::db::diesel_schema::collectives;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        // Arrange: pre-coherence seed row id='family-dowell' (governance_layer
+        // 'family', reach 'trusted', collective_cid NULL).
+        {
+            let mut conn = pool.get().expect("conn");
+            let ctx = AppContext::new("lamad");
+            create_collective(
+                &mut conn,
+                &ctx,
+                &CreateCollectiveInput {
+                    id: "family-dowell".to_string(),
+                    name: "Dowell Family".to_string(),
+                    description: None,
+                    governance_layer: "family".to_string(),
+                    constitutional_parent_id: None,
+                    reach: "trusted".to_string(),
+                    metadata_json: None,
+                    created_by: None,
+                },
+            )
+            .expect("seed row");
+        }
+
+        // Act: drive the controller over one CollectiveProjected whose household
+        // charter declares slugAlias = 'family-dowell'.
+        let signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkFAKE".to_string(),
+            collective_cid: "collective:uhCkkFAKE".to_string(),
+            display_name: "Dowell Family".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderDowell".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"household","slugAlias":"family-dowell"}"#.to_string()),
+        };
+
+        let stream =
+            InMemoryDnaSignalStream::with_signals(vec![DnaSignal::CollectiveProjected(signal)]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+        controller
+            .run_one_pass()
+            .await
+            .expect("run_one_pass must not error");
+
+        // Assert: EXACTLY ONE row, merged onto the seed row.
+        let mut conn = pool.get().expect("conn");
+        let total: i64 = collectives::table
+            .count()
+            .get_result(&mut conn)
+            .expect("count");
+        assert_eq!(total, 1, "household charter must merge, not duplicate");
+
+        let (id, cid, layer, slug): (String, Option<String>, String, Option<String>) =
+            collectives::table
+                .select((
+                    collectives::id,
+                    collectives::collective_cid,
+                    collectives::governance_layer,
+                    collectives::slug,
+                ))
+                .first(&mut conn)
+                .expect("the merged row");
+
+        assert_eq!(id, "family-dowell");
+        assert_eq!(cid.as_deref(), Some("collective:uhCkkFAKE"));
+        assert_eq!(layer, "family");
+        assert_eq!(slug.as_deref(), Some("family-dowell"));
+    }
+
     /// T5-c: MembershipCommitted projects a `collective_participations` row with
     /// the correct member_cid, member_kind, dht_anchor_hash.
     #[tokio::test]
@@ -1798,6 +1938,7 @@ mod tests {
             display_name: "Membership Test Collective".to_string(),
             founder_agent_cid: "agent:uhCAkFounder0010".to_string(),
             anchor_agreement_cid: None,
+            charter: None,
         };
 
         let mem_signal = MembershipProjectedSignal {
@@ -1862,6 +2003,7 @@ mod tests {
             display_name: "Redelivery Test Collective".to_string(),
             founder_agent_cid: "agent:uhCAkFounder0020".to_string(),
             anchor_agreement_cid: None,
+            charter: None,
         };
 
         let mem_signal = MembershipProjectedSignal {
@@ -1917,6 +2059,7 @@ mod tests {
             display_name: "Withdrawal Test Collective".to_string(),
             founder_agent_cid: "agent:uhCAkFounder0030".to_string(),
             anchor_agreement_cid: None,
+            charter: None,
         };
 
         let mem_signal = MembershipProjectedSignal {
