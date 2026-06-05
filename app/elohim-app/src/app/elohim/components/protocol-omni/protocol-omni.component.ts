@@ -15,9 +15,12 @@ import 'elohim-core/register';
 
 import { ProtocolNavigationService } from '@app/elohim/services/protocol-navigation.service';
 
+import { ResilienceService, ResilienceSnapshotComponent } from '@elohim/service/public-api';
+
 import { ConfigService } from '../../../services/config.service';
 
 import type { ServingContext } from '../../models/serving-context.model';
+import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
 
 /**
  * ProtocolOmniComponent — DOM-tier protocol chrome.
@@ -25,7 +28,14 @@ import type { ServingContext } from '../../models/serving-context.model';
  * A chip at the top of the viewport announcing protocol provenance.
  * Click expands a full-width toolbar with context-aware affordances:
  *   - EPR identifier (CID, click-to-copy)
- *   - Resilience indicator (placeholder; real wiring is a follow-up)
+ *   - Resilience indicator (live <elohim-resilience-snapshot> at icon
+ *     density, fed by GET /api/v1/resilience/{id}/household — fetched
+ *     lazily on first expansion; the collapsed chip never spends a
+ *     round-trip. The headline is stewarding collectives (the household/
+ *     collective is the resilience unit); peers-online is tooltip
+ *     drilldown. With no snapshot (loading, error, empty substrate) the
+ *     segment holds a neutral glyph that makes no status claim — the
+ *     trust surface never cries wolf and never fakes a signal.)
  *   - In-network back/forward (gated on ProtocolNavigationService —
  *     substrate-derived for cold visitors, session-derived for
  *     walked-from-protocol visitors)
@@ -47,7 +57,7 @@ import type { ServingContext } from '../../models/serving-context.model';
 @Component({
   selector: 'app-protocol-omni',
   standalone: true,
-  imports: [NgIf, RouterLink],
+  imports: [NgIf, RouterLink, ResilienceSnapshotComponent],
   templateUrl: './protocol-omni.component.html',
   styleUrls: ['./protocol-omni.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -69,11 +79,17 @@ export class ProtocolOmniComponent implements OnInit {
   private readonly nav = inject(ProtocolNavigationService);
   private readonly router = inject(Router);
   private readonly configService = inject(ConfigService);
+  private readonly resilienceService = inject(ResilienceService);
 
   readonly back = computed(() => this.nav.back());
   readonly forward = computed(() => this.nav.forward());
 
   readonly servingContext = signal<ServingContext | null>(null);
+
+  /** Live household resilience snapshot; null until fetched (or on error). */
+  readonly resilience = signal<ResilienceSnapshotView | null>(null);
+  /** CID the current snapshot was fetched for — guards duplicate fetches. */
+  private resilienceFetchedCid: string | null = null;
 
   readonly envVisible = computed(() => {
     const ctx = this.servingContext();
@@ -125,6 +141,25 @@ export class ProtocolOmniComponent implements OnInit {
 
   toggleExpanded(): void {
     this.expanded.update(v => !v);
+    if (this.expanded()) this.loadResilience();
+  }
+
+  /**
+   * Lazily fetch the household resilience snapshot — once per CID, on
+   * toolbar expansion only. A failed fetch leaves the neutral glyph (no
+   * status claim) and clears the guard so a later expansion may retry.
+   */
+  private loadResilience(): void {
+    const cid = this.contentId();
+    if (cid === this.resilienceFetchedCid) return;
+    this.resilienceFetchedCid = cid;
+    this.resilienceService.getSnapshot(cid).subscribe({
+      next: snap => this.resilience.set(snap),
+      error: () => {
+        this.resilienceFetchedCid = null;
+        this.resilience.set(null);
+      },
+    });
   }
 
   collapse(): void {

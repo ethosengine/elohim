@@ -665,3 +665,22 @@ export const CONTEXT_MENU = {
   // The three MVP labels asserted present by the right-click scenario.
   MVP_LABELS: ['Open', 'About this EPR', 'Copy EPR link'],
 } as const;
+
+// protocol-omni.component.ts — DOM-tier protocol chrome (the trust surface).
+// Renders on protocolContent routes ('' and /resource/:resourceId) in
+// elohim-app's app.component. The RESILIENCE segment wraps the library's
+// <elohim-resilience-snapshot density="icon"> once the snapshot loads; while
+// no data is available it holds a neutral glyph making no status claim
+// (trust surface never cries wolf). Inner icon/tooltip testids come from
+// resilience-snapshot.component.html (resilience-icon / resilience-tooltip).
+export const PROTOCOL_OMNI = {
+  CHIP: 'protocol-omni-chip',
+  TOOLBAR: 'protocol-omni-toolbar',
+  EPR: 'protocol-omni-epr',
+  ENV: 'protocol-omni-env',
+  RESILIENCE: 'protocol-omni-resilience',
+  BACK: 'protocol-omni-back',
+  FORWARD: 'protocol-omni-forward',
+  ACCOUNT: 'protocol-omni-account',
+  COLLAPSE: 'protocol-omni-collapse',
+} as const;

@@ -165,6 +165,24 @@ Feature: Observable + contract-aware auto-distribute
     # "credible to a grandmother" bar. Operational: both widgets render off
     # the single EPR head response — no extra round-trip.
 
+  # --- Protocol omni resilience indicator -----------------------------------
+  # Omnibar-consolidation follow-up (spec §9.6): the trust surface's resilience
+  # segment wires to the live household snapshot. Glance signal only — the
+  # omni is a navigation/provenance tool, not an analytics display; the
+  # headline is stewarding collectives (the household/collective is the
+  # resilience unit), with peers-online as tooltip drilldown. Never cries
+  # wolf: until a snapshot loads the segment is a neutral glyph that makes
+  # no status claim, and a fetch error stays neutral rather than alarming.
+
+  @browser-only @resilience-p1
+  Scenario: Protocol omni toolbar surfaces the live resilience snapshot
+    Given "content-alpha" has been distributed to at least 2 households
+    When I open the EPR resource page for "content-alpha"
+    And I expand the protocol omni toolbar
+    Then the omni resilience segment renders a live resilience icon
+    And the resilience icon has class "status-protected" or "status-partial"
+    And the omni resilience tooltip mentions stewarding collectives
+
   @wip @resilience-p1
   Scenario: Distribution badge defers details fetch until tooltip opens
     Given a content-viewer is open for "content-alpha"

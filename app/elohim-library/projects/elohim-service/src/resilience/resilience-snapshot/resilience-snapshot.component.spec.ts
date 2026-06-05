@@ -52,6 +52,40 @@ describe('ResilienceSnapshotComponent', () => {
     expect(icon?.classList.contains('status-partial')).toBe(true);
   });
 
+  it('icon tooltip names the commitment-backed collective count', () => {
+    // samplePartial: 2 stewarding vs 4 commitment-backed — distinct numbers so
+    // the assertion can't pass off the stewarding segment by accident.
+    component.snapshot = samplePartial;
+    component.density = 'icon';
+    fixture.detectChanges();
+    const tooltip =
+      fixture.nativeElement.querySelector('[data-testid="resilience-tooltip"]')?.textContent ?? '';
+    expect(tooltip).toContain('2 collectives');
+    expect(tooltip).toContain('4 commitment-backed');
+  });
+
+  it('icon tooltip names peers online when details carry a live peer count', () => {
+    component.snapshot = {
+      ...sampleProtected,
+      details: { stewardingCollectives: [], onlinePeerCount: 5 },
+    };
+    component.density = 'icon';
+    fixture.detectChanges();
+    const tooltip =
+      fixture.nativeElement.querySelector('[data-testid="resilience-tooltip"]')?.textContent ?? '';
+    expect(tooltip).toContain('5 peers online');
+  });
+
+  it('icon tooltip stays silent about peers when details are absent', () => {
+    // Honest signal: no liveness data → no liveness claim.
+    component.snapshot = sampleProtected;
+    component.density = 'icon';
+    fixture.detectChanges();
+    const tooltip =
+      fixture.nativeElement.querySelector('[data-testid="resilience-tooltip"]')?.textContent ?? '';
+    expect(tooltip).not.toContain('peers online');
+  });
+
   it('context-menu density lists placement gap count', () => {
     const withGaps: ResilienceSnapshotView = {
       ...samplePartial,

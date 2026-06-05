@@ -1,0 +1,22 @@
+---
+name: resilience-snapshot-humans-junction
+description: Why seeding provide-commitments alone can never light the resilience snapshot — both joins pass through substrate-owned humans fields
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 8dd8d2c6-91fb-499c-bd3e-cadbcb784c8b
+---
+
+`household_resilience::snapshot()` (elohim/elohim-storage/src/services/household_resilience.rs) lights up only through the **humans junction**, and both of its joins require fields no HTTP create surface can set:
+
+- `stewardingCollectives`/`protectionStatus`: `shard_locations.peer_id = humans.agent_pub_key` + `humans.household_id IS NOT NULL`
+- `commitmentBackedCollectives`: `rea_commitments.provider = humans.agent_pub_key` + `action='provide'` + `state='active'` + `resource_classified_as='content:<reach>'`
+
+**Why naive seeding lights nothing (verified 2026-06-05):**
+1. `CreateHumanInputView` has no `householdId`; doorway `/auth/register` writes neither `household_id` nor `agent_pub_key` — these are deliberately substrate-owned ("projection of collectives DHT entry with kind:household", humans.rs:31-33). Seeded humans = NULL on both → every join excludes them.
+2. `POST /api/v1/commitments` inserts `state="proposed"` hardcoded (rea_commitments.rs:288); activation needs `PATCH /api/v1/commitments/{id}` (auth_required).
+3. Nothing in production writes `resource_classified_as='content:<reach>'` provide rows — only `test_util.rs`. So `commitmentBackedCollectives` is 0 even on alpha (that leg is the roadmapped "Epic B committed-accounting readers" work).
+
+**Honest states:** local dev `hc:start:seed` → at-risk/all-zeros (correct, not a bug — see [[local-stack-dht-anchor-gap]] for the sibling seeding gap); CI/alpha fixture cluster → placement-driven partial/protected via real shard_locations + peer heartbeats (the a2o `observable-distribution.feature` scenarios prove it).
+
+**How to apply:** any plan that says "just seed commitments to demo resilience" is the terrance-drift dead-data shape (cf. seed-commitments.ts docstring: "Drift in any of these fields = views silently filter out the row"). Lighting local dev requires the substrate chain (household projection + peer registration + placement) first.

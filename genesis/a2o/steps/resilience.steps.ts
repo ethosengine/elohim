@@ -20,7 +20,9 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { request } from 'undici';
 
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
+import { PROTOCOL_OMNI } from '../src/framework/pages/selectors.js';
 import { retry } from '../src/framework/utils/retry.js';
+import { doorwayToAppUrl } from '../src/framework/utils/url.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -293,6 +295,48 @@ When('I open the admin content list', async function (this: E2EWorld) {
   return 'pending';
 });
 
+/**
+ * Open the EPR resource page (/resource/{id}) in elohim-app — one of the two
+ * protocolContent routes where app.component mounts <app-protocol-omni>
+ * (the trust surface). Waits for the omni chip so follow-up steps can expand it.
+ *
+ * Example:
+ *   When I open the EPR resource page for "content-alpha"
+ */
+When(
+  'I open the EPR resource page for {string}',
+  async function (this: E2EWorld, contentId: string) {
+    const device = findPwDevice(this);
+    if (!device) return 'pending';
+    const appUrl = doorwayToAppUrl(device.client.url);
+    await device.page.goto(`${appUrl}/resource/${encodeURIComponent(contentId)}`, {
+      waitUntil: 'networkidle',
+    });
+    await device.page
+      .locator(`[data-testid="${PROTOCOL_OMNI.CHIP}"]`)
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    return undefined;
+  }
+);
+
+/**
+ * Expand the protocol omni toolbar by clicking the collapsed chip. The
+ * expansion is also what triggers the lazy resilience-snapshot fetch —
+ * the collapsed chip never spends a round-trip.
+ *
+ * Example:
+ *   And I expand the protocol omni toolbar
+ */
+When('I expand the protocol omni toolbar', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) return 'pending';
+  await device.page.locator(`[data-testid="${PROTOCOL_OMNI.CHIP}"]`).click();
+  await device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.TOOLBAR}"]`)
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  return undefined;
+});
+
 // ---------------------------------------------------------------------------
 // Then — assertions
 // ---------------------------------------------------------------------------
@@ -436,6 +480,51 @@ Then(
       classes.includes(classA) || classes.includes(classB),
       `Expected resilience-icon to have class "${classA}" or "${classB}"; ` +
         `got [${classes.join(', ')}]`
+    );
+  }
+);
+
+/**
+ * Assert that the protocol-omni resilience segment renders the LIVE snapshot
+ * icon — i.e. the <elohim-resilience-snapshot> [data-testid="resilience-icon"]
+ * nested inside [data-testid="protocol-omni-resilience"], not the neutral
+ * no-data glyph. The snapshot fetch is lazy (fires on toolbar expansion), so
+ * this waits for the icon to appear rather than asserting instantaneously.
+ */
+Then('the omni resilience segment renders a live resilience icon', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const icon = device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE}"] [data-testid="resilience-icon"]`)
+    .first();
+  await icon.waitFor({ state: 'visible', timeout: 15_000 });
+});
+
+/**
+ * Assert that the omni resilience tooltip names the stewarding-collective
+ * count. The icon-density tooltip renders "{N} collectives · …" (see
+ * resilience-snapshot.component.html) — the headline is collectives, not
+ * peers, because the household/collective is the resilience unit.
+ */
+Then(
+  'the omni resilience tooltip mentions stewarding collectives',
+  async function (this: E2EWorld) {
+    const device = findPwDevice(this);
+    if (!device) {
+      assert.fail(NO_PW_DEVICE);
+    }
+    const tooltip = device.page
+      .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE}"] [data-testid="resilience-tooltip"]`)
+      .first();
+    await tooltip.waitFor({ state: 'attached', timeout: 15_000 });
+    const text = ((await tooltip.textContent()) ?? '').trim();
+    // Bounded \d{1,9} to avoid super-linear backtracking on adversarial input.
+    assert.match(
+      text,
+      /\d{1,9} collectives/i,
+      `Expected omni resilience tooltip to name the collective count; got: "${text}"`
     );
   }
 );

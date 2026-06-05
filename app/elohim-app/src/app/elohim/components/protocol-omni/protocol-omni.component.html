@@ -62,10 +62,20 @@
     <span
       class="omni-resilience"
       data-testid="protocol-omni-resilience"
-      title="Resilience tier (placeholder — wires to elohim-resilience-snapshot in a follow-up)"
       aria-label="Resilience indicator"
     >
-      &#x25C9;
+      <elohim-resilience-snapshot
+        *ngIf="resilience() as snap; else resilienceNeutral"
+        [snapshot]="snap"
+        density="icon"
+      ></elohim-resilience-snapshot>
+      <!-- No snapshot yet (loading, error, or empty substrate): a neutral
+           glyph that makes no status claim — never cries wolf, never fakes. -->
+      <ng-template #resilienceNeutral>
+        <span class="omni-resilience-neutral" title="Resilience snapshot unavailable">
+          &#x25C9;
+        </span>
+      </ng-template>
     </span>
 
     <button

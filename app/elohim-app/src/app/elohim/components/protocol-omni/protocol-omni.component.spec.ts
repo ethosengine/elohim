@@ -3,11 +3,15 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+
+import { ResilienceService } from '@elohim/service/public-api';
 
 import { ProtocolOmniComponent } from './protocol-omni.component';
 import { ProtocolNavigationService } from '@app/elohim/services/protocol-navigation.service';
 import { ConfigService } from '../../../services/config.service';
+
+import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
 
 describe('ProtocolOmniComponent', () => {
   let fixture: ComponentFixture<ProtocolOmniComponent>;
@@ -266,5 +270,115 @@ describe('ProtocolOmniComponent serving context', () => {
     b.fixture.detectChanges();
     b.expand();
     expect(b.fixture.nativeElement.querySelector('elohim-theme-toggle')).toBeTruthy();
+  });
+});
+
+describe('ProtocolOmniComponent resilience segment', () => {
+  const snapshotFixture: ResilienceSnapshotView = {
+    contentId: 'test-cid',
+    stewardingCollectives: 3,
+    commitmentBackedCollectives: 2,
+    diversityScore: 0.43,
+    regionalDistribution: { local: 1, regional: 1, global: 1, unknown: 0 },
+    placementGaps: [],
+    protectionStatus: 'partial',
+    details: { stewardingCollectives: [], onlinePeerCount: 5, healthScore: 0.8 },
+  } as ResilienceSnapshotView;
+
+  function setup(opts?: { getSnapshot?: ReturnType<typeof vi.fn>; contentId?: string }) {
+    TestBed.resetTestingModule();
+
+    const nav = {
+      back: vi.fn(() => null),
+      forward: vi.fn(() => null),
+      context: vi.fn(() => null),
+      activate: vi.fn(async () => undefined),
+    };
+
+    const getSnapshot = opts?.getSnapshot ?? vi.fn(() => of(snapshotFixture));
+
+    TestBed.configureTestingModule({
+      imports: [ProtocolOmniComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ProtocolNavigationService, useValue: nav },
+        { provide: ResilienceService, useValue: { getSnapshot } },
+      ],
+    });
+
+    const fixture: ComponentFixture<ProtocolOmniComponent> =
+      TestBed.createComponent(ProtocolOmniComponent);
+    fixture.componentRef.setInput('contentId', opts?.contentId ?? 'test-cid');
+    fixture.detectChanges();
+
+    const chip = (): HTMLElement =>
+      fixture.nativeElement.querySelector('[data-testid="protocol-omni-chip"]');
+    const expand = () => {
+      chip().click();
+      fixture.detectChanges();
+    };
+    const collapse = () => {
+      const btn: HTMLElement = fixture.nativeElement.querySelector(
+        '[data-testid="protocol-omni-collapse"]'
+      );
+      btn.click();
+      fixture.detectChanges();
+    };
+    const segment = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector('[data-testid="protocol-omni-resilience"]');
+    const liveIcon = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector(
+        '[data-testid="protocol-omni-resilience"] [data-testid="resilience-icon"]'
+      );
+
+    return { fixture, getSnapshot, expand, collapse, segment, liveIcon };
+  }
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('does not fetch the snapshot while collapsed (lazy — the chip never spends a round-trip)', () => {
+    const { getSnapshot } = setup();
+    expect(getSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('fetches once on first expansion and renders the live icon in the segment', () => {
+    const { getSnapshot, expand, liveIcon } = setup();
+    expand();
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+    expect(getSnapshot).toHaveBeenCalledWith('test-cid');
+    const icon = liveIcon();
+    expect(icon).not.toBeNull();
+    expect(icon?.classList.contains('status-partial')).toBe(true);
+  });
+
+  it('does not re-fetch on collapse/re-expand for the same content', () => {
+    const { getSnapshot, expand, collapse } = setup();
+    expand();
+    collapse();
+    expand();
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a neutral no-claim glyph when the fetch errors (never cries wolf)', () => {
+    const { expand, segment, liveIcon } = setup({
+      getSnapshot: vi.fn(() => throwError(() => new Error('storage unreachable'))),
+    });
+    expand();
+    expect(segment()).not.toBeNull();
+    expect(liveIcon()).toBeNull();
+    expect(segment()?.textContent).toContain('◉');
+  });
+
+  it('surfaces the honest counts in the live tooltip (collectives headline, peers drilldown)', () => {
+    const { expand, segment } = setup();
+    expand();
+    const tooltip = segment()?.querySelector('[data-testid="resilience-tooltip"]');
+    expect(tooltip?.textContent).toContain('3 collectives');
+    expect(tooltip?.textContent).toContain('2 commitment-backed');
+    expect(tooltip?.textContent).toContain('5 peers online');
   });
 });

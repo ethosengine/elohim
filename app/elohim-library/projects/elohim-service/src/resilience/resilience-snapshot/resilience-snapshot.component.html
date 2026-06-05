@@ -12,8 +12,11 @@
     </span>
     <span data-testid="resilience-tooltip" class="resilience-tooltip">
       {{ snapshot.stewardingCollectives }} collectives
+      · {{ snapshot.commitmentBackedCollectives }} commitment-backed
       · {{ regionSummary || 'no region data' }}
-      · {{ snapshot.protectionStatus }}
+      · {{ snapshot.protectionStatus }}<ng-container
+        *ngIf="snapshot.details?.onlinePeerCount != null"
+      > · {{ snapshot.details?.onlinePeerCount }} peers online</ng-container>
     </span>
   </span>
 
