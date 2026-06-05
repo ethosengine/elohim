@@ -407,6 +407,15 @@ pub const OPERATE_DOORWAY_ACTION: &str = "operate-doorway";
 /// idempotency of every existing seed.
 pub const PROJECT_EPR_ACTION: &str = "project-epr";
 
+/// Actions that round-trip the conductor when one is connected (anchored,
+/// gossiped) but degrade gracefully to diesel-direct when not. custody-blob
+/// joined 2026-06-04 (household formation spec §5.3) — it is in the elohim
+/// DNA's REA_ACTIONS vocabulary, so content_store::create_rea_commitment
+/// accepts it. Mishpat-discriminated actions (delegates-compute,
+/// replicates-dwelling) are NOT here: they need a mishpat-role client
+/// (stage-2 work).
+pub const CONDUCTOR_SOFT_ACTIONS: [&str; 1] = ["custody-blob"];
+
 /// Build the canonical in_scope_of value for an operate-doorway commitment.
 ///
 /// Stored encoding is a JSON-array string (ValueFlows in_scope_of convention),

@@ -23,7 +23,7 @@ use diesel::SqliteConnection;
 use crate::db::context::AppContext;
 use crate::db::rea_commitments::{
     self, CreateReaCommitmentInput, ReaCommitmentQuery, UpdateReaCommitmentState,
-    PROJECT_EPR_ACTION,
+    CONDUCTOR_SOFT_ACTIONS, PROJECT_EPR_ACTION,
 };
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
@@ -43,6 +43,14 @@ impl ReaCommitmentService {
         hc_lamad: Option<&Arc<HcClient>>,
     ) -> Result<ReaCommitmentView, StorageError> {
         if input.action == PROJECT_EPR_ACTION {
+            return Self::create_via_conductor(conn, ctx, input, events, hc_lamad).await;
+        }
+        // Soft gate: conductor round-trip when connected, diesel fallback when not.
+        // custody-blob is in the elohim DNA's REA_ACTIONS vocabulary so the zome
+        // accepts it; local-dev / degraded environments have no conductor and must
+        // still succeed. Mishpat-discriminated actions (delegates-compute) are
+        // explicitly NOT here — they need a mishpat-role client (stage-2 work).
+        if CONDUCTOR_SOFT_ACTIONS.contains(&input.action.as_str()) && hc_lamad.is_some() {
             return Self::create_via_conductor(conn, ctx, input, events, hc_lamad).await;
         }
         // Legacy diesel-direct path — preserved for non-project-epr actions
@@ -208,6 +216,14 @@ impl ReaCommitmentService {
         if existing.action == PROJECT_EPR_ACTION {
             return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;
         }
+        // Soft gate mirrors the create path: custody-blob round-trips the conductor
+        // when one is connected (so state transitions are notarized on the DHT),
+        // and falls back to diesel-direct when the conductor is absent.
+        // update_state_via_conductor is action-generic (calls update_rea_commitment_state
+        // with {id, state, finished}), so no custody-blob-specific zome risk.
+        if CONDUCTOR_SOFT_ACTIONS.contains(&existing.action.as_str()) && hc_lamad.is_some() {
+            return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;
+        }
 
         // Legacy diesel-direct path.
         let commitment = rea_commitments::update_commitment_state(conn, ctx, id, update)?;
@@ -318,6 +334,55 @@ impl ReaCommitmentService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diesel::Connection;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup_conn() -> diesel::SqliteConnection {
+        let mut conn = diesel::SqliteConnection::establish(":memory:").expect("in-memory SQLite");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    /// Soft gate regression guard: custody-blob without a conductor must succeed
+    /// diesel-direct, preserving pre-gate behavior in local-dev / degraded
+    /// environments. This is the primary invariant for the soft-gate extension
+    /// (household formation spec §5.3).
+    ///
+    /// Asserts:
+    /// - `create` returns `Ok` with the expected action
+    /// - the persisted row has `dht_anchor_hash IS NULL` (diesel path, unanchored)
+    #[tokio::test]
+    async fn custody_blob_routes_diesel_when_no_conductor() {
+        let mut conn = setup_conn();
+        let ctx = crate::db::context::AppContext::default_lamad();
+
+        let input = CreateReaCommitmentInput {
+            id: Some("custody-blob-test01".to_string()),
+            action: "custody-blob".to_string(),
+            provider: "12D3KooWAAAA".to_string(),
+            receiver: "12D3KooWBBBB".to_string(),
+            ..Default::default()
+        };
+
+        // hc_lamad = None → soft gate must fall through to diesel-direct
+        let result = ReaCommitmentService::create(&mut conn, &ctx, input, None, None).await;
+        assert!(result.is_ok(), "expected Ok, got: {:?}", result.err());
+
+        let view = result.unwrap();
+        assert_eq!(view.action, "custody-blob");
+
+        // Confirm the row is diesel-direct (no DHT anchor)
+        let row = rea_commitments::get_commitment(&mut conn, &ctx, "custody-blob-test01")
+            .expect("db query")
+            .expect("row present");
+        assert!(
+            row.dht_anchor_hash.is_none(),
+            "diesel path must leave dht_anchor_hash unset, got: {:?}",
+            row.dht_anchor_hash
+        );
+    }
 
     /// Validates that `shefa_types::Commitment` (the entry field inside
     /// `ReaCommitmentOutput`) round-trips through MessagePack encoding+decoding.
