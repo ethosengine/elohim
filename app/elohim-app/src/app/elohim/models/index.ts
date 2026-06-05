@@ -93,3 +93,6 @@ export type { GatedResponse } from '@elohim/service/angular/models/gated-respons
 
 // Zome Wire Types - Centralized Holochain zome response types
 export * from './zome-wire-types';
+
+// ServingContext — orthogonal dimension to reach; protocol-omni trust surface view-model
+export * from './serving-context.model';
