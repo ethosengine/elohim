@@ -227,3 +227,46 @@ describe('<elohim-navigator> — ua-prefs gate', () => {
     expect(cssText).to.contain('44px');
   });
 });
+
+describe('<elohim-navigator> preferences (theme/lang restore)', () => {
+  it('shows the inline theme toggle for visitors', async () => {
+    const el = await fixture<ElohimNavigator>(html`<elohim-navigator></elohim-navigator>`);
+    expect(el.shadowRoot!.querySelector('[data-testid="nav-theme-inline"]')).to.exist;
+  });
+
+  it('hides the inline toggle when authenticated (tray owns it)', async () => {
+    const el = await fixture<ElohimNavigator>(
+      html`<elohim-navigator .isAuthenticated=${true}></elohim-navigator>`,
+    );
+    expect(el.shadowRoot!.querySelector('[data-testid="nav-theme-inline"]')).to.not.exist;
+  });
+
+  it('renders theme + language rows in the profile tray', async () => {
+    const el = await fixture<ElohimNavigator>(html`<elohim-navigator></elohim-navigator>`);
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="profile-bubble"]')!.click();
+    await elementUpdated(el);
+    expect(el.shadowRoot!.querySelector('[data-testid="nav-theme-toggle"]')).to.exist;
+    expect(el.shadowRoot!.querySelector('[data-testid="nav-language"]')).to.exist;
+  });
+
+  it('show-preferences=false suppresses the tray rows', async () => {
+    const el = await fixture<ElohimNavigator>(
+      html`<elohim-navigator .showPreferences=${false}></elohim-navigator>`,
+    );
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="profile-bubble"]')!.click();
+    await elementUpdated(el);
+    expect(el.shadowRoot!.querySelector('[data-testid="nav-theme-toggle"]')).to.not.exist;
+  });
+
+  it('tray theme row cycles the shared store and keeps the tray open', async () => {
+    const { getThemeStore } = await import('./theme/theme-store.js');
+    getThemeStore().set('device');
+    const el = await fixture<ElohimNavigator>(html`<elohim-navigator></elohim-navigator>`);
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="profile-bubble"]')!.click();
+    await elementUpdated(el);
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="nav-theme-toggle"]')!.click();
+    await elementUpdated(el);
+    expect(getThemeStore().theme).to.equal('light');
+    expect(el.shadowRoot!.querySelector('[part="profile-tray"]')).to.exist;
+  });
+});

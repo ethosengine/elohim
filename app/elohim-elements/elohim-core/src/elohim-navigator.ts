@@ -2,6 +2,13 @@ import { css, html, LitElement, nothing } from 'lit';
 import { property, state } from 'lit/decorators.js';
 
 import { CapabilityAwareElement } from './capability/index.js';
+import {
+  LOCALE_LABELS,
+  SUPPORTED_LOCALES,
+  getLocaleStore,
+  type ElohimLocale,
+} from './localize/locale-store.js';
+import { getThemeStore, type ElohimTheme } from './theme/theme-store.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -45,6 +52,8 @@ const DEFAULT_CONTEXT_APPS: ElohimContextAppConfig[] = [
  * - Context app switcher (pillar tray)
  * - Optional search bar
  * - Banner notices
+ * - Theme toggle (visitor inline via `elohim-theme-toggle`; tray row for all users)
+ * - Language selector row in the profile tray
  *
  * All routing is done by emitting events or calling callbacks. The element
  * holds no router state itself — callers handle navigation.
@@ -66,6 +75,8 @@ const DEFAULT_CONTEXT_APPS: ElohimContextAppConfig[] = [
  * @prop {Function | null} onSearch - Called with { query } when search submitted
  * @prop {Function | null} onLogout - Called when logout requested
  * @prop {Function | null} onBannerDismiss - Called with { id } when a banner is dismissed
+ *
+ * @attr {boolean} show-preferences - Show theme + language rows in the profile tray and inline theme toggle for visitors (default true)
  *
  * @fires navigate - { detail: { route: string } }
  * @fires search - { detail: { query: string, context: string } }
@@ -363,9 +374,72 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
   @property({ attribute: false }) onLogout: (() => void) | null = null;
   @property({ attribute: false }) onBannerDismiss: ((id: string) => void) | null = null;
 
+  /** Render the theme/language rows in the profile tray (restore of the pre-Lit-migration toggle; on by default). */
+  @property({ type: Boolean, attribute: 'show-preferences' }) showPreferences = true;
+
+  @state() private _theme: ElohimTheme = getThemeStore().theme;
+  @state() private _locale: ElohimLocale = getLocaleStore().locale;
+
+  private _unsubTheme?: () => void;
+  private _unsubLocale?: () => void;
+
   @state() private showProfileTray = false;
   @state() private showContextSwitcher = false;
   @state() private searchQuery = '';
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._unsubTheme = getThemeStore().subscribe((t) => {
+      this._theme = t;
+    });
+    this._unsubLocale = getLocaleStore().subscribe((l) => {
+      this._locale = l;
+    });
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._unsubTheme?.();
+    this._unsubLocale?.();
+  }
+
+  private cyclePreferenceTheme(): void {
+    getThemeStore().cycle(); // tray stays open so the change is visible
+  }
+
+  private cyclePreferenceLocale(): void {
+    const i = SUPPORTED_LOCALES.indexOf(this._locale);
+    getLocaleStore().set(SUPPORTED_LOCALES[(i + 1) % SUPPORTED_LOCALES.length] as ElohimLocale);
+  }
+
+  // eslint-disable-next-line sonarjs/function-return-type -- html template and nothing() are both valid Lit renderable; explicit union type loses readability
+  private _renderPreferenceTrayRows() {
+    if (!this.showPreferences) return nothing;
+    const themeIcon = getThemeStore().effectiveTheme === 'dark' ? '🌙' : '☀️';
+    return html`
+      <div class="tray-divider"></div>
+      <button
+        class="tray-item"
+        type="button"
+        role="menuitem"
+        data-testid="nav-theme-toggle"
+        @click=${this.cyclePreferenceTheme}
+      >
+        <span aria-hidden="true">${themeIcon}</span>
+        Theme: ${this._theme}
+      </button>
+      <button
+        class="tray-item"
+        type="button"
+        role="menuitem"
+        data-testid="nav-language"
+        @click=${this.cyclePreferenceLocale}
+      >
+        <span aria-hidden="true">🌐</span>
+        ${LOCALE_LABELS[this._locale]}
+      </button>
+    `;
+  }
 
   override render() {
     const currentApp = this.contextApps.find(a => a.id === this.context) ?? this.contextApps[0];
@@ -468,6 +542,9 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
             : nothing}
 
           <div class="actions-section" part="actions-section">
+            ${!this.isAuthenticated && this.showPreferences
+              ? html`<elohim-theme-toggle data-testid="nav-theme-inline"></elohim-theme-toggle>`
+              : nothing}
             <div style="position: relative;">
               <button
                 class="profile-bubble"
@@ -539,6 +616,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
                               Register
                             </button>
                           `}
+                      ${this._renderPreferenceTrayRows()}
                     </div>
                   `
                 : nothing}
