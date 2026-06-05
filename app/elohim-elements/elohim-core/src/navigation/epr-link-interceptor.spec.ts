@@ -54,8 +54,9 @@ describe('epr-link-interceptor', () => {
 
   it('intercepts a cross-bundle anchor: preventDefault + assign + handoff record', async () => {
     install({ ownsPath: () => false });
-    await clickAnchor('/lamad');
-    // Intercepted: assign called, bubble guard NOT reached (stopImmediatePropagation)
+    const ev = await clickAnchor('/lamad');
+    // Intercepted: preventDefault called, assign called, bubble guard NOT reached (stopImmediatePropagation)
+    expect(ev.defaultPrevented).to.be.true;
     expect(assigned).to.deep.equal(['/lamad']);
     expect(bubbleReached).to.be.false;
     const stack = JSON.parse(sessionStorage.getItem(NAV_STACK_KEY) ?? '[]') as unknown[];
