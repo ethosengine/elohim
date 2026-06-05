@@ -37,6 +37,15 @@ Feature: Chrome preferences follow the person across EPR-app boundaries
     And the document root carries the chosen theme in data-theme and color-scheme
 
   @wip @browser-only @regression
+  Scenario: The lamad viewport carries no UA frame
+    # Pins the bundle-baseline gap (theme-authority spec D5): a bundle whose
+    # styles.scss skips elohim-core/base.scss ships the UA default
+    # body{margin:8px} as a visible frame around the whole viewport
+    # (alpha 1.0.0-dev-60cc0846, live-probed margin "8px").
+    When Matthew navigates to "/lamad" in the browser
+    Then the computed margin of the document body is "0px"
+
+  @wip @browser-only @regression
   Scenario: Dark-mode chrome is readable
     # Pins the color-scheme desync + pairing classes (theme-authority spec
     # C2/C3/C4): with the manual dark theme active, every visible chrome
