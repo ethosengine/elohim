@@ -10,11 +10,14 @@ import { environment } from '../../environments/environment';
 export interface AppConfig {
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error';
   readonly environment: string;
+  /** CI-substituted git commit hash (ServingContext.buildId source). */
+  readonly gitHash: string;
 }
 
 const DEFAULT_PROD_CONFIG: AppConfig = {
   logLevel: 'error',
   environment: 'production',
+  gitHash: environment.gitHash,
 } as const;
 
 @Injectable({
@@ -30,8 +33,8 @@ export class ConfigService {
       return of(this.getDevConfig());
     }
 
-    return this.http.get<AppConfig>('/assets/config.json').pipe(
-      map(config => config || DEFAULT_PROD_CONFIG),
+    return this.http.get<Partial<AppConfig>>('/assets/config.json').pipe(
+      map(config => ({ ...DEFAULT_PROD_CONFIG, ...(config ?? {}) })),
       catchError(() => of(DEFAULT_PROD_CONFIG)),
       shareReplay(1)
     );
@@ -41,6 +44,7 @@ export class ConfigService {
     return {
       logLevel: environment.logLevel || 'debug',
       environment: environment.environment || 'development',
+      gitHash: environment.gitHash,
     };
   }
 

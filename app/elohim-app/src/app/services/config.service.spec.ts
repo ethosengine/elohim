@@ -37,6 +37,16 @@ describe('ConfigService', () => {
     expect(service).toBeTruthy();
   });
 
+  it('dev config exposes gitHash from the environment (ServingContext.buildId source)', () =>
+    new Promise<void>(done => {
+      (environment as any).production = false;
+      service = TestBed.inject(ConfigService);
+      service.getConfig().subscribe(config => {
+        expect(config.gitHash).toBe(environment.gitHash);
+        done();
+      });
+    }));
+
   describe('getConfig in development environment', () => {
     beforeEach(() => {
       (environment as any).production = false;
@@ -51,6 +61,7 @@ describe('ConfigService', () => {
           expect(config).toEqual({
             logLevel: 'debug',
             environment: 'development',
+            gitHash: environment.gitHash,
           });
           done();
         });
@@ -68,6 +79,7 @@ describe('ConfigService', () => {
           expect(config).toEqual({
             logLevel: 'debug',
             environment: 'development',
+            gitHash: environment.gitHash,
           });
         });
 
@@ -76,6 +88,7 @@ describe('ConfigService', () => {
           expect(config).toEqual({
             logLevel: 'debug',
             environment: 'development',
+            gitHash: environment.gitHash,
           });
 
           // Should only emit once due to shareReplay
@@ -96,6 +109,7 @@ describe('ConfigService', () => {
         const mockConfig: AppConfig = {
           logLevel: 'error',
           environment: 'production',
+          gitHash: environment.gitHash,
         };
 
         service.getConfig().subscribe(config => {
@@ -114,6 +128,7 @@ describe('ConfigService', () => {
           expect(config).toEqual({
             logLevel: 'error',
             environment: 'production',
+            gitHash: environment.gitHash,
           });
           done();
         });
@@ -128,6 +143,7 @@ describe('ConfigService', () => {
           expect(config).toEqual({
             logLevel: 'error',
             environment: 'production',
+            gitHash: environment.gitHash,
           });
           done();
         });
@@ -142,6 +158,7 @@ describe('ConfigService', () => {
           expect(config).toEqual({
             logLevel: 'error',
             environment: 'production',
+            gitHash: environment.gitHash,
           });
           done();
         });
@@ -155,6 +172,7 @@ describe('ConfigService', () => {
         const mockConfig: AppConfig = {
           logLevel: 'info',
           environment: 'production',
+          gitHash: environment.gitHash,
         };
 
         let subscriptionCount = 0;
@@ -190,6 +208,7 @@ describe('ConfigService', () => {
           expect(config).toEqual({
             logLevel: 'debug',
             environment: 'development',
+            gitHash: environment.gitHash,
           });
           done();
         });
