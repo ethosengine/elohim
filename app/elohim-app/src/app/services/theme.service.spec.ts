@@ -43,6 +43,16 @@ describe('ThemeService', () => {
     expect(document.body.getAttribute('data-theme')).toBe('light');
   });
 
+  it('dual-writes data-theme to documentElement (authority) and body (compat)', () => {
+    service.setTheme('dark');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(document.documentElement.classList.contains('theme-dark')).toBe(true);
+    expect(document.body.getAttribute('data-theme')).toBe('dark');
+    service.setTheme('light');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    expect(document.documentElement.classList.contains('theme-dark')).toBe(false);
+  });
+
   it('adopts an elohim-theme-changed event from a Lit island without re-dispatching', () => {
     let events = 0;
     const onEvent = (): void => {

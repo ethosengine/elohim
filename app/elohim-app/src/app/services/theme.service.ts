@@ -70,21 +70,20 @@ export class ThemeService {
   }
 
   /**
-   * Apply the theme to the document
+   * Apply the theme to the document.
+   * html is the AUTHORITY (tokens.scss :root[data-theme] + color-scheme key
+   * off it — chrome var-chains are declared on :root and substitute there);
+   * body keeps the attribute for legacy body[data-theme] descendant selectors.
+   * Twin contract with elohim-core's ThemeStore — change BOTH or NEITHER.
    */
   private applyTheme(theme: Theme): void {
-    const body = document.body;
-
-    // Remove any existing theme classes
-    this.renderer.removeClass(body, 'theme-light');
-    this.renderer.removeClass(body, 'theme-dark');
-    this.renderer.removeClass(body, 'theme-device');
-
-    // Apply new theme class
-    this.renderer.addClass(body, `theme-${theme}`);
-
-    // Set data attribute for CSS targeting
-    this.renderer.setAttribute(body, 'data-theme', theme);
+    for (const target of [document.documentElement, document.body]) {
+      this.renderer.removeClass(target, 'theme-light');
+      this.renderer.removeClass(target, 'theme-dark');
+      this.renderer.removeClass(target, 'theme-device');
+      this.renderer.addClass(target, `theme-${theme}`);
+      this.renderer.setAttribute(target, 'data-theme', theme);
+    }
   }
 
   /**

@@ -4,7 +4,9 @@
  * Speaks the EXACT contract of elohim-app's Angular ThemeService so the two
  * implementations can never disagree:
  *   - localStorage key 'elohim-theme'
- *   - body[data-theme="device|light|dark"] + body.theme-{device|light|dark}
+ *   - html[data-theme="device|light|dark"] (AUTHORITY — tokens.scss
+ *     :root[data-theme] + color-scheme key off it) + body[data-theme]
+ *     (legacy compat), each with the matching theme-{device|light|dark} class
  *   - cycle order device → light → dark → device
  *
  * Cross-context sync:
@@ -114,10 +116,15 @@ export class ThemeStore {
 
   private applyToDocument(theme: ElohimTheme): void {
     if (typeof document === 'undefined') return;
-    const body = document.body;
-    body.classList.remove('theme-light', 'theme-dark', 'theme-device');
-    body.classList.add(`theme-${theme}`);
-    body.setAttribute('data-theme', theme);
+    // html is the AUTHORITY: tokens.scss :root[data-theme] + color-scheme key
+    // off it (chrome var-chains are declared on :root and substitute THERE, so
+    // the override must cascade on the same element). body keeps the attribute
+    // for the shell's legacy body[data-theme] descendant selectors.
+    for (const target of [document.documentElement, document.body]) {
+      target.classList.remove('theme-light', 'theme-dark', 'theme-device');
+      target.classList.add(`theme-${theme}`);
+      target.setAttribute('data-theme', theme);
+    }
   }
 
   private persist(theme: ElohimTheme): void {

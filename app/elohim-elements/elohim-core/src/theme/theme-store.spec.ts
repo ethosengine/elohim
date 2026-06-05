@@ -22,8 +22,10 @@ describe('ThemeStore', () => {
 
   beforeEach(() => {
     localStorage.removeItem(THEME_STORAGE_KEY);
-    document.body.removeAttribute('data-theme');
-    document.body.classList.remove('theme-light', 'theme-dark', 'theme-device');
+    for (const target of [document.documentElement, document.body]) {
+      target.removeAttribute('data-theme');
+      target.classList.remove('theme-light', 'theme-dark', 'theme-device');
+    }
   });
 
   afterEach(() => {
@@ -72,6 +74,19 @@ describe('ThemeStore', () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).to.equal('light');
   });
 
+  it('dual-writes data-theme + theme class to documentElement (authority) and body (compat)', () => {
+    store = new ThemeStore();
+    store.set('dark');
+    expect(document.documentElement.getAttribute('data-theme')).to.equal('dark');
+    expect(document.documentElement.classList.contains('theme-dark')).to.be.true;
+    expect(document.body.getAttribute('data-theme')).to.equal('dark');
+    expect(document.body.classList.contains('theme-dark')).to.be.true;
+    store.set('light');
+    expect(document.documentElement.getAttribute('data-theme')).to.equal('light');
+    expect(document.documentElement.classList.contains('theme-light')).to.be.true;
+    expect(document.documentElement.classList.contains('theme-dark')).to.be.false;
+  });
+
   it('notifies subscribers and dispatches the change event exactly once per set()', () => {
     store = new ThemeStore();
     const seen: ElohimTheme[] = [];
@@ -79,12 +94,12 @@ describe('ThemeStore', () => {
     const onEvent = (): void => {
       events += 1;
     };
-    window.addEventListener(THEME_CHANGE_EVENT, onEvent);
-    const unsub = store.subscribe((t) => seen.push(t));
+    globalThis.addEventListener(THEME_CHANGE_EVENT, onEvent);
+    const unsub = store.subscribe(t => seen.push(t));
     store.set('dark');
     store.set('dark'); // no-op: same value
     unsub();
-    window.removeEventListener(THEME_CHANGE_EVENT, onEvent);
+    globalThis.removeEventListener(THEME_CHANGE_EVENT, onEvent);
     expect(seen).to.deep.equal(['dark']);
     expect(events).to.equal(1);
   });
@@ -95,11 +110,9 @@ describe('ThemeStore', () => {
     const onEvent = (): void => {
       events += 1;
     };
-    window.addEventListener(THEME_CHANGE_EVENT, onEvent);
-    window.dispatchEvent(
-      new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme: 'dark' } }),
-    );
-    window.removeEventListener(THEME_CHANGE_EVENT, onEvent);
+    globalThis.addEventListener(THEME_CHANGE_EVENT, onEvent);
+    globalThis.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme: 'dark' } }));
+    globalThis.removeEventListener(THEME_CHANGE_EVENT, onEvent);
     expect(store.theme).to.equal('dark');
     expect(events).to.equal(1); // only the one we dispatched ourselves
   });
@@ -116,9 +129,7 @@ describe('ThemeStore', () => {
     store = new ThemeStore();
     store.destroy();
     // After destroy, dispatching an external change event must NOT update the store
-    window.dispatchEvent(
-      new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme: 'dark' } }),
-    );
+    globalThis.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme: 'dark' } }));
     expect(store.theme).to.equal('device'); // unchanged
     // store is already destroyed; afterEach calling destroy() again is safe (idempotent)
   });
