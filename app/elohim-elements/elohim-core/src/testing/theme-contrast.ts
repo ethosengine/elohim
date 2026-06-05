@@ -272,7 +272,7 @@ function requiredRatio(el: Element, text: string): number {
   const cs = getComputedStyle(el);
   const size = parseFloat(cs.fontSize);
   const weight = parseInt(cs.fontWeight, 10) || 400;
-  const large = size >= 24 || (size >= 18.66 && weight >= 700);
+  const large = size >= 24 || (size >= 18.667 && weight >= 700);
   if (!HAS_LETTERS_OR_DIGITS.test(text)) return 3.0; // symbol glyph in a control → 1.4.11
   return large ? 3.0 : 4.5;
 }

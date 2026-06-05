@@ -55,6 +55,10 @@
   --lamad-warning: #f59e0b;
   --lamad-info: #3b82f6;
 
+  /* On-accent pair (theme-authority spec D-3) — twin of elohim-core/tokens.scss */
+  --lamad-accent-emphasis: #4f46e5;
+  --lamad-on-accent: #ffffff;
+
   /* ============================================================================
        Responsive Breakpoints
        ============================================================================
@@ -114,6 +118,10 @@
     --lamad-success: #059669;
     --lamad-warning: #d97706;
     --lamad-info: #2563eb;
+
+    /* On-accent pair (theme-authority spec D-3) — twin of elohim-core/tokens.scss */
+    --lamad-accent-emphasis: #4f46e5;
+    --lamad-on-accent: #ffffff;
   }
 }
 
@@ -574,6 +582,10 @@ body[data-theme='light'] {
   --lamad-success: #059669;
   --lamad-warning: #d97706;
   --lamad-info: #2563eb;
+
+  /* On-accent pair (theme-authority spec D-3) — twin of elohim-core/tokens.scss */
+  --lamad-accent-emphasis: #4f46e5;
+  --lamad-on-accent: #ffffff;
 }
 
 body[data-theme='light']::before {
@@ -662,6 +674,10 @@ body[data-theme='dark'] {
   --lamad-success: #10b981;
   --lamad-warning: #f59e0b;
   --lamad-info: #3b82f6;
+
+  /* On-accent pair (theme-authority spec D-3) — twin of elohim-core/tokens.scss */
+  --lamad-accent-emphasis: #4f46e5;
+  --lamad-on-accent: #ffffff;
 }
 
 body[data-theme='dark']::before {

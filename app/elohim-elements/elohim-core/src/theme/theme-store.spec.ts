@@ -42,6 +42,8 @@ describe('ThemeStore', () => {
     expect(store.theme).to.equal('device');
     expect(document.body.getAttribute('data-theme')).to.equal('device');
     expect(document.body.classList.contains('theme-device')).to.be.true;
+    expect(document.documentElement.getAttribute('data-theme')).to.equal('device');
+    expect(document.documentElement.classList.contains('theme-device')).to.be.true;
   });
 
   it('loads a persisted valid theme and ignores garbage', () => {

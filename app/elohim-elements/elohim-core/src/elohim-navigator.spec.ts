@@ -340,6 +340,7 @@ describe('<elohim-navigator> — theme-contrast gate', () => {
       el.shadowRoot!.querySelector<HTMLButtonElement>('.context-switcher-btn')!.click();
       await el.updateComplete;
       assertThemeContrast(el);
+      await axeScanStrict(el);
     });
   }
 
