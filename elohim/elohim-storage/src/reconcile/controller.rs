@@ -735,7 +735,18 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         let hints: CharterHints = signal
             .charter
             .as_deref()
-            .and_then(|c| serde_json::from_str(c).ok())
+            .and_then(|c| {
+                serde_json::from_str(c)
+                    .map_err(|e| {
+                        warn!(
+                            collective_cid = %signal.collective_cid,
+                            error = %e,
+                            "on_collective_projected: charter is not valid JSON — \
+                             defaulting to community governance"
+                        );
+                    })
+                    .ok()
+            })
             .unwrap_or_default();
         let is_household = hints.kind.as_deref() == Some("household");
         let layer = if is_household {
@@ -760,6 +771,15 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                 collectives::governance_layer.eq(&layer),
             ))
             .execute(&mut conn)
+            .map_err(|e| {
+                warn!(
+                    collective_cid = %signal.collective_cid,
+                    alias = %alias,
+                    error = %e,
+                    "on_collective_projected: slug-alias merge UPDATE failed (non-fatal) — \
+                     falls through to CREATE; redelivery re-attempts the merge"
+                );
+            })
             .unwrap_or(0);
             if stamped > 0 {
                 debug!(
@@ -777,6 +797,8 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             description: None,
             governance_layer: layer,
             constitutional_parent_id: None,
+            // TODO: replace with a canonical collective-reach constant once the
+            // reach vocabulary is reconciled (roadmap #13 — don't bake new literals).
             reach: if is_household {
                 "trusted".to_string()
             } else {
@@ -1918,6 +1940,54 @@ mod tests {
         assert_eq!(cid.as_deref(), Some("collective:uhCkkFAKE"));
         assert_eq!(layer, "family");
         assert_eq!(slug.as_deref(), Some("family-dowell"));
+
+        // Redelivery idempotency: drive the SAME signal through a second
+        // controller over a fresh stream backed by the same pool.  Row count
+        // must stay exactly 1 and the merged fields must be unchanged.
+        let signal2 = CollectiveProjectedSignal {
+            action_hash: "uhCkkFAKE".to_string(),
+            collective_cid: "collective:uhCkkFAKE".to_string(),
+            display_name: "Dowell Family".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderDowell".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"household","slugAlias":"family-dowell"}"#.to_string()),
+        };
+        let stream2 =
+            InMemoryDnaSignalStream::with_signals(vec![DnaSignal::CollectiveProjected(signal2)]);
+        let mut controller2 =
+            ReconcileController::new_with_storage(stream2, Arc::clone(&pool), Arc::clone(&cache));
+        controller2
+            .run_one_pass()
+            .await
+            .expect("second run_one_pass must not error");
+
+        let total2: i64 = collectives::table
+            .count()
+            .get_result(&mut conn)
+            .expect("count after redelivery");
+        assert_eq!(total2, 1, "redelivery must not duplicate the row");
+
+        let (id2, cid2, layer2, _slug2): (String, Option<String>, String, Option<String>) =
+            collectives::table
+                .select((
+                    collectives::id,
+                    collectives::collective_cid,
+                    collectives::governance_layer,
+                    collectives::slug,
+                ))
+                .first(&mut conn)
+                .expect("the merged row after redelivery");
+
+        assert_eq!(id2, "family-dowell", "id unchanged after redelivery");
+        assert_eq!(
+            cid2.as_deref(),
+            Some("collective:uhCkkFAKE"),
+            "collective_cid unchanged after redelivery"
+        );
+        assert_eq!(
+            layer2, "family",
+            "governance_layer unchanged after redelivery"
+        );
     }
 
     /// T5-c: MembershipCommitted projects a `collective_participations` row with
