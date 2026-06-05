@@ -1760,12 +1760,16 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // Seed Custody Commitments stage remains the M1 anti-drift flag.
                         // The script probes the storage projection to REUSE the existing
                         // collective cid, so re-runs converge (no new collective per run).
-                        // DOORWAY_URL / STORAGE_URL exported here (not in runProbedSeeder)
-                        // so the probe-convergence path in seed-household-formation.ts can
-                        // reach the storage projection without touching the shared helper.
-                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
-                        if (doorwayHost) {
-                            env.DOORWAY_URL = "http://${doorwayHost}"
+                        // STORAGE_URL exported here (not in runProbedSeeder) so the
+                        // probe-convergence path in seed-household-formation.ts can reach
+                        // /db/collectives/family-dowell on the in-cluster storage node.
+                        // INTERNAL_STORAGE_URL is scheme-less (host:port); prefix http://.
+                        // RESOLVED_DOORWAY_HOST already carries https:// — assign verbatim
+                        // as DOORWAY_URL fallback so the seeder never sees http://https://…
+                        if (env.INTERNAL_STORAGE_URL) {
+                            env.STORAGE_URL = "http://${env.INTERNAL_STORAGE_URL}"
+                        } else if (env.RESOLVED_DOORWAY_HOST) {
+                            env.DOORWAY_URL = env.RESOLVED_DOORWAY_HOST
                         }
                         def res = runProbedSeeder('Seed Household Formation', 'seed-household-formation.ts',
                             env.SEED_RESULTS_HOUSEHOLD_FORMATION_FILE ?: 'seed-results-household-formation.json')
