@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""cite-propagate.py — materialize the optional inline `status:` field on cites (the epr-head edge hint).
+"""cite-propagate.py — materialize the tool-managed inline fields on cites: `status:` + `path:`.
 
 Phase 4 of semantic-computable-links. The fingerprints + reverse-index make the corpus a COMPUTE SURFACE:
 when a target goes held / stale / dead, this fans the verdict OUT to every citing edge, stamping
@@ -7,8 +7,14 @@ when a target goes held / stale / dead, this fans the verdict OUT to every citin
 This is the difference between an audit REPORT and a self-describing EDGE — the link-health travels WITH
 the doc, in git, readable in the raw file. Each run is a reviewable commit (the link-health ledger).
 
-Triggered by a scope-tree move, an audit `--apply`, or the stasis loop. Default = dry-run; --apply writes.
-Idempotent. Verified = the script exits 0.
+`path:` (2026-06-05) is the second tool-managed field — the MATERIALIZED LOCATOR: every envelope cite gets
+the slug→path resolution cached inline so an agent follows a cite with a plain read (no resolver run).
+Every pass refreshes it (a move self-heals on the next propagate); a dead slug keeps its last path as a
+forensic breadcrumb. The slug stays IDENTITY; the fingerprint stays drift-truth; the path is only a cache.
+
+Corpus = doc roots (genesis/docs + .claude/memory) PLUS gospel CLAUDE.mds (the 2026-06-05 graph members —
+see _lib.managed_surfaces for the edit-time registry). Triggered by a scope-tree move, an audit `--apply`,
+or the stasis loop. Default = dry-run; --apply writes. Idempotent. Verified = the script exits 0.
 """
 from __future__ import annotations
 
@@ -45,14 +51,24 @@ def corpus():
             if md.name in SKIP or "/_state/" in s or "/memory-kit/" in s:
                 continue
             out.append(md)
-    return sorted(out)
+    # Gospel CLAUDE.mds join the propagation corpus (2026-06-05): the SKIP set above is for doc-root
+    # index files; a gospel that declares cites: is a first-class citing edge and gets the same
+    # status/path maintenance as a spec.
+    for g in cg.gospel_claude_md_paths(ROOT):
+        try:
+            f = fm.parse_file(g)
+        except OSError:
+            continue
+        if f.get("id") or f.get("cites"):
+            out.append(g)
+    return sorted(set(out))
 
 
 def main(apply: bool) -> int:
     docs = corpus()
     held_roots = [str(r) for r in DOC_ROOTS] + [str(ROOT / "genesis/docs/superpowers/held")]
     slug_index = cg.extend_index_with_gospels(cg.build_slug_index(held_roots), ROOT)
-    stamped = cleared = touched = 0
+    stamped = cleared = touched = paths_set = 0
     by_verdict: dict = {}
     for d in docs:
         text = d.read_text(encoding="utf-8", errors="replace")
@@ -76,6 +92,11 @@ def main(apply: bool) -> int:
                     cleared += 1
                 c["status"] = want
                 changed = True
+        # The materialized locator: refresh every envelope's path: cache from the live resolution.
+        p_changed = cg.materialize_paths(cites, slug_index, ROOT)
+        if p_changed:
+            paths_set += p_changed
+            changed = True
         if changed:
             touched += 1
             if apply:
@@ -85,9 +106,9 @@ def main(apply: bool) -> int:
     verb = "APPLIED" if apply else "DRY-RUN"
     print(f"cite-propagate [{verb}]: {len(docs)} docs")
     print(f"  status stamped: {stamped} {by_verdict or ''}  |  cleared (recovered/healthy): {cleared}"
-          f"  |  docs touched: {touched}")
+          f"  |  path: stamped/refreshed: {paths_set}  |  docs touched: {touched}")
     if not apply and touched:
-        print("  (re-run with --apply to write the self-describing status: hints)")
+        print("  (re-run with --apply to write the self-describing status:/path: fields)")
     return 0
 
 

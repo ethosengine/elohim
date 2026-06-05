@@ -107,7 +107,10 @@ def cite_resolves(pattern: str) -> bool:
     return p.exists()
 
 
-# Doc-graph roots the slug-index scans (live + the scope-tree held/ tree, if it exists).
+# Doc-graph ROOTS the slug-index scans (live + the scope-tree held/ tree, if it exists). The graph's
+# FULL membership is these roots + id-declaring gospel CLAUDE.mds repo-wide (run_audit composes both
+# via extend_index_with_gospels; the edit-time registry is _lib.managed_surfaces). Envelope `path:`
+# fields are tool-managed locator caches maintained by cite-propagate — not audited here.
 _DOC_ROOTS = [
     REPO_ROOT / "genesis" / "docs",
     MEMORY_DIR,

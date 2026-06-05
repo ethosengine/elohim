@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """cites-migrate.py — one-time migration: assign id: slugs + convert legacy DOC cites to envelopes.
 
-Deterministic two-pass over the doc graph (genesis/docs + .claude/memory), idempotent. Phase 7 of
-semantic-computable-links. Default = dry-run preview; --apply writes. Re-running is a no-op (docs that
+Deterministic two-pass over the doc graph (genesis/docs + .claude/memory, PLUS id-or-cites-bearing gospel
+CLAUDE.mds since 2026-06-05 — passive CLAUDE.mds without frontmatter stay untouched), idempotent. Phase 7
+of semantic-computable-links. Default = dry-run preview; --apply writes. Re-running is a no-op (docs that
 already have id: / envelope cites are skipped). The audit resolves slugs, so this never DEAD-storms.
+Envelopes are minted with the tool-managed path: locator cache (cite-propagate refreshes it).
 """
 from __future__ import annotations
 
@@ -36,7 +38,17 @@ def corpus():
             if md.name in SKIP or "/_state/" in s or "/memory-kit/" in s:
                 continue
             out.append(md)
-    return sorted(out)
+    # Gospel CLAUDE.mds that ALREADY opted into the graph (id: or cites: frontmatter) join the
+    # migration (2026-06-05). Membership is opt-in by declaration — the sweep never force-mints
+    # ids onto passive CLAUDE.mds.
+    for g in cg.gospel_claude_md_paths(ROOT):
+        try:
+            f = fm.parse_file(g)
+        except OSError:
+            continue
+        if f.get("id") or f.get("cites"):
+            out.append(g)
+    return sorted(set(out))
 
 
 def _split(text):
@@ -83,7 +95,10 @@ def _set_cites(fm_lines, items):
 
 def _is_doc(ref):
     p = ROOT / ref.strip("/")
-    return p.suffix == ".md" and p.is_file() and any(str(p).startswith(str(r)) for r in DOC_ROOTS)
+    if not (p.suffix == ".md" and p.is_file()):
+        return False
+    # Doc-roots OR gospel CLAUDE.mds (2026-06-05) — the same membership cite-gen._is_doc_root uses.
+    return any(str(p).startswith(str(r)) for r in DOC_ROOTS) or cg.is_gospel_claude_md(p, ROOT)
 
 
 def main(apply: bool) -> int:
@@ -128,9 +143,13 @@ def main(apply: bool) -> int:
             tgt = (ROOT / c["ref"].strip("/")) if not Path(c["ref"]).is_absolute() else Path(c["ref"])
             if _is_doc(c["ref"]) and str(tgt) in id_by_path:
                 tf = fm.parse_file(tgt)
+                try:
+                    _loc = tgt.resolve().relative_to(ROOT.resolve()).as_posix()
+                except ValueError:
+                    _loc = tgt.as_posix()
                 env = {"ref": id_by_path[str(tgt)], "legacy_path": False,
                        "desc": (tf.get("title") or tgt.stem).split(" — ")[0].strip()[:90],
-                       "fingerprint": cg.fingerprint(tgt), "status": ""}
+                       "fingerprint": cg.fingerprint(tgt), "status": "", "path": _loc}
                 new.append(cg.serialize_cite(env))
                 did += 1
             else:

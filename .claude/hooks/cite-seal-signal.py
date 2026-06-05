@@ -2,11 +2,14 @@
 """
 Cite-seal advisory (deterministic born-linked enforcement).
 
-PostToolUse hook (matcher: Edit|Write). When a Write/Edit lands on a `.md` under the doc roots
-(genesis/docs, .claude/memory) that carries UN-SEALED cite debt, it nudges the agent to run
-`cite-gen --seal <doc>` — so a new spec/plan/memory enters the graph content-addressed instead of
-depending on anyone remembering the ceremony. This is the postHook half of the discipline; the
-ceremony POST-steps (brainstorm/plan) and end-of-sprint decompose are the proactive halves.
+PostToolUse hook (matcher: Edit|Write). When a Write/Edit lands on a `.md` that is a CITE-GRAPH
+MEMBER (doc-roots + gospel CLAUDE.mds — membership answered by _lib.managed_surfaces, the single
+edit-time registry; hardcoding doc-roots here is what let the 2026-06-05 gospel episode through)
+and it carries UN-SEALED cite debt, it nudges the agent to run `cite-gen --seal <doc>` — so a new
+spec/plan/memory/gospel enters the graph content-addressed instead of depending on anyone
+remembering the ceremony. This is the postHook half of the discipline; managed-surface-context.py
+is the PRE half (discipline injected before the edit); the ceremony POST-steps (brainstorm/plan)
+and end-of-sprint decompose are the proactive halves.
 
 Un-sealed debt = either:
   - a legacy path-cite whose target is a doc-root .md that HAS an `id:` (a CITE-FORMAT-CANDIDATE —
@@ -34,13 +37,7 @@ for _ in range(8):
     _here = _here.parent
 from _lib import cite_graph as cg  # noqa: E402
 from _lib import frontmatter as fm  # noqa: E402
-
-DOC_ROOTS = (("genesis", "docs"), (".claude", "memory"))
-
-
-def _under_doc_root(rel: str) -> bool:
-    parts = Path(rel).parts
-    return any(parts[: len(r)] == r for r in DOC_ROOTS)
+from _lib import managed_surfaces as ms  # noqa: E402
 
 
 def _unsealed_debt(doc: Path, repo: Path) -> int:
@@ -84,7 +81,10 @@ def main() -> int:
         rel = str(ep.relative_to(repo)) if ep.is_absolute() else str(ep)
     except (ValueError, OSError):
         rel = edited
-    if not _under_doc_root(rel):
+    try:
+        if not ms.in_cite_graph(rel, repo):
+            return 0
+    except Exception:
         return 0
     doc = repo / rel
     if not doc.is_file():

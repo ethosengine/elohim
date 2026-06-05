@@ -79,6 +79,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/seed-data-validation.py\"",
             "timeout": 3000
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/managed-surface-context.py\"",
+            "timeout": 3000
           }
         ]
       },

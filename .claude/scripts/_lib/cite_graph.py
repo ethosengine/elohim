@@ -4,12 +4,15 @@ The cite ENVELOPE is a single human-readable LINE (back-compatible with the mini
 string-list parser, so every existing cites-reader keeps working structurally — no nested-YAML rewrite):
 
     cites:
-      - <ref-slug> | <one-sentence desc> | <fingerprint> [| status: <health hint>]
+      - <ref-slug> | <one-sentence desc> | <fingerprint> [| status: <health hint>] [| path: <locator>]
 
 A legacy path-string cite (no "|") parses as ref=<path>, legacy_path=True. IDENTITY is the slug (survives
 moves + edits); FINGERPRINT is sha256 of the content-BODY (frontmatter EXCLUDED, so a metadata edit does
 not trip STALE); the optional `status:` is tool-managed (the epr-head edge hint, set by the propagation
-pass). Pure-stdlib; imports _lib.frontmatter.
+pass). The optional `path:` (2026-06-05) is ALSO tool-managed — a materialized locator CACHE of the
+slug→path resolution (stamped at mint, refreshed by every propagate pass) so an agent can follow a cite
+with a plain read; never hand-written, never identity (a stale path heals on the next pass — the slug +
+fingerprint stay the truth). Pure-stdlib; imports _lib.frontmatter.
 """
 from __future__ import annotations
 
@@ -159,18 +162,20 @@ def parse_cite(s: str) -> dict:
     raw = _INLINE_COMMENT.sub("", (s or "").strip()).strip()
     if "|" not in raw:
         is_path = ("/" in raw) or raw.endswith(_PATH_EXTS)
-        return {"ref": raw, "legacy_path": is_path, "desc": "", "fingerprint": "", "status": ""}
+        return {"ref": raw, "legacy_path": is_path, "desc": "", "fingerprint": "", "status": "", "path": ""}
     parts = [p.strip() for p in raw.split("|")]
     ref = parts[0]
-    desc = fp = status = ""
+    desc = fp = status = path = ""
     for p in parts[1:]:
         if _is_fingerprint(p):
             fp = p
         elif p.lower().startswith("status:"):
             status = p.split(":", 1)[1].strip()
+        elif p.lower().startswith("path:"):
+            path = p.split(":", 1)[1].strip()
         elif not desc:
             desc = p
-    return {"ref": ref, "legacy_path": False, "desc": desc, "fingerprint": fp, "status": status}
+    return {"ref": ref, "legacy_path": False, "desc": desc, "fingerprint": fp, "status": status, "path": path}
 
 
 def parse_cites(fm) -> list:
@@ -188,11 +193,40 @@ def serialize_cite(d: dict) -> str:
         parts.append(d["fingerprint"])
     if d.get("status"):
         parts.append("status: " + d["status"])
+    if d.get("path"):
+        parts.append("path: " + d["path"])
     return SEP.join(p for p in parts if p is not None and p != "" or p == parts[0])
 
 
 def serialize_cites(entries) -> list:
     return [serialize_cite(d) for d in entries]
+
+
+def materialize_paths(cites, slug_index: dict, repo_root) -> int:
+    """Stamp/refresh each envelope cite's tool-managed `path:` segment — the materialized locator
+    (a CACHE of the slug→path resolution so an agent follows a cite with a plain read; the slug stays
+    IDENTITY, the fingerprint stays drift-truth). Resolvable slug → repo-relative posix path stamped
+    or refreshed; dead slug → any existing path kept as a forensic breadcrumb; legacy path-cites
+    untouched (their ref IS the path). Mutates in place; returns the number of cites changed."""
+    rr = Path(repo_root).resolve()
+    changed = 0
+    for c in cites:
+        if c.get("legacy_path"):
+            continue
+        tgt = slug_index.get(c.get("ref", ""))
+        if not tgt:
+            continue
+        tp = Path(tgt)
+        if tp.is_absolute():
+            try:
+                tp = tp.resolve().relative_to(rr)
+            except ValueError:
+                pass  # outside the repo — keep absolute (still followable)
+        new = tp.as_posix()
+        if c.get("path", "") != new:
+            c["path"] = new
+            changed += 1
+    return changed
 
 
 def envelope_verdict(cite: dict, slug_index: dict) -> str:
