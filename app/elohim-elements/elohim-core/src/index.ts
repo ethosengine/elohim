@@ -100,3 +100,14 @@ export type {
 
 export { ThemeStore, getThemeStore, THEME_STORAGE_KEY, THEME_CHANGE_EVENT } from './theme/theme-store.js';
 export type { ElohimTheme } from './theme/theme-store.js';
+
+export {
+  LocaleStore,
+  getLocaleStore,
+  detectLocale,
+  SUPPORTED_LOCALES,
+  LOCALE_LABELS,
+  LOCALE_STORAGE_KEY,
+  LOCALE_CHANGE_EVENT,
+} from './localize/locale-store.js';
+export type { ElohimLocale } from './localize/locale-store.js';
