@@ -1,8 +1,8 @@
 ---
 id: lamad-bundle-gospel
 cites:
-  - elohim-elements-ui-substrate-gospel | layer rails — element/token/binding ownership this bundle consumes (never defines) | sha256:beb182a704c38c60 | path: app/elohim-elements/CLAUDE.md
-  - elohim-app-frontend-gospel | the shell twin of these rails — chrome composition + cross-bundle navigation rules | sha256:b7f99abd4e4b6e03 | path: app/elohim-app/CLAUDE.md
+  - elohim-elements-ui-substrate-gospel | layer rails — element/token/binding ownership this bundle consumes (never defines) | sha256:84cff1a46650cf8f | path: app/elohim-elements/CLAUDE.md
+  - elohim-app-frontend-gospel | the shell twin of these rails — chrome composition + cross-bundle navigation rules | sha256:5e339d814c53974b | path: app/elohim-app/CLAUDE.md
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
 ---
 
@@ -23,7 +23,7 @@ Do not hand-edit — regenerate with `pnpm run lamad:codegen`.
 
 This is an independently-served EPR-app bundle (`<base href="/lamad/">`), not a module of the shell. The bundle IMPORTS layers; it never defines them:
 
-- **Styling**: `src/styles.scss` imports the token layer (`elohim-core/tokens.scss`) and the chrome-binding layer (`src/_chrome-binding.scss` — interim home, ONE concern: chrome `--elohim-*` cssprops → palette; it migrates wholesale to the graphos-tokens artifact). Never define or duplicate `--lamad-*` tokens in this bundle; never add bundle styles to the binding file.
+- **Styling**: `src/styles.scss` imports, in order: the base layer (`elohim-core/base.scss` — universal reset + a11y floor; without it the UA's `body{margin:8px}` frames the viewport), the token layer (`elohim-core/tokens.scss` — palette + `color-scheme` + `:root[data-theme]` theme reactivity), and the chrome-binding layer (`src/_chrome-binding.scss` — interim home, ONE concern: chrome `--elohim-*` cssprops → palette, every bound `*-bg` paired with a bound `*-fg`; it migrates wholesale to the graphos-tokens artifact). Never define or duplicate `--lamad-*` tokens in this bundle; never add bundle styles to the binding file.
 - **Chrome**: `<elohim-page-chrome>` wraps the root (auto-installs the epr-link interceptor); `<elohim-navigator>` is the Lit element — its `(navigate)` CustomEvent must be wired (see `lamad-layout.component.ts:onNavigatorNavigate`): lamad-owned routes → this router (base-href-stripped), everything else → full doorway load.
 - **Cross-bundle links**: under this base href, `routerLink="/"` resolves to lamad's OWN home — links to the landing/shell must be plain `href` (the interceptor records the nav handoff).
 

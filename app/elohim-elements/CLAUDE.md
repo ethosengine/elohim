@@ -2,8 +2,8 @@
 id: elohim-elements-ui-substrate-gospel
 cites:
   - elohim-library-pattern-gospel | story-level binding discipline — Library A/B boundary; Library B decorators are Storybook-only until graphos-tokens ships | sha256:94b851810ce6cdc8 | path: app/elohim-library/CLAUDE.md
-  - elohim-app-frontend-gospel | the shell side of the layer rails — protocol-omni trust surface, ThemeService twin contract, EPR-native cross-bundle nav | sha256:b7f99abd4e4b6e03 | path: app/elohim-app/CLAUDE.md
-  - lamad-bundle-gospel | the bundle-consumer side of the layer rails — B18 token wiring is the worked example | sha256:52df1a45e2470dcd | path: app/lamad/CLAUDE.md
+  - elohim-app-frontend-gospel | the shell side of the layer rails — protocol-omni trust surface, ThemeService twin contract, EPR-native cross-bundle nav | sha256:5e339d814c53974b | path: app/elohim-app/CLAUDE.md
+  - lamad-bundle-gospel | the bundle-consumer side of the layer rails — B18 token wiring is the worked example | sha256:5b547c63cc0c1a2c | path: app/lamad/CLAUDE.md
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
   - omnibar-consolidation-epr-native-links-design | the design whose theme/serving-context/nav decisions the layer rails enforce; records the B18 styling audit | sha256:71ad45eb5993b56c | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
 ---
@@ -99,15 +99,16 @@ Elements without a Capability Profile declaration are not eligible for `elohim-c
 
 ---
 
-## The three precondition gates
+## The four precondition gates
 
-Before claiming a Lit element is ready, every element passes three gates:
+Before claiming a Lit element is ready, every element passes four gates:
 
 1. **Accessibility (a11y)** — ARIA roles correct, keyboard navigation complete, focus management, screen reader semantics tested. Default story includes accessibility-tree assertions.
 2. **Internationalization (i18n)** — lit-localize hooks wired; locale-aware formatting; right-to-left support for he. No hardcoded English strings.
 3. **User-agent preferences (ua-prefs)** — `prefers-color-scheme`, `prefers-reduced-motion`, `prefers-contrast` honored. Stories demonstrate each preference's effect.
+4. **Theme contrast (theme-contrast)** — the `@capabilityThemes`/`@capabilityContrast` claims are EXECUTABLE: every claimed theme has a passing gate cell (`src/testing/theme-contrast.ts`). All claimants run the **system cells** (blank-slate under `color-scheme: light|dark` — system-color defaults must pair correctly per scheme); elements with a shipped binding also run the **tokens cells** (the REAL `tokens.scss` + binding injected as the fixture, `documentElement[data-theme]` set — the production cascade, never a copy) plus the **reactivity canary** (themed surfaces must CHANGE across themes; a frozen var-chain is the 2026-06-05 dark-mode regression class). The contrast walk is computed-style WCAG 1.4.3/1.4.11; axe runs strict (violations AND color-contrast incompletes empty, content/parse abstentions excused). An element that cannot pass a cell shrinks its claim — never skips the assertion. Fixtures bind tokens in the TEST, never in the element.
 
-The three gates are non-negotiable. An element that fails any one is not contract-passing.
+The four gates are non-negotiable. An element that fails any one is not contract-passing.
 
 ---
 
@@ -128,14 +129,14 @@ The chain from element to rendered, branded UI has exactly four layers. Each has
 | Layer | Home | The one concern |
 |---|---|---|
 | **Element** | `<module>/src/*.ts` (this directory) | Render blank-slate + a11y + emit intent. Publishes `@cssprop`; binds nothing. |
-| **Token layer** | `elohim-core/tokens.scss` | Palette + theme reactivity (`body[data-theme]`, `prefers-color-scheme`). Defined once; only SHIPS when a bundle imports it. |
+| **Token layer** | `elohim-core/tokens.scss` | Palette + theme reactivity (`:root[data-theme]`, `prefers-color-scheme`) + `color-scheme` (system colors must always agree with the palette). Defined once; only SHIPS when a bundle imports it. |
 | **Binding layer** | per-bundle `_chrome-binding.scss` (interim) → graphos-tokens artifact (canonical, unbuilt) | Map element `--elohim-*` cssprops onto the palette. Nothing else lives in that file. |
 | **Bundle** | `app/<bundle>/src/styles.scss` | IMPORTS the layers + genuinely bundle-local styles. Never defines or duplicates tokens. |
 
 Rails:
 - An element never references a token it doesn't declare as `@cssprop` with a system-color default.
 - A bundle whose components consume `var(--lamad-*)` (or any palette) MUST import the token layer — "it renders fine in the shell" is not evidence (the shell's global `styles.css` is doing the work).
-- Preference state crosses the chain only via the shared store contracts (`theme/theme-store.ts`: `localStorage['elohim-theme']` + `body[data-theme]` + `elohim-theme-changed`; `localize/locale-store.ts` likewise) — never element-private theme/locale state.
+- Preference state crosses the chain only via the shared store contracts (`theme/theme-store.ts`: `localStorage['elohim-theme']` + `html[data-theme]` (AUTHORITY — token overrides + `color-scheme` live at `:root[data-theme]`, where the `:root`-declared binding chains actually re-resolve; a custom property's `var()` refs substitute at the DECLARING element, so a body-level override can never reach a `:root`-declared chain) + `body[data-theme]` (legacy compat, dual-written) + `elohim-theme-changed`; `localize/locale-store.ts` likewise) — never element-private theme/locale state.
 
 Concern routing (content-addressed — slugs resolve via this file's `cites:` frontmatter and survive moves):
 - `elohim-library-pattern-gospel` — story-level binding discipline; Library B decorators are Storybook-only until graphos-tokens ships
