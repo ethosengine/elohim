@@ -19,8 +19,9 @@ describe('App Routes', () => {
   // TODO(#12-6 Slice 2): the shell has no top-level `path`/`path/:id` route —
   // `path`-shaped EPR routes minted by eprToRoute()/resolveInContext() (e.g.
   // `['/path', id]`, spec §12.3) render only inside the lamad bundle (base href
-  // `/lamad/`). From the shell they hit the `**` catch-all. This is a tracked
-  // Slice-2 deferral (BundleRouteContext claims + `/epr/{id}` resolver), NOT a
+  // `/lamad/`). From the shell they hit the `**` catch-all. Cross-bundle anchors
+  // are now handled by the epr-link interceptor + EprNavService (2026-06-05
+  // omnibar-consolidation spec §4) pending the Slice-2 /epr resolver; NOT a
   // regression: the prior `/lamad/path` literal was equally unreachable here.
   // This canary pins the absence so a stray shell `path` route (or a regression
   // that silently makes these links "work" by accident) is caught.

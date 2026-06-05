@@ -4,11 +4,14 @@ import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 
 import { filter } from 'rxjs/operators';
 
+import { installEprLinkInterceptor } from 'elohim-core';
+
 import { environment } from '../environments/environment';
 
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 import { ProtocolOmniComponent } from './elohim/components/protocol-omni/protocol-omni.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
+import { EprNavService } from './elohim/services/epr-nav.service';
 import { ProtocolRouteContextService } from './elohim/services/protocol-route-context.service';
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
@@ -38,6 +41,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   protected readonly protocolRouteCtx = inject(ProtocolRouteContextService);
 
+  private readonly eprNav = inject(EprNavService);
   private readonly holochainService = inject(HolochainClientService);
   private readonly blobBootstrap = inject(BlobBootstrapService);
   private readonly authService = inject(AuthService);
@@ -96,6 +100,15 @@ export class AppComponent implements OnInit, OnDestroy {
 
     // Register web+epr protocol handler (browser primitive for EPR links)
     this.registerEprProtocolHandler();
+
+    // Cross-bundle anchors (e.g. /lamad) are EPR-native: capture-phase
+    // interception beats stale routerLink 404s; ownsPath derives from the
+    // live router config. Explicit install wins over page-chrome's default.
+    installEprLinkInterceptor({
+      explicit: true,
+      ownsPath: p => this.eprNav.ownsPath(p),
+      beforeCrossBundle: () => this.eprNav.recordHandoff(),
+    });
 
     // Initialize auth and connections
     void this.initializeApp();
