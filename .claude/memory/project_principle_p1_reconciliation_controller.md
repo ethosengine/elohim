@@ -5,7 +5,7 @@ description: Load-bearing architectural principle unifying EPR Phase 2B design a
 type: project
 originSessionId: 8c8c7e97-f63b-4df5-ae26-36e0fb18bcf7
 cites:
-  - observation-event-layer-design | the witness substrate built on this controller principle — observed state drives eager reconcile | sha256:63322aa57b9db914
+  - observation-event-layer-design | the witness substrate built on this controller principle — observed state drives eager reconcile | sha256:63322aa57b9db914 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md
 ---
 The Holochain DHT is the authoritative manifest for identity/key/governance state. The libp2p/elohim-storage layer is a reconciliation controller over that manifest — k8s-controller-over-manifest pattern. Observed state changes → controller reconciles → no hesitation, no lazy acceptance.
 

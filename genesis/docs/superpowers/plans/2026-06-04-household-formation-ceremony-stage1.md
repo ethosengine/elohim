@@ -6,7 +6,7 @@ class: protocol-canonical
 domain: D7
 topic: [qahal, household, formation, affirm-membership, seeder, custody-blob, quiltPolicy, a2o, plan]
 cites:
-  - household-formation-ceremony-design | the spec this plan implements — Stage 1 of its §12 build order (ceremony floor: coordinators, projection, soft action gate, seeder driver, scenario spine, quiltPolicy); stages 2/3 get their own plans | sha256:c4c55b654b2cb763
+  - household-formation-ceremony-design | the spec this plan implements — Stage 1 of its §12 build order (ceremony floor: coordinators, projection, soft action gate, seeder driver, scenario spine, quiltPolicy); stages 2/3 get their own plans | sha256:c4c55b654b2cb763 | path: genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md
 derived_from: genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md
 ---
 

@@ -1,11 +1,11 @@
 ---
 id: elohim-elements-ui-substrate-gospel
 cites:
-  - elohim-library-pattern-gospel | story-level binding discipline — Library A/B boundary; Library B decorators are Storybook-only until graphos-tokens ships | sha256:94b851810ce6cdc8
-  - elohim-app-frontend-gospel | the shell side of the layer rails — protocol-omni trust surface, ThemeService twin contract, EPR-native cross-bundle nav | sha256:b7f99abd4e4b6e03
-  - lamad-bundle-gospel | the bundle-consumer side of the layer rails — B18 token wiring is the worked example | sha256:10b8708970358e57
+  - elohim-library-pattern-gospel | story-level binding discipline — Library A/B boundary; Library B decorators are Storybook-only until graphos-tokens ships | sha256:94b851810ce6cdc8 | path: app/elohim-library/CLAUDE.md
+  - elohim-app-frontend-gospel | the shell side of the layer rails — protocol-omni trust surface, ThemeService twin contract, EPR-native cross-bundle nav | sha256:b7f99abd4e4b6e03 | path: app/elohim-app/CLAUDE.md
+  - lamad-bundle-gospel | the bundle-consumer side of the layer rails — B18 token wiring is the worked example | sha256:52df1a45e2470dcd | path: app/lamad/CLAUDE.md
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
-  - omnibar-consolidation-epr-native-links-design | the design whose theme/serving-context/nav decisions the layer rails enforce; records the B18 styling audit | sha256:71ad45eb5993b56c
+  - omnibar-consolidation-epr-native-links-design | the design whose theme/serving-context/nav decisions the layer rails enforce; records the B18 styling audit | sha256:71ad45eb5993b56c | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
 ---
 
 # elohim-elements — UI Substrate Gospel

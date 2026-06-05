@@ -5,7 +5,7 @@ description: Python CLI + library + MCP server (30 tools) with ChromaDB vector s
 type: reference
 originSessionId: b5ef4833-2583-4482-b36e-b595da75dafe
 cites:
-  - historian-and-epic-timeline | the spec that proposed mempalace as the historian substrate this entry records as wired | sha256:7f1a6a2932456aa0
+  - historian-and-epic-timeline | the spec that proposed mempalace as the historian substrate this entry records as wired | sha256:7f1a6a2932456aa0 | path: genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md
 ---
 **URL**: https://github.com/mempalace/mempalace
 

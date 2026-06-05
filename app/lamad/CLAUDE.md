@@ -1,8 +1,8 @@
 ---
 id: lamad-bundle-gospel
 cites:
-  - elohim-elements-ui-substrate-gospel | layer rails — element/token/binding ownership this bundle consumes (never defines) | sha256:99e918ce9147e2f1
-  - elohim-app-frontend-gospel | the shell twin of these rails — chrome composition + cross-bundle navigation rules | sha256:b7f99abd4e4b6e03
+  - elohim-elements-ui-substrate-gospel | layer rails — element/token/binding ownership this bundle consumes (never defines) | sha256:beb182a704c38c60 | path: app/elohim-elements/CLAUDE.md
+  - elohim-app-frontend-gospel | the shell twin of these rails — chrome composition + cross-bundle navigation rules | sha256:b7f99abd4e4b6e03 | path: app/elohim-app/CLAUDE.md
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
 ---
 

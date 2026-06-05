@@ -6,8 +6,8 @@ class: protocol-canonical
 topic: [epr-routing, spa-fallback, doorway, lamad-bundle, deep-links, base-href]
 cites:
   - genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
-  - substrate-shakeout-epr-delivery-sprint | the prior delivery sprint this slice continues — its open render-verified acceptance is satisfied by leg D | sha256:086e3437eb475995
-  - doorway-dispatch-registry-fallback-and-vocabulary | the registry-fallback gotcha to read before touching doorway dispatch — leg A modifies the same dispatch surface | sha256:8adde339010ac508
+  - substrate-shakeout-epr-delivery-sprint | the prior delivery sprint this slice continues — its open render-verified acceptance is satisfied by leg D | sha256:086e3437eb475995 | path: genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md
+  - doorway-dispatch-registry-fallback-and-vocabulary | the registry-fallback gotcha to read before touching doorway dispatch — leg A modifies the same dispatch surface | sha256:8adde339010ac508 | path: genesis/docs/content/elohim-protocol/history/2026-06-02-doorway-dispatch-registry-fallback-and-vocabulary.md
 refines: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
 domain: D8
 informed-by:

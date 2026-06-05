@@ -7,9 +7,9 @@ domain: D-epr-apps
 topic: [omnibar, protocol-omni, page-chrome, epr-link, navigation, debug-bar, serving-context, theme, locale, i18n, a11y, ua-prefs, elohim-core, lamad]
 cites:
   - genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
-  - elohim-sdk-epr-app-boundaries-sprint-kickoff | SDK-boundary canon whose app-bootstrap/app-manifest workstreams this chrome work composes with — Tier-5 delivery-seam vocabulary and the manifest-as-canonical constraint | sha256:9776d193efcabc84
-  - sprint-1b-library-b-design | theme-binding discipline this spec honors — brand tokens bind at story-decorator level only, so the new toggle/picker elements stay blank-slate primitives | sha256:0d1ca1c9f6d09e92
-  - session-bridge-design | its deferred ephemeral-UI-preferences question is where the person-level preference-sync follow-up (§9.1) eventually lands | sha256:1d52dbaa44affce5
+  - elohim-sdk-epr-app-boundaries-sprint-kickoff | SDK-boundary canon whose app-bootstrap/app-manifest workstreams this chrome work composes with — Tier-5 delivery-seam vocabulary and the manifest-as-canonical constraint | sha256:9776d193efcabc84 | path: genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md
+  - sprint-1b-library-b-design | theme-binding discipline this spec honors — brand tokens bind at story-decorator level only, so the new toggle/picker elements stay blank-slate primitives | sha256:0d1ca1c9f6d09e92 | path: genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md
+  - session-bridge-design | its deferred ephemeral-UI-preferences question is where the person-level preference-sync follow-up (§9.1) eventually lands | sha256:1d52dbaa44affce5 | path: genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md
   - genesis/docs/architecture/cradle-to-grave-capability-gradient.md
 ---
 

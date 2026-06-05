@@ -1,7 +1,7 @@
 ---
 id: elohim-library-pattern-gospel
 cites:
-  - elohim-elements-ui-substrate-gospel | blank-slate gospel + layer rails that this library's two-library discipline serves | sha256:99e918ce9147e2f1
+  - elohim-elements-ui-substrate-gospel | blank-slate gospel + layer rails that this library's two-library discipline serves | sha256:beb182a704c38c60 | path: app/elohim-elements/CLAUDE.md
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
 ---
 

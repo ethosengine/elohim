@@ -7,12 +7,12 @@ class: process-meta
 process_subdomain: doc-lifecycle
 sprint: bootstrap
 cites:
-  - subject-routed-decomposition-design | the spec this plan implements — its load-bearing phase order builds the readers before the manifest | sha256:0d910143a8498b64
+  - subject-routed-decomposition-design | the spec this plan implements — its load-bearing phase order builds the readers before the manifest | sha256:0d910143a8498b64 | path: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md
   - .claude/scripts/_lib/frontmatter.py
   - .claude/scripts/memory-kit/decompose.py
   - .claude/commands/brainstorm.md
-  - placement | the contract this plan proposes the subject-class axis section for | sha256:f84d7cb16bea9379
-  - map | the product-domain lattice this plan adds Axis 0 subject class above | sha256:de878342b28843e8
+  - placement | the contract this plan proposes the subject-class axis section for | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md
+  - map | the product-domain lattice this plan adds Axis 0 subject class above | sha256:de878342b28843e8 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/MAP.md
 derived_from:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md  # dogfood breadcrumb (vocabulary only)
 requires_env: []   # pure dev-tooling (python/yaml/markdown) — testable on household-nodes, no shem/harbor/alpha

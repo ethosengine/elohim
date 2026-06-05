@@ -1,9 +1,9 @@
 ---
 id: elohim-app-frontend-gospel
 cites:
-  - elohim-elements-ui-substrate-gospel | element/token/binding layer ownership — don't restyle elements from the shell | sha256:99e918ce9147e2f1
-  - lamad-bundle-gospel | the bundle-consumer twin of the chrome & nav rails | sha256:10b8708970358e57
-  - omnibar-consolidation-epr-native-links-design | settled decisions behind the chrome rails — serving context, sweep+interceptor, shared theme contract | sha256:71ad45eb5993b56c
+  - elohim-elements-ui-substrate-gospel | element/token/binding layer ownership — don't restyle elements from the shell | sha256:beb182a704c38c60 | path: app/elohim-elements/CLAUDE.md
+  - lamad-bundle-gospel | the bundle-consumer twin of the chrome & nav rails | sha256:52df1a45e2470dcd | path: app/lamad/CLAUDE.md
+  - omnibar-consolidation-epr-native-links-design | settled decisions behind the chrome rails — serving context, sweep+interceptor, shared theme contract | sha256:71ad45eb5993b56c | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
 ---
 
 # Elohim App - Angular Frontend

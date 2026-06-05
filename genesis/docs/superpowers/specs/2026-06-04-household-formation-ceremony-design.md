@@ -6,16 +6,16 @@ class: protocol-canonical
 domain: D7
 topic: [qahal, household, formation, ceremony, affirm-membership, custody-blob, delegates-compute, stewardship-grant, seeder, realism-ladder, quiltPolicy, a2o]
 cites:
-  - qahal-epr-household-lattice-design | the umbrella doctrine seed this spec derives from — lattice, two flows, reach doctrine, drive doctrine; formation is its active spine | sha256:ed5c1d3d2698b567
-  - qahal-architecture-vision | gospel discriminator — implementation work in the qahal pillar resolves to claims expressed there; the rubric concept this spec configures for households | sha256:6a519b464b586832
-  - qahal-collective-membership-dht-design | the existing Collective+Membership entry types and request/attest/revoke coordinator family that affirm_membership joins as the recognition-flow sibling | sha256:8d7b9704f7aa9ca0
-  - mutual-storage-replication-dwelling-hub-design | replicates-dwelling + mutuality-audit + intent-first/observed-second — the pattern the ambient-custody responder reuses; gertrude cross-dwelling counterparty stays distinct from intra-household custody | sha256:5596799dbb456bc2
-  - recovery-protocol-phase-2-revised-design | StewardshipGrant/DevicePolicy primitives instantiated for kid devices at formation; Phase 2b stub scope is verification flag V2 | sha256:9d1844484ed64de4
+  - qahal-epr-household-lattice-design | the umbrella doctrine seed this spec derives from — lattice, two flows, reach doctrine, drive doctrine; formation is its active spine | sha256:ed5c1d3d2698b567 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md
+  - qahal-architecture-vision | gospel discriminator — implementation work in the qahal pillar resolves to claims expressed there; the rubric concept this spec configures for households | sha256:6a519b464b586832 | path: genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md
+  - qahal-collective-membership-dht-design | the existing Collective+Membership entry types and request/attest/revoke coordinator family that affirm_membership joins as the recognition-flow sibling | sha256:8d7b9704f7aa9ca0 | path: genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md
+  - mutual-storage-replication-dwelling-hub-design | replicates-dwelling + mutuality-audit + intent-first/observed-second — the pattern the ambient-custody responder reuses; gertrude cross-dwelling counterparty stays distinct from intra-household custody | sha256:5596799dbb456bc2 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
+  - recovery-protocol-phase-2-revised-design | StewardshipGrant/DevicePolicy primitives instantiated for kid devices at formation; Phase 2b stub scope is verification flag V2 | sha256:9d1844484ed64de4 | path: genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md
   - genesis/docs/plans/2026-03-15-qahal-community-directory-design.md
-  - d1-through-d5-node-and-household-canon | D2: household reuses collectives, no new entry types — the constraint the entity model honors | sha256:5ee9472bbefad806
-  - tiered-quilt-stewardship-design | §4 v0.2 quiltPolicy classes + pledge clamp — §8 declares qahal/household and ties the ceremony custody commitments as the backing pledges | sha256:9f9c6a1c391712b3
+  - d1-through-d5-node-and-household-canon | D2: household reuses collectives, no new entry types — the constraint the entity model honors | sha256:5ee9472bbefad806 | path: genesis/docs/content/elohim-protocol/history/2026-04-19-d1-through-d5-node-and-household-canon.md
+  - tiered-quilt-stewardship-design | §4 v0.2 quiltPolicy classes + pledge clamp — §8 declares qahal/household and ties the ceremony custody commitments as the backing pledges | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
   - genesis/docs/architecture/rea-compute-commitment-primitive.md
-  - admin-key-lifecycle-dev-to-production | X-API-Key displacement direction — stage 3 of the drive architecture instantiates its commitment-backed delegation for the seeder service-agent | sha256:44dc9b49dec9d439
+  - admin-key-lifecycle-dev-to-production | X-API-Key displacement direction — stage 3 of the drive architecture instantiates its commitment-backed delegation for the seeder service-agent | sha256:44dc9b49dec9d439 | path: genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md
   - genesis/data/timeline/backlog/qahal-household-collective-first-class.md
 derived_from: genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md
 informed-by:

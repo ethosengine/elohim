@@ -8,13 +8,13 @@ class: process-meta
 process_subdomain: doc-lifecycle
 topic: [memory, compaction, lifecycle, decompose, stasis, comet, history, trajectory, born-linked, mempalace, no-dumping-grounds, pickup, session-surfacing, hooks]
 cites:
-  - unified-memory-loop-design | the loop this rides while correcting its single stasis metric to the three-zone comet shape | sha256:99100efd20d10129
-  - memory-lifecycle-design | the product seed supplying the compact/merge/memorialize primitives this loop dogfoods for docs | sha256:b6545e6548573fa4
-  - placement | the contract whose retired-language and doc homes this loop proposes six edits to | sha256:f84d7cb16bea9379
-  - verification-result-index-design | the state store whose verification results gate when a spec may self-dissolve | sha256:8d6b292dafc4a44e
+  - unified-memory-loop-design | the loop this rides while correcting its single stasis metric to the three-zone comet shape | sha256:99100efd20d10129 | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md
+  - memory-lifecycle-design | the product seed supplying the compact/merge/memorialize primitives this loop dogfoods for docs | sha256:b6545e6548573fa4 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
+  - placement | the contract whose retired-language and doc homes this loop proposes six edits to | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md
+  - verification-result-index-design | the state store whose verification results gate when a spec may self-dissolve | sha256:8d6b292dafc4a44e | path: genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md
   - genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md
   - .claude/scripts/memory-kit/LIFECYCLE.md
-  - converge-skill-design | the session-start what's-next moment whose manual surfacing step the PICKUP fire point (§4b) makes deterministic | sha256:3034b991de8d3d87
+  - converge-skill-design | the session-start what's-next moment whose manual surfacing step the PICKUP fire point (§4b) makes deterministic | sha256:3034b991de8d3d87 | path: genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md
 refines:
   - genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md  # rides its loop machinery; corrects its stasis metric + history model
 derived_from:

@@ -7,7 +7,7 @@ metadata:
   type: feedback
   originSessionId: 3b93d5d1-a372-4195-9ba9-6d2c9b0faa75
 cites:
-  - sweettest-integration-layer | the DNA-test layer whose target-cache PVC path is this RCA workaround #3b (sccache-free sweettest) | sha256:a8747e884a24fdea
+  - sweettest-integration-layer | the DNA-test layer whose target-cache PVC path is this RCA workaround #3b (sccache-free sweettest) | sha256:a8747e884a24fdea | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-sweettest-integration-layer.md
 ---
 
 ## The bug, correctly stated

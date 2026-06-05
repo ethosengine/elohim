@@ -6,7 +6,7 @@ class: protocol-canonical
 domain: D5
 topic: [quilt, tier, manifest, schema, storage-policy]
 cites:
-  - tiered-quilt-stewardship-design | the canonical D5 spec whose §4 v0.2 amendment (declarative quilt-policy classes) this plan implements the schema substrate for — substrate-only; classifier/negotiation surfaces stay HELD | sha256:9f9c6a1c391712b3
+  - tiered-quilt-stewardship-design | the canonical D5 spec whose §4 v0.2 amendment (declarative quilt-policy classes) this plan implements the schema substrate for — substrate-only; classifier/negotiation surfaces stay HELD | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
 ---

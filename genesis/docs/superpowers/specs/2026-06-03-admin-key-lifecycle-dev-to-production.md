@@ -9,7 +9,7 @@ requires_env: none   # design spec; landable on household-compute
 cites:
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
   - genesis/docs/architecture/rea-compute-commitment-primitive.md
-  - rea-compute-substrate-native-roadmap | 2026-05-28-rea-compute-substrate-native-roadmap | sha256:64e5ffe3b8756e6e
+  - rea-compute-substrate-native-roadmap | 2026-05-28-rea-compute-substrate-native-roadmap | sha256:64e5ffe3b8756e6e | path: genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md
   - doorway/doorway-service/src/auth/api_key.rs
   - doorway/doorway-service/src/routes/auth_routes.rs
   - doorway/doorway-service/src/routes/admin_users.rs

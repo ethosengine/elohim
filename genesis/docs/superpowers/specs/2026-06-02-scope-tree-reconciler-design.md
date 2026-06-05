@@ -11,14 +11,14 @@ derived_from:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md  # comet shape (dogfood breadcrumb — lineage, NOT a domain claim; see history/2026-06-02-d4-name-collision)
 cites:
   - genesis/manifests/cluster-state.yaml
-  - placement | the contract this proposes held/ doctrine and requires_env capability vocabulary for | sha256:f84d7cb16bea9379
+  - placement | the contract this proposes held/ doctrine and requires_env capability vocabulary for | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md
   - .claude/scripts/memory-kit/placement-audit.py
   - .claude/scripts/memory-kit/memory-coherence-audit.py
-  - spec-plan-compaction-loop-design | the compaction loop whose path-based cites this upgrades to content-addressed so they survive held/ moves | sha256:958940bdf5a41b40
-  - unified-memory-loop-design | the loop machinery this reconciler plugs the narrow-plate scope discipline into | sha256:99100efd20d10129
+  - spec-plan-compaction-loop-design | the compaction loop whose path-based cites this upgrades to content-addressed so they survive held/ moves | sha256:958940bdf5a41b40 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md
+  - unified-memory-loop-design | the loop machinery this reconciler plugs the narrow-plate scope discipline into | sha256:99100efd20d10129 | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md
   - .claude/skills/epr-content-addressing/SKILL.md
   - genesis/Jenkinsfile
-  - semantic-computable-links-design | the slug-resolving cite system this depends on so file moves stay HELD not DEAD | sha256:405c25775e06a985
+  - semantic-computable-links-design | the slug-resolving cite system this depends on so file moves stay HELD not DEAD | sha256:91622260b60e4f33 | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
 depends_on:
   - genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md  # moves are unsafe until cites resolve by slug (HELD-CITE, not DEAD-CITE)
 refines:
