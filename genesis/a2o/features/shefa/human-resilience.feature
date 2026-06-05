@@ -24,11 +24,11 @@ Feature: Human Resilience Profile
 
   # --- Household Reciprocation --------------------------------------------
 
-  @wip @requires:shem
-  Scenario: Matthew + Susan — household reciprocation, partial protection
+  @wip @requires:household-nodes
+  Scenario: Matthew + Jessica — household reciprocation, partial protection
     Given human "Matthew" is logged in on doorway "alpha" with device
-    And human "Susan" is in Matthew's household with relationship "spouse"
-    And Susan has 1 mutual aid commitment with Matthew
+    And human "Jessica" is in Matthew's household with relationship "spouse"
+    And Jessica has 1 mutual aid commitment with Matthew
     When the resilience profile is computed for Matthew
     Then the protection status should be "partial"
     And the peer count should be 1
@@ -36,10 +36,11 @@ Feature: Human Resilience Profile
 
   # --- Community Depth ----------------------------------------------------
 
+  # household arm is household-testable; Pete's congregation reach is the shem dependency — split when shem returns
   @wip @requires:shem
-  Scenario: Matthew + Susan + Pete — community depth through trust topology
+  Scenario: Matthew + Jessica + Pete — community depth through trust topology
     Given human "Matthew" is logged in on doorway "alpha" with device
-    And human "Susan" is in Matthew's household with relationship "spouse"
+    And human "Jessica" is in Matthew's household with relationship "spouse"
     And human "Pete" is at congregation with relationship "congregation_member"
     And Pete has neighborhood-reach content that replicates to Matthew
     When the resilience profile is computed for Matthew
@@ -79,7 +80,7 @@ Feature: Human Resilience Profile
 
   # --- Building Resilience ------------------------------------------------
 
-  @wip @requires:shem
+  @wip @requires:household-nodes
   Scenario: Maria builds resilience through first connection
     Given human "Maria" is logged in on doorway "alpha" with device
     And Maria is connected with Susan via relationship "neighbor"
@@ -91,23 +92,23 @@ Feature: Human Resilience Profile
 
   # --- Degradation --------------------------------------------------------
 
-  @wip @requires:shem
-  Scenario: Degradation — Matthew goes offline, Susan's resilience drops
-    Given human "Susan" is logged in on doorway "alpha" with device
-    And Susan previously had protection status "protected"
+  @wip @requires:household-nodes
+  Scenario: Degradation — Matthew goes offline, Jessica's resilience drops
+    Given human "Jessica" is logged in on doorway "alpha" with device
+    And Jessica previously had protection status "protected"
     And human "Matthew" has gone offline
-    When the resilience profile is recomputed for Susan
+    When the resilience profile is recomputed for Jessica
     Then the protection status should be "partial"
     And emergency mutual aid should be activated
 
   # --- Recovery -----------------------------------------------------------
 
-  @wip @requires:shem
+  @wip @requires:household-nodes
   Scenario: Recovery — after-action review when Matthew returns
-    Given human "Susan" is logged in on doorway "alpha" with device
-    And Susan had an active emergency mutual aid event
+    Given human "Jessica" is logged in on doorway "alpha" with device
+    And Jessica had an active emergency mutual aid event
     And human "Matthew" has come back online
-    When the resilience profile is recomputed for Susan
+    When the resilience profile is recomputed for Jessica
     Then the protection status should be "protected"
     And the emergency should be closed
     And elohim memory should note "resolved"

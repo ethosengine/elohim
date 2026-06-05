@@ -22,3 +22,10 @@ Feature: Household reciprocity — the M1 custody pair is named, not assumed
     When I list active "custody-blob" commitments
     Then an active "custody-blob" commitment exists from "human-matthew-manager" to "human-jessica-spouse"
     And an active "custody-blob" commitment exists from "human-jessica-spouse" to "human-matthew-manager"
+
+  Scenario: The triad mesh — James is in the household's custody, both ways
+    When I list active "custody-blob" commitments
+    Then an active "custody-blob" commitment exists from "human-matthew-manager" to "human-james-student"
+    And an active "custody-blob" commitment exists from "human-james-student" to "human-matthew-manager"
+    And an active "custody-blob" commitment exists from "human-jessica-spouse" to "human-james-student"
+    And an active "custody-blob" commitment exists from "human-james-student" to "human-jessica-spouse"

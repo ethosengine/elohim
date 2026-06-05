@@ -1,4 +1,5 @@
-@e2e @lamad @love-map @requires:shem
+@e2e @lamad @love-map @requires:household-nodes
+# Adam/Eve dyad on a single doorway — household-class compute; Adam persona is shem-deployed today, so scenarios stay @wip until a household-deployable dyad or persona swap (formation spec §9).
 Feature: Love Map Path Negotiation
   As intimate partners (Adam and Eve),
   we want to negotiate and follow an emergent learning path together,

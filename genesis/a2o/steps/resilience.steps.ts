@@ -51,7 +51,7 @@ function storageUrl(): string {
 }
 
 /** GET a path from elohim-storage, return parsed JSON or throw. */
-async function storageGet(path: string): Promise<Record<string, unknown>> {
+export async function storageGet(path: string): Promise<Record<string, unknown>> {
   const { statusCode, body } = await request(`${storageUrl()}${path}`);
   const text = await body.text();
   assert.equal(statusCode, 200, `GET ${path} failed: ${statusCode} ${text}`);
@@ -570,7 +570,7 @@ interface CommitmentRow {
   metadata?: { providerHumanId?: string; receiverHumanId?: string } | null;
 }
 
-const commitmentListKey = Symbol('resilience:commitmentList');
+export const commitmentListKey = Symbol('resilience:commitmentList');
 
 When('I list active {string} commitments', async function (this: E2EWorld, action: string) {
   // Query through the DOORWAY (manifest-routed /api/v1/commitments), not
