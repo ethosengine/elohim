@@ -197,7 +197,9 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
 
     .reaction-count {
       font-size: 0.75rem;
-      color: var(--elohim-reaction-count-fg, GrayText);
+      /* CanvasText, not GrayText: counts are ACTIVE content and GrayText is
+         the system DISABLED color (3.95:1 on a light Canvas — fails 4.5:1) */
+      color: var(--elohim-reaction-count-fg, CanvasText);
       min-inline-size: 1rem;
       text-align: center;
     }

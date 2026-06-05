@@ -79,7 +79,7 @@ export class ElohimButton extends CapabilityAwareElement(LitElement) {
     }
 
     button:focus-visible {
-      outline: 2px solid var(--tech-glow, #7fcbee);
+      outline: 2px solid Highlight;
       outline-offset: 2px;
     }
 
@@ -96,19 +96,23 @@ export class ElohimButton extends CapabilityAwareElement(LitElement) {
       opacity: 0.55;
     }
 
+    /* Blank-slate variant defaults are SYSTEM pairs (gospel: brand bake in
+       element CSS is the cardinal sin — the old fallbacks shipped #6b46c1 /
+       #ec4899 / #f3f4f6 inside the primitive; ghost's light-gray fg computed
+       1.1:1 on a light page). Brand binds via --elohim-button-* only. */
     :host([variant='primary']) button {
-      background: var(--elohim-button-bg, var(--primary, #6b46c1));
-      color: var(--elohim-button-fg, #fff);
+      background: var(--elohim-button-bg, AccentColor);
+      color: var(--elohim-button-fg, AccentColorText);
     }
 
     :host([variant='secondary']) button {
-      background: var(--elohim-button-bg, var(--secondary, #ec4899));
-      color: var(--elohim-button-fg, #1a1a1a);
+      background: var(--elohim-button-bg, ButtonFace);
+      color: var(--elohim-button-fg, ButtonText);
     }
 
     :host([variant='ghost']) button {
       background: var(--elohim-button-bg, transparent);
-      color: var(--elohim-button-fg, var(--text-light, #f3f4f6));
+      color: var(--elohim-button-fg, inherit);
       border: var(--elohim-button-border, 1px solid currentColor);
     }
   `;

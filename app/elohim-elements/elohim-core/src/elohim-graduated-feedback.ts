@@ -380,6 +380,24 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
     return true;
   }
 
+  /**
+   * Luminance-picked readable fg for a SELECTED position's fixed scale hex.
+   * `CanvasText` was theme-blind here: dark-scheme white on the lighter scale
+   * hexes (e.g. usefulness blue #3498db) computed 3.15:1. The scale colors
+   * are element-owned semantics (not theme tokens), so the readable pair is
+   * derived, not bound. White passes 4.5:1 below L≈0.1833; black above.
+   */
+  private static readableOn(hex: string): string {
+    const n = parseInt(hex.slice(1), 16);
+    const lin = (c: number): number => {
+      const s = c / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    const l =
+      0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    return l > 0.1833 ? '#000000' : '#ffffff';
+  }
+
   override render() {
     const scale = this.currentScale;
 
@@ -402,7 +420,7 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
                 style="
                   border-color: ${position.color};
                   background-color: ${selected ? position.color : 'transparent'};
-                  color: CanvasText;
+                  color: ${selected ? ElohimGraduatedFeedback.readableOn(position.color) : 'CanvasText'};
                 "
                 @click=${() => this.selectPosition(position)}
               >
