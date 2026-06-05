@@ -101,6 +101,13 @@ export type {
 export { ThemeStore, getThemeStore, THEME_STORAGE_KEY, THEME_CHANGE_EVENT } from './theme/theme-store.js';
 export type { ElohimTheme } from './theme/theme-store.js';
 
+export {
+  installEprLinkInterceptor,
+  recordCrossBundleHandoff,
+  baseHrefOwnsPath,
+} from './navigation/epr-link-interceptor.js';
+export type { EprLinkInterceptorOptions } from './navigation/epr-link-interceptor.js';
+
 export { ElohimThemeToggle } from './elohim-theme-toggle.js';
 
 export { ElohimLangPicker } from './elohim-lang-picker.js';

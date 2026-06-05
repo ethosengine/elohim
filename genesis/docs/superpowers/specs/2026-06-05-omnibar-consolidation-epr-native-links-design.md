@@ -94,7 +94,7 @@ apps).
 
 ### 4.2 Interceptor — `elohim-core/src/navigation/epr-link-interceptor.ts` (new)
 
-`installEprLinkInterceptor({ ownsPath, onSameBundle, onCrossBundle? })`:
+`installEprLinkInterceptor({ ownsPath?, beforeCrossBundle?, explicit?, assign? })`:
 
 - **Capture-phase** `document` click listener — fires *before* Angular's
   `routerLink` target-phase handler, so it beats the 404 even on un-swept anchors.
@@ -105,8 +105,11 @@ apps).
   route config (`'' | community | shefa | identity | account | doorway | avodah |
   resource | deliver | resolve | epr`). lamad: `/lamad/` base-href prefix check.
   Cross-bundle ⇔ `!ownsPath(path)`.
-- Same-bundle plain anchor → `preventDefault` + `onSameBundle(path)` (host routes
-  via Angular router — content-authored links get SPA navigation, no full reload).
+- Same-bundle anchors always pass through untouched — Angular `routerLink` (or
+  default browser behavior) owns them. Implementation refinement 2026-06-05: the
+  same-bundle upgrade hook was dropped because routerLink-managed anchors can't be
+  reliably distinguished from plain anchors in prod builds; interception is
+  cross-bundle-only, which is the regression being healed.
 - Cross-bundle anchor → write nav-handoff record (source CID, scroll, timestamp
   into the session-nav-stack), then `window.location.assign(href)` — the full load
   through doorway **is** EPR-native navigation; the URL is the projected EPR
