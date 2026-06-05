@@ -105,7 +105,22 @@ The lamad split surfaced **seven** spec files orphaned by the bundle split's str
 - [ ] URL routes change with bundle splits (the bundle's `<base href>` becomes `/<pillar>/`). Update `.feature` files that assert URLs accordingly.
 - [ ] If the split changes navigation behavior (e.g., introduces an EPR-link card-flip where there used to be a hard navigation), add a regression scenario in the relevant `genesis/a2o/features/<pillar>/` directory.
 
-### §4.8 — Build-artifact tracking convention
+### §4.8 — Styling / token contract
+
+- [ ] **`src/styles.scss` imports, in order:** `elohim-core/base` (universal reset + a11y floor —
+  without it the UA's default `body{margin:8px}` frames the whole viewport, the bug lamad shipped
+  on 2026-06-05), `elohim-core/tokens` (palette + `color-scheme` + `:root[data-theme]` theme
+  reactivity), and the chrome binding layer (interim per-bundle `_chrome-binding.scss`; migrates
+  wholesale to the graphos-tokens artifact — see
+  `genesis/data/timeline/backlog/bundle-styling-token-contract.md`).
+- [ ] **Never define or duplicate `--lamad-*` (or any palette) tokens in the bundle.** The token
+  layer is defined once; a bundle that re-declares values forks the theme.
+- [ ] **Every bound `*-bg` must have a paired bound `*-fg`** in the binding layer — an unpaired
+  surface puts scheme-mismatched system colors on bound backgrounds (the 2026-06-05 dark-mode
+  regression; theme-authority spec §1 C2/C3). The elohim-core theme-contrast gate enforces this
+  for chrome elements.
+
+### §4.9 — Build-artifact tracking convention
 
 - [ ] **Pick one policy and propagate.** `app/elohim-elements/elohim-core/dist/custom-elements.json` is git-tracked but `app/elohim-elements/elohim-imagodei/dist/` is gitignored. This inconsistency caused the elohim-imagodei tests to 404 on `custom-elements.json` until the operator ran `pnpm --filter elohim-imagodei run build` locally first. **Convention going forward:** every new bundle that produces a `custom-elements.json` either git-tracks it (matches `elohim-core`) or documents the build-first dependency in its README and CI. Pick; do not leave ambiguous.
 
