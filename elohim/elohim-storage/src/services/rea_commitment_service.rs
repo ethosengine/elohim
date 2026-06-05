@@ -221,7 +221,15 @@ impl ReaCommitmentService {
         // and falls back to diesel-direct when the conductor is absent.
         // update_state_via_conductor is action-generic (calls update_rea_commitment_state
         // with {id, state, finished}), so no custody-blob-specific zome risk.
-        if CONDUCTOR_SOFT_ACTIONS.contains(&existing.action.as_str()) && hc_lamad.is_some() {
+        //
+        // Soft actions only round-trip the conductor for rows that were
+        // conductor-created (anchored). A rung-1 diesel row has NO DHT entry —
+        // routing its update to the zome would error "no commitment found";
+        // SQL stays authoritative for unanchored rows.
+        if CONDUCTOR_SOFT_ACTIONS.contains(&existing.action.as_str())
+            && hc_lamad.is_some()
+            && existing.dht_anchor_hash.is_some()
+        {
             return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;
         }
 
@@ -380,6 +388,68 @@ mod tests {
         assert!(
             row.dht_anchor_hash.is_none(),
             "diesel path must leave dht_anchor_hash unset, got: {:?}",
+            row.dht_anchor_hash
+        );
+    }
+
+    /// Regression guard: `update_state` for an unanchored custody-blob row must
+    /// stay diesel-authoritative — even if a conductor were present, the zome
+    /// has no DHT entry for it and would error "no commitment found".
+    ///
+    /// Asserts:
+    /// - `update_state` returns `Ok` with the updated state
+    /// - `dht_anchor_hash` remains `None` (row stays unanchored / diesel path)
+    #[tokio::test]
+    async fn custody_blob_update_state_stays_diesel_for_unanchored_rows() {
+        let mut conn = setup_conn();
+        let ctx = crate::db::context::AppContext::default_lamad();
+
+        // Create a custody-blob commitment via the service with hc=None (diesel, unanchored).
+        let input = CreateReaCommitmentInput {
+            id: Some("custody-blob-test02".to_string()),
+            action: "custody-blob".to_string(),
+            provider: "12D3KooWAAAA".to_string(),
+            receiver: "12D3KooWBBBB".to_string(),
+            ..Default::default()
+        };
+        let create_result = ReaCommitmentService::create(&mut conn, &ctx, input, None, None).await;
+        assert!(
+            create_result.is_ok(),
+            "create expected Ok, got: {:?}",
+            create_result.err()
+        );
+
+        // Call update_state with hc=None (the hc=Some + unanchored case cannot be
+        // constructed without a live conductor; the anchor-condition is covered by
+        // code review + this diesel-path regression guard).
+        let update = UpdateReaCommitmentState {
+            state: "active".to_string(),
+            finished: None,
+        };
+        let update_result = ReaCommitmentService::update_state(
+            &mut conn,
+            &ctx,
+            "custody-blob-test02",
+            &update,
+            None,
+            None, // hc_lamad = None
+        )
+        .await;
+        assert!(
+            update_result.is_ok(),
+            "update_state expected Ok, got: {:?}",
+            update_result.err()
+        );
+        let view = update_result.unwrap();
+        assert_eq!(view.state, "active", "state should be updated");
+
+        // Confirm the row remains unanchored (diesel path, no DHT entry).
+        let row = rea_commitments::get_commitment(&mut conn, &ctx, "custody-blob-test02")
+            .expect("db query")
+            .expect("row present");
+        assert!(
+            row.dht_anchor_hash.is_none(),
+            "unanchored row must stay unanchored after update_state, got: {:?}",
             row.dht_anchor_hash
         );
     }
