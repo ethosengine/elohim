@@ -18,6 +18,18 @@ export class ThemeService {
   constructor() {
     this.renderer = this.rendererFactory.createRenderer(null, null);
     this.loadTheme();
+
+    // Cross-island/tab sync: Lit's ThemeStore (elohim-core) speaks the same
+    // contract; adopt its changes without re-dispatching (no loops).
+    window.addEventListener('storage', (e: StorageEvent) => {
+      if (e.key === 'elohim-theme' && this.isValidTheme(e.newValue)) {
+        this.adoptExternal(e.newValue);
+      }
+    });
+    window.addEventListener('elohim-theme-changed', (e: Event) => {
+      const theme = (e as CustomEvent<{ theme?: unknown }>).detail?.theme;
+      if (this.isValidTheme(theme)) this.adoptExternal(theme);
+    });
   }
 
   /**
@@ -51,6 +63,7 @@ export class ThemeService {
     this.currentTheme$.next(theme);
     this.applyTheme(theme);
     this.saveTheme(theme);
+    window.dispatchEvent(new CustomEvent('elohim-theme-changed', { detail: { theme } }));
   }
 
   /**
@@ -110,5 +123,16 @@ export class ThemeService {
       // localStorage read failure - fallback to default theme
       this.setTheme('device');
     }
+  }
+
+  private isValidTheme(v: unknown): v is Theme {
+    return v === 'light' || v === 'dark' || v === 'device';
+  }
+
+  /** External change (Lit island / other tab): apply + emit, never re-persist/dispatch. */
+  private adoptExternal(theme: Theme): void {
+    if (theme === this.currentTheme$.value) return;
+    this.currentTheme$.next(theme);
+    this.applyTheme(theme);
   }
 }

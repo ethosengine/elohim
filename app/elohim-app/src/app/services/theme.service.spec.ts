@@ -42,4 +42,28 @@ describe('ThemeService', () => {
     expect(document.body.classList.contains('theme-light')).toBe(true);
     expect(document.body.getAttribute('data-theme')).toBe('light');
   });
+
+  it('adopts an elohim-theme-changed event from a Lit island without re-dispatching', () => {
+    let events = 0;
+    const onEvent = (): void => {
+      events += 1;
+    };
+    window.addEventListener('elohim-theme-changed', onEvent);
+    window.dispatchEvent(new CustomEvent('elohim-theme-changed', { detail: { theme: 'dark' } }));
+    window.removeEventListener('elohim-theme-changed', onEvent);
+    expect(service.getCurrentTheme()).toBe('dark');
+    expect(document.body.getAttribute('data-theme')).toBe('dark');
+    expect(events).toBe(1); // only the one we dispatched
+  });
+
+  it('dispatches elohim-theme-changed when Angular sets the theme (Lit follows)', () => {
+    let detail: { theme?: string } | null = null;
+    const onEvent = (e: Event): void => {
+      detail = (e as CustomEvent<{ theme: string }>).detail;
+    };
+    window.addEventListener('elohim-theme-changed', onEvent);
+    service.setTheme('light');
+    window.removeEventListener('elohim-theme-changed', onEvent);
+    expect(detail).toEqual({ theme: 'light' });
+  });
 });
