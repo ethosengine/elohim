@@ -1,3 +1,13 @@
-:root {
-  /* lamad bundle styles — B18 expands this */
-}
+/* Lamad bundle styles (B18).
+ *
+ * Token layer: elohim-core/tokens.scss is the harvested token source
+ * (--lamad-* custom properties, dark default + prefers-color-scheme light
+ * + body[data-theme] manual overrides). Importing it here makes the bundle
+ * self-contained: lamad renders identically with or without the elohim-app
+ * shell, and ThemeStore's body[data-theme] writes actually repaint.
+ * Source of truth: operational styling, no substrate state (spec §2).
+ */
+@use '../../elohim-elements/elohim-core/tokens';
+
+/* Binding layer — separate concern, separate file. */
+@use './chrome-binding';

@@ -1,0 +1,37 @@
+/* Chrome binding layer (interim home).
+ *
+ * ONE concern: map the blank-slate Lit chrome's published @cssprop surface
+ * onto the lamad token palette. Nothing else belongs in this file.
+ * Custom-property chains resolve at the consuming element, so
+ * body[data-theme] overrides of --lamad-* flow through automatically —
+ * the chrome follows the theme toggle.
+ *
+ * This file migrates WHOLESALE to the shippable graphos-tokens artifact
+ * when it ships (see genesis/data/timeline/backlog/
+ * bundle-styling-token-contract.md). Do not add bundle-local styles here.
+ */
+:root {
+  /* <elohim-navigator> */
+  --elohim-nav-bg: var(--lamad-bg-secondary);
+  --elohim-nav-fg: var(--lamad-text-primary);
+  --elohim-nav-border: var(--lamad-border);
+  --elohim-nav-bubble-bg: var(--lamad-accent-primary);
+  --elohim-nav-bubble-fg: var(--lamad-text-primary);
+  --elohim-nav-tray-bg: var(--lamad-bg-secondary);
+  --elohim-nav-tray-border: var(--lamad-border);
+  --elohim-nav-search-bg: var(--lamad-bg-tertiary);
+  --elohim-nav-search-border: var(--lamad-border);
+
+  /* <elohim-page-chrome> + <elohim-default-omnibar> */
+  --elohim-omnibar-bg: var(--lamad-bg-secondary);
+  --elohim-omnibar-border: var(--lamad-border);
+
+  /* <elohim-theme-toggle> */
+  --elohim-theme-toggle-fg: var(--lamad-text-primary);
+  --elohim-theme-toggle-badge-bg: var(--lamad-accent-primary);
+  --elohim-theme-toggle-badge-fg: var(--lamad-text-primary);
+
+  /* <elohim-lang-picker> */
+  --elohim-lang-picker-fg: var(--lamad-text-primary);
+  --elohim-lang-picker-border: var(--lamad-border);
+}

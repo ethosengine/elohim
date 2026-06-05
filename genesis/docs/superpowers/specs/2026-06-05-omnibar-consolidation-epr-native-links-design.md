@@ -296,6 +296,13 @@ failures silent; locale bundle failure → `en`.
    `buildId` then upgrades from self-reported `gitHash` to doorway-attested
    bundle address (and may earn prod visibility); `variant` gains its source.
    rust-architect lane.
+8. **Canonical bundle-styling token artifact** — the 2026-06-05 styling audit found
+   the lamad split deferred token wiring (B18): tokens harvested into
+   `elohim-core/tokens.scss` but imported nowhere, `--elohim-*` chrome bindings
+   Storybook-only. Interim fix shipped with this work (lamad `styles.scss` imports
+   tokens + binds the chrome surface). The canonical layer — shippable
+   graphos-tokens artifact + runbook §4.X bundle-styling contract — is captured in
+   `genesis/data/timeline/backlog/bundle-styling-token-contract.md`.
 
 ## 10. File inventory
 
