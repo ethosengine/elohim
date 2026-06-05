@@ -10,6 +10,12 @@ import type {
 import { ElohimComputeTile as ElohimComputeTileClass } from './elohim-compute-tile.js';
 import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
 import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -743,4 +749,47 @@ describe('<elohim-compute-tile> — slots', () => {
       .trim();
     expect(text).to.include('Custom label');
   });
+});
+
+// ---------------------------------------------------------------------------
+// Theme-contrast gate
+// ---------------------------------------------------------------------------
+
+describe('<elohim-compute-tile> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell} (detail lens, full triptych)`, async () => {
+      const { el } = await themeFixture<ElohimComputeTile>(
+        html`
+          <elohim-compute-tile last-sample-at="2026-05-20T10:00:00Z"></elohim-compute-tile>
+        `,
+        cell
+      );
+      // Richest fixture: online hub with full compute triptych + meta. The
+      // detail lens reveals used/stewarded (the widest visible-text surface);
+      // value + profile are imperative props (no attribute path), set here.
+      el.value = hubValue;
+      el.profile = { ...el.profile, lens: 'detail' };
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell} (error state banner)`, async () => {
+      const { el } = await themeFixture<ElohimComputeTile>(
+        html`
+          <elohim-compute-tile tile-state="error"></elohim-compute-tile>
+        `,
+        cell
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

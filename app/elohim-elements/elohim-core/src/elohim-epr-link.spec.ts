@@ -5,6 +5,12 @@ import './register.js';
 import { ElohimEprLink } from './elohim-epr-link.js';
 import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
 import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 // ---------------------------------------------------------------------------
 // <elohim-epr-link> — core behavior
@@ -375,4 +381,32 @@ describe('<elohim-epr-link> — i18n precondition gate', () => {
     const rect = el.getBoundingClientRect();
     expect(rect.width).to.be.greaterThan(0);
   });
+});
+
+// ---------------------------------------------------------------------------
+// <elohim-epr-link> — theme-contrast gate
+// ---------------------------------------------------------------------------
+
+describe('<elohim-epr-link> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimEprLink>(
+        html`
+          <elohim-epr-link epr="epr:lamad-spa" display="chip"></elohim-epr-link>
+        `,
+        cell
+      );
+      await el.updateComplete;
+      // No resolver is wired in the fixture; force to L2 so the anchor text is
+      // visible (mirrors the a11y/ua-prefs gates above).
+      el.setResolution(2, { title: 'Lamad Learning Platform' });
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

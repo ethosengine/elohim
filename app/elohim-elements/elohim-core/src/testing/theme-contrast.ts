@@ -117,7 +117,36 @@ export async function themeFixture<T extends Element>(
     `
   );
   const el = wrapper.firstElementChild as T;
+  disableMotion(wrapper);
   return { el, wrapper, cell };
+}
+
+/**
+ * Contrast is a STEADY-STATE property: an element animating open (opacity
+ * transition) measures mid-flight otherwise — fg composited onto bg at
+ * opacity≈0 reads as a bogus 1:1. Document styles don't pierce shadow roots,
+ * so adopt a no-motion sheet into every shadow root in the subtree.
+ */
+const NO_MOTION_SHEET = new CSSStyleSheet();
+// `:host` is required separately — `*` inside a shadow root never matches the
+// host element, and host-level entry animations (e.g. :host([open]) fold-down)
+// are exactly what leaves computed opacity at 0 mid-measurement.
+NO_MOTION_SHEET.replaceSync(
+  ':host, *, *::before, *::after { transition: none !important; animation: none !important; }'
+);
+
+function disableMotion(rootEl: Element): void {
+  const queue: Element[] = [rootEl];
+  while (queue.length > 0) {
+    const el = queue.shift()!;
+    if (el.shadowRoot) {
+      if (!el.shadowRoot.adoptedStyleSheets.includes(NO_MOTION_SHEET)) {
+        el.shadowRoot.adoptedStyleSheets = [...el.shadowRoot.adoptedStyleSheets, NO_MOTION_SHEET];
+      }
+      queue.push(...Array.from(el.shadowRoot.querySelectorAll('*')));
+    }
+    queue.push(...Array.from(el.children));
+  }
 }
 
 /* ── color math ── */
@@ -196,6 +225,10 @@ const EMOJI_ONLY = /^[\s\p{Extended_Pictographic}\u{FE0F}\u{200D}]*$/u;
 function isVisible(el: Element): boolean {
   const cs = getComputedStyle(el);
   if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+  // display:contents (e.g. <slot>) generates no box — children decide.
+  // Skipping on zero-rect here silently dropped all slotted text (gap found
+  // by the axe backstop on elohim-button's slotted labels).
+  if (cs.display === 'contents') return true;
   const rect = el.getBoundingClientRect();
   return rect.width > 0 && rect.height > 0;
 }
@@ -218,6 +251,21 @@ function* walkTextNodes(rootEl: Element): Generator<{ text: string; el: Element 
       }
     }
   }
+}
+
+/** WCAG 1.4.3 exempts "text that is part of an inactive user interface component". */
+function isInactiveControl(el: Element): boolean {
+  let cur: Element | null = el;
+  while (cur) {
+    if (
+      cur.hasAttribute('disabled') ||
+      cur.getAttribute('aria-disabled') === 'true'
+    ) {
+      return true;
+    }
+    cur = flattenedParent(cur);
+  }
+  return false;
 }
 
 function requiredRatio(el: Element, text: string): number {
@@ -254,6 +302,7 @@ export function assertThemeContrast(
   const failures: ContrastFinding[] = [];
   for (const { text, el: textEl } of walkTextNodes(el)) {
     if (EMOJI_ONLY.test(text)) continue;
+    if (isInactiveControl(textEl)) continue; // WCAG 1.4.3 inactive-component exemption
     const cs = getComputedStyle(textEl);
     let fg = new Color(cs.color);
     const bg = effectiveBackground(textEl);

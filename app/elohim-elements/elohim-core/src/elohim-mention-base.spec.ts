@@ -6,6 +6,12 @@ import type { ElohimMentionBase } from './elohim-mention-base.js';
 import { ElohimMentionBase as ElohimMentionBaseClass } from './elohim-mention-base.js';
 import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
 import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 describe('<elohim-mention-base>', () => {
   it('is defined in the custom element registry', () => {
@@ -165,4 +171,27 @@ describe('<elohim-mention-base> — i18n precondition gate', () => {
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });
+});
+
+describe('<elohim-mention-base> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimMentionBase>(
+        html`
+          <elohim-mention-base
+            epr="epr:content:abc123"
+            label="Introduction to Lamad"
+          ></elohim-mention-base>
+        `,
+        cell
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

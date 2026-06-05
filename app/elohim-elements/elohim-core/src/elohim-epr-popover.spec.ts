@@ -6,6 +6,12 @@ import type { ElohimEprPopover } from './elohim-epr-popover.js';
 import { ElohimEprPopover as PopoverClass } from './elohim-epr-popover.js';
 import type { EprHead } from './elohim-epr-popover.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 const FIXTURE_HEAD: EprHead = {
   version: 1,
@@ -258,4 +264,26 @@ describe('<elohim-epr-popover> — ua-prefs gate', () => {
       after.includes('LinkText');
     expect(hasSystemColor).to.be.true;
   });
+});
+
+describe('<elohim-epr-popover> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimEprPopover>(
+        html`<elohim-epr-popover
+          .head=${FIXTURE_HEAD}
+          .visible=${true}
+          route="/lamad/intro-shefa"
+        ></elohim-epr-popover>`,
+        cell,
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

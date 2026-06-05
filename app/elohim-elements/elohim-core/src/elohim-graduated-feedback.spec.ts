@@ -5,6 +5,12 @@ import './register.js';
 import type { ElohimGraduatedFeedback } from './elohim-graduated-feedback.js';
 import { ElohimGraduatedFeedback as ElohimGraduatedFeedbackClass } from './elohim-graduated-feedback.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 describe('<elohim-graduated-feedback>', () => {
   it('is defined in the custom element registry', () => {
@@ -200,4 +206,28 @@ describe('<elohim-graduated-feedback> — ua-prefs precondition gate', () => {
     const cssText = (ElohimGraduatedFeedbackClass as { styles: { cssText: string } }).styles.cssText;
     expect(cssText).to.contain('pointer: coarse');
   });
+});
+
+describe('<elohim-graduated-feedback> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimGraduatedFeedback>(
+        html`<elohim-graduated-feedback></elohim-graduated-feedback>`,
+        cell,
+      );
+      await el.updateComplete;
+      // Select a position to reveal the selected button (hex bg + CanvasText),
+      // intensity slider label, and submit button — the text-bearing states.
+      el.shadowRoot
+        ?.querySelector<HTMLButtonElement>('[data-testid="position-useful"]')
+        ?.click();
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

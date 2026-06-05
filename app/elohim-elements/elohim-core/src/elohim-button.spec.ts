@@ -6,6 +6,12 @@ import type { ElohimButton } from './elohim-button.js';
 import { ElohimButton as ElohimButtonClass } from './elohim-button.js';
 import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
 import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 describe('<elohim-button>', () => {
   it('renders the default slot content', async () => {
@@ -289,4 +295,33 @@ describe('<elohim-button> — i18n precondition gate', () => {
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });
+});
+
+describe('<elohim-button> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      // One fixture renders all three variants (primary, secondary, ghost) so
+      // assertThemeContrast walks every variant's slotted label in the cell;
+      // each carries distinct text so a per-variant fg/bg pairing is measured.
+      const { el } = await themeFixture<HTMLDivElement>(
+        html`
+          <div>
+            <elohim-button variant="primary">Primary</elohim-button>
+            <elohim-button variant="secondary">Secondary</elohim-button>
+            <elohim-button variant="ghost">Ghost</elohim-button>
+          </div>
+        `,
+        cell
+      );
+      // Wrapper is a plain <div>; settle each Lit button before measuring.
+      const buttons = Array.from(el.querySelectorAll<ElohimButton>('elohim-button'));
+      await Promise.all(buttons.map(b => b.updateComplete));
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

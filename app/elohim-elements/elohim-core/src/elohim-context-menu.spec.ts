@@ -6,6 +6,12 @@ import { ElohimContextMenu } from './elohim-context-menu.js';
 import type { ContextMenuItem } from './elohim-context-menu.js';
 import { clearMediaQueries, measureLuminanceChanges } from './testing/ua-prefs.js';
 import { renderInLocale, requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 // ---------------------------------------------------------------------------
 // Shared fixture data
@@ -333,4 +339,34 @@ describe('<elohim-context-menu> — i18n precondition gate', () => {
     const rect = el.getBoundingClientRect();
     expect(rect.width).to.be.greaterThan(0);
   });
+});
+
+// ---------------------------------------------------------------------------
+// <elohim-context-menu> — theme-contrast gate
+// ---------------------------------------------------------------------------
+
+describe('<elohim-context-menu> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  // Menu items must be visible for the contrast walk, so render OPEN with a
+  // disabled item present (its dimmed state is the lowest-contrast surface).
+  const THEME_ITEMS: ContextMenuItem[] = [
+    { id: 'open', label: 'Open' },
+    { id: 'about', label: 'About this EPR' },
+    { id: 'copy', label: 'Copy EPR link', disabled: true },
+  ];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimContextMenu>(
+        html`<elohim-context-menu .items=${THEME_ITEMS} open></elohim-context-menu>`,
+        cell
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

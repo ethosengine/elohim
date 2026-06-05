@@ -5,6 +5,12 @@ import './register.js';
 import type { ElohimFeedbackMechanismGateway } from './elohim-feedback-mechanism-gateway.js';
 import { ElohimFeedbackMechanismGateway as GatewayClass } from './elohim-feedback-mechanism-gateway.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 describe('<elohim-feedback-mechanism-gateway>', () => {
   it('is defined in the custom element registry', () => {
@@ -137,4 +143,36 @@ describe('<elohim-feedback-mechanism-gateway> — ua-prefs gate', () => {
     const cssText = (GatewayClass as { styles: { cssText: string } }).styles.cssText;
     expect(cssText).to.contain('forced-colors: active');
   });
+});
+
+describe('<elohim-feedback-mechanism-gateway> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  // All three badge states (sensemaking / controversy / settled) render at once
+  // when every accumulation flag is set — cheapest path to the richest text.
+  const selection = { level: 1, renderTarget: 'angular' } as const;
+  const accumulationStatus = {
+    readyForSensemaking: true,
+    controversyDetected: true,
+    settled: true,
+  } as const;
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimFeedbackMechanismGateway>(
+        html`<elohim-feedback-mechanism-gateway
+          entity-type="content"
+          entity-id="test-id"
+          .selection=${selection}
+          .accumulationStatus=${accumulationStatus}
+        ></elohim-feedback-mechanism-gateway>`,
+        cell,
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

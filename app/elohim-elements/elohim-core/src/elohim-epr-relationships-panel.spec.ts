@@ -5,6 +5,12 @@ import './register.js';
 import type { ElohimEprRelationshipsPanel } from './elohim-epr-relationships-panel.js';
 import { ElohimEprRelationshipsPanel as ElohimEprRelationshipsPanelClass } from './elohim-epr-relationships-panel.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 const SAMPLE_RELATIONSHIPS = [
   { type: 'PREREQUISITE', target: 'epr:foundations-intro' },
@@ -161,4 +167,24 @@ describe('<elohim-epr-relationships-panel> — ua-prefs precondition gate', () =
       afterForced.includes('Highlight');
     expect(hasSystemColor).to.be.true;
   });
+});
+
+describe('<elohim-epr-relationships-panel> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimEprRelationshipsPanel>(
+        html`<elohim-epr-relationships-panel
+          .relationships=${SAMPLE_RELATIONSHIPS}
+        ></elohim-epr-relationships-panel>`,
+        cell,
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

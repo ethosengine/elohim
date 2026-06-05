@@ -5,6 +5,12 @@ import './register.js';
 import type { ElohimGateFeedbackTrigger } from './elohim-gate-feedback-trigger.js';
 import { ElohimGateFeedbackTrigger as TriggerClass } from './elohim-gate-feedback-trigger.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 describe('<elohim-gate-feedback-trigger>', () => {
   it('is defined in the custom element registry', () => {
@@ -201,4 +207,36 @@ describe('<elohim-gate-feedback-trigger> — ua-prefs gate', () => {
     const cssText = (TriggerClass as { styles: { cssText: string } }).styles.cssText;
     expect(cssText).to.contain('44px');
   });
+});
+
+describe('<elohim-gate-feedback-trigger> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`trigger button passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimGateFeedbackTrigger>(
+        html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
+        cell,
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+
+    it(`open menu passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimGateFeedbackTrigger>(
+        html`<elohim-gate-feedback-trigger></elohim-gate-feedback-trigger>`,
+        cell,
+      );
+      await el.updateComplete;
+      el.shadowRoot
+        ?.querySelector<HTMLButtonElement>('[data-testid="feedback-trigger-btn"]')
+        ?.click();
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

@@ -6,6 +6,12 @@ import type { ElohimContentAnalytics } from './elohim-content-analytics.js';
 import { ElohimContentAnalytics as AnalyticsClass } from './elohim-content-analytics.js';
 import type { ContentAnalyticsLoader, ContentAnalyticsMetrics } from './elohim-content-analytics.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 const FIXTURE_METRICS: ContentAnalyticsMetrics = {
   viewCount: 123,
@@ -254,4 +260,22 @@ describe('<elohim-content-analytics> — ua-prefs gate', () => {
     const after = cssText.slice(idx);
     expect(after.includes('Canvas') || after.includes('CanvasText') || after.includes('GrayText')).to.be.true;
   });
+});
+
+describe('<elohim-content-analytics> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      const { el } = await themeFixture<ElohimContentAnalytics>(
+        html`<elohim-content-analytics .metrics=${FIXTURE_METRICS}></elohim-content-analytics>`,
+        cell,
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });

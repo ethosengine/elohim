@@ -5,6 +5,12 @@ import './register.js';
 import type { ElohimReactionBar } from './elohim-reaction-bar.js';
 import { ElohimReactionBar as ElohimReactionBarClass } from './elohim-reaction-bar.js';
 import { requiresLogicalProperties } from './testing/i18n.js';
+import {
+  assertThemeContrast,
+  axeScanStrict,
+  themeFixture,
+  type ThemeCell,
+} from './testing/theme-contrast.js';
 
 describe('<elohim-reaction-bar>', () => {
   it('is defined in the custom element registry', () => {
@@ -217,4 +223,28 @@ describe('<elohim-reaction-bar> — ua-prefs precondition gate', () => {
       afterForced.includes('HighlightText');
     expect(hasSystemColor).to.be.true;
   });
+});
+
+describe('<elohim-reaction-bar> — theme-contrast gate', () => {
+  // tokens cells: no shipped binding for this element yet — system cells only
+  // (theme-authority spec §4.1). The blank-slate contract per scheme.
+  const CELLS: ThemeCell[] = ['system-light', 'system-dark'];
+
+  for (const cell of CELLS) {
+    it(`passes contrast in ${cell}`, async () => {
+      // Richest text-visible fixture: default reactions rendered with their
+      // labels plus a GrayText count badge ("5") via showCounts. Mediation
+      // overlay stays closed (no mediated click), matching the default view.
+      const { el } = await themeFixture<ElohimReactionBar>(
+        html`<elohim-reaction-bar
+          .counts=${[{ type: 'moved', count: 5 }]}
+          .showCounts=${true}
+        ></elohim-reaction-bar>`,
+        cell,
+      );
+      await el.updateComplete;
+      assertThemeContrast(el);
+      await axeScanStrict(el);
+    });
+  }
 });
