@@ -1,3 +1,10 @@
+---
+id: elohim-library-pattern-gospel
+cites:
+  - elohim-elements-ui-substrate-gospel | blank-slate gospel + layer rails that this library's two-library discipline serves | sha256:99e918ce9147e2f1
+  - genesis/data/timeline/backlog/bundle-styling-token-contract.md
+---
+
 # elohim-library — Pattern Library Gospel
 
 This document is the **shared synthesis** for everyone (humans + agents) authoring inside `app/elohim-library/`. It establishes the three sources of truth, the boundary between the "default" and "designed" pattern libraries, and the ownership rules.
@@ -60,6 +67,8 @@ A story that does not come from this composition is wrong. If you find yourself 
 ### The boundary, in one sentence
 
 **component-architect writes Library A; graphos-designer reads Library A and writes Library B.** Neither agent crosses into the other's library.
+
+> **Shipping rail (2026-06-05):** Library B bindings are Storybook-only — no production bundle reads them today. The shippable binding artifact (graphos-tokens) is captured in `bundle-styling-token-contract` (see `cites:`); until it ships, bundles carry interim `_chrome-binding.scss` files per the layer rails in `elohim-elements-ui-substrate-gospel`.
 
 ### Directory convention (the scaffold is live)
 

@@ -46,7 +46,11 @@ def _doc_roots():
 
 
 def _slug_index():
-    return cg.build_slug_index([str(r) for r in _doc_roots()])
+    # Doc-root index + repo-wide id-declaring gospel CLAUDE.mds (2026-06-05 —
+    # contextual-gospel concern routing is content-addressed like everything else).
+    return cg.extend_index_with_gospels(
+        cg.build_slug_index([str(r) for r in _doc_roots()]), ROOT
+    )
 
 
 def _split(text):
@@ -75,7 +79,8 @@ def _resolve_doc(ref, index):
 
 
 def _is_doc_root(p: Path) -> bool:
-    return any(str(p).startswith(str(r)) for r in _doc_roots())
+    # Gospel CLAUDE.mds join the doc graph (2026-06-05) — see cite_graph.extend_index_with_gospels.
+    return any(str(p).startswith(str(r)) for r in _doc_roots()) or cg.is_gospel_claude_md(p, ROOT)
 
 
 def emit(target: str) -> str | None:

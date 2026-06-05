@@ -51,7 +51,7 @@ def corpus():
 def main(apply: bool) -> int:
     docs = corpus()
     held_roots = [str(r) for r in DOC_ROOTS] + [str(ROOT / "genesis/docs/superpowers/held")]
-    slug_index = cg.build_slug_index(held_roots)
+    slug_index = cg.extend_index_with_gospels(cg.build_slug_index(held_roots), ROOT)
     stamped = cleared = touched = 0
     by_verdict: dict = {}
     for d in docs:

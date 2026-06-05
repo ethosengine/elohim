@@ -14,6 +14,7 @@ pass). Pure-stdlib; imports _lib.frontmatter.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from pathlib import Path
 
@@ -93,6 +94,53 @@ def build_slug_index(roots) -> dict:
             if sid:
                 index[sid] = str(md)
     return index
+
+
+# Gospel surfaces (2026-06-05): id-declaring CLAUDE.md files repo-wide join the
+# doc graph so contextual-gospel concern routing can be content-addressed
+# (slug | hint | fingerprint — move-safe, drift-audited). ONLY CLAUDE.md
+# filenames are indexed; entity docs (genesis/data) deliberately stay
+# plain-path cites. Only docs DECLARING id: enter the index, so the wide walk
+# admits nothing accidental.
+GOSPEL_EXCLUDE_DIRS = {"node_modules", "dist", ".angular", "coverage", "target", "sophia"}
+
+
+def gospel_claude_md_paths(repo_root):
+    """Yield the repo's CLAUDE.md gospel paths, pruning vendored/build/dot dirs."""
+    rp = Path(repo_root)
+    for dirpath, dirnames, filenames in os.walk(rp):
+        dirnames[:] = [
+            d for d in dirnames if d not in GOSPEL_EXCLUDE_DIRS and not d.startswith(".")
+        ]
+        if "CLAUDE.md" in filenames:
+            yield Path(dirpath) / "CLAUDE.md"
+
+
+def extend_index_with_gospels(index: dict, repo_root) -> dict:
+    """Add id-declaring gospel CLAUDE.mds to a slug index. Existing entries win
+    on collision (doc-root declarations take precedence)."""
+    for md in gospel_claude_md_paths(repo_root):
+        try:
+            sid = _fm.parse_file(md).get("id")
+        except OSError:
+            continue
+        if sid and sid not in index:
+            index[sid] = str(md)
+    return index
+
+
+def is_gospel_claude_md(path, repo_root) -> bool:
+    """True iff path is a gospel CLAUDE.md inside the walk scope above."""
+    p = Path(path).resolve()
+    if p.name != "CLAUDE.md":
+        return False
+    try:
+        rel = p.relative_to(Path(repo_root).resolve())
+    except ValueError:
+        return False
+    return not any(
+        part in GOSPEL_EXCLUDE_DIRS or part.startswith(".") for part in rel.parts[:-1]
+    )
 
 
 def _is_fingerprint(p: str) -> bool:

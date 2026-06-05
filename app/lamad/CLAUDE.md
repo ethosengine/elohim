@@ -1,3 +1,11 @@
+---
+id: lamad-bundle-gospel
+cites:
+  - elohim-elements-ui-substrate-gospel | layer rails — element/token/binding ownership this bundle consumes (never defines) | sha256:99e918ce9147e2f1
+  - elohim-app-frontend-gospel | the shell twin of these rails — chrome composition + cross-bundle navigation rules | sha256:b7f99abd4e4b6e03
+  - genesis/data/timeline/backlog/bundle-styling-token-contract.md
+---
+
 # Lamad Reference Client Views
 
 This directory contains the reference Angular client's view layer for the
@@ -10,6 +18,19 @@ The domain vocabulary (manifest, schemas, coupling declarations) lives in
 
 Types in `generated/` are produced by `sdk/domains/lamad/scripts/codegen.mjs`.
 Do not hand-edit — regenerate with `pnpm run lamad:codegen`.
+
+## EPR-app bundle rails (separation of concerns)
+
+This is an independently-served EPR-app bundle (`<base href="/lamad/">`), not a module of the shell. The bundle IMPORTS layers; it never defines them:
+
+- **Styling**: `src/styles.scss` imports the token layer (`elohim-core/tokens.scss`) and the chrome-binding layer (`src/_chrome-binding.scss` — interim home, ONE concern: chrome `--elohim-*` cssprops → palette; it migrates wholesale to the graphos-tokens artifact). Never define or duplicate `--lamad-*` tokens in this bundle; never add bundle styles to the binding file.
+- **Chrome**: `<elohim-page-chrome>` wraps the root (auto-installs the epr-link interceptor); `<elohim-navigator>` is the Lit element — its `(navigate)` CustomEvent must be wired (see `lamad-layout.component.ts:onNavigatorNavigate`): lamad-owned routes → this router (base-href-stripped), everything else → full doorway load.
+- **Cross-bundle links**: under this base href, `routerLink="/"` resolves to lamad's OWN home — links to the landing/shell must be plain `href` (the interceptor records the nav handoff).
+
+Concern routing (content-addressed — slugs resolve via this file's `cites:` frontmatter and survive moves):
+- `elohim-elements-ui-substrate-gospel` §Layer rails — element/token/binding layer ownership
+- `elohim-app-frontend-gospel` §Chrome & cross-bundle composition rails — the shell twin of these rails
+- `genesis/data/timeline/backlog/bundle-styling-token-contract.md` — canonical token artifact (deletes the interim binding file)
 
 ## See Also
 

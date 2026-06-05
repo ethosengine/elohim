@@ -1,3 +1,13 @@
+---
+id: elohim-elements-ui-substrate-gospel
+cites:
+  - elohim-library-pattern-gospel | story-level binding discipline — Library A/B boundary; Library B decorators are Storybook-only until graphos-tokens ships | sha256:94b851810ce6cdc8
+  - elohim-app-frontend-gospel | the shell side of the layer rails — protocol-omni trust surface, ThemeService twin contract, EPR-native cross-bundle nav | sha256:b7f99abd4e4b6e03
+  - lamad-bundle-gospel | the bundle-consumer side of the layer rails — B18 token wiring is the worked example | sha256:10b8708970358e57
+  - genesis/data/timeline/backlog/bundle-styling-token-contract.md
+  - omnibar-consolidation-epr-native-links-design | the design whose theme/serving-context/nav decisions the layer rails enforce; records the B18 styling audit | sha256:71ad45eb5993b56c
+---
+
 # elohim-elements — UI Substrate Gospel
 
 This document is the **shared synthesis** for everyone (humans + agents) authoring inside `app/elohim-elements/`. It establishes scope discipline: what this directory is for, what it is NOT for, and the anti-patterns that creep in when those lines blur.
@@ -110,6 +120,28 @@ Brand bake in element CSS is the cardinal sin. Replacing `var(--elohim-button-bg
 Default values use CSS system colors (`Canvas`, `CanvasText`, `ButtonFace`, `ButtonText`, `LinkText`, `Mark`, `MarkText`, …) and `font: inherit`. The blank-slate proof story (`style="all: initial;"`) is the verification: if the element looks like a usable raw HTML control with zero tokens bound, the discipline held.
 
 ---
+
+## Layer rails — component → UI composition (one concern per layer)
+
+The chain from element to rendered, branded UI has exactly four layers. Each has ONE home; blending them is how the B18 gap happened (tokens harvested into `tokens.scss` but imported by nothing — lamad shipped 575 unresolved `var(--lamad-*)` references; 2026-06-05 styling-migration audit).
+
+| Layer | Home | The one concern |
+|---|---|---|
+| **Element** | `<module>/src/*.ts` (this directory) | Render blank-slate + a11y + emit intent. Publishes `@cssprop`; binds nothing. |
+| **Token layer** | `elohim-core/tokens.scss` | Palette + theme reactivity (`body[data-theme]`, `prefers-color-scheme`). Defined once; only SHIPS when a bundle imports it. |
+| **Binding layer** | per-bundle `_chrome-binding.scss` (interim) → graphos-tokens artifact (canonical, unbuilt) | Map element `--elohim-*` cssprops onto the palette. Nothing else lives in that file. |
+| **Bundle** | `app/<bundle>/src/styles.scss` | IMPORTS the layers + genuinely bundle-local styles. Never defines or duplicates tokens. |
+
+Rails:
+- An element never references a token it doesn't declare as `@cssprop` with a system-color default.
+- A bundle whose components consume `var(--lamad-*)` (or any palette) MUST import the token layer — "it renders fine in the shell" is not evidence (the shell's global `styles.css` is doing the work).
+- Preference state crosses the chain only via the shared store contracts (`theme/theme-store.ts`: `localStorage['elohim-theme']` + `body[data-theme]` + `elohim-theme-changed`; `localize/locale-store.ts` likewise) — never element-private theme/locale state.
+
+Concern routing (content-addressed — slugs resolve via this file's `cites:` frontmatter and survive moves):
+- `elohim-library-pattern-gospel` — story-level binding discipline; Library B decorators are Storybook-only until graphos-tokens ships
+- `elohim-app-frontend-gospel` §Chrome & cross-bundle composition rails — the shell side (protocol-omni trust surface, ThemeService twin, EPR-native nav)
+- `lamad-bundle-gospel` §EPR-app bundle rails — the bundle-consumer side (the worked example)
+- `genesis/data/timeline/backlog/bundle-styling-token-contract.md` — the canonical token artifact + runbook §4.X follow-up (entity docs stay path-cites by convention)
 
 ## Library boundary
 

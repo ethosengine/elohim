@@ -129,9 +129,12 @@ def _doc_target_has_id(ref: str) -> bool:
     AND sit within the migrator's doc-root scope? (then it should be an envelope,
     not a path-string — a CITE-FORMAT-CANDIDATE). Id-bearing .md OUTSIDE the doc
     roots (genesis/data entity docs), code, and external files stay healthy
-    plain-path cites — they are not migratable, so they are not candidates."""
+    plain-path cites — they are not migratable, so they are not candidates.
+    Gospel CLAUDE.mds (2026-06-05) ARE in-graph: id-declaring ones are migratable."""
     p = REPO_ROOT / ref.strip("/")
-    if p.suffix == ".md" and p.is_file() and _within_doc_roots(p):
+    if p.suffix == ".md" and p.is_file() and (
+        _within_doc_roots(p) or _cg.is_gospel_claude_md(p, REPO_ROOT)
+    ):
         try:
             return bool(_fm.parse_file(p).get("id"))
         except OSError:
@@ -224,9 +227,12 @@ def body_has_codepath(fm) -> bool:
 def run_audit() -> tuple[list[EntryReport], dict]:
     reports: list[EntryReport] = []
     index: dict[str, list[str]] = {}
-    slug_index = _cg.build_slug_index([str(r) for r in _DOC_ROOTS] + [
-        str(REPO_ROOT / "genesis" / "docs" / "superpowers" / "held"),  # held/ if scope-tree created it
-    ])
+    slug_index = _cg.extend_index_with_gospels(
+        _cg.build_slug_index([str(r) for r in _DOC_ROOTS] + [
+            str(REPO_ROOT / "genesis" / "docs" / "superpowers" / "held"),  # held/ if scope-tree created it
+        ]),
+        REPO_ROOT,
+    )
     _bucket = {"dead": "dead_cites", "held": "held_cites", "stale": "stale_cites",
                "format-candidate": "format_candidates"}
     for slug, p, fm in iter_memory_entries():
