@@ -3,9 +3,11 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { of } from 'rxjs';
 
 import { ProtocolOmniComponent } from './protocol-omni.component';
 import { ProtocolNavigationService } from '@app/elohim/services/protocol-navigation.service';
+import { ConfigService } from '../../../services/config.service';
 
 describe('ProtocolOmniComponent', () => {
   let fixture: ComponentFixture<ProtocolOmniComponent>;
@@ -151,5 +153,118 @@ describe('ProtocolOmniComponent', () => {
     fixture.detectChanges();
     const chip = fixture.nativeElement.querySelector('[data-testid="protocol-omni-chip"]');
     expect(chip).not.toBeNull();
+  });
+});
+
+describe('ProtocolOmniComponent serving context', () => {
+  function setup(opts: {
+    environment?: string;
+    logLevel?: string;
+    gitHash?: string;
+    showEnvContext?: boolean;
+  }) {
+    TestBed.resetTestingModule();
+
+    const nav = {
+      back: vi.fn(() => null),
+      forward: vi.fn(() => null),
+      context: vi.fn(() => null),
+      activate: vi.fn(async () => undefined),
+    };
+
+    const configStub = {
+      getConfig: () =>
+        of({
+          environment: opts.environment ?? 'alpha',
+          logLevel: opts.logLevel ?? 'debug',
+          gitHash: opts.gitHash ?? 'abc1234def',
+        }),
+    };
+
+    TestBed.configureTestingModule({
+      imports: [ProtocolOmniComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ProtocolNavigationService, useValue: nav },
+        { provide: ConfigService, useValue: configStub },
+      ],
+    });
+
+    const fixture: ComponentFixture<ProtocolOmniComponent> = TestBed.createComponent(ProtocolOmniComponent);
+    fixture.componentRef.setInput('contentId', 'elohim-host-landing');
+    fixture.componentRef.setInput('showEnvContext', opts.showEnvContext ?? true);
+    fixture.detectChanges();
+
+    const expand = () => {
+      const chip: HTMLElement = fixture.nativeElement.querySelector('[data-testid="protocol-omni-chip"]');
+      chip?.click();
+      fixture.detectChanges();
+    };
+
+    return { fixture, expand };
+  }
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('renders nothing when showEnvContext is false (default)', () => {
+    const { fixture, expand } = setup({ showEnvContext: false });
+    expand();
+    expect(fixture.nativeElement.querySelector('[data-testid="protocol-omni-env"]')).toBeNull();
+  });
+
+  it('renders tier + short buildId adjacent to the EPR on alpha', () => {
+    const { fixture, expand } = setup({ environment: 'alpha', gitHash: 'abc1234def' });
+    expand();
+    const env = fixture.nativeElement.querySelector('[data-testid="protocol-omni-env"]');
+    expect(env).toBeTruthy();
+    expect(env.textContent).toContain('alpha');
+    expect(env.textContent).toContain('abc1234');
+    expect(env.getAttribute('aria-label')).toContain('alpha environment');
+  });
+
+  it('renders on staging and development too', () => {
+    for (const tier of ['staging', 'development']) {
+      const { fixture, expand } = setup({ environment: tier });
+      expand();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="protocol-omni-env"]'),
+      ).toBeTruthy();
+    }
+  });
+
+  it('stays silent on production even when enabled', () => {
+    const { fixture, expand } = setup({ environment: 'production' });
+    expand();
+    expect(fixture.nativeElement.querySelector('[data-testid="protocol-omni-env"]')).toBeNull();
+    const chip = fixture.nativeElement.querySelector('[data-testid="protocol-omni-chip"]');
+    expect(chip?.classList.contains('omni-chip-env')).toBe(false);
+  });
+
+  it('omits a placeholder/local gitHash from the segment', () => {
+    const { fixture, expand } = setup({ gitHash: 'GIT_HASH_PLACEHOLDER' });
+    expand();
+    const env = fixture.nativeElement.querySelector('[data-testid="protocol-omni-env"]');
+    expect(env.querySelector('.omni-env-build')).toBeNull();
+  });
+
+  it('tints the collapsed chip when env context is active', () => {
+    const { fixture } = setup({ environment: 'alpha' });
+    const chip = fixture.nativeElement.querySelector('[data-testid="protocol-omni-chip"]');
+    expect(chip.classList.contains('omni-chip-env')).toBe(true);
+  });
+
+  it('renders the theme toggle only when showThemeToggle is set', () => {
+    const a = setup({ showEnvContext: false });
+    a.expand();
+    expect(a.fixture.nativeElement.querySelector('elohim-theme-toggle')).toBeNull();
+    const b = setup({ showEnvContext: false });
+    b.fixture.componentRef.setInput('showThemeToggle', true);
+    b.fixture.detectChanges();
+    b.expand();
+    expect(b.fixture.nativeElement.querySelector('elohim-theme-toggle')).toBeTruthy();
   });
 });

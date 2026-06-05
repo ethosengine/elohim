@@ -3,7 +3,7 @@
 
 <!-- Protocol omni — top-of-viewport chrome, gated by route protocolContent flag -->
 @if (protocolRouteCtx.isProtocol() && protocolRouteCtx.cid(); as cid) {
-  <app-protocol-omni [contentId]="cid"></app-protocol-omni>
+  <app-protocol-omni [contentId]="cid" [showEnvContext]="true"></app-protocol-omni>
 }
 
 <!-- Floating theme toggle button (only on root landing page) -->

@@ -15,6 +15,7 @@
   --omni-border: rgba(20, 22, 30, 0.14);
   --omni-accent: rgba(20, 22, 30, 0.96);
   --omni-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  --omni-env-ring: #d97706;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -25,6 +26,7 @@
     --omni-border: rgba(232, 234, 240, 0.16);
     --omni-accent: rgba(232, 234, 240, 0.96);
     --omni-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+    --omni-env-ring: #d97706;
   }
 }
 
@@ -111,4 +113,34 @@
 
 .omni-collapse {
   margin-left: auto;
+}
+
+.omni-epr-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.omni-env {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-color: var(--omni-env-ring);
+}
+
+.omni-env-tier {
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.omni-env-build {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.omni-chip-env {
+  box-shadow:
+    0 0 0 2px var(--omni-env-ring),
+    var(--omni-shadow);
 }

@@ -2,6 +2,7 @@
   <button
     type="button"
     class="omni-chip"
+    [class.omni-chip-env]="envVisible()"
     data-testid="protocol-omni-chip"
     (click)="toggleExpanded()"
     [attr.aria-expanded]="expanded()"
@@ -31,17 +32,31 @@
       &larr; {{ b.label || 'Back' }}
     </button>
 
-    <button
-      type="button"
-      class="omni-epr"
-      data-testid="protocol-omni-epr"
-      (click)="copyCid()"
-      title="Click to copy content identifier"
-      aria-label="Copy content identifier"
-    >
-      <span class="omni-epr-label">EPR</span>
-      <code class="omni-epr-value">{{ shortCid() }}</code>
-    </button>
+    <span class="omni-epr-group">
+      <button
+        type="button"
+        class="omni-epr"
+        data-testid="protocol-omni-epr"
+        (click)="copyCid()"
+        title="Click to copy content identifier"
+        aria-label="Copy content identifier"
+      >
+        <span class="omni-epr-label">EPR</span>
+        <code class="omni-epr-value">{{ shortCid() }}</code>
+      </button>
+
+      <a
+        *ngIf="envVisible()"
+        class="omni-env"
+        data-testid="protocol-omni-env"
+        routerLink="/doorway/elohim"
+        [attr.title]="envLabel()"
+        [attr.aria-label]="envLabel()"
+      >
+        <span class="omni-env-tier">{{ servingContext()?.tier }}</span>
+        <code *ngIf="shortBuildId()" class="omni-env-build">{{ shortBuildId() }}</code>
+      </a>
+    </span>
 
     <span
       class="omni-resilience"
@@ -72,6 +87,11 @@
     >
       &#x25D0;
     </a>
+
+    <elohim-theme-toggle
+      *ngIf="showThemeToggle()"
+      data-testid="protocol-omni-theme"
+    ></elohim-theme-toggle>
 
     <button
       type="button"
