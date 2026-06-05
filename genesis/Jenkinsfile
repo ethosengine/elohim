@@ -1145,6 +1145,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         env.CONDUCTOR_READINESS_FILE = artifactNames.genesis.conductorReadiness
                         env.SEED_RESULTS_CONDUCTOR_IDENTITIES_FILE = artifactNames.genesis.seedResultsConductorIdentities
                         env.SEED_RESULTS_AGENT_BINDINGS_FILE = artifactNames.genesis.seedResultsAgentBindings
+                        env.SEED_RESULTS_HOUSEHOLD_FORMATION_FILE = artifactNames.genesis.seedResultsHouseholdFormation
                     }
                 }
             }
@@ -1740,6 +1741,37 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         } else if (res.exitCode != 0) {
                             unstable("Seed Agent Peer Bindings exited ${res.exitCode} (unexpected — see console)")
                         }
+                    }
+                }
+            }
+        }
+
+        stage('Seed Household Formation') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        // Ceremony driver (rung 3): collective + affirmations + stewardship
+                        // grant run BEFORE the blob upload; the custody layer inside the
+                        // script self-skips when M1_BLOB_HASH is absent, and the
+                        // Seed Custody Commitments stage remains the M1 anti-drift flag.
+                        // The script probes the storage projection to REUSE the existing
+                        // collective cid, so re-runs converge (no new collective per run).
+                        // DOORWAY_URL / STORAGE_URL exported here (not in runProbedSeeder)
+                        // so the probe-convergence path in seed-household-formation.ts can
+                        // reach the storage projection without touching the shared helper.
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        if (doorwayHost) {
+                            env.DOORWAY_URL = "http://${doorwayHost}"
+                        }
+                        def res = runProbedSeeder('Seed Household Formation', 'seed-household-formation.ts',
+                            env.SEED_RESULTS_HOUSEHOLD_FORMATION_FILE ?: 'seed-results-household-formation.json')
+                        if (res.skipped) return
+                        if (res.exitCode == 2) { unstable("Household formation partial: affirmed=${res.seedReport?.affirmed}") }
+                        else if (res.exitCode != 0) { unstable("Household formation exited ${res.exitCode}") }
                     }
                 }
             }

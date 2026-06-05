@@ -28,10 +28,21 @@
  *   1 — fatal: no conductors / founder collective creation failed
  */
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+
+// Canonical artifact filename from build-artifacts.json — single source of
+// truth across Groovy + TypeScript + JS. Resolved once at module load so
+// the writeFileSync below cannot drift from what genesis/Jenkinsfile reads.
+const ARTIFACTS_MANIFEST_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..', '..', 'orchestrator', 'build-artifacts.json',
+);
+const ARTIFACTS = JSON.parse(readFileSync(ARTIFACTS_MANIFEST_PATH, 'utf8'));
+const SEED_RESULTS_FILE: string =
+  ARTIFACTS.genesis.seedResultsHouseholdFormation ?? 'seed-results-household-formation.json';
 import {
   AdminWebsocket,
   AppWebsocket,
@@ -680,7 +691,7 @@ async function main(): Promise<void> {
     partial,
   };
 
-  const resultsFile = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'seed-results-household-formation.json');
+  const resultsFile = resolve(dirname(fileURLToPath(import.meta.url)), '..', SEED_RESULTS_FILE);
   try {
     writeFileSync(resultsFile, JSON.stringify(report, null, 2));
   } catch (e) {
