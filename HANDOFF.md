@@ -1,65 +1,62 @@
-# HANDOFF — Household Formation Ceremony, Stage 1: COMMITTED, ready for integrator dev-merge + the CI run that unlocks Task 10
+# HANDOFF — shift/a2o-greenup carries TWO complete deliverables awaiting integrator dev-merge
 
-_Last updated: 2026-06-05 (~03:30) · Author: Claude Opus · Branch: `shift/a2o-greenup` · Session mode: **orchestrating** (subagent-driven execution; the 18-commit local diff is the work product — this doc is the integrator's checklist)_
+_Last updated: 2026-06-05 (late) · Author: Claude Opus · Branch: `shift/a2o-greenup` · Session mode: **orchestrating** (subagent/workflow-driven execution; the 56-commit local diff is the work product — this doc is the integrator's checklist)_
 
-> **Previous handoff (2026-06-04, peer-native OAuth portal-handoff): DELIVERED.** All 8 portal commits verified present in `origin/dev` (`6ada3ad55`, `0e9ef8357`, `6011d00d4` ancestry-checked 2026-06-05). Nothing from it remains open; see git history for its decisions (redemption-callback ratified; Session Transfer Store reuse; client-driven redirect; conductor stays authority).
+**Branch state (verified):** `origin/shift/a2o-greenup` does NOT exist; `origin/dev` tip was `04817e6e9` at last check. **`origin/dev..HEAD` = 56 commits, all local-only.** A concurrent session is still active in this worktree (~64 dirty files: elohim-core lint/format normalization + memkit `path:`-locator tooling + managed_surfaces hook) — those are THEIRS; merge/push coordination should let them commit first or exclude their paths.
 
-## Goal
+---
 
-Land the **household formation ceremony** (design session 2026-06-04 → spec → stage-1 plan → execution): a family (matthew/jessica/james) forms a household through real multi-agent zome calls — collective + affirmed memberships + anchored custody reciprocity — driven by the seeder as each persona's own conductor agent, projected to storage, validated by a2o on `household-nodes`. Fork settled: **emergent reciprocity + explicitly-marked interim fixtures** (fixtures retire at Task 10).
+## Deliverable 1 — Household Formation Ceremony, Stage 1 (earlier session, unchanged)
 
-Canonical docs (all committed):
-- Umbrella seed: `genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md`
-- Spec: `genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md` (§1 = the 8 settled decisions)
-- Plan: `genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md` (Tasks 1–10)
+Commits `89d86805c..1faa8315e` (18). Spec: `genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md`. All stage-1 tasks 1–9 complete and reviewed; Task 10 (fixture retirement) is precondition-gated on a CI run. **The integrator checklist for this deliverable is unchanged — see "Next Steps" items 2–5 below** (carried verbatim from the previous handoff; nothing new happened to it this session).
 
-## Current Progress — VERIFIED against repo state
+## Deliverable 2 — Omnibar Consolidation + EPR-Native Links (this session)
 
-**Branch `shift/a2o-greenup` is NOT pushed** (no `origin/shift/a2o-greenup` exists); `origin/dev` tip is `04817e6e9`. **Local-only commits = `89d86805c..HEAD` (18):** 2 design docs (`89d86805c` lattice+spec+backlog theses, `fa19ec4ee` plan), 15 stage-1 commits, 1 co-session a2o fix (`1faa8315e`).
+Spec `genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md` (committed `18b2cbe5c`, amended `9bc27e309` with the **ServingContext** dimension) · Plan `genesis/docs/superpowers/plans/2026-06-05-omnibar-consolidation-epr-native-links-plan.md` (`e14fb6416`) · 17 tasks executed via per-task implement→spec-review→quality-review workflow pipelines, then a whole-implementation integration review: **VERDICT READY, no blocking findings** (its one actionable — a `@wip` scenario testid — fixed in `f0b134a89`).
 
-Stage-1 tasks 1–9 ALL complete, each through implementer → spec review → quality review (+ fix rounds):
-
-| Task | Commits | Evidence |
+What landed (commit anchors):
+| Piece | Commits | Evidence |
 |---|---|---|
-| 1 Fixture triad pairs + provenance | `a934056dd`, `ceb651a55` | seeder vitest 8/8 |
-| 2 `issue_household_invite` + `affirm_membership` (imagodei) | `6462ffbad`, `9cb43955b` | sweettest 2/2 (`qahal_formation_test`); TOCTOU + clock-trust documented; projector dedup verified (UNIQUE(h_app_id,collective_id,human_id) + upsert) |
-| 3 Charter→projection (`governance_layer='family'` + slug-alias merge) | `1a86f0a9a`, `e1d5fb24a` | storage lib 1341/0; redelivery idempotency asserted |
-| 4 Soft action-gate (custody-blob conductor round-trip, diesel fallback; update_state anchor-gated) | `1e5bd0ab5`, `fca614344` | rea_commitment tests 24/24 |
-| 5 DeliveryPeer enrichment patch applied (household_id + provide reaches; patch file retired) | `ec500e1d6` | lib 1350/0 |
-| 6 `seed-household-formation.ts` (rung-3 ceremony driver; convergent re-runs via projection probe) | `c322d950e`, `8a902af9a` | vitest 9/9; encodeHashToBase64 for ActionHash |
-| 7 Jenkins `Seed Household Formation` stage + artifacts entry + probe env | `a0986fb71`, `bcccb37ef` | stage between Bindings and Upload-M1; STORAGE_URL from INTERNAL_STORAGE_URL |
-| 8 `qahal/household` quiltPolicy + qahal codegen quilt-refs gate | `ad70e954e` | manifest:test 32/0, schema:test 83/0, both codegen gates GATE OK |
-| 9 a2o spine + retags (household-formation.feature; Susan→Jessica; love-map → live) | `2a4507726` | dry-run 0 undefined; eslint clean |
+| ThemeStore + LocaleStore (elohim-core, exact ThemeService contract) | `…` Tasks 1–2 + `900d7051c` | wtr suite green |
+| `<elohim-theme-toggle>` + `<elohim-lang-picker>` + Library A stories | `c144b1cc8`, `2f5b5029c` | three precondition gates pass |
+| Capture-phase epr-link interceptor + spec §4.2 refinement | `b950726bd`, `c9bbdf107` | beats stale routerLink 404s; fails open |
+| page-chrome auto-install; default-omnibar opt-in attrs | `0320c86ff` | defaults off |
+| Navigator theme/lang restore (heals `8ce50c4e2` drop) | `483bfcba6`, `1b8746707` | tray + visitor inline |
+| ServingContext (`{tier, logLevel, buildId, variant?}`) + AppConfig.gitHash + ThemeService sync | `bef3dcf86`–`af6142ed4` | dimension orthogonal to reach |
+| protocol-omni serving-context segment (opt-in, prod-silent, EPR-adjacent) + debug-bar DELETED | `836c38319`–`d5e8149eb` | 21 component tests |
+| EprNavService (ownsPath from live router config) + shell interceptor install | `0195ffd63`, `d39c43637` | future pillar splits flip automatically |
+| 21-site link sweep (footer/not-found/profile/presence/tauri-auth/lamad-layout + navigator wiring) | `26ee27eb4`, `f107a11a5` | sweep greps clean; 2783 tests green |
+| **B18**: lamad bundle imports token layer + `_chrome-binding.scss` | `ed04923c7` | dist greps prove tokens/theme-blocks/binding ship; theme toggle now repaints lamad |
+| a2o scenarios (serving-context, footer cross-bundle, chrome-preferences spine) | `4ad63f8c9`, `226eb9d54`, `f0b134a89` | 0 new undefined steps |
+| Review-debt cleanup + gate fix-ups | `5e86a6384`, `5b677c44e`, `d2e01d8ad`, `91261285f` | see gates |
+| CLAUDE.md separation-of-concerns rails + memkit gospel cite graph | `e49f26c43` | 4 gospels content-addressed; coherence audit clean |
 
-Final whole-implementation integration review (seams BETWEEN tasks): **coherent, no Criticals.** Charter contract, CID round-trip, provenance wire shape, Jenkins env all verified end-to-end.
+**Final gates (G7, recorded):** elohim-core 447/447 + typecheck + build; elohim-app 4517/4517; lamad 2731/2733 (2 PRE-EXISTING content-viewer zone.js failures, untouched file); storybook builds; a2o dry-run 0 new undefined; lint baseline-aware **0 NEW issues** (887 pre-existing repo-wide, not ours).
 
 ## What Worked
 
-- **Subagent-driven execution with two-stage review caught real bugs**: ActionHash returned as raw bytes (would have silently broken all CID scope matching); double-schemed probe URL (`http://https://…` — convergence would never fire); CI re-runs minting a fresh collective nightly (fixed via projection-probe reuse + deterministic salt).
-- **Zero new DHT entry types** — the whole feature composes existing primitives (D2 canon held; entity model in spec §2).
-- The seed-realism audit before planning: rung-3 identity seeding already existed (`seed-conductor-identities.ts` pattern) — the ceremony driver is its sibling, not an invention.
-- Native sweettest env quirks memorialized: `RUSTFLAGS=""` + `BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/clang/21/include"` + `just pack` (not `just build`) — see `.claude/memory/project_sweettest_native_build_env.md`.
+- **Workflow-orchestrated subagent pipeline** (implement → spec-review → quality-review, ≤2 fix rounds each) with an **admissibility clause** + **fix-verification-only re-reviews** — added after round-3 reviewer churn nearly deadlocked Task 1; zero churn afterward. Real bugs caught: listener leaks, dead Router injection, a Vitest-4 done-callback defect in the plan itself, the wtr synthetic-click navigation hazard.
+- **Styling-migration audit on operator question** exposed the B18 gap (tokens harvested to `elohim-core/tokens.scss` but imported by NOTHING; 575 unresolved `var(--lamad-*)`; theme switching inert in lamad) — fixed as Task 16 with build-verified dist greps.
+- Plan template defects are survivable when implementer contexts grant adaptation authority ("the committed interface is authoritative over the task file's listing").
 
 ## What Didn't Work / Don't Repeat
 
-- `GetLinksInputBuilder` isn't this HDK's idiom — use `LinkQuery::try_new` + `get_links(q, GetStrategy::default())`.
-- The sweettest crate registers tests via `[[test]]` in `Cargo.toml`, NOT `src/tests/mod.rs`.
-- `runProbedSeeder` exports only `CONDUCTOR_URLS` — stage-level `env.X =` assignments are pipeline-GLOBAL in Jenkins; `RESOLVED_DOORWAY_HOST` already carries `https://` (never prefix it).
-- Doorway does NOT proxy `/db/*` (it maps `/api/v1/collectives/*` → `/db/collectives/*` internally) — the seeder's DOORWAY_URL probe fallback soft-fails to the create path; only STORAGE_URL actually probes.
-- `qahal_collab_t0_test::two_conductor_t0_collab_end_to_end` has a pre-existing peer-exchange-timeout flake — verify YOUR symbols appear in a failure before chasing it.
+- Workflow `args` never reaches scripts in this environment — bake config into the script file (DEFAULT_ARGS) and edit per run.
+- A schema-enforced workflow agent that runs ~40 min may die "completed without calling StructuredOutput" with its WORK ON DISK — check `git status` before re-running; a completion agent (verify→finish→commit) beats a blind retry (Task 13 recovery).
+- Fresh quality reviewers each round invent new findings — re-reviews must verify prior findings only (now encoded in the pipeline prompts).
+- `routerLink="/"` inside a base-href'd bundle resolves to the bundle's OWN root, not the site root.
 
 ## Next Steps (integrator, in order)
 
-1. **Push + dev-merge** `shift/a2o-greenup` (18 local commits; repo convention = local fast-forward onto `dev`, no PR). Pre-push hook runs the per-project gates — all were green at commit time. `sweettest-check` fires on a dev-targeted push; budget for the DNA build (and note the `just pack` requirement if running zome tests by hand).
-2. **Watch the genesis pipeline run**: the new `Seed Household Formation` stage runs after Agent Bindings, before Upload-M1. Expect the `seed-results-household-formation.json` artifact. First run: probe misses (no stamped CID yet) → creates the collective → affirms jessica + james → stewardship grant → custody layer self-skips (no `M1_BLOB_HASH` yet at that stage position); the triad's custody rows come from the Task-1 FIXTURES this run (marked `fixture: formation-output`). The projector stamps `family-dowell` with the collective CID + `governance_layer='family'`.
-3. **TASK 10 — fixture retirement (the one open plan task, precondition-gated).** Trigger: a CI run shows `seed-results-household-formation.json` with `"partial": false` AND `GET /api/v1/commitments?action=custody-blob&state=active` returns triad rows with `metadata.seedGeneration == "ceremony"`. Then execute plan Task 10 (`genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md`, last task — fully specified, ~30 min): flip the seed-commitments test to expect 2 pairs, remove the 4 fixture pairs from `defaultM1Pairs` (KEEP the M1 matthew↔jessica anti-drift pair + the `fixture?` capability), un-`@wip` the provenance scenario in `household-formation.feature`.
-   - NOTE: ceremony custody rows require a run where `M1_BLOB_HASH` is available to the formation seeder — either re-order the stage after Upload-M1 at that point, or run `seed:household` ad-hoc with the env set. Decide at Task-10 time; the seeder reads the env and self-skips gracefully either way.
-4. **Verify the a2o spine against the deployed env**: `cd genesis/a2o && npx cucumber-js features/qahal/household-formation.feature` (needs `E2E_DOORWAY_ALPHA` + `E2E_STORAGE_URL`). Scenarios 1/2/4 should pass post-seed; 3 and 5 are `@wip` by design (sponsor surfacing on the participants view; ceremony provenance pre-Task-10).
-5. **Stage-2 seams already captured** in `.claude/memory-kit/gap-items/specs__2026-06-04-household-formation-ceremony-design.json` (#13, #14): `ReaCommitmentView.in_scope_of` nulls for conductor-path rows (`views_convert/shefa.rs:140` — fix before any scenario asserts household scope on the wire); `create_stewardship_grant` non-idempotent (timestamped ids → duplicate grants on re-runs; bounded noise, latest-wins).
-6. **Future plans (not this branch):** Stage 2 = doorway headless persona auth (`/auth/service-login`) + thin ceremony proxy + `conductor_writes` collective wrappers; Stage 3 = seeder service-agent with `delegates-compute` standing (X-API-Key displacement per admin-key-lifecycle spec). Held design theses in `genesis/data/timeline/backlog/`: dwelling-first-class-entity, household-mobility-seams, capability-arc-stewardship-gradient, witnessed-records-reach-flywheel.
+1. **Coordinate with the still-active co-session** (memkit `path:` tooling + elohim-core format pass, ~64 dirty files) — let it commit, then **push + dev-merge** `shift/a2o-greenup` (56+ commits; repo convention = local fast-forward onto `dev`, no PR). Pre-push `sweettest-check` fires on dev-targeted push (Deliverable 1 touched imagodei zome — budget for the DNA build; `just pack`, not `just build`).
+2. **Household formation (unchanged from previous handoff):** watch the genesis pipeline's `Seed Household Formation` stage; expect `seed-results-household-formation.json`; projector stamps `family-dowell`.
+3. **Task 10 fixture retirement** (precondition-gated): when a CI run shows `"partial": false` AND `GET /api/v1/commitments?action=custody-blob&state=active` returns triad rows with `metadata.seedGeneration == "ceremony"` → execute plan Task 10 (`2026-06-04-household-formation-ceremony-stage1.md`, ~30 min).
+4. **Verify household a2o:** `cd genesis/a2o && npx cucumber-js features/qahal/household-formation.feature` (needs `E2E_DOORWAY_ALPHA` + `E2E_STORAGE_URL`); scenarios 1/2/4 pass post-seed; 3/5 `@wip` by design.
+5. **Verify omnibar/links a2o post-deploy:** `features/browser/navigation-browser.feature` (footer cross-bundle scenario), `features/protocol/protocol-omni.feature` (serving-context shows `alpha` + short gitHash on the expanded toolbar). Visual: landing footer "📚 Lamad" lands on lamad with no 404; lamad theme toggle (navigator) repaints the page; `EPR elohim-host-landing · alpha · <hash>` in the expanded omni bar.
+6. **De-@wip later (deliver-phase):** `features/elohim-core/chrome-preferences.feature` (needs browser step defs for data-theme/dir assertions).
 
-## Housekeeping for the next dev session (not integrator-blocking)
+## Captured follow-ups (not integrator-blocking)
 
-- `/memory-stasis-loop` owed (cleanup gate 141/120 at SessionStart); MAP.md refresh owed (11 seeds changed, incl. the lattice — gap-item `architecture__2026-06-04-qahal-epr-household-lattice-design#1`).
-- Uncommitted in-repo memory files from this session (`.claude/memory/feedback_k8s_is_not_the_architecture.md`, `.claude/memory/project_sweettest_native_build_env.md`, refined `project_local_stack_dht_anchor_gap.md`, MEMORY.md index line) — commit with the next memory-hygiene pass (MEMORY.md is co-dirtied by a concurrent session; selective-stage).
-- Untracked `genesis/docs/superpowers/held/CLAUDE.md` and modified `genesis/docs/architecture/pillar-bundle-split-runbook.md` predate/parallel this session — not ours; leave for their owners.
+- **`genesis/data/timeline/backlog/bundle-styling-token-contract.md`** — shippable graphos-tokens artifact; runbook §4.X bundle-styling contract; `--lamad-on-accent` token (light-mode contrast at exactly 3:1 on accent surfaces); next pillar split inherits the recipe.
+- Spec §9 follow-ups: person-level preference sync (imagodei, p2p-gate re-run), settings-palette a11y overrides, Angular surface localization, ThemeService→ThemeStore collapse, Library B designed stories for toggle/picker, ServingContext substrate home (doorway `X-Build-Id`/`X-Variant` headers — rust-architect lane).
+- Housekeeping: `/memory-stasis-loop` still owed (cleanup gate was 143/120 at SessionStart); MAP.md refresh owed; elohim-shell metadata still mentions debug-bar (harvest sweep).
