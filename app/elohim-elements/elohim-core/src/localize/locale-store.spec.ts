@@ -9,10 +9,17 @@ import {
 } from './locale-store.js';
 
 describe('LocaleStore', () => {
+  let store: LocaleStore | undefined;
+
   beforeEach(() => {
     localStorage.removeItem(LOCALE_STORAGE_KEY);
     document.documentElement.lang = '';
     document.documentElement.dir = '';
+  });
+
+  afterEach(() => {
+    store?.destroy();
+    store = undefined;
   });
 
   it('supports the lit-localize registry (en source + es/he targets)', () => {
@@ -27,14 +34,14 @@ describe('LocaleStore', () => {
 
   it('loads a persisted valid locale', () => {
     localStorage.setItem(LOCALE_STORAGE_KEY, 'es');
-    const store = new LocaleStore();
+    store = new LocaleStore();
     expect(store.locale).to.equal('es');
     expect(document.documentElement.lang).to.equal('es');
     expect(document.documentElement.dir).to.equal('ltr');
   });
 
   it('set() persists, applies lang/dir (he → rtl) and dispatches once', () => {
-    const store = new LocaleStore();
+    store = new LocaleStore();
     let events = 0;
     const onEvent = (): void => {
       events += 1;
@@ -51,7 +58,7 @@ describe('LocaleStore', () => {
   });
 
   it('adopts an external change event without re-dispatching', () => {
-    const store = new LocaleStore();
+    store = new LocaleStore();
     let events = 0;
     const onEvent = (): void => {
       events += 1;
