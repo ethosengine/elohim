@@ -265,3 +265,45 @@ describe('<elohim-default-omnibar> — i18n precondition gate', () => {
     expect(rect.height).to.be.greaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// <elohim-page-chrome> interceptor auto-install
+// ---------------------------------------------------------------------------
+
+describe('<elohim-page-chrome> interceptor auto-install', () => {
+  it('installs the epr-link interceptor on connect and removes it on disconnect', async () => {
+    expect(window.__elohimEprLinkInterceptor).to.be.undefined;
+    const el = await fixture(html`<elohim-page-chrome><p>x</p></elohim-page-chrome>`);
+    expect(window.__elohimEprLinkInterceptor).to.exist;
+    expect(window.__elohimEprLinkInterceptor!.explicit).to.be.false;
+    el.remove();
+    expect(window.__elohimEprLinkInterceptor).to.be.undefined;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// <elohim-default-omnibar> opt-in controls
+// ---------------------------------------------------------------------------
+
+describe('<elohim-default-omnibar> opt-in controls', () => {
+  it('renders no controls by default', async () => {
+    const el = await fixture(html`<elohim-default-omnibar></elohim-default-omnibar>`);
+    expect(el.shadowRoot!.querySelector('elohim-theme-toggle')).to.not.exist;
+    expect(el.shadowRoot!.querySelector('elohim-lang-picker')).to.not.exist;
+  });
+
+  it('renders the theme toggle with show-theme-toggle', async () => {
+    const el = await fixture(html`<elohim-default-omnibar show-theme-toggle></elohim-default-omnibar>`);
+    expect(el.shadowRoot!.querySelector('elohim-theme-toggle')).to.exist;
+  });
+
+  it('renders the lang picker with show-lang-picker', async () => {
+    const el = await fixture(html`<elohim-default-omnibar show-lang-picker></elohim-default-omnibar>`);
+    expect(el.shadowRoot!.querySelector('elohim-lang-picker')).to.exist;
+  });
+
+  it('keeps the user part rendered alongside controls', async () => {
+    const el = await fixture(html`<elohim-default-omnibar show-theme-toggle show-lang-picker></elohim-default-omnibar>`);
+    expect(el.shadowRoot!.querySelector('[part="user"]')).to.exist;
+  });
+});

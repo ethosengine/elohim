@@ -1,5 +1,5 @@
-import { css, html, LitElement } from 'lit';
-import { state } from 'lit/decorators.js';
+import { css, html, LitElement, nothing } from 'lit';
+import { property, state } from 'lit/decorators.js';
 
 import { Session, type CurrentUserView } from './session/session.js';
 
@@ -20,6 +20,10 @@ import { Session, type CurrentUserView } from './session/session.js';
  * @csspart brand     - The brand mark span
  * @csspart user      - The user area (name or sign-in link)
  * @csspart user-name - The authenticated user's humanId (present only when signed in)
+ * @csspart end       - The inline-end cluster (controls + user area)
+ *
+ * @attr show-theme-toggle - Opt-in: render <elohim-theme-toggle> in the end cluster
+ * @attr show-lang-picker  - Opt-in: render <elohim-lang-picker> in the end cluster
  *
  * @capabilityMaxLens standard
  * @capabilityThemes light, dark
@@ -35,6 +39,9 @@ export class ElohimDefaultOmnibar extends LitElement {
   private _session = new Session();
 
   @state() private _user: CurrentUserView | null = this._session.currentUser;
+
+  @property({ type: Boolean, attribute: 'show-theme-toggle' }) showThemeToggle = false;
+  @property({ type: Boolean, attribute: 'show-lang-picker' }) showLangPicker = false;
 
   private _unsub?: () => void;
 
@@ -64,6 +71,12 @@ export class ElohimDefaultOmnibar extends LitElement {
     .user {
       font-size: 0.875rem;
       opacity: 0.8;
+    }
+
+    .end {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
     }
 
     a {
@@ -104,10 +117,14 @@ export class ElohimDefaultOmnibar extends LitElement {
   override render() {
     return html`
       <span class="brand" part="brand">elohim.host</span>
-      <span class="user" part="user">
-        ${this._user
-          ? html`<span part="user-name">${this._user.humanId}</span>`
-          : html`<a href="/auth/signin">sign in</a>`}
+      <span class="end" part="end">
+        ${this.showLangPicker ? html`<elohim-lang-picker></elohim-lang-picker>` : nothing}
+        ${this.showThemeToggle ? html`<elohim-theme-toggle></elohim-theme-toggle>` : nothing}
+        <span class="user" part="user">
+          ${this._user
+            ? html`<span part="user-name">${this._user.humanId}</span>`
+            : html`<a href="/auth/signin">sign in</a>`}
+        </span>
       </span>
     `;
   }

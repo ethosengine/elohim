@@ -1,6 +1,8 @@
 import { css, html, LitElement } from 'lit';
 import { state } from 'lit/decorators.js';
 
+import { installEprLinkInterceptor } from './navigation/epr-link-interceptor.js';
+
 /**
  * <elohim-page-chrome> — the bundle's root wrapper. Provides a slotted
  * omnibar contract: bundles that have their own toolbar place it in
@@ -26,9 +28,26 @@ import { state } from 'lit/decorators.js';
  * @capabilityRequiredStandings pilot | steward | elohim-support
  * @capabilityContentCertainty not-observed
  * @capabilityStates empty:n/a, loading:n/a, error:n/a, stale:n/a, contested:n/a, offline:n/a, unauthorized:n/a
+ *
+ * Auto-installs the EPR link interceptor (cross-bundle anchor handling) on connect.
  */
 export class ElohimPageChrome extends LitElement {
   @state() private hasSlottedOmnibar = false;
+
+  private _uninstallInterceptor?: () => void;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // Default (base-href heuristic) install — a shell that installs
+    // explicitly (Angular elohim-app) wins via the explicit flag.
+    this._uninstallInterceptor = installEprLinkInterceptor();
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._uninstallInterceptor?.();
+    this._uninstallInterceptor = undefined;
+  }
 
   static override readonly styles = css`
     :host {
