@@ -14,6 +14,91 @@ import {
 } from './testing/theme-contrast.js';
 
 // ---------------------------------------------------------------------------
+// Helpers — omni binding fixture injection
+//
+// The protocol-omni SHIPPED binding (protocol-omni.component.css) assigns
+// --elohim-hypercard-bg/border/shadow from --omni-* tokens but (pre-fix)
+// does NOT set `color` on the embedding rule, so hypercard text inherits the
+// app theme fg while the bg follows the OS color-scheme.  These helpers
+// reproduce that exact cascade inside the WTR browser for the tokens cells
+// declared in the theme-contrast gate describe block below.
+//
+// Approach (spec §4.1): the shipped binding is injected as a <style> element
+// in the test fixture; the element itself stays blank-slate untouched.
+// ---------------------------------------------------------------------------
+
+/**
+ * Inject a <style> element with the given CSS text into document.head.
+ * Returns a cleanup function that removes the element.
+ */
+function injectStyle(cssText: string): () => void {
+  const el = document.createElement('style');
+  el.setAttribute('data-omni-test-fixture', '');
+  el.textContent = cssText;
+  document.head.append(el);
+  return () => el.remove();
+}
+
+/**
+ * Render an <elohim-hypercard-panel> inside a container that mimics the
+ * protocol-omni embedding: `--elohim-hypercard-{bg,border,shadow}` are bound
+ * to the BROKEN omni light-scheme tokens (OS-scheme-keyed, no `color`), while
+ * the document context carries a dark-app-theme fg — reproducing the contrast
+ * failure reported by the operator.
+ *
+ * Returns the hypercard element and a cleanup function.
+ */
+async function renderInBrokenOmniBinding(
+  actions: ContextMenuItem[]
+): Promise<{ el: ElohimHypercardPanel; cleanup: () => void }> {
+  // Broken binding: bg from omni-light tokens, no color set.
+  // The page context fg is a dark-theme value — simulating the OS=light /
+  // app-theme=dark mismatch (or OS=dark / app-theme=light, same failure class).
+  const BROKEN_CSS = `
+    .omni-resilience-test {
+      /* omni light bg — the value the OS-scheme block provides */
+      --elohim-hypercard-bg: rgba(255, 255, 255, 0.92);
+      --elohim-hypercard-border: 1px solid rgba(20, 22, 30, 0.14);
+      --elohim-hypercard-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+      /* deliberately no color binding on this rule — the bug */
+    }
+  `;
+  const cleanup = injectStyle(BROKEN_CSS);
+
+  // The wrapper provides a dark-theme fg (app theme), opaque dark bg (page).
+  // color-scheme:light mimics OS=light so the hypercard bg (rgba(255,255,255,...))
+  // resolves white — while the inherited fg stays the dark-app-theme value set
+  // on the wrapper below.  Ratio ~1.44:1, matching the live alpha measurement.
+  const wrapper = await fixture<HTMLDivElement>(html`
+    <div
+      style="color-scheme: light; background: rgb(15, 23, 42); color: rgb(232, 234, 240); padding: 8px;"
+    >
+      <div class="omni-resilience-test" style="position: relative; display: inline-block;">
+        <elohim-hypercard-panel panelLabel="Resilience status" .actions=${actions} open>
+          <dl>
+            <dt>Placement coverage</dt>
+            <dd>9 of 12 collective roles filled</dd>
+          </dl>
+        </elohim-hypercard-panel>
+      </div>
+    </div>
+  `);
+  const el = wrapper.querySelector('elohim-hypercard-panel') as ElohimHypercardPanel;
+  await el.updateComplete;
+  // Disable the fold-down animation before measurement so cumulativeOpacity()
+  // sees steady-state opacity (not mid-flight 0), same as themeFixture's
+  // disableMotion() helper.
+  if (el.shadowRoot) {
+    const noMotion = new CSSStyleSheet();
+    noMotion.replaceSync(
+      ':host, *, *::before, *::after { transition: none !important; animation: none !important; }'
+    );
+    el.shadowRoot.adoptedStyleSheets = [...el.shadowRoot.adoptedStyleSheets, noMotion];
+  }
+  return { el, cleanup };
+}
+
+// ---------------------------------------------------------------------------
 // Shared fixture data
 // ---------------------------------------------------------------------------
 
@@ -605,4 +690,188 @@ describe('<elohim-hypercard-panel> — theme-contrast gate', () => {
       await axeScanStrict(el);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// <elohim-hypercard-panel> — omni binding tokens cells
+//
+// These cells pin the protocol-omni.component.css → hypercard cssprop
+// binding contract (theme-authority spec §4.1 "tokens cells": inject the
+// SHIPPED binding as the test fixture; blank-slate discipline holds; the
+// element is never modified).
+//
+// Cell taxonomy:
+//   omni-binding-broken  — FAILING-FIRST gate: reproduces the OS-scheme ≠
+//     app-theme mismatch that produced the operator-reported unreadable cards.
+//     Injects the pre-fix binding (no `color` on the embedding rule); the
+//     dark-app-theme fg inherited from the wrapper over the light-OS-scheme bg
+//     yields ~1.44:1 (WCAG 4.5:1 threshold → FAIL).  This cell MUST fail
+//     before the CSS fix and pass after it (post-fix color pairing closes the
+//     contrast gap because both fg and bg come from the same --omni-* family).
+//
+//   omni-light           — CONTRACT cell: omni light tokens + light context.
+//     Verifies rgba(255,255,255,0.92) bg is paired with rgba(20,22,30,0.96) fg
+//     (the fixed .omni-resilience rule adds `color: var(--omni-fg)`).
+//     Passes post-fix only.
+//
+//   omni-dark            — CONTRACT cell: omni dark tokens + dark context.
+//     Verifies rgba(22,23,28,0.92) bg is paired with rgba(232,234,240,0.96) fg.
+//     Passes post-fix only.
+// ---------------------------------------------------------------------------
+
+describe('<elohim-hypercard-panel> — omni binding tokens cells', () => {
+  const OMNI_ACTIONS: ContextMenuItem[] = [
+    { id: 'view-full', label: 'View full resilience' },
+    { id: 'steward', label: 'Steward this content' },
+    { id: 'network', label: 'View network', disabled: true },
+  ];
+
+  // ── FAILING-FIRST cell ────────────────────────────────────────────────────
+  // This cell reproduces the BROKEN pre-fix pairing:
+  //   bg = rgba(255,255,255,0.92)  (omni light, OS-scheme-keyed)
+  //   fg = rgb(232,234,240)        (dark-app-theme, inherited from wrapper)
+  // Computed ratio ≈1.44:1 — far below the 4.5:1 WCAG threshold.
+  //
+  // Expected lifecycle:
+  //   BEFORE CSS fix  → FAIL  (assertThemeContrast throws — red gate)
+  //   AFTER  CSS fix  → PASS  (color: var(--omni-fg) brings fg into the
+  //                            light-token family → rgba(20,22,30,0.96) on
+  //                            rgba(255,255,255,0.92) ≈ 18:1 PASS)
+  it('omni-binding-broken: fails contrast when OS-scheme bg is paired with app-theme fg (pre-fix reproducer)', async () => {
+    const { el, cleanup } = await renderInBrokenOmniBinding(OMNI_ACTIONS);
+    try {
+      // assertThemeContrast is expected to THROW here — that is the failing-first
+      // evidence.  We catch the error and re-throw with a clear label so the WTR
+      // output names the regression class, not just "Error".
+      let threw = false;
+      try {
+        assertThemeContrast(el);
+      } catch (err) {
+        threw = true;
+        // Confirm it IS a contrast failure (not some other error).
+        const msg = err instanceof Error ? err.message : String(err);
+        expect(msg, 'Expected a theme-contrast failure').to.contain('theme-contrast');
+        // Confirm the measured ratio is below threshold (ratio string present).
+        // The walk reports "X:1 < 4.5:1" so we just check "<" is in the message.
+        expect(msg, 'Expected a below-threshold ratio in the failure message').to.contain('<');
+      }
+      expect(
+        threw,
+        'assertThemeContrast MUST throw for the broken pairing — if it does not throw, the failing-first gate is not exercising the regression'
+      ).to.be.true;
+    } finally {
+      cleanup();
+    }
+  });
+
+  // ── CONTRACT cell: omni-light (post-fix) ─────────────────────────────────
+  // Fixed binding: both bg and fg come from the omni light token family.
+  //   bg ≈ rgba(255,255,255,0.92) — omni light bg
+  //   fg ≈ rgba(20,22,30,0.96)    — omni light fg  (color: var(--omni-fg))
+  // Ratio ≈ 18:1 — well above 4.5:1.
+  //
+  // Note: a no-motion sheet is injected into the hypercard shadow root to
+  // disable the fold-down animation before measurement.  The animation runs
+  // opacity 0→1; without suppression, cumulativeOpacity() would pick up
+  // opacity≈0 mid-flight and report a bogus 1:1 ratio (same guard the
+  // themeFixture helper applies via disableMotion()).
+  it('omni-light: hypercard bg+fg both come from omni light tokens (post-fix contract)', async () => {
+    const FIXED_LIGHT_CSS = `
+      .omni-resilience-test-light {
+        --omni-bg: rgba(255, 255, 255, 0.92);
+        --omni-fg: rgba(20, 22, 30, 0.96);
+        --omni-border: rgba(20, 22, 30, 0.14);
+        --omni-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+        --elohim-hypercard-bg: var(--omni-bg);
+        --elohim-hypercard-border: var(--omni-border);
+        --elohim-hypercard-shadow: var(--omni-shadow);
+        color: var(--omni-fg);
+      }
+    `;
+    const cleanup = injectStyle(FIXED_LIGHT_CSS);
+    try {
+      const wrapper = await fixture<HTMLDivElement>(html`
+        <div
+          style="color-scheme: light; background: rgb(249, 250, 251); color: rgb(17, 24, 39); padding: 8px;"
+        >
+          <div
+            class="omni-resilience-test-light"
+            style="position: relative; display: inline-block;"
+          >
+            <elohim-hypercard-panel panelLabel="Resilience status" .actions=${OMNI_ACTIONS} open>
+              <dl>
+                <dt>Placement coverage</dt>
+                <dd>9 of 12 collective roles filled</dd>
+              </dl>
+            </elohim-hypercard-panel>
+          </div>
+        </div>
+      `);
+      const el = wrapper.querySelector('elohim-hypercard-panel') as ElohimHypercardPanel;
+      await el.updateComplete;
+      // Disable the fold-down animation before measurement so cumulativeOpacity()
+      // sees steady-state opacity (not mid-flight 0).  Mirror the approach used
+      // in themeFixture's disableMotion() helper.
+      if (el.shadowRoot) {
+        const noMotion = new CSSStyleSheet();
+        noMotion.replaceSync(
+          ':host, *, *::before, *::after { transition: none !important; animation: none !important; }'
+        );
+        el.shadowRoot.adoptedStyleSheets = [...el.shadowRoot.adoptedStyleSheets, noMotion];
+      }
+      assertThemeContrast(el);
+    } finally {
+      cleanup();
+    }
+  });
+
+  // ── CONTRACT cell: omni-dark (post-fix) ──────────────────────────────────
+  // Fixed binding: both bg and fg come from the omni dark token family.
+  //   bg ≈ rgba(22,23,28,0.92)      — omni dark bg
+  //   fg ≈ rgba(232,234,240,0.96)   — omni dark fg  (color: var(--omni-fg))
+  // Ratio ≈ 11:1 — well above 4.5:1.
+  it('omni-dark: hypercard bg+fg both come from omni dark tokens (post-fix contract)', async () => {
+    const FIXED_DARK_CSS = `
+      .omni-resilience-test-dark {
+        --omni-bg: rgba(22, 23, 28, 0.92);
+        --omni-fg: rgba(232, 234, 240, 0.96);
+        --omni-border: rgba(232, 234, 240, 0.16);
+        --omni-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+        --elohim-hypercard-bg: var(--omni-bg);
+        --elohim-hypercard-border: var(--omni-border);
+        --elohim-hypercard-shadow: var(--omni-shadow);
+        color: var(--omni-fg);
+      }
+    `;
+    const cleanup = injectStyle(FIXED_DARK_CSS);
+    try {
+      const wrapper = await fixture<HTMLDivElement>(html`
+        <div
+          style="color-scheme: dark; background: rgb(15, 23, 42); color: rgb(226, 232, 240); padding: 8px;"
+        >
+          <div class="omni-resilience-test-dark" style="position: relative; display: inline-block;">
+            <elohim-hypercard-panel panelLabel="Resilience status" .actions=${OMNI_ACTIONS} open>
+              <dl>
+                <dt>Placement coverage</dt>
+                <dd>9 of 12 collective roles filled</dd>
+              </dl>
+            </elohim-hypercard-panel>
+          </div>
+        </div>
+      `);
+      const el = wrapper.querySelector('elohim-hypercard-panel') as ElohimHypercardPanel;
+      await el.updateComplete;
+      // Disable animation so cumulativeOpacity() sees steady-state opacity.
+      if (el.shadowRoot) {
+        const noMotion = new CSSStyleSheet();
+        noMotion.replaceSync(
+          ':host, *, *::before, *::after { transition: none !important; animation: none !important; }'
+        );
+        el.shadowRoot.adoptedStyleSheets = [...el.shadowRoot.adoptedStyleSheets, noMotion];
+      }
+      assertThemeContrast(el);
+    } finally {
+      cleanup();
+    }
+  });
 });

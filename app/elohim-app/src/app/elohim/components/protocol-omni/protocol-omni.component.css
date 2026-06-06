@@ -26,6 +26,14 @@
   --omni-env-ring: #d97706;
 }
 
+/* D-1 (theme-authority spec 2026-06-05): html[data-theme] is the theme
+   authority; `prefers-color-scheme: dark` is the no-preference fallback only.
+   Explicit :host-context([data-theme='…']) blocks WIN over the media block
+   (higher specificity + later in source order) so the app-theme toggle always
+   beats the OS scheme. Angular emulated encapsulation supports :host-context.
+   Both html and body carry data-theme (ThemeStore dual-write), so the
+   attribute-only form [data-theme='…'] matches whichever ancestor has it. */
+
 @media (prefers-color-scheme: dark) {
   :host {
     --omni-bg: rgba(22, 23, 28, 0.92);
@@ -36,6 +44,28 @@
     --omni-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
     --omni-env-ring: #d97706;
   }
+}
+
+/* Explicit app-theme overrides — win over the OS-scheme media block above.
+   'device' resolves through the OS media block (no explicit override needed). */
+:host-context([data-theme='light']) {
+  --omni-bg: rgba(255, 255, 255, 0.92);
+  --omni-fg: rgba(20, 22, 30, 0.96);
+  --omni-muted: rgba(20, 22, 30, 0.55);
+  --omni-border: rgba(20, 22, 30, 0.14);
+  --omni-accent: rgba(20, 22, 30, 0.96);
+  --omni-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  --omni-env-ring: #d97706;
+}
+
+:host-context([data-theme='dark']) {
+  --omni-bg: rgba(22, 23, 28, 0.92);
+  --omni-fg: rgba(232, 234, 240, 0.96);
+  --omni-muted: rgba(232, 234, 240, 0.55);
+  --omni-border: rgba(232, 234, 240, 0.16);
+  --omni-accent: rgba(232, 234, 240, 0.96);
+  --omni-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  --omni-env-ring: #d97706;
 }
 
 .omni-chip,
@@ -115,7 +145,13 @@
 }
 
 .omni-resilience {
-  color: var(--omni-accent);
+  /* color: var(--omni-fg) pairs hypercard text with the hypercard bg — both
+     come from the --omni-* family which is now theme-authoritative (keyed to
+     html[data-theme] / body[data-theme] via :host-context blocks above, not
+     just the OS color-scheme). This closes the contrast gap where bg followed
+     the OS scheme while text could inherit a differently-keyed ancestor color.
+     Theme-authority spec 2026-06-05 root cause fix. */
+  color: var(--omni-fg);
   padding: 0 0.25rem;
 
   /* Bind the resilience hypercard panel's cssprops to the chrome vars so the
