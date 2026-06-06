@@ -29,6 +29,8 @@ export class EprNavService {
     const matches = (routes: readonly Route[] | undefined): boolean =>
       !!routes?.some(r => {
         // Pathless layout roots (pillar-bundle shape) — descend into children.
+        // Note: loadChildren (lazy) roots have r.children === undefined here;
+        // they fall through to false (safe: ownsPath → false → full-load handoff).
         if (r.path === '' && r.children) return matches(r.children);
         if (!r.path || r.path === '**') return false;
         return r.path.split('/')[0] === top;
