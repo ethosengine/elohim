@@ -446,3 +446,26 @@ prefix guards in dispatch arms; no granular data on the DHT.
    commons loads at HTTP speed with AttentionTending as the only — consumption-side,
    negotiated — read-time mediation; anon explores commons + head-edges; the gated boundary is
    the discovery-RPG inclusive path, the protocol's default daily-drive experience.
+
+## Appendix B — HTTP ↔ EPR translation (informative, for web developers)
+
+How the status codes and artifacts you already know translate when routing is a projection of
+notarized substrate rather than server state. The deepest shift: **a response is never "what
+this server decided" — it is what *any* doorway projecting the same commitments would resolve**
+(the swap test). Nothing in this appendix adds normative requirements; sections cited are the
+normative homes.
+
+| The web you know | The EPR world | Where |
+|---|---|---|
+| **200 OK** — the server has the file | A **projection served you**: a notarized `project-epr` commitment authorized this mount; provenance headers (`X-Content-Address`, `X-Reach`) say which substrate facts backed the response. Commons content rides the fast path — table lookup, no governance compute (R1). | §2, §5.1 |
+| **301/302** — the admin moved a file | A **notarized routing decision**: a granted claim 302s `/epr/{id}` to its pretty mount, or a steward's alias promise (`redirectsFrom` / `redirectTemplates`) keeps an old address alive. Every redirect is walkable to the commitment that authorized it — revocable by supersession, never silent config. Browsers carry your `#fragment` across (RFC 7231); the landed bundle upgrades it. | §4, §5.1–5.2 |
+| **404 Not Found** — dead end, your problem | **Narrowed to assets only.** A missing hashed bundle file is a deploy bug and MUST surface as an honest 404 (§12.2 discipline). A *content route* never raw-404s: an unknown `/epr/{id}` renders a designed boundary. 404-as-user-experience is a conformance failure. | §7.3, §9 |
+| **401/403** — a wall | **Never a wall for content.** A gated target renders the head-edge boundary: the steward-authored outward face (preview + `gateHints` — the inclusive path to earning reach). The face is itself commons content, served as a real page; machine clients read the state from the epr-summary-hint envelope, not the status code. Parent §2.4 Rule 1 means a gated projection *cannot exist* without this face. | §5.1, §6 |
+| **410 Gone** — deleted, tough luck | **Intentionally degraded, never lost truth**: a closed EPR's address resolves to a designed terminus; redaction leaves a `redaction-applied` provenance marker; validation rejects *minting* new links to closed EPRs (the failure is prevented at write time, not discovered at read time). | records-lifecycle; §7.2 |
+| **304 / ETag / Cache-Control** — hope the cache is right | **Content addressing makes caching exact**: CID-addressed content is immutable — cache it forever; a new version is a new address, not an invalidation. The content address IS the strongest possible ETag. | §3.1, R1 |
+| **429 / paywalls** — rate-limit the stranger | The **trust-compute gradient**: cost scales with distance from commons, paid at authorship/grant time — never imposed on commons reads. (Toll access for un-contracted content is the §12.7 vision tier, via `delegates-compute` commitments.) | §2, §11 |
+| **5xx** — the server is sad | Operational failure stays honest and **fails open toward the floor**: head-lookup down → degrade to serve-shell (Slice-2 semantics); interceptor errors → default browser navigation. Substrate truth is unaffected; any other doorway resolves identically. | §9 |
+| **sitemap.xml** — hand-maintained, drifts | **Derived by construction** from projections × granted claims × commons enumeration — the static plane is enumerable because routing is data. It cannot drift from reality; it *is* a read of the routing table. | §7.5 |
+| **rel=canonical** — SEO guesswork | The universal `/epr/{id}` is the durable canonical for content (bundle-agnostic, survives remounts); pretty mounts are claimed presentation addresses. | §5.1; slice2 plan |
+| **.htaccess / nginx.conf** — config nobody audits | **The commitment table**: routing law is notarized, steward-authored, witnessed, revocable — legible governance artifacts instead of config files. | §3–§4 |
+| **robots.txt / ad blockers / content filters** — adversarial scraping & blocking | **AttentionTending**: consumption-side, negotiated mediation. Content declares legibly (the epr-summary-hint); the person's tending agent decides follow/skip/wrap before fetching; the doorway never filters commons. The tending-immune floor protects what may never be silenced. | §2 R3, §5.3 |
