@@ -469,3 +469,33 @@ normative homes.
 | **rel=canonical** — SEO guesswork | The universal `/epr/{id}` is the durable canonical for content (bundle-agnostic, survives remounts); pretty mounts are claimed presentation addresses. | §5.1; slice2 plan |
 | **.htaccess / nginx.conf** — config nobody audits | **The commitment table**: routing law is notarized, steward-authored, witnessed, revocable — legible governance artifacts instead of config files. | §3–§4 |
 | **robots.txt / ad blockers / content filters** — adversarial scraping & blocking | **AttentionTending**: consumption-side, negotiated mediation. Content declares legibly (the epr-summary-hint); the person's tending agent decides follow/skip/wrap before fetching; the doorway never filters commons. The tending-immune floor protects what may never be silenced. | §2 R3, §5.3 |
+
+## Appendix C — Learning-path template: *The Elohim Protocol for Web Developers* (NOT seeder-ingested)
+
+**Status: template only.** This appendix scaffolds a future lamad learning path bridging from
+what W3C / LAMP / MEAN-stack developers already know into the protocol's way. It is
+deliberately **not** in seed-data form (no `contentFormat`/seed JSON — transformation happens
+via `elohim-import` in a future content sprint); its job today is to pin the path's shape and
+**link each step to the canonical spec it teaches**, so the curriculum stays born-linked to
+this sprint's artifacts. Do not ingest.
+
+**The recursion is the capstone**: the path will itself be served at `/epr/{id}`, claimed by
+lamad's grant, with later steps reach-gated — so the learner *experiences* the inclusive-path
+boundary at the moment the curriculum explains it. The medium demonstrates the message.
+
+| # | Step (working title) | The bridge anchor (what you already know) | Protocol concept | Canonical source |
+|---|---|---|---|---|
+| 1 | Addresses that cannot lie | URLs, permalinks, ETags | Content addressing: CID as identity; slug vs fingerprint; new version = new address | semantic-computable-links-design; records-lifecycle §A.1 |
+| 2 | The server that isn't the truth | LAMP vhosts / document root; Express `app` | Projection-of-substrate; the swap test; doorway as optional projection, never host | pillar-epr-decomposition §2, §12.1; stewardship-over-sovereignty §3 |
+| 3 | .htaccess, notarized | .htaccess / nginx.conf / Express middleware | Routing law as commitments: declare + grant; aliases as revocable promises | this spec §3–§4 |
+| 4 | 404 is a deploy bug, not a user experience | 404 pages; SPA fallback (`try_files`) | ROUTE/ASSET discipline; the universal address floor; designed boundaries | pillar-epr-decomposition §12.2; this spec §5, §7.3 |
+| 5 | Walls become inclusive paths | 401/403, paywalls, login walls | Reach; head-edges; gateHints as the discovery-RPG quest surface | this spec §6; trust-compute-gradient §1–§3 |
+| 6 | Pay at write time | CDN caching, rate limits, ad blockers | The inverted compute gradient; Commons Fast Path; AttentionTending as negotiated mediation | trust-compute-gradient; this spec §2 |
+| 7 | Sitemaps that cannot drift | sitemap.xml, link checkers, W3C validators | The enumerable static plane; minted-never-literal; conformance classes | this spec §7 |
+| 8 | Capstone: the address of this path | view-source | *This path's own URL resolves through the claims you just learned* — walk the commitment | this spec §5.1; epr-slice2-universal-address-plan |
+
+Each step, when authored, carries: 2–4 atomic concepts (one per bridge-anchor row of
+Appendix B where applicable), a `sophia-quiz-json` assessment translating a familiar-web
+scenario into protocol terms, and `relatedNodeIds` pointing at the canonical sources above.
+Audience variants (W3C / LAMP / MEAN) differ only in the anchor column's framing, not the
+concept sequence.
