@@ -14,6 +14,7 @@ import { IdentityService } from '@app/imagodei/services/identity.service';
 import { AuthService } from '@app/imagodei/services/auth.service';
 import { RunningContextService } from '@app/doorway/services/running-context.service';
 import { UpgradeBannerProvider } from '@app/imagodei/services/providers/upgrade-banner.provider';
+import { EprNavService } from '@app/elohim/services/epr-nav.service';
 import { vi } from 'vitest';
 
 describe('ElohimNavigatorComponent', () => {
@@ -21,6 +22,7 @@ describe('ElohimNavigatorComponent', () => {
   let fixture: ComponentFixture<ElohimNavigatorComponent>;
   let mockSessionHumanService: any;
   let mockRouter: any;
+  let mockEprNav: any;
   let mockHolochainService: any;
   let mockIdentityService: any;
   let mockAuthService: any;
@@ -43,6 +45,11 @@ describe('ElohimNavigatorComponent', () => {
       serializeUrl: vi.fn(),
       events: routerEventsSubject.asObservable(),
       url: '/lamad',
+    };
+    mockEprNav = {
+      navigate: vi.fn(),
+      ownsPath: vi.fn(() => true),
+      recordHandoff: vi.fn(),
     };
     mockRouter.createUrlTree.mockReturnValue({
       root: {},
@@ -124,6 +131,7 @@ describe('ElohimNavigatorComponent', () => {
         { provide: RunningContextService, useValue: mockRunningContext },
         { provide: BannerService, useValue: mockBannerService },
         { provide: UpgradeBannerProvider, useValue: mockUpgradeBannerProvider },
+        { provide: EprNavService, useValue: mockEprNav },
       ],
     }).compileComponents();
 

@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, Input, computed, inject, isDevMode } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
+import { EprNavService } from '../../services/epr-nav.service';
 
 // @coverage: 44.6% (2026-02-24)
 
@@ -182,6 +183,9 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   /** Upgrade banner provider (injected to ensure it's instantiated and to subscribe to modal requests) */
   private readonly upgradeBannerProvider = inject(UpgradeBannerProvider);
 
+  /** EPR-aware navigation — routes cross-bundle paths (e.g. /lamad) via handoff+assign */
+  private readonly eprNav = inject(EprNavService);
+
   constructor(
     private readonly sessionHumanService: SessionHumanService,
     private readonly router: Router,
@@ -316,7 +320,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   switchContext(app: ContextAppConfig): void {
     if (!app.available) return;
     this.showContextSwitcher = false;
-    void this.router.navigate([app.route]);
+    void this.eprNav.navigate(app.route);
   }
 
   // =========================================================================
@@ -367,7 +371,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   goToIdentityProfile(): void {
     this.showProfileTray = false;
-    void this.router.navigate(['/identity/profile']);
+    void this.eprNav.navigate('/identity/profile');
   }
 
   /**
@@ -377,7 +381,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   goToContextProfile(): void {
     this.showProfileTray = false;
-    void this.router.navigate([this.contextProfileRoute]);
+    void this.eprNav.navigate(this.contextProfileRoute);
   }
 
   /**
@@ -429,9 +433,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   onSearch(): void {
     if (this.searchQuery.trim()) {
-      void this.router.navigate([`/${this.context}/search`], {
-        queryParams: { q: this.searchQuery },
-      });
+      void this.eprNav.navigate(`/${this.context}/search?q=${encodeURIComponent(this.searchQuery.trim())}`);
     }
   }
 
@@ -483,10 +485,8 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   goToLogin(): void {
     this.closeAllTrays();
-    const returnUrl = this.router.url;
-    void this.router.navigate(['/identity/login'], {
-      queryParams: { returnUrl },
-    });
+    const returnUrl = encodeURIComponent(this.router.url);
+    void this.eprNav.navigate(`/identity/login?returnUrl=${returnUrl}`);
   }
 
   /**
@@ -494,10 +494,8 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   goToRegister(): void {
     this.closeAllTrays();
-    const returnUrl = this.router.url;
-    void this.router.navigate(['/identity/register'], {
-      queryParams: { returnUrl },
-    });
+    const returnUrl = encodeURIComponent(this.router.url);
+    void this.eprNav.navigate(`/identity/register?returnUrl=${returnUrl}`);
   }
 
   /**
@@ -507,9 +505,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
     this.closeAllTrays();
     await this.identityService.logout();
     // Navigate to home after logout
-    this.router.navigate(['/'])?.catch(() => {
-      // Navigation errors are acceptable during logout
-    });
+    void this.eprNav.navigate('/');
   }
 
   // =========================================================================
