@@ -172,6 +172,11 @@ describe('SearchComponent', () => {
       expect(component.getNodeHref(contentResult)).toBe('/epr/test-id');
     });
 
+    it('should URI-encode non-slug ids in the universal href', () => {
+      const spaced = { ...contentResult, id: 'has space' } as unknown as SearchResult;
+      expect(component.getNodeHref(spaced)).toBe('/epr/has%20space');
+    });
+
     it('should return in-bundle commands for path results', () => {
       expect(component.getNodeCommands(pathResult)).toEqual(['/path', 'path-id']);
     });
