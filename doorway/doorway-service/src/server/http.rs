@@ -1499,7 +1499,11 @@ async fn dispatch_to_projected_epr(
         let body = serde_json::json!({
             "error": "reach-gated",
             "message": "This content requires authorization. Gated EPR serving is not yet implemented."
-            // TODO(B-later): consult gate_hints + req auth to serve regional-private/local projections
+            // TODO(#6-2 gate-face / spec §5.1 "never a wall"): this MOUNT-arm 401 contradicts
+            // the resolver-owns-the-gate invariant — gated mounts should fall to the shell
+            // boundary (head-edge + inclusive path), not a hard 401. Tracked: gap #6-2 of
+            // epr-route-claims-link-conformance-design + epr-routing-complementary-captures.md.
+            // (Was: TODO(B-later) consult gate_hints + req auth for gated projections.)
         });
         return Response::builder()
             .status(StatusCode::UNAUTHORIZED)

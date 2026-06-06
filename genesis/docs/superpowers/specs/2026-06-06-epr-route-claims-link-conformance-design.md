@@ -429,6 +429,10 @@ prefix guards in dispatch arms; no granular data on the DHT.
 
 ## §13 Captured follow-ups (not this spec)
 
+- **Conformance crawler + sweep statuses** (Slice 3c remainder, gap item `#7-5`): the a2o
+  crawler walking rendered anchors against the sitemap expected-set, and the sweep stamping
+  `claims-stale` (§3.4) / `DEAD-ALIAS` statuses. Backlog:
+  `genesis/data/timeline/backlog/epr-routing-complementary-captures.md`.
 - **Substrate-visible link-audit Attestation** (`kind=link-audit` on the existing Attestation
   entry type, attached to the projection commitment) — after the crawler exists.
 - **ServingContext provenance headers** (omnibar §9.7) — `X-Bundle-Address`/`X-Variant`;
