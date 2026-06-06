@@ -13,6 +13,8 @@ Two container-environment facts that contradict expectations (observed 2026-06-0
 
 2. **Cargo builds with target dirs on the `/projects` volume intermittently fail** with `failed to write .../.fingerprint/...: No such file or directory` mid-compile (seen in-tree AND in a fresh `/projects/.cargo-target-pool` slot; disk 52%, inodes 3%, no concurrent cargo, pool log idle). `/tmp` target dirs (`CARGO_TARGET_DIR=/tmp/cargo-<crate>`) build reliably. Subagents independently discovered the same workaround ("pool slot filesystem permission issue").
 
+Observed 4x total incl. the PRE-PUSH HOOK's doorway-clippy gate (pool slot) — when the hook fails with this signature, the documented bypass (git push --no-verify) is correct AFTER manually verifying the gates on /tmp targets.
+
 **Why:** verification claims based on nextest in this container are unreliable; and a red Rust gate may be the volume, not the code.
 
 **How to apply:** for Rust gates here, run `cargo test` with `CARGO_TARGET_DIR=/tmp/cargo-<crate>` (keep `RUSTFLAGS=""` for native, the getrandom custom flag for elohim-storage), and check exit codes without pipes. Related: [[cargo-target-dir-for-native-builds]].
