@@ -1,9 +1,12 @@
 ---
+id: feedback-zone-native-await-unhandled-rejection
 name: zone-native-await-unhandled-rejection
 description: zone.js false-flags handled rejections as "Uncaught (in promise)" when the only consumer is a native await — zone drains its whole microtask queue in one native job and checks uncaught rejections at drain-end, but native await attaches its handler via a V8 thenable-job that runs AFTER the drain
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - app/elohim-app/src/test-setup.ts
 ---
 
 # zone.js + native async/await: phantom "Uncaught (in promise)" on handled rejections

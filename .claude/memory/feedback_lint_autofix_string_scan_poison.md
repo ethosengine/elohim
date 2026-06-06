@@ -1,10 +1,13 @@
 ---
+id: feedback-lint-autofix-string-scan-poison
 name: lint-autofix-string-scan-poison
 description: Mass eslint --fix can apply behavior-changing autofixes (unicorn/prefer-set-has on STRINGS) that silently break string-scan assertions — always run the full test suite after any --fix pass
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: 4dc49cfc-da6d-46ba-83cb-79c5c0613b7a
+cites:
+  - app/elohim-elements/elohim-core
 ---
 
 During the 2026-06-05 theme-gate lint pass, `eslint --fix` rewrote `const after = cssText.slice(i)` + `after.includes('ButtonFace')` into `new Set(cssText.slice(i))` + `.has('ButtonFace')` (unicorn/prefer-set-has assumes an array; a Set of a string is a set of CHARACTERS, so `.has('ButtonFace')` is always false). 8 ua-prefs forced-colors gates in elohim-core went green→red purely from the "safe" fix pass.

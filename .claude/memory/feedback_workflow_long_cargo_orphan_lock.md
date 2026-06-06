@@ -1,10 +1,13 @@
 ---
+id: feedback-workflow-long-cargo-orphan-lock
 name: workflow-long-cargo-orphan-lock
 description: "Workflow gate agents running >10-min cargo commands orphan the process on Bash timeout; it keeps the artifact-dir lock and retries block — let it finish, don't kill"
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: 22ae7e20-f5ce-4831-9568-a0a648ab063a
+cites:
+  - .husky/pre-push
 ---
 
 During the url-routing-slice1 workflow (2026-06-04), a gate agent's `cargo test export_bindings` in the elohim-storage workspace (~35 min: debug-profile test binaries from cold, since the prior nextest pass was release-profile) outlived the Bash tool timeout. The cargo process kept running detached, holding the `.cargo-lock` on the pool slot; the agent's retries blocked on the lock and a pgrep quoting quirk made it mis-read the orphan as dead.

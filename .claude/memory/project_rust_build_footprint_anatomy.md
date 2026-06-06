@@ -1,10 +1,14 @@
 ---
+id: project-rust-build-footprint-anatomy
 name: rust-build-footprint-anatomy
 description: "Verified anatomy of the 321G cargo pool (2026-06-04 ultracode research) — 71% is DWARF-laden ~1GB test binaries; retention policy, not Rust, is the dominant cause; ranked levers for maintainers and framework consumers"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 29e291fd-09c2-42e4-b132-bffd8a584b73
+cites:
+  - .cargo/config.toml
+  - genesis/agentic/pool-policy.json
 ---
 
 2026-06-04 measured + adversarially verified (workflow wf_fbed4ec7, 18 claims re-measured, readelf-confirmed):

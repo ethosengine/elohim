@@ -5,7 +5,7 @@ description: The protocol's design floor is one device, no hub required. Hubs ar
 type: project
 originSessionId: 155036b0-387a-441c-91c5-7a1333fb2f07
 cites:
-  - elohim-hub-boundaries-design | the hub-boundary design this floor-invariant constrains — hubs graduate, never gate participation | sha256:6b7ee97f246b732f | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
+  - elohim-hub-boundaries-design | the hub-boundary design this floor-invariant constrains — hubs graduate, never gate participation | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
 ---
 The protocol's primitives are sized so a single device can be a complete participant. Adding a hub increases convenience (a teacher-laptop syncing a Khan-style library to student devices when they show up at school) and aggregates scale, but does not unlock new categories of participation.
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-05",
+  "generated_at": "2026-06-06",
   "cites": {
     "genesis/orchestrator/Jenkinsfile": [
       "feedback_cargo_target_dir_for_native_builds",
@@ -13,17 +13,39 @@
     "elohim/sdk/schemas/scripts/codegen-ts.mjs": [
       "feedback_codegen_prettier_oscillation"
     ],
+    "findings-sentinel-pattern-design | the canonical spec this memory points to \u2014 compose new event\u2192agent automation from its \u00a71, dont re-derive the pattern from this entry | sha256:c284074fe38e2450 | path: genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md": [
+      "feedback_deterministic_flag_agent_canon_stasis_pattern"
+    ],
+    ".claude/hooks/deprecation-sentinel.py": [
+      "feedback_deterministic_flag_agent_canon_stasis_pattern"
+    ],
     "elohim/elohim-storage/src/db/mod.rs": [
       "feedback_diesel_migration_timestamp_collision"
+    ],
+    "app/elohim-elements/elohim-core": [
+      "feedback_lint_autofix_string_scan_poison"
+    ],
+    "managed-surface-edit-discipline-design | the durable home of this lesson \u2014 registry design, forensic, and the open gap-items | sha256:e5afb16c974b109b | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md": [
+      "feedback_managed_surface_edit_discipline"
+    ],
+    ".claude/scripts/_lib/managed_surfaces.py": [
+      "feedback_managed_surface_edit_discipline"
     ],
     "devfile.yaml": [
       "feedback_no_brittle_commands_in_poststart"
     ],
-    "sweettest-integration-layer | the DNA-test layer whose target-cache PVC path is this RCA workaround #3b (sccache-free sweettest) | sha256:a8747e884a24fdea": [
+    "sweettest-integration-layer | the DNA-test layer whose target-cache PVC path is this RCA workaround #3b (sccache-free sweettest) | sha256:a8747e884a24fdea | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-sweettest-integration-layer.md": [
       "feedback_sccache_spawn_enoent_rca"
     ],
     "elohim/holochain/tests/sweettest/src/common/conductors.rs": [
       "feedback_swarm_composition_fresh_tree_build"
+    ],
+    ".husky/pre-push": [
+      "feedback_workflow_long_cargo_orphan_lock",
+      "project_container_cargo_environment_quirks"
+    ],
+    "app/elohim-app/src/test-setup.ts": [
+      "feedback_zone_native_await_unhandled_rejection"
     ],
     "genesis/orchestrator/data/deployments.json": [
       "project_alpha_topology_bootstrap_pair"
@@ -40,13 +62,30 @@
     "steward/device/Jenkinsfile": [
       "project_ci_storage_topology"
     ],
-    "elohim-hub-boundaries-design | the hub-boundary design this floor-invariant constrains \u2014 hubs graduate, never gate participation | sha256:6b7ee97f246b732f": [
+    ".claude/hooks/cargo-disk-guard.py": [
+      "project_container_cargo_environment_quirks",
+      "project_devspace_disk_cleanup_procedure"
+    ],
+    "genesis/agentic/pool-policy.json": [
+      "project_devspace_disk_cleanup_procedure",
+      "project_rust_build_footprint_anatomy"
+    ],
+    "elohim-hub-boundaries-design | the hub-boundary design this floor-invariant constrains \u2014 hubs graduate, never gate participation | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md": [
       "project_hub_optional_floor"
     ],
-    "dht-is-a-notary-not-a-byte-store | the ADR this is a memory_anchor of \u2014 same lesson at the DHT layer: notarize, do not move bytes | sha256:a1d408ef2478b288": [
+    "dht-is-a-notary-not-a-byte-store | the ADR this is a memory_anchor of \u2014 same lesson at the DHT layer: notarize, do not move bytes | sha256:a1d408ef2478b288 | path: genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md": [
       "project_inventory_exchange_not_byte_replication"
     ],
-    "observation-event-layer-design | the witness substrate built on this controller principle \u2014 observed state drives eager reconcile | sha256:63322aa57b9db914": [
+    "elohim/elohim-storage/src/db/content_diesel.rs": [
+      "project_local_stack_dht_anchor_gap"
+    ],
+    "elohim/elohim-storage/src/services/rea_commitment_service.rs": [
+      "project_local_stack_dht_anchor_gap"
+    ],
+    "elohim/elohim-storage/src/db/rea_commitments.rs": [
+      "project_local_stack_dht_anchor_gap"
+    ],
+    "observation-event-layer-design | the witness substrate built on this controller principle \u2014 observed state drives eager reconcile | sha256:2b57787e60a0ddc6 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md": [
       "project_principle_p1_reconciliation_controller"
     ],
     "genesis/docs/architecture/rea-compute-commitment-primitive.md": [
@@ -61,7 +100,22 @@
     "elohim/sdk/schemas/v1/enums/reach.schema.json": [
       "project_reach_enum_drift_reconciliation"
     ],
-    "historian-and-epic-timeline | the spec that proposed mempalace as the historian substrate this entry records as wired | sha256:7f1a6a2932456aa0": [
+    "elohim/elohim-storage/src/services/household_resilience.rs": [
+      "project_resilience_snapshot_humans_junction"
+    ],
+    "elohim/elohim-storage/src/db/humans.rs": [
+      "project_resilience_snapshot_humans_junction"
+    ],
+    "elohim/elohim-storage/src/api/rea_commitments.rs": [
+      "project_resilience_snapshot_humans_junction"
+    ],
+    ".cargo/config.toml": [
+      "project_rust_build_footprint_anatomy"
+    ],
+    "elohim/holochain/tests/sweettest": [
+      "project_sweettest_native_build_env"
+    ],
+    "historian-and-epic-timeline | the spec that proposed mempalace as the historian substrate this entry records as wired | sha256:7f1a6a2932456aa0 | path: genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md": [
       "reference_mempalace"
     ]
   }

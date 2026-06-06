@@ -1,3 +1,10 @@
+---
+id: omnibar-consolidation-epr-native-links-plan
+status: active
+cites:
+  - omnibar-consolidation-epr-native-links-design | the design spec this plan implements task-by-task — omnibar consolidation, EPR-native link interceptor, shared elohim-core theme/locale stores | sha256:92df16eea8d9bcf8 | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
+---
+
 # Omnibar Consolidation + EPR-Native Links — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

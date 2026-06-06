@@ -3,13 +3,14 @@ title: "The D4 name-collision — why four process specs mis-filed as substrate"
 id: d4-name-collision
 tier: history
 type: history-gotcha
+status: Accepted
 created: 2026-06-02
 class: process-meta
 process_subdomain: doc-lifecycle
 cites:
   - .claude/subject-routing.yaml
   - subject-routed-decomposition-design | the class gate this gotcha motivates — the fix for process specs mis-filing as D4 substrate | sha256:0d910143a8498b64 | path: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md
-  - map | the product-only D1–D10 lattice with no meta axis that made D4 magnetic for process specs | sha256:de878342b28843e8 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/MAP.md
+  - map | the product-only D1–D10 lattice with no meta axis that made D4 magnetic for process specs | sha256:bf8aac51a76d5797 | path: genesis/docs/content/elohim-protocol/architecture/MAP.md
 qualifies:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md    # the magnetic D4 seed (innocent — the dogfood vocabulary it shares is the trap)
 ---

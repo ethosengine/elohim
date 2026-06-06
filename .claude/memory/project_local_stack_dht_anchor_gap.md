@@ -1,10 +1,15 @@
 ---
+id: project-local-stack-dht-anchor-gap
 name: local-stack-dht-anchor-gap
 description: Local hc:start:seed bulk-import never DHT-anchors (provenance NULL → all external reads 404 by design); dev repair = SQLite p2p_published_at backfill; the gate is get_content require_provenance
 metadata: 
   node_type: memory
   type: project
   originSessionId: 52e75242-0c09-464a-9a0d-613667fc14e0
+cites:
+  - elohim/elohim-storage/src/db/content_diesel.rs
+  - elohim/elohim-storage/src/services/rea_commitment_service.rs
+  - elohim/elohim-storage/src/db/rea_commitments.rs
 ---
 
 On the local dev stack, the seeder's bulk content import writes the storage SQLite but the DHT-anchor step no-ops (post-flight 2026-06-04: 1/600 conductor entries; all rows `dht_anchor_hash=NULL, p2p_published_at=NULL`). External HTTP reads then 404 EVERYTHING via the provenance gate (`db/content_diesel.rs get_content require_provenance=true` filters rows lacking both fields) — storage-as-projection working as designed, refusing unanotarized content.

@@ -1,10 +1,14 @@
 ---
+id: project-devspace-disk-cleanup-procedure
 name: devspace-disk-cleanup-procedure
 description: "/projects disk-pressure thresholds and the verified reclaim ladder — cargo-pool families are the dominant occupant, not worktree targets"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 6bd0f758-fe18-46cf-b0d0-8848acafeca0
+cites:
+  - genesis/agentic/pool-policy.json
+  - .claude/hooks/cargo-disk-guard.py
 ---
 
 Recreated 2026-06-04 (the original was graduated to MemPalace 2026-06-02, but live citations remained — `genesis/data/timeline/backlog/prepush-cargo-target-pool.md` and the operator's own muscle memory — so it earned re-canonization, refreshed with verified numbers).

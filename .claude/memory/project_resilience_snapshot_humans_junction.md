@@ -1,10 +1,15 @@
 ---
+id: project-resilience-snapshot-humans-junction
 name: resilience-snapshot-humans-junction
 description: Why seeding provide-commitments alone can never light the resilience snapshot — both joins pass through substrate-owned humans fields
 metadata: 
   node_type: memory
   type: project
   originSessionId: 8dd8d2c6-91fb-499c-bd3e-cadbcb784c8b
+cites:
+  - elohim/elohim-storage/src/services/household_resilience.rs
+  - elohim/elohim-storage/src/db/humans.rs
+  - elohim/elohim-storage/src/api/rea_commitments.rs
 ---
 
 `household_resilience::snapshot()` (elohim/elohim-storage/src/services/household_resilience.rs) lights up only through the **humans junction**, and both of its joins require fields no HTTP create surface can set:

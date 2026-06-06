@@ -71,7 +71,12 @@ CLAIMED_WORDS = {"claimed-not-verified"}
 REGRESSED_WORDS = {"regressed", "regression"}
 DEAD_WORDS = {"superseded", "abandoned", "cancelled", "canceled", "deprecated", "retired"}
 ACTIVE_WORDS = {"draft", "design", "brainstorm", "proposal", "proposed", "in-flight",
-                "inflight", "wip", "vision", "approved", "accepted-draft"}
+                "inflight", "wip", "vision", "approved", "accepted-draft", "active"}
+# PLACEMENT.md §16: CANONICAL = "living cross-cutting truth (gospel-tier)" with tier: architecture.
+# A canonical seed's status leads with one of these descriptive permanence words ("Living document",
+# "Architecture pattern/principle") — it is the SETTLED steady state, not pressure. Recognized only
+# when the doc's home is CANONICAL (a "living" status on an ACTIVE-home plan would still be a smell).
+LIVING_WORDS = {"living", "architecture", "principle", "pattern"}
 LINK_KEYS = ("canonical", "distills", "cites", "verified_by", "informed-by", "informs",
              "supersedes", "superseded-by", "supersedes-or-conforms-to",
              # a declared parent/related/spec IS a real anchor — a doc that names its lineage
@@ -141,6 +146,8 @@ def status_bucket(raw: str):
         return "DEAD"
     if w in ACTIVE_WORDS:
         return "ACTIVE"
+    if w in LIVING_WORDS:
+        return "LIVING"
     return "UNKNOWN" if w else "NONE"
 
 
@@ -303,6 +310,12 @@ def budget_state(rec, available):
         return ("VERIFIED-STABLE", "retire-eligible → history") if rec["verified"] else ("CLAIMED-ONLY", "VERIFY (ci-investigator)")
     if b == "ACTIVE":
         return "ACTIVE", "in-flight"
+    if b == "LIVING":
+        # Canonical living-truth seed (PLACEMENT.md §16). Settled iff it sits in its canonical home;
+        # a "living"-status doc loitering in an ACTIVE plan/spec dir is a real placement smell.
+        if home == "CANONICAL":
+            return "SETTLED", "living canonical seed — no verification queue"
+        return "UNKNOWN-STATUS", "living status outside canonical home — re-place or re-status"
     return "UNKNOWN-STATUS", "normalize the status string"
 
 

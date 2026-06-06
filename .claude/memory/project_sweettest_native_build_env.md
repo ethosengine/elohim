@@ -1,10 +1,13 @@
 ---
+id: project-sweettest-native-build-env
 name: sweettest-native-build-env
 description: "Native sweettest builds need RUSTFLAGS=\"\" (WASM getrandom flag leaks → undefined __getrandom_v03_custom at link), BINDGEN_EXTRA_CLANG_ARGS for clang-21, and `just pack` (not `just build`) to refresh the .dna bundle"
 metadata: 
   node_type: memory
   type: project
   originSessionId: dda22ff0-818e-4f87-8398-38ed1ef4e174
+cites:
+  - elohim/holochain/tests/sweettest
 ---
 
 Running `cargo test -p elohim_sweettest` (elohim/holochain/tests/sweettest) in this devspace image (verified 2026-06-05, Task-2 formation coordinators):
