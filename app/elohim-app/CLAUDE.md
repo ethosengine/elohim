@@ -2,7 +2,7 @@
 id: elohim-app-frontend-gospel
 cites:
   - elohim-elements-ui-substrate-gospel | element/token/binding layer ownership — don't restyle elements from the shell | sha256:84cff1a46650cf8f | path: app/elohim-elements/CLAUDE.md
-  - lamad-bundle-gospel | the bundle-consumer twin of the chrome & nav rails | sha256:5b547c63cc0c1a2c | path: app/lamad/CLAUDE.md
+  - lamad-bundle-gospel | the bundle-consumer twin of the chrome & nav rails | sha256:5b547c63cc0c1a2c | status: stale — target content moved on; re-verify | path: app/lamad/CLAUDE.md
   - omnibar-consolidation-epr-native-links-design | settled decisions behind the chrome rails — serving context, sweep+interceptor, shared theme contract | sha256:71ad45eb5993b56c | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
 ---
 
@@ -196,7 +196,8 @@ The shell composes protocol chrome; it does not own element or token concerns.
 
 - **protocol-omni is a trust surface** (`src/app/elohim/components/protocol-omni/`): EPR identity, resilience placeholder, opt-in ServingContext (`showEnvContext` — prod-silent, never cries wolf), opt-in theme toggle. Anything added here must be provenance-true, never decorative.
 - **Theme**: `ThemeService` and elohim-core's `ThemeStore` are twins on ONE contract — `localStorage['elohim-theme']` + `html[data-theme]` (AUTHORITY — tokens.scss `:root[data-theme]` + `color-scheme` key off it; chrome var-chains substitute at `:root`) + `body[data-theme]` (legacy compat, dual-written) + the `elohim-theme-changed` event; each side adopts external changes silently, only the originator dispatches. Change the contract in both or neither.
-- **Cross-bundle navigation**: never `routerLink`/`router.navigate` to another bundle's path (`/lamad*`). Template anchors → plain `href`; programmatic → `EprNavService.navigate()` (`ownsPath` derives from the live router config, so future pillar splits flip automatically); the capture-phase epr-link interceptor (explicit install in `app.component`) is the safety net for content-authored/legacy anchors.
+- **Cross-bundle navigation**: never `routerLink`/`router.navigate` to another bundle's path (`/lamad*`). Template anchors → plain `href`; programmatic → `EprNavService.navigate()` (`ownsPath` derives from the live router config, so future pillar splits flip automatically; the sink refuses non-origin-relative targets); the capture-phase epr-link interceptor (explicit install in `app.component`) is the safety net for content-authored/legacy anchors.
+- **Universal EPR address (§12.6 Slice 2, 2026-06-06)**: unclaimed EPR targets mint `/epr/{id}` via `eprToRoute(ref, BUNDLE_ROUTE_CONTEXT[, contentType])` — the shell provides `{ claims: [], ownsUniversalRoute: true }` and owns `epr/:resourceId` (cross-pillar viewer). `resource/:resourceId` stays as a legacy surface; new minting targets `/epr`. No pillar prefix in shared code.
 
 Concern routing (content-addressed — resolve via this file's `cites:` frontmatter; slugs survive moves):
 - `elohim-elements-ui-substrate-gospel` §Layer rails — element/token/binding layer ownership (don't restyle elements from the shell)

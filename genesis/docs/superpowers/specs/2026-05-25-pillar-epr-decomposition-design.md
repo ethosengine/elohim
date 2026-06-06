@@ -825,9 +825,11 @@ This generalizes the §8.1 deliverable "EPR resolution endpoint `/api/v1/epr/{id
 
 | Slice | Contents | Unblocks |
 |---|---|---|
-| **1 — alpha green** | doorway `spa_fallback` + storage safety net + relative routes in the lamad bundle | shared path URLs work; doubled URLs stop being minted |
-| **2 — universal address** | `/epr/{id}` doorway resolver + shell `epr/:id` route + `eprToRoute`/claims rewrite in `@elohim/service` | cross-bundle links, durable shares |
-| **3 — claims & gates** | `routeClaims` in bundle manifests + fragment mapping + designed gate experience | type-driven 302s, graceful boundaries |
+| **1 — alpha green** (landed 2026-06-04, `edc907c43`) | doorway `spa_fallback` + storage safety net + relative routes in the lamad bundle | shared path URLs work; doubled URLs stop being minted |
+| **2 — universal address** (landed 2026-06-06, branch `epr/slice2-universal-address`) | `/epr/{id}` doorway resolver + shell `epr/:resourceId` route + `eprToRoute`/`BundleRouteContext` claims rewrite in `@elohim/service` + the distributed link sweep (lamad templates/programmatic/guard, Lit navigator de-literalized, legacy `/lamad/resource` bridge, SEO canonicals, portal interceptor) | cross-bundle links, durable shares |
+| **3 — claims & gates** | `routeClaims` in bundle manifests + fragment mapping + designed gate experience + card-flip pushState | type-driven 302s, graceful boundaries |
+
+Slice-2 implementation notes: reservation is enforced structurally (`/epr` joined `is_service_path`, so no projection mount can capture it) plus a warn-and-skip at projection ingestion — the spec's named `validate_url_path` never existed as a function; `is_reserved_url_path` (doorway `http.rs`) is its realized home. Unclaimed-with-unknown-type targets always resolve to `/epr/{id}` (safe-by-default). Step fragments degrade in the shell to `/epr/{pathId}` (fragment-preserving redirect is Slice 3).
 
 ### 12.7 Vision-tier horizon (designed-for, not built)
 

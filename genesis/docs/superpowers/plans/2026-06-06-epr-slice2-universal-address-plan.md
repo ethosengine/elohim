@@ -2,7 +2,7 @@
 id: epr-slice2-universal-address-plan
 status: active
 cites:
-  - pillar-epr-decomposition-design | parent canon — §12 URL & Routing Contract; §12.3 mount-agnostic link minting and §12.6 slice table this plan implements (Slice 2) | sha256:d1e7e3703c2bd6aa | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
+  - pillar-epr-decomposition-design | parent canon — §12 URL & Routing Contract; §12.3 mount-agnostic link minting and §12.6 slice table this plan implements (Slice 2) | sha256:f14c5ebe1fc086d8 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
   - omnibar-consolidation-epr-native-links-design | the landed interceptor + EprNavService substrate this plan distributes to every bundle; settled cross-bundle anchor form (plain href + handoff) | sha256:71ad45eb5993b56c | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
 ---
 

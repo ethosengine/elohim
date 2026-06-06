@@ -11,7 +11,7 @@ cites:
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
   - elohim-elements-ui-substrate-gospel | the gospel this amends — three precondition gates become four (theme-contrast), and §Layer rails store-contract line moves to html[data-theme] authority | sha256:84cff1a46650cf8f | path: app/elohim-elements/CLAUDE.md
   - elohim-library-pattern-gospel | Library A/B boundary the gate honors — Dark stories stay eyeball canaries; their assertion-backed twins are the gate cells, bindings live in test fixtures only | sha256:94b851810ce6cdc8 | path: app/elohim-library/CLAUDE.md
-  - lamad-bundle-gospel | the consumer bundle whose rails change — styles import set gains base.scss; _chrome-binding.scss is the shipped binding the tokens-cells inject as fixture | sha256:5b547c63cc0c1a2c | path: app/lamad/CLAUDE.md
+  - lamad-bundle-gospel | the consumer bundle whose rails change — styles import set gains base.scss; _chrome-binding.scss is the shipped binding the tokens-cells inject as fixture | sha256:5b547c63cc0c1a2c | status: stale — target content moved on; re-verify | path: app/lamad/CLAUDE.md
 informed-by: [app/elohim-elements/CLAUDE.md]
 ---
 
