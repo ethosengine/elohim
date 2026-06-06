@@ -785,6 +785,9 @@ fn commitment_to_projection_view(c: ReaCommitment) -> Result<EprProjectionView, 
             .get("redirectsFrom")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default(),
+        // Task-2 stubs — Task 3 replaces these with the real metadata mapping.
+        redirect_templates: vec![],
+        route_claims: None,
         preview_epr_ref: metadata
             .get("previewEprRef")
             .and_then(|v| v.as_str())

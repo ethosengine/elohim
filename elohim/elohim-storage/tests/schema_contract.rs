@@ -3366,6 +3366,8 @@ fn epr_projection_view_cached_mode_matches_schema() {
         entry_file: "index.html".into(),
         spa_fallback: true,
         redirects_from: vec!["/learn".into(), "/study".into()],
+        redirect_templates: vec![],
+        route_claims: None,
         preview_epr_ref: None,
         gate_hints: vec![GateHintRef {
             epr_ref: "bafyreib2vq7gateEPRcid0123456789012345678901234567890123456".into(),
@@ -3393,6 +3395,53 @@ fn epr_projection_view_cached_mode_matches_schema() {
         "doorwayId must begin with 'doorway:'"
     );
 
+    validate_against_schema("views/epr-projection-view.schema.json", &json);
+}
+
+#[test]
+fn epr_projection_view_with_route_claims_matches_schema() {
+    use elohim_views::projection::{
+        EprProjectionView, ProjectionMode, RedirectTemplate, RouteClaimGrant, RouteClaimTemplate,
+    };
+
+    let view = EprProjectionView {
+        commitment_id: "sha256-claims0123".into(),
+        epr_id: "lamad-spa".into(),
+        doorway_id: "doorway:alpha-elohim-host".into(),
+        url_path: "/lamad".into(),
+        mode: ProjectionMode::Cached,
+        reach: "commons".into(),
+        base_href: "/lamad/".into(),
+        entry_file: "index.html".into(),
+        spa_fallback: true,
+        redirects_from: vec![],
+        redirect_templates: vec![RedirectTemplate {
+            from: "/lamad/resource/{id}".into(),
+            to: "/epr/{id}".into(),
+        }],
+        route_claims: Some(RouteClaimGrant {
+            schema_version: 1,
+            claims_manifest_cid: None,
+            claims: vec![RouteClaimTemplate {
+                content_type: "path".into(),
+                template: "path/{id}".into(),
+                fragments: std::collections::BTreeMap::from([(
+                    "step".to_string(),
+                    "path/{id}/step/{n}".to_string(),
+                )]),
+            }],
+        }),
+        preview_epr_ref: None,
+        gate_hints: vec![],
+        dead_end: false,
+        steward_direct_endpoint: None,
+        seeded_at: "2026-06-06T00:00:00Z".into(),
+        seeded_by: "12D3KooWTest".into(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    assert_eq!(json["routeClaims"]["claims"][0]["contentType"], serde_json::json!("path"));
+    assert_eq!(json["redirectTemplates"][0]["from"], serde_json::json!("/lamad/resource/{id}"));
     validate_against_schema("views/epr-projection-view.schema.json", &json);
 }
 
@@ -3425,6 +3474,8 @@ fn epr_projection_view_steward_direct_populated_matches_schema() {
         // app_request_route_miss_respects_spa_fallback_opt_out test).
         spa_fallback: false,
         redirects_from: vec![],
+        redirect_templates: vec![],
+        route_claims: None,
         preview_epr_ref: Some(
             "bafyreib2vq7previewEPR01234567890123456789012345678901234567".into(),
         ),

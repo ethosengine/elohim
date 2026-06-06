@@ -44,6 +44,12 @@ pub struct EprProjectionView {
     pub spa_fallback: bool,
     /// Additional URL paths that redirect to url_path (legacy aliases).
     pub redirects_from: Vec<String>,
+    /// Route-level alias promises (spec §4 — the notarized bridge story).
+    #[serde(default)]
+    pub redirect_templates: Vec<RedirectTemplate>,
+    /// GRANTED route claims (spec §3.2). None = no claims granted.
+    #[serde(default)]
+    pub route_claims: Option<RouteClaimGrant>,
     /// EPR CID of a preview / draft build, surfaced alongside the stable build.
     pub preview_epr_ref: Option<String>,
     /// Gate hints the access layer should surface when reach is restricted.
@@ -128,6 +134,45 @@ pub struct StewardDirectEndpoint {
     pub accepts_projection_for: Vec<String>,
 }
 
+/// A serializable route-claim template (spec §3, 2026-06-06 route-claims design).
+/// `template` and `fragments` values use `{id}` / `{n}` placeholders, substituted
+/// segment-safe (a placeholder binds exactly one path segment).
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RouteClaimTemplate {
+    /// The EPR contentType this claim binds (e.g. "path").
+    pub content_type: String,
+    /// Mount-relative route template (e.g. "path/{id}").
+    pub template: String,
+    /// Fragment-type → deeper route template (e.g. step → "path/{id}/step/{n}").
+    #[serde(default)]
+    pub fragments: std::collections::BTreeMap<String, String>,
+}
+
+/// The GRANTED claims block on a project-epr commitment (spec §3.2): the
+/// steward-authored operative routing law. `claims_manifest_cid` fingerprints
+/// the bundle-manifest declaration acknowledged at grant time (claims-stale
+/// drift detection, §3.4).
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RouteClaimGrant {
+    pub schema_version: u32,
+    pub claims_manifest_cid: Option<String>,
+    pub claims: Vec<RouteClaimTemplate>,
+}
+
+/// A route-level alias promise on the commitment (spec §4): requests matching
+/// `from` 302 to `to`. One hop; `to` must be a canonical address.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RedirectTemplate {
+    pub from: String,
+    pub to: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,6 +190,8 @@ mod tests {
             entry_file: "index.html".into(),
             spa_fallback: true,
             redirects_from: vec![],
+            redirect_templates: vec![],
+            route_claims: None,
             preview_epr_ref: None,
             gate_hints: vec![],
             dead_end: false,

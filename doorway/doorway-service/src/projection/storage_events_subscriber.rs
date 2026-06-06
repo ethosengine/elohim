@@ -375,6 +375,8 @@ mod tests {
             entry_file: "index.html".into(),
             spa_fallback: true,
             redirects_from: vec![],
+            redirect_templates: vec![],
+            route_claims: None,
             preview_epr_ref: None,
             gate_hints: vec![],
             dead_end: false,

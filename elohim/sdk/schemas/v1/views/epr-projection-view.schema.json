@@ -15,6 +15,7 @@
     "baseHref",
     "entryFile",
     "redirectsFrom",
+    "redirectTemplates",
     "gateHints",
     "deadEnd",
     "spaFallback",
@@ -63,6 +64,15 @@
       "items": { "type": "string" },
       "description": "Legacy URL paths that redirect to urlPath."
     },
+    "redirectTemplates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/RedirectTemplate" },
+      "description": "Route-level alias promises: requests matching 'from' 302 to 'to'. One hop, canonical targets only."
+    },
+    "routeClaims": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/RouteClaimGrant" }],
+      "description": "GRANTED route claims (steward-authored at grant time). Null when no claims granted."
+    },
     "previewEprRef": {
       "type": ["string", "null"],
       "description": "CIDv1 base32 of the preview EPR, if this projection has a distinct preview variant. Null when no preview is configured."
@@ -99,6 +109,39 @@
     }
   },
   "$defs": {
+    "RouteClaimTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contentType", "template", "fragments"],
+      "properties": {
+        "contentType": { "type": "string", "description": "EPR contentType this claim binds." },
+        "template": { "type": "string", "description": "Mount-relative route template with {id} placeholder." },
+        "fragments": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Fragment-type to deeper route template ({id}/{n} placeholders)."
+        }
+      }
+    },
+    "RouteClaimGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "claims"],
+      "properties": {
+        "schemaVersion": { "type": "integer" },
+        "claimsManifestCid": { "type": ["string", "null"], "description": "Bundle-manifest CID acknowledged at grant time (claims-stale fingerprint)." },
+        "claims": { "type": "array", "items": { "$ref": "#/$defs/RouteClaimTemplate" } }
+      }
+    },
+    "RedirectTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "type": "string", "pattern": "^/", "description": "Request-path template to match ({id} binds one segment)." },
+        "to": { "type": "string", "pattern": "^/", "description": "Canonical target template (one hop)." }
+      }
+    },
     "GateHintRef": {
       "type": "object",
       "additionalProperties": false,
