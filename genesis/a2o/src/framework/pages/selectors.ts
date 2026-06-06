@@ -256,6 +256,11 @@ export const PATH_OVERVIEW = {
   VIEW_AS_CONTENT: 'overview-view-as-content',
 } as const;
 
+/** Cross-pillar resource viewer (shell-rendered at /resource/:id and /epr/:id). */
+export const CONTENT_VIEWER = {
+  ROOT: 'content-viewer',
+} as const;
+
 // Content viewer (elohim-app: content-viewer.component.html)
 export const VIEWER = {
   BACK_HOME: 'viewer-back-home',

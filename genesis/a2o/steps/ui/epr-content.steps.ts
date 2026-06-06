@@ -53,7 +53,10 @@ Given(
   async function (this: E2EWorld, humanName: string, resourceId: string) {
     const device = requirePwDevice(this, humanName);
     const appUrl = doorwayToAppUrl(device.client.url);
-    await device.page.goto(`${appUrl}/lamad/resource/${resourceId}`, {
+    // §12.1 Slice 2 — content is now served at the universal /epr/{id} address.
+    // The legacy /lamad/resource/{id} bridge still resolves via handoff but
+    // /epr/{id} is the canonical load path for render-verified steps.
+    await device.page.goto(`${appUrl}/epr/${resourceId}`, {
       waitUntil: 'networkidle',
     });
     await device.page.locator('.markdown-content').waitFor({ state: 'visible', timeout: 15_000 });
@@ -66,9 +69,11 @@ Given(
     const device = requirePwDevice(this, humanName);
     const appUrl = doorwayToAppUrl(device.client.url);
     // The manifesto contains an epr:rea-foundations link, rea-foundations contains epr:manifesto
-    // Navigate to manifesto standalone view to get a page with EPR links
+    // Navigate to manifesto standalone view to get a page with EPR links.
+    // §12.1 Slice 2 — use the universal /epr/{id} address; legacy /lamad/resource/{id}
+    // still bridges via handoff but /epr/{id} is the canonical load path.
     const source = contentId === 'manifesto' ? 'rea-foundations' : 'manifesto';
-    await device.page.goto(`${appUrl}/lamad/resource/${source}`, {
+    await device.page.goto(`${appUrl}/epr/${source}`, {
       waitUntil: 'networkidle',
     });
     await device.page.locator('.markdown-content').waitFor({ state: 'visible', timeout: 15_000 });
@@ -192,9 +197,11 @@ Then(
   function (this: E2EWorld, humanName: string, resourceId: string) {
     const device = requirePwDevice(this, humanName);
     const url = device.page.url();
+    // §12.1 Slice 2 — the universal /epr/{id} address is the canonical landing
+    // point after an EPR link click from within the shell viewer.
     assert.ok(
-      url.includes(`/lamad/resource/${resourceId}`),
-      `Expected URL to contain /lamad/resource/${resourceId}, got: ${url}`
+      url.includes(`/epr/${resourceId}`),
+      `Expected URL to contain /epr/${resourceId}, got: ${url}`
     );
   }
 );
@@ -203,7 +210,7 @@ Then('the resolution type is {string}', function (this: E2EWorld, expectedType: 
   // Resolution type is determined by the URL pattern after navigation:
   // - in-path: URL contains /lamad/path/{id}/step/{n}
   // - cross-path: URL contains /lamad/path/{differentId}/step/{n}
-  // - standalone: URL contains /lamad/resource/{id}
+  // - standalone: URL contains /epr/{id}  (§12.1 Slice 2 — universal address)
   // The feature file asserts the right URL pattern in the previous step,
   // so this step is a semantic label — validate it's a known type.
   assert.ok(

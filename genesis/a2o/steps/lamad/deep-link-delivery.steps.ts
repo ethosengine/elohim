@@ -36,7 +36,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
-import { NOT_FOUND, PATH_NAV, PATH_OVERVIEW } from '../../src/framework/pages/selectors.js';
+import { CONTENT_VIEWER, NOT_FOUND, PATH_NAV, PATH_OVERVIEW } from '../../src/framework/pages/selectors.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 import { fetchApp, responseStore } from '../delivery.steps.js';
@@ -245,6 +245,64 @@ Then('the rendered surface is not a raw error response', async function (this: E
 // (steps/delivery.steps.ts) — reused, not redefined. Only the body-shape guard
 // below is unique to the deep-link contract.
 // ---------------------------------------------------------------------------
+
+/**
+ * "Given a learner opens the deep link {string}" — the visitor navigates to
+ * the path with no prior session. Variant without "cold" suffix; used by
+ * Slice-2 scenarios that don't carry the cold-start semantic (the link may
+ * be a warm navigate or a cross-bundle handoff target).
+ *
+ * Example:
+ *   Given a learner opens the deep link "/epr/foundations-christian-technology"
+ */
+Given('a learner opens the deep link {string}', async function (this: E2EWorld, deepLink: string) {
+  const device = await ensureVisitor(this);
+  if (!device) {
+    return PENDING;
+  }
+  await device.navigate(deepLink);
+});
+
+/**
+ * "Then the cross-pillar resource viewer renders" — the universal /epr/{id}
+ * address resolved and the shell's epr/:resourceId route rendered the
+ * cross-pillar resource viewer. Render-verified by the viewer's root testid.
+ *
+ * Example: Then the cross-pillar resource viewer renders
+ */
+Then('the cross-pillar resource viewer renders', async function (this: E2EWorld) {
+  const device = await ensureVisitor(this);
+  if (!device) {
+    return PENDING;
+  }
+  const rendered = await rootRendered(device, CONTENT_VIEWER.ROOT);
+  assert.ok(
+    rendered,
+    `Expected the cross-pillar resource viewer to render (data-testid="${CONTENT_VIEWER.ROOT}"); ` +
+      `URL is "${device.page.url()}"`
+  );
+});
+
+/**
+ * "When the learner follows the View Resource Details link" — the step
+ * navigator's "View Resource Details" affordance is a plain href to the
+ * universal /epr/{id} address. Clicking it triggers a full doorway load
+ * (captured by the epr-link interceptor) and lands on the shell viewer.
+ * Regression anchor for the resource self-loop redirect killed in Slice 2.
+ *
+ * Example: When the learner follows the View Resource Details link
+ */
+When(
+  'the learner follows the View Resource Details link',
+  async function (this: E2EWorld) {
+    const device = await ensureVisitor(this);
+    if (!device) {
+      return PENDING;
+    }
+    await device.page.locator(`[data-testid="${PATH_NAV.VIEW_RESOURCE}"]`).first().click();
+    await device.page.waitForLoadState('domcontentloaded');
+  }
+);
 
 /**
  * "Then the response body is JSON, not an index.html shell" — the honest-404

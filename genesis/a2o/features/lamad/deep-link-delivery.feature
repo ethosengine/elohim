@@ -49,3 +49,24 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     When the missing asset "/lamad/main-DOESNOTEXIST00000000.js" is requested from doorway "alpha"
     Then the response status is 404
     And the response body is JSON, not an index.html shell
+
+  @browser-only
+  Scenario: Universal EPR address resolves to a rendered surface
+    # §12.1 Slice 2 — /epr/{id}: the doorway serves the root bundle; the
+    # shell's epr/:resourceId route resolves the EPR and renders the
+    # cross-pillar resource viewer. The durable, bundle-agnostic address.
+    Given a learner opens the deep link "/epr/foundations-christian-technology"
+    Then the cross-pillar resource viewer renders
+    And the rendered surface is not a raw error response
+
+  @browser-only
+  Scenario: View Resource Details crosses the bundle boundary
+    # §12.3 sweep — the lamad step navigator's resource link is a plain href
+    # to the universal address; the epr-link interceptor records the handoff
+    # and the full doorway load renders the shell viewer. Regression anchor
+    # for the resource self-loop redirect killed in Slice 2.
+    Given a learner opens the deep link "/lamad/path/foundations-christian-technology/step/0"
+    Then the lamad step navigator renders
+    When the learner follows the View Resource Details link
+    Then the cross-pillar resource viewer renders
+    And the rendered surface is not a raw error response

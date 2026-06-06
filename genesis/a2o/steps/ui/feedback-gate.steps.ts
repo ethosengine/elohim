@@ -38,7 +38,8 @@ function requirePlaywright(world: E2EWorld, humanName?: string): PlaywrightDevic
 
 async function ensureOnContentPage(device: PlaywrightDevice): Promise<void> {
   const appUrl = doorwayToAppUrl(device.client.url);
-  await device.page.goto(`${appUrl}/lamad/resource/${DEFAULT_CONTENT_ID}`, {
+  // §12.1 Slice 2 — content is served at the universal /epr/{id} address.
+  await device.page.goto(`${appUrl}/epr/${DEFAULT_CONTENT_ID}`, {
     waitUntil: 'networkidle',
   });
   // Wait for the content-viewer header to render — that's where our trigger lives.

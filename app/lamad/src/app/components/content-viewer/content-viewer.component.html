@@ -1,6 +1,7 @@
 <div
   class="content-viewer-container focused-view-container"
   [class.focused-view-active]="isFocusedView"
+  data-testid="content-viewer"
 >
   <!-- Loading state -->
   <div *ngIf="isLoading" class="loading-state">
