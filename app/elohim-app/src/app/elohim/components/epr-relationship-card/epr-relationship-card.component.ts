@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -89,7 +89,7 @@ function resilienceTitle(resilience: ResilienceView): string {
 @Component({
   selector: 'app-epr-relationship-card',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
@@ -159,7 +159,7 @@ function resilienceTitle(resilience: ResilienceView): string {
     `,
   ],
   template: `
-    <a class="epr-rel-card" data-testid="epr-relationship-card" [routerLink]="route ?? []">
+    <ng-template #cardBody>
       <div class="epr-rel-card__type" data-testid="epr-rel-card-type">{{ label }}</div>
       <div class="epr-rel-card__title" data-testid="epr-rel-card-title">{{ title }}</div>
       @if (description) {
@@ -199,6 +199,23 @@ function resilienceTitle(resilience: ResilienceView): string {
           }
         }
       </div>
+    </ng-template>
+
+    <a
+      *ngIf="route"
+      class="epr-rel-card"
+      data-testid="epr-relationship-card"
+      [routerLink]="route"
+    >
+      <ng-container *ngTemplateOutlet="cardBody"></ng-container>
+    </a>
+    <a
+      *ngIf="!route"
+      class="epr-rel-card"
+      data-testid="epr-relationship-card"
+      [href]="href ?? ''"
+    >
+      <ng-container *ngTemplateOutlet="cardBody"></ng-container>
     </a>
   `,
 })

@@ -29,7 +29,7 @@ import {
   Output,
   inject,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { type NavigationExtras, Router } from '@angular/router';
 
 import { firstValueFrom } from 'rxjs';
 
@@ -37,7 +37,7 @@ import 'elohim-core/register';
 
 import { type ContextMenuAction } from '@app/qahal';
 
-import { EprResolverService } from '../../services/epr-resolver.service';
+import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
 import { EprNavService } from '../../services/epr-nav.service';
 
 import type { ContextMenuItem, ElohimEprLink, EprLinkDisplay } from 'elohim-core';
@@ -118,11 +118,7 @@ export class EprLinkComponent implements OnInit, OnDestroy {
   private readonly navigateListener = (e: Event): void => {
     const epr = (e as CustomEvent<{ epr: string }>).detail.epr;
     this.eprResolver.resolve(epr).subscribe(resolved => {
-      if (resolved?.route) {
-        void this.router.navigate(resolved.route);
-      } else if (resolved) {
-        this.eprNav.navigate(resolved.href);
-      }
+      this.navigateResolved(resolved);
     });
   };
 
@@ -185,11 +181,7 @@ export class EprLinkComponent implements OnInit, OnDestroy {
         // Resolve to the resource route, then land directly on the Network /
         // resilience tab via the route fragment (content-viewer honors it).
         this.eprResolver.resolve(epr).subscribe(resolved => {
-          if (resolved?.route) {
-            void this.router.navigate(resolved.route, { fragment: 'network' });
-          } else if (resolved) {
-            this.eprNav.navigate(resolved.href);
-          }
+          this.navigateResolved(resolved, { fragment: 'network' });
         });
         break;
       case 'relationships':
@@ -214,13 +206,22 @@ export class EprLinkComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Route in-bundle when claimed; cross-bundle full-load via the universal href.
+   *  NOTE: navExtras (e.g. fragment) apply only to in-bundle navigation — a
+   *  cross-bundle full-load drops them (Slice 3 fragment-preserving redirect). */
+  private navigateResolved(resolved: ResolvedContent | null, extras?: NavigationExtras): void {
+    if (resolved?.route) {
+      void (extras
+        ? this.router.navigate(resolved.route, extras)
+        : this.router.navigate(resolved.route));
+    } else if (resolved) {
+      this.eprNav.navigate(resolved.href);
+    }
+  }
+
   private navigateToResource(epr: string): void {
     this.eprResolver.resolve(epr).subscribe(resolved => {
-      if (resolved?.route) {
-        void this.router.navigate(resolved.route);
-      } else if (resolved) {
-        this.eprNav.navigate(resolved.href);
-      }
+      this.navigateResolved(resolved);
     });
   }
 }

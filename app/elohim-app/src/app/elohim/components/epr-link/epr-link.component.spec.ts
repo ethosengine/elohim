@@ -22,6 +22,7 @@ import { type ContextMenuAction } from '@app/qahal';
 
 import { EprLinkComponent } from './epr-link.component';
 import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
+import { EprNavService } from '../../services/epr-nav.service';
 
 const mockResolved: ResolvedContent = {
   ref: { id: 'manifesto', tier: 'doc' },
@@ -45,13 +46,18 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
   let component: EprLinkComponent;
   let resolverSpy: { resolve: ReturnType<typeof vi.fn> };
   let routerNavSpy: ReturnType<typeof vi.spyOn>;
+  let eprNavSpy: { navigate: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     resolverSpy = { resolve: vi.fn().mockReturnValue(of(mockResolved)) };
+    eprNavSpy = { navigate: vi.fn() };
 
     await TestBed.configureTestingModule({
       imports: [EprLinkComponent, RouterModule.forRoot([])],
-      providers: [{ provide: EprResolverService, useValue: resolverSpy }],
+      providers: [
+        { provide: EprResolverService, useValue: resolverSpy },
+        { provide: EprNavService, useValue: eprNavSpy },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(EprLinkComponent);
@@ -99,6 +105,25 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
 
     expect(resolverSpy.resolve).toHaveBeenCalledWith('epr:manifesto');
     expect(routerNavSpy).toHaveBeenCalledWith(['/epr', 'manifesto']);
+  });
+
+  it('should navigate via EprNavService when route is null (cross-bundle)', async () => {
+    resolverSpy.resolve.mockReturnValue(
+      of({ ...mockResolved, route: null, href: '/epr/manifesto' }),
+    );
+
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.dispatchEvent(
+      new CustomEvent('navigate', { detail: { epr: 'epr:manifesto' }, bubbles: true }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(eprNavSpy.navigate).toHaveBeenCalledWith('/epr/manifesto');
+    expect(routerNavSpy).not.toHaveBeenCalled();
   });
 
   it('should not throw on ngOnDestroy', () => {

@@ -131,13 +131,26 @@ describe('EprPopoverComponent', () => {
     expect(link?.textContent?.trim()).toBe('Open resource');
   });
 
-  it('should not render link when route is null', () => {
+  it('should not render link when route and href are both null', () => {
     component.head = mockHead;
     component.route = null;
+    component.href = null;
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('[data-testid="epr-popover-link"]')).toBeNull();
+  });
+
+  it('should render href anchor when route is null but href is provided', () => {
+    component.head = mockHead;
+    component.route = null;
+    component.href = '/epr/x';
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const link = el.querySelector('[data-testid="epr-popover-link"]');
+    expect(link).toBeTruthy();
+    expect(link?.getAttribute('href')).toBe('/epr/x');
   });
 
   it('should emit dismissed on mouse leave', () => {

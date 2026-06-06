@@ -235,6 +235,23 @@ describe('EprRelationshipCardComponent', () => {
     expect(href).toContain('systems-thinking');
   });
 
+  it('uses the href fallback anchor when route is null (cross-bundle)', () => {
+    mockResolver.resolve.mockReturnValue(
+      of({ ...resolvedContent, route: null, href: '/epr/systems-thinking' }),
+    );
+
+    component.relationship = { type: 'PREREQUISITE', target: 'systems-thinking' };
+    component.ngOnChanges({ relationship: {} as any });
+    fixture.detectChanges();
+
+    const card = query(fixture, 'epr-relationship-card');
+    expect(card).toBeTruthy();
+    // href anchor must carry the universal address
+    expect(card!.getAttribute('href')).toBe('/epr/systems-thinking');
+    // and must NOT have a routerLink attribute (which would produce an empty route)
+    expect(card!.hasAttribute('ng-reflect-router-link')).toBe(false);
+  });
+
   // ── Fallback ──────────────────────────────────────────────────────────────
 
   it('falls back to target id when resolution returns null', () => {
