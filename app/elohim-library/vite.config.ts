@@ -19,11 +19,9 @@ export default defineConfig({
     ],
     exclude: ['node_modules', 'dist'],
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        maxForks: 8,
-      },
-    },
+    // Vitest 4 removed `poolOptions`; `poolOptions.forks.maxForks` is now the
+    // top-level `maxWorkers`. See migration guide #pool-rework.
+    maxWorkers: 8,
     reporters: ['default'],
     coverage: {
       provider: 'v8',
