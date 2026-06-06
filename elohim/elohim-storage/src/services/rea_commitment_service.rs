@@ -106,6 +106,34 @@ impl ReaCommitmentService {
                 }),
             };
             crate::db::rea_commitments::validate_project_epr_commitment(&v_input)?;
+
+            // Re-grant supersession (spec §3.2/§3.3). When the create names a
+            // predecessor, the successor is committed normally (conductor when
+            // connected, diesel-direct otherwise) and the predecessor is flipped
+            // to `superseded` so only the current grant serves
+            // (find_active_projections excludes superseded). We PRE-VALIDATE the
+            // predecessor here so a double-supersede (409) or cross-scope/provider
+            // mismatch fails fast — before any conductor round-trip — and we
+            // RE-CHECK + mark transactionally after the successor projects (so a
+            // concurrent supersede cannot slip a second successor through).
+            if input.supersedes.is_some() {
+                rea_commitments::validate_supersession(conn, ctx, &input)?;
+                let view = if hc_lamad.is_some() {
+                    Self::create_via_conductor(conn, ctx, input.clone(), events, hc_lamad).await?
+                } else {
+                    // No conductor (local-dev / degraded): the diesel-direct
+                    // supersession path is the single atomic truth function.
+                    return Self::create_via_supersession_diesel(conn, ctx, input, events);
+                };
+                // Successor projected via conductor — now mark the predecessor.
+                let predecessor_id = input
+                    .supersedes
+                    .as_deref()
+                    .expect("supersedes.is_some() checked above");
+                rea_commitments::mark_superseded(conn, ctx, predecessor_id)?;
+                return Ok(view);
+            }
+
             return Self::create_via_conductor(conn, ctx, input, events, hc_lamad).await;
         }
         // Soft gate: conductor round-trip when connected, diesel fallback when not.
@@ -119,6 +147,27 @@ impl ReaCommitmentService {
         // Legacy diesel-direct path — preserved for non-project-epr actions
         // pending follow-up migration. See module docs.
         Self::create_via_diesel(conn, ctx, input, events)
+    }
+
+    /// Diesel-direct supersession create (no conductor): the predecessor mark and
+    /// successor insert happen in one transaction via
+    /// `rea_commitments::create_with_supersession`. Used in local-dev / degraded
+    /// environments and exercised directly by the storage unit tests.
+    fn create_via_supersession_diesel(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        input: CreateReaCommitmentInput,
+        events: Option<&EventBus>,
+    ) -> Result<ReaCommitmentView, StorageError> {
+        let commitment = rea_commitments::create_with_supersession(conn, ctx, input)?;
+        if let Some(bus) = events {
+            if commitment.action == PROJECT_EPR_ACTION {
+                bus.emit(StorageEvent::ProjectionRegistered {
+                    commitment_id: commitment.id.clone(),
+                });
+            }
+        }
+        Ok(ReaCommitmentView::from(commitment))
     }
 
     fn create_via_diesel(
@@ -214,6 +263,10 @@ impl ReaCommitmentService {
             medium_of_exchange_id: None, // storage-only field; not on DNA wire
             note: c.note.clone(),
             metadata_json: Some(c.metadata_json.clone()),
+            // Projecting the conductor's committed entry — supersession (if any)
+            // was already applied transactionally before the conductor round-trip;
+            // never re-run it on the projection write.
+            supersedes: None,
         };
         let commitment = rea_commitments::upsert_with_anchor(
             conn,
@@ -384,6 +437,8 @@ impl ReaCommitmentService {
             medium_of_exchange_id: None,
             note: c.note.clone(),
             metadata_json: Some(c.metadata_json.clone()),
+            // Anchor-advance only; no supersession on a state-update projection.
+            supersedes: None,
         };
         rea_commitments::upsert_with_anchor(conn, ctx, anchor_input, Some(&action_hash_str))?;
 
@@ -514,6 +569,116 @@ mod tests {
             row.dht_anchor_hash.is_none(),
             "unanchored row must stay unanchored after update_state, got: {:?}",
             row.dht_anchor_hash
+        );
+    }
+
+    /// Build the seeder-shaped project-epr body for a service supersession test.
+    fn project_epr_input(
+        id: &str,
+        with_grant: bool,
+        supersedes: Option<&str>,
+    ) -> CreateReaCommitmentInput {
+        let route_claims = if with_grant {
+            serde_json::json!({
+                "schemaVersion": 1, "claimsManifestCid": null,
+                "claims": [{ "contentType": "path", "template": "path/{id}",
+                             "fragments": { "step": "path/{id}/step/{n}" } }]
+            })
+        } else {
+            serde_json::Value::Null
+        };
+        let metadata = serde_json::json!({
+            "urlPath": "/lamad", "mode": "cached", "reach": "commons",
+            "baseHref": "/lamad/", "entryFile": "index.html",
+            "redirectsFrom": [], "previewEprRef": null, "gateHints": [],
+            "deadEnd": false, "stewardDirectEndpoint": null,
+            "routeClaims": route_claims, "redirectTemplates": [],
+            "supersedes": supersedes,
+        });
+        CreateReaCommitmentInput {
+            id: Some(id.to_string()),
+            action: PROJECT_EPR_ACTION.to_string(),
+            provider: "12D3KooWSteward".to_string(),
+            receiver: "12D3KooWSteward".to_string(),
+            in_scope_of: Some("doorway:alpha-elohim-host|epr:lamad-spa".to_string()),
+            note: Some("Project lamad-spa at /lamad".to_string()),
+            metadata_json: Some(metadata.to_string()),
+            supersedes: supersedes.map(String::from),
+            ..Default::default()
+        }
+    }
+
+    /// Service re-grant path (no conductor): a project-epr create carrying
+    /// `supersedes` routes through the diesel-direct supersession path, marks
+    /// the grant-less predecessor superseded, and the active set returns only
+    /// the grant-bearing successor. Mirrors the live-alpha re-grant gap fix at
+    /// the service boundary the HTTP handler invokes.
+    #[tokio::test]
+    async fn service_regrant_supersedes_via_diesel_when_no_conductor() {
+        let mut conn = setup_conn();
+        let ctx = crate::db::context::AppContext::default_lamad();
+
+        // Seed the grant-less predecessor at the DB layer — this reproduces the
+        // live-alpha shape (the row was seeded earlier; a plain project-epr
+        // create requires a conductor, but the supersession path does not).
+        let pred = project_epr_input("svc-pred", false, None);
+        rea_commitments::create_commitment(&mut conn, &ctx, pred).expect("predecessor seed");
+
+        // Re-grant: supersede with a grant-bearing successor.
+        let succ = project_epr_input("svc-succ", true, Some("svc-pred"));
+        let view = ReaCommitmentService::create(&mut conn, &ctx, succ, None, None)
+            .await
+            .expect("supersession create");
+        assert_eq!(view.id, "svc-succ");
+
+        // Predecessor is superseded; only the successor is active and carries the grant.
+        let pred_row = rea_commitments::get_commitment(&mut conn, &ctx, "svc-pred")
+            .unwrap()
+            .unwrap();
+        assert_eq!(pred_row.state, rea_commitments::SUPERSEDED_STATE);
+
+        let active =
+            rea_commitments::find_active_projections(&mut conn, &ctx, "alpha-elohim-host").unwrap();
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].commitment_id, "svc-succ");
+        assert!(active[0].route_claims.is_some(), "successor carries grant");
+    }
+
+    /// Service double-supersede is rejected (first-write-wins) with a 409-mapped
+    /// AlreadyExists error.
+    #[tokio::test]
+    async fn service_double_supersede_rejected() {
+        let mut conn = setup_conn();
+        let ctx = crate::db::context::AppContext::default_lamad();
+
+        rea_commitments::create_commitment(
+            &mut conn,
+            &ctx,
+            project_epr_input("svc2-pred", false, None),
+        )
+        .expect("predecessor seed");
+        ReaCommitmentService::create(
+            &mut conn,
+            &ctx,
+            project_epr_input("svc2-s1", true, Some("svc2-pred")),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let err = ReaCommitmentService::create(
+            &mut conn,
+            &ctx,
+            project_epr_input("svc2-s2", true, Some("svc2-pred")),
+            None,
+            None,
+        )
+        .await
+        .expect_err("second supersede must reject");
+        assert!(
+            matches!(err, StorageError::AlreadyExists(_)),
+            "expected AlreadyExists (409), got {err:?}"
         );
     }
 
@@ -677,6 +842,7 @@ mod tests {
             medium_of_exchange_id: None,
             note: c.note.clone(),
             metadata_json: Some(c.metadata_json.clone()),
+            supersedes: None,
         };
 
         assert_eq!(input.id.as_deref(), Some("test-commit-001"));

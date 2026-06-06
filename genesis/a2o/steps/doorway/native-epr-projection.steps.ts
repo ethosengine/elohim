@@ -264,6 +264,240 @@ Then(
   }
 );
 
+// ---------------------------------------------------------------------------
+// @regrant — re-grant supersession (spec §3.2/§3.3)
+//
+// SUBSTRATE-VERIFIABLE against a live doorway: the doorway proxies the storage
+// projection endpoints. The mechanics are real (create_with_supersession), so
+// these steps drive the actual ceremony rather than stubbing it:
+//   - discover the active grant-less predecessor (GET projections),
+//   - re-grant via a superseding POST carrying `supersedes`,
+//   - assert the active set now carries the grant (re-grant took effect),
+//   - assert the predecessor is `superseded` and the chain is walkable.
+//
+// The steward-authenticated POST may be blocked in a hosted run without an admin
+// credential; in that case the When step returns 'pending' (matching this file's
+// discipline for mutations that aren't a2o-runnable in the current environment),
+// so the scenario records the contract without a false failure.
+// ---------------------------------------------------------------------------
+
+const REGRANT_KEY = 'regrant:predecessorId';
+const REGRANT_SUCCESSOR_KEY = 'regrant:successorId';
+const REGRANT_SKIP_KEY = 'regrant:skipped';
+
+interface ProjectionRow {
+  commitmentId: string;
+  eprId: string;
+  doorwayId: string;
+  urlPath?: string;
+  routeClaims?: { schemaVersion: number; claims: { contentType: string }[] } | null;
+}
+
+/** Bare doorway id (no scheme/host) the storage projection endpoint expects. */
+function bareDoorwayIdFor(world: E2EWorld, hostname: string): string {
+  // The seeded doorway ids are alpha-elohim-host / apex-elohim-host. The feature
+  // says "alpha", so map the canonical alpha id. Fall back to a slugified host.
+  if (hostname === 'alpha' || hostname.startsWith('alpha')) return 'alpha-elohim-host';
+  return hostname.replace(/\./g, '-');
+}
+
+async function fetchProjectionRows(base: string, bareDoorwayId: string): Promise<ProjectionRow[]> {
+  const url = `${base.replace(/\/$/, '')}/db/rea_commitments?action=project-epr&doorwayId=${encodeURIComponent(
+    bareDoorwayId
+  )}`;
+  const resp = await getRaw(url);
+  if (resp.status !== 200) return [];
+  try {
+    return JSON.parse(resp.body.toString('utf-8')) as ProjectionRow[];
+  } catch {
+    return [];
+  }
+}
+
+Given(
+  /^the ([\w.-]+) doorway has an active grant-less project-epr commitment for "([^"]+)" at "([^"]+)"$/,
+  async function (this: E2EWorld, hostname: string, eprSlug: string, urlPath: string) {
+    const base = resolveDoorwayUrl(this, hostname);
+    const bareDoorwayId = bareDoorwayIdFor(this, hostname);
+    const rows = await fetchProjectionRows(base, bareDoorwayId);
+    const row = rows.find(r => r.eprId === eprSlug);
+
+    if (!row) {
+      // No seeded projection reachable (doorway not seeded in this env) — record
+      // the precondition as unmet and skip the mutation rather than false-fail.
+      this.contentIds.set(REGRANT_SKIP_KEY, 'no-projection');
+      return 'pending';
+    }
+    this.contentIds.set(REGRANT_KEY, row.commitmentId);
+    this.contentIds.set(`projection:${eprSlug}:urlPath`, urlPath);
+    this.contentIds.set(`projection:${eprSlug}:doorway`, base);
+    this.contentIds.set('regrant:bareDoorwayId', bareDoorwayId);
+    this.contentIds.set('regrant:eprSlug', eprSlug);
+    // The scenario's premise is a grant-less row; if it's already granted the
+    // re-grant has already happened (idempotent) — record so later steps adapt.
+    if (row.routeClaims) {
+      this.contentIds.set('regrant:already-granted', 'true');
+    }
+  }
+);
+
+When(
+  /^the steward re-grants the "([^"]+)" projection with routeClaims for contentType "([^"]+)"$/,
+  async function (this: E2EWorld, eprSlug: string, contentType: string) {
+    if (this.contentIds.get(REGRANT_SKIP_KEY)) return 'pending';
+    const predecessorId = this.contentIds.get(REGRANT_KEY);
+    assert.ok(predecessorId, 'predecessor commitmentId not captured by the Given step');
+    if (this.contentIds.get('regrant:already-granted')) {
+      // Already re-granted earlier — nothing to do; the Then steps verify the
+      // grant is present (idempotent end state).
+      return;
+    }
+
+    const base = this.contentIds.get(`projection:${eprSlug}:doorway`)!;
+    const urlPath = this.contentIds.get(`projection:${eprSlug}:urlPath`) ?? '/lamad';
+    const bareDoorwayId = this.contentIds.get('regrant:bareDoorwayId')!;
+
+    // The granted metadata: same projection, now carrying routeClaims. The
+    // successor id is the predecessor's id with an `-regrant` suffix — distinct
+    // (required) and deterministic for this scenario. Production seeding uses a
+    // metadata fingerprint suffix; the a2o step only needs a distinct id.
+    const successorId = `${predecessorId}-regrant`;
+    const metadata = {
+      urlPath,
+      mode: 'cached',
+      reach: 'commons',
+      baseHref: `${urlPath}/`,
+      entryFile: 'index.html',
+      redirectsFrom: [],
+      previewEprRef: null,
+      gateHints: [],
+      deadEnd: false,
+      stewardDirectEndpoint: null,
+      routeClaims: {
+        schemaVersion: 1,
+        claimsManifestCid: null,
+        claims: [
+          {
+            contentType,
+            template: `${contentType}/{id}`,
+            fragments: { step: `${contentType}/{id}/step/{n}` },
+          },
+        ],
+      },
+      redirectTemplates: [],
+      supersedes: predecessorId,
+    };
+    const scope = `doorway:${bareDoorwayId}|epr:${eprSlug}`;
+    const body = {
+      id: successorId,
+      action: 'project-epr',
+      provider: 'a2o-regrant-steward',
+      receiver: 'a2o-regrant-steward',
+      inScopeOf: scope,
+      note: `Re-grant ${eprSlug} at ${urlPath}`,
+      metadataJson: JSON.stringify(metadata),
+      supersedes: predecessorId,
+    };
+
+    // NOTE: provider must match the predecessor's provider for the storage
+    // supersession scope/provider check. We don't know the seeded provider here,
+    // so read it from the predecessor commitment first.
+    const predResp = await getRaw(`${base.replace(/\/$/, '')}/api/v1/commitments/${predecessorId}`);
+    if (predResp.status === 200) {
+      try {
+        const pred = JSON.parse(predResp.body.toString('utf-8')) as {
+          provider?: string;
+          inScopeOf?: string[] | string;
+        };
+        if (pred.provider) {
+          body.provider = pred.provider;
+          body.receiver = pred.provider;
+        }
+      } catch {
+        /* keep defaults; the POST will report the mismatch */
+      }
+    }
+
+    const postResp = await request(`${base.replace(/\/$/, '')}/api/v1/commitments`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const status = postResp.statusCode;
+    const respText = Buffer.from(await postResp.body.arrayBuffer()).toString('utf-8');
+
+    // Auth-gated environments: a steward POST without an admin credential is
+    // refused. Record the contract and skip rather than false-fail.
+    if (status === 401 || status === 403) {
+      this.contentIds.set(REGRANT_SKIP_KEY, `auth-${status}`);
+      return 'pending';
+    }
+    // 409 = this exact re-grant already applied (idempotent) — acceptable.
+    if (status === 409) {
+      this.contentIds.set(REGRANT_SUCCESSOR_KEY, successorId);
+      return;
+    }
+    assert.ok(
+      status >= 200 && status < 300,
+      `re-grant POST failed: HTTP ${status}: ${respText.slice(0, 300)}`
+    );
+    this.contentIds.set(REGRANT_SUCCESSOR_KEY, successorId);
+  }
+);
+
+Then(
+  /^within one refresh cycle the active projection for "([^"]+)" carries the granted claims$/,
+  async function (this: E2EWorld, eprSlug: string) {
+    if (this.contentIds.get(REGRANT_SKIP_KEY)) return 'pending';
+    const base = this.contentIds.get(`projection:${eprSlug}:doorway`)!;
+    const bareDoorwayId = this.contentIds.get('regrant:bareDoorwayId')!;
+    const rows = await fetchProjectionRows(base, bareDoorwayId);
+    const active = rows.filter(r => r.eprId === eprSlug);
+    // Exactly one ACTIVE row for the slug (the superseded predecessor is excluded
+    // by find_active_projections), and it carries the granted claims.
+    assert.equal(
+      active.length,
+      1,
+      `expected exactly one active projection for "${eprSlug}", got ${active.length}`
+    );
+    const grant = active[0].routeClaims;
+    assert.ok(grant, `active projection for "${eprSlug}" must carry routeClaims after re-grant`);
+    assert.equal(grant.schemaVersion, 1);
+    assert.ok(grant.claims.length > 0, 'granted claims must be non-empty');
+  }
+);
+
+Then(
+  /^the previous grant-less commitment is marked superseded and walkable on the chain$/,
+  async function (this: E2EWorld) {
+    if (this.contentIds.get(REGRANT_SKIP_KEY)) return 'pending';
+    const predecessorId = this.contentIds.get(REGRANT_KEY)!;
+    const successorId = this.contentIds.get(REGRANT_SUCCESSOR_KEY);
+    const base = this.contentIds.get(
+      `projection:${this.contentIds.get('regrant:eprSlug')}:doorway`
+    )!;
+
+    // Predecessor: GET /api/v1/commitments/{id} → state "superseded".
+    const predResp = await getRaw(`${base.replace(/\/$/, '')}/api/v1/commitments/${predecessorId}`);
+    assert.equal(predResp.status, 200, 'predecessor must remain queryable (history preserved)');
+    const pred = JSON.parse(predResp.body.toString('utf-8')) as { state?: string };
+    assert.equal(pred.state, 'superseded', 'predecessor must be marked superseded');
+
+    // Successor: metadata.supersedes points back to the predecessor (walkable).
+    assert.ok(successorId, 'successor commitmentId not captured');
+    const succResp = await getRaw(`${base.replace(/\/$/, '')}/api/v1/commitments/${successorId}`);
+    assert.equal(succResp.status, 200, 'successor must be queryable');
+    const succ = JSON.parse(succResp.body.toString('utf-8')) as {
+      metadata?: { supersedes?: string };
+    };
+    assert.equal(
+      succ.metadata?.supersedes,
+      predecessorId,
+      'successor metadata.supersedes must point to the predecessor (walkable chain)'
+    );
+  }
+);
+
 Then("both doorways' projections reference the same blob_hash", function (this: E2EWorld) {
   // The blob_hash is exposed via X-Content-Address (or similar) on
   // delivered responses. If neither doorway emits the header today,

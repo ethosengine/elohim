@@ -802,8 +802,17 @@ def seedStewardshipStage() {
  *     (related substrate work — dev response §682-695 confirms
  *     `storage-api-key-admin` is the canonical credential)
  *
- * Idempotent: re-runs collapse to 409 (id content-addressed over
- * steward_peer_id + action + scope per seed-projections.ts:130).
+ * Idempotent: a re-run whose projection-relevant metadata is unchanged
+ * collapses to a quiet 409 (id content-addressed over steward_peer_id + action
+ * + scope). When the metadata DRIFTED (e.g. routeClaims newly granted), the
+ * seeder re-grants via supersession — it POSTs a fingerprint-suffixed successor
+ * (`{baseId}-r{sha256(metadata)[:8]}`) carrying `supersedes:{baseId}`, which the
+ * storage layer applies transactionally (mark predecessor `superseded`, insert
+ * successor); only the current grant then serves and the chain stays walkable
+ * via GET /api/v1/commitments/{id}. Drift fields compared:
+ * urlPath, mode, reach, baseHref, entryFile, spaFallback, redirectsFrom,
+ * redirectTemplates, routeClaims, previewEprRef, gateHints, deadEnd,
+ * stewardDirectEndpoint (null-vs-missing normalized to storage defaults).
  *
  * Body extracted to a helper above pipeline {} so the giant pipeline block
  * stays under the 64KB CPS method-size limit (see .claude/hooks/jenkinsfile-

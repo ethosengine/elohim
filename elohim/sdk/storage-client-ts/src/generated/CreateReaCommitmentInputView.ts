@@ -5,4 +5,13 @@ import type { MeasureView } from "./MeasureView";
 /**
  * REA Commitment — API input
  */
-export type CreateReaCommitmentInputView = { id: string | null, action: string, provider: string, receiver: string, resourceConformsTo: string | null, resourceClassifiedAs: Array<string> | null, resourceQuantity: MeasureView | null, effortQuantity: MeasureView | null, hasBeginning: string | null, hasEnd: string | null, due: string | null, clauseOf: string | null, inScopeOf: Array<string> | null, mediumOfExchangeId: string | null, note: string | null, metadata: JsonValue | null, };
+export type CreateReaCommitmentInputView = { id: string | null, action: string, provider: string, receiver: string, resourceConformsTo: string | null, resourceClassifiedAs: Array<string> | null, resourceQuantity: MeasureView | null, effortQuantity: MeasureView | null, hasBeginning: string | null, hasEnd: string | null, due: string | null, clauseOf: string | null, inScopeOf: Array<string> | null, mediumOfExchangeId: string | null, note: string | null, metadata: JsonValue | null, 
+/**
+ * Predecessor commitment id this create supersedes (spec §3.2/§3.3 re-grant
+ * path). When present on a project-epr create, the create runs the
+ * supersession ceremony (mark predecessor `superseded`, insert successor)
+ * transactionally. Not persisted as a column — the steward-authored
+ * `supersedes` pointer rides the successor's `metadata` so the chain stays
+ * walkable via `GET /api/v1/commitments/{id}`.
+ */
+supersedes: string | null, };

@@ -72,6 +72,20 @@ pub struct CreateReaCommitmentInput {
     pub note: Option<String>,
     #[serde(default)]
     pub metadata_json: Option<String>,
+    /// Predecessor commitment id this create supersedes (spec §3.2/§3.3 re-grant
+    /// path). When present on a project-epr create, the create runs the
+    /// supersession ceremony: in one transaction the named predecessor is marked
+    /// `state='superseded'` and the successor is inserted. Both rows remain
+    /// notarized DHT entries; the `superseded` state is projection-layer
+    /// current-view materialization per the stewardship-chain precedent
+    /// (genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md §9 —
+    /// "at most one non-superseded successor per predecessor; first-write-wins").
+    /// This field is NOT persisted as a column; the steward-authored `supersedes`
+    /// pointer rides the successor's `metadata_json` (spec §3.2 "grant is
+    /// steward-authored commitment metadata"), keeping the chain walkable via
+    /// `GET /api/v1/commitments/{id}` with no view change.
+    #[serde(default)]
+    pub supersedes: Option<String>,
 }
 
 /// Query parameters for listing REA commitments - camelCase for URL params
@@ -300,6 +314,211 @@ pub fn create_commitment(
 
     get_commitment(conn, ctx, &id)?
         .ok_or_else(|| StorageError::Internal("Failed to retrieve created commitment".into()))
+}
+
+/// Projection state assigned to a predecessor commitment when a successor
+/// supersedes it. Excluded from the active-projection set by
+/// `find_active_projections` so the doorway's `replace_all` table only ever
+/// carries the current (non-superseded) grant.
+///
+/// This is projection-layer current-view materialization, NOT a DHT mutation:
+/// both predecessor and successor remain notarized DHT entries. See the
+/// stewardship-chain precedent
+/// (genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md §9).
+pub const SUPERSEDED_STATE: &str = "superseded";
+
+/// Validate that `input` may supersede the predecessor it names, given the
+/// current projection state. Returns `Ok(())` when the supersede is admissible.
+///
+/// Rules (shared by the diesel-direct transactional path and the conductor
+/// pre-flight check):
+/// - `input.supersedes` must be set (else this is not a supersede; `Internal`).
+/// - the successor id (`input.id`) must differ from the predecessor id.
+/// - the predecessor must exist (`Validation` — phantom re-grant).
+/// - the predecessor must NOT already be superseded — first-write-wins; the
+///   second supersede is `AlreadyExists` (→ HTTP 409).
+/// - the predecessor must share the successor's `(action, provider, in_scope_of)`
+///   binding — a cross-scope/provider/action supersede is `Validation` (a
+///   re-grant rewrites the SAME projection's grant, never hijacks another).
+///
+/// Read-only: performs no writes. The transactional path calls this then writes;
+/// the conductor path calls this as a fail-fast pre-flight then again (inside
+/// [`mark_superseded`]) to defend against a concurrent supersede.
+pub fn validate_supersession(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    input: &CreateReaCommitmentInput,
+) -> Result<(), StorageError> {
+    let predecessor_id = input.supersedes.as_deref().ok_or_else(|| {
+        StorageError::Internal("validate_supersession called without input.supersedes".into())
+    })?;
+
+    if let Some(successor_id) = input.id.as_deref() {
+        if successor_id == predecessor_id {
+            return Err(StorageError::Validation(format!(
+                "successor id must differ from the predecessor it supersedes: {predecessor_id}"
+            )));
+        }
+    }
+
+    let predecessor = get_commitment(conn, ctx, predecessor_id)?.ok_or_else(|| {
+        StorageError::Validation(format!(
+            "cannot supersede unknown commitment: {predecessor_id}"
+        ))
+    })?;
+
+    if predecessor.state == SUPERSEDED_STATE {
+        return Err(StorageError::AlreadyExists(format!(
+            "commitment {predecessor_id} is already superseded \
+             (at most one non-superseded successor per predecessor)"
+        )));
+    }
+    if predecessor.action != input.action {
+        return Err(StorageError::Validation(format!(
+            "supersede action mismatch: predecessor is '{}', successor is '{}'",
+            predecessor.action, input.action
+        )));
+    }
+    if predecessor.provider != input.provider {
+        return Err(StorageError::Validation(format!(
+            "supersede provider mismatch: predecessor provider '{}' != successor provider '{}'",
+            predecessor.provider, input.provider
+        )));
+    }
+    if predecessor.in_scope_of.as_deref() != input.in_scope_of.as_deref() {
+        return Err(StorageError::Validation(format!(
+            "supersede scope mismatch: predecessor in_scope_of {:?} != successor in_scope_of {:?}",
+            predecessor.in_scope_of, input.in_scope_of
+        )));
+    }
+    Ok(())
+}
+
+/// Flip a predecessor commitment's `state` to [`SUPERSEDED_STATE`], inside a
+/// transaction that re-checks the not-already-superseded invariant.
+///
+/// Used by the conductor supersession path AFTER the successor has been
+/// projected: the successor entry is already notarized, so the predecessor mark
+/// is the final, idempotent step. The re-check guards against a concurrent
+/// supersede landing between the pre-flight [`validate_supersession`] and here.
+/// Marking an already-superseded predecessor is a no-op success (the mark is
+/// idempotent — the desired end state is identical).
+pub fn mark_superseded(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    predecessor_id: &str,
+) -> Result<(), StorageError> {
+    conn.transaction(|conn| {
+        let predecessor = get_commitment(conn, ctx, predecessor_id)?.ok_or_else(|| {
+            StorageError::Validation(format!(
+                "cannot supersede unknown commitment: {predecessor_id}"
+            ))
+        })?;
+        if predecessor.state == SUPERSEDED_STATE {
+            // Idempotent: already in the desired end state.
+            return Ok(());
+        }
+        diesel::update(
+            rea_commitments::table
+                .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+                .filter(rea_commitments::id.eq(predecessor_id)),
+        )
+        .set(rea_commitments::state.eq(SUPERSEDED_STATE))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("mark-superseded failed: {e}")))?;
+        Ok(())
+    })
+}
+
+/// Create a successor project-epr commitment that supersedes a predecessor,
+/// transactionally (spec §3.2/§3.3 re-grant ceremony).
+///
+/// In ONE transaction:
+/// 1. The predecessor (`input.supersedes`) is validated:
+///    - it must exist (else `Validation` → the grant references a phantom row),
+///    - it must NOT itself already be superseded — the second supersede of the
+///      same predecessor is rejected with `AlreadyExists` (→ HTTP 409),
+///      satisfying first-write-wins ("at most one non-superseded successor per
+///      predecessor"),
+///    - it must share the successor's `(provider, in_scope_of)` binding — a
+///      cross-scope or cross-provider supersede is a `Validation` rejection
+///      (a re-grant rewrites the SAME projection's grant, never hijacks another).
+/// 2. The predecessor's `state` is flipped to [`SUPERSEDED_STATE`].
+/// 3. The successor row is inserted (state `"proposed"`, same as a plain create).
+///
+/// The successor's `metadata_json` SHOULD carry a steward-authored `supersedes`
+/// pointer (spec §3.2) so the chain is walkable via `GET /api/v1/commitments/{id}`;
+/// this function does not synthesize that pointer (the caller — seeder or
+/// service — owns metadata authorship), but it does enforce the projection-state
+/// invariants above.
+///
+/// Returns the freshly-inserted successor row. Both rows survive the transaction;
+/// a rollback (any step failing) leaves the predecessor un-superseded and no
+/// successor inserted — the projection cannot land in a half-superseded state.
+pub fn create_with_supersession(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    input: CreateReaCommitmentInput,
+) -> Result<ReaCommitment, StorageError> {
+    let predecessor_id = input.supersedes.clone().ok_or_else(|| {
+        StorageError::Internal(
+            "create_with_supersession called without input.supersedes set".into(),
+        )
+    })?;
+
+    let successor_id = input
+        .id
+        .clone()
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    conn.transaction(|conn| {
+        // Single source of supersession-admissibility truth (exists,
+        // not-already-superseded → 409, scope/provider/action match, distinct id).
+        validate_supersession(conn, ctx, &input)?;
+
+        // Mark the predecessor superseded.
+        diesel::update(
+            rea_commitments::table
+                .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+                .filter(rea_commitments::id.eq(&predecessor_id)),
+        )
+        .set(rea_commitments::state.eq(SUPERSEDED_STATE))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("mark-superseded failed: {e}")))?;
+
+        // Insert the successor (state="proposed", like a plain create).
+        let new = NewReaCommitment {
+            id: &successor_id,
+            h_app_id: &ctx.h_app_id,
+            action: &input.action,
+            provider: &input.provider,
+            receiver: &input.receiver,
+            resource_conforms_to: input.resource_conforms_to.as_deref(),
+            resource_classified_as: input.resource_classified_as.as_deref(),
+            resource_quantity_value: input.resource_quantity_value,
+            resource_quantity_unit: input.resource_quantity_unit.as_deref(),
+            effort_quantity_value: input.effort_quantity_value,
+            effort_quantity_unit: input.effort_quantity_unit.as_deref(),
+            has_beginning: input.has_beginning.as_deref(),
+            has_end: input.has_end.as_deref(),
+            due: input.due.as_deref(),
+            clause_of: input.clause_of.as_deref(),
+            in_scope_of: input.in_scope_of.as_deref(),
+            medium_of_exchange_id: input.medium_of_exchange_id.as_deref(),
+            state: "proposed",
+            finished: 0,
+            note: input.note.as_deref(),
+            metadata_json: input.metadata_json.as_deref(),
+            dht_anchor_hash: None,
+        };
+        diesel::insert_into(rea_commitments::table)
+            .values(&new)
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("successor insert failed: {e}")))?;
+
+        get_commitment(conn, ctx, &successor_id)?
+            .ok_or_else(|| StorageError::Internal("failed to retrieve inserted successor".into()))
+    })
 }
 
 /// Update commitment state
@@ -725,10 +944,11 @@ pub fn find_active_operator_binding(
 
 /// Find all active project-epr commitments scoped to a specific doorway.
 ///
-/// "Active" means state is not "cancelled" or "terminated". Returns all
-/// projections for the given doorway across all states except cancelled/
-/// terminated, so the access layer can resolve URL paths from the freshly-
-/// seeded set before DHT notarization completes.
+/// "Active" means state is not "cancelled", "terminated", or "superseded".
+/// Returns all projections for the given doorway across the remaining states,
+/// so the access layer can resolve URL paths from the freshly-seeded set before
+/// DHT notarization completes. A superseded predecessor (re-grant ceremony,
+/// spec §3.2/§3.3) is excluded so only the current grant serves.
 ///
 /// The `doorway_id` parameter is the SHORT form (e.g. "alpha-elohim-host");
 /// the scope column stores `doorway:alpha-elohim-host|epr:{epr_id}`. The
@@ -754,6 +974,10 @@ pub fn find_active_projections(
         .filter(rea_commitments::in_scope_of.like(&scope_filter))
         .filter(rea_commitments::state.ne("cancelled"))
         .filter(rea_commitments::state.ne("terminated"))
+        // Re-grant supersession (spec §3.2/§3.3): a superseded predecessor is no
+        // longer the operative routing law — only the current (non-superseded)
+        // successor serves. See create_with_supersession + SUPERSEDED_STATE.
+        .filter(rea_commitments::state.ne(SUPERSEDED_STATE))
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("DB error: {}", e)))?;
 
@@ -1249,6 +1473,263 @@ mod projection_resolver_tests {
         );
         assert_eq!(view.redirect_templates[0].from, "/lamad/resource/{id}");
         assert_eq!(view.redirect_templates[0].to, "/epr/{id}");
+    }
+}
+
+// =============================================================================
+// Re-grant supersession tests (spec §3.2/§3.3)
+// =============================================================================
+#[cfg(test)]
+mod supersession_tests {
+    use super::*;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    const STEWARD: &str = "12D3KooWSteward";
+    const SCOPE: &str = "doorway:alpha-elohim-host|epr:lamad-spa";
+
+    /// Build a project-epr create input mirroring the seeder's body shape.
+    /// `route_claims_json` controls whether the grant carries routeClaims:
+    /// `None` reproduces the live-alpha grant-less predecessor row.
+    fn project_epr_input(
+        id: &str,
+        route_claims: Option<serde_json::Value>,
+        supersedes: Option<&str>,
+    ) -> CreateReaCommitmentInput {
+        let metadata = serde_json::json!({
+            "urlPath": "/lamad",
+            "mode": "cached",
+            "reach": "commons",
+            "baseHref": "/lamad/",
+            "entryFile": "index.html",
+            "redirectsFrom": [],
+            "previewEprRef": null,
+            "gateHints": [],
+            "deadEnd": false,
+            "stewardDirectEndpoint": null,
+            "routeClaims": route_claims,
+            "redirectTemplates": [],
+            // Walkable supersession pointer (spec §3.2 steward-authored metadata).
+            "supersedes": supersedes,
+        });
+        CreateReaCommitmentInput {
+            id: Some(id.to_string()),
+            action: PROJECT_EPR_ACTION.into(),
+            provider: STEWARD.into(),
+            receiver: STEWARD.into(),
+            in_scope_of: Some(SCOPE.into()),
+            note: Some("Project lamad-spa at /lamad".into()),
+            metadata_json: Some(metadata.to_string()),
+            supersedes: supersedes.map(String::from),
+            ..Default::default()
+        }
+    }
+
+    fn grant_value() -> serde_json::Value {
+        serde_json::json!({
+            "schemaVersion": 1,
+            "claimsManifestCid": null,
+            "claims": [
+                { "contentType": "path", "template": "path/{id}",
+                  "fragments": { "step": "path/{id}/step/{n}" } }
+            ]
+        })
+    }
+
+    /// END-TO-END re-grant: a grant-less predecessor (the live-alpha 2026-05-29
+    /// shape) is superseded by a successor carrying routeClaims. After the
+    /// supersede, find_active_projections returns ONLY the successor, and it
+    /// carries the grant.
+    #[test]
+    fn regrant_supersedes_grantless_predecessor_with_grant() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+
+        // 1. Seed the grant-less predecessor (routeClaims: null).
+        let pred = project_epr_input("project-epr-aaaaaaaaaaaaaaaa", None, None);
+        create_commitment(&mut conn, &ctx, pred).unwrap();
+
+        // Sanity: it is active and has no granted claims.
+        let before = find_active_projections(&mut conn, &ctx, "alpha-elohim-host").unwrap();
+        assert_eq!(before.len(), 1);
+        assert!(
+            before[0].route_claims.is_none(),
+            "predecessor must be grant-less"
+        );
+
+        // 2. Supersede with a grant-bearing successor (fingerprint-suffixed id).
+        let succ = project_epr_input(
+            "project-epr-aaaaaaaaaaaaaaaa-rbbbbbbbb",
+            Some(grant_value()),
+            Some("project-epr-aaaaaaaaaaaaaaaa"),
+        );
+        let successor = create_with_supersession(&mut conn, &ctx, succ).unwrap();
+        assert_eq!(successor.id, "project-epr-aaaaaaaaaaaaaaaa-rbbbbbbbb");
+
+        // 3. ONLY the successor is active, and it carries the grant.
+        let after = find_active_projections(&mut conn, &ctx, "alpha-elohim-host").unwrap();
+        assert_eq!(
+            after.len(),
+            1,
+            "exactly one active projection after re-grant"
+        );
+        assert_eq!(
+            after[0].commitment_id,
+            "project-epr-aaaaaaaaaaaaaaaa-rbbbbbbbb"
+        );
+        let grant = after[0]
+            .route_claims
+            .as_ref()
+            .expect("successor must carry the granted claims");
+        assert_eq!(grant.claims[0].content_type, "path");
+
+        // 4. The predecessor row still exists but is marked superseded
+        //    (notarized history preserved; walkable on the chain).
+        let pred_row = get_commitment(&mut conn, &ctx, "project-epr-aaaaaaaaaaaaaaaa")
+            .unwrap()
+            .expect("predecessor row must survive");
+        assert_eq!(pred_row.state, SUPERSEDED_STATE);
+
+        // 5. The successor's metadata carries the walkable supersedes pointer.
+        let succ_meta: serde_json::Value =
+            serde_json::from_str(successor.metadata_json.as_deref().unwrap()).unwrap();
+        assert_eq!(
+            succ_meta.get("supersedes").and_then(|v| v.as_str()),
+            Some("project-epr-aaaaaaaaaaaaaaaa")
+        );
+    }
+
+    /// Double-supersede of the SAME predecessor is rejected (first-write-wins):
+    /// the second supersede returns AlreadyExists (→ HTTP 409).
+    #[test]
+    fn double_supersede_rejected_first_write_wins() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+
+        let pred = project_epr_input("pred-1", None, None);
+        create_commitment(&mut conn, &ctx, pred).unwrap();
+
+        // First supersede succeeds.
+        let s1 = project_epr_input("succ-1", Some(grant_value()), Some("pred-1"));
+        create_with_supersession(&mut conn, &ctx, s1).unwrap();
+
+        // Second supersede of the now-superseded predecessor must reject.
+        let s2 = project_epr_input("succ-2", Some(grant_value()), Some("pred-1"));
+        let err = create_with_supersession(&mut conn, &ctx, s2)
+            .expect_err("double-supersede must reject");
+        assert!(
+            matches!(err, StorageError::AlreadyExists(_)),
+            "expected AlreadyExists (409), got: {err:?}"
+        );
+
+        // The second successor was NOT inserted (transaction rolled back).
+        assert!(get_commitment(&mut conn, &ctx, "succ-2").unwrap().is_none());
+        // Exactly one active projection (succ-1) remains.
+        let active = find_active_projections(&mut conn, &ctx, "alpha-elohim-host").unwrap();
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].commitment_id, "succ-1");
+    }
+
+    /// A cross-scope supersede is rejected: a re-grant rewrites the SAME
+    /// projection's grant, never another's.
+    #[test]
+    fn cross_scope_supersede_rejected() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+
+        // Predecessor on the lamad-spa scope.
+        let pred = project_epr_input("pred-scope", None, None);
+        create_commitment(&mut conn, &ctx, pred).unwrap();
+
+        // Successor names pred-scope but declares a DIFFERENT scope.
+        let mut succ = project_epr_input("succ-scope", Some(grant_value()), Some("pred-scope"));
+        succ.in_scope_of = Some("doorway:alpha-elohim-host|epr:other-epr".into());
+        let err = create_with_supersession(&mut conn, &ctx, succ)
+            .expect_err("cross-scope supersede must reject");
+        assert!(
+            matches!(err, StorageError::Validation(_)),
+            "expected Validation, got: {err:?}"
+        );
+        assert!(err.to_string().contains("scope mismatch"), "msg: {err}");
+
+        // Predecessor stays active (no partial mutation).
+        let pred_row = get_commitment(&mut conn, &ctx, "pred-scope")
+            .unwrap()
+            .unwrap();
+        assert_ne!(pred_row.state, SUPERSEDED_STATE);
+    }
+
+    /// A cross-provider supersede is rejected for the same reason.
+    #[test]
+    fn cross_provider_supersede_rejected() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+
+        let pred = project_epr_input("pred-prov", None, None);
+        create_commitment(&mut conn, &ctx, pred).unwrap();
+
+        let mut succ = project_epr_input("succ-prov", Some(grant_value()), Some("pred-prov"));
+        succ.provider = "12D3KooWImposter".into();
+        let err = create_with_supersession(&mut conn, &ctx, succ)
+            .expect_err("cross-provider supersede must reject");
+        assert!(matches!(err, StorageError::Validation(_)));
+        assert!(err.to_string().contains("provider mismatch"), "msg: {err}");
+    }
+
+    /// Superseding an unknown predecessor is a Validation rejection (phantom).
+    #[test]
+    fn supersede_unknown_predecessor_rejected() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+
+        let succ = project_epr_input("succ-x", Some(grant_value()), Some("does-not-exist"));
+        let err = create_with_supersession(&mut conn, &ctx, succ)
+            .expect_err("phantom predecessor must reject");
+        assert!(matches!(err, StorageError::Validation(_)));
+        assert!(err.to_string().contains("unknown commitment"), "msg: {err}");
+    }
+
+    /// Successor id equal to predecessor id is rejected before any write.
+    #[test]
+    fn successor_id_equals_predecessor_rejected() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+
+        let pred = project_epr_input("same-id", None, None);
+        create_commitment(&mut conn, &ctx, pred).unwrap();
+
+        let succ = project_epr_input("same-id", Some(grant_value()), Some("same-id"));
+        let err =
+            create_with_supersession(&mut conn, &ctx, succ).expect_err("equal ids must reject");
+        assert!(matches!(err, StorageError::Validation(_)));
+        assert!(err.to_string().contains("must differ"), "msg: {err}");
+    }
+
+    /// mark_superseded is idempotent: marking an already-superseded predecessor
+    /// is a no-op success (the conductor path may re-enter after a signal).
+    #[test]
+    fn mark_superseded_is_idempotent() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+
+        let pred = project_epr_input("idem-pred", None, None);
+        create_commitment(&mut conn, &ctx, pred).unwrap();
+
+        mark_superseded(&mut conn, &ctx, "idem-pred").unwrap();
+        // Second call must succeed (idempotent).
+        mark_superseded(&mut conn, &ctx, "idem-pred").unwrap();
+
+        let row = get_commitment(&mut conn, &ctx, "idem-pred")
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.state, SUPERSEDED_STATE);
     }
 }
 

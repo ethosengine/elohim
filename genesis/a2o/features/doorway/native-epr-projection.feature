@@ -44,18 +44,25 @@ Feature: Doorway natively projects EPRs at author-declared URL paths
     Then the response is a validation rejection naming the reserved prefix
     And no rea_commitments row is created for it
 
-  @wip @route-claims @regrant
-  Scenario: Updating a projection's granted claims takes effect without a new mount
-    # Story-harvest (Slice 3, 2026-06-06) — constraint boundary: the commitment id is
-    # content-addressed over (steward|action|scope), so re-seeding the SAME projection
-    # with NEW grant metadata 409s and the old grant-less row keeps serving. The spec's
-    # §3.4 re-grant ceremony (claims-stale → steward re-grants) therefore needs a
-    # metadata-update or supersession path — none exists yet. Surfaced in Task-14 sweep;
-    # carried on the alpha deploy watch (the seeded lamad grant only reaches doorways
-    # whose projection row is created AFTER 3777bd185).
-    # Operational parameters: idempotency key = sha256(stewardPeerId|project-epr|scope);
-    # informs: re-grant tooling design + alpha re-seed runbook.
-    Given the alpha doorway has an active project-epr commitment for "lamad-spa" with no routeClaims
-    When the steward re-grants the projection with routeClaims for contentType "path"
-    Then the doorway's claims index serves /epr/{path-id} as a 302 to /lamad within one refresh cycle
-    And the supersession is walkable on the commitment chain
+  @route-claims @regrant @requires:doorway
+  Scenario: Re-granting a projection's claims supersedes the grant-less row
+    # Story-harvest (Slice 3, 2026-06-06) — constraint boundary RESOLVED: the commitment
+    # id is content-addressed over (steward|action|scope), so re-seeding the SAME
+    # projection with NEW grant metadata used to 409 and the old grant-less row kept
+    # serving forever. The spec's §3.2/§3.3 re-grant ceremony is now wired as
+    # SUPERSESSION-ON-CREATE: the steward POSTs a fingerprint-suffixed successor
+    # carrying `supersedes:{predecessorId}`, and storage (create_with_supersession)
+    # transactionally marks the predecessor `superseded` and inserts the successor.
+    # find_active_projections excludes `superseded`, so within one doorway refresh
+    # cycle ONLY the grant-bearing successor serves — no new mount, same urlPath. The
+    # chain stays walkable via GET /api/v1/commitments/{id} (successor metadata carries
+    # `supersedes`; predecessor state reads `superseded`). first-write-wins: a second
+    # supersede of the same predecessor 409s.
+    # Operational parameters:
+    #   base id        = project-epr-sha256(stewardPeerId|project-epr|scope)[:16]
+    #   successor id   = {base}-r{sha256(stableJson(projectionRelevantMetadata))[:8]}
+    # informs: re-grant tooling (seed-projections.ts drift → supersede) + alpha re-seed runbook.
+    Given the alpha doorway has an active grant-less project-epr commitment for "lamad-spa" at "/lamad"
+    When the steward re-grants the "lamad-spa" projection with routeClaims for contentType "path"
+    Then within one refresh cycle the active projection for "lamad-spa" carries the granted claims
+    And the previous grant-less commitment is marked superseded and walkable on the chain

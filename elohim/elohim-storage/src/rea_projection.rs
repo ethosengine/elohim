@@ -364,6 +364,9 @@ pub fn handle_rea_signal(
                 medium_of_exchange_id: None,
                 note: commitment.note,
                 metadata_json: commitment.metadata_json,
+                // Projection of an already-committed entry — supersession (if any)
+                // already happened on the originating create; never re-run it here.
+                supersedes: None,
             };
             rea_commitments::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
         }

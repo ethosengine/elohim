@@ -932,6 +932,14 @@ pub struct CreateReaCommitmentInputView {
     pub note: Option<String>,
     #[serde(default)]
     pub metadata: Option<JsonVal>,
+    /// Predecessor commitment id this create supersedes (spec §3.2/§3.3 re-grant
+    /// path). When present on a project-epr create, the create runs the
+    /// supersession ceremony (mark predecessor `superseded`, insert successor)
+    /// transactionally. Not persisted as a column — the steward-authored
+    /// `supersedes` pointer rides the successor's `metadata` so the chain stays
+    /// walkable via `GET /api/v1/commitments/{id}`.
+    #[serde(default)]
+    pub supersedes: Option<String>,
 }
 
 /// State update input

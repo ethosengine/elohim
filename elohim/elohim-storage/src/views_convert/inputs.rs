@@ -302,6 +302,7 @@ impl From<CreateReaCommitmentInputView> for CreateReaCommitmentInput {
             medium_of_exchange_id: v.medium_of_exchange_id,
             note: v.note,
             metadata_json: serialize_json_opt(&v.metadata),
+            supersedes: v.supersedes,
         }
     }
 }
