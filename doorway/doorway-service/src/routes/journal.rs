@@ -150,27 +150,29 @@ pub fn generate_suggestions_stub(intent: &IntentAnalysis) -> Vec<RoutingSuggesti
         status: "suggested".to_string(),
     });
 
-    // Derivative cards
+    // Derivative cards. suggested_path is deliberately EMPTY (§12.3): the
+    // server never mints pillar mount URLs — destination_type is the routing
+    // vocabulary; the client mints routes via its BundleRouteContext claims.
     let templates: &[(&str, &str, &str, &str, &str)] = &[
         (
             "exchange-request",
             "Post to exchange",
             "Post a request or offer on the community exchange.",
-            "/shefa/exchange/",
+            "",
             "community",
         ),
         (
             "governance-proposal",
             "Draft governance proposal",
             "Draft a governance proposal for community review.",
-            "/qahal/proposals/",
+            "",
             "community",
         ),
         (
             "content",
             "Share as learning content",
             "Share this as learning content for others.",
-            "/lamad/contributions/",
+            "",
             "network",
         ),
     ];
@@ -353,6 +355,10 @@ mod tests {
         assert_eq!(suggestions[0].kind, "filing");
         assert_eq!(suggestions[1].kind, "derivative");
         assert_eq!(suggestions[2].kind, "derivative");
+        // §12.3: the server never mints pillar mount URLs. destination_type is
+        // the routing vocabulary; clients mint routes via their claims context.
+        assert_eq!(suggestions[1].suggested_path, "");
+        assert_eq!(suggestions[2].suggested_path, "");
     }
 
     #[test]

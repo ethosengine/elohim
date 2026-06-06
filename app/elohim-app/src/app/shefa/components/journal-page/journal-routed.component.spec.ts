@@ -23,7 +23,7 @@ const POSTED: RoutingSuggestion[] = [
     destinationType: 'exchange-request',
     title: 'Post to Exchange',
     summary: 'Create a request on the community exchange',
-    suggestedPath: '/shefa/exchange/',
+    suggestedPath: '',
     reach: 'community',
     contextMetadata: {},
     status: 'posted',

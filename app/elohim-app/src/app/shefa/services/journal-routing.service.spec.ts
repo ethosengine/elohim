@@ -43,7 +43,7 @@ describe('JournalRoutingService', () => {
               destinationType: 'exchange-request',
               title: 'Post to exchange',
               summary: 'Post a request on the community exchange.',
-              suggestedPath: '/shefa/exchange/',
+              suggestedPath: '',
               reach: 'community',
               contextMetadata: {},
               status: 'suggested',
