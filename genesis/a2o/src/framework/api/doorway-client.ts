@@ -497,8 +497,12 @@ export class DoorwayClient {
 
   async searchContent(tags: string[]): Promise<Record<string, unknown>[]> {
     const tagsCsv = tags.map(t => encodeURIComponent(t)).join(',');
+    // limit=10000: storage's tag filter is applied in memory AFTER the SQL
+    // LIMIT (content_diesel.rs list_content — default 100, newest-first), so
+    // without a high limit a tag query silently misses any tagged row older
+    // than the newest 100 ("No content found with tag X" on a seeded corpus).
     const envelope = await this.get<{ items: Record<string, unknown>[] }>(
-      `/db/content?tags=${tagsCsv}`
+      `/db/content?tags=${tagsCsv}&limit=10000`
     );
     return envelope.items;
   }

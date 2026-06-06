@@ -233,6 +233,14 @@ class CommitmentClient extends DoorwayClient {
       body: JSON.stringify(body),
     });
   }
+
+  async patchCommitmentState(id: string, state: string): Promise<Response> {
+    return this.fetch(`/api/v1/commitments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    });
+  }
 }
 
 // =============================================================================
@@ -276,6 +284,61 @@ export async function seedCustodyCommitments(
 
   console.log(
     `[seed-commitments] Done. created=${created} already-exists=${alreadyExists} total=${pairs.length}`,
+  );
+
+  await activateCustodyCommitments(client, pairs);
+}
+
+/**
+ * Transition every seeded custody-blob commitment from its creation-time
+ * `proposed` state to `active` via PATCH /api/v1/commitments/{id}.
+ *
+ * Why: POST inserts `state = "proposed"` unconditionally (storage lifecycle
+ * discipline — `db/rea_commitments.rs` `create_commitment`), but custody is
+ * only live once active: the a2o reciprocity scenarios (and any real reader)
+ * list `?action=custody-blob&state=active`. A seed row that never activates
+ * satisfies the insert but is silently filtered by the view predicate — the
+ * seed-row-shape lesson (history/2026-06-02-seed-row-shape-satisfies-view-
+ * sql-predicates.md). Idempotent: ids are content-addressed, PATCH active →
+ * active is a no-op write; runs after both fresh creates and 409 re-runs.
+ */
+export async function activateCustodyCommitments(
+  client: CommitmentClient,
+  pairs: CustodyPair[],
+): Promise<void> {
+  console.log(`[seed-commitments] Activating ${pairs.length} custody-blob commitments...`);
+
+  let activated = 0;
+  let missing = 0;
+
+  for (const pair of pairs) {
+    const body = buildCustodyCommitmentBody(pair);
+    const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
+
+    const response = await client.patchCommitmentState(body.id, 'active');
+
+    if (response.ok) {
+      activated += 1;
+      continue;
+    }
+
+    if (response.status === 404) {
+      // The POST for this pair never landed — loud but non-fatal so one
+      // missing row doesn't mask the activation of the rest.
+      console.warn(`  [?] ${label}: commitment ${body.id} not found — POST never landed?`);
+      missing += 1;
+      continue;
+    }
+
+    // ANY other failure is a shape mismatch or doorway issue — fail fast.
+    const text = await response.text();
+    console.error(`  [X] ${label}: PATCH state=active HTTP ${response.status}`);
+    console.error(`      Body: ${text.slice(0, 500)}`);
+    process.exit(1);
+  }
+
+  console.log(
+    `[seed-commitments] Activation done. active=${activated} missing=${missing} total=${pairs.length}`,
   );
 }
 

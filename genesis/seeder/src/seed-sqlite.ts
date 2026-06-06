@@ -908,25 +908,38 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
  * external read (the local-stack DHT-anchor gap). We PATCH per id rather than
  * extend the bulk-create input so the create path stays untouched.
  *
+ * The same PATCH reconciles the authored `reach` onto already-present rows:
+ * `/db/content/bulk` is strict skip-on-exists (content_diesel.rs
+ * bulk_create_content — never UPDATEs), so a row seeded before its authored
+ * reach changed keeps the stale value forever (the manifesto reach=null gap —
+ * authored floor `commons` computed by the seeder but never written on
+ * re-seed). Carrying `reach` here makes re-seeds reconcile the authored value
+ * idempotently without wiping content.
+ *
  * Best-effort: a failed stamp is logged but does not abort seeding (the drain
  * loop may still publish later in a peered stack). Mirrors seedContent's
  * batch/catch structure.
  */
-async function stampProvenance(ids: string[]): Promise<{ stamped: number; failed: number }> {
-  if (DRY_RUN || ids.length === 0) {
-    return { stamped: DRY_RUN ? ids.length : 0, failed: 0 };
+async function stampProvenance(
+  items: Array<{ id: string; reach?: string | null }>,
+): Promise<{ stamped: number; failed: number }> {
+  if (DRY_RUN || items.length === 0) {
+    return { stamped: DRY_RUN ? items.length : 0, failed: 0 };
   }
 
   const publishedAt = new Date().toISOString();
   let stamped = 0;
   let failed = 0;
 
-  for (const id of ids) {
+  for (const item of items) {
     try {
-      const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}`, {
+      const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(item.id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ p2pPublishedAt: publishedAt }),
+        body: JSON.stringify({
+          p2pPublishedAt: publishedAt,
+          ...(item.reach ? { reach: item.reach } : {}),
+        }),
       });
       if (response.ok) {
         stamped++;
@@ -1175,8 +1188,9 @@ async function main() {
         // even on peerless household/local stacks (the DHT-anchor gap). Stamp
         // every id in the batch — already-present rows (skipped) re-stamp
         // harmlessly (PATCH is idempotent), and we don't get a per-id inserted
-        // list back from the bulk endpoint.
-        const stamp = await stampProvenance(batch.map(c => c.id));
+        // list back from the bulk endpoint. Carries authored reach so re-seeds
+        // reconcile it onto skipped rows (bulk create never updates).
+        const stamp = await stampProvenance(batch.map(c => ({ id: c.id, reach: c.reach })));
         const stampNote = stamp.failed > 0 ? `, ${stamp.failed} stamp-failed` : '';
 
         console.log(`   Batch ${batchNum}/${totalBatches}: ${result.inserted} inserted, ${result.skipped} skipped${stampNote}`);
@@ -1237,7 +1251,7 @@ async function main() {
       totalSkipped += result.skipped;
       totalErrors.push(...result.errors);
       // Paths are content too — stamp provenance so they clear the read gate.
-      const stamp = await stampProvenance(pathContentInputs.map(p => p.id));
+      const stamp = await stampProvenance(pathContentInputs.map(p => ({ id: p.id, reach: p.reach })));
       const stampNote = stamp.failed > 0 ? `, ${stamp.failed} stamp-failed` : '';
       console.log(`   ${result.inserted} paths inserted, ${result.skipped} skipped${stampNote}`);
     } catch (err) {
