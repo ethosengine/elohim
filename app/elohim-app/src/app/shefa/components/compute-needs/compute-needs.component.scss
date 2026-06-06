@@ -4,6 +4,8 @@
  * Help-flow styling for guiding users through compute assessment
  */
 
+@use 'sass:color';
+
 // Colors
 $color-primary: #3b82f6;
 $color-success: #10b981;
@@ -90,7 +92,7 @@ $color-bg-subtle: #f9fafb;
 
   &.health-moderate {
     background: rgba($color-warning, 0.1);
-    color: darken($color-warning, 10%);
+    color: color.adjust($color-warning, $lightness: -10%);
   }
 
   &.health-critical {
@@ -503,7 +505,7 @@ section {
     border: none;
 
     &:hover {
-      background: darken($color-primary, 10%);
+      background: color.adjust($color-primary, $lightness: -10%);
     }
   }
 
@@ -564,7 +566,7 @@ section {
   transition: all 0.15s ease;
 
   &:hover {
-    background: darken($color-primary, 10%);
+    background: color.adjust($color-primary, $lightness: -10%);
   }
 }
 

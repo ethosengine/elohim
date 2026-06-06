@@ -11,6 +11,9 @@
  * - inline: Embedded in content
  */
 
+@use 'sass:color';
+@use 'sass:map';
+
 // =============================================================================
 // SEVERITY ACCENT COLORS (raw RGB values for alpha compositing)
 // =============================================================================
@@ -28,7 +31,7 @@ $severity-accents: (
 // =============================================================================
 
 @mixin severity-variant($name) {
-  $accent: map-get($severity-accents, $name);
+  $accent: map.get($severity-accents, $name);
 
   &.severity-#{$name} {
     // Translucent accent background - works in both themes
@@ -48,7 +51,7 @@ $severity-accents: (
       color: white;
 
       &:hover {
-        background: darken($accent, 10%);
+        background: color.adjust($accent, $lightness: -10%);
       }
     }
   }
