@@ -1,0 +1,193 @@
+---
+id: "backlog-ci-alpha-cluster-degraded-substrate"
+kind: "backlog"
+contentType: "backlog-item"
+contentFormat: "markdown"
+title: "Alpha cluster degraded (10/13 peers crashlooping) + shem down → cross-job UNSTABLE deploy/upload/E2E (one infra condition, many fingerprints)"
+slug: "ci-alpha-cluster-degraded-substrate"
+written: "2026-06-06"
+author: "ci-failure-triage"
+status: "backlog"
+priority: "high"
+ci_status: blocked
+fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4]
+jobs: [elohim, elohim-edge, elohim-genesis]
+relatedNodeIds: []
+tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env]
+cites:
+  - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1100/
+  - https://jenkins.ethosengine.com/job/elohim/job/dev/1504/
+  - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1042/
+  - genesis/manifests/cluster-state.yaml
+  - genesis/a2o/features/resilience/household-reciprocity.feature
+  - genesis/a2o/steps/resilience.steps.ts
+  - genesis/a2o/steps/lamad/deep-link-delivery.steps.ts
+  - genesis/a2o/steps/common.steps.ts
+  - genesis/a2o/src/framework/fixtures/substrate-scope.ts
+  - Jenkinsfile
+  - genesis/Jenkinsfile
+  - genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md
+---
+
+# Alpha-cluster-degraded substrate — one infra condition surfacing as UNSTABLE across three jobs
+
+## The failure
+
+Seven of the eleven open fingerprints are facets of **one** infrastructure
+condition, not seven independent code bugs. The genesis E2E assertion cluster:
+
+```
+44518e179748  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:        (genesis 1097)
+597cbd37725a  AssertionError: env var E2E_STORAGE_URL is not set (and "E2E_STORAGE_URL"…)   (genesis 1097–1099)
+41b22c5d7ad1  AssertionError: No commitments listed — did the listing step run …?           (genesis 1097–1100)
+97f6d69af262  AssertionError: "content-alpha" is stewarded by 0 households; expected ≥2.     (genesis 1098–1100)
+6b6e5de4e4ef  AssertionError: Expected the cross-pillar resource viewer to render
+              (data-testid="content-viewer"); URL is "https://alpha.elohim.host/"           (genesis 1100)
+```
+
+plus two deploy/upload facets on the sibling jobs:
+
+```
+7bbfcf8928b9  elohim — stage:Upload SPA Blob          (elohim 1500–1504, build result UNSTABLE)
+5af3f81c7dd4  elohim-edge — deploy.alpha-doorway.elohim-doorway-alpha-b  (elohim-edge 1038–1042, UNSTABLE)
+```
+
+Occurrence evidence: genesis builds **1091–1100 are ALL UNSTABLE** (no green
+genesis run in the window; 1090 ABORTED, 1101 FAILURE = the separate TS2739
+concern, see `ci-genesis-projectionspec-ts2739.md`). elohim 1495–1504 are ALL
+UNSTABLE; elohim-edge 1035–1042 are ALL UNSTABLE. The whole edge/genesis
+surface has been UNSTABLE-not-green for the entire recent window — the
+signature of an environment-down condition, not a code regression.
+
+## Verdict
+
+**infra — degraded alpha substrate (operator-owned), running TOLERANT-but-LOUD
+(intentional UNSTABLE).** Not a flake, not a code regression to fix in the tree.
+This is the declared steady state in `genesis/manifests/cluster-state.yaml`:
+
+- `shem: available: false` — "offline / inaccessible (operator-declared
+  2026-06-01)."
+- `alpha-cluster-6peer: available: degraded` — "10/13 peers CrashLooping
+  (158–168 restarts, failedSince build #1024). Whether this is a CODE
+  regression or env-down is UNRESOLVED — needs operator/investigation before it
+  earns a regression cascade."
+
+The genesis `Probe Substrate` stage confirms it every run:
+`🛰️ SUBSTRATE PROBE — remote pool (shem): UNAVAILABLE` →
+`⚠️ REDUCED SCOPE — operating on available compute only` →
+`This run is intentionally UNSTABLE (loud signal), not FAILED — re-run when
+shem returns to restabilize to full topology.`
+
+This is **museum trap #1's mirror image**: there the danger is reading
+NOT_BUILT/UNSTABLE as a regression; here UNSTABLE is the *correct, intentional*
+signal of a degraded substrate, and the trap would be chasing it as a code bug.
+It is also the canonical **host-green ≠ CI-green / availability-≠-regression**
+boundary (`genesis/docs/PLACEMENT.md` § "Availability ≠ regression").
+
+## Root cause
+
+Each fingerprint traces to the same degraded backends:
+
+1. **`No commitments listed` / `stewarded by 0 households`** — the
+   household-reciprocity and observable-distribution scenarios assert on the
+   resilience snapshot and active-commitment state. Both light up ONLY through
+   the substrate placement chain (real `shard_locations.peer_id =
+   humans.agent_pub_key` + peer heartbeats + `state='active'` provide
+   commitments) — see memory `project_resilience_snapshot_humans_junction` and
+   `project_local_stack_dht_anchor_gap`. With 10/13 alpha peers crashlooping,
+   the placement substrate cannot produce ≥2 stewarding households, and the
+   seeded custody commitments cannot reach `active` across the down pods. The
+   resilience snapshot reads 0 — honestly.
+
+2. **`cross-pillar resource viewer … URL is "https://alpha.elohim.host/"`** — a
+   `@browser-only` scenario hitting the live (degraded) alpha deployment; the
+   shell viewer doesn't render because the backend it loads from is degraded.
+
+3. **`E2E_STORAGE_URL is not set`** — the storage env var is only exported in
+   the BROWSER stage (`genesis/Jenkinsfile:2100`), not the API stage; an API
+   scenario reaching a storage-direct step under reduced scope trips the guard
+   (`genesis/a2o/steps/resilience.steps.ts:52`, `delivery-admin.steps.ts:251`).
+   A scenario-routing/tagging artifact of the reduced-scope run, not a missing
+   secret.
+
+4. **`Upload SPA Blob` (elohim)** — uploads the SPA blob (PUT /blob + PATCH
+   /db/content) to `https://alpha.elohim.host` **and** `https://elohim.host`
+   (`Jenkinsfile:1036`), both fronting the degraded alpha storage backends. A
+   PUT/PATCH against a crashlooping backend fails the stage → UNSTABLE.
+
+5. **`deploy.alpha-doorway.elohim-doorway-alpha-b` (elohim-edge)** — the edge
+   deploy/health-verify of the alpha doorway-B pod, on the same degraded
+   cluster. (Distinct from the doorway *image quality-gate* fixture concern at
+   edge #1043, which is the separate `ci-doorway-dockerfile-fixture-context`
+   entry — that one is host-green-≠-CI-green build-context, this one is
+   live-deploy-against-degraded-pods.)
+
+## The tagging seam (the one bounded, in-tree improvement)
+
+`common.steps.ts:241` HOLDS (skips, not fails) any scenario tagged
+`@requires:<cap>` when that cap is unavailable/degraded in `cluster-state.yaml`
+(`substrate-scope.ts` reads `degraded` as conservatively unavailable). The
+observable-distribution feature already tags its remote scenarios
+`@requires:shem` (lines 85, 104) and is correctly held. But three failing
+scenarios lack a substrate `@requires:` tag and therefore RUN against the
+degraded cluster and FAIL — **exactly the seam the gate's own docstring names**
+("a scenario that needs the remote canvas but doesn't happen to name a
+remote-only persona would otherwise run against down pods and fail, masking the
+real signal", `common.steps.ts:235`):
+
+- `genesis/a2o/features/resilience/household-reciprocity.feature` — untagged;
+  asserts `active "custody-blob"` pairs that need a stable cluster to activate.
+- `observable-distribution.feature` `distributed to at least N households` /
+  `stewarded by` scenarios — need real placement.
+- the `cross-pillar resource viewer renders` deep-link scenarios — `@requires:
+  doorway` only (a fixture precondition, not a substrate cap).
+
+**Tagging these `@requires:alpha-cluster-6peer` is the bounded, correct,
+in-tree fix** — it would convert these from masking UNSTABLE-noise into clean
+HELD skips that auto-return when the cluster stabilizes (same cybernetic
+reconciler the rest of the suite uses). It is NOT done in this triage run on
+purpose: which scenarios are legitimately "needs the 6-peer cluster" vs "a
+genuine seeding gap that should be fixed so the household (matthew/jessica/james
+— available) CAN satisfy it" is a per-scenario story judgment (the household IS
+a 3-node cluster, so some of these may be household-testable once seeding
+activates commitments — cf. the a2o CLAUDE.md "`shem` ≠ multi-node" note). That
+is `@e2e`-authoring (Opus story work) + a possible seeder activation fix, i.e.
+an operator-scoped `/shift` Objective, not a sentinel fix. Sketch below.
+
+## Current decision
+
+**BLOCKED on operator — substrate is operator-owned; the live cluster is not a
+sentinel surface (never `kubectl`).** Two unblock paths, both operator-initiated:
+
+1. **Substrate returns** — operator brings alpha-cluster-6peer back to a stable
+   ≥6-peer topology (and/or shem returns). Then the placement substrate
+   produces real households/commitments and these assertions pass; the
+   harvester confirms by green streak. The repo move is to flip
+   `cluster-state.yaml` `alpha-cluster-6peer: available: true` (evidence-backed,
+   mirroring a probe) when it stabilizes — then `scope-reconcile.py` cascades.
+
+2. **Tag + seed-activation `/shift`** (in-tree, doesn't need the cluster) — add
+   `@requires:alpha-cluster-6peer` to the genuinely-cluster-dependent scenarios
+   so they HELD-skip cleanly, AND fix the seeder so the household-testable
+   custody/provide commitments actually reach `active` for the 3-node household
+   (memory `project_resilience_snapshot_humans_junction` item 2: POST inserts
+   `proposed`, activation needs the PATCH path). This is a bounded ~5–10 file
+   `/shift` Objective (a2o tags + seeder activation), Opus-authored scenarios +
+   Sonnet glue. Naming it here for the operator; not opening it as sentinel work.
+
+This entry stays `ci_status: blocked` (live-trajectory documented) until either
+path lands. The fingerprints will disappear on a green streak once the substrate
+stabilizes OR the tags hold the scenarios out of the degraded run.
+
+## Fix trail
+
+- No tree change in this triage run (correctly — substrate is operator-owned and
+  the tagging/seeding fix is an operator `/shift`, not a sentinel edit).
+- Ledger: all 7 fingerprints set `status: blocked` (blocker: degraded
+  alpha-cluster-6peer + down shem; operator-owned). No `triaged_at_build` stamp
+  (nothing landed). Recurrence is expected every run until the substrate flips —
+  that's the intended LOUD signal, not a re-fire bug.
+- **Ceiling note for the operator** (sentinel cannot trigger builds; anonymous
+  MCP): confirmation requires either a substrate flip + re-run, or the
+  tag+seed `/shift` above. Until then, these UNSTABLE results are the
+  cluster-state telling the truth.
