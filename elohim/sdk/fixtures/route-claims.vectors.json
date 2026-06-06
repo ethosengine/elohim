@@ -1,0 +1,30 @@
+{
+  "description": "Shared route-claims contract vectors — spec §8.4 of genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md. ONE claims vocabulary, two planes: client minting (claimsFromDeclaration + eprToRoute in @elohim/service) and doorway dispatch (EprRouter claims/alias indexes). Consumed via include_str! by doorway-service and via import by epr-ref.spec.ts + seed-projections tests. Edit here, never fork per-crate copies. reservedPrefixes mirrors doorway is_service_path (asserted by tests in BOTH doorway-service and elohim-storage's validator).",
+  "reservedPrefixes": ["/epr", "/epr-head", "/db", "/api", "/blob", "/apps", "/status", "/health", "/admin", "/identity", "/threshold", "/sitemap.xml"],
+  "lamadGrant": {
+    "schemaVersion": 1,
+    "claimsManifestCid": null,
+    "claims": [
+      { "contentType": "path", "template": "path/{id}", "fragments": { "step": "path/{id}/step/{n}" } }
+    ]
+  },
+  "lamadRedirectTemplates": [
+    { "from": "/lamad/resource/{id}", "to": "/epr/{id}" }
+  ],
+  "mintVectors": [
+    { "note": "claimed type, no fragment", "refId": "elohim-protocol", "contentType": "path", "expectCommands": ["/path", "elohim-protocol"], "expectHref": "/epr/elohim-protocol" },
+    { "note": "claimed type, step fragment", "refId": "foundations-christian-technology", "contentType": "path", "fragmentType": "step", "fragmentValue": "2", "expectCommands": ["/path", "foundations-christian-technology", "step", "2"], "expectHref": "/epr/foundations-christian-technology#step/2" },
+    { "note": "unclaimed type", "refId": "fct-module-01-church-dilemma", "contentType": "concept", "expectCommands": null, "expectHref": "/epr/fct-module-01-church-dilemma" }
+  ],
+  "dispatchVectors": [
+    { "note": "claimed commons path id → 302 to pretty mount", "mountUrlPath": "/lamad", "template": "path/{id}", "id": "foundations-christian-technology", "expectLocation": "/lamad/path/foundations-christian-technology" },
+    { "note": "id stays as-received (no re-encoding)", "mountUrlPath": "/lamad", "template": "path/{id}", "id": "a%20b", "expectLocation": "/lamad/path/a%20b" }
+  ],
+  "aliasVectors": [
+    { "note": "legacy monolith share", "from": "/lamad/resource/{id}", "to": "/epr/{id}", "requestPath": "/lamad/resource/fct-module-01-church-dilemma", "expectLocation": "/epr/fct-module-01-church-dilemma" },
+    { "note": "no match — different segment count", "from": "/lamad/resource/{id}", "to": "/epr/{id}", "requestPath": "/lamad/resource/a/b", "expectLocation": null },
+    { "note": "no match — different prefix", "from": "/lamad/resource/{id}", "to": "/epr/{id}", "requestPath": "/lamad/path/x", "expectLocation": null },
+    { "note": "bare redirects_from prefix swap", "bareFrom": "/learn", "mountUrlPath": "/lamad", "requestPath": "/learn/path/x", "expectLocation": "/lamad/path/x" },
+    { "note": "bare redirects_from exact", "bareFrom": "/learn", "mountUrlPath": "/lamad", "requestPath": "/learn", "expectLocation": "/lamad" }
+  ]
+}
