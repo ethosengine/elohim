@@ -11,6 +11,7 @@ import { filter, map, mergeMap } from 'rxjs/operators';
 
 import { JsonLdMetadata } from '@elohim/service';
 import { OpenGraphMetadata } from '@elohim/service';
+import { eprToUniversalHref } from '@elohim/service';
 
 /**
  * SEO configuration for a page
@@ -410,8 +411,9 @@ export class SeoService {
     createdAt?: string;
     updatedAt?: string;
   }): void {
-    // Universal EPR address (§12.1) — the durable, bundle-agnostic canonical.
-    const canonicalUrl = `${DEFAULTS.siteUrl}/epr/${content.id}`;
+    // Universal EPR address (§12.1) — the durable, bundle-agnostic canonical,
+    // minted (encoded) via the shared helper rather than string-concatenated.
+    const canonicalUrl = `${DEFAULTS.siteUrl}${eprToUniversalHref({ id: content.id, tier: 'head' })}`;
     const description = content.summary ?? `${content.title} - ${content.contentType} content`;
 
     this.updateSeo({

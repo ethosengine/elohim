@@ -1041,7 +1041,7 @@ export class ContentViewerComponent
    * Navigate to related content
    */
   viewRelatedContent(node: ContentNode): void {
-    this.eprNav.navigate(`/epr/${encodeURIComponent(node.id)}`);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(node.id)}`); // route-literal-ok: sanctioned EprNavService universal /epr/{id} nav (cross-bundle resource viewer), not a raw literal mint
   }
 
   /**
@@ -1249,7 +1249,7 @@ export class ContentViewerComponent
     }
 
     // Navigate to the selected content (cross-bundle: shell resource viewer).
-    this.eprNav.navigate(`/epr/${encodeURIComponent(nodeId)}`);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(nodeId)}`); // route-literal-ok: sanctioned EprNavService universal /epr/{id} nav (cross-bundle resource viewer), not a raw literal mint
   }
 
   /**

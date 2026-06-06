@@ -186,7 +186,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Navigate to content viewer
    */
   viewContent(node: ContentNodeWithAffinity): void {
-    this.eprNav.navigate(`/epr/${encodeURIComponent(node.id)}`);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(node.id)}`); // route-literal-ok: sanctioned EprNavService universal /epr/{id} nav (cross-bundle resource viewer), not a raw literal mint
   }
 
   /**

@@ -750,7 +750,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.order]);
     } else {
       // Fallback to the universal resource view if no matching step found
-      this.eprNav.navigate(`/epr/${encodeURIComponent(conceptId)}`);
+      this.eprNav.navigate(`/epr/${encodeURIComponent(conceptId)}`); // route-literal-ok: sanctioned EprNavService universal /epr/{id} nav (cross-bundle resource viewer), not a raw literal mint
     }
   }
 

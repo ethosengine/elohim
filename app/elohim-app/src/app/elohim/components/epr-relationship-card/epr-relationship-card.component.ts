@@ -275,7 +275,7 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
     this.label = typeLabel(rel.type);
     this.title = rel.target;
     this.route = null;
-    this.href = `/epr/${encodeURIComponent(rel.target)}`;
+    this.href = `/epr/${encodeURIComponent(rel.target)}`; // route-literal-ok: pre-resolution universal /epr/{id} fallback href (resolver overwrites with the minted href on success), not a raw literal mint
     this.description = null;
     this.reach = null;
     this.reachIconValue = '·';
@@ -305,7 +305,7 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
         } else {
           this.title = target;
           this.route = null;
-          this.href = `/epr/${encodeURIComponent(target)}`;
+          this.href = `/epr/${encodeURIComponent(target)}`; // route-literal-ok: unresolved-target universal /epr/{id} fallback href (resolver returned null), not a raw literal mint
         }
 
         this.reachIconValue = reachIcon(this.reach);

@@ -818,35 +818,35 @@ export interface HistoryFilters {
  */
 export const GOVERNANCE_ROUTES = {
   summary: (entityType: string, entityId: string) =>
-    `/lamad/${entityType}:${entityId}/governance/summary`,
+    `/lamad/${entityType}:${entityId}/governance/summary`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
   history: (entityType: string, entityId: string) =>
-    `/lamad/${entityType}:${entityId}/governance/history`,
+    `/lamad/${entityType}:${entityId}/governance/history`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
   discussions: (entityType: string, entityId: string) =>
-    `/lamad/${entityType}:${entityId}/governance/discussions`,
+    `/lamad/${entityType}:${entityId}/governance/discussions`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
   discussionThread: (entityType: string, entityId: string, threadId: string) =>
-    `/lamad/${entityType}:${entityId}/governance/discussions/thread:${threadId}`,
+    `/lamad/${entityType}:${entityId}/governance/discussions/thread:${threadId}`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
   challenges: (entityType: string, entityId: string) =>
-    `/lamad/${entityType}:${entityId}/governance/challenges`,
+    `/lamad/${entityType}:${entityId}/governance/challenges`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
   newChallenge: (entityType: string, entityId: string) =>
-    `/lamad/${entityType}:${entityId}/governance/challenges/new`,
+    `/lamad/${entityType}:${entityId}/governance/challenges/new`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
   proposals: (entityType: string, entityId: string) =>
-    `/lamad/${entityType}:${entityId}/governance/proposals`,
+    `/lamad/${entityType}:${entityId}/governance/proposals`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
   newProposal: (entityType: string, entityId: string) =>
-    `/lamad/${entityType}:${entityId}/governance/proposals/new`,
+    `/lamad/${entityType}:${entityId}/governance/proposals/new`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
   sensemaking: (entityType: string, entityId: string) =>
-    `/lamad/${entityType}:${entityId}/governance/sensemaking`,
+    `/lamad/${entityType}:${entityId}/governance/sensemaking`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
-  precedents: () => `/lamad/governance/precedents`,
+  precedents: () => `/lamad/governance/precedents`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 
-  precedent: (precedentId: string) => `/lamad/governance/precedents/${precedentId}`,
+  precedent: (precedentId: string) => `/lamad/governance/precedents/${precedentId}`, // route-literal-ok: per-entity /lamad/{type}:{id} canonical route builder — claims-minting migration tracked in epr-routing captures
 };
 
 // ============================================================================

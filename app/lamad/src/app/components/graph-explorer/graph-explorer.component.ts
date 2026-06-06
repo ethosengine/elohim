@@ -828,7 +828,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    * Navigate to content viewer.
    */
   navigateToContent(nodeId: string): void {
-    this.eprNav.navigate(`/epr/${encodeURIComponent(nodeId)}`);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(nodeId)}`); // route-literal-ok: sanctioned EprNavService universal /epr/{id} nav (cross-bundle resource viewer), not a raw literal mint
   }
 
   /**

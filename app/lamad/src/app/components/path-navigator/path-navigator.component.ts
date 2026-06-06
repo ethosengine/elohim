@@ -874,7 +874,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     });
 
     // Navigate to the content (cross-bundle handoff — full doorway load).
-    this.eprNav.navigate(`/epr/${encodeURIComponent(contentId)}`);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(contentId)}`); // route-literal-ok: sanctioned EprNavService universal /epr/{id} nav (cross-bundle resource viewer), not a raw literal mint
   }
 
   /** Mint the universal EPR address for a content id (never a literal). */

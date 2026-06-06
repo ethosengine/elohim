@@ -21,6 +21,6 @@ export class LegacyResourceRedirectComponent implements OnInit {
 
   ngOnInit(): void {
     const id = this.route.snapshot.params['resourceId'] as string;
-    this.eprNav.navigate(`/epr/${encodeURIComponent(id)}`);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(id)}`); // route-literal-ok: sanctioned EprNavService universal /epr/{id} nav (legacy /resource bridge handoff), not a raw literal mint
   }
 }

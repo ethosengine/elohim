@@ -457,7 +457,7 @@ export class TrustBadgeService {
       label: 'View Trust Profile',
       icon: '🔍',
       available: true,
-      route: `/resource/${content.id}/trust`,
+      route: `/resource/${content.id}/trust`, // route-literal-ok: legacy /resource route builder (appends /trust sub-segment /epr/{id} cannot carry) — migrate to claims-minted route when trust-badge joins the EPR-link surface
     });
 
     // Endorse - available to community members
@@ -484,7 +484,7 @@ export class TrustBadgeService {
         label: 'Request Review',
         icon: '📝',
         available: true,
-        route: `/resource/${content.id}/attestation/request`,
+        route: `/resource/${content.id}/attestation/request`, // route-literal-ok: legacy /resource route builder (appends /attestation/request sub-segments /epr/{id} cannot carry) — migrate to claims-minted route when trust-badge joins the EPR-link surface
       });
     }
 
@@ -533,7 +533,7 @@ export class TrustBadgeService {
           label: 'View Trust Profile',
           icon: '🔍',
           available: true,
-          route: `/resource/${contentId}/trust`,
+          route: `/resource/${contentId}/trust`, // route-literal-ok: legacy /resource route builder (appends /trust sub-segment /epr/{id} cannot carry) — migrate to claims-minted route when trust-badge joins the EPR-link surface
         },
       ],
     };

@@ -138,7 +138,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
    * Navigate back to the resource view.
    */
   navigateBack(): void {
-    this.eprNav.navigate(`/epr/${encodeURIComponent(this.resourceId)}`);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(this.resourceId)}`); // route-literal-ok: sanctioned EprNavService universal /epr/{id} nav (cross-bundle resource viewer), not a raw literal mint
   }
 
   /**

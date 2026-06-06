@@ -5,6 +5,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 
 // @coverage: 95.8% (2026-02-24)
 
+import { eprToUniversalHref } from '@elohim/service';
+
 import { SearchResult } from '../../models/search.model';
 import { SearchService } from '../../services/search.service';
 
@@ -187,7 +189,7 @@ export class SearchComponent implements OnInit {
 
   /** Universal address for cross-bundle content results. */
   getNodeHref(result: SearchResult): string {
-    return `/epr/${encodeURIComponent(result.id)}`;
+    return eprToUniversalHref({ id: result.id, tier: 'head' });
   }
 
   getNodeTypeIcon(type: string): string {

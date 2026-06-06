@@ -40,7 +40,7 @@ export const lamadIdentityGuard: CanActivateFn = (_route, state): boolean => {
 
   // /identity lives in the shell: full-load handoff with the PUBLIC return URL
   // (state.url is base-stripped — re-prefix the /lamad mount).
-  const returnUrl = encodeURIComponent(`/lamad${state.url}`);
+  const returnUrl = encodeURIComponent(`/lamad${state.url}`); // route-literal-ok: re-prefixes the bundle's own base-href mount onto a base-stripped router URL for an auth returnUrl handoff, not a minted content link
   eprNav.navigate(`${LOGIN_ROUTE}?returnUrl=${returnUrl}`);
   return false;
 };
