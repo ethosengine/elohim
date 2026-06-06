@@ -10,6 +10,21 @@ import type { Meta, StoryObj } from '@storybook/web-components';
 import { html } from 'lit';
 
 import 'elohim-core/register';
+import type { ElohimContextAppConfig } from 'elohim-core';
+
+const CONTEXT_APPS: ElohimContextAppConfig[] = [
+  { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true },
+  { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true },
+  { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true },
+  { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true },
+  { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true },
+];
+
+const IDENTITY_ROUTES = {
+  profile: '/identity/profile',
+  login: '/identity/login',
+  register: '/identity/register',
+};
 
 // ---------------------------------------------------------------------------
 // Brand tokens
@@ -93,6 +108,8 @@ export const Light: Story = {
     <elohim-navigator
       context="lamad"
       show-search
+      .contextApps=${CONTEXT_APPS}
+      .identityRoutes=${IDENTITY_ROUTES}
       .isAuthenticated=${true}
       display-name="Alice"
       identifier="alice.pilot"
@@ -113,6 +130,8 @@ export const Dark: Story = {
     <elohim-navigator
       context="shefa"
       show-search
+      .contextApps=${CONTEXT_APPS}
+      .identityRoutes=${IDENTITY_ROUTES}
       .isAuthenticated=${true}
       display-name="Bob"
       identifier="bob.steward"
@@ -129,5 +148,12 @@ export const LightUnauthenticated: Story = {
       </div>
     `,
   ],
-  render: () => html`<elohim-navigator context="lamad" .isAuthenticated=${false}></elohim-navigator>`,
+  render: () => html`
+    <elohim-navigator
+      context="lamad"
+      .contextApps=${CONTEXT_APPS}
+      .identityRoutes=${IDENTITY_ROUTES}
+      .isAuthenticated=${false}
+    ></elohim-navigator>
+  `,
 };

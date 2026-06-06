@@ -13,6 +13,30 @@ import {
   type ThemeCell,
 } from './testing/theme-contrast.js';
 
+const FIXTURE_APPS = [
+  {
+    id: 'lamad',
+    name: 'Lamad',
+    icon: '📚',
+    route: '/lamad',
+    tagline: 'Learning & Content',
+    available: true,
+  },
+  {
+    id: 'shefa',
+    name: 'Shefa',
+    icon: '✨',
+    route: '/shefa',
+    tagline: 'Economics of Flourishing',
+    available: true,
+  },
+] as const;
+const FIXTURE_IDENTITY = {
+  profile: '/identity/profile',
+  login: '/identity/login',
+  register: '/identity/register',
+};
+
 describe('<elohim-navigator>', () => {
   it('is defined in the custom element registry', () => {
     expect(customElements.get('elohim-navigator')).to.equal(NavigatorClass);
@@ -26,12 +50,27 @@ describe('<elohim-navigator>', () => {
     expect(nav).to.exist;
   });
 
-  it('renders context switcher button', async () => {
+  it('renders context switcher button when contextApps are supplied', async () => {
     const el = await fixture<ElohimNavigator>(html`
-      <elohim-navigator></elohim-navigator>
+      <elohim-navigator .contextApps=${FIXTURE_APPS}></elohim-navigator>
     `);
     const btn = el.shadowRoot?.querySelector('[part="context-switcher-btn"]');
     expect(btn).to.exist;
+  });
+
+  it('renders no context switcher without host-supplied apps (blank-slate)', async () => {
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
+    expect(el.shadowRoot?.querySelector('[part="context-switcher-btn"]')).to.equal(null);
+  });
+
+  it('renders no identity tray items without host-supplied routes (blank-slate)', async () => {
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
+    const trayBtn = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="nav-login"]');
+    expect(trayBtn).to.equal(null);
   });
 
   it('renders profile bubble button', async () => {
@@ -44,7 +83,7 @@ describe('<elohim-navigator>', () => {
 
   it('shows the active context app name in the switcher', async () => {
     const el = await fixture<ElohimNavigator>(html`
-      <elohim-navigator context="shefa"></elohim-navigator>
+      <elohim-navigator context="shefa" .contextApps=${FIXTURE_APPS}></elohim-navigator>
     `);
     const switcher = el.shadowRoot?.querySelector('[part="context-switcher-btn"]');
     expect(switcher?.textContent).to.contain('Shefa');
@@ -52,7 +91,7 @@ describe('<elohim-navigator>', () => {
 
   it('opens context switcher dropdown on click', async () => {
     const el = await fixture<ElohimNavigator>(html`
-      <elohim-navigator></elohim-navigator>
+      <elohim-navigator .contextApps=${FIXTURE_APPS}></elohim-navigator>
     `);
     const switcherBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
       '[part="context-switcher-btn"]'
@@ -66,7 +105,7 @@ describe('<elohim-navigator>', () => {
 
   it('dispatches navigate event when a context app is selected', async () => {
     const el = await fixture<ElohimNavigator>(html`
-      <elohim-navigator></elohim-navigator>
+      <elohim-navigator .contextApps=${FIXTURE_APPS}></elohim-navigator>
     `);
 
     let navigatedRoute: string | null = null;
@@ -95,7 +134,7 @@ describe('<elohim-navigator>', () => {
     };
 
     const el = await fixture<ElohimNavigator>(html`
-      <elohim-navigator .onNavigate=${onNavigate}></elohim-navigator>
+      <elohim-navigator .contextApps=${FIXTURE_APPS} .onNavigate=${onNavigate}></elohim-navigator>
     `);
 
     const switcherBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(
@@ -143,9 +182,12 @@ describe('<elohim-navigator>', () => {
     expect(tray).to.exist;
   });
 
-  it('shows sign-in menu items when not authenticated', async () => {
+  it('shows sign-in menu items when not authenticated and identityRoutes supplied', async () => {
     const el = await fixture<ElohimNavigator>(html`
-      <elohim-navigator .isAuthenticated=${false}></elohim-navigator>
+      <elohim-navigator
+        .isAuthenticated=${false}
+        .identityRoutes=${FIXTURE_IDENTITY}
+      ></elohim-navigator>
     `);
 
     const bubble = el.shadowRoot?.querySelector<HTMLButtonElement>(
@@ -160,7 +202,10 @@ describe('<elohim-navigator>', () => {
 
   it('dispatches logout event when logout is triggered', async () => {
     const el = await fixture<ElohimNavigator>(html`
-      <elohim-navigator .isAuthenticated=${true}></elohim-navigator>
+      <elohim-navigator
+        .isAuthenticated=${true}
+        .identityRoutes=${FIXTURE_IDENTITY}
+      ></elohim-navigator>
     `);
 
     let loggedOut = false;
@@ -332,7 +377,7 @@ describe('<elohim-navigator> — theme-contrast gate', () => {
     it(`context tray passes contrast in ${cell}`, async () => {
       const { el } = await themeFixture<ElohimNavigator>(
         html`
-          <elohim-navigator></elohim-navigator>
+          <elohim-navigator .contextApps=${FIXTURE_APPS}></elohim-navigator>
         `,
         cell
       );

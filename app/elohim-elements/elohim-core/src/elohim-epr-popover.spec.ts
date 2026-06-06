@@ -148,6 +148,22 @@ describe('<elohim-epr-popover>', () => {
     expect(link).to.not.exist;
   });
 
+  it('renders plain anchor with href when route=null and href is supplied', async () => {
+    const el = await fixture<ElohimEprPopover>(html`
+      <elohim-epr-popover
+        .head=${FIXTURE_HEAD}
+        .visible=${true}
+        href="/epr/foo"
+      ></elohim-epr-popover>
+    `);
+    const link = el.shadowRoot?.querySelector<HTMLAnchorElement>(
+      '[data-testid="epr-popover-link"]'
+    );
+    expect(link).to.exist;
+    expect(link?.tagName.toLowerCase()).to.equal('a');
+    expect(link?.getAttribute('href')).to.equal('/epr/foo');
+  });
+
   it('dispatches epr-popover-navigate on link click', async () => {
     const el = await fixture<ElohimEprPopover>(html`
       <elohim-epr-popover

@@ -65,7 +65,8 @@ export interface EprHead {
  *
  * @prop {EprHead | null} head - EPR Head metadata to display
  * @prop {{ top: number; left: number }} position - Position relative to the viewport (px)
- * @prop {string | null} route - Route href for the "Open resource" link
+ * @prop {string | null} route - Route href for the "Open resource" link (routerLink, in-bundle)
+ * @prop {string | null} href - Universal href for cross-bundle navigation (plain anchor fallback)
  * @prop {boolean} visible - Whether the popover is visible
  *
  * @fires epr-popover-enter - when mouse enters the popover

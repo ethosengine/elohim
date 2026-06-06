@@ -1,6 +1,12 @@
 <div class="lamad-container">
   <!-- Elohim Navigator (unified header — Lit element from elohim-core) -->
-  <elohim-navigator [attr.context]="'lamad'" [attr.show-search]="true" (navigate)="onNavigatorNavigate($event)">
+  <elohim-navigator
+    [attr.context]="'lamad'"
+    [attr.show-search]="true"
+    [contextApps]="navigatorApps"
+    [identityRoutes]="navigatorIdentityRoutes"
+    (navigate)="onNavigatorNavigate($event)"
+  >
     <!-- Loading State -->
     <div *ngIf="!isReady" class="loading-state">
       <div class="spinner"></div>

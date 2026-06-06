@@ -137,6 +137,7 @@ export class ElohimDefaultOmnibar extends LitElement {
                 <span part="user-name">${this._user.humanId}</span>
               `
             : html`
+                <!-- /auth/* is doorway-owned service vocabulary (same class as /epr) — uniform across deployments, NOT app routing. -->
                 <a href="/auth/signin">sign in</a>
               `}
         </span>

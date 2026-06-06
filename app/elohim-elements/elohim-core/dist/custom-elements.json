@@ -1773,8 +1773,18 @@
                 "text": "string | null"
               },
               "default": "null",
-              "description": "Route href for the \"Open resource\" link",
+              "description": "Route href for the \"Open resource\" link (routerLink, in-bundle)",
               "attribute": "route"
+            },
+            {
+              "kind": "field",
+              "name": "href",
+              "type": {
+                "text": "string | null"
+              },
+              "default": "null",
+              "description": "Universal href for cross-bundle navigation (plain anchor fallback)",
+              "attribute": "href"
             },
             {
               "kind": "field",
@@ -1885,8 +1895,17 @@
                 "text": "string | null"
               },
               "default": "null",
-              "description": "Route href for the \"Open resource\" link",
+              "description": "Route href for the \"Open resource\" link (routerLink, in-bundle)",
               "fieldName": "route"
+            },
+            {
+              "name": "href",
+              "type": {
+                "text": "string | null"
+              },
+              "default": "null",
+              "description": "Universal href for cross-bundle navigation (plain anchor fallback)",
+              "fieldName": "href"
             },
             {
               "name": "visible",
@@ -3960,8 +3979,17 @@
               "type": {
                 "text": "ElohimContextAppConfig[]"
               },
-              "default": "[ { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true, }, { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true, }, { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true, }, { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true, }, { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true }, ]",
-              "description": "List of context apps to show"
+              "default": "[]",
+              "description": "Host-supplied context apps (§12.3: no app routing baked into primitives). Empty → switcher hidden."
+            },
+            {
+              "kind": "field",
+              "name": "identityRoutes",
+              "type": {
+                "text": "{ profile?: string; login?: string; register?: string }"
+              },
+              "default": "{}",
+              "description": "Host-supplied identity surface routes; absent entries render no tray item."
             },
             {
               "kind": "field",
@@ -4111,6 +4139,19 @@
               "kind": "method",
               "name": "_renderPreferenceTrayRows",
               "privacy": "private"
+            },
+            {
+              "kind": "method",
+              "name": "_renderContextSwitcher",
+              "privacy": "private",
+              "parameters": [
+                {
+                  "name": "currentApp",
+                  "type": {
+                    "text": "ElohimContextAppConfig | undefined"
+                  }
+                }
+              ]
             },
             {
               "kind": "method",
@@ -6452,6 +6493,79 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/navigation/epr-link-interceptor.ts",
       "declarations": [
         {
@@ -6654,353 +6768,6 @@
           "declaration": {
             "name": "Session",
             "module": "src/session/session.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/locale-store.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "LOCALE_STORAGE_KEY",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-locale'"
-        },
-        {
-          "kind": "variable",
-          "name": "LOCALE_CHANGE_EVENT",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-locale-changed'"
-        },
-        {
-          "kind": "variable",
-          "name": "SUPPORTED_LOCALES",
-          "type": {
-            "text": "[sourceLocale, ...targetLocales]"
-          },
-          "default": "[sourceLocale, ...targetLocales]"
-        },
-        {
-          "kind": "variable",
-          "name": "LOCALE_LABELS",
-          "type": {
-            "text": "Readonly<Record<ElohimLocale, string>>"
-          },
-          "default": "{ en: 'English', es: 'Español', he: 'עברית', }",
-          "description": "Native-script labels — intentionally NOT localized (each language names itself)."
-        },
-        {
-          "kind": "function",
-          "name": "detectLocale",
-          "return": {
-            "type": {
-              "text": "ElohimLocale"
-            }
-          },
-          "description": "navigator.language 'es-MX' → 'es' when supported, else the en source locale."
-        },
-        {
-          "kind": "class",
-          "description": "",
-          "name": "LocaleStore",
-          "members": [
-            {
-              "kind": "field",
-              "name": "_locale",
-              "type": {
-                "text": "ElohimLocale"
-              },
-              "privacy": "private"
-            },
-            {
-              "kind": "field",
-              "name": "_destroyed",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "default": "false"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "readonly": true,
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "_onStorage",
-              "type": {
-                "text": "(e: StorageEvent) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "_onLocaleChange",
-              "type": {
-                "text": "(e: Event) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "destroy",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getLocaleStore()) is intentionally never destroyed."
-            },
-            {
-              "kind": "field",
-              "name": "locale",
-              "type": {
-                "text": "ElohimLocale"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "set",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "locale",
-                  "type": {
-                    "text": "ElohimLocale"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to locale changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "adopt",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "locale",
-                  "type": {
-                    "text": "ElohimLocale"
-                  }
-                }
-              ],
-              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
-            },
-            {
-              "kind": "method",
-              "name": "applyToDocument",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "locale",
-                  "type": {
-                    "text": "ElohimLocale"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "load",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "ElohimLocale | null"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "kind": "function",
-          "name": "getLocaleStore",
-          "return": {
-            "type": {
-              "text": "LocaleStore"
-            }
-          },
-          "description": "Module-level singleton — all islands in a document share one store."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "LOCALE_STORAGE_KEY",
-          "declaration": {
-            "name": "LOCALE_STORAGE_KEY",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LOCALE_CHANGE_EVENT",
-          "declaration": {
-            "name": "LOCALE_CHANGE_EVENT",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "SUPPORTED_LOCALES",
-          "declaration": {
-            "name": "SUPPORTED_LOCALES",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LOCALE_LABELS",
-          "declaration": {
-            "name": "LOCALE_LABELS",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "detectLocale",
-          "declaration": {
-            "name": "detectLocale",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LocaleStore",
-          "declaration": {
-            "name": "LocaleStore",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "getLocaleStore",
-          "declaration": {
-            "name": "getLocaleStore",
-            "module": "src/localize/locale-store.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/runtime.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "sourceLocale",
-          "type": {
-            "text": "string"
-          },
-          "default": "'en'"
-        },
-        {
-          "kind": "variable",
-          "name": "targetLocales",
-          "type": {
-            "text": "['es', 'he']"
-          },
-          "default": "['es', 'he']"
-        },
-        {
-          "kind": "variable",
-          "name": "{ getLocale, setLocale }"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "sourceLocale",
-          "declaration": {
-            "name": "sourceLocale",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "targetLocales",
-          "declaration": {
-            "name": "targetLocales",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "{ getLocale, setLocale }",
-          "declaration": {
-            "name": "{ getLocale, setLocale }",
-            "module": "src/localize/runtime.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/source-locale.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "smokeGreeting",
-          "parameters": [
-            {
-              "name": "name",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "smokeGreeting",
-          "declaration": {
-            "name": "smokeGreeting",
-            "module": "src/localize/source-locale.ts"
           }
         }
       ]
@@ -7720,73 +7487,347 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
+      "path": "src/localize/locale-store.ts",
       "declarations": [
+        {
+          "kind": "variable",
+          "name": "LOCALE_STORAGE_KEY",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale'"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_CHANGE_EVENT",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale-changed'"
+        },
+        {
+          "kind": "variable",
+          "name": "SUPPORTED_LOCALES",
+          "type": {
+            "text": "[sourceLocale, ...targetLocales]"
+          },
+          "default": "[sourceLocale, ...targetLocales]"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_LABELS",
+          "type": {
+            "text": "Readonly<Record<ElohimLocale, string>>"
+          },
+          "default": "{ en: 'English', es: 'Español', he: 'עברית', }",
+          "description": "Native-script labels — intentionally NOT localized (each language names itself)."
+        },
+        {
+          "kind": "function",
+          "name": "detectLocale",
+          "return": {
+            "type": {
+              "text": "ElohimLocale"
+            }
+          },
+          "description": "navigator.language 'es-MX' → 'es' when supported, else the en source locale."
+        },
         {
           "kind": "class",
           "description": "",
-          "name": "Loader",
+          "name": "LocaleStore",
           "members": [
             {
               "kind": "field",
-              "name": "verifyCid",
+              "name": "_locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_destroyed",
               "type": {
                 "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "_onStorage",
+              "type": {
+                "text": "(e: StorageEvent) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "_onLocaleChange",
+              "type": {
+                "text": "(e: Event) => void"
               },
               "privacy": "private",
               "readonly": true
             },
             {
               "kind": "method",
-              "name": "resolve",
+              "name": "destroy",
               "return": {
                 "type": {
-                  "text": "Promise<LoaderResolution>"
+                  "text": "void"
+                }
+              },
+              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getLocaleStore()) is intentionally never destroyed."
+            },
+            {
+              "kind": "field",
+              "name": "locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "set",
+              "return": {
+                "type": {
+                  "text": "void"
                 }
               },
               "parameters": [
                 {
-                  "name": "cid",
+                  "name": "locale",
                   "type": {
-                    "text": "string"
+                    "text": "ElohimLocale"
                   }
                 }
               ]
             },
             {
               "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
+              "name": "subscribe",
               "return": {
                 "type": {
-                  "text": "Promise<void>"
+                  "text": "() => void"
                 }
               },
               "parameters": [
                 {
-                  "name": "cid",
+                  "name": "fn",
                   "type": {
-                    "text": "string"
+                    "text": "Subscriber"
                   }
-                },
+                }
+              ],
+              "description": "Subscribe to locale changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "adopt",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
                 {
-                  "name": "bytes",
+                  "name": "locale",
                   "type": {
-                    "text": "Uint8Array"
+                    "text": "ElohimLocale"
+                  }
+                }
+              ],
+              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
+            },
+            {
+              "kind": "method",
+              "name": "applyToDocument",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
                   }
                 }
               ]
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "ElohimLocale | null"
+                }
+              }
             }
           ]
+        },
+        {
+          "kind": "function",
+          "name": "getLocaleStore",
+          "return": {
+            "type": {
+              "text": "LocaleStore"
+            }
+          },
+          "description": "Module-level singleton — all islands in a document share one store."
         }
       ],
       "exports": [
         {
           "kind": "js",
-          "name": "Loader",
+          "name": "LOCALE_STORAGE_KEY",
           "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
+            "name": "LOCALE_STORAGE_KEY",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_CHANGE_EVENT",
+          "declaration": {
+            "name": "LOCALE_CHANGE_EVENT",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SUPPORTED_LOCALES",
+          "declaration": {
+            "name": "SUPPORTED_LOCALES",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_LABELS",
+          "declaration": {
+            "name": "LOCALE_LABELS",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "detectLocale",
+          "declaration": {
+            "name": "detectLocale",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LocaleStore",
+          "declaration": {
+            "name": "LocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getLocaleStore",
+          "declaration": {
+            "name": "getLocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/runtime.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "type": {
+            "text": "string"
+          },
+          "default": "'en'"
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "['es', 'he']"
+          },
+          "default": "['es', 'he']"
+        },
+        {
+          "kind": "variable",
+          "name": "{ getLocale, setLocale }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "{ getLocale, setLocale }",
+          "declaration": {
+            "name": "{ getLocale, setLocale }",
+            "module": "src/localize/runtime.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/source-locale.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "smokeGreeting",
+          "parameters": [
+            {
+              "name": "name",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "smokeGreeting",
+          "declaration": {
+            "name": "smokeGreeting",
+            "module": "src/localize/source-locale.ts"
           }
         }
       ]

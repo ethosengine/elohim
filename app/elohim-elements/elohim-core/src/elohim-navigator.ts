@@ -36,42 +36,6 @@ export interface ElohimNavigatorBannerItem {
   severity?: 'info' | 'warning' | 'error';
 }
 
-const DEFAULT_CONTEXT_APPS: ElohimContextAppConfig[] = [
-  {
-    id: 'lamad',
-    name: 'Lamad',
-    icon: '📚',
-    route: '/lamad',
-    tagline: 'Learning & Content',
-    available: true,
-  },
-  {
-    id: 'community',
-    name: 'Qahal',
-    icon: '👥',
-    route: '/community',
-    tagline: 'Community & Governance',
-    available: true,
-  },
-  {
-    id: 'shefa',
-    name: 'Shefa',
-    icon: '✨',
-    route: '/shefa',
-    tagline: 'Economics of Flourishing',
-    available: true,
-  },
-  {
-    id: 'avodah',
-    name: 'Avodah',
-    icon: '🔨',
-    route: '/avodah',
-    tagline: 'Work & Stewardship',
-    available: true,
-  },
-  { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true },
-];
-
 /**
  * <elohim-navigator> — unified cross-pillar navigation primitive.
  *
@@ -97,7 +61,8 @@ const DEFAULT_CONTEXT_APPS: ElohimContextAppConfig[] = [
  * @prop {string} identifier - Authenticated user identifier (email)
  * @prop {string} identityMode - Identity mode ('hosted' | 'steward' | 'anonymous')
  * @prop {ElohimNavigatorSession | null} session - Session human state
- * @prop {ElohimContextAppConfig[]} contextApps - List of context apps to show
+ * @prop {ElohimContextAppConfig[]} contextApps - Host-supplied context apps (§12.3: no app routing baked into primitives). Empty → switcher hidden.
+ * @prop {{ profile?: string; login?: string; register?: string }} identityRoutes - Host-supplied identity surface routes; absent entries render no tray item.
  * @prop {ElohimNavigatorBannerItem[]} banners - Active banner notices
  * @prop {Function | null} onNavigate - Called with { route } when navigation triggered
  * @prop {Function | null} onSearch - Called with { query } when search submitted
@@ -435,7 +400,14 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
   @property() identifier = '';
   @property() identityMode = 'anonymous';
   @property({ attribute: false }) session: ElohimNavigatorSession | null = null;
-  @property({ attribute: false }) contextApps: ElohimContextAppConfig[] = DEFAULT_CONTEXT_APPS;
+  /** Host-supplied context apps (§12.3: no app routing baked into primitives). Empty → switcher hidden. */
+  @property({ attribute: false }) contextApps: ElohimContextAppConfig[] = [];
+  /** Host-supplied identity surface routes; absent entries render no tray item. */
+  @property({ attribute: false }) identityRoutes: {
+    profile?: string;
+    login?: string;
+    register?: string;
+  } = {};
   @property({ attribute: false }) banners: ElohimNavigatorBannerItem[] = [];
   @property({ attribute: false }) onNavigate: ((route: string) => void) | null = null;
   @property({ attribute: false }) onSearch: ((query: string, context: string) => void) | null =
@@ -497,16 +469,20 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
           ${this._renderIdentifierRow()}
         </div>
         <div class="tray-divider"></div>
-        <button
-          class="tray-item"
-          type="button"
-          role="menuitem"
-          data-testid="nav-identity-profile"
-          @click=${() => this.navigate('/identity/profile')}
-        >
-          Identity Profile
-        </button>
-        <div class="tray-divider"></div>
+        ${this.identityRoutes.profile
+          ? html`
+              <button
+                class="tray-item"
+                type="button"
+                role="menuitem"
+                data-testid="nav-identity-profile"
+                @click=${() => this.navigate(this.identityRoutes.profile!)}
+              >
+                Identity Profile
+              </button>
+              <div class="tray-divider"></div>
+            `
+          : nothing}
         <button
           class="tray-item danger"
           type="button"
@@ -519,24 +495,32 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       `;
     }
     return html`
-      <button
-        class="tray-item"
-        type="button"
-        role="menuitem"
-        data-testid="nav-login"
-        @click=${() => this.navigate('/identity/login')}
-      >
-        Sign in
-      </button>
-      <button
-        class="tray-item"
-        type="button"
-        role="menuitem"
-        data-testid="nav-register"
-        @click=${() => this.navigate('/identity/register')}
-      >
-        Register
-      </button>
+      ${this.identityRoutes.login
+        ? html`
+            <button
+              class="tray-item"
+              type="button"
+              role="menuitem"
+              data-testid="nav-login"
+              @click=${() => this.navigate(this.identityRoutes.login!)}
+            >
+              Sign in
+            </button>
+          `
+        : nothing}
+      ${this.identityRoutes.register
+        ? html`
+            <button
+              class="tray-item"
+              type="button"
+              role="menuitem"
+              data-testid="nav-register"
+              @click=${() => this.navigate(this.identityRoutes.register!)}
+            >
+              Register
+            </button>
+          `
+        : nothing}
     `;
   }
 
@@ -569,6 +553,63 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
     `;
   }
 
+  // eslint-disable-next-line sonarjs/function-return-type -- html template and nothing are both valid Lit renderables
+  private _renderContextSwitcher(currentApp: ElohimContextAppConfig | undefined) {
+    if (this.contextApps.length === 0) return nothing;
+    const expandedStr = this.showContextSwitcher ? 'true' : 'false';
+    return html`
+      <div style="position: relative;">
+        <button
+          class="context-switcher-btn"
+          part="context-switcher-btn"
+          type="button"
+          aria-label="Switch context app"
+          aria-expanded=${expandedStr}
+          aria-haspopup="menu"
+          @click=${this.toggleContextSwitcher}
+        >
+          <span aria-hidden="true">${currentApp?.icon ?? ''}</span>
+          <span>${currentApp?.name ?? ''}</span>
+          <span aria-hidden="true">▾</span>
+        </button>
+
+        ${this.showContextSwitcher
+          ? html`
+              <div
+                class="tray context-tray"
+                part="context-tray"
+                role="menu"
+                aria-label="Context apps"
+              >
+                ${this.contextApps.map(app => {
+                  const currentStr = app.id === this.context ? 'true' : 'false';
+                  return html`
+                    <button
+                      class="tray-item"
+                      type="button"
+                      role="menuitem"
+                      aria-current=${currentStr}
+                      data-testid="context-app-${app.id}"
+                      ?disabled=${!app.available}
+                      @click=${() => this.switchContext(app)}
+                    >
+                      <div class="context-app-item">
+                        <span class="context-app-icon" aria-hidden="true">${app.icon}</span>
+                        <div class="context-app-info">
+                          <span class="context-app-name">${app.name}</span>
+                          <span class="context-app-tagline">${app.tagline}</span>
+                        </div>
+                      </div>
+                    </button>
+                  `;
+                })}
+              </div>
+            `
+          : nothing}
+      </div>
+    `;
+  }
+
   override render() {
     const currentApp = this.contextApps.find(a => a.id === this.context) ?? this.contextApps[0];
     const initials = this.session?.initials ?? this.displayName?.charAt(0).toUpperCase() ?? 'T';
@@ -598,54 +639,7 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
 
         <nav class="nav" part="nav" aria-label="Protocol navigation">
           <div class="identity-section" part="identity-section">
-            <div style="position: relative;">
-              <button
-                class="context-switcher-btn"
-                part="context-switcher-btn"
-                type="button"
-                aria-label="Switch context app"
-                aria-expanded=${this.showContextSwitcher ? 'true' : 'false'}
-                aria-haspopup="menu"
-                @click=${this.toggleContextSwitcher}
-              >
-                <span aria-hidden="true">${currentApp?.icon ?? ''}</span>
-                <span>${currentApp?.name ?? ''}</span>
-                <span aria-hidden="true">▾</span>
-              </button>
-
-              ${this.showContextSwitcher
-                ? html`
-                    <div
-                      class="tray context-tray"
-                      part="context-tray"
-                      role="menu"
-                      aria-label="Context apps"
-                    >
-                      ${this.contextApps.map(
-                        app => html`
-                          <button
-                            class="tray-item"
-                            type="button"
-                            role="menuitem"
-                            aria-current=${app.id === this.context ? 'true' : 'false'}
-                            data-testid="context-app-${app.id}"
-                            ?disabled=${!app.available}
-                            @click=${() => this.switchContext(app)}
-                          >
-                            <div class="context-app-item">
-                              <span class="context-app-icon" aria-hidden="true">${app.icon}</span>
-                              <div class="context-app-info">
-                                <span class="context-app-name">${app.name}</span>
-                                <span class="context-app-tagline">${app.tagline}</span>
-                              </div>
-                            </div>
-                          </button>
-                        `
-                      )}
-                    </div>
-                  `
-                : nothing}
-            </div>
+            ${this._renderContextSwitcher(currentApp)}
           </div>
 
           ${this.showSearch

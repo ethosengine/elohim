@@ -13,11 +13,26 @@ import type { Meta, StoryObj } from '@storybook/web-components';
 import { html } from 'lit';
 
 import 'elohim-core/register';
-import type { ElohimNavigatorBannerItem } from 'elohim-core';
+import type { ElohimContextAppConfig, ElohimNavigatorBannerItem } from 'elohim-core';
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
+
+/** Host-supplied context apps (§12.3: routing lives in the host, not the primitive). */
+const CONTEXT_APPS: ElohimContextAppConfig[] = [
+  { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true },
+  { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true },
+  { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true },
+  { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true },
+  { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true },
+];
+
+const IDENTITY_ROUTES = {
+  profile: '/identity/profile',
+  login: '/identity/login',
+  register: '/identity/register',
+};
 
 const INFO_BANNER: ElohimNavigatorBannerItem = {
   id: 'system-notice-1',
@@ -44,7 +59,8 @@ const meta: Meta = {
 \`<elohim-navigator>\` — the protocol's application navigation bar.
 
 Includes:
-- Context switcher (dropdown) for lamad, community, shefa, avodah, map
+- Context switcher (dropdown) — entries are **host-supplied** via \`.contextApps\` (§12.3: no routing baked into the primitive). Empty → switcher hidden.
+- Identity tray routes — **host-supplied** via \`.identityRoutes\`. Absent entries render no tray item.
 - Optional search input (\`show-search\`)
 - Profile tray (authenticated or sign-in)
 - Banner notices at top
@@ -73,6 +89,8 @@ export const Authenticated: Story = {
   render: () => html`
     <elohim-navigator
       context="lamad"
+      .contextApps=${CONTEXT_APPS}
+      .identityRoutes=${IDENTITY_ROUTES}
       .isAuthenticated=${true}
       display-name="Alice"
       identifier="alice.pilot"
@@ -84,7 +102,12 @@ export const Authenticated: Story = {
 export const Unauthenticated: Story = {
   name: 'Unauthenticated',
   render: () => html`
-    <elohim-navigator context="lamad" .isAuthenticated=${false}></elohim-navigator>
+    <elohim-navigator
+      context="lamad"
+      .contextApps=${CONTEXT_APPS}
+      .identityRoutes=${IDENTITY_ROUTES}
+      .isAuthenticated=${false}
+    ></elohim-navigator>
   `,
   parameters: {
     docs: {
@@ -100,7 +123,13 @@ export const Unauthenticated: Story = {
 export const ShefaContext: Story = {
   name: 'ShefaContext (active)',
   render: () => html`
-    <elohim-navigator context="shefa" .isAuthenticated=${true} display-name="Bob"></elohim-navigator>
+    <elohim-navigator
+      context="shefa"
+      .contextApps=${CONTEXT_APPS}
+      .identityRoutes=${IDENTITY_ROUTES}
+      .isAuthenticated=${true}
+      display-name="Bob"
+    ></elohim-navigator>
   `,
 };
 
@@ -110,6 +139,8 @@ export const WithSearch: Story = {
     <elohim-navigator
       context="lamad"
       show-search
+      .contextApps=${CONTEXT_APPS}
+      .identityRoutes=${IDENTITY_ROUTES}
       .isAuthenticated=${true}
       display-name="Carol"
     ></elohim-navigator>
@@ -125,6 +156,7 @@ export const WithInfoBanner: Story = {
   render: () => html`
     <elohim-navigator
       context="lamad"
+      .contextApps=${CONTEXT_APPS}
       .banners=${[INFO_BANNER]}
     ></elohim-navigator>
   `,
@@ -135,6 +167,7 @@ export const WithWarningBanner: Story = {
   render: () => html`
     <elohim-navigator
       context="lamad"
+      .contextApps=${CONTEXT_APPS}
       .banners=${[WARNING_BANNER]}
     ></elohim-navigator>
   `,
@@ -145,6 +178,7 @@ export const WithMultipleBanners: Story = {
   render: () => html`
     <elohim-navigator
       context="lamad"
+      .contextApps=${CONTEXT_APPS}
       .banners=${[INFO_BANNER, WARNING_BANNER]}
     ></elohim-navigator>
   `,
@@ -170,6 +204,8 @@ export const Interactive: Story = {
       <elohim-navigator
         context="lamad"
         show-search
+        .contextApps=${CONTEXT_APPS}
+        .identityRoutes=${IDENTITY_ROUTES}
         .isAuthenticated=${true}
         display-name="Dave"
         .banners=${[INFO_BANNER]}
@@ -205,6 +241,8 @@ export const Dark: Story = {
   render: () => html`
     <elohim-navigator
       context="lamad"
+      .contextApps=${CONTEXT_APPS}
+      .identityRoutes=${IDENTITY_ROUTES}
       .isAuthenticated=${true}
       display-name="Alice"
     ></elohim-navigator>
@@ -221,7 +259,12 @@ export const RTLCanary: Story = {
     `,
   ],
   render: () => html`
-    <elohim-navigator context="lamad" .isAuthenticated=${true} display-name="עלי"></elohim-navigator>
+    <elohim-navigator
+      context="lamad"
+      .contextApps=${CONTEXT_APPS}
+      .isAuthenticated=${true}
+      display-name="עלי"
+    ></elohim-navigator>
   `,
 };
 
@@ -232,7 +275,7 @@ export const RTLCanary: Story = {
 export const Unstyled: Story = {
   name: 'Unstyled (blank-slate proof)',
   decorators: [story => html`<div style="all: initial; display: block;">${story()}</div>`],
-  render: () => html`<elohim-navigator context="lamad"></elohim-navigator>`,
+  render: () => html`<elohim-navigator context="lamad" .contextApps=${CONTEXT_APPS}></elohim-navigator>`,
   parameters: {
     docs: {
       description: {
@@ -268,6 +311,8 @@ export const CustomTheme: Story = {
     <elohim-navigator
       context="shefa"
       show-search
+      .contextApps=${CONTEXT_APPS}
+      .identityRoutes=${IDENTITY_ROUTES}
       .isAuthenticated=${true}
       display-name="Eve"
       .banners=${[INFO_BANNER]}

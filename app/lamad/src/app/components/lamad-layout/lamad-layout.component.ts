@@ -10,6 +10,7 @@ import { filter, takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 
 import 'elohim-core/register';
+import type { ElohimContextAppConfig } from 'elohim-core';
 
 import { DataLoaderService } from '../../services/data-loader.service';
 
@@ -26,6 +27,21 @@ import { RendererInitializerService } from '../../renderers/renderer-initializer
 export class LamadLayoutComponent implements OnInit, OnDestroy {
   isReady = false;
   isHomePage = false;
+
+  /** Host-supplied navigator config (§12.3: routing lives in the host, not the primitive). */
+  readonly navigatorApps: ElohimContextAppConfig[] = [
+    { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true },
+    { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true },
+    { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true },
+    { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true },
+    { id: 'map', name: 'Map', icon: '🌍', route: '/map', tagline: 'Living Places', available: true },
+  ];
+
+  readonly navigatorIdentityRoutes = {
+    profile: '/identity/profile',
+    login: '/identity/login',
+    register: '/identity/register',
+  } as const;
 
   private readonly destroy$ = new Subject<void>();
 
