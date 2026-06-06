@@ -51,11 +51,18 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     And the response body is JSON, not an index.html shell
 
   @browser-only
-  Scenario: Universal EPR address resolves to a rendered surface
-    # §12.1 Slice 2 — /epr/{id}: the doorway serves the root bundle; the
-    # shell's epr/:resourceId route resolves the EPR and renders the
-    # cross-pillar resource viewer. The durable, bundle-agnostic address.
+  Scenario: Universal EPR address 302s a claimed type to its pretty mount
+    # Spec §5.1 (Slice 3): claimed commons contentType → 302 to the mount.
+    # The browser follows the redirect; the learner lands on the path overview.
     Given a learner opens the deep link "/epr/foundations-christian-technology"
+    Then the lamad path overview renders
+    And the rendered surface is not a raw error response
+
+  @browser-only
+  Scenario: Universal EPR address renders unclaimed types in the shell viewer
+    # Spec §5.1: unclaimed contentType stays at the universal address —
+    # the shell's cross-pillar resource viewer (safe-by-default floor).
+    Given a learner opens the deep link "/epr/fct-module-01-church-dilemma"
     Then the cross-pillar resource viewer renders
     And the rendered surface is not a raw error response
 
@@ -82,3 +89,19 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     Given a learner opens the deep link "/lamad/resource/fct-module-01-church-dilemma"
     Then the cross-pillar resource viewer renders
     And the rendered surface is not a raw error response
+
+  @regression
+  Scenario: The monolith-era share is honored by a notarized alias promise
+    # Spec §4 (Slice 3): the redirectTemplates grant on the lamad projection
+    # 302s the legacy address at the DOORWAY — before any bundle boots. The
+    # client bridge component remains only as the SPA-plane twin.
+    When the path "/lamad/resource/fct-module-01-church-dilemma" is requested without following redirects from doorway "alpha"
+    Then the response status is 302
+    And the response Location header is "/epr/fct-module-01-church-dilemma"
+
+  Scenario: The sitemap enumerates the claimed static plane
+    # Spec §7.5: the sitemap is a derived projection of the routing table —
+    # mounts plus claimed commons entries; it cannot drift from dispatch.
+    When the path "/sitemap.xml" is requested without following redirects from doorway "alpha"
+    Then the response status is 200
+    And the response body contains "/lamad/path/foundations-christian-technology"

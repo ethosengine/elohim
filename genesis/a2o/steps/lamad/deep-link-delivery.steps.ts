@@ -34,6 +34,8 @@ import { strict as assert } from 'node:assert';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
+import { request } from 'undici';
+
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
 import {
@@ -44,7 +46,7 @@ import {
 } from '../../src/framework/pages/selectors.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
-import { fetchApp, responseStore } from '../delivery.steps.js';
+import { AppResponse, fetchApp, responseStore } from '../delivery.steps.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -104,6 +106,30 @@ async function rootRendered(device: PlaywrightDevice, testId: string): Promise<b
     .waitFor({ state: 'visible', timeout: RENDER_TIMEOUT_MS })
     .then(() => true)
     .catch(() => false);
+}
+
+/**
+ * Fetch a URL WITHOUT following redirects, capturing status + headers + body.
+ *
+ * The shared `fetchApp` (steps/delivery.steps.ts) uses undici's `request`, which
+ * already does not auto-follow redirects; this variant pins that contract
+ * explicitly (`maxRedirections: 0`) for the Slice-3 doorway-302 assertions,
+ * where a followed redirect would erase the 302 status and Location header we
+ * need to observe. Same undici transport as `fetchApp` — the AppResponse shape
+ * (lower-cased headers, Buffer body) matches so the SHARED responseStore Then
+ * assertions resolve it unchanged.
+ */
+async function fetchAppNoRedirect(baseUrl: string, path: string): Promise<AppResponse> {
+  const { statusCode, headers, body } = await request(`${baseUrl}${path}`, {
+    maxRedirections: 0,
+  });
+  const data = Buffer.from(await body.arrayBuffer());
+  const flatHeaders: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (typeof value === 'string') flatHeaders[key.toLowerCase()] = value;
+    else if (Array.isArray(value)) flatHeaders[key.toLowerCase()] = value[0];
+  }
+  return { status: statusCode, headers: flatHeaders, body: data };
 }
 
 // ---------------------------------------------------------------------------
@@ -342,4 +368,62 @@ Then('the response body is JSON, not an index.html shell', async function (this:
     jsonContentType || jsonParsable,
     `Expected a JSON error body for the asset miss; content-type="${contentType}", body="${bodyText.slice(0, 200)}"`
   );
+});
+
+// ---------------------------------------------------------------------------
+// Slice 3 — doorway-side routing (HTTP transport, no browser)
+//
+// The doorway honors notarized alias promises (redirectTemplates / redirects_from)
+// and claimed-type 302s BEFORE any bundle boots, and materializes a /sitemap.xml
+// projection of the routing table. These steps observe that substrate behavior at
+// the transport layer with redirects unfollowed, so the 302 status + Location are
+// directly assertable. `Then the response status is {int}` is the SHARED delivery
+// assertion (steps/delivery.steps.ts) — reused, not redefined.
+// ---------------------------------------------------------------------------
+
+/**
+ * "When the path {string} is requested without following redirects from doorway
+ * {string}" — a raw HTTP GET against the doorway with redirects unfollowed, so a
+ * doorway-side 302 (alias promise or claimed-type redirect) surfaces as a 302
+ * status + Location header rather than being chased to its target.
+ *
+ * The capture is stored in the SHARED delivery responseStore so the existing
+ * `Then the response status is {int}` assertion resolves it.
+ *
+ * Example:
+ *   When the path "/lamad/resource/abc" is requested without following redirects from doorway "alpha"
+ */
+When(
+  'the path {string} is requested without following redirects from doorway {string}',
+  async function (this: E2EWorld, path: string, doorwayId: string) {
+    const doorway = this.getDoorway(doorwayId);
+    const resp = await fetchAppNoRedirect(doorway.url, path);
+    responseStore.set(this, resp);
+  }
+);
+
+/**
+ * "Then the response Location header is {string}" — the doorway's 302 Location
+ * is the expected canonical target (spec §4 alias law / §5.1 claimed-type
+ * redirect). Reads the shared delivery responseStore.
+ *
+ * Example: And the response Location header is "/epr/abc"
+ */
+Then('the response Location header is {string}', function (this: E2EWorld, expected: string) {
+  const resp = responseStore.get(this);
+  assert.ok(resp, 'No response captured — run the request step first');
+  assert.equal(resp.headers['location'], expected);
+});
+
+/**
+ * "Then the response body contains {string}" — the response body includes the
+ * given substring (spec §7.5: the sitemap enumerates the claimed static plane).
+ * Reads the shared delivery responseStore.
+ *
+ * Example: And the response body contains "/lamad/path/foundations-christian-technology"
+ */
+Then('the response body contains {string}', function (this: E2EWorld, needle: string) {
+  const resp = responseStore.get(this);
+  assert.ok(resp, 'No response captured — run the request step first');
+  assert.ok(resp.body.toString('utf8').includes(needle), `Expected body to contain "${needle}"`);
 });
