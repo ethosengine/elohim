@@ -21,6 +21,8 @@ describe('buildProjectionCommitmentBody', () => {
     gateHints: [],
     deadEnd: false,
     stewardDirectEndpoint: null,
+    routeClaims: null,
+    redirectTemplates: [],
   };
 
   it('builds a commons-reach lamad projection at /lamad', () => {
@@ -53,6 +55,18 @@ describe('buildProjectionCommitmentBody', () => {
 describe('defaultProjectionSeeds', () => {
   it('default seed set has 6 commitments total (landing × 2 + lamad × 2 + portal × 2)', () => {
     expect(defaultProjectionSeeds().length).toBe(6);
+  });
+
+  it('grants lamad routeClaims + the legacy resource redirect template', () => {
+    const lamad = defaultProjectionSeeds().find(
+      (s) => s.eprId === 'lamad-spa' && s.doorwayId === 'alpha-elohim-host',
+    )!;
+    const meta = JSON.parse(buildProjectionCommitmentBody(lamad).metadataJson);
+    expect(meta.routeClaims.schemaVersion).toBe(1);
+    expect(meta.routeClaims.claims).toEqual([
+      { contentType: 'path', template: 'path/{id}', fragments: { step: 'path/{id}/step/{n}' } },
+    ]);
+    expect(meta.redirectTemplates).toEqual([{ from: '/lamad/resource/{id}', to: '/epr/{id}' }]);
   });
 
   it('default seed set includes /auth/portal projections on both doorways', () => {

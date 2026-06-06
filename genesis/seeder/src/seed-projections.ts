@@ -58,6 +58,23 @@ export interface StewardDirectEndpoint {
   acceptsProjectionFor: string[];
 }
 
+export interface RouteClaimTemplate {
+  contentType: string;
+  template: string;
+  fragments?: Record<string, string>;
+}
+
+export interface RouteClaimGrant {
+  schemaVersion: number;
+  claimsManifestCid: string | null;
+  claims: RouteClaimTemplate[];
+}
+
+export interface RedirectTemplate {
+  from: string;
+  to: string;
+}
+
 export interface ProjectionSpec {
   stewardHumanId: string;
   stewardArchetype: Archetype;
@@ -73,6 +90,8 @@ export interface ProjectionSpec {
   gateHints: GateHintRef[];
   deadEnd: boolean;
   stewardDirectEndpoint: StewardDirectEndpoint | null;
+  routeClaims: RouteClaimGrant | null;
+  redirectTemplates: RedirectTemplate[];
 }
 
 interface CommitmentBody {
@@ -143,6 +162,8 @@ export function buildProjectionCommitmentBody(spec: ProjectionSpec): CommitmentB
     gateHints: spec.gateHints,
     deadEnd: spec.deadEnd,
     stewardDirectEndpoint: spec.stewardDirectEndpoint,
+    routeClaims: spec.routeClaims,
+    redirectTemplates: spec.redirectTemplates,
   };
 
   return {
@@ -177,6 +198,8 @@ export function defaultProjectionSeeds(): ProjectionSpec[] {
     gateHints: [] as GateHintRef[],
     deadEnd: false,
     stewardDirectEndpoint: null,
+    routeClaims: null as RouteClaimGrant | null,
+    redirectTemplates: [] as RedirectTemplate[],
   };
 
   const landingAt = (doorwayId: string): ProjectionSpec => ({
@@ -193,6 +216,14 @@ export function defaultProjectionSeeds(): ProjectionSpec[] {
     eprId: 'lamad-spa',
     urlPath: '/lamad',
     baseHref: '/lamad/',
+    routeClaims: {
+      schemaVersion: 1,
+      claimsManifestCid: null,
+      claims: [
+        { contentType: 'path', template: 'path/{id}', fragments: { step: 'path/{id}/step/{n}' } },
+      ],
+    },
+    redirectTemplates: [{ from: '/lamad/resource/{id}', to: '/epr/{id}' }],
   });
 
   const imagodeiPortalAt = (doorwayId: string): ProjectionSpec => ({
