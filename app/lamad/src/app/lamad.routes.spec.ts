@@ -35,6 +35,8 @@ describe('Lamad Routes', () => {
     const children = LAMAD_ROUTES[0].children;
     const resourceRoute = children?.find(r => r.path === 'resource/:resourceId');
     expect(resourceRoute).toBeDefined();
+    expect(resourceRoute?.redirectTo).toBeUndefined(); // self-loop killed (§12.6 Slice 2)
+    expect(resourceRoute?.loadComponent).toBeDefined();
   });
 
   it('should have search child route', () => {

@@ -62,10 +62,15 @@ export const LAMAD_ROUTES: Routes = [
       // DIRECT RESOURCE ACCESS (Secondary)
       // ============================================
 
-      // Redirect to app-level /resource/:resourceId (ContentNodes are cross-pillar primitives)
+      // Legacy bridge: /lamad/resource/{id} (monolith-era canonical) hands off
+      // to the universal /epr/{id} address. NOTE: an absolute redirectTo here
+      // re-enters THIS router and self-loops — it can never escape the bundle.
       {
         path: 'resource/:resourceId',
-        redirectTo: '/resource/:resourceId',
+        loadComponent: async () =>
+          import('./components/legacy-resource-redirect/legacy-resource-redirect.component').then(
+            m => m.LegacyResourceRedirectComponent
+          ),
       },
 
       // Content Editor - edit existing content
