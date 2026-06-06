@@ -24,11 +24,16 @@ re-encounter without another dispatch.
    `{ts, fp, class, category, job, line, status, seen, first_build,
    last_build, backlog?}`. The HARVESTER owns `seen`/`last_build` (occurrence
    evidence — never touch them); YOU own `status` (`open → triaged →
-   blocked`) and `backlog`. Closure is NOT yours to finalize: a CI fix is
-   confirmed by DISAPPEARANCE — set `status: triaged` when your fix lands
-   locally-verified; the stasis sweep decomposes (deletes ledger line +
-   backlog entry) once the fingerprint stays absent for ≥3 subsequently
-   harvested builds of that job. Never park a `fixed` tombstone.
+   blocked`), `backlog`, `triaged_at_build`, and `decompose_on_confirm`.
+   Closure is NOT yours to finalize — it is DETERMINISTIC in the harvester:
+   set `status: triaged` + `triaged_at_build` when your fix lands
+   locally-verified, plus `decompose_on_confirm: true` when you judge (now,
+   once) that the concern carries no museum-worthy lesson — the harvester
+   then deletes ledger line AND backlog entry automatically once the job's
+   green streak confirms disappearance (≥3, no recurrence). Without the
+   stamp, the harvester deletes the ledger line and reports the backlog
+   entry for graduate-then-decompose. Recurrence reopens automatically.
+   Never park a `fixed` tombstone.
 2. **Canonical backlog**: `genesis/data/timeline/backlog/ci-<slug>.md` —
    one file per CONCERN (fingerprints N:1 — five assertion failures from one
    broken seeding step are ONE concern). Timeline-CONVENTIONS-conformant

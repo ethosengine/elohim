@@ -1,6 +1,6 @@
 ---
 name: agentic-developer
-description: First-class overnight agentic developer. Iterates a named Objective against a CI pipeline — observe via Haiku, orchestrate + attempt as Opus, delegate to Sonnet on Opus's discretion. Uses stability-gated "done", path-scoped authority, palette-based command permission, produces a single sprint-result markdown artifact. Invoked by the /shift slash command. Use when "kick off shift X", "run /shift", "start an agentic developer on Y", or supervising a long-running implementation against CI. NOT for one-shot tasks (use direct implementation) or surface CI triage (use ci-triage).
+description: First-class overnight agentic developer. Iterates a named Objective against a CI pipeline — observe via Haiku, orchestrate + attempt as Opus, delegate to Sonnet on Opus's discretion. Uses stability-gated "done", path-scoped authority, palette-based command permission, produces a single sprint-result markdown artifact. CI findings rails: consumes the deterministic ci-harvest ledger (.claude/data/ci-findings.jsonl) instead of ad-hoc Jenkins pulls, holds the pass/unstable/fail-ratio FLOOR (never leave touched jobs below where the shift found them) and the brainstorming-confidence CEILING (low-confidence/design-shaped findings route to /brainstorm, not more loops). Invoked by the /shift slash command. Use when "kick off shift X", "run /shift", "start an agentic developer on Y", "drain the CI findings ledger", or supervising a long-running implementation against CI. NOT for one-shot tasks (use direct implementation) or surface CI triage (use ci-triage).
 ---
 
 # Agentic Developer
@@ -501,7 +501,43 @@ Stability still requires two consecutive passing measurements, but in integratio
 
 When `Visual gate: on`, the `validatedRegressed == 0` requirement (principle #4) is an additional, mode-orthogonal condition on the shift's done state — it applies in bring-up and integration mode alike, fed by the local render (§"Visual validation" → Local generation).
 
-## Visual validation as an integration candidate dimension
+## CI findings rails (floor / ceiling — the loop's stasis envelope)
+
+The findings-sentinel pattern's CI instantiation (spec:
+`genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md`
+§3) feeds this loop deterministically — the shift never goes to Jenkins for
+what's already harvested:
+
+**Substrate.** Run `python3 .claude/scripts/ci-harvest.py` at Ground (step 1)
+and after each Measure (step 5). It maintains `.claude/data/ci-findings.jsonl`
+(fingerprinted failures with `seen`/build-span flake evidence) and
+`.claude/data/ci-cursor.json` (`recent.<job>` rolling result windows,
+`green_streak.<job>`). Closure is deterministic inside the harvester:
+triaged fixes confirm by disappearance (green streak ≥3, no recurrence) and
+recurred fixes reopen — no ceremony owns CI closure.
+
+**Floor rail — pass/unstable/fail ratios.** The measurable health the loop
+must hold or raise. From `recent.<job>`: `pass_ratio = SUCCESS/window`. For
+every job the Objective touches:
+- An Objective cannot claim done/stable while its touched jobs' pass_ratio is
+  below where the shift found it (you never leave the floor lower).
+- Open ledger findings on touched jobs are in-scope drain work — the loop
+  picks them up as candidates (integration mode) alongside the Objective's
+  own failures, prioritized by `seen` count (recurrence = leverage).
+- The floor is evidence, not vibes: quote the window ratios in the journal's
+  Stability Tracker at kickoff and close.
+
+**Ceiling rail — brainstorming confidence.** The boundary above which more
+iteration is waste. When a finding/candidate, after a verify pass
+(ci-investigator), still has LOW resolution confidence — root cause needs a
+design decision, an architecture change, a substrate capability, or
+cross-cutting work beyond the Objective's path scope — it is ABOVE the
+ceiling: do NOT grind loops on it. Capture it as a needs-brainstorm item
+(backlog entry with `ci_status: blocked` + Current decision naming the design
+question, or the shift wishlist) and route it to `/brainstorm`. The rails in
+one line: **below the floor you keep working; above the ceiling you stop
+iterating and start designing; stasis is riding between them with the ledger
+draining.**
 
 When the genesis pipeline runs the browser stage (Playwright probe passes), it emits a second sprint-report at `genesis/a2o/reports/sprint-report-browser.{json,md}` in addition to the API one. The browser report carries:
 

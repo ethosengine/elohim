@@ -1,6 +1,6 @@
 ---
 name: deprecation-stasis
-description: Drive the findings-sentinel disciplines to stasis in one loop — BOTH ledgers (.claude/data/deprecations.jsonl for deprecation/security, .claude/data/ci-findings.jsonl for CI failures) reconciled against the canonical backlog (genesis/data/timeline/backlog/{deprecation,security,ci}-*.md), dispatching deprecation-triage / ci-failure-triage for the highest-leverage open items, re-checking blocked items whose blockers may have cleared, confirming CI closures by fingerprint disappearance, re-measuring until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). Use when "drain the deprecation ledger", "drain the CI findings", "deprecation stasis pass", "findings stasis", on a /loop or scheduled routine, or when sentinel/harvest nudges have accumulated past comfort.
+description: Drive the deprecation/security-concern discipline to stasis in one loop — reconcile the deterministic ledger (.claude/data/deprecations.jsonl) against the canonical backlog (genesis/data/timeline/backlog/{deprecation,security}-*.md), dispatch deprecation-triage for the highest-leverage open item, re-check blocked items whose blockers may have cleared, re-measure, repeat until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). NOT for CI findings — that class closes deterministically in ci-harvest (disappearance/reopen) and drains under the agentic-developer loop's floor/ceiling rails. Use when "drain the deprecation ledger", "deprecation stasis pass", on a /loop or scheduled routine, or when the sentinel's nudges have accumulated past comfort.
 ---
 
 # Deprecation Stasis Sweep
@@ -69,29 +69,14 @@ Dispatch one `deprecation-triage` (Opus) at a time for focused concerns, or
 fan out in parallel when concerns are independent (different packages,
 different projects).
 
-### 1b. CI findings ledger (instantiation B — same loop, three asymmetries)
-
-Run `python3 .claude/scripts/ci-harvest.py` first (fresh evidence), then
-scoreboard `.claude/data/ci-findings.jsonl` the same way. The CI class
-differs in three ways:
-
-1. **Dispatch target** is `ci-failure-triage` (it composes the read-only
-   ci-observer/ci-investigator analysts; museum gate before novel root
-   causes).
-2. **Closure is by disappearance, and the SWEEP owns it** — the computable
-   rule (build-number arithmetic lies across aborted-build gaps): an entry
-   with `status: triaged` is a CONFIRMED fix when
-   `cursor.green_streak.<job> >= 3` (the harvester's consecutive-green
-   counter) AND `last_build <= triaged_at_build` (no recurrence since the
-   fix — `triaged_at_build` is stamped by ci-failure-triage when it sets
-   triaged). Confirmed → decompose here (delete ledger line + backlog entry;
-   graduate genuinely-recurring lessons to the anti-patterns museum record,
-   not chronicle). A `triaged` entry with `last_build > triaged_at_build`
-   RECURRED — the fix didn't take: set it back to `open` and re-dispatch.
-3. **Flake evidence is deterministic**: `seen` count + `first_build..
-   last_build` spread (harvester-owned) + `getFlakyFailures` cross-check —
-   read it before any verdict; never re-derive what the ledger already
-   counted.
+> **CI findings are NOT this sweep's class.** That ledger
+> (`.claude/data/ci-findings.jsonl`) closes deterministically inside
+> `ci-harvest.py` (confirmation-by-disappearance via green streaks;
+> recurrence-reopen) and its open items drain under the
+> **agentic-developer loop's CI findings rails** (floor: pass/unstable/fail
+> ratios; ceiling: brainstorming-confidence) — see
+> `.claude/skills/agentic-developer/SKILL.md` and the findings-sentinel
+> pattern spec §3.3.
 
 ### 3. Re-measure and decide
 

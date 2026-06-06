@@ -53,6 +53,8 @@ JOBS = [
     "elohim-storybook",
 ]
 RED = {"FAILURE", "UNSTABLE"}
+CONFIRM_STREAK = 3  # consecutive greens that confirm a triaged fix (disappearance)
+RECENT_WINDOW = 15  # rolling per-job result window (pass/unstable/fail ratio rails)
 SHALLOW_INIT = 5  # first run: look back this many builds, never full history
 MAX_BUILDS_PER_JOB = 10  # per harvest run
 MAX_NEW_FINDINGS = 12  # ledger appends per run (per-build console findings also capped)
@@ -315,15 +317,47 @@ def reconcile(results, cursor):
         if r["green"]:
             cursor["green"][r["job"]] = max(cursor["green"].get(r["job"], 0), r["green"])
         # Consecutive-green streak per job (the COMPUTABLE disappearance
-        # evidence — build-number arithmetic lies across aborted gaps).
-        # The sweep confirms a triaged fix when the job's streak reaches
-        # its threshold after the fix landed.
+        # evidence — build-number arithmetic lies across aborted gaps) and
+        # the rolling result window (pass/unstable/fail ratio = the
+        # agentic-developer loop's FLOOR rail).
         streaks = cursor.setdefault("green_streak", {})
+        recent = cursor.setdefault("recent", {})
         for _n, res in r.get("sequence", []):
             if res == "SUCCESS":
                 streaks[r["job"]] = streaks.get(r["job"], 0) + 1
             else:
                 streaks[r["job"]] = 0
+            window = recent.setdefault(r["job"], [])
+            window.append(res)
+            del window[:-RECENT_WINDOW]
+
+    # Deterministic lifecycle — no agent, no ceremony (spec §3.3):
+    # confirmation-by-disappearance and recurrence-reopen are computable.
+    confirmed, reopened, kept = [], [], []
+    for e in entries:
+        if e.get("class") == "ci-failure" and e.get("status") == "triaged":
+            tab = e.get("triaged_at_build")
+            if tab is not None and e.get("last_build", 0) > tab:
+                e["status"] = "open"  # recurred after the fix — it didn't take
+                reopened.append(e)
+            elif (
+                tab is not None
+                and cursor.get("green_streak", {}).get(e.get("job", ""), 0) >= CONFIRM_STREAK
+            ):
+                confirmed.append(e)  # decomposed — ledger line not kept
+                # Judgment was made ONCE at triage time: decompose_on_confirm
+                # means no museum-worthy lesson — the backlog entry deletes
+                # deterministically too. Otherwise the entry is reported for
+                # graduate-then-decompose.
+                bl = e.get("backlog")
+                if e.get("decompose_on_confirm") and bl:
+                    try:
+                        os.remove(os.path.join(PROJECT, bl))
+                    except OSError:
+                        pass
+                continue
+        kept.append(e)
+    entries = kept
     write_jsonl(LEDGER_PATH, entries)
     os.makedirs(os.path.dirname(CURSOR_PATH), exist_ok=True)
     tmp = CURSOR_PATH + ".tmp"
@@ -332,10 +366,10 @@ def reconcile(results, cursor):
     os.replace(tmp, CURSOR_PATH)
     fcntl.flock(lock, fcntl.LOCK_UN)
     lock.close()
-    return new_entries, bumped
+    return new_entries, bumped, confirmed, reopened
 
 
-def render(results, new_entries, bumped, as_hook):
+def render(results, new_entries, bumped, confirmed, reopened, as_hook):
     urgent = [r for r in results if r["urgent"]]
     parts, sys_parts = [], []
     if urgent:
@@ -372,6 +406,25 @@ def render(results, new_entries, bumped, as_hook):
         sys_parts.append(f"+{len(new_entries)} new finding(s) → ci-failure-triage dispatch")
     if bumped:
         sys_parts.append(f"{len(bumped)} known finding(s) recurred (flake evidence)")
+    if reopened:
+        fps = ", ".join(e["fp"] for e in reopened)
+        parts.append(
+            f"[ci-harvest] {len(reopened)} triaged fix(es) RECURRED — reopened: {fps}. "
+            f"The fix didn't take; re-dispatch ci-failure-triage for these."
+        )
+        sys_parts.append(f"{len(reopened)} triaged finding(s) recurred → reopened")
+    if confirmed:
+        graduate = [e for e in confirmed if not e.get("decompose_on_confirm") and e.get("backlog")]
+        sys_parts.append(
+            f"{len(confirmed)} fix(es) CONFIRMED by disappearance (green streak) → decomposed"
+        )
+        if graduate:
+            paths = ", ".join(e["backlog"] for e in graduate)
+            parts.append(
+                f"[ci-harvest] confirmed-fixed backlog entr(ies) awaiting graduation "
+                f"judgment before decompose: {paths} — graduate the lesson to the "
+                f"anti-patterns museum if worthy, then delete the entry."
+            )
     if not parts and not sys_parts:
         return None
     if as_hook:
@@ -396,8 +449,8 @@ def run_harvest(jobs, as_hook):
     taxonomy = load_taxonomy()
     with ThreadPoolExecutor(max_workers=6) as ex:
         results = list(ex.map(lambda j: harvest_job(j, cursor, taxonomy), jobs))
-    new_entries, bumped = reconcile(results, cursor)
-    rendered = render(results, new_entries, bumped, as_hook)
+    new_entries, bumped, confirmed, reopened = reconcile(results, cursor)
+    rendered = render(results, new_entries, bumped, confirmed, reopened, as_hook)
     if rendered:
         print(rendered)
     elif not as_hook:

@@ -116,13 +116,29 @@ same decomposition-at-close, plus CI-domain specifics:
   frequency-ranked list is exactly this pattern's chronicle-equivalent) —
   extend the museum, never fork a second lessons doc.
 
-### 3.3 Sweep — extend `deprecation-stasis`
+### 3.3 Stasis home — the agentic-developer loop's rails (operator revision, 2026-06-06)
 
-One findings-stasis discipline, two ledgers: the existing skill gains the CI
-scoreboard (both JSONL files), the disappearance-confirmation close
-(`triaged` + gone-for-≥3-builds → decompose), and flake-evidence reading
-(`seen` counts + `getFlakyFailures` cross-check). Renaming the skill to
-`findings-stasis` is deferred until the name grates.
+CI stasis does NOT live in `deprecation-stasis` (that sweep stays
+instantiation-A-only). Two-part replacement:
+
+1. **Closure is fully deterministic — it lives in the harvester.**
+   Confirmation-by-disappearance (`green_streak.<job> ≥ 3` with no recurrence
+   past `triaged_at_build`) deletes the ledger line; recurrence
+   (`last_build > triaged_at_build`) reopens to `open`. Backlog decompose
+   rides the `decompose_on_confirm` stamp the triage agent set at fix time
+   (judgment made once, executed deterministically); unstamped entries are
+   reported for graduate-then-decompose. No agent or ceremony owns CI
+   closure.
+2. **Draining lives in the agentic-developer loop as floor/ceiling rails**
+   (SKILL.md §"CI findings rails"): the harvester's `recent.<job>` rolling
+   windows give the **floor** — pass/unstable/fail ratios the shift must hold
+   or raise (never leave touched jobs below where it found them; open
+   findings on touched jobs are in-scope candidates, prioritized by `seen`);
+   **ceiling** — brainstorming confidence: a finding whose resolution is
+   design-shaped (low confidence after verify, architecture/substrate/
+   cross-cutting) is above the ceiling — stop iterating, capture as
+   needs-brainstorm (`ci_status: blocked` + the design question), route to
+   /brainstorm. Stasis = riding between the rails with the ledger draining.
 
 ## 4. Testing
 
