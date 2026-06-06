@@ -70,3 +70,15 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     When the learner follows the View Resource Details link
     Then the cross-pillar resource viewer renders
     And the rendered surface is not a raw error response
+
+  @browser-only @regression
+  Scenario: A monolith-era resource share still lands on rendered content
+    # Constraint (story-harvest, Slice 2): an absolute redirectTo inside a
+    # based bundle's router re-enters the SAME router and self-loops — it can
+    # never escape the bundle. /lamad/resource/{id} was the monolith-era
+    # canonical content URL (real shares exist); the legacy bridge COMPONENT
+    # hands off to the universal /epr/{id} address instead. If this scenario
+    # stops passing, the bridge died or the constraint moved.
+    Given a learner opens the deep link "/lamad/resource/fct-module-01-church-dilemma"
+    Then the cross-pillar resource viewer renders
+    And the rendered surface is not a raw error response
