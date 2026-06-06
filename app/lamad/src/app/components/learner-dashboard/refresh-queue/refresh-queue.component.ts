@@ -1,6 +1,5 @@
 import { AsyncPipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { RouterModule } from '@angular/router';
 
 // @coverage: 38.5% (2026-03-03)
 
@@ -17,7 +16,7 @@ import type { ContentMastery } from '../../../models';
 @Component({
   selector: 'app-refresh-queue',
   standalone: true,
-  imports: [AsyncPipe, RouterModule],
+  imports: [AsyncPipe],
   template: `
     <div class="refresh-queue">
       <h3 class="queue-title">Practice Queue</h3>
@@ -43,8 +42,9 @@ import type { ContentMastery } from '../../../models';
                   </div>
                 </div>
                 <a
-                  [routerLink]="['/resource', item.contentId]"
+                  [attr.href]="'/epr/' + item.contentId"
                   class="practice-link"
+                  data-testid="practice-link"
                   title="Practice this content"
                 >
                   <span class="material-icons">play_arrow</span>

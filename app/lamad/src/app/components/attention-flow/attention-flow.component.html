@@ -18,7 +18,7 @@
       <a
         *ngFor="let event of events"
         class="event-item"
-        [routerLink]="['/resource', event.contentId]"
+        [attr.href]="'/epr/' + event.contentId"
         data-testid="attention-event"
       >
         <span class="event-icon">{{ getEventIcon(event) }}</span>

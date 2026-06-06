@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { RouterModule } from '@angular/router';
 
 import type { EconomicEventView } from '@elohim/storage-client/generated';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
@@ -16,7 +15,7 @@ import { EventService } from '@elohim/rea-runtime';
 @Component({
   selector: 'app-attention-flow',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule],
   templateUrl: './attention-flow.component.html',
   styleUrls: ['./attention-flow.component.css'],
 })

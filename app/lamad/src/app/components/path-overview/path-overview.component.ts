@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 // @coverage: 45.1% (2026-03-03)
 
@@ -128,7 +128,7 @@ interface ChapterDisplay {
 @Component({
   selector: 'app-path-overview',
   standalone: true,
-  imports: [CommonModule, RouterModule, RecommendationListComponent],
+  imports: [CommonModule, RecommendationListComponent],
   templateUrl: './path-overview.component.html',
   styleUrls: ['./path-overview.component.css'],
 })

@@ -20,6 +20,7 @@ import { SearchService } from '../../services/search.service';
           [(ngModel)]="query"
           (keyup.enter)="performSearch()"
           placeholder="Search..."
+          aria-label="Search query"
           class="search-input"
           data-testid="search-input"
         />
@@ -31,7 +32,7 @@ import { SearchService } from '../../services/search.service';
       <div class="results-section" *ngIf="hasSearched">
         <h2>Results ({{ results.length }})</h2>
         <div class="results-list" *ngIf="results.length > 0">
-          <a *ngFor="let result of results" [routerLink]="getNodeRoute(result)" class="result-card">
+          <ng-template #cardBody let-result="result">
             <div class="result-type">
               {{ getNodeTypeIcon(result.contentType) }} {{ result.contentType }}
             </div>
@@ -40,7 +41,15 @@ import { SearchService } from '../../services/search.service';
             <div class="result-tags">
               <span *ngFor="let tag of result.tags.slice(0, 3)" class="tag">{{ tag }}</span>
             </div>
-          </a>
+          </ng-template>
+          <ng-container *ngFor="let result of results">
+            <a *ngIf="getNodeCommands(result) as commands" [routerLink]="commands" class="result-card" data-testid="result-card">
+              <ng-container *ngTemplateOutlet="cardBody; context: { result: result }"></ng-container>
+            </a>
+            <a *ngIf="!getNodeCommands(result)" [attr.href]="getNodeHref(result)" class="result-card" data-testid="result-card">
+              <ng-container *ngTemplateOutlet="cardBody; context: { result: result }"></ng-container>
+            </a>
+          </ng-container>
         </div>
         <div class="no-results" *ngIf="results.length === 0">
           <p>No results found for "{{ query }}"</p>
@@ -171,14 +180,14 @@ export class SearchComponent implements OnInit {
     });
   }
 
-  getNodeRoute(result: SearchResult): string[] {
-    // Route paths to path overview, content to content viewer
-    if (result.contentType === 'path') {
-      return ['/path', result.id];
-    }
-    // TODO(#12-6 Slice 2): direct content is a cross-bundle target (shell /resource) —
-    // replace with BundleRouteContext claims / universal /epr route per spec §12.3.
-    return ['/resource', result.id];
+  /** In-bundle commands for path results; null for cross-bundle content (§12.3). */
+  getNodeCommands(result: SearchResult): string[] | null {
+    return result.contentType === 'path' ? ['/path', result.id] : null;
+  }
+
+  /** Universal address for cross-bundle content results. */
+  getNodeHref(result: SearchResult): string {
+    return `/epr/${encodeURIComponent(result.id)}`;
   }
 
   getNodeTypeIcon(type: string): string {

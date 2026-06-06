@@ -21,7 +21,7 @@
 
     <div class="profile-actions">
       <a
-        routerLink="/identity/profile"
+        href="/identity/profile"
         class="btn-link identity-link"
         data-testid="profile-identity-link"
       >
@@ -332,6 +332,7 @@
                     <a
                       [routerLink]="['/path', path.pathId, 'step', path.currentStepIndex]"
                       class="path-card-action"
+                      data-testid="profile-path-continue"
                     >
                       Continue
                       <span class="material-icons">arrow_forward</span>
@@ -380,6 +381,7 @@
                     <a
                       [routerLink]="['/path', path.pathId]"
                       class="path-card-action path-card-action--review"
+                      data-testid="profile-path-review"
                     >
                       Review
                       <span class="material-icons">visibility</span>
@@ -418,6 +420,7 @@
                     <a
                       [routerLink]="['/path', path.pathId]"
                       class="path-card-action path-card-action--start"
+                      data-testid="profile-path-start"
                     >
                       Start Path
                       <span class="material-icons">arrow_forward</span>
@@ -477,17 +480,25 @@
                     <p class="timeline-event-description">{{ event.description }}</p>
                   }
                   @if (event.resourceId) {
-                    <a
-                      [routerLink]="
-                        event.resourceType === 'path'
-                          ? ['/path', event.resourceId]
-                          : ['/content', event.resourceId]
-                      "
-                      class="timeline-event-link"
-                    >
-                      View {{ event.resourceType }}
-                      <span class="material-icons">open_in_new</span>
-                    </a>
+                    @if (event.resourceType === 'path') {
+                      <a
+                        [routerLink]="['/path', event.resourceId]"
+                        class="timeline-event-link"
+                        data-testid="timeline-event-link"
+                      >
+                        View {{ event.resourceType }}
+                        <span class="material-icons">open_in_new</span>
+                      </a>
+                    } @else {
+                      <a
+                        [attr.href]="'/epr/' + event.resourceId"
+                        class="timeline-event-link"
+                        data-testid="timeline-event-link"
+                      >
+                        View {{ event.resourceType }}
+                        <span class="material-icons">open_in_new</span>
+                      </a>
+                    }
                   }
                 </div>
               </div>

@@ -147,20 +147,33 @@ describe('SearchComponent', () => {
     }));
   });
 
-  describe('getNodeRoute', () => {
-    it('should return correct route array', () => {
-      const result = {
-        id: 'test-id',
-        title: 'Test',
-        description: 'Desc',
-        contentType: 'epic',
-        tags: [],
-      } as unknown as SearchResult;
+  describe('getNodeCommands / getNodeHref', () => {
+    const contentResult = {
+      id: 'test-id',
+      title: 'Test',
+      description: 'Desc',
+      contentType: 'epic',
+      tags: [],
+    } as unknown as SearchResult;
 
-      const route = component.getNodeRoute(result);
+    const pathResult = {
+      id: 'path-id',
+      title: 'A Path',
+      description: 'Desc',
+      contentType: 'path',
+      tags: [],
+    } as unknown as SearchResult;
 
-      // Cross-bundle target (shell /resource) — TODO(#12-6 Slice 2): claims rewrite per spec §12.3.
-      expect(route).toEqual(['/resource', 'test-id']);
+    it('should return null commands for cross-bundle content', () => {
+      expect(component.getNodeCommands(contentResult)).toBeNull();
+    });
+
+    it('should return universal /epr href for cross-bundle content', () => {
+      expect(component.getNodeHref(contentResult)).toBe('/epr/test-id');
+    });
+
+    it('should return in-bundle commands for path results', () => {
+      expect(component.getNodeCommands(pathResult)).toEqual(['/path', 'path-id']);
     });
   });
 
