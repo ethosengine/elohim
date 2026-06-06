@@ -11,7 +11,12 @@ import { apiBaseUrlInterceptor } from './elohim/interceptors/api-base-url.interc
 import { CONTENT_ATTESTATION } from '@elohim/service';
 import { GOVERNANCE } from '@elohim/service';
 import { ELOHIM_ENV } from '@elohim/service';
-import { provideElohimClient, detectClientMode } from './elohim/providers/elohim-client.provider';
+import {
+  provideElohimClient,
+  detectClientMode,
+  ELOHIM_CLIENT as LOCAL_ELOHIM_CLIENT,
+} from './elohim/providers/elohim-client.provider';
+import { ELOHIM_CLIENT } from '@elohim/service';
 import { ContentAttestationApiService } from './elohim/services/content-attestation-api.service';
 import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
 import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
@@ -22,11 +27,29 @@ import { HeliaFetchService } from './elohim/services/helia-fetch.service';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
 import { ContentIOModuleWithPlugins } from '@app/lamad/content-io/content-io.module';
-import { LAMAD_HOLOCHAIN_CLIENT } from '@app/lamad/interfaces/cross-pillar.interface';
-import { ECONOMIC_EVENT_FACTORY, EVENT_API } from '@elohim/rea-runtime';
+import {
+  LAMAD_HOLOCHAIN_CLIENT,
+  LAMAD_AFFINITY_TRACKING,
+  LAMAD_EPR_RESOLVER,
+  LAMAD_EPR_NAV,
+  LAMAD_GOVERNANCE,
+  LAMAD_GOVERNANCE_SIGNAL,
+  LAMAD_CONTEXT_ASSEMBLY,
+} from '@app/lamad/interfaces/cross-pillar.interface';
+import { LAMAD_AGENT } from '@app/lamad/interfaces/agent.interface';
+import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '@app/lamad/interfaces/storage.interface';
+import { ECONOMIC_EVENT_FACTORY, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
 import { BUNDLE_ROUTE_CONTEXT, type BundleRouteContext } from '@elohim/service';
 import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
 import { StorageApiService } from './elohim/services/storage-api.service';
+import { StorageClientService } from './elohim/services/storage-client.service';
+import { AgentService } from './elohim/services/agent.service';
+import { AffinityTrackingService } from './elohim/services/affinity-tracking.service';
+import { EprResolverService } from './elohim/services/epr-resolver.service';
+import { EprNavService } from './elohim/services/epr-nav.service';
+import { GovernanceService } from './elohim/services/governance.service';
+import { GovernanceSignalService } from './elohim/services/governance-signal.service';
+import { ContextAssemblyService } from './elohim/services/context-assembly.service';
 
 /**
  * Resolve the doorway URL at runtime.
@@ -115,6 +138,48 @@ export const appConfig: ApplicationConfig = {
     // HolochainClientService is providedIn:'root' in @app/elohim; this useExisting
     // binding wires the lamad narrow interface to the concrete elohim-app service.
     { provide: LAMAD_HOLOCHAIN_CLIENT, useExisting: HolochainClientService },
+    // §12.3 cross-pillar viewer chain — the shell OWNS the universal /epr and
+    // /resource routes (app.routes.ts), which lazy-load @app/lamad's
+    // ContentViewerComponent. That component + its transitive service chain inject
+    // the lamad narrow tokens below, so the shell's composition root must provide
+    // them exactly as the lamad bundle does (mirrors app/lamad/src/app/app.config.ts).
+    // Each concrete class is providedIn:'root' in @app/elohim; useExisting bridges
+    // the narrow lamad interface to the shell-resolved instance (same pattern as
+    // LAMAD_HOLOCHAIN_CLIENT above). Only the tokens the viewer chain reaches are
+    // provided here — not the full lamad cross-pillar catalog.
+    //
+    // LAMAD_AFFINITY_TRACKING — content-viewer.component (direct inject) +
+    // hierarchical-graph / path-negotiation services.
+    { provide: LAMAD_AFFINITY_TRACKING, useExisting: AffinityTrackingService },
+    // LAMAD_AGENT — content-viewer (direct) + content/trust-badge/signal-harness.
+    { provide: LAMAD_AGENT, useExisting: AgentService },
+    // LAMAD_GOVERNANCE / LAMAD_GOVERNANCE_SIGNAL — content-viewer (direct inject).
+    { provide: LAMAD_GOVERNANCE, useExisting: GovernanceService },
+    { provide: LAMAD_GOVERNANCE_SIGNAL, useExisting: GovernanceSignalService },
+    // LAMAD_EPR_RESOLVER / LAMAD_EPR_NAV — content-viewer (direct) + markdown-renderer.
+    { provide: LAMAD_EPR_RESOLVER, useExisting: EprResolverService },
+    { provide: LAMAD_EPR_NAV, useExisting: EprNavService },
+    // LAMAD_STORAGE_CLIENT — content-viewer (direct) + resilience / household-
+    // resilience / projection-api / content-backend services in the viewer chain.
+    { provide: LAMAD_STORAGE_CLIENT, useExisting: StorageClientService },
+    // LAMAD_STORAGE_API — StewardshipAllocationService (injected by content-viewer).
+    { provide: LAMAD_STORAGE_API, useExisting: StorageApiService },
+    // LAMAD_CONTEXT_ASSEMBLY — ContentEditorService (injected by content-viewer for
+    // edit/reach-negotiation surfaces) injects this token. ContextAssemblyService is
+    // providedIn:'root' in @app/elohim and pulls only concrete root services.
+    { provide: LAMAD_CONTEXT_ASSEMBLY, useExisting: ContextAssemblyService },
+    // AGENT_CONTEXT (rea-runtime) — AttentionTrackerService injects this token and is
+    // injected directly by content-viewer.component. AgentService satisfies
+    // IAgentContext via getCurrentAgentId() (mirrors lamad app.config.ts).
+    { provide: AGENT_CONTEXT, useExisting: AgentService },
+    // §12.3 cross-pillar viewer chain — lamad's ContentBackendService (reached via
+    // DataLoaderService -> ProjectionAPIService) injects the LIBRARY @elohim/service
+    // ELOHIM_CLIENT token, whereas this shell's provideElohimClient registers the
+    // LOCAL @app/elohim provider token. The two tokens share the description
+    // 'ElohimClient' but are distinct object references — this useExisting bridges
+    // the library token to the shell-resolved local instance so both consumers share
+    // one ElohimClient (the mirror-image of lamad app.config.ts's local->library alias).
+    { provide: ELOHIM_CLIENT, useExisting: LOCAL_ELOHIM_CLIENT },
     // Shefa metrics and custodian selection services
     CustodianCommitmentService,
     PerformanceMetricsService,

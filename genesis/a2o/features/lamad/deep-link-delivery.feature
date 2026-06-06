@@ -62,12 +62,19 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
   Scenario: Universal EPR address renders unclaimed types in the shell viewer
     # Spec §5.1: unclaimed contentType stays at the universal address —
     # the shell's cross-pillar resource viewer (safe-by-default floor).
-    Given a learner opens the deep link "/epr/fct-module-01-church-dilemma"
+    Given a learner opens the deep link "/epr/unit-core-principles"
     Then the cross-pillar resource viewer renders
     And the rendered surface is not a raw error response
 
-  @browser-only
+  @browser-only @wip
   Scenario: View Resource Details crosses the bundle boundary
+    # REACH-PINNED (alpha verification 2026-06-06): the FCT step's resource is
+    # community-gated (403 requiredReach:community for anon) — the correct anon
+    # outcome is the §6 gate face (head-edge + inclusive path), which is gap
+    # #6-2 of epr-route-claims-link-conformance-design (deferred). Un-@wip when
+    # the gate face lands (assert the boundary), or run with an authed
+    # community-reach visitor. Today the shell bounces home (the undesigned
+    # boundary this gap names).
     # §12.3 sweep — the lamad step navigator's resource link is a plain href
     # to the universal address; the epr-link interceptor records the handoff
     # and the full doorway load renders the shell viewer. Regression anchor
@@ -86,7 +93,7 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     # canonical content URL (real shares exist); the legacy bridge COMPONENT
     # hands off to the universal /epr/{id} address instead. If this scenario
     # stops passing, the bridge died or the constraint moved.
-    Given a learner opens the deep link "/lamad/resource/fct-module-01-church-dilemma"
+    Given a learner opens the deep link "/lamad/resource/unit-core-principles"
     Then the cross-pillar resource viewer renders
     And the rendered surface is not a raw error response
 
