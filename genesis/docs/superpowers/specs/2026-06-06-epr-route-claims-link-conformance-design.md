@@ -314,6 +314,15 @@ Every gated boundary renders the head-edge + inclusive path (§6.2).
 ### §7.5 Continuous
 - **`sitemap.xml`** — doorway-generated from projections × granted claims × commons-reach
   enumeration (Operational C, derived-by-construction; the static plane becomes enumerable).
+  **Materialization model**: an event-materialized projection, never request-time computation —
+  every sitemap change source is a notarized write event (grant, commons content registration,
+  alias change) already flowing gossip → post-commit signal → SSE → doorway refresh; sitemap
+  regeneration rides those same events (debounced alongside `replace_all`) and `GET /sitemap.xml`
+  is a static cached read with `ETag`/`<lastmod>` from commitment/content timestamps (R1 applied
+  to crawlers; eventual consistency at gossip latency is over-fresh for sitemap consumers).
+  Derived *from* DHT entries, never notarized *as* one — reconstructable by construction, and
+  the swap test holds: any doorway projecting the same commitments materializes the identical
+  sitemap.
 - **The conformance crawler** (a2o) — walks every rendered anchor from the seeded surface set
   against the sitemap expected-set; asserts rendered-surface-or-designed-boundary,
   render-verified (never HTML-shell).
