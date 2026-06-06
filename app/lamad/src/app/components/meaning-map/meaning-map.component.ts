@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, Inject, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
@@ -10,7 +10,9 @@ import { Subject, combineLatest } from 'rxjs';
 
 import {
   LAMAD_AFFINITY_TRACKING,
+  LAMAD_EPR_NAV,
   type ILamadAffinityTracking,
+  type ILamadEprNav,
   type LamadCategoryAffinityStats,
 } from '../../interfaces/cross-pillar.interface';
 import { DataLoaderService } from '../../services/data-loader.service';
@@ -50,6 +52,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
   };
 
   private readonly destroy$ = new Subject<void>();
+  private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
 
   constructor(
     private readonly dataLoader: DataLoaderService,
@@ -184,7 +187,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Navigate to content viewer
    */
   viewContent(node: ContentNodeWithAffinity): void {
-    void this.router.navigate(['/content', node.id]);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(node.id)}`);
   }
 
   /**

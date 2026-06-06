@@ -18,7 +18,9 @@ import { Subject } from 'rxjs';
 
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import {
+  LAMAD_EPR_NAV,
   LAMAD_GOVERNANCE_SIGNAL,
+  type ILamadEprNav,
   type ILamadGovernanceSignal,
 } from '../../interfaces/cross-pillar.interface';
 
@@ -150,6 +152,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   private readonly seoService = inject(SeoService);
   private readonly contentMasteryService = inject(ContentMasteryService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
 
   // Learning signal tracking
   private contentViewStartTime: number | null = null;
@@ -866,10 +869,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       timestamp: new Date().toISOString(),
     });
 
-    // Navigate to the content
-    this.router.navigate(['/resource', contentId]).catch((err: unknown) => {
-      console.error(NAV_FAILED_MSG, err);
-    });
+    // Navigate to the content (cross-bundle handoff — full doorway load).
+    this.eprNav.navigate(`/epr/${encodeURIComponent(contentId)}`);
   }
 
   /**

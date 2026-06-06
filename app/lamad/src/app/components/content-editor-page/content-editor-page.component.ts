@@ -7,8 +7,13 @@ import {
   ViewContainerRef,
   Type,
   ComponentRef,
+  inject,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import {
+  LAMAD_EPR_NAV,
+  type ILamadEprNav,
+} from '../../interfaces/cross-pillar.interface';
 
 // @coverage: 29.3% (2026-03-03)
 
@@ -80,6 +85,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
   private editorRef: ComponentRef<ContentEditorComponent> | null = null;
   private readonly destroy$ = new Subject<void>();
   private readonly SAVE_ERROR_MSG = 'Failed to save';
+  private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -133,7 +139,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
    * Navigate back to the resource view.
    */
   navigateBack(): void {
-    void this.router.navigate(['/resource', this.resourceId]);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(this.resourceId)}`);
   }
 
   /**

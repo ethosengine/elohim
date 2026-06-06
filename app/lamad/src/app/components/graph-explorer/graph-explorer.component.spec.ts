@@ -4,7 +4,7 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { Router, ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { GraphExplorerComponent } from './graph-explorer.component';
-import { LAMAD_AFFINITY_TRACKING } from '../../interfaces/cross-pillar.interface';
+import { LAMAD_AFFINITY_TRACKING, LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
 import { DataLoaderService } from '../../services/data-loader.service';
 import { HierarchicalGraphService } from '../../services/hierarchical-graph.service';
 import { ElementRef } from '@angular/core';
@@ -15,6 +15,7 @@ describe('GraphExplorerComponent', () => {
   let component: GraphExplorerComponent;
   let fixture: ComponentFixture<GraphExplorerComponent>;
   let router: Router;
+  let eprNavSpy: any;
   let affinityService: any;
   let hierarchicalGraphService: any;
   let dataLoaderService: any;
@@ -94,6 +95,10 @@ describe('GraphExplorerComponent', () => {
         { provide: LAMAD_AFFINITY_TRACKING, useValue: affinityServiceSpy },
         { provide: HierarchicalGraphService, useValue: hierarchicalGraphSpy },
         { provide: DataLoaderService, useValue: dataLoaderSpy },
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
+        },
       ],
     }).compileComponents();
 
@@ -140,6 +145,7 @@ describe('GraphExplorerComponent', () => {
     fixture = TestBed.createComponent(GraphExplorerComponent);
     component = fixture.componentInstance;
     router = TestBed.inject(Router);
+    eprNavSpy = TestBed.inject(LAMAD_EPR_NAV);
 
     // Mock the graphContainer with proper read-only properties
     const mockDiv = document.createElement('div');
@@ -260,7 +266,7 @@ describe('GraphExplorerComponent', () => {
 
     component.handleNodeDoubleClick(conceptNode);
 
-    expect(router.navigate).toHaveBeenCalledWith(['/resource', 'concept-1']);
+    expect(eprNavSpy.navigate).toHaveBeenCalledWith('/epr/concept-1');
   });
 
   it('should not navigate for locked nodes', () => {
@@ -756,11 +762,9 @@ describe('GraphExplorerComponent', () => {
 
   describe('navigation to content', () => {
     it('should navigate to content viewer', () => {
-      vi.spyOn(router, 'navigate');
-
       component.navigateToContent('node-123');
 
-      expect(router.navigate).toHaveBeenCalledWith(['/resource', 'node-123']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/epr/node-123');
     });
   });
 

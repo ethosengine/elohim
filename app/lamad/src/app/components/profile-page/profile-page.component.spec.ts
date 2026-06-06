@@ -4,7 +4,7 @@ import { signal } from '@angular/core';
 
 import { of, BehaviorSubject } from 'rxjs';
 
-import { LAMAD_PROFILE, LAMAD_IDENTITY } from '../../interfaces/cross-pillar.interface';
+import { LAMAD_EPR_NAV, LAMAD_PROFILE, LAMAD_IDENTITY } from '../../interfaces/cross-pillar.interface';
 import { SessionHumanService } from '@elohim/identity';
 
 import { ContentMasteryService } from '../../services/content-mastery.service';
@@ -21,6 +21,7 @@ describe('ProfilePageComponent', () => {
   let masteryServiceSpy: any;
   let masteryStatsSpy: any;
   let router: Router;
+  let eprNavSpy: any;
 
   beforeEach(async () => {
     // Mock session observable
@@ -101,10 +102,15 @@ describe('ProfilePageComponent', () => {
         { provide: ContentMasteryService, useValue: masteryServiceSpy },
         { provide: MasteryStatsService, useValue: masteryStatsSpy },
         provideRouter([]),
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
+        },
       ],
     }).compileComponents();
 
     router = TestBed.inject(Router);
+    eprNavSpy = TestBed.inject(LAMAD_EPR_NAV);
     vi.spyOn(router, 'navigate');
 
     fixture = TestBed.createComponent(ProfilePageComponent);
@@ -179,12 +185,12 @@ describe('ProfilePageComponent', () => {
   describe('Navigation', () => {
     it('should navigate to identity profile', () => {
       component.goToIdentityProfile();
-      expect(router.navigate).toHaveBeenCalledWith(['/identity/profile']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/identity/profile');
     });
 
     it('should navigate to registration', () => {
       component.onJoinNetwork();
-      expect(router.navigate).toHaveBeenCalledWith(['/identity/register']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/identity/register');
     });
   });
 

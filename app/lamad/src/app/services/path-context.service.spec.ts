@@ -244,7 +244,7 @@ describe('PathContextService', () => {
       });
 
       const route = service.returnFromDetour();
-      expect(route).toEqual(['/resource', 'related-concept']);
+      expect(route).toEqual(['/epr', 'related-concept']);
       expect(service.detourDepth).toBe(1);
     });
 

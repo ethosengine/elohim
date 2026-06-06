@@ -7,6 +7,7 @@ import { DataLoaderService } from '../../services/data-loader.service';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
 import { ContentFormatRegistryService } from '../../content-io/services/content-format-registry.service';
 import { vi } from 'vitest';
+import { LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
 
 describe('ContentEditorPageComponent', () => {
   let component: ContentEditorPageComponent;
@@ -56,6 +57,10 @@ describe('ContentEditorPageComponent', () => {
         { provide: DataLoaderService, useValue: mockDataLoader },
         { provide: ContentEditorService, useValue: mockEditorService },
         { provide: ContentFormatRegistryService, useValue: mockRegistry },
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
+        },
       ],
     }).compileComponents();
 

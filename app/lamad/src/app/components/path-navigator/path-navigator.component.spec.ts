@@ -9,6 +9,7 @@ import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface'
 import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { DataLoaderService } from '../../services/data-loader.service';
 import {
+  LAMAD_EPR_NAV,
   LAMAD_GOVERNANCE_SIGNAL,
   LAMAD_EPR_RESOLVER,
 } from '../../interfaces/cross-pillar.interface';
@@ -26,6 +27,7 @@ describe('PathNavigatorComponent', () => {
   let agentService: any;
   let contentMasteryService: any;
   let router: Router;
+  let eprNavSpy: any;
   let paramsSubject: BehaviorSubject<any>;
 
   const mockPath: LearningPath = {
@@ -156,6 +158,10 @@ describe('PathNavigatorComponent', () => {
         { provide: GOVERNANCE, useValue: {} },
         { provide: CONTENT_ATTESTATION, useValue: {} },
         {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
+        },
+        {
           provide: LAMAD_STORAGE_CLIENT,
           useValue: {
             getBlobUrl: (h: string) => `https://test/blob/${h}`,
@@ -187,6 +193,7 @@ describe('PathNavigatorComponent', () => {
       [K in keyof ContentMasteryService]?: Mock;
     };
     router = TestBed.inject(Router);
+    eprNavSpy = TestBed.inject(LAMAD_EPR_NAV);
     vi.spyOn(router, 'navigate').mockReturnValue(Promise.resolve(true));
 
     pathService.getPath.mockReturnValue(of(mockPath));
@@ -590,7 +597,7 @@ describe('PathNavigatorComponent', () => {
           detourType: 'related',
         })
       );
-      expect(router.navigate).toHaveBeenCalledWith(['/resource', 'related-node-1']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/epr/related-node-1');
     });
 
     it('should handle explore in graph event', () => {

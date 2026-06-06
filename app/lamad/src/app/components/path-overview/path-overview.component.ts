@@ -10,6 +10,10 @@ import { Subject, forkJoin } from 'rxjs';
 
 import { AgentProgress, MasteryLevel, MasteryTier } from '@elohim/service/angular/models/agent.model';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
+import {
+  LAMAD_EPR_NAV,
+  type ILamadEprNav,
+} from '../../interfaces/cross-pillar.interface';
 
 import { SeoService } from '../../shared/services/seo.service';
 import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
@@ -170,6 +174,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   private readonly contentMasteryService = inject(ContentMasteryService);
   private readonly adaptationService = inject(PathAdaptationService);
   private readonly agentService: ILamadAgent = inject(LAMAD_AGENT);
+  private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
 
   /** Base route for path navigation */
   private readonly PATH_ROUTE = '/path';
@@ -738,8 +743,8 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     if (step) {
       void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.order]);
     } else {
-      // Fallback to direct resource view if no matching step found
-      void this.router.navigate(['/resource', conceptId]);
+      // Fallback to the universal resource view if no matching step found
+      this.eprNav.navigate(`/epr/${encodeURIComponent(conceptId)}`);
     }
   }
 

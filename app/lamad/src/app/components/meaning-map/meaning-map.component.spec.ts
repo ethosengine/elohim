@@ -4,7 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
 import { ContentIndex, DataLoaderService } from '../../services/data-loader.service';
-import { LAMAD_AFFINITY_TRACKING } from '../../interfaces/cross-pillar.interface';
+import { LAMAD_AFFINITY_TRACKING, LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
 import { ContentNode } from '../../models/content-node.model';
 import { vi, Mock } from 'vitest';
 
@@ -14,6 +14,7 @@ describe('MeaningMapComponent', () => {
   let dataLoaderSpy: any;
   let affinityServiceSpy: any;
   let routerSpy: any;
+  let eprNavSpy: any;
   let affinitySubject: BehaviorSubject<Map<string, number>>;
 
   const mockNodes: ContentNode[] = [
@@ -92,12 +93,17 @@ describe('MeaningMapComponent', () => {
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: LAMAD_AFFINITY_TRACKING, useValue: affinitySpyObj },
         { provide: Router, useValue: routerSpyObj },
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
+        },
       ],
     }).compileComponents();
 
     dataLoaderSpy = TestBed.inject(DataLoaderService) as any;
     affinityServiceSpy = TestBed.inject(LAMAD_AFFINITY_TRACKING) as any;
     routerSpy = TestBed.inject(Router) as any;
+    eprNavSpy = TestBed.inject(LAMAD_EPR_NAV) as any;
 
     fixture = TestBed.createComponent(MeaningMapComponent);
     component = fixture.componentInstance;
@@ -193,7 +199,7 @@ describe('MeaningMapComponent', () => {
       const node = { ...mockNodes[0], affinity: 0.5, affinityLevel: 'medium' as const };
       component.viewContent(node);
 
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/content', 'node-1']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/epr/node-1');
     }));
   });
 

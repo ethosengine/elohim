@@ -172,7 +172,7 @@ export class PathContextService {
     // If there are more detours, return to the previous detour's content
     if (current.detourStack.length > 0) {
       const previousDetour = current.detourStack.at(-1)!;
-      return ['/resource', previousDetour.toContentId];
+      return ['/epr', previousDetour.toContentId];
     }
 
     // No more detours - return to the path
@@ -253,7 +253,7 @@ export class PathContextService {
         const detour = current.detourStack[i];
         breadcrumbs.push({
           label: `Exploring: ${detour.toContentId}`,
-          route: ['/resource', detour.toContentId],
+          route: ['/epr', detour.toContentId],
           isDetour: true,
           isCurrent: i === current.detourStack.length - 1,
         });

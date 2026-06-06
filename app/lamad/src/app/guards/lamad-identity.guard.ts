@@ -15,12 +15,13 @@
  */
 
 import { inject } from '@angular/core';
-import { Router, type CanActivateFn, type UrlTree } from '@angular/router';
+import { type CanActivateFn } from '@angular/router';
 
+import { LAMAD_EPR_NAV } from '../interfaces/cross-pillar.interface';
 import { LAMAD_IDENTITY } from '../interfaces/cross-pillar.interface';
 import { isNetworkMode } from '../utils/identity.utils';
 
-/** Login route for unauthenticated users. */
+/** Login route for unauthenticated users (shell mount — cross-bundle from lamad). */
 const LOGIN_ROUTE = '/identity/login';
 
 /**
@@ -29,16 +30,18 @@ const LOGIN_ROUTE = '/identity/login';
  * Delegates identity state to the LAMAD_IDENTITY token — the concrete binding
  * (IdentityService) is registered in app.config.ts.
  */
-export const lamadIdentityGuard: CanActivateFn = (route, state): boolean | UrlTree => {
+export const lamadIdentityGuard: CanActivateFn = (_route, state): boolean => {
   const identityService = inject(LAMAD_IDENTITY);
-  const router = inject(Router);
+  const eprNav = inject(LAMAD_EPR_NAV);
 
   const mode = identityService.mode();
   if (isNetworkMode(mode) && identityService.isAuthenticated()) {
     return true;
   }
 
-  return router.createUrlTree([LOGIN_ROUTE], {
-    queryParams: { returnUrl: state.url },
-  });
+  // /identity lives in the shell: full-load handoff with the PUBLIC return URL
+  // (state.url is base-stripped — re-prefix the /lamad mount).
+  const returnUrl = encodeURIComponent(`/lamad${state.url}`);
+  eprNav.navigate(`${LOGIN_ROUTE}?returnUrl=${returnUrl}`);
+  return false;
 };

@@ -5,6 +5,7 @@ import { PathOverviewComponent } from './path-overview.component';
 import { PathService } from '../../services/path.service';
 import { PathAdaptationService } from '../../quiz-engine/services/path-adaptation.service';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
+import { LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
 import { SeoService } from '../../shared/services/seo.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { LearningPath } from '../../models';
@@ -190,6 +191,10 @@ describe('PathOverviewComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: { params: paramsSubject.asObservable() },
+        },
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
         },
       ],
     }).compileComponents();

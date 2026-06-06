@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Inject, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, inject, Inject, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 // @coverage: 84.6% (2026-03-03)
@@ -11,7 +11,9 @@ import { Subject } from 'rxjs';
 
 import {
   LAMAD_AFFINITY_TRACKING,
+  LAMAD_EPR_NAV,
   type ILamadAffinityTracking,
+  type ILamadEprNav,
 } from '../../interfaces/cross-pillar.interface';
 import { DataLoaderService } from '../../services/data-loader.service';
 
@@ -91,6 +93,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
   private zoom!: d3.ZoomBehavior<SVGSVGElement, unknown>;
 
   private readonly destroy$ = new Subject<void>();
+  private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -825,7 +828,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    * Navigate to content viewer.
    */
   navigateToContent(nodeId: string): void {
-    void this.router.navigate(['/resource', nodeId]);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(nodeId)}`);
   }
 
   /**

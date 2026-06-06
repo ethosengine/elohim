@@ -27,10 +27,12 @@ import { TrustBadge } from '../../models/trust-badge.model';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import {
   LAMAD_AFFINITY_TRACKING,
+  LAMAD_EPR_NAV,
   LAMAD_EPR_RESOLVER,
   LAMAD_GOVERNANCE_SIGNAL,
   LAMAD_GOVERNANCE,
   type ILamadAffinityTracking,
+  type ILamadEprNav,
   type ILamadEprResolver,
   type ILamadGovernanceSignal,
   type ILamadGovernance,
@@ -221,6 +223,7 @@ export class ContentViewerComponent
   private readonly householdResilienceService = inject(HouseholdResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
+  private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
   private readonly eventService = inject(EventService);
   private readonly storageClient: ILamadStorageClient = inject(LAMAD_STORAGE_CLIENT);
   private readonly governanceApi = inject(GovernanceApiService);
@@ -967,7 +970,8 @@ export class ContentViewerComponent
    */
   handleAction(action: { route?: string }): void {
     if (action.route) {
-      void this.router.navigate([action.route]);
+      // Dynamic target (trust-badge config) — eprNav decides in-bundle vs handoff.
+      this.eprNav.navigate(action.route);
     }
   }
 
@@ -1037,7 +1041,7 @@ export class ContentViewerComponent
    * Navigate to related content
    */
   viewRelatedContent(node: ContentNode): void {
-    void this.router.navigate(['/content', node.id]);
+    this.eprNav.navigate(`/epr/${encodeURIComponent(node.id)}`);
   }
 
   /**
@@ -1223,7 +1227,7 @@ export class ContentViewerComponent
   returnToPath(): void {
     const returnRoute = this.pathContextService.returnToPath();
     if (returnRoute) {
-      void this.router.navigate(returnRoute);
+      this.eprNav.navigate(returnRoute);
     }
   }
 
@@ -1241,8 +1245,8 @@ export class ContentViewerComponent
       });
     }
 
-    // Navigate to the selected content
-    void this.router.navigate(['/resource', nodeId]);
+    // Navigate to the selected content (cross-bundle: shell resource viewer).
+    this.eprNav.navigate(`/epr/${encodeURIComponent(nodeId)}`);
   }
 
   /**

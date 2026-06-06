@@ -6,6 +6,7 @@ import { of, Subject, throwError } from 'rxjs';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import {
   LAMAD_AFFINITY_TRACKING,
+  LAMAD_EPR_NAV,
   LAMAD_EPR_RESOLVER,
   LAMAD_GOVERNANCE_SIGNAL,
   LAMAD_GOVERNANCE,
@@ -43,6 +44,7 @@ describe('ContentViewerComponent', () => {
   let stewardshipServiceSpy: any;
   let householdResilienceServiceSpy: any;
   let governanceApiSpy: any;
+  let eprNavSpy: any;
   let affinityChangesSubject: Subject<any>;
   let pathContextSubject: Subject<any>;
 
@@ -262,6 +264,10 @@ describe('ContentViewerComponent', () => {
             queryParams: of({}),
           },
         },
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
+        },
       ],
     }).compileComponents();
 
@@ -275,6 +281,7 @@ describe('ContentViewerComponent', () => {
     pathContextServiceSpy = TestBed.inject(PathContextService);
     rendererRegistrySpy = TestBed.inject(RendererRegistryService);
     routerSpy = TestBed.inject(Router);
+    eprNavSpy = TestBed.inject(LAMAD_EPR_NAV);
     stewardshipServiceSpy = TestBed.inject(StewardshipAllocationService);
     householdResilienceServiceSpy = TestBed.inject(HouseholdResilienceService);
     governanceApiSpy = TestBed.inject(GovernanceApiService);
@@ -395,7 +402,7 @@ describe('ContentViewerComponent', () => {
 
     it('should navigate to related content', () => {
       component.viewRelatedContent(mockRelatedNode);
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/content', 'related-1']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/epr/related-1');
     });
 
     it('should navigate to path', () => {
@@ -555,7 +562,7 @@ describe('ContentViewerComponent', () => {
   describe('action handling', () => {
     it('should navigate on action with route', () => {
       component.handleAction({ route: '/some/route' });
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/some/route']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/some/route');
     });
 
     it('should handle action without route gracefully', () => {
@@ -727,7 +734,7 @@ describe('ContentViewerComponent', () => {
       component.returnToPath();
 
       expect(pathContextServiceSpy.returnToPath).toHaveBeenCalled();
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/path', 'test-path', 'step', '2']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith(['/path', 'test-path', 'step', '2']);
     });
 
     it('should not navigate if no return path', () => {
@@ -736,7 +743,7 @@ describe('ContentViewerComponent', () => {
 
       component.returnToPath();
 
-      expect(routerSpy.navigate).not.toHaveBeenCalled();
+      expect(eprNavSpy.navigate).not.toHaveBeenCalled();
     });
 
     it('should track detour when selecting graph node', () => {
@@ -759,7 +766,7 @@ describe('ContentViewerComponent', () => {
           detourType: 'related',
         })
       );
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/resource', 'related-node']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/epr/related-node');
     });
 
     it('should track detour when exploring in graph', () => {
@@ -801,7 +808,7 @@ describe('ContentViewerComponent', () => {
       component.onGraphNodeSelected('related-node');
 
       expect(pathContextServiceSpy.startDetour).not.toHaveBeenCalled();
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/resource', 'related-node']);
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/epr/related-node');
     });
 
     it('should not explore in graph if no nodeId', () => {

@@ -9,8 +9,10 @@ import { takeUntil, catchError } from 'rxjs/operators';
 import { Subject, of } from 'rxjs';
 
 import {
+  LAMAD_EPR_NAV,
   LAMAD_PROFILE,
   LAMAD_IDENTITY,
+  type ILamadEprNav,
   type ILamadProfile,
   type ILamadIdentity,
   type LamadResumePoint,
@@ -52,6 +54,7 @@ import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile
 export class ProfilePageComponent implements OnInit, OnDestroy {
   readonly identityService: ILamadIdentity = inject(LAMAD_IDENTITY); // Public for template access
   private readonly router = inject(Router);
+  private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
 
   // Tab management
   activeTab: 'overview' | 'paths' | 'timeline' = 'overview';
@@ -282,12 +285,12 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
 
   /** Navigate to identity profile for editing */
   goToIdentityProfile(): void {
-    void this.router.navigate(['/identity/profile']);
+    this.eprNav.navigate('/identity/profile');
   }
 
   /** Navigate to registration for network upgrade */
   onJoinNetwork(): void {
-    void this.router.navigate(['/identity/register']);
+    this.eprNav.navigate('/identity/register');
   }
 
   // =========================================================================
