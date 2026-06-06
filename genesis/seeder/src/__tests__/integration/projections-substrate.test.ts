@@ -135,6 +135,8 @@ describe.skipIf(!RUN_INTEGRATION)(
         baseHref: '/gated/',
         entryFile: 'index.html',
         redirectsFrom: [],
+        routeClaims: null,
+        redirectTemplates: [],
         previewEprRef: null,
         gateHints: [],       // empty — invalid for non-commons
         deadEnd: false,      // not flagged either
