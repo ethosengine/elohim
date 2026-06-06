@@ -16,25 +16,29 @@ describe('App Routes', () => {
     expect(lamadRoute).toBeUndefined();
   });
 
-  // TODO(#12-6 Slice 2): the shell has no top-level `path`/`path/:id` route —
-  // `path`-shaped EPR routes minted by eprToRoute()/resolveInContext() (e.g.
-  // `['/path', id]`, spec §12.3) render only inside the lamad bundle (base href
-  // `/lamad/`). From the shell they hit the `**` catch-all. Cross-bundle anchors
-  // are now handled by the epr-link interceptor + EprNavService (2026-06-05
-  // omnibar-consolidation spec §4) pending the Slice-2 /epr resolver; NOT a
-  // regression: the prior `/lamad/path` literal was equally unreachable here.
+  // §12.6 Slice 2 (landed): the shell still has no top-level `path` route —
+  // path-claimed EPRs render only inside the lamad bundle. Unclaimed refs now
+  // mint the universal /epr/:resourceId route (BundleRouteContext, spec §12.3);
+  // cross-bundle anchors ride the epr-link interceptor + EprNavService
+  // (2026-06-05 omnibar-consolidation spec §4).
   // This canary pins the absence so a stray shell `path` route (or a regression
   // that silently makes these links "work" by accident) is caught.
-  it('should NOT have a top-level path route (lamad-bundle-only until Slice 2 /epr resolver)', () => {
+  it('should NOT have a top-level path route (path is lamad-claimed)', () => {
     const pathRoute = routes.find(r => r.path === 'path' || r.path?.startsWith('path/'));
     expect(pathRoute).toBeUndefined();
   });
 
   it('should have correct number of routes', () => {
     // home, community, shefa, identity, account, doorway, avodah,
-    // auth/callback, deliver/:slug, resource/:resourceId, map, resolve,
-    // and 404 catch-all
-    expect(routes.length).toBe(13);
+    // auth/callback, deliver/:slug, resource/:resourceId, epr/:resourceId,
+    // map, resolve, and 404 catch-all
+    expect(routes.length).toBe(14);
+  });
+
+  it('should have the universal epr/:resourceId route (§12.6 Slice 2)', () => {
+    const eprRoute = routes.find(r => r.path === 'epr/:resourceId');
+    expect(eprRoute).toBeDefined();
+    expect(eprRoute?.data?.['protocolContent']).toBe(true);
   });
 
   it('should have an auth callback route for OAuth', () => {

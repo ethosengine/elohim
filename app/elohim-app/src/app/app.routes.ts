@@ -62,6 +62,18 @@ export const routes: Routes = [
       ),
     data: { protocolContent: true },
   },
+  // Universal EPR address (§12.1) — durable cross-bundle target. Renders the
+  // cross-pillar resource viewer (reachable-but-unclaimed semantics); the
+  // doorway serves this bundle for any /epr/* path (Slice 2). Param is named
+  // resourceId so ContentViewerComponent + ProtocolRouteContextService work.
+  {
+    path: 'epr/:resourceId',
+    loadComponent: async () =>
+      import('@app/lamad/components/content-viewer/content-viewer.component').then(
+        m => m.ContentViewerComponent
+      ),
+    data: { protocolContent: true },
+  },
   // Spatial map — cross-pillar geospatial view (Places, resources, governance)
   {
     path: 'map',
