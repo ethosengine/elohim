@@ -112,3 +112,20 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     When the path "/sitemap.xml" is requested without following redirects from doorway "alpha"
     Then the response status is 200
     And the response body contains "/lamad/path/foundations-christian-technology"
+
+  @browser-only
+  Scenario: View as Content from the path overview honors the path claim
+    # Rendered-anchor coverage (operator click-path, 2026-06-06): the overview's
+    # "View as Content" anchor minted /epr/path-{id} — a NONEXISTENT id (the
+    # path's content id IS the bare id; broken since the Slice-1 era, surfaced
+    # by a human click — exactly the class the #7-5 conformance crawler will
+    # generalize). Post-Slice-3 truth: the bare path id is a CLAIMED type, so
+    # /epr/{path-id} 302s back to the pretty mount (§12.1) — following the link
+    # lands on the rendered path overview again. (Whether a claimed type should
+    # offer a "View as Content" affordance at all is a lamad UX question —
+    # captured in epr-routing-complementary-captures.)
+    Given a learner opens the deep link "/lamad/path/foundations-christian-technology" cold
+    Then the lamad path overview renders
+    When the learner follows the View as Content link
+    Then the lamad path overview renders
+

@@ -426,3 +426,12 @@ Then('the response body contains {string}', function (this: E2EWorld, needle: st
   assert.ok(resp, 'No response captured — run the request step first');
   assert.ok(resp.body.toString('utf8').includes(needle), `Expected body to contain "${needle}"`);
 });
+
+When('the learner follows the View as Content link', async function (this: E2EWorld) {
+  const device = await ensureVisitor(this);
+  if (!device) {
+    return PENDING;
+  }
+  await device.page.locator(`[data-testid="${PATH_OVERVIEW.VIEW_AS_CONTENT}"]`).first().click();
+  await device.page.waitForLoadState('domcontentloaded');
+});
