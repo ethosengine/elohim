@@ -159,6 +159,8 @@ export class PathContextService {
    * Pops the latest detour and returns the route to navigate to.
    *
    * @returns Route segments to navigate to, or null if not in a detour
+   * NOTE: detour state is in-memory; cross-bundle detours full-load the shell
+   * and wipe this stack — returns only function for in-bundle detours.
    */
   returnFromDetour(): string[] | null {
     const current = this.contextStack.at(-1);
@@ -218,6 +220,8 @@ export class PathContextService {
   /**
    * Get breadcrumb trail for current context.
    * Useful for displaying navigation history.
+   * NOTE: detour state is in-memory; cross-bundle detours full-load the shell
+   * and wipe this stack — returns only function for in-bundle detours.
    */
   getBreadcrumbs(): BreadcrumbItem[] {
     const current = this.contextStack.at(-1);

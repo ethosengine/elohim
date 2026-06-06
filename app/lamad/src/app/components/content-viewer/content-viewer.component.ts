@@ -1237,6 +1237,9 @@ export class ContentViewerComponent
   onGraphNodeSelected(nodeId: string): void {
     // Track the detour if we're in a path context
     if (this.pathContext && this.nodeId) {
+      // NOTE: the cross-bundle nav below full-loads the shell; this in-memory
+      // detour push does NOT survive the boundary (back-affordance = the
+      // session-nav-stack handoff recorded by EprNavService).
       this.pathContextService.startDetour({
         fromContentId: this.nodeId,
         toContentId: nodeId,

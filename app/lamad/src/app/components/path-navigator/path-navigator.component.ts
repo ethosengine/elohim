@@ -862,6 +862,9 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
    */
   onExploreContent(contentId: string): void {
     // Track the detour in path context
+    // NOTE: the cross-bundle nav below full-loads the shell; this in-memory
+    // detour push does NOT survive the boundary (back-affordance = the
+    // session-nav-stack handoff recorded by EprNavService).
     this.pathContextService.startDetour({
       fromContentId: this.stepView?.content?.id ?? '',
       toContentId: contentId,

@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, computed, Inject } from '@angular/core';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule } from '@angular/router';
 
 // @coverage: 60.0% (2026-02-24)
 
@@ -53,7 +53,6 @@ import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile
 })
 export class ProfilePageComponent implements OnInit, OnDestroy {
   readonly identityService: ILamadIdentity = inject(LAMAD_IDENTITY); // Public for template access
-  private readonly router = inject(Router);
   private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
 
   // Tab management

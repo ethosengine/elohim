@@ -69,6 +69,16 @@ describe('EprNavService', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
+  it('refuses non-origin-relative navigation targets', () => {
+    const assign = vi.fn();
+    (service as unknown as { assign: (h: string) => void }).assign = assign;
+    service.navigate('javascript:alert(1)');
+    service.navigate('https://evil.example/x');
+    service.navigate('//evil.example/x');
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
   describe('ownsPath with a pathless layout root (pillar-bundle shape)', () => {
     beforeEach(() => {
       // lamad-shaped config: everything hangs off a path:'' layout root.

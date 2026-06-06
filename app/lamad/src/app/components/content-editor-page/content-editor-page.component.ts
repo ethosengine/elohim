@@ -9,7 +9,7 @@ import {
   ComponentRef,
   inject,
 } from '@angular/core';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import {
   LAMAD_EPR_NAV,
   type ILamadEprNav,
@@ -89,7 +89,6 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly route: ActivatedRoute,
-    private readonly router: Router,
     private readonly dataLoader: DataLoaderService,
     private readonly registry: ContentFormatRegistryService,
     private readonly editorService: ContentEditorService

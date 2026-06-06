@@ -17,8 +17,7 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn } from '@angular/router';
 
-import { LAMAD_EPR_NAV } from '../interfaces/cross-pillar.interface';
-import { LAMAD_IDENTITY } from '../interfaces/cross-pillar.interface';
+import { LAMAD_EPR_NAV, LAMAD_IDENTITY } from '../interfaces/cross-pillar.interface';
 import { isNetworkMode } from '../utils/identity.utils';
 
 /** Login route for unauthenticated users (shell mount — cross-bundle from lamad). */

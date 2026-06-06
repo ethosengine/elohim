@@ -42,6 +42,13 @@ export class EprNavService {
     const url = Array.isArray(pathOrCommands)
       ? this.router.createUrlTree(pathOrCommands as never[]).toString()
       : (pathOrCommands as string);
+    // Defense-in-depth: this sink can location.assign — only origin-relative
+    // paths are navigable (no javascript:, data:, protocol-relative //, or
+    // absolute-origin URLs through this seam).
+    if (!url.startsWith('/') || url.startsWith('//')) {
+      console.warn('[EprNavService] refused non-origin-relative navigation target:', url);
+      return;
+    }
     if (this.ownsPath(url)) {
       void this.router.navigateByUrl(url);
       return;

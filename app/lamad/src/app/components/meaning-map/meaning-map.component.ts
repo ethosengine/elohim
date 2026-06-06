@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, Inject, OnInit, OnDestroy } from '@angular/core';
-import { Router, RouterModule } from '@angular/router';
+import { RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -57,7 +57,6 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
   constructor(
     private readonly dataLoader: DataLoaderService,
     @Inject(LAMAD_AFFINITY_TRACKING) private readonly affinityService: ILamadAffinityTracking,
-    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
