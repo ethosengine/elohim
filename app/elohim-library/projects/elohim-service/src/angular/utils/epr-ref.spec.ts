@@ -1,4 +1,4 @@
-import { parseEpr, formatEpr, epr, eprToRoute, eprToDid } from './epr-ref';
+import { parseEpr, formatEpr, epr, eprToRoute, eprToUniversalHref, eprToDid, type BundleRouteContext } from './epr-ref';
 
 describe('EprRef', () => {
   describe('parseEpr', () => {
@@ -129,23 +129,80 @@ describe('EprRef', () => {
     });
   });
 
-  describe('eprToRoute', () => {
-    it('returns resource route for head tier', () => {
-      expect(eprToRoute({ id: 'manifesto', tier: 'head' })).toEqual(['/resource', 'manifesto']);
+  describe('eprToRoute (claims-aware, §12.3)', () => {
+    const LAMAD_CTX: BundleRouteContext = {
+      claims: [
+        {
+          contentType: 'path',
+          commands: ref =>
+            ref.fragment?.type === 'step'
+              ? ['/path', ref.id, 'step', ref.fragment.value]
+              : ['/path', ref.id],
+        },
+      ],
+    };
+    const SHELL_CTX: BundleRouteContext = { claims: [], ownsUniversalRoute: true };
+    const EMPTY_CTX: BundleRouteContext = { claims: [] };
+
+    it('unclaimed in a pillar bundle → no commands, universal href', () => {
+      const res = eprToRoute({ id: 'manifesto', tier: 'head' }, LAMAD_CTX);
+      expect(res).toEqual({ commands: null, href: '/epr/manifesto', claimed: false });
     });
 
-    it('returns path step route for step fragment', () => {
-      expect(
-        eprToRoute({
-          id: 'elohim-protocol',
-          tier: 'head',
-          fragment: { type: 'step', value: '2' },
-        })
-      ).toEqual(['/path', 'elohim-protocol', 'step', '2']);
+    it('claimed contentType → in-bundle commands', () => {
+      const res = eprToRoute({ id: 'elohim-protocol', tier: 'head' }, LAMAD_CTX, 'path');
+      expect(res).toEqual({
+        commands: ['/path', 'elohim-protocol'],
+        href: '/epr/elohim-protocol',
+        claimed: true,
+      });
+    });
+
+    it('step fragment structurally implies the path claim', () => {
+      const res = eprToRoute(
+        { id: 'elohim-protocol', tier: 'head', fragment: { type: 'step', value: '2' } },
+        LAMAD_CTX
+      );
+      expect(res?.commands).toEqual(['/path', 'elohim-protocol', 'step', '2']);
+      expect(res?.claimed).toBe(true);
+      expect(res?.href).toBe('/epr/elohim-protocol#step/2');
+    });
+
+    it('shell owns the universal route → /epr commands for unclaimed refs', () => {
+      const res = eprToRoute({ id: 'manifesto', tier: 'head' }, SHELL_CTX);
+      expect(res).toEqual({ commands: ['/epr', 'manifesto'], href: '/epr/manifesto', claimed: false });
+    });
+
+    it('step fragment in the shell (no path claim) degrades to /epr commands', () => {
+      const res = eprToRoute(
+        { id: 'elohim-protocol', tier: 'head', fragment: { type: 'step', value: '2' } },
+        SHELL_CTX
+      );
+      expect(res?.commands).toEqual(['/epr', 'elohim-protocol']);
+      expect(res?.href).toBe('/epr/elohim-protocol#step/2');
+    });
+
+    it('empty context (no claims, no universal route) is cross-bundle for everything', () => {
+      const res = eprToRoute({ id: 'manifesto', tier: 'head' }, EMPTY_CTX);
+      expect(res).toEqual({ commands: null, href: '/epr/manifesto', claimed: false });
     });
 
     it('returns null for blob tier', () => {
-      expect(eprToRoute({ id: 'manifesto', tier: 'blob' })).toBeNull();
+      expect(eprToRoute({ id: 'manifesto', tier: 'blob' }, SHELL_CTX)).toBeNull();
+    });
+  });
+
+  describe('eprToUniversalHref', () => {
+    it('mints the universal address', () => {
+      expect(eprToUniversalHref({ id: 'manifesto', tier: 'head' })).toBe('/epr/manifesto');
+    });
+    it('carries the fragment', () => {
+      expect(
+        eprToUniversalHref({ id: 'p', tier: 'head', fragment: { type: 'step', value: '3' } })
+      ).toBe('/epr/p#step/3');
+    });
+    it('URI-encodes the id', () => {
+      expect(eprToUniversalHref({ id: 'a b', tier: 'head' })).toBe('/epr/a%20b');
     });
   });
 

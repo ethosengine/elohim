@@ -166,3 +166,4 @@ export { HolochainSourceChainService } from './angular/services/holochain-source
 // Utils
 export * from './angular/utils/access-control.helper';
 export * from './angular/utils/epr-ref';
+export * from './angular/utils/bundle-route-context';

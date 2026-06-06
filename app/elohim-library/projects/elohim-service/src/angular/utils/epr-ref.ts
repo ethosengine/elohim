@@ -148,21 +148,74 @@ export function epr(id: string, tier: EprTier = 'head'): EprRef {
   return { id, tier };
 }
 
+// ── §12.3 Mount-agnostic link minting ──────────────────────────────────────
+
+/** A contentType this bundle renders natively, with its in-bundle route shape. */
+export interface RouteClaim {
+  contentType: string;
+  /** Mint in-bundle router commands for a claimed ref. */
+  commands(ref: EprRef): string[];
+}
+
 /**
- * Convert an EprRef to the corresponding Angular route.
- * Returns null if no app route exists for this reference (e.g., blob tier).
+ * Declared by each bundle's composition root (provide via BUNDLE_ROUTE_CONTEXT):
+ * which EPR shapes this bundle renders natively. Unclaimed → /epr/{id}.
  */
-export function eprToRoute(ref: EprRef): string[] | null {
+export interface BundleRouteContext {
+  claims: readonly RouteClaim[];
+  /** The shell owns the universal epr/:resourceId route. */
+  ownsUniversalRoute?: boolean;
+}
+
+/**
+ * Result of claims-aware route minting. `commands` is non-null iff THIS bundle
+ * claims the target (routerLink/router.navigate is safe); otherwise navigate
+ * cross-bundle via `href` (plain anchor → epr-link interceptor, or
+ * EprNavService.navigate → full doorway load).
+ */
+export interface EprRouteResolution {
+  commands: string[] | null;
+  /** Origin-absolute universal address — always present, safe in every bundle. */
+  href: string;
+  claimed: boolean;
+}
+
+/** Mint the universal EPR address (§12.1): /epr/{id}[#fragment]. */
+export function eprToUniversalHref(ref: EprRef): string {
+  const frag = ref.fragment ? `#${formatFragment(ref.fragment)}` : '';
+  return `/epr/${encodeURIComponent(ref.id)}${frag}`;
+}
+
+/**
+ * Convert an EprRef to a navigable resolution for THIS bundle (§12.3):
+ * in-mount targets → relative commands; everything else → /epr/{id}.
+ * Route shape comes from the EPR head's contentType (caller-supplied when
+ * known) — never guessed from the id. The single sanctioned structural
+ * inference: a `step` fragment implies contentType 'path'.
+ * Returns null for blob tier (no page address).
+ */
+export function eprToRoute(
+  ref: EprRef,
+  ctx: BundleRouteContext,
+  contentType?: string | null
+): EprRouteResolution | null {
   if (ref.tier === 'blob') return null;
 
-  if (ref.fragment?.type === 'step') {
-    // TODO(#12-6 Slice 2): replace with BundleRouteContext claims — spec §12.3.
-    return ['/path', ref.id, 'step', ref.fragment.value];
+  const effectiveType = contentType ?? (ref.fragment?.type === 'step' ? 'path' : null);
+  const href = eprToUniversalHref(ref);
+
+  if (effectiveType) {
+    const claim = ctx.claims.find(c => c.contentType === effectiveType);
+    if (claim) {
+      return { commands: claim.commands(ref), href, claimed: true };
+    }
   }
 
-  // Path detection: IDs ending with -path or known path IDs
-  // Caller should use the content's type to decide; this is a convenience heuristic
-  return ['/resource', ref.id];
+  if (ctx.ownsUniversalRoute) {
+    return { commands: ['/epr', ref.id], href, claimed: false };
+  }
+
+  return { commands: null, href, claimed: false };
 }
 
 /**
