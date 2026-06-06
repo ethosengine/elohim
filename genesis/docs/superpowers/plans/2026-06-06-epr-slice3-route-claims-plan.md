@@ -1401,3 +1401,31 @@ python3 .claude/scripts/memory-kit/placement-audit.py --ledger | head -20
 1. **Spec coverage**: §3 claims contract → Tasks 2–7; §3.3 uniqueness → Task 4 (with an honest MVP deferral path to router-warn); §4 alias law → Tasks 4, 8, 9; §5.1 resolver → Task 9; §5.2 fragments → free (RFC 7231, asserted by a2o fragment scenario — NOTE: add the `#step/2` cold-load case to Task 12 if alpha verification shows fragment loss); §5.3 epr-summary-hint → existing `/epr-head/` surface (no new work; boundary-face consumption is the deferred gate-face plan); §6 gate face → explicitly deferred (gap `#6-2`); §7.1 lint → Task 11; §7.5 sitemap/sweep → Task 10 (sweep statuses `claims-stale`/`DEAD-ALIAS` ride the conformance crawler follow-up; recorded in spec §13); §8 homes → Tasks 1, 2, 6, 7, 8; §10 a2o → Task 12; §11 parent amendments → Task 13.
 2. **Placeholders**: none — every adaptive instruction names the exact file to read and the decision rule.
 3. **Type consistency**: `RouteClaimTemplate`/`RouteClaimGrant`/`RedirectTemplate` names identical across Rust (Task 2), seeder TS (Task 5), and @elohim/service TS (Task 6); `claimed_mount_location`/`resolve_alias`/`mint_mount_location` used in Task 9 match Task 8 definitions; `HeadFacts`/`classify_epr_universal`/`EprUniversalDisposition` defined and used only in Task 9.
+
+---
+
+## Execution record (2026-06-06, same-day)
+
+Executed via orchestrated subagents (5 parallel + serial chains), all commits on `dev`:
+
+| Task(s) | Commit | Evidence |
+|---|---|---|
+| 1 fixture | `74499bcd6` | — |
+| 2 view types | `dc72b333f` | schema_contract 3 ✓ · views 367 ✓ · export_bindings regenerated |
+| 3+4 storage | `8b8ca9dd8` | full lib 1355 ✓ · validator WIRED (had zero call sites) · rule-7 → router-warn |
+| 5 seeder | `3777bd185` | vitest 257 ✓ |
+| 6+7 client | `01fb7c851` | epr-ref 38 ✓ (3 vector-driven) · elohim-service 780 ✓ · lamad 2742 ✓ |
+| 8–10 doorway | `385a7485a` | full suite 551 ✓ · clippy -D warnings ✓ · fmt ✓ · frozen oracles untouched |
+| 11 lint gate | `c31f1d577` | 32 hits triaged · gate exit 0 · 290 component tests ✓ |
+| 12 a2o | `5dfc3ddc1` | 10 scenarios · dry-run 42/42 bound, 0 ambiguous |
+| 13 parent | `704dcfc88` | cite-verify ✓ |
+| 14 sweep | `aec717b98` | schema:test 17 ✓ · schema:validate 3426 ✓ · codegen fresh ✓ · schema_contract 209 ✓ · cite graph clean |
+
+**Verification debt (honest):** live-stack curl smoke + the seven `@browser-only` a2o runs await
+alpha post-push (dev container cannot browser-render; local stack carries the known DHT-anchor
+provenance gap). NOTE for re-seeding: the grant rides commitment *metadata*, but the commitment
+id is content-addressed over (steward|action|scope) — a re-run 409s and the OLD grant-less row
+persists; refreshing existing alpha projections needs a metadata update path or a one-time
+projection re-seed, surfaced during Task 14 — carry this into the deploy watch. Gap items: 11
+CLAIMED / 3 OPEN (5-3 hint-consumption legs, 6-2 gate face, 7-5 crawler+sweep — all deferred by
+design).
