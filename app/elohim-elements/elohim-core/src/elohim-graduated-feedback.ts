@@ -27,9 +27,7 @@ export interface GraduatedFeedbackInput {
   reasoning?: string;
 }
 
-export interface FeedbackDistribution {
-  [positionLabel: string]: number;
-}
+export type FeedbackDistribution = Record<string, number>;
 
 export type FeedbackContextScales = Record<FeedbackContext, ScaleDefinition>;
 
@@ -226,7 +224,8 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
       inline-size: 100%;
       padding-block: 0.5rem;
       padding-inline: 0.5rem;
-      border: 1px solid var(--elohim-feedback-border, color-mix(in oklch, currentColor 25%, transparent));
+      border: 1px solid
+        var(--elohim-feedback-border, color-mix(in oklch, currentColor 25%, transparent));
       border-radius: 0.25rem;
       font: inherit;
       font-size: 0.875rem;
@@ -274,7 +273,8 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
     .reset-btn {
       padding-block: 0.5rem;
       padding-inline: 1rem;
-      border: 1px solid var(--elohim-feedback-border, color-mix(in oklch, currentColor 25%, transparent));
+      border: 1px solid
+        var(--elohim-feedback-border, color-mix(in oklch, currentColor 25%, transparent));
       border-radius: 0.25rem;
       background: transparent;
       cursor: pointer;
@@ -285,7 +285,8 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
     .aggregate-section {
       margin-block-start: 1rem;
       padding-block-start: 0.75rem;
-      border-block-start: 1px solid var(--elohim-feedback-border, color-mix(in oklch, currentColor 15%, transparent));
+      border-block-start: 1px solid
+        var(--elohim-feedback-border, color-mix(in oklch, currentColor 15%, transparent));
     }
 
     .aggregate-header {
@@ -388,13 +389,12 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
    * derived, not bound. White passes 4.5:1 below L≈0.1833; black above.
    */
   private static readableOn(hex: string): string {
-    const n = parseInt(hex.slice(1), 16);
+    const n = Number.parseInt(hex.slice(1), 16);
     const lin = (c: number): number => {
       const s = c / 255;
       return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
     };
-    const l =
-      0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    const l = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
     return l > 0.1833 ? '#000000' : '#ffffff';
   }
 
@@ -420,7 +420,9 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
                 style="
                   border-color: ${position.color};
                   background-color: ${selected ? position.color : 'transparent'};
-                  color: ${selected ? ElohimGraduatedFeedback.readableOn(position.color) : 'CanvasText'};
+                  color: ${selected
+                  ? ElohimGraduatedFeedback.readableOn(position.color)
+                  : 'CanvasText'};
                 "
                 @click=${() => this.selectPosition(position)}
               >
@@ -430,8 +432,9 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
           })}
         </div>
 
-        ${this.selectedPosition !== null
-          ? html`
+        ${this.selectedPosition === null
+          ? nothing
+          : html`
               <div class="intensity-section" part="intensity-section">
                 <label class="intensity-label" for="intensity-slider-${this.entityId}">
                   Intensity: ${this.getIntensityLabel()} (${this.intensity}/10)
@@ -449,9 +452,7 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
                   }}
                 />
               </div>
-            `
-          : nothing}
-
+            `}
         ${this.showReasoningField || this.reasoningIsRequired
           ? html`
               <div class="reasoning-section" part="reasoning-section">
@@ -471,8 +472,9 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
                 ></textarea>
               </div>
             `
-          : this.selectedPosition !== null
-            ? html`
+          : this.selectedPosition === null
+            ? nothing
+            : html`
                 <button
                   class="toggle-reasoning-btn"
                   type="button"
@@ -481,11 +483,10 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
                 >
                   Add reasoning
                 </button>
-              `
-            : nothing}
-
-        ${this.selectedPosition !== null
-          ? html`
+              `}
+        ${this.selectedPosition === null
+          ? nothing
+          : html`
               <div class="submit-section" part="submit-section">
                 <button
                   class="submit-btn"
@@ -515,9 +516,7 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
                     `
                   : nothing}
               </div>
-            `
-          : nothing}
-
+            `}
         ${this.showAggregates && this.totalResponses > 0 && this.distribution
           ? this.renderAggregates()
           : nothing}
@@ -589,7 +588,7 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
         detail: feedback,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
 
     this.isSubmitting = false;
@@ -607,7 +606,7 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
       new CustomEvent('feedback-reset', {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
