@@ -68,4 +68,32 @@ describe('EprNavService', () => {
     expect(assign).toHaveBeenCalledWith('/lamad/path/abc');
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
+
+  describe('ownsPath with a pathless layout root (pillar-bundle shape)', () => {
+    beforeEach(() => {
+      // lamad-shaped config: everything hangs off a path:'' layout root.
+      (router as unknown as { config: unknown[] }).config = [
+        {
+          path: '',
+          children: [
+            { path: 'path/:pathId', children: [] },
+            { path: 'explore', children: [] },
+            { path: 'resource/:resourceId/edit', children: [] },
+            { path: '**', children: [] },
+          ],
+        },
+      ];
+    });
+
+    it('owns routes declared under the layout root', () => {
+      expect(service.ownsPath('/path/foundations/step/0')).toBe(true);
+      expect(service.ownsPath('/explore')).toBe(true);
+      expect(service.ownsPath('/resource/abc/edit')).toBe(true);
+    });
+
+    it('does not own foreign top segments', () => {
+      expect(service.ownsPath('/epr/abc')).toBe(false);
+      expect(service.ownsPath('/identity/login')).toBe(false);
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import type { Route } from '@angular/router';
 
 import { ProtocolRouteContextService } from './protocol-route-context.service';
 import { SessionNavStackService } from './session-nav-stack.service';
@@ -24,11 +25,15 @@ export class EprNavService {
 
   ownsPath(path: string): boolean {
     const top = path.replace(/^\//, '').split(/[/?#]/)[0] ?? '';
-    if (top === '') return true; // root landing is shell-owned
-    return this.router.config.some(r => {
-      if (!r.path || r.path === '**') return false;
-      return r.path.split('/')[0] === top;
-    });
+    if (top === '') return true; // root landing is bundle-owned
+    const matches = (routes: readonly Route[] | undefined): boolean =>
+      !!routes?.some(r => {
+        // Pathless layout roots (pillar-bundle shape) — descend into children.
+        if (r.path === '' && r.children) return matches(r.children);
+        if (!r.path || r.path === '**') return false;
+        return r.path.split('/')[0] === top;
+      });
+    return matches(this.router.config);
   }
 
   navigate(pathOrCommands: string | readonly unknown[]): void {
