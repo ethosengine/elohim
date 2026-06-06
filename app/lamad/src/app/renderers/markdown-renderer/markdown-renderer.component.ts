@@ -536,7 +536,9 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
     // Route (in-bundle) or universal href (cross-bundle) for the "Open resource" link
     const { route, href } = this.eprResolver.resolveUrl(eprUri);
-    const routeHref = route ? '/' + route.filter(Boolean).join('/').replace(/^\/+/, '') : href;
+    // Joined string form of the in-bundle route; null when cross-bundle (the
+    // popover's href property carries the universal address independently).
+    const routeHref = route ? '/' + route.filter(Boolean).join('/').replace(/^\/+/, '') : null;
 
     // Fetch EPR Head metadata
     this.popoverSub = this.eprResolver.resolveEprHead(eprUri).subscribe(head => {
@@ -564,7 +566,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       // the two declarations.
       popover.head = head as unknown as EprHead;
       popover.position = position;
-      popover.route = route ? routeHref : null;
+      popover.route = routeHref; // already null when cross-bundle
       popover.href = href;
       popover.visible = true;
 
