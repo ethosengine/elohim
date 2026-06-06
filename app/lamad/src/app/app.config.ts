@@ -14,9 +14,10 @@ import {
   provideElohimClient,
   detectClientMode,
   BUNDLE_ROUTE_CONTEXT,
+  claimsFromDeclaration,
   type BundleRouteContext,
-  type EprRef,
 } from '@elohim/service';
+import { LAMAD_ROUTE_CLAIMS } from './route-claims.declaration';
 import { AGENT_CONTEXT, ECONOMIC_EVENT_FACTORY, EVENT_API } from '@elohim/rea-runtime';
 import { environment } from '../environments/environment';
 import { LEARNER_BACKEND } from './interfaces/learner-backend.interface';
@@ -84,7 +85,7 @@ function resolveDoorwayUrl(configured: string | undefined): string {
  * Lamad bundle application config.
  *
  * B18d: Provides HTTP client, router (wired to LAMAD_ROUTES via app.routes.ts),
- * and animations. The lamad bundle is served at /lamad/ with <base href="/lamad/">.
+ * and animations. The lamad bundle is served at /lamad/ with <base href="/lamad/">. // route-literal-ok: doc comment describing the base-href, not a minted link
  *
  * B18d omnibar note:
  * When spec Task B6 lands <elohim-page-chrome>, the lamad toolbar becomes a
@@ -169,20 +170,12 @@ export const appConfig: ApplicationConfig = {
     { provide: LAMAD_AFFINITY_TRACKING, useExisting: AffinityTrackingService },
     { provide: LAMAD_EPR_RESOLVER, useExisting: EprResolverService },
     { provide: LAMAD_EPR_NAV, useExisting: EprNavService },
-    // §12.3: lamad claims contentType 'path' — everything else is cross-bundle.
+    // §12.3 / Slice 3 (§8.3): lamad's claims derive from its DECLARATION —
+    // one authoring home; the executable commands come from the shared
+    // interpreter. Everything not declared stays cross-bundle.
     {
       provide: BUNDLE_ROUTE_CONTEXT,
-      useValue: {
-        claims: [
-          {
-            contentType: 'path',
-            commands: (ref: EprRef) =>
-              ref.fragment?.type === 'step'
-                ? ['/path', ref.id, 'step', ref.fragment.value]
-                : ['/path', ref.id],
-          },
-        ],
-      } satisfies BundleRouteContext,
+      useValue: { claims: claimsFromDeclaration(LAMAD_ROUTE_CLAIMS) } satisfies BundleRouteContext,
     },
     { provide: LAMAD_GOVERNANCE_SIGNAL, useExisting: GovernanceSignalService },
     { provide: LAMAD_ELOHIM_PRESENCE, useExisting: ElohimPresenceService },

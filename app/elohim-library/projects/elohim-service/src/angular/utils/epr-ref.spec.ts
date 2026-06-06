@@ -1,4 +1,15 @@
-import { parseEpr, formatEpr, epr, eprToRoute, eprToUniversalHref, eprToDid, type BundleRouteContext } from './epr-ref';
+import {
+  parseEpr,
+  formatEpr,
+  epr,
+  eprToRoute,
+  eprToUniversalHref,
+  eprToDid,
+  claimsFromDeclaration,
+  type BundleRouteContext,
+  type EprRef,
+} from './epr-ref';
+import vectors from '../../../../../../../elohim/sdk/fixtures/route-claims.vectors.json';
 
 describe('EprRef', () => {
   describe('parseEpr', () => {
@@ -256,4 +267,25 @@ describe('EprRef', () => {
       }
     });
   });
+});
+
+describe('claimsFromDeclaration (route-claims contract vectors)', () => {
+  const ctx: BundleRouteContext = {
+    claims: claimsFromDeclaration(vectors.lamadGrant.claims),
+  };
+
+  for (const v of vectors.mintVectors) {
+    it(v.note, () => {
+      const ref: EprRef = {
+        id: v.refId,
+        tier: 'head',
+        ...(v.fragmentType
+          ? { fragment: { type: v.fragmentType as 'step', value: v.fragmentValue! } }
+          : {}),
+      };
+      const res = eprToRoute(ref, ctx, v.contentType);
+      expect(res?.commands ?? null).toEqual(v.expectCommands);
+      expect(res?.href).toBe(v.expectHref);
+    });
+  }
 });

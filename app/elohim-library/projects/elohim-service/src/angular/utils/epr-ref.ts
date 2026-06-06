@@ -157,6 +157,35 @@ export interface RouteClaim {
   commands(ref: EprRef): string[];
 }
 
+/** Serializable claim shape (spec §3.1) — what bundle manifests DECLARE and
+ *  commitment grants carry. {id}/{n} placeholders, segment-safe. */
+export interface RouteClaimTemplate {
+  contentType: string;
+  template: string;
+  fragments?: Record<string, string>;
+}
+
+/**
+ * Interpret serializable claim templates into executable RouteClaims (§8.3).
+ * The single authoring home: bundles declare templates; this turns them into
+ * the commands() the router consumes. A fragment whose type has a template
+ * uses it ({n} = fragment value); otherwise the base template applies.
+ */
+export function claimsFromDeclaration(decl: readonly RouteClaimTemplate[]): RouteClaim[] {
+  return decl.map(d => ({
+    contentType: d.contentType,
+    commands: (ref: EprRef): string[] => {
+      const fragTpl = ref.fragment ? d.fragments?.[ref.fragment.type] : undefined;
+      const tpl = fragTpl ?? d.template;
+      const substituted = tpl
+        .replace('{id}', ref.id)
+        .replace('{n}', ref.fragment?.value ?? '');
+      const segments = substituted.split('/').filter(s => s.length > 0);
+      return ['/' + segments[0], ...segments.slice(1)];
+    },
+  }));
+}
+
 /**
  * Declared by each bundle's composition root (provide via BUNDLE_ROUTE_CONTEXT):
  * which EPR shapes this bundle renders natively. Unclaimed → /epr/{id}.
