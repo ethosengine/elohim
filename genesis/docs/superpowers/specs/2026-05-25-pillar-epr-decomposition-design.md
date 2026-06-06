@@ -804,7 +804,7 @@ This generalizes the §8.1 deliverable "EPR resolution endpoint `/api/v1/epr/{id
 
 - **`eprToRoute()` is rewritten around bundle route-claims.** Each bundle's composition root provides a `BundleRouteContext` declaring which EPR shapes it renders natively: lamad claims `contentType: 'path'` → `['/path', id]` (and `#step/n` → `['/path', id, 'step', n]`); the shell claims `resource`. Unclaimed → `['/epr', id]`. With `APP_BASE_HREF = '/lamad/'`, `['/path', id]` renders as `/lamad/path/{id}` — remount lamad at `/learn` and nothing breaks.
 - **The type-vs-slug heuristic dies.** Route shape comes from the EPR head's `contentType` (`"path"` for learning paths), never guessed from the id suffix. The §7.2 `resolveInContext()` in-path/cross-path arms consult the injected context instead of `'/lamad/path'` literals; lamad's `navigateToPath()` mints `['/path', pathId]`.
-- **Bundle manifests gain `routeClaims`** so the *doorway-side* `/epr/{id}` resolver can 302 to pretty mounts: `[{contentType: 'path', template: 'path/{id}', fragments: {step: 'path/{id}/step/{n}'}}]`. Claims are content (ride the bundle EPR, like §3 element manifests), surfaced through the projection the doorway already loads. Fragment mapping lives in exactly one place per side: claimed-in-bundle (bundle maps it) or `/epr` resolver (everyone else).
+- **Bundle manifests gain `routeClaims`** so the *doorway-side* `/epr/{id}` resolver can 302 to pretty mounts: `[{contentType: 'path', template: 'path/{id}', fragments: {step: 'path/{id}/step/{n}'}}]`. Claims are content (ride the bundle EPR, like §3 element manifests), surfaced through the projection the doorway already loads. Fragment mapping lives in exactly one place per side: claimed-in-bundle (bundle maps it) or `/epr` resolver (everyone else). Slice-3 elevation: the full claims contract (declare+grant, alias law, conformance) is canonical in 2026-06-06-epr-route-claims-link-conformance-design.md.
 - **elohim-elements stay blank-slate.** `<elohim-epr-link>` emits intent; the host resolves URLs. No URL knowledge in Lit primitives.
 - **Card-flip + pushState.** EPR-links flip cards in place (§7); on flip, pushState the target's canonical local URL — mount URL if this bundle claims it, else `/epr/{id}`. Refresh/share of any pushed URL cold-loads correctly via §12.2. Session and scroll survive flips; URLs stay durable addresses of the card being viewed.
 
@@ -827,7 +827,7 @@ This generalizes the §8.1 deliverable "EPR resolution endpoint `/api/v1/epr/{id
 |---|---|---|
 | **1 — alpha green** (landed 2026-06-04, `edc907c43`) | doorway `spa_fallback` + storage safety net + relative routes in the lamad bundle | shared path URLs work; doubled URLs stop being minted |
 | **2 — universal address** (landed 2026-06-06, branch `epr/slice2-universal-address`) | `/epr/{id}` doorway resolver + shell `epr/:resourceId` route + `eprToRoute`/`BundleRouteContext` claims rewrite in `@elohim/service` + the distributed link sweep (lamad templates/programmatic/guard, Lit navigator de-literalized, legacy `/lamad/resource` bridge, SEO canonicals, portal interceptor) | cross-bundle links, durable shares |
-| **3 — claims & gates** | `routeClaims` in bundle manifests + fragment mapping + designed gate experience + card-flip pushState | type-driven 302s, graceful boundaries |
+| **3 — claims & gates** | `routeClaims` in bundle manifests + fragment mapping + designed gate experience + card-flip pushState | type-driven 302s, graceful boundaries — designed by epr-route-claims-link-conformance-design (2026-06-06) |
 
 Slice-2 implementation notes: reservation is enforced structurally (`/epr` joined `is_service_path`, so no projection mount can capture it) plus a warn-and-skip at projection ingestion — the spec's named `validate_url_path` never existed as a function; `is_reserved_url_path` (doorway `http.rs`) is its realized home. Unclaimed-with-unknown-type targets always resolve to `/epr/{id}` (safe-by-default). Step fragments degrade in the shell to `/epr/{pathId}` (fragment-preserving redirect is Slice 3).
 
@@ -841,7 +841,7 @@ The URL contract is shaped so these layer in without changing URL shapes — onl
 
 ### 12.8 P2P-design-gate addendum
 
-`spa_fallback` is a field on the existing notarized `project-epr` Commitment (A — extends Appendix B item 1, no new entry types). `routeClaims` is content inside the bundle EPR's manifest (operational projection, C — same classification as `ElementRegistryView`). The storage safety-net fallback is pure operational convention (C). No new DHT entry types, no new identity schemes.
+`spa_fallback` is a field on the existing notarized `project-epr` Commitment (A — extends Appendix B item 1, no new entry types). `routeClaims` is content inside the bundle EPR's manifest (operational projection, C — same classification as `ElementRegistryView`). The storage safety-net fallback is pure operational convention (C). No new DHT entry types, no new identity schemes. The 2026-06-06 design upholds Class C for claims (CID-addressed manifest content; grant rides the Category-A commitment) and adds redirectTemplates as commitment metadata (A); see its §12 gate record.
 
 ---
 
