@@ -36,7 +36,12 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
-import { CONTENT_VIEWER, NOT_FOUND, PATH_NAV, PATH_OVERVIEW } from '../../src/framework/pages/selectors.js';
+import {
+  CONTENT_VIEWER,
+  NOT_FOUND,
+  PATH_NAV,
+  PATH_OVERVIEW,
+} from '../../src/framework/pages/selectors.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 import { fetchApp, responseStore } from '../delivery.steps.js';
@@ -292,17 +297,14 @@ Then('the cross-pillar resource viewer renders', async function (this: E2EWorld)
  *
  * Example: When the learner follows the View Resource Details link
  */
-When(
-  'the learner follows the View Resource Details link',
-  async function (this: E2EWorld) {
-    const device = await ensureVisitor(this);
-    if (!device) {
-      return PENDING;
-    }
-    await device.page.locator(`[data-testid="${PATH_NAV.VIEW_RESOURCE}"]`).first().click();
-    await device.page.waitForLoadState('domcontentloaded');
+When('the learner follows the View Resource Details link', async function (this: E2EWorld) {
+  const device = await ensureVisitor(this);
+  if (!device) {
+    return PENDING;
   }
-);
+  await device.page.locator(`[data-testid="${PATH_NAV.VIEW_RESOURCE}"]`).first().click();
+  await device.page.waitForLoadState('domcontentloaded');
+});
 
 /**
  * "Then the response body is JSON, not an index.html shell" — the honest-404
