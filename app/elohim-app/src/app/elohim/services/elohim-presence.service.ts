@@ -264,10 +264,10 @@ export class ElohimPresenceService implements BannerNoticeProvider, OnDestroy {
 
     const pathId = moment.metadata?.['recommendedPathId'] as string | undefined;
     if (pathId) {
-      this.eprNav.navigate(['/lamad/path', pathId]);
+      this.eprNav.navigate(['/lamad/path', pathId]); // route-literal-ok: sanctioned EprNavService cross-bundle mount nav (elohim-app gospel), not a minted content link
     } else {
       // Fallback: navigate to path catalog
-      this.eprNav.navigate('/lamad');
+      this.eprNav.navigate('/lamad'); // route-literal-ok: sanctioned EprNavService cross-bundle mount nav (elohim-app gospel), not a minted content link
     }
 
     this.dismissNotice(noticeId);

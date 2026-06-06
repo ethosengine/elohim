@@ -173,7 +173,7 @@
             <div class="content-meta">
               <span class="content-type-badge">{{ stepView.content.contentType }}</span>
               <a
-                [attr.href]="'/epr/' + stepView.content.id"
+                [attr.href]="eprHref(stepView.content.id)"
                 class="view-resource-link"
                 data-testid="path-nav-view-resource"
               >

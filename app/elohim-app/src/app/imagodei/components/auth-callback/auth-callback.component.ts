@@ -100,7 +100,7 @@ export class AuthCallbackComponent implements OnInit, AfterViewInit {
   }
 
   onSuccess(_e: Event): void {
-    const returnUrl = this.oauth.consumeReturnUrl() ?? '/lamad';
+    const returnUrl = this.oauth.consumeReturnUrl() ?? '/lamad'; // route-literal-ok: default post-auth return mount (bundle nav target), not a minted content link
     void this.router.navigate([returnUrl]);
   }
 

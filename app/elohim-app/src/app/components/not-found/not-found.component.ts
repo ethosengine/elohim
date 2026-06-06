@@ -33,6 +33,17 @@ export class NotFoundComponent implements OnInit {
   /** The attempted URL path */
   attemptedUrl = '';
 
+  /**
+   * Suggested cross-bundle links to the lamad mount. Sanctioned plain-href
+   * targets (elohim-app gospel; the capture-phase interceptor handles them) —
+   * fixed mount paths, not minted content links.
+   */
+  readonly lamadLinks = {
+    home: '/lamad', // route-literal-ok: cross-bundle mount link, not a minted content link
+    explore: '/lamad/explore', // route-literal-ok: cross-bundle mount link, not a minted content link
+    search: '/lamad/search', // route-literal-ok: cross-bundle mount link, not a minted content link
+  };
+
   ngOnInit(): void {
     this.attemptedUrl = this.router.url;
 
@@ -58,7 +69,7 @@ export class NotFoundComponent implements OnInit {
    * Navigate to Lamad learning platform
    */
   goToLamad(): void {
-    this.eprNav.navigate('/lamad');
+    this.eprNav.navigate('/lamad'); // route-literal-ok: sanctioned EprNavService cross-bundle mount nav (elohim-app gospel), not a minted content link
   }
 
   /**

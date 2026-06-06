@@ -22,6 +22,7 @@ export interface BuildInfo {
 export class FooterComponent {
   private readonly http = inject(HttpClient);
 
+  readonly lamadHref = '/lamad'; // route-literal-ok: sanctioned cross-bundle mount link (elohim-app gospel), not a minted content link
   gitHash = environment.gitHash;
   githubCommitUrl = `https://github.com/ethosengine/elohim/commit/${environment.gitHash}`;
   buildInfo = signal<BuildInfo | null>(null);

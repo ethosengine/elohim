@@ -60,7 +60,7 @@ import { RouterModule } from '@angular/router';
       </div>
 
       <div class="navigation">
-        <a href="/lamad" class="nav-link">📚 Explore Lamad (Content)</a>
+        <a [attr.href]="lamadHref" class="nav-link">📚 Explore Lamad (Content)</a>
         <a routerLink="/shefa" class="nav-link secondary">✨ View Shefa (Economy)</a>
       </div>
     </div>
@@ -213,4 +213,6 @@ import { RouterModule } from '@angular/router';
     `,
   ],
 })
-export class CommunityHomeComponent {}
+export class CommunityHomeComponent {
+  readonly lamadHref = '/lamad'; // route-literal-ok: sanctioned cross-bundle mount link (elohim-app gospel), not a minted content link
+}

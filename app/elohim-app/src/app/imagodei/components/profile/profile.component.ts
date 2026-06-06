@@ -89,6 +89,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
   private readonly eprNav = inject(EprNavService);
   private readonly destroy$ = new Subject<void>();
 
+  readonly lamadProfileHref = '/lamad/human'; // route-literal-ok: sanctioned cross-bundle mount link (elohim-app gospel), not a minted content link
+
   // ==========================================================================
   // Tab State
   // ==========================================================================
@@ -360,7 +362,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   // ==========================================================================
 
   navigateToDiscovery(): void {
-    this.eprNav.navigate('/lamad/discovery');
+    this.eprNav.navigate('/lamad/discovery'); // route-literal-ok: sanctioned EprNavService cross-bundle mount nav (elohim-app gospel), not a minted content link
   }
 
   navigateToResource(contentNodeId: string): void {

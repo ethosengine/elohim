@@ -394,7 +394,7 @@ export class TauriAuthService {
       this.authService.setTauriSession(session);
 
       // Navigate to main app
-      this.eprNav.navigate('/lamad');
+      this.eprNav.navigate('/lamad'); // route-literal-ok: sanctioned EprNavService cross-bundle mount nav (elohim-app gospel), not a minted content link
     } catch (err) {
       this.status.set('error');
       this.errorMessage.set(err instanceof Error ? err.message : 'Authentication failed');

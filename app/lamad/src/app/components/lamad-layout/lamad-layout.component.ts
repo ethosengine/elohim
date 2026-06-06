@@ -30,7 +30,7 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
 
   /** Host-supplied navigator config (§12.3: routing lives in the host, not the primitive). */
   readonly navigatorApps: ElohimContextAppConfig[] = [
-    { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true },
+    { id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: 'Learning & Content', available: true }, // route-literal-ok: navigator app-config route declaration (host routing config, not a minted content link)
     { id: 'community', name: 'Qahal', icon: '👥', route: '/community', tagline: 'Community & Governance', available: true },
     { id: 'shefa', name: 'Shefa', icon: '✨', route: '/shefa', tagline: 'Economics of Flourishing', available: true },
     { id: 'avodah', name: 'Avodah', icon: '🔨', route: '/avodah', tagline: 'Work & Stewardship', available: true },
@@ -86,7 +86,7 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
   }
 
   private checkIfHomePage(): void {
-    // router.url is already base-stripped (bundle served with <base href="/lamad/">),
+    // router.url is already base-stripped (bundle served with <base href="/lamad/">), // route-literal-ok: doc comment describing base-href stripping
     // so the home route is the bare '/'. Tolerate a trailing query string and the
     // empty string the Router reports before the first navigation commits.
     this.isHomePage =
@@ -95,14 +95,14 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
 
   /**
    * Navigator routes are protocol-absolute. Lamad-owned ones go through this
-   * bundle's router (base-href '/lamad/' is stripped); everything else is a
+   * bundle's router (base-href '/lamad/' is stripped); everything else is a // route-literal-ok: doc comment describing base-href stripping
    * cross-bundle handoff to the doorway-projected address.
    */
   onNavigatorNavigate(event: Event): void {
     const route = (event as CustomEvent<{ route?: string }>).detail?.route;
     if (!route) return;
-    if (route === '/lamad' || route.startsWith('/lamad/')) {
-      void this.router.navigateByUrl(route.slice('/lamad'.length) || '/');
+    if (route === '/lamad' || route.startsWith('/lamad/')) { // route-literal-ok: own-bundle prefix detection (base-href handoff), not a minted link
+      void this.router.navigateByUrl(route.slice('/lamad'.length) || '/'); // route-literal-ok: base-href strip length, not a minted link
     } else {
       globalThis.location.assign(route);
     }

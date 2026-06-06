@@ -142,7 +142,7 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
             Engage with content, practice assessments, and complete paths to earn participation
             points. Your learning activity fuels the network.
           </p>
-          <a href="/lamad" class="action-link">
+          <a [attr.href]="lamadHref" class="action-link">
             <span class="material-icons">arrow_forward</span>
             Explore Learning Paths
           </a>
@@ -1049,6 +1049,7 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
   ],
 })
 export class DeviceStewardshipComponent implements OnInit {
+  readonly lamadHref = '/lamad'; // route-literal-ok: sanctioned cross-bundle mount link (elohim-app gospel), not a minted content link
   readonly service = inject(DeviceStewardshipService);
   private readonly identityService = inject(IdentityService);
   private readonly pointsService = inject(PointsService);

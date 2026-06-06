@@ -19,6 +19,7 @@ import {
   type LamadPathsOverview,
   type LamadTimelineEvent,
 } from '../../interfaces/cross-pillar.interface';
+import { eprToUniversalHref } from '@elohim/service';
 import { isNetworkMode } from '../../utils/identity.utils';
 import {
   SessionHuman,
@@ -299,6 +300,11 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   setActivityFilter(filter: typeof this.activityFilter): void {
     this.activityFilter = filter;
     this.applyActivityFilter();
+  }
+
+  /** Mint the universal EPR address for a resource id (never a literal). */
+  eprHref(id: string): string {
+    return eprToUniversalHref({ id, tier: 'head' });
   }
 
   private applyActivityFilter(): void {

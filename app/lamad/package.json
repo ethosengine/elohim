@@ -5,7 +5,8 @@
   "scripts": {
     "build": "ng build",
     "start": "ng serve",
-    "test": "vitest run --config vite.config.ts"
+    "test": "vitest run --config vite.config.ts",
+    "lint": "node ../../scripts/lint-route-literals.mjs src"
   },
   "dependencies": {
     "@angular/animations": "^19.2.18",

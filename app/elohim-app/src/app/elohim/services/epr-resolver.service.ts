@@ -146,7 +146,7 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
    *     // resolved.content  → { id, title, description, contentType, blobHash, ... }
    *     // resolved.blobUrl  → "https://doorway.host/blob/sha256-abc..." or null
    *     // resolved.route    → ['/epr', 'manifesto-foundations'] (shell) or in-bundle commands
-   *     // resolved.href     → '/epr/manifesto-foundations'
+   *     // resolved.href     → '/epr/manifesto-foundations' // route-literal-ok: JSDoc @example illustrating minted output, not a literal mint
    *   });
    */
   resolve(input: string): Observable<ResolvedContent | null> {

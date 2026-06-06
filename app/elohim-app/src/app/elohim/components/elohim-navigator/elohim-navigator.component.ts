@@ -109,7 +109,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       id: 'lamad',
       name: 'Lamad',
       icon: '📚',
-      route: '/lamad',
+      route: '/lamad', // route-literal-ok: navigator app-config route declaration (host routing config), not a minted content link
       tagline: 'Learning & Content',
       available: true,
     },
@@ -390,7 +390,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   get contextProfileRoute(): string {
     switch (this.context) {
       case 'lamad':
-        return '/lamad/human';
+        return '/lamad/human'; // route-literal-ok: per-context profile route declaration (mount nav target), not a minted content link
       case 'shefa':
         return '/shefa/dashboard';
       case 'community':
@@ -400,7 +400,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       case 'map':
         return '/map';
       default:
-        return '/lamad/human';
+        return '/lamad/human'; // route-literal-ok: default profile route declaration (mount nav target), not a minted content link
     }
   }
 

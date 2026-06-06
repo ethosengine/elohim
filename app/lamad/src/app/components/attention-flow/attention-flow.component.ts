@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 
+import { eprToUniversalHref } from '@elohim/service';
 import type { EconomicEventView } from '@elohim/storage-client/generated';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import { EventService } from '@elohim/rea-runtime';
@@ -50,6 +51,11 @@ export class AttentionFlowComponent implements OnInit {
     if (type === 'assessment-complete') return '\u{1F3AF}';
     if (type === 'quiz-submit') return '\u{1F4DD}';
     return '\u{25CF}';
+  }
+
+  /** Mint the universal EPR address for an event's content (never a literal). */
+  eprHref(contentId: string): string {
+    return eprToUniversalHref({ id: contentId, tier: 'head' });
   }
 
   getEventLabel(event: EconomicEventView): string {

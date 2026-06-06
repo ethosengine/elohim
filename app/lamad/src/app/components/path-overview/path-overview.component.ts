@@ -8,6 +8,7 @@ import { takeUntil } from 'rxjs/operators';
 
 import { Subject, forkJoin } from 'rxjs';
 
+import { eprToUniversalHref } from '@elohim/service';
 import { AgentProgress, MasteryLevel, MasteryTier } from '@elohim/service/angular/models/agent.model';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import {
@@ -415,6 +416,11 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   goHome(): void {
     void this.router.navigate(['/']);
+  }
+
+  /** Mint the universal EPR address for this path's content (never a literal). */
+  eprHref(id: string): string {
+    return eprToUniversalHref({ id, tier: 'head' });
   }
 
   /**

@@ -16,6 +16,7 @@ import { takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
 
+import { eprToUniversalHref } from '@elohim/service';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import {
   LAMAD_EPR_NAV,
@@ -874,6 +875,11 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
 
     // Navigate to the content (cross-bundle handoff — full doorway load).
     this.eprNav.navigate(`/epr/${encodeURIComponent(contentId)}`);
+  }
+
+  /** Mint the universal EPR address for a content id (never a literal). */
+  eprHref(id: string): string {
+    return eprToUniversalHref({ id, tier: 'head' });
   }
 
   /**

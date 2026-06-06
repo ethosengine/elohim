@@ -51,7 +51,7 @@ export class LamadNotFoundComponent implements OnInit {
     if (this.attemptedUrl.includes('/path/')) {
       this.resourceType = 'path';
     } else if (
-      this.attemptedUrl.includes('/resource/') ||
+      this.attemptedUrl.includes('/resource/') || // route-literal-ok: URL-classification substring match (detects legacy resource path), not a minted link
       this.attemptedUrl.includes('/content/')
     ) {
       this.resourceType = 'resource';

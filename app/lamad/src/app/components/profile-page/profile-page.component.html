@@ -491,7 +491,7 @@
                       </a>
                     } @else {
                       <a
-                        [attr.href]="'/epr/' + event.resourceId"
+                        [attr.href]="eprHref(event.resourceId)"
                         class="timeline-event-link"
                         data-testid="timeline-event-link"
                       >
