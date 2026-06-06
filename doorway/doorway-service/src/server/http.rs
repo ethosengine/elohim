@@ -251,6 +251,13 @@ pub struct AppState {
     ///
     /// See `src/projection/epr_router.rs` (B11) and `src/main.rs` (B12).
     pub epr_router: Arc<crate::projection::EprRouter>,
+
+    /// Materialized `/sitemap.xml` cache (spec §7.5): `(generation, xml)`.
+    /// Served when the cached generation still matches `epr_router.generation()`;
+    /// otherwise re-materialized from the routing table + commons ids and
+    /// recached. Event-invalidated — never time-expired — so it cannot drift
+    /// from dispatch.
+    pub sitemap_cache: Arc<tokio::sync::RwLock<Option<(u64, String)>>>,
 }
 
 /// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
@@ -385,6 +392,7 @@ impl AppState {
             render_semaphore: None,
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
+            sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
 
@@ -477,6 +485,7 @@ impl AppState {
             render_semaphore: None,
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
+            sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
 
@@ -584,6 +593,7 @@ impl AppState {
             render_semaphore: None,
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
+            sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
 
@@ -694,6 +704,7 @@ impl AppState {
             render_semaphore: None,
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
+            sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
         })
     }
 
@@ -1134,7 +1145,25 @@ fn is_service_path(path: &str) -> bool {
     // Note: "/" is intentionally NOT listed here so the EPR router (B13) can
     // match a root projection (url_path="/") before the explicit match arm below.
     // The explicit arm still handles WebSocket upgrades on "/" (dev-mode legacy path).
-    matches!(path, "/admin" | "/status.json" | "/epr" | "/db")
+    //
+    // The bare-root forms below are pinned by the shared route-claims fixture
+    // (`elohim/sdk/fixtures/route-claims.vectors.json` reservedPrefixes) — the
+    // two-layer guard with storage's alias validator (spec §4). They mirror the
+    // trailing-slash prefixes above so a bare reserved root is never a legal
+    // projection mount or alias target.
+    matches!(
+        path,
+        "/admin"
+            | "/status.json"
+            | "/epr"
+            | "/epr-head"
+            | "/db"
+            | "/api"
+            | "/blob"
+            | "/apps"
+            | "/identity"
+            | "/sitemap.xml"
+    )
 }
 
 /// §12.1 reserved-prefix guard: a projection's `url_path` may never collide
@@ -1606,27 +1635,251 @@ async fn dispatch_to_projected_epr(
     }
 }
 
-/// §12.1 universal EPR address: GET /epr/{id} serves the ROOT projection's
-/// bundle (the shell), whose `epr/:resourceId` route resolves and renders the
-/// EPR client-side. Doorway-side 302-to-pretty-mount is Slice 3 (routeClaims).
-/// Passing "/" as the request path makes `derive_app_subpath` yield the
-/// projection's entry_file — /epr/{id} is BY DEFINITION a page address.
+/// Head facts for the /epr/{id} resolver — fetched from storage's LOCAL
+/// projection only (never a DHT walk on the dispatch path, spec §5.1 R1).
+/// Tolerant deserialization: a shape mismatch yields None fields → ServeShell
+/// (fail open toward the floor).
+#[derive(Debug, Clone, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct HeadFacts {
+    #[serde(default)]
+    pub content_type: Option<String>,
+    #[serde(default)]
+    pub reach: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum EprUniversalDisposition {
+    /// Claimed + reach passes → 302 to the pretty mount (browser carries the
+    /// fragment per RFC 7231 — the doorway never sees or needs it, spec §5.2).
+    RedirectToMount { location: String },
+    /// Everything else: the shell renders (universal viewer or gate face).
+    ServeShell,
+}
+
+/// Spec §5.1 — pure, table-data-only (no prefix guards). MVP visitor tier:
+/// anonymous (commons-only); the authed snapshot wires in when gated
+/// projections exist (spec: out of scope here, signature stays ready).
+pub(crate) fn classify_epr_universal(
+    head: Option<HeadFacts>,
+    claimed_location: Option<String>,
+) -> EprUniversalDisposition {
+    let reach_passes = head
+        .as_ref()
+        .and_then(|h| h.reach.as_deref())
+        .map(|r| r == "commons")
+        .unwrap_or(false);
+    match (reach_passes, claimed_location) {
+        (true, Some(location)) => EprUniversalDisposition::RedirectToMount { location },
+        _ => EprUniversalDisposition::ServeShell,
+    }
+}
+
+/// §12.1 universal EPR address + Slice 3 claims (spec §5.1): a claimed,
+/// commons-reach target 302s to its pretty mount; everything else serves the
+/// ROOT projection's bundle (the shell renders the viewer or gate face).
 async fn dispatch_epr_universal(state: &AppState, original_path: &str) -> Response<Full<Bytes>> {
-    match state.epr_router.dispatch("/") {
-        Some(root) => {
-            tracing::debug!(path = %original_path, root_epr = %root.epr_id,
-                "universal /epr address — serving root bundle");
-            // Always dispatch as "/" so derive_app_subpath yields entry_file.
-            // The resource id in the original path is resolved client-side by
-            // the shell's epr/:resourceId route.
-            dispatch_to_projected_epr(state, "/", root).await
+    // Extract the id segment: /epr/{id}[/...] — id stays percent-encoded.
+    let id = original_path
+        .strip_prefix("/epr/")
+        .unwrap_or("")
+        .split('/')
+        .next()
+        .unwrap_or("");
+
+    // Head facts: one LOCAL storage lookup (storage caches /db/content 300s).
+    let head = if id.is_empty() {
+        None
+    } else {
+        fetch_head_facts(state, id).await
+    };
+    let claimed = head
+        .as_ref()
+        .and_then(|h| h.content_type.as_deref())
+        .and_then(|ct| state.epr_router.claimed_mount_location(ct, id));
+
+    match classify_epr_universal(head, claimed) {
+        EprUniversalDisposition::RedirectToMount { location } => {
+            tracing::debug!(path = %original_path, location = %location,
+                "universal /epr address — 302 to claimed pretty mount (Slice 3)");
+            Response::builder()
+                .status(StatusCode::FOUND)
+                .header("Location", location)
+                // Commons-only by construction here; cacheable (R1 for crawlers).
+                .header("cache-control", "public, max-age=300")
+                .body(Full::new(Bytes::new()))
+                .unwrap()
         }
-        // No root projection registered — same posture as the bare "/" arm.
-        None => Response::builder()
-            .status(StatusCode::FOUND)
-            .header("Location", "/threshold")
-            .body(Full::new(Bytes::new()))
-            .unwrap(),
+        EprUniversalDisposition::ServeShell => match state.epr_router.dispatch("/") {
+            Some(root) => dispatch_to_projected_epr(state, "/", root).await,
+            None => Response::builder()
+                .status(StatusCode::FOUND)
+                .header("Location", "/threshold")
+                .body(Full::new(Bytes::new()))
+                .unwrap(),
+        },
+    }
+}
+
+/// Tolerant local head lookup. Any failure → None (fail open to the shell).
+async fn fetch_head_facts(state: &AppState, id: &str) -> Option<HeadFacts> {
+    let storage_url = state
+        .args
+        .storage_url
+        .as_deref()?
+        .trim_end_matches('/')
+        .to_string();
+    let url = format!("{storage_url}/db/content/{id}");
+    let resp = state
+        .ssr_http_client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let v: serde_json::Value = resp.json().await.ok()?;
+    // Unwrap a possible envelope; tolerate either shape.
+    let body = v.get("item").unwrap_or(&v);
+    serde_json::from_value(body.clone()).ok()
+}
+
+/// Render the doorway sitemap (spec §7.5) — a DERIVED projection of the routing
+/// table that cannot drift from dispatch. One `<url>` per live mount plus one
+/// per claimed commons id (minted via the SAME `mint_mount_location` dispatch
+/// uses). Pure: no IO, table data only — the caller fetches commons ids.
+fn render_sitemap(
+    router: &crate::projection::EprRouter,
+    base_url: &str,
+    commons_ids_by_type: &[(String, Vec<String>)],
+) -> String {
+    let base = base_url.trim_end_matches('/');
+    let mut out = String::from(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
+    out.push('\n');
+    out.push_str(r#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"#);
+    out.push('\n');
+
+    // One entry per live mount (the pretty roots).
+    let mut mounts = router.mount_url_paths();
+    mounts.sort();
+    for mount in &mounts {
+        let path = if mount == "/" { "" } else { mount.as_str() };
+        out.push_str(&format!("  <url><loc>{base}{path}</loc></url>\n"));
+    }
+
+    // One entry per claimed commons id — minted through the same dispatch fn.
+    for (content_type, ids) in commons_ids_by_type {
+        for id in ids {
+            if let Some(loc) = router.claimed_mount_location(content_type, id) {
+                out.push_str(&format!("  <url><loc>{base}{loc}</loc></url>\n"));
+            }
+        }
+    }
+
+    out.push_str("</urlset>\n");
+    out
+}
+
+/// Serve `/sitemap.xml` (spec §7.5). Generation-invalidated materialized
+/// projection: serve the cache while it matches the router generation; on a
+/// miss, fetch commons ids per claimed type, render, recache, serve. Storage
+/// unavailable → render a mounts-only sitemap (fail open, log a warning).
+async fn serve_sitemap(state: &AppState, base_url: &str) -> Response<Full<Bytes>> {
+    let generation = state.epr_router.generation();
+
+    // Fast path: cached XML still matches the current routing-table generation.
+    {
+        let cache = state.sitemap_cache.read().await;
+        if let Some((cached_gen, xml)) = cache.as_ref() {
+            if *cached_gen == generation {
+                return sitemap_response(xml.clone(), generation);
+            }
+        }
+    }
+
+    // Materialize: fetch commons ids per claimed contentType (tolerant). A
+    // failure for any type yields an empty list for that type (fail open).
+    let mut commons_ids_by_type: Vec<(String, Vec<String>)> = Vec::new();
+    let storage_url = state
+        .args
+        .storage_url
+        .as_deref()
+        .map(|u| u.trim_end_matches('/').to_string());
+    for content_type in state.epr_router.claimed_content_types() {
+        let ids = match &storage_url {
+            Some(base) => fetch_commons_ids(state, base, &content_type).await,
+            None => {
+                tracing::warn!("sitemap: storage URL not configured — serving mounts-only sitemap");
+                Vec::new()
+            }
+        };
+        commons_ids_by_type.push((content_type, ids));
+    }
+
+    let xml = render_sitemap(&state.epr_router, base_url, &commons_ids_by_type);
+    {
+        let mut cache = state.sitemap_cache.write().await;
+        *cache = Some((generation, xml.clone()));
+    }
+    sitemap_response(xml, generation)
+}
+
+/// Build the standard sitemap HTTP response (shared by hit + miss paths).
+fn sitemap_response(xml: String, generation: u64) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/xml")
+        .header("cache-control", "public, max-age=300")
+        .header("ETag", format!("\"g{generation}\""))
+        .body(Full::new(Bytes::from(xml)))
+        .expect("infallible sitemap response")
+}
+
+/// Tolerant commons-id fetch for one claimed contentType. Any failure → empty
+/// (the sitemap omits that type's entries rather than 500ing — fail open).
+async fn fetch_commons_ids(
+    state: &AppState,
+    storage_base: &str,
+    content_type: &str,
+) -> Vec<String> {
+    let url =
+        format!("{storage_base}/db/content?contentType={content_type}&reach=commons&limit=500");
+    let resp = match state
+        .ssr_http_client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => r,
+        Ok(r) => {
+            tracing::warn!(content_type = %content_type, status = %r.status(),
+                "sitemap: commons-id fetch non-success — omitting type");
+            return Vec::new();
+        }
+        Err(e) => {
+            tracing::warn!(content_type = %content_type, error = %e,
+                "sitemap: commons-id fetch failed — omitting type");
+            return Vec::new();
+        }
+    };
+    let v: serde_json::Value = match resp.json().await {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+    // Tolerant parse: accept a bare array or an `{items:[...]}` envelope.
+    let items = v
+        .get("items")
+        .and_then(|i| i.as_array())
+        .or_else(|| v.as_array());
+    match items {
+        Some(arr) => arr
+            .iter()
+            .filter_map(|item| item.get("id").and_then(|id| id.as_str()).map(String::from))
+            .collect(),
+        None => Vec::new(),
     }
 }
 
@@ -1708,6 +1961,21 @@ async fn handle_request(
         && !hyper_tungstenite::is_upgrade_request(&req)
         && !is_service_path(&path)
     {
+        // Slice 3 alias law (spec §4): a notarized alias promise 302s BEFORE
+        // mount dispatch — template aliases may live under a live mount
+        // (e.g. /lamad/resource/{id}).
+        if let Some(location) = state.epr_router.resolve_alias(&path) {
+            tracing::debug!(path = %path, location = %location,
+                "alias promise matched — 302 (redirects_from / redirectTemplates)");
+            return Ok(to_boxed(
+                Response::builder()
+                    .status(StatusCode::FOUND)
+                    .header("Location", location)
+                    .header("cache-control", "public, max-age=300")
+                    .body(Full::new(Bytes::new()))
+                    .unwrap(),
+            ));
+        }
         if let Some(projection) = state.epr_router.dispatch(&path) {
             tracing::debug!(
                 path = %path,
@@ -2257,6 +2525,27 @@ async fn handle_request(
             return Ok(to_boxed(
                 routes::handle_app_request(Arc::clone(&state), p).await,
             ));
+        }
+
+        // Sitemap (spec §7.5): a derived projection of the routing table —
+        // mounts plus claimed commons entries. Event-invalidated by the EPR
+        // router generation; it cannot drift from dispatch.
+        (Method::GET, "/sitemap.xml") => {
+            // Derive the public origin from the Host header (the canonical
+            // doorway-origin pattern used by the streaming/SEO arms — no
+            // public_url/external_url field exists on Args).
+            let host = req
+                .headers()
+                .get("host")
+                .and_then(|h| h.to_str().ok())
+                .unwrap_or("localhost");
+            let scheme = if host.contains("localhost") || host.starts_with("127.") {
+                "http"
+            } else {
+                "https"
+            };
+            let base_url = format!("{scheme}://{host}");
+            to_boxed(serve_sitemap(&state, &base_url).await)
         }
 
         // Universal EPR address (§12.1): /epr/{id} → root bundle (shell epr/:id route).
@@ -3528,5 +3817,113 @@ mod epr_universal_tests {
         assert!(!is_reserved_url_path("/"));
         assert!(!is_reserved_url_path("/auth/portal"));
         assert!(!is_reserved_url_path("/lamad"));
+    }
+}
+
+#[cfg(test)]
+mod epr_claims_dispatch_tests {
+    use super::*;
+
+    #[test]
+    fn classify_redirects_claimed_commons() {
+        let d = classify_epr_universal(
+            Some(HeadFacts {
+                content_type: Some("path".into()),
+                reach: Some("commons".into()),
+            }),
+            Some("/lamad/path/abc".to_string()), // pre-resolved claimed location
+        );
+        assert_eq!(
+            d,
+            EprUniversalDisposition::RedirectToMount {
+                location: "/lamad/path/abc".into()
+            }
+        );
+    }
+
+    #[test]
+    fn classify_serves_shell_for_unclaimed_commons() {
+        let d = classify_epr_universal(
+            Some(HeadFacts {
+                content_type: Some("concept".into()),
+                reach: Some("commons".into()),
+            }),
+            None,
+        );
+        assert_eq!(d, EprUniversalDisposition::ServeShell);
+    }
+
+    #[test]
+    fn classify_never_redirects_gated_targets() {
+        // Spec §5.1: 302 only when reach passes — anon never passes non-commons.
+        let d = classify_epr_universal(
+            Some(HeadFacts {
+                content_type: Some("path".into()),
+                reach: Some("household:x".into()),
+            }),
+            Some("/lamad/path/abc".to_string()),
+        );
+        assert_eq!(d, EprUniversalDisposition::ServeShell);
+    }
+
+    #[test]
+    fn classify_serves_shell_when_head_unknown() {
+        // Fail open toward the floor (spec §9): no head facts → shell.
+        assert_eq!(
+            classify_epr_universal(None, None),
+            EprUniversalDisposition::ServeShell
+        );
+    }
+
+    #[test]
+    fn sitemap_xml_renders_mounts_and_claimed_entries() {
+        use elohim_views::projection::{
+            EprProjectionView, ProjectionMode, RouteClaimGrant, RouteClaimTemplate,
+        };
+        let router = crate::projection::epr_router::EprRouter::new();
+        let mut lamad = EprProjectionView {
+            commitment_id: "test-lamad".into(),
+            epr_id: "lamad".into(),
+            doorway_id: "doorway:test".into(),
+            url_path: "/lamad".into(),
+            mode: ProjectionMode::Cached,
+            reach: "commons".into(),
+            base_href: "/lamad/".into(),
+            entry_file: "index.html".into(),
+            spa_fallback: true,
+            redirects_from: vec![],
+            redirect_templates: vec![],
+            route_claims: None,
+            preview_epr_ref: None,
+            gate_hints: vec![],
+            dead_end: false,
+            steward_direct_endpoint: None,
+            seeded_at: "2026-06-06T00:00:00Z".into(),
+            seeded_by: "test".into(),
+        };
+        // give it the path claim as in Task 8's claim_binding test
+        lamad.route_claims = Some(RouteClaimGrant {
+            schema_version: 1,
+            claims_manifest_cid: None,
+            claims: vec![RouteClaimTemplate {
+                content_type: "path".into(),
+                template: "path/{id}".into(),
+                fragments: Default::default(),
+            }],
+        });
+        router.replace_all(vec![lamad]);
+        let xml = render_sitemap(
+            &router,
+            "https://alpha.elohim.host",
+            &[(
+                "path".to_string(),
+                vec!["foundations-christian-technology".to_string()],
+            )],
+        );
+        assert!(xml.contains("<loc>https://alpha.elohim.host/lamad</loc>"));
+        assert!(xml.contains(
+            "<loc>https://alpha.elohim.host/lamad/path/foundations-christian-technology</loc>"
+        ));
+        assert!(xml.starts_with("<?xml"));
     }
 }
