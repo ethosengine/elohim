@@ -57,6 +57,16 @@ export interface PWPage {
     arg?: unknown,
     options?: Record<string, unknown>
   ): Promise<unknown>;
+  /** Current viewport dimensions (null in some headless contexts). */
+  viewportSize(): { width: number; height: number } | null;
+  /** Keyboard input surface (e.g. `keyboard.press('Escape')`). */
+  keyboard: PWKeyboard;
+}
+
+/** Minimal stub for Playwright's page.keyboard. */
+export interface PWKeyboard {
+  press(key: string, options?: Record<string, unknown>): Promise<void>;
+  type(text: string, options?: Record<string, unknown>): Promise<void>;
 }
 
 /** Minimal stub for a Playwright Route handed to a `page.route` interceptor. */
@@ -82,6 +92,19 @@ export interface PWLocator {
   locator(selector: string): PWLocator;
   allTextContents(): Promise<string[]>;
   inputValue(): Promise<string>;
+  /** Element bounding box in page coordinates, or null if not rendered. */
+  boundingBox(options?: Record<string, unknown>): Promise<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>;
+  /** Evaluate a function in-page against the resolved element handle. */
+  evaluate<R>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fn: (element: any, arg?: any) => R,
+    arg?: unknown
+  ): Promise<R>;
 }
 
 interface PWBrowserContext {

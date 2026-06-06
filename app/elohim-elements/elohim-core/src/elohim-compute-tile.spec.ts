@@ -136,7 +136,8 @@ describe('<elohim-compute-tile> — lens coverage', () => {
     await elementUpdated(el);
     const text = el.shadowRoot!.textContent ?? '';
     // "5 GB free" or locale variant
-    expect(text).to.match(/\d.*free/i);
+    expect(text).to.match(/\d/);
+    expect(text.toLowerCase()).to.include('free');
   });
 
   it('standard lens: renders free-of-total tuple', async () => {

@@ -198,8 +198,9 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
 
     .reaction-count {
       font-size: 0.75rem;
+
       /* CanvasText, not GrayText: counts are ACTIVE content and GrayText is
-         the system DISABLED color (3.95:1 on a light Canvas — fails 4.5:1) */
+       the system DISABLED color (3.95:1 on a light Canvas — fails 4.5:1) */
       color: var(--elohim-reaction-count-fg, CanvasText);
       min-inline-size: 1rem;
       text-align: center;
@@ -213,7 +214,7 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
     .mediation-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgb(0 0 0 / 50%);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -439,6 +440,11 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
           aria-label="Mediation reflection"
           data-testid="mediation-dialog"
           @click=${(e: Event) => e.stopPropagation()}
+          @keydown=${(e: KeyboardEvent) => {
+            // Keep clicks/keys inside the dialog from reaching the overlay, but let
+            // Escape bubble so the overlay's close handler still fires.
+            if (e.key !== 'Escape') e.stopPropagation();
+          }}
         >
           <h3>A moment of reflection</h3>
           <p>${config.constitutionalReasoning}</p>

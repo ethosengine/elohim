@@ -432,93 +432,107 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
           })}
         </div>
 
-        ${this.selectedPosition === null
-          ? nothing
-          : html`
-              <div class="intensity-section" part="intensity-section">
-                <label class="intensity-label" for="intensity-slider-${this.entityId}">
-                  Intensity: ${this.getIntensityLabel()} (${this.intensity}/10)
-                </label>
-                <input
-                  id="intensity-slider-${this.entityId}"
-                  class="intensity-slider"
-                  type="range"
-                  min="1"
-                  max="10"
-                  .value=${String(this.intensity)}
-                  data-testid="intensity-slider"
-                  @input=${(e: Event) => {
-                    this.intensity = Number((e.target as HTMLInputElement).value);
-                  }}
-                />
-              </div>
-            `}
-        ${this.showReasoningField || this.reasoningIsRequired
-          ? html`
-              <div class="reasoning-section" part="reasoning-section">
-                <label class="reasoning-label" for="reasoning-text-${this.entityId}">
-                  ${this.reasoningIsRequired ? 'Reasoning (required)' : 'Reasoning (optional)'}
-                </label>
-                <textarea
-                  id="reasoning-text-${this.entityId}"
-                  class="reasoning-textarea"
-                  placeholder="Share your thinking..."
-                  rows="3"
-                  data-testid="reasoning-textarea"
-                  .value=${this.reasoning}
-                  @input=${(e: Event) => {
-                    this.reasoning = (e.target as HTMLTextAreaElement).value;
-                  }}
-                ></textarea>
-              </div>
-            `
-          : this.selectedPosition === null
-            ? nothing
-            : html`
-                <button
-                  class="toggle-reasoning-btn"
-                  type="button"
-                  data-testid="toggle-reasoning-btn"
-                  @click=${this.toggleReasoning}
-                >
-                  Add reasoning
-                </button>
-              `}
-        ${this.selectedPosition === null
-          ? nothing
-          : html`
-              <div class="submit-section" part="submit-section">
-                <button
-                  class="submit-btn"
-                  part="submit-btn"
-                  type="button"
-                  ?disabled=${!this.canSubmit || this.isSubmitting}
-                  data-testid="submit-feedback-btn"
-                  @click=${this.submit}
-                >
-                  ${this.isSubmitting
-                    ? 'Submitting...'
-                    : this.hasSubmitted
-                      ? 'Update Feedback'
-                      : 'Submit'}
-                </button>
-                ${this.hasSubmitted
-                  ? html`
-                      <button
-                        class="reset-btn"
-                        part="reset-btn"
-                        type="button"
-                        data-testid="reset-feedback-btn"
-                        @click=${this.reset}
-                      >
-                        Reset
-                      </button>
-                    `
-                  : nothing}
-              </div>
-            `}
+        ${this.renderIntensitySection()} ${this.renderReasoningSection()}
+        ${this.renderSubmitSection()}
         ${this.showAggregates && this.totalResponses > 0 && this.distribution
           ? this.renderAggregates()
+          : nothing}
+      </div>
+    `;
+  }
+
+  private renderIntensitySection(): unknown {
+    if (this.selectedPosition === null) return nothing;
+    return html`
+      <div class="intensity-section" part="intensity-section">
+        <label class="intensity-label" for="intensity-slider-${this.entityId}">
+          Intensity: ${this.getIntensityLabel()} (${this.intensity}/10)
+        </label>
+        <input
+          id="intensity-slider-${this.entityId}"
+          class="intensity-slider"
+          type="range"
+          min="1"
+          max="10"
+          .value=${String(this.intensity)}
+          data-testid="intensity-slider"
+          @input=${(e: Event) => {
+            this.intensity = Number((e.target as HTMLInputElement).value);
+          }}
+        />
+      </div>
+    `;
+  }
+
+  private renderReasoningSection(): unknown {
+    if (this.showReasoningField || this.reasoningIsRequired) {
+      const reasoningLabel = this.reasoningIsRequired
+        ? 'Reasoning (required)'
+        : 'Reasoning (optional)';
+      return html`
+        <div class="reasoning-section" part="reasoning-section">
+          <label class="reasoning-label" for="reasoning-text-${this.entityId}">
+            ${reasoningLabel}
+          </label>
+          <textarea
+            id="reasoning-text-${this.entityId}"
+            class="reasoning-textarea"
+            placeholder="Share your thinking..."
+            rows="3"
+            data-testid="reasoning-textarea"
+            .value=${this.reasoning}
+            @input=${(e: Event) => {
+              this.reasoning = (e.target as HTMLTextAreaElement).value;
+            }}
+          ></textarea>
+        </div>
+      `;
+    }
+    if (this.selectedPosition === null) return nothing;
+    return html`
+      <button
+        class="toggle-reasoning-btn"
+        type="button"
+        data-testid="toggle-reasoning-btn"
+        @click=${this.toggleReasoning}
+      >
+        Add reasoning
+      </button>
+    `;
+  }
+
+  private renderSubmitSection(): unknown {
+    if (this.selectedPosition === null) return nothing;
+    let submitLabel = 'Submit';
+    if (this.isSubmitting) {
+      submitLabel = 'Submitting...';
+    } else if (this.hasSubmitted) {
+      submitLabel = 'Update Feedback';
+    }
+    return html`
+      <div class="submit-section" part="submit-section">
+        <button
+          class="submit-btn"
+          part="submit-btn"
+          type="button"
+          ?disabled=${!this.canSubmit || this.isSubmitting}
+          data-testid="submit-feedback-btn"
+          @click=${this.submit}
+        >
+          ${submitLabel}
+        </button>
+        ${this.hasSubmitted
+          ? html`
+              <button
+                class="reset-btn"
+                part="reset-btn"
+                type="button"
+                data-testid="reset-feedback-btn"
+                @click=${this.reset}
+              >
+                Reset
+              </button>
+            `
           : nothing}
       </div>
     `;
@@ -535,7 +549,7 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
           Community response (${total} ${total === 1 ? 'response' : 'responses'})
         </p>
         <div class="distribution-bar" part="distribution-bar">
-          ${scale.positions.map(position => {
+          ${scale.positions.map((position): unknown => {
             const count = dist[position.label] ?? 0;
             const pct = total > 0 ? (count / total) * 100 : 0;
             if (pct === 0) return nothing;

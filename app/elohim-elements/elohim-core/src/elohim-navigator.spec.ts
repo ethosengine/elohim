@@ -66,8 +66,12 @@ describe('<elohim-navigator>', () => {
   });
 
   it('renders no identity tray items without host-supplied routes (blank-slate)', async () => {
-    const el = await fixture<ElohimNavigator>(html`<elohim-navigator></elohim-navigator>`);
-    const bubble = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="profile-bubble"]');
+    const el = await fixture<ElohimNavigator>(html`
+      <elohim-navigator></elohim-navigator>
+    `);
+    const bubble = el.shadowRoot?.querySelector<HTMLButtonElement>(
+      '[data-testid="profile-bubble"]'
+    );
     bubble?.click();
     await elementUpdated(el);
     expect(el.shadowRoot?.querySelector('[data-testid="nav-login"]')).to.equal(null);

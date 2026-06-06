@@ -112,7 +112,11 @@ export class ElohimMentionBase extends LitElement {
           role="presentation"
         ></span>
         <span class="label" part="label">${displayText}</span>
-        ${this.label ? html`<span class="id" part="id">${this.epr}</span>` : ''}
+        ${this.label
+          ? html`
+              <span class="id" part="id">${this.epr}</span>
+            `
+          : ''}
       </span>
     `;
   }

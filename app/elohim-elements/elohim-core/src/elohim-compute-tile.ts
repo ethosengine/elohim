@@ -215,7 +215,7 @@ export class ElohimComputeTile extends CapabilityAwareElement(LitElement) {
       padding: var(--elohim-compute-tile-padding, 0.75rem 1rem);
       font: inherit;
       min-inline-size: 0;
-      word-break: break-word;
+      overflow-wrap: break-word;
     }
 
     /* Header row */
@@ -231,7 +231,7 @@ export class ElohimComputeTile extends CapabilityAwareElement(LitElement) {
       inline-size: 0.5rem;
       block-size: 0.5rem;
       border-radius: 50%;
-      background: currentColor;
+      background: currentcolor;
       flex-shrink: 0;
     }
 
@@ -305,7 +305,7 @@ export class ElohimComputeTile extends CapabilityAwareElement(LitElement) {
     .meta {
       margin-block-start: 0.75rem;
       padding-block-start: 0.5rem;
-      border-block-start: 1px solid currentColor;
+      border-block-start: 1px solid currentcolor;
       font-size: 0.75em;
       font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
       color: var(--elohim-compute-tile-meta-color, CanvasText);
@@ -370,8 +370,8 @@ export class ElohimComputeTile extends CapabilityAwareElement(LitElement) {
     }
 
     /* Reduced-transparency: elements that use opacity for visual layering restore it
-       only when transparency is acceptable. Default (no media query) is full opacity
-       so forced-colors and high-contrast environments always get full legibility. */
+     only when transparency is acceptable. Default (no media query) is full opacity
+     so forced-colors and high-contrast environments always get full legibility. */
     @media (prefers-reduced-transparency: no-preference) {
       .value-detail {
         opacity: 0.8;
@@ -557,7 +557,7 @@ export class ElohimComputeTile extends CapabilityAwareElement(LitElement) {
     const idLine = this._renderMetaIdLine();
 
     const memberLine =
-      this.value?.kind === 'hub' && this.value.memberDeviceCount !== undefined
+      this.value?.kind === 'hub'
         ? html`
             <dt>${msg('Members')}</dt>
             <dd>${this.value.memberDeviceCount}</dd>

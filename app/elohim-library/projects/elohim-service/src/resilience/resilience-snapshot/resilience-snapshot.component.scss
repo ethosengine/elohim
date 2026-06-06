@@ -8,12 +8,29 @@
   font-size: 0.9em;
   line-height: 1;
   vertical-align: middle;
-  cursor: help;
+  cursor: pointer;
 
-  &.status-protected   { color: var(--success-600, #16a34a); }
-  &.status-partial     { color: var(--warning-600, #d97706); }
-  &.status-at-risk     { color: var(--danger-600, #dc2626); }
-  &.status-unknown     { color: var(--neutral-400, #9ca3af); }
+  &.status-protected {
+    color: var(--success-600, #16a34a);
+  }
+  &.status-partial {
+    color: var(--warning-600, #d97706);
+  }
+  &.status-at-risk {
+    color: var(--danger-600, #dc2626);
+  }
+  &.status-unknown {
+    color: var(--neutral-400, #9ca3af);
+  }
+}
+
+// The icon glyph is now a <button> in icon density; reset native chrome so
+// the glyph renders identically to the former <span>.
+button.resilience-icon {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
 }
 
 .resilience-icon-wrap {
@@ -23,10 +40,17 @@
   .resilience-tooltip {
     visibility: hidden;
     position: absolute;
-    bottom: 125%;
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
+    // Fold DOWN, inline-start aligned (logical properties — he/RTL claimed):
+    // down-right in LTR, down-left in RTL. Matches distribution-badge's
+    // top-chrome convention and keeps the tooltip inside the viewport when
+    // the snapshot is pinned to the top edge.
+    inset-block-start: calc(100% + 0.35rem);
+    inset-inline-start: 0;
+    // Wrap instead of running off the viewport edge.
+    max-inline-size: min(20rem, 80vw);
+    // A glance surface only — must never intercept the pointer (it overlaps
+    // the hypercard panel's anchor area and the click-outside detection).
+    pointer-events: none;
     background: var(--tooltip-bg, rgba(15, 23, 42, 0.92));
     color: var(--tooltip-fg, white);
     padding: 0.25rem 0.5rem;
@@ -35,9 +59,17 @@
     z-index: 1000;
   }
 
-  &:hover .resilience-tooltip,
-  &:focus-within .resilience-tooltip {
+  // Reveal the hover tooltip only off the icon button itself — NOT
+  // :focus-within on the wrap, which would also fire when focus lands inside
+  // the open hypercard panel (it shares this wrap). And never while the panel
+  // is open, so the two surfaces don't stack.
+  .resilience-icon:hover + .resilience-tooltip,
+  .resilience-icon:focus-visible + .resilience-tooltip {
     visibility: visible;
+  }
+
+  &.panel-open .resilience-tooltip {
+    visibility: hidden;
   }
 }
 
@@ -50,9 +82,15 @@
   background: var(--surface-1, white);
   border-left: 4px solid transparent;
 
-  &.status-protected { border-left-color: var(--success-600, #16a34a); }
-  &.status-partial   { border-left-color: var(--warning-600, #d97706); }
-  &.status-at-risk   { border-left-color: var(--danger-600, #dc2626); }
+  &.status-protected {
+    border-left-color: var(--success-600, #16a34a);
+  }
+  &.status-partial {
+    border-left-color: var(--warning-600, #d97706);
+  }
+  &.status-at-risk {
+    border-left-color: var(--danger-600, #dc2626);
+  }
 
   header {
     grid-column: 1 / -1;
@@ -63,8 +101,12 @@
 
   dl {
     display: contents;
-    dt { color: var(--text-muted, #64748b); }
-    dd { margin: 0; }
+    dt {
+      color: var(--text-muted, #64748b);
+    }
+    dd {
+      margin: 0;
+    }
   }
 }
 
@@ -80,7 +122,10 @@
     gap: 0.5rem;
     margin-bottom: 0.75rem;
 
-    h3 { margin: 0; flex: 1; }
+    h3 {
+      margin: 0;
+      flex: 1;
+    }
     .status-pill {
       padding: 0.125rem 0.5rem;
       border-radius: 999px;
@@ -95,8 +140,13 @@
     gap: 0.25rem 1rem;
     margin: 0 0 1rem;
 
-    dt { color: var(--text-muted, #64748b); }
-    dd { margin: 0; font-weight: 500; }
+    dt {
+      color: var(--text-muted, #64748b);
+    }
+    dd {
+      margin: 0;
+      font-weight: 500;
+    }
   }
 
   h4 {
@@ -105,7 +155,8 @@
     color: var(--text-muted, #64748b);
   }
 
-  .collective-list, .gap-list {
+  .collective-list,
+  .gap-list {
     margin: 0 0 0.75rem;
     padding-left: 1rem;
   }
@@ -116,7 +167,12 @@
     gap: 0.5rem;
     margin-bottom: 0.25rem;
 
-    .collective-label { font-weight: 500; }
-    .collective-kind { font-size: 0.85em; color: var(--text-muted, #64748b); }
+    .collective-label {
+      font-weight: 500;
+    }
+    .collective-kind {
+      font-size: 0.85em;
+      color: var(--text-muted, #64748b);
+    }
   }
 }

@@ -16,11 +16,11 @@ class TcBadContrast extends LitElement {
   static override readonly styles = css`
     :host {
       display: block;
-      background: #ffffff;
+      background: #fff;
     }
 
     p {
-      color: #cccccc; /* 1.6:1 on white — must be caught */
+      color: #ccc; /* 1.6:1 on white — must be caught */
     }
   `;
 

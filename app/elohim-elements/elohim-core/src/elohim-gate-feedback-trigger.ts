@@ -136,9 +136,12 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
       inset-block-start: 100%;
       inset-inline-end: 0;
       background: var(--elohim-gate-menu-bg, Canvas);
-      border: var(--elohim-gate-menu-border, 1px solid color-mix(in oklch, currentColor 20%, transparent));
+      border: var(
+        --elohim-gate-menu-border,
+        1px solid color-mix(in oklch, currentColor 20%, transparent)
+      );
       border-radius: var(--elohim-gate-menu-radius, 0.5rem);
-      box-shadow: var(--elohim-gate-menu-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
+      box-shadow: var(--elohim-gate-menu-shadow, 0 2px 8px rgb(0 0 0 / 15%));
       z-index: 100;
       min-inline-size: 140px;
     }
@@ -160,14 +163,17 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
 
     .menu-item:hover,
     .menu-item:focus-visible {
-      background: var(--elohim-gate-menu-item-hover-bg, color-mix(in oklch, Canvas 90%, CanvasText));
+      background: var(
+        --elohim-gate-menu-item-hover-bg,
+        color-mix(in oklch, Canvas 90%, CanvasText)
+      );
       outline: none;
     }
 
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgb(0 0 0 / 50%);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -181,7 +187,7 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
       inline-size: min(600px, calc(100vw - 2rem));
       max-block-size: 90vh;
       overflow-y: auto;
-      box-shadow: var(--elohim-gate-modal-shadow, 0 8px 32px rgba(0, 0, 0, 0.2));
+      box-shadow: var(--elohim-gate-modal-shadow, 0 8px 32px rgb(0 0 0 / 20%));
       color: CanvasText;
     }
 
@@ -225,7 +231,7 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
       inline-size: 100%;
       padding-block: 0.5rem;
       padding-inline: 0.75rem;
-      border: 1px solid color-mix(in oklch, currentColor 25%, transparent);
+      border: 1px solid color-mix(in oklch, currentcolor 25%, transparent);
       border-radius: 0.25rem;
       font: inherit;
       font-size: 0.875rem;
@@ -305,9 +311,8 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
   menuItems: GateFeedbackMenuItem[] = DEFAULT_MENU_ITEMS;
 
   @property({ attribute: false })
-  onFeedbackSubmit:
-    | ((type: GateFeedbackType, contentId: string, text: string) => void)
-    | null = null;
+  onFeedbackSubmit: ((type: GateFeedbackType, contentId: string, text: string) => void) | null =
+    null;
 
   @state() private menuOpen = false;
   @state() private modalOpen = false;
@@ -351,12 +356,11 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
                   >
                     ${item.label}
                   </button>
-                `,
+                `
               )}
             </div>
           `
         : nothing}
-
       ${this.modalOpen ? this.renderModal() : nothing}
     `;
   }
@@ -384,9 +388,19 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
           aria-labelledby="gate-modal-title"
           data-testid="feedback-modal-panel"
           @click=${(e: Event) => e.stopPropagation()}
+          @keydown=${(e: KeyboardEvent) => {
+            // Keep clicks/keys inside the panel from reaching the overlay, but let
+            // Escape bubble so the overlay's close handler still fires.
+            if (e.key !== 'Escape') e.stopPropagation();
+          }}
         >
           <div class="modal-header">
-            <h3 id="gate-modal-title" class="modal-title" part="modal-title" data-testid="feedback-modal-title">
+            <h3
+              id="gate-modal-title"
+              class="modal-title"
+              part="modal-title"
+              data-testid="feedback-modal-title"
+            >
               ${title}
             </h3>
             <button
@@ -428,9 +442,7 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
   private toggleMenu(): void {
     this.menuOpen = !this.menuOpen;
     if (this.menuOpen) {
-      this.dispatchEvent(
-        new CustomEvent('feedback-menu-open', { bubbles: true, composed: true }),
-      );
+      this.dispatchEvent(new CustomEvent('feedback-menu-open', { bubbles: true, composed: true }));
     }
   }
 
@@ -445,16 +457,14 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
         detail: { type },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
   private closeModal(): void {
     this.modalOpen = false;
     this.feedbackText = '';
-    this.dispatchEvent(
-      new CustomEvent('feedback-closed', { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent('feedback-closed', { bubbles: true, composed: true }));
   }
 
   private handleOverlayClick(e: MouseEvent): void {
@@ -484,7 +494,7 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
         detail: { type: this.activeFeedbackType, contentId: this.contentId, text },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
 
     this.isSubmitting = false;

@@ -70,6 +70,15 @@ importers:
       '@angular/ssr':
         specifier: ~19.2.25
         version: 19.2.25(efade4ca320b619d98c0d894805da231)
+      '@elohim/identity':
+        specifier: workspace:*
+        version: link:../elohim-library/projects/elohim-identity
+      '@elohim/rea-runtime':
+        specifier: workspace:*
+        version: link:../elohim-library/projects/elohim-rea-runtime
+      '@elohim/service':
+        specifier: workspace:*
+        version: link:../elohim-library/projects/elohim-service
       '@elohim/storage-client':
         specifier: workspace:*
         version: link:../../elohim/sdk/storage-client-ts
@@ -730,6 +739,9 @@ importers:
       commander:
         specifier: ^12.0.0
         version: 12.1.0
+      elohim-core:
+        specifier: workspace:*
+        version: link:../../../elohim-elements/elohim-core
       glob:
         specifier: ^10.3.0
         version: 10.5.0

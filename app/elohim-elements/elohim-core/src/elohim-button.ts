@@ -97,9 +97,9 @@ export class ElohimButton extends CapabilityAwareElement(LitElement) {
     }
 
     /* Blank-slate variant defaults are SYSTEM pairs (gospel: brand bake in
-       element CSS is the cardinal sin — the old fallbacks shipped #6b46c1 /
-       #ec4899 / #f3f4f6 inside the primitive; ghost's light-gray fg computed
-       1.1:1 on a light page). Brand binds via --elohim-button-* only. */
+     element CSS is the cardinal sin — the old fallbacks shipped #6b46c1 /
+     #ec4899 / #f3f4f6 inside the primitive; ghost's light-gray fg computed
+     1.1:1 on a light page). Brand binds via --elohim-button-* only. */
     :host([variant='primary']) button {
       background: var(--elohim-button-bg, AccentColor);
       color: var(--elohim-button-fg, AccentColorText);

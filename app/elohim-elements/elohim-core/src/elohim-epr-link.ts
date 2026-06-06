@@ -222,7 +222,7 @@ export class ElohimEprLink extends LitElement {
     `;
   }
 
-  private renderContextMenu() {
+  private renderContextMenu(): unknown {
     if (!this.menuOpen) return nothing;
     return html`
       <elohim-context-menu

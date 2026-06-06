@@ -688,4 +688,13 @@ export const PROTOCOL_OMNI = {
   FORWARD: 'protocol-omni-forward',
   ACCOUNT: 'protocol-omni-account',
   COLLAPSE: 'protocol-omni-collapse',
+  // Progressive disclosure (omnibar spec §11): clicking the omni resilience
+  // icon folds down a hypercard panel. The Angular host (resilience-snapshot)
+  // renders <elohim-hypercard-panel> and stamps this testid on it. The action
+  // buttons live INSIDE the panel's shadow root carrying part="action" and
+  // data-action-id="<id>" (e.g. "view-full") — Playwright's CSS engine pierces
+  // shadow DOM, so a descendant `[data-testid=...] [data-action-id=...]` query
+  // reaches them. Slotted full-density content (.resilience-full-card) lives in
+  // light DOM (the default slot), reachable by the same descendant query.
+  RESILIENCE_HYPERCARD: 'resilience-hypercard',
 } as const;

@@ -38,7 +38,7 @@ export interface EprHead {
   lamad: EprLamadContext;
   shefa: EprShefaContext;
   qahal: EprQahalContext;
-  relationships: Array<{ type: string; target: string; targetCid?: string }>;
+  relationships: { type: string; target: string; targetCid?: string }[];
   author?: string;
   updated?: string;
 }
@@ -133,9 +133,12 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
       padding: 0.75rem;
       background: var(--elohim-epr-popover-bg, Canvas);
       color: var(--elohim-epr-popover-fg, CanvasText);
-      border: var(--elohim-epr-popover-border, 1px solid color-mix(in oklch, currentColor 20%, transparent));
+      border: var(
+        --elohim-epr-popover-border,
+        1px solid color-mix(in oklch, currentColor 20%, transparent)
+      );
       border-radius: var(--elohim-epr-popover-radius, 0.5rem);
-      box-shadow: var(--elohim-epr-popover-shadow, 0 4px 16px rgba(0, 0, 0, 0.12));
+      box-shadow: var(--elohim-epr-popover-shadow, 0 4px 16px rgb(0 0 0 / 12%));
       font-size: 0.85rem;
       line-height: 1.4;
     }
@@ -195,7 +198,7 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
       background: var(--elohim-epr-tag-bg, Canvas);
       color: var(--elohim-epr-tag-fg, CanvasText);
       font-size: 0.75em;
-      border: 1px solid color-mix(in oklch, currentColor 15%, transparent);
+      border: 1px solid color-mix(in oklch, currentcolor 15%, transparent);
     }
 
     .section {
@@ -221,7 +224,7 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
       font-size: 0.75em;
       background: var(--elohim-epr-reach-bg, Canvas);
       color: var(--elohim-epr-reach-fg, CanvasText);
-      border: 1px solid color-mix(in oklch, currentColor 15%, transparent);
+      border: 1px solid color-mix(in oklch, currentcolor 15%, transparent);
     }
 
     .layer-badge {
@@ -231,16 +234,16 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
       font-size: 0.75em;
       background: var(--elohim-epr-layer-bg, Canvas);
       color: var(--elohim-epr-layer-fg, CanvasText);
-      border: 1px solid color-mix(in oklch, currentColor 15%, transparent);
+      border: 1px solid color-mix(in oklch, currentcolor 15%, transparent);
     }
 
     .link {
       display: block;
       margin-block-start: 0.5rem;
       padding-block-start: 0.5rem;
-      border-block-start: 1px solid var(--elohim-epr-divider-color, color-mix(in oklch, currentColor 15%, transparent));
+      border-block-start: 1px solid
+        var(--elohim-epr-divider-color, color-mix(in oklch, currentColor 15%, transparent));
       color: var(--elohim-epr-link-color, LinkText);
-      font-size: 0.8em;
       text-decoration: none;
       cursor: pointer;
       background: none;
@@ -320,7 +323,7 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
     }
   }
 
-  override render() {
+  override render(): unknown {
     if (!this.head || !this.visible) return nothing;
 
     const { lamad, shefa, qahal } = this.head;
@@ -330,6 +333,7 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
         class="popover"
         part="popover"
         role="tooltip"
+        aria-labelledby="epr-popover-title"
         data-testid="epr-popover"
         @mouseenter=${this.handleMouseEnter}
         @mouseleave=${this.handleMouseLeave}
@@ -343,18 +347,24 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
             ${lamad.contentType}
           </span>
           ${lamad.contentFormat
-            ? html`<span class="format" part="format" data-testid="epr-popover-format">
-                ${lamad.contentFormat}
-              </span>`
+            ? html`
+                <span class="format" part="format" data-testid="epr-popover-format">
+                  ${lamad.contentFormat}
+                </span>
+              `
             : nothing}
         </div>
 
-        <h4 class="title" part="title" data-testid="epr-popover-title">${lamad.title}</h4>
+        <h4 id="epr-popover-title" class="title" part="title" data-testid="epr-popover-title">
+          ${lamad.title}
+        </h4>
 
         ${lamad.description
-          ? html`<p class="description" part="description" data-testid="epr-popover-desc">
-              ${lamad.description}
-            </p>`
+          ? html`
+              <p class="description" part="description" data-testid="epr-popover-desc">
+                ${lamad.description}
+              </p>
+            `
           : nothing}
 
         <!-- Lamad: tags -->
@@ -362,7 +372,9 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
           ? html`
               <div class="tags" part="tags" data-testid="epr-popover-tags">
                 ${lamad.tags.map(
-                  tag => html`<span class="tag" part="tag">${tag}</span>`,
+                  tag => html`
+                    <span class="tag" part="tag">${tag}</span>
+                  `
                 )}
               </div>
             `
@@ -379,52 +391,58 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
           : nothing}
 
         <!-- Qahal: reach + layer -->
-        ${qahal?.reach || qahal?.layer
-          ? html`
-              <div class="section" part="qahal-section" data-testid="epr-popover-qahal">
-                ${qahal.reach
-                  ? html`<span class="reach-badge" part="reach-badge">${qahal.reach}</span>`
-                  : nothing}
-                ${qahal.layer
-                  ? html`<span class="layer-badge" part="layer-badge">${qahal.layer}</span>`
-                  : nothing}
-              </div>
-            `
-          : nothing}
+        ${this.renderQahalSection(qahal)}
 
         <!-- Footer: link to full resource — router event (in-bundle) or plain anchor (cross-bundle) -->
-        ${this.route
-          ? html`
-              <button
-                class="link"
-                part="link"
-                type="button"
-                data-testid="epr-popover-link"
-                @click=${this.handleLinkClick}
-              >
-                Open resource
-              </button>
-            `
-          : this.href
-            ? html`
-                <a
-                  class="link"
-                  part="link"
-                  href=${this.href}
-                  data-testid="epr-popover-link"
-                >
-                  Open resource
-                </a>
-              `
-            : nothing}
+        ${this.renderFooter()}
       </div>
     `;
   }
 
+  private renderQahalSection(qahal: EprQahalContext): unknown {
+    if (!qahal?.reach && !qahal?.layer) return nothing;
+    return html`
+      <div class="section" part="qahal-section" data-testid="epr-popover-qahal">
+        ${qahal.reach
+          ? html`
+              <span class="reach-badge" part="reach-badge">${qahal.reach}</span>
+            `
+          : nothing}
+        ${qahal.layer
+          ? html`
+              <span class="layer-badge" part="layer-badge">${qahal.layer}</span>
+            `
+          : nothing}
+      </div>
+    `;
+  }
+
+  private renderFooter(): unknown {
+    if (this.route) {
+      return html`
+        <button
+          class="link"
+          part="link"
+          type="button"
+          data-testid="epr-popover-link"
+          @click=${this.handleLinkClick}
+        >
+          Open resource
+        </button>
+      `;
+    }
+    if (this.href) {
+      return html`
+        <a class="link" part="link" href=${this.href} data-testid="epr-popover-link">
+          Open resource
+        </a>
+      `;
+    }
+    return nothing;
+  }
+
   private handleMouseEnter(): void {
-    this.dispatchEvent(
-      new CustomEvent('epr-popover-enter', { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent('epr-popover-enter', { bubbles: true, composed: true }));
   }
 
   private handleMouseLeave(): void {
@@ -432,9 +450,7 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
   }
 
   private dispatchDismiss(): void {
-    this.dispatchEvent(
-      new CustomEvent('epr-popover-dismiss', { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent('epr-popover-dismiss', { bubbles: true, composed: true }));
   }
 
   private handleLinkClick(): void {
@@ -444,7 +460,7 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
           detail: { route: this.route },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     }
   }

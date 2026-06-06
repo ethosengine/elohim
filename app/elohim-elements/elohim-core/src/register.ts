@@ -9,6 +9,7 @@ import { ElohimEprRelationshipsPanel } from './elohim-epr-relationships-panel.js
 import { ElohimFeedbackMechanismGateway } from './elohim-feedback-mechanism-gateway.js';
 import { ElohimGateFeedbackTrigger } from './elohim-gate-feedback-trigger.js';
 import { ElohimGraduatedFeedback } from './elohim-graduated-feedback.js';
+import { ElohimHypercardPanel } from './elohim-hypercard-panel.js';
 import { ElohimLangPicker } from './elohim-lang-picker.js';
 import { ElohimMentionBase } from './elohim-mention-base.js';
 import { ElohimNavigator } from './elohim-navigator.js';
@@ -102,4 +103,8 @@ if (!customElements.get('elohim-theme-toggle')) {
 
 if (!customElements.get('elohim-lang-picker')) {
   customElements.define('elohim-lang-picker', ElohimLangPicker);
+}
+
+if (!customElements.get('elohim-hypercard-panel')) {
+  customElements.define('elohim-hypercard-panel', ElohimHypercardPanel);
 }

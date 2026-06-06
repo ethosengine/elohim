@@ -196,13 +196,16 @@ describe('ProtocolOmniComponent serving context', () => {
       ],
     });
 
-    const fixture: ComponentFixture<ProtocolOmniComponent> = TestBed.createComponent(ProtocolOmniComponent);
+    const fixture: ComponentFixture<ProtocolOmniComponent> =
+      TestBed.createComponent(ProtocolOmniComponent);
     fixture.componentRef.setInput('contentId', 'elohim-host-landing');
     fixture.componentRef.setInput('showEnvContext', opts.showEnvContext ?? true);
     fixture.detectChanges();
 
     const expand = () => {
-      const chip: HTMLElement = fixture.nativeElement.querySelector('[data-testid="protocol-omni-chip"]');
+      const chip: HTMLElement = fixture.nativeElement.querySelector(
+        '[data-testid="protocol-omni-chip"]'
+      );
       chip?.click();
       fixture.detectChanges();
     };
@@ -234,9 +237,7 @@ describe('ProtocolOmniComponent serving context', () => {
     for (const tier of ['staging', 'development']) {
       const { fixture, expand } = setup({ environment: tier });
       expand();
-      expect(
-        fixture.nativeElement.querySelector('[data-testid="protocol-omni-env"]'),
-      ).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-testid="protocol-omni-env"]')).toBeTruthy();
     }
   });
 
@@ -371,6 +372,21 @@ describe('ProtocolOmniComponent resilience segment', () => {
     expect(segment()).not.toBeNull();
     expect(liveIcon()).toBeNull();
     expect(segment()?.textContent).toContain('◉');
+  });
+
+  it('renders the neutral glyph as a non-interactive span — no popup affordance over a null snapshot', () => {
+    // Spec §11.5: the hypercard is the live icon's affordance; with no
+    // snapshot there is nothing to fold down, so the neutral glyph must not
+    // advertise (or own) a dialog. Guards the *ngIf="resilience()" contract.
+    const { expand, segment } = setup({
+      getSnapshot: vi.fn(() => throwError(() => new Error('storage unreachable'))),
+    });
+    expand();
+    const neutral = segment()?.querySelector('.omni-resilience-neutral');
+    expect(neutral).not.toBeNull();
+    expect(neutral?.tagName).toBe('SPAN');
+    expect(segment()?.querySelector('button[aria-haspopup]')).toBeNull();
+    expect(segment()?.querySelector('elohim-hypercard-panel')).toBeNull();
   });
 
   it('surfaces the honest counts in the live tooltip (collectives headline, peers drilldown)', () => {

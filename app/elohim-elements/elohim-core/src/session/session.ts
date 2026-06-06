@@ -24,7 +24,7 @@ type Subscriber = (user: CurrentUserView | null) => void;
 
 export class Session {
   private _currentUser: CurrentUserView | null = null;
-  private subscribers = new Set<Subscriber>();
+  private readonly subscribers = new Set<Subscriber>();
 
   constructor() {
     this.refreshFromCookies();
@@ -46,17 +46,17 @@ export class Session {
   refreshFromCookies(): void {
     const prev = this._currentUser;
     const cookie = this.readCookie('elohim_session');
-    if (!cookie) {
-      this._currentUser = null;
-    } else {
+    if (cookie) {
       try {
         this._currentUser = JSON.parse(decodeURIComponent(cookie)) as CurrentUserView;
       } catch {
         this._currentUser = null;
       }
+    } else {
+      this._currentUser = null;
     }
     if (this.shallowEquals(prev, this._currentUser)) return;
-    this.subscribers.forEach((s) => s(this._currentUser));
+    this.subscribers.forEach(s => s(this._currentUser));
   }
 
   /** Subscribe to session changes. Returns an unsubscribe function. */
@@ -69,8 +69,8 @@ export class Session {
 
   private readCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
-    const all = document.cookie.split(';').map((c) => c.trim());
-    const found = all.find((c) => c.startsWith(`${name}=`));
+    const all = document.cookie.split(';').map(c => c.trim());
+    const found = all.find(c => c.startsWith(`${name}=`));
     return found ? found.slice(name.length + 1) : null;
   }
 

@@ -335,9 +335,9 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
     }
 
     /* warning/error were color-mix(in oklch, Canvas 85%, Canvas) — a no-op
-       (severity rendered identical to the page). Mark/MarkText is the only
-       system pair with highlight semantics; the binding layer overrides with
-       real severity colors. */
+     (severity rendered identical to the page). Mark/MarkText is the only
+     system pair with highlight semantics; the binding layer overrides with
+     real severity colors. */
     .banner-warning {
       background: var(--elohim-nav-banner-warning-bg, Mark);
       color: var(--elohim-nav-banner-warning-fg, MarkText);
@@ -353,8 +353,9 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
       border: none;
       cursor: pointer;
       padding: 0.25rem;
+
       /* inherit the banner's severity-paired fg — GrayText is the DISABLED
-         color and fails 3:1 on bound banner surfaces (active control) */
+       color and fails 3:1 on bound banner surfaces (active control) */
       color: inherit;
       min-block-size: 44px;
       min-inline-size: 44px;

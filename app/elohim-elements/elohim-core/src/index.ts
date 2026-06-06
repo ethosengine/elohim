@@ -117,6 +117,8 @@ export { ElohimThemeToggle } from './elohim-theme-toggle.js';
 
 export { ElohimLangPicker } from './elohim-lang-picker.js';
 
+export { ElohimHypercardPanel } from './elohim-hypercard-panel.js';
+
 export {
   LocaleStore,
   getLocaleStore,

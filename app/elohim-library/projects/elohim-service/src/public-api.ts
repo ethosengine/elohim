@@ -16,6 +16,8 @@
 export { ResilienceService } from './resilience/resilience.service';
 export { ResilienceSnapshotComponent } from './resilience/resilience-snapshot/resilience-snapshot.component';
 export type { ResilienceSnapshotDensity } from './resilience/resilience-snapshot/resilience-snapshot.types';
+/** Re-exported so hosts can type the resilience hypercard `actions` input without reaching into elohim-core. */
+export type { ContextMenuItem } from 'elohim-core';
 
 export { DistributionService } from './distribution/distribution.service';
 export { DistributionBadgeComponent } from './distribution/distribution-badge/distribution-badge.component';

@@ -1,4 +1,4 @@
-import { css, html, LitElement, nothing } from 'lit';
+import { css, html, LitElement, nothing, type TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 
 import { CapabilityAwareElement } from './capability/index.js';
@@ -167,7 +167,7 @@ export class ElohimFeedbackMechanismGateway extends CapabilityAwareElement(LitEl
   @property({ attribute: false })
   onChallengeAction: (() => void) | null = null;
 
-  @state() private showChallengeForm = false;
+  @state() private readonly showChallengeForm = false;
 
   override render() {
     if (this.loading || !this.selection) {
@@ -182,22 +182,11 @@ export class ElohimFeedbackMechanismGateway extends CapabilityAwareElement(LitEl
 
     return html`
       <div part="content">
-        ${sel.renderTarget === 'angular'
-          ? html`
-              ${sel.level === 0
-                ? html`<slot name="context-menu"></slot>`
-                : nothing}
-              ${sel.level >= 1
-                ? html`<slot name="reactions"></slot>`
-                : nothing}
-              ${sel.level >= 2
-                ? html`<slot name="graduated-feedback"></slot>`
-                : nothing}
-            `
-          : nothing}
-
+        ${sel.renderTarget === 'angular' ? this.renderAngularSlots(sel) : nothing}
         ${sel.renderTarget === 'psephos'
-          ? html`<slot name="psephos"></slot>`
+          ? html`
+              <slot name="psephos"></slot>
+            `
           : nothing}
 
         <slot name="aggregate"></slot>
@@ -206,6 +195,26 @@ export class ElohimFeedbackMechanismGateway extends CapabilityAwareElement(LitEl
           ? this.renderAccumulationBadges(this.accumulationStatus)
           : nothing}
       </div>
+    `;
+  }
+
+  private renderAngularSlots(sel: MechanismSelection): TemplateResult {
+    return html`
+      ${sel.level === 0
+        ? html`
+            <slot name="context-menu"></slot>
+          `
+        : nothing}
+      ${sel.level >= 1
+        ? html`
+            <slot name="reactions"></slot>
+          `
+        : nothing}
+      ${sel.level >= 2
+        ? html`
+            <slot name="graduated-feedback"></slot>
+          `
+        : nothing}
     `;
   }
 
@@ -233,9 +242,7 @@ export class ElohimFeedbackMechanismGateway extends CapabilityAwareElement(LitEl
         : nothing}
       ${status.settled
         ? html`
-            <div class="badge badge-settled" part="badge settled-badge">
-              Community consensus
-            </div>
+            <div class="badge badge-settled" part="badge settled-badge">Community consensus</div>
           `
         : nothing}
     `;
@@ -250,7 +257,7 @@ export class ElohimFeedbackMechanismGateway extends CapabilityAwareElement(LitEl
           detail: { entityType: this.entityType, entityId: this.entityId },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     }
   }

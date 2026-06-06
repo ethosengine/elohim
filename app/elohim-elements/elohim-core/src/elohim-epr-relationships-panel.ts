@@ -137,7 +137,10 @@ export class ElohimEprRelationshipsPanel extends CapabilityAwareElement(LitEleme
       padding-inline: 0.75rem;
       background: var(--elohim-epr-panel-card-bg, Canvas);
       color: var(--elohim-epr-panel-card-fg, CanvasText);
-      border: var(--elohim-epr-panel-card-border, 1px solid color-mix(in oklch, currentColor 20%, transparent));
+      border: var(
+        --elohim-epr-panel-card-border,
+        1px solid color-mix(in oklch, currentColor 20%, transparent)
+      );
       border-radius: var(--elohim-epr-panel-card-radius, 0.375rem);
       cursor: pointer;
       font: inherit;
@@ -205,7 +208,7 @@ export class ElohimEprRelationshipsPanel extends CapabilityAwareElement(LitEleme
     return this.relationships.length > 0 ? buildGroups(this.relationships) : [];
   }
 
-  override render() {
+  override render(): unknown {
     const groups = this.groups;
     if (groups.length === 0) return nothing;
 
@@ -218,12 +221,7 @@ export class ElohimEprRelationshipsPanel extends CapabilityAwareElement(LitEleme
 
   private renderGroup(group: RelationshipGroup) {
     return html`
-      <div
-        class="group"
-        part="group"
-        data-testid="epr-rel-group"
-        data-type=${group.type}
-      >
+      <div class="group" part="group" data-testid="epr-rel-group" data-type=${group.type}>
         <h3 class="group-heading" part="group-heading">${group.label}</h3>
         <div class="group-grid" part="group-grid">
           ${group.items.map(item => this.renderCard(item))}
@@ -264,7 +262,7 @@ export class ElohimEprRelationshipsPanel extends CapabilityAwareElement(LitEleme
           detail: { target },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     }
   }

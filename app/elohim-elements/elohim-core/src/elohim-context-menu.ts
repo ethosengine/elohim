@@ -47,7 +47,7 @@ export class ElohimContextMenu extends LitElement {
   @property({ type: Array }) items: ContextMenuItem[] = [];
 
   @state() private focusedIndex = -1;
-  @queryAll('[role="menuitem"]') private menuItems!: NodeListOf<HTMLElement>;
+  @queryAll('[role="menuitem"]') private readonly menuItems!: NodeListOf<HTMLElement>;
 
   private previouslyFocused: HTMLElement | null = null;
 
@@ -66,9 +66,10 @@ export class ElohimContextMenu extends LitElement {
       display: block;
       position: absolute;
       background: var(--elohim-menu-bg, Canvas);
-      border: 1px solid var(--elohim-menu-border, color-mix(in oklch, currentColor 15%, transparent));
+      border: 1px solid
+        var(--elohim-menu-border, color-mix(in oklch, currentColor 15%, transparent));
       border-radius: var(--elohim-menu-radius, 6px);
-      box-shadow: var(--elohim-menu-shadow, 0 4px 12px rgba(0, 0, 0, 0.12));
+      box-shadow: var(--elohim-menu-shadow, 0 4px 12px rgb(0 0 0 / 12%));
       min-inline-size: 180px;
       padding-block: 0.25rem;
       padding-inline: 0;
@@ -118,7 +119,6 @@ export class ElohimContextMenu extends LitElement {
     }
 
     [role='menuitem'] {
-      display: block;
       padding-block: 0.5rem;
       padding-inline: 1rem;
       cursor: pointer;
@@ -132,7 +132,7 @@ export class ElohimContextMenu extends LitElement {
 
     [role='menuitem']:hover,
     [role='menuitem']:focus {
-      background: color-mix(in oklch, currentColor 8%, transparent);
+      background: color-mix(in oklch, currentcolor 8%, transparent);
       outline: none;
     }
 
@@ -184,17 +184,25 @@ export class ElohimContextMenu extends LitElement {
               tabindex=${i === this.focusedIndex ? '0' : '-1'}
               aria-disabled=${item.disabled ? 'true' : 'false'}
               @click=${() => this.select(item)}
+              @keydown=${(e: KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  // Stop the parent role="menu" handleKeydown from also selecting (double-dispatch).
+                  e.stopPropagation();
+                  this.select(item);
+                }
+              }}
             >
               ${item.label}
             </li>
-          `,
+          `
         )}
       </ul>
     `;
   }
 
   private firstEnabledIndex(): number {
-    return this.items.findIndex((it) => !it.disabled);
+    return this.items.findIndex(it => !it.disabled);
   }
 
   private focusItem(i: number): void {
@@ -240,7 +248,7 @@ export class ElohimContextMenu extends LitElement {
         detail: { id: item.id },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this.handleClose();
   }

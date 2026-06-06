@@ -51,11 +51,7 @@ export class ElohimSkeleton extends LitElement {
       background: linear-gradient(
         90deg,
         transparent 0%,
-        var(
-            --elohim-skeleton-shimmer,
-            color-mix(in oklch, currentColor 20%, transparent)
-          )
-          50%,
+        var(--elohim-skeleton-shimmer, color-mix(in oklch, currentColor 20%, transparent)) 50%,
         transparent 100%
       );
     }
@@ -69,6 +65,7 @@ export class ElohimSkeleton extends LitElement {
         0% {
           transform: translateX(-100%);
         }
+
         100% {
           transform: translateX(100%);
         }

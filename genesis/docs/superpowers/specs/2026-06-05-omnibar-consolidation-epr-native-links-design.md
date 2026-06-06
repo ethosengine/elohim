@@ -4,9 +4,9 @@ id: omnibar-consolidation-epr-native-links-design
 status: Draft
 class: ui-truth-layer
 domain: D-epr-apps
-topic: [omnibar, protocol-omni, page-chrome, epr-link, navigation, debug-bar, serving-context, theme, locale, i18n, a11y, ua-prefs, elohim-core, lamad]
+topic: [omnibar, protocol-omni, page-chrome, epr-link, navigation, debug-bar, serving-context, theme, locale, i18n, a11y, ua-prefs, elohim-core, lamad, resilience, hypercard, context-menu, tooltip]
 cites:
-  - genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
+  - pillar-epr-decomposition-design | parent canon — omnibar slotted contract, EPR-link HyperCard semantics (§7.3–7.4 context-menu derivation + card-flip-in-place this spec's §11 resilience hypercard speaks), and the §12 URL-routing amendment | sha256:f14c5ebe1fc086d8 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
   - elohim-sdk-epr-app-boundaries-sprint-kickoff | SDK-boundary canon whose app-bootstrap/app-manifest workstreams this chrome work composes with — Tier-5 delivery-seam vocabulary and the manifest-as-canonical constraint | sha256:9776d193efcabc84 | path: genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md
   - sprint-1b-library-b-design | theme-binding discipline this spec honors — brand tokens bind at story-decorator level only, so the new toggle/picker elements stay blank-slate primitives | sha256:0d1ca1c9f6d09e92 | path: genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md
   - session-bridge-design | its deferred ephemeral-UI-preferences question is where the person-level preference-sync follow-up (§9.1) eventually lands | sha256:1d52dbaa44affce5 | path: genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md
@@ -288,7 +288,9 @@ failures silent; locale bundle failure → `en`.
 5. **Library B designed stories** for `<elohim-theme-toggle>` /
    `<elohim-lang-picker>` (graphos-designer lane).
 6. **Resilience indicator wiring** (`elohim-resilience-snapshot` into
-   protocol-omni) — pre-existing placeholder, untouched here.
+   protocol-omni) — ~~pre-existing placeholder, untouched here~~ **landed**
+   (icon density, lazy household-snapshot fetch) and **extended by §11**
+   (tooltip-direction fix + resilience hypercard).
 7. **ServingContext substrate home** — doorway emits serving-context provenance
    headers sibling to `X-Content-Address`/`X-Reach` (e.g. `X-Build-Id`,
    `X-Bundle-Address`, `X-Variant` from projection-commitment metadata);
@@ -323,3 +325,111 @@ install), 14 sweep files, `app.routes.spec.ts`, `navigation-browser.feature`,
 
 **Deleted** — `components/debug-bar/*` (4 files) + its usage in
 `home.component.{html,ts,spec}`.
+
+## 11. Resilience hypercard — progressive disclosure from the omni resilience segment
+
+Design session: 2026-06-06. Follow-up 6 landed after this spec was drafted
+(protocol-omni renders `<elohim-resilience-snapshot density="icon">`, lazily fed
+by `GET /api/v1/resilience/{id}/household`). Two defects/gaps in that landing:
+
+1. **Tooltip clips above the viewport.** The icon-density hover tooltip is
+   hard-coded `bottom: 125%` (always flips up); protocol-omni is fixed to the
+   top viewport edge (`inset: 0 0 auto 0`), so on desktop the tooltip renders
+   off-screen. Convention (matching `distribution-badge`'s `top: 100%; left: 0`):
+   top-chrome affordances fold **down**, inline-start-aligned — down-right in
+   LTR, down-left in RTL (logical properties; `he` is a claimed locale).
+2. **The resilience unit has no progressive path.** `elohim-resilience-snapshot`
+   already declares the density ladder (`icon → context → full`) but no
+   interaction walks it. Meanwhile the pillar-EPR-decomposition design
+   (§7.3–7.4) gives the protocol its HyperCard idiom — `<elohim-context-menu>`,
+   menu items derive from the EPR being looked at, cards flip in place. The
+   resilience icon should speak that idiom.
+
+### 11.1 Decisions (session record, 2026-06-06)
+
+| Decision | Verdict |
+|---|---|
+| Tooltip fate | **Keep** as the zero-click glance (L1), repositioned downward/inline-start. The existing a2o tooltip step stays green; coarse pointers rely on the click panel. |
+| Click affordance | Icon click folds down a **hypercard panel**: context-density body + action row. Progressive: tooltip (L1) → context panel (L2) → full card (L3, in-place flip). |
+| "View full resilience" | **In-place card flip** context→full inside the panel (HyperCard semantics; no full-resilience route exists and none is needed). Closing the panel resets to context density. |
+| Primitive | New blank-slate **`<elohim-hypercard-panel>`** in elohim-core — a generic anchored fold-down surface (default slot for content + `ContextMenuItem[]` action row), sibling of `<elohim-context-menu>` and reusing its item type + fold-down motion. Component-architect lane: capability tags, four gates, Library A stories. |
+| Boundary | Per pillar-EPR-decomposition §7.4 discipline: the Lit primitive renders slotted content + items and emits intent (`action-select`); *derivation* (which actions this EPR affords) is host-side; `resilience-snapshot` (Angular) owns the density flip; protocol-omni binds chrome theming via cssprops. |
+| Epic E actions (Steward this content / View network) | **Not wired here** — destinations don't exist yet. The `actions` input + `actionSelect` output carry the contract (mirrors epr-link's `contextMenuItems` / `epr-menu-select`); wiring is captured follow-up §11.6. |
+
+### 11.2 `<elohim-hypercard-panel>` (new, elohim-core)
+
+- Props: `open` (boolean, reflected), `actions: ContextMenuItem[]` (type imported
+  from `elohim-context-menu.ts`), `panelLabel: string` (the dialog's
+  `aria-label`; host-supplied — the element ships no built-in strings).
+- Default slot: arbitrary hypercard content.
+- Action row: renders below the slot when `actions` is non-empty; each action
+  button carries `part="action"` and `data-action-id="${item.id}"` (the
+  shadow-piercing test seam).
+- Events: `action-select` `{ detail: { id } }` (bubbles, composed), `close`.
+- Positioning convention: `:host([open])` is `position: absolute;
+  inset-block-start: calc(100% + 0.25rem); inset-inline-start: 0` — assumes a
+  `position: relative` anchor wrapper, same `.menu-anchor` convention as
+  epr-link. Folds **down + inline-start aligned** by construction.
+- A11y: non-modal `role="dialog"` + `aria-label`; Escape closes; click-outside
+  closes; focus moves into the panel on open and restores to the previously
+  focused element on close (same discipline as `<elohim-context-menu>`).
+- Motion: the `elohim-menu-fold-down` idiom (120ms ease-out), gated on
+  `prefers-reduced-motion: no-preference` and `update: fast`.
+- cssprops: `--elohim-hypercard-bg/border/radius/shadow/min-width/max-width/z`,
+  system-color defaults (`Canvas`/`CanvasText`); `forced-colors` support.
+- Four precondition gates + Library A default stories
+  (`Default/Core/elohim-hypercard-panel`: Standard, WithActions, Unstyled,
+  CustomTheme).
+
+### 11.3 `elohim-resilience-snapshot` changes (elohim-library)
+
+- **Tooltip fix**: `bottom: 125%` → below the icon (`top: calc(100% + 0.35rem)`);
+  centered transform → `inset-inline-start: 0`; `white-space: nowrap` →
+  wrapped at a sane `max-inline-size` so it cannot run off the viewport edge.
+- Icon density becomes interactive: the icon `<span>` becomes a `<button>`
+  (`aria-haspopup="dialog"`, `aria-expanded`, existing `aria-label` retained).
+  Click toggles the hypercard panel. The **neutral glyph stays non-interactive**
+  (no snapshot → nothing to show; the trust surface never fakes).
+- Panel content: the context-density body (markup extracted to a shared
+  `ng-template` so the `context` density and the panel render one source);
+  built-in default action `{ id: 'view-full', label: 'View full resilience' }`
+  flips the panel body to the full-density card in place.
+- New `@Input() actions` (host-injected extras, appended after the built-in) and
+  `@Output() actionSelect` (re-emits every selection id, built-in included —
+  mirrors epr-link's re-emit contract).
+- `CUSTOM_ELEMENTS_SCHEMA` + `import 'elohim-core/register'`
+  (`elohim-core: workspace:*` is already a declared dependency).
+
+### 11.4 protocol-omni binding
+
+`protocol-omni.component.css` binds the panel's cssprops to the chrome vars
+(`--elohim-hypercard-bg: var(--omni-bg)` etc. on `.omni-resilience`) so the
+fold-down matches the toolbar in both schemes — custom properties cascade into
+the Lit shadow root. No host actions injected yet (§11.6).
+
+### 11.5 Testing (story-first)
+
+a2o (extends `features/resilience/observable-distribution.feature`'s omni
+section): tooltip folds down fully inside the viewport (`@regression` anchor for
+the flip-up bug); icon click folds down the hypercard naming the stewarding
+collective count; "View full resilience" flips the card in place with the URL
+unchanged; Escape closes and restores focus to the icon.
+
+Unit: hypercard panel mirrors the context-menu spec structure (open/close,
+slot + action rendering, `action-select`, Escape/click-outside, focus restore,
+axe strict, i18n logical properties, ua-prefs no-motion, theme-contrast system
+cells). Angular: icon `aria-expanded` toggle, panel render on click, view-full
+flip, `actionSelect` re-emit, neutral-glyph non-interactivity.
+
+### 11.6 Captured follow-ups
+
+1. **Epic E action wiring** — "Steward this content" / "View network" items for
+   the omni resilience hypercard once their destinations exist (derivation
+   host-side per §7.4; protocol-omni injects via `actions`).
+2. **Lit migration of `elohim-resilience-snapshot`** — the Angular component is
+   the last non-Lit piece of the omni's segments; migrating it would let the
+   lamad bundle drop the Angular dependency for this surface
+   (component-architect + angular-architect lanes).
+3. **Tooltip → hypercard convergence** — once the panel has telemetry, consider
+   whether the hover tooltip should render the same context body at a glance
+   (one source, two stimuli) instead of the concatenated summary string.

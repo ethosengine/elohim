@@ -36,10 +36,13 @@ import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-
  *     density, fed by GET /api/v1/resilience/{id}/household — fetched
  *     lazily on first expansion; the collapsed chip never spends a
  *     round-trip. The headline is stewarding collectives (the household/
- *     collective is the resilience unit); peers-online is tooltip
- *     drilldown. With no snapshot (loading, error, empty substrate) the
- *     segment holds a neutral glyph that makes no status claim — the
- *     trust surface never cries wolf and never fakes a signal.)
+ *     collective is the resilience unit); peers-online is hover-tooltip
+ *     drilldown, and clicking the icon folds down a hypercard panel
+ *     (context body → in-place flip to the full card) bound to the chrome
+ *     theme via the panel's cssprops. With no snapshot (loading, error,
+ *     empty substrate) the segment holds a neutral glyph that makes no
+ *     status claim — the trust surface never cries wolf and never fakes a
+ *     signal.)
  *   - In-network back/forward (gated on ProtocolNavigationService —
  *     substrate-derived for cold visitors, session-derived for
  *     walked-from-protocol visitors)

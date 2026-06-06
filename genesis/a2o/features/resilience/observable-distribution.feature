@@ -183,6 +183,57 @@ Feature: Observable + contract-aware auto-distribute
     And the omni resilience icon has class "status-protected" or "status-partial"
     And the omni resilience tooltip mentions stewarding collectives
 
+  @browser-only @resilience-p1 @regression
+  Scenario: Omni resilience tooltip folds down into the viewport, never up out of it
+    # Regression anchor: the icon-density tooltip was hard-coded to flip UP
+    # (bottom: 125%); protocol-omni is fixed to the top viewport edge, so on
+    # desktop the tooltip rendered above y=0 — invisible. Top-chrome
+    # affordances fold DOWN, inline-start-aligned (editor-menu convention,
+    # matching the distribution badge's top:100%/left:0). Omnibar spec §11.
+    Given "content-alpha" has been distributed to at least 2 households
+    When I open the EPR resource page for "content-alpha"
+    And I expand the protocol omni toolbar
+    And I hover the omni resilience icon
+    Then the omni resilience tooltip is fully inside the viewport
+    And the omni resilience tooltip renders below the resilience icon
+
+  @browser-only @resilience-p1
+  Scenario: Clicking the omni resilience icon folds down the resilience hypercard
+    # Progressive disclosure (omnibar spec §11): tooltip is the zero-click
+    # glance; click folds down a hypercard panel with the context-density
+    # body — collectives, diversity, gaps — plus an action row. The panel
+    # speaks the protocol's HyperCard idiom (pillar-EPR-decomposition §7.4).
+    Given "content-alpha" has been distributed to at least 2 households
+    When I open the EPR resource page for "content-alpha"
+    And I expand the protocol omni toolbar
+    And I click the omni resilience icon
+    Then the resilience hypercard panel is visible below the icon
+    And the resilience hypercard names the stewarding collective count
+    And the resilience hypercard offers a "View full resilience" action
+
+  @browser-only @resilience-p1
+  Scenario: View full resilience flips the hypercard in place without navigating
+    # HyperCard semantics: cards flip in place — deepening disclosure never
+    # requires leaving the page. No full-resilience route exists, and none
+    # is needed.
+    Given "content-alpha" has been distributed to at least 2 households
+    When I open the EPR resource page for "content-alpha"
+    And I expand the protocol omni toolbar
+    And I click the omni resilience icon
+    And I choose the "View full resilience" hypercard action
+    Then the resilience hypercard shows the full resilience card
+    And the browser URL is unchanged
+
+  @browser-only @resilience-p1
+  Scenario: Escape closes the resilience hypercard and returns focus to the icon
+    Given "content-alpha" has been distributed to at least 2 households
+    When I open the EPR resource page for "content-alpha"
+    And I expand the protocol omni toolbar
+    And I click the omni resilience icon
+    And I press Escape in the resilience hypercard
+    Then the resilience hypercard panel is not visible
+    And the omni resilience icon has focus
+
   @wip @resilience-p1
   Scenario: Distribution badge defers details fetch until tooltip opens
     Given a content-viewer is open for "content-alpha"

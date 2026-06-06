@@ -178,13 +178,19 @@ export class ElohimContentAnalytics extends CapabilityAwareElement(LitElement) {
         <h3 class="title" part="title">Attention Metrics</h3>
 
         ${this.isLoading
-          ? html`<div class="loading" part="loading" data-testid="analytics-loading">Loading metrics...</div>`
+          ? html`
+              <div class="loading" part="loading" data-testid="analytics-loading">
+                Loading metrics...
+              </div>
+            `
           : nothing}
-
         ${this.hasError && !display
-          ? html`<div class="error" part="error" data-testid="analytics-error">Metrics unavailable.</div>`
+          ? html`
+              <div class="error" part="error" data-testid="analytics-error">
+                Metrics unavailable.
+              </div>
+            `
           : nothing}
-
         ${!this.isLoading && display
           ? html`
               <div class="grid" part="grid">
@@ -203,15 +209,14 @@ export class ElohimContentAnalytics extends CapabilityAwareElement(LitElement) {
               </div>
             `
           : nothing}
-
-        ${!this.isLoading
-          ? html`
+        ${this.isLoading
+          ? nothing
+          : html`
               <p class="note" part="note">
                 Metrics are protocol-native economic events, not external analytics. Views are
                 recorded after 3 seconds of engagement.
               </p>
-            `
-          : nothing}
+            `}
       </div>
     `;
   }
@@ -231,7 +236,7 @@ export class ElohimContentAnalytics extends CapabilityAwareElement(LitElement) {
             detail: result,
             bubbles: true,
             composed: true,
-          }),
+          })
         );
       } else {
         this.hasError = true;

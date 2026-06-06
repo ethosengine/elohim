@@ -564,6 +564,352 @@ Then(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Omni resilience tooltip direction + hypercard progressive disclosure
+// (omnibar-consolidation spec §11). Two defects healed here: (1) the icon
+// tooltip flipped UP (bottom:125%) and clipped above y=0 because protocol-omni
+// is pinned to the top viewport edge — it now folds DOWN, inline-start aligned
+// (the @regression anchor below); (2) the icon gains a click affordance that
+// folds down <elohim-hypercard-panel> (testid PROTOCOL_OMNI.RESILIENCE_HYPERCARD)
+// carrying the context-density body + an action row. The panel's action buttons
+// live in its shadow root (data-action-id="<id>", part="action"); slotted
+// full-density content (.resilience-full-card) lives in the default slot (light
+// DOM). Playwright's CSS engine pierces shadow DOM, so a descendant query off
+// the testid reaches both.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the omni resilience icon locator — the interactive button rendered by
+ * <elohim-resilience-snapshot> inside the PROTOCOL_OMNI.RESILIENCE wrapper.
+ * Two resilience-icon instances can coexist on /resource/{id} (omni topbar +
+ * content-viewer header), so omni steps always scope through the wrapper.
+ */
+function omniResilienceIcon(device: PlaywrightDevice) {
+  return device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE}"] [data-testid="resilience-icon"]`)
+    .first();
+}
+
+/**
+ * Map a human-facing hypercard action label to its stable action id. The
+ * built-in "View full resilience" action is { id: 'view-full' } (spec §11.3);
+ * the table grows as Epic E actions get wired (§11.6). Centralised so the
+ * "offers a {string} action" and "choose the {string} action" steps agree.
+ */
+const HYPERCARD_ACTION_IDS: Record<string, string> = {
+  'View full resilience': 'view-full',
+};
+
+function hypercardActionId(label: string): string {
+  const id = HYPERCARD_ACTION_IDS[label];
+  assert.ok(
+    id,
+    `Unknown hypercard action label "${label}" — add it to HYPERCARD_ACTION_IDS ` +
+      `(resilience.steps.ts) mapping label → data-action-id.`
+  );
+  return id;
+}
+
+// Captured by "I click the omni resilience icon" so the "browser URL is
+// unchanged" assertion can prove the in-place card flip never navigated.
+// Lives on the world (per-scenario) rather than a module-level let so parallel
+// scenarios don't clobber one another.
+const resilienceUrlKey = Symbol('resilience:urlBefore');
+
+/**
+ * Hover the omni resilience icon — opens the icon-density tooltip (the L1
+ * zero-click glance). Mirrors the hover-then-waitFor idiom the
+ * "tooltip mentions stewarding collectives" step uses.
+ */
+When('I hover the omni resilience icon', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const icon = omniResilienceIcon(device);
+  await icon.waitFor({ state: 'visible', timeout: 15_000 });
+  await icon.hover();
+  // Wait for the tooltip to render so the direction/viewport assertions that
+  // follow measure a laid-out box, not display:none geometry.
+  await device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE}"] [data-testid="resilience-tooltip"]`)
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+});
+
+/**
+ * REGRESSION ANCHOR (omnibar spec §11.3): the tooltip was hard-coded
+ * `bottom: 125%` (always flips up); protocol-omni is fixed to the top viewport
+ * edge, so on desktop the tooltip rendered above y=0 — invisible. Assert the
+ * tooltip's bounding box is FULLY inside the viewport: x>=0, y>=0, and the
+ * right/bottom edges within page.viewportSize(). This fails if the tooltip
+ * flips up off-screen again.
+ */
+Then('the omni resilience tooltip is fully inside the viewport', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const tooltip = device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE}"] [data-testid="resilience-tooltip"]`)
+    .first();
+  await tooltip.waitFor({ state: 'visible', timeout: 5_000 });
+  const box = await tooltip.boundingBox();
+  assert.ok(box, 'Expected the resilience tooltip to have a bounding box (is it visible?)');
+  const viewport = device.page.viewportSize();
+  assert.ok(viewport, 'Expected a viewport size (browser device should set one)');
+  assert.ok(
+    box.x >= 0 && box.y >= 0,
+    `Tooltip clips off the top/left edge: box=(${box.x}, ${box.y}). ` +
+      `Regression: it must fold DOWN into the viewport, never UP out of it.`
+  );
+  assert.ok(
+    box.x + box.width <= viewport.width && box.y + box.height <= viewport.height,
+    `Tooltip clips off the right/bottom edge: box right=${box.x + box.width}, ` +
+      `bottom=${box.y + box.height}; viewport=${viewport.width}x${viewport.height}.`
+  );
+});
+
+/**
+ * Assert the tooltip renders BELOW the icon (folds down, not up). Tooltip box
+ * top must be at or below the icon box bottom (1px slack for sub-pixel layout).
+ * Paired with the viewport-containment anchor above — together they pin the
+ * down-fold convention (matching distribution-badge's top:100%/left:0).
+ */
+Then(
+  'the omni resilience tooltip renders below the resilience icon',
+  async function (this: E2EWorld) {
+    const device = findPwDevice(this);
+    if (!device) {
+      assert.fail(NO_PW_DEVICE);
+    }
+    const iconBox = await omniResilienceIcon(device).boundingBox();
+    const tooltip = device.page
+      .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE}"] [data-testid="resilience-tooltip"]`)
+      .first();
+    const tooltipBox = await tooltip.boundingBox();
+    assert.ok(iconBox, 'Expected the resilience icon to have a bounding box');
+    assert.ok(tooltipBox, 'Expected the resilience tooltip to have a bounding box');
+    assert.ok(
+      tooltipBox.y >= iconBox.y + iconBox.height - 1,
+      `Tooltip must render below the icon: tooltip top=${tooltipBox.y}, ` +
+        `icon bottom=${iconBox.y + iconBox.height}. It should fold DOWN, not UP.`
+    );
+  }
+);
+
+/**
+ * Click the omni resilience icon — folds down the hypercard panel (the L2
+ * context-density disclosure). Also captures the current URL onto the world so
+ * the later "browser URL is unchanged" assertion can prove the in-place card
+ * flip never navigated.
+ */
+When('I click the omni resilience icon', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const icon = omniResilienceIcon(device);
+  await icon.waitFor({ state: 'visible', timeout: 15_000 });
+  // Capture before the click so the URL-unchanged check has a baseline even if
+  // the panel were (wrongly) to navigate.
+  (this as unknown as Record<symbol, unknown>)[resilienceUrlKey] = device.page.url();
+  await icon.click();
+});
+
+/**
+ * Assert the hypercard panel is visible AND folds DOWN (its box top is at or
+ * below the icon box bottom, 1px slack). Same down-fold convention as the
+ * tooltip — the click affordance must not flip up out of the top-pinned omni.
+ */
+Then('the resilience hypercard panel is visible below the icon', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const panel = device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE_HYPERCARD}"]`)
+    .first();
+  await panel.waitFor({ state: 'visible', timeout: 5_000 });
+  const panelBox = await panel.boundingBox();
+  const iconBox = await omniResilienceIcon(device).boundingBox();
+  assert.ok(panelBox, 'Expected the resilience hypercard to have a bounding box');
+  assert.ok(iconBox, 'Expected the resilience icon to have a bounding box');
+  assert.ok(
+    panelBox.y >= iconBox.y + iconBox.height - 1,
+    `Hypercard must fold down below the icon: panel top=${panelBox.y}, ` +
+      `icon bottom=${iconBox.y + iconBox.height}.`
+  );
+});
+
+/**
+ * Assert the panel's context body names the stewarding-collective count — a
+ * number followed by "collectives" (the household/collective is the resilience
+ * unit). Bounded \d{1,9} per the file's backtracking discipline; the count and
+ * label may be separated by markup, so they're matched independently.
+ */
+Then(
+  'the resilience hypercard names the stewarding collective count',
+  async function (this: E2EWorld) {
+    const device = findPwDevice(this);
+    if (!device) {
+      assert.fail(NO_PW_DEVICE);
+    }
+    const panel = device.page
+      .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE_HYPERCARD}"]`)
+      .first();
+    await panel.waitFor({ state: 'visible', timeout: 5_000 });
+    const text = ((await panel.textContent()) ?? '').trim();
+    // Bounded \d{1,9} avoids super-linear backtracking on adversarial input.
+    assert.match(text, /\d{1,9}/, `Expected the hypercard to render a count; got: "${text}"`);
+    assert.match(
+      text,
+      /collectives/i,
+      `Expected the hypercard to name "collectives"; got: "${text}"`
+    );
+  }
+);
+
+/**
+ * Assert the panel offers a named action — the action button is rendered inside
+ * the panel's shadow root carrying data-action-id="<id>". Map the human label
+ * to its id ("View full resilience" → "view-full"); Playwright's CSS engine
+ * pierces shadow DOM, so the descendant query off the testid reaches it.
+ */
+Then(
+  'the resilience hypercard offers a {string} action',
+  async function (this: E2EWorld, label: string) {
+    const device = findPwDevice(this);
+    if (!device) {
+      assert.fail(NO_PW_DEVICE);
+    }
+    const id = hypercardActionId(label);
+    const action = device.page
+      .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE_HYPERCARD}"] [data-action-id="${id}"]`)
+      .first();
+    await action.waitFor({ state: 'visible', timeout: 5_000 });
+  }
+);
+
+/**
+ * Choose (click) a named hypercard action — drives the in-place card flip
+ * (view-full) or, once wired, an Epic E destination (§11.6).
+ */
+When('I choose the {string} hypercard action', async function (this: E2EWorld, label: string) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const id = hypercardActionId(label);
+  const action = device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE_HYPERCARD}"] [data-action-id="${id}"]`)
+    .first();
+  await action.waitFor({ state: 'visible', timeout: 5_000 });
+  await action.click();
+});
+
+/**
+ * Assert the in-place card flip happened — the panel now renders the full-
+ * density resilience card. The slotted full card lives in the default slot
+ * (light DOM): assert either the .resilience-full-card container or its
+ * "Resilience snapshot" heading is present under the panel testid.
+ */
+Then('the resilience hypercard shows the full resilience card', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const fullCard = device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE_HYPERCARD}"] .resilience-full-card`)
+    .first();
+  const fullCardCount = await fullCard.count();
+  if (fullCardCount > 0) {
+    await fullCard.waitFor({ state: 'visible', timeout: 5_000 });
+    return;
+  }
+  // Fallback: the full card surfaces its "Resilience snapshot" heading even if
+  // the .resilience-full-card class name shifts.
+  const panel = device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE_HYPERCARD}"]`)
+    .first();
+  const text = ((await panel.textContent()) ?? '').trim();
+  assert.match(
+    text,
+    /Resilience snapshot/i,
+    `Expected the full resilience card (.resilience-full-card or "Resilience snapshot" ` +
+      `heading) after the in-place flip; got: "${text}"`
+  );
+});
+
+/**
+ * Assert the browser URL is unchanged since "I click the omni resilience icon"
+ * captured it — proves HyperCard semantics (the card flips in place; no
+ * navigation). Fails with a clear message if the capture step never ran.
+ */
+Then('the browser URL is unchanged', function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const before = (this as unknown as Record<symbol, unknown>)[resilienceUrlKey] as
+    | string
+    | undefined;
+  assert.ok(
+    before !== undefined,
+    'No baseline URL captured — the "I click the omni resilience icon" step must run ' +
+      'before "the browser URL is unchanged".'
+  );
+  assert.equal(
+    device.page.url(),
+    before,
+    'Expected the URL to be unchanged (HyperCard in-place flip, no navigation).'
+  );
+});
+
+/**
+ * Press Escape from inside the resilience hypercard — closes the non-modal
+ * dialog (the element listens for Escape from anywhere inside, per spec §11.2).
+ */
+When('I press Escape in the resilience hypercard', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  await device.page.keyboard.press('Escape');
+});
+
+/**
+ * Assert the hypercard panel is no longer visible (closed).
+ */
+Then('the resilience hypercard panel is not visible', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  await device.page
+    .locator(`[data-testid="${PROTOCOL_OMNI.RESILIENCE_HYPERCARD}"]`)
+    .first()
+    .waitFor({ state: 'hidden', timeout: 5_000 });
+});
+
+/**
+ * Assert focus returned to the omni resilience icon — the panel restores focus
+ * to the previously focused element on close (spec §11.2). Compare the icon's
+ * element identity against document.activeElement, evaluated in-page (mirrors
+ * the feedback-gate focus assertion). The icon lives in the snapshot's shadow
+ * root, so resolve it via the same selector chain the locator uses.
+ */
+Then('the omni resilience icon has focus', async function (this: E2EWorld) {
+  const device = findPwDevice(this);
+  if (!device) {
+    assert.fail(NO_PW_DEVICE);
+  }
+  const icon = omniResilienceIcon(device);
+  await icon.waitFor({ state: 'visible', timeout: 5_000 });
+  const focused = await icon.evaluate(el => el === document.activeElement);
+  assert.ok(focused, 'Expected focus to return to the omni resilience icon after Escape.');
+});
+
 /**
  * Assert that the distribution badge tooltip (opened via hover/focus on the
  * badge) mentions the household count. C3 wired the tooltip text as

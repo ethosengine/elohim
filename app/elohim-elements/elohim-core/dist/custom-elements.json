@@ -973,7 +973,8 @@
               "type": {
                 "text": "NodeListOf<HTMLElement>"
               },
-              "privacy": "private"
+              "privacy": "private",
+              "readonly": true
             },
             {
               "kind": "field",
@@ -1470,7 +1471,12 @@
             {
               "kind": "method",
               "name": "renderContextMenu",
-              "privacy": "private"
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "unknown"
+                }
+              }
             },
             {
               "kind": "field",
@@ -1796,6 +1802,34 @@
               "description": "Whether the popover is visible",
               "attribute": "visible",
               "reflects": true
+            },
+            {
+              "kind": "method",
+              "name": "renderQahalSection",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "unknown"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "qahal",
+                  "type": {
+                    "text": "EprQahalContext"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "renderFooter",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "unknown"
+                }
+              }
             },
             {
               "kind": "method",
@@ -2384,7 +2418,26 @@
                 "text": "boolean"
               },
               "privacy": "private",
+              "readonly": true,
               "default": "false"
+            },
+            {
+              "kind": "method",
+              "name": "renderAngularSlots",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "TemplateResult"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "sel",
+                  "type": {
+                    "text": "MechanismSelection"
+                  }
+                }
+              ]
             },
             {
               "kind": "method",
@@ -3223,6 +3276,36 @@
             },
             {
               "kind": "method",
+              "name": "renderIntensitySection",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "unknown"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "renderReasoningSection",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "unknown"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "renderSubmitSection",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "unknown"
+                }
+              }
+            },
+            {
+              "kind": "method",
               "name": "renderAggregates",
               "privacy": "private"
             },
@@ -3460,6 +3543,299 @@
           "declaration": {
             "name": "ElohimGraduatedFeedback",
             "module": "src/elohim-graduated-feedback.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-hypercard-panel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-hypercard-panel> — anchored fold-down hypercard panel.\n\nA generic fold-down surface providing a default slot for arbitrary hypercard\ncontent and an optional action row below the slot. Intended as the\nprogressive L2 disclosure surface from a position:relative anchor wrapper\n(the same .menu-anchor convention as <elohim-epr-link>).\n\nPositioning: :host([open]) is position:absolute; inset-block-start:\ncalc(100% + 0.25rem); inset-inline-start:0 — folds DOWN + inline-start\naligned (down-right LTR, down-left RTL). Top-chrome affordances conventionally\nfold downward so they render on-screen under fixed top-edge chrome.\n\nAccessibility: non-modal role=\"dialog\" + aria-label from panelLabel; Escape\ncloses from anywhere inside; click-outside closes; on open focus moves into\nthe panel (first enabled action button, else the panel container with\ntabindex=\"-1\"); on close focus restores to the previously focused element.\n\nMotion: fold-down animation (120ms ease-out) gated on\n(prefers-reduced-motion: no-preference) and (update: fast).",
+          "name": "ElohimHypercardPanel",
+          "cssProperties": [
+            {
+              "description": "Panel background (default: Canvas)",
+              "name": "--elohim-hypercard-bg"
+            },
+            {
+              "description": "Panel border (default: 1px solid color-mix(in oklch, currentColor 15%, transparent))",
+              "name": "--elohim-hypercard-border"
+            },
+            {
+              "description": "Panel border-radius (default: 6px)",
+              "name": "--elohim-hypercard-radius"
+            },
+            {
+              "description": "Panel drop shadow (default: 0 4px 12px rgba(0,0,0,0.12))",
+              "name": "--elohim-hypercard-shadow"
+            },
+            {
+              "description": "Minimum inline size (default: 240px)",
+              "name": "--elohim-hypercard-min-width"
+            },
+            {
+              "description": "Maximum inline size (default: min(22rem, 80vw))",
+              "name": "--elohim-hypercard-max-width"
+            },
+            {
+              "description": "z-index when open (default: 1000)",
+              "name": "--elohim-hypercard-z"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The outer panel container (role=\"dialog\")",
+              "name": "container"
+            },
+            {
+              "description": "The slot wrapper div",
+              "name": "content"
+            },
+            {
+              "description": "The action row container (only present when actions is non-empty)",
+              "name": "action-row"
+            },
+            {
+              "description": "Each action button in the action row",
+              "name": "action"
+            }
+          ],
+          "slots": [
+            {
+              "description": "Arbitrary hypercard content rendered above the action row",
+              "name": ""
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "open",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the panel is visible (reflected attribute)",
+              "attribute": "open",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "actions",
+              "type": {
+                "text": "ContextMenuItem[]"
+              },
+              "default": "[]",
+              "description": "Action row items; row is absent when empty",
+              "attribute": "actions"
+            },
+            {
+              "kind": "field",
+              "name": "panelLabel",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "aria-label for the dialog; host-supplied — the element ships NO built-in strings",
+              "attribute": "panelLabel"
+            },
+            {
+              "kind": "field",
+              "name": "focusedActionIndex",
+              "type": {
+                "text": "number"
+              },
+              "privacy": "private",
+              "default": "-1"
+            },
+            {
+              "kind": "field",
+              "name": "previouslyFocused",
+              "type": {
+                "text": "HTMLElement | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "containerEl",
+              "type": {
+                "text": "HTMLElement | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "clickOutsideHandler",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "firstEnabledActionIndex",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "number"
+                }
+              }
+            },
+            {
+              "kind": "method",
+              "name": "moveFocusIn",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            },
+            {
+              "kind": "field",
+              "name": "handleKeydown",
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "selectAction",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "item",
+                  "type": {
+                    "text": "ContextMenuItem"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "handleClose",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "action-select",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "{ detail: { id: string } } when an action is activated. The panel stays open — selection is intent, not dismissal; the HOST decides whether to close (set open=false), per the §11.1 boundary discipline. This is what makes in-place card flips possible (host swaps slotted content on selection without the panel closing underneath it)."
+            },
+            {
+              "name": "close",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "When the panel closes (Escape / click-outside), bubbles + composed"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "open",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Whether the panel is visible (reflected attribute)",
+              "fieldName": "open"
+            },
+            {
+              "name": "actions",
+              "type": {
+                "text": "ContextMenuItem[]"
+              },
+              "default": "[]",
+              "description": "Action row items; row is absent when empty",
+              "fieldName": "actions"
+            },
+            {
+              "name": "panelLabel",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "aria-label for the dialog; host-supplied — the element ships NO built-in strings",
+              "fieldName": "panelLabel"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-hypercard-panel",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "detail",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en",
+              "es",
+              "he"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual",
+              "symbolic"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "not-observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "n/a",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "n/a",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ContextMenuItem",
+          "declaration": {
+            "name": "ContextMenuItem",
+            "module": "./elohim-context-menu.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimHypercardPanel",
+          "declaration": {
+            "name": "ElohimHypercardPanel",
+            "module": "src/elohim-hypercard-panel.ts"
           }
         }
       ]
@@ -5994,6 +6370,14 @@
         },
         {
           "kind": "js",
+          "name": "ElohimHypercardPanel",
+          "declaration": {
+            "name": "ElohimHypercardPanel",
+            "module": "./elohim-hypercard-panel.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "LocaleStore",
           "declaration": {
             "name": "LocaleStore",
@@ -6205,6 +6589,14 @@
           "declaration": {
             "name": "ElohimLangPicker",
             "module": "/src/elohim-lang-picker.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-hypercard-panel",
+          "declaration": {
+            "name": "ElohimHypercardPanel",
+            "module": "/src/elohim-hypercard-panel.js"
           }
         }
       ]
@@ -6493,73 +6885,347 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
+      "path": "src/localize/locale-store.ts",
       "declarations": [
+        {
+          "kind": "variable",
+          "name": "LOCALE_STORAGE_KEY",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale'"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_CHANGE_EVENT",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale-changed'"
+        },
+        {
+          "kind": "variable",
+          "name": "SUPPORTED_LOCALES",
+          "type": {
+            "text": "[sourceLocale, ...targetLocales]"
+          },
+          "default": "[sourceLocale, ...targetLocales]"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_LABELS",
+          "type": {
+            "text": "Readonly<Record<ElohimLocale, string>>"
+          },
+          "default": "{ en: 'English', es: 'Español', he: 'עברית', }",
+          "description": "Native-script labels — intentionally NOT localized (each language names itself)."
+        },
+        {
+          "kind": "function",
+          "name": "detectLocale",
+          "return": {
+            "type": {
+              "text": "ElohimLocale"
+            }
+          },
+          "description": "navigator.language 'es-MX' → 'es' when supported, else the en source locale."
+        },
         {
           "kind": "class",
           "description": "",
-          "name": "Loader",
+          "name": "LocaleStore",
           "members": [
             {
               "kind": "field",
-              "name": "verifyCid",
+              "name": "_locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_destroyed",
               "type": {
                 "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "_onStorage",
+              "type": {
+                "text": "(e: StorageEvent) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "_onLocaleChange",
+              "type": {
+                "text": "(e: Event) => void"
               },
               "privacy": "private",
               "readonly": true
             },
             {
               "kind": "method",
-              "name": "resolve",
+              "name": "destroy",
               "return": {
                 "type": {
-                  "text": "Promise<LoaderResolution>"
+                  "text": "void"
+                }
+              },
+              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getLocaleStore()) is intentionally never destroyed."
+            },
+            {
+              "kind": "field",
+              "name": "locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "set",
+              "return": {
+                "type": {
+                  "text": "void"
                 }
               },
               "parameters": [
                 {
-                  "name": "cid",
+                  "name": "locale",
                   "type": {
-                    "text": "string"
+                    "text": "ElohimLocale"
                   }
                 }
               ]
             },
             {
               "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
+              "name": "subscribe",
               "return": {
                 "type": {
-                  "text": "Promise<void>"
+                  "text": "() => void"
                 }
               },
               "parameters": [
                 {
-                  "name": "cid",
+                  "name": "fn",
                   "type": {
-                    "text": "string"
+                    "text": "Subscriber"
                   }
-                },
+                }
+              ],
+              "description": "Subscribe to locale changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "adopt",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
                 {
-                  "name": "bytes",
+                  "name": "locale",
                   "type": {
-                    "text": "Uint8Array"
+                    "text": "ElohimLocale"
+                  }
+                }
+              ],
+              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
+            },
+            {
+              "kind": "method",
+              "name": "applyToDocument",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
                   }
                 }
               ]
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "ElohimLocale | null"
+                }
+              }
             }
           ]
+        },
+        {
+          "kind": "function",
+          "name": "getLocaleStore",
+          "return": {
+            "type": {
+              "text": "LocaleStore"
+            }
+          },
+          "description": "Module-level singleton — all islands in a document share one store."
         }
       ],
       "exports": [
         {
           "kind": "js",
-          "name": "Loader",
+          "name": "LOCALE_STORAGE_KEY",
           "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
+            "name": "LOCALE_STORAGE_KEY",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_CHANGE_EVENT",
+          "declaration": {
+            "name": "LOCALE_CHANGE_EVENT",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SUPPORTED_LOCALES",
+          "declaration": {
+            "name": "SUPPORTED_LOCALES",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_LABELS",
+          "declaration": {
+            "name": "LOCALE_LABELS",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "detectLocale",
+          "declaration": {
+            "name": "detectLocale",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LocaleStore",
+          "declaration": {
+            "name": "LocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getLocaleStore",
+          "declaration": {
+            "name": "getLocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/runtime.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "type": {
+            "text": "string"
+          },
+          "default": "'en'"
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "['es', 'he']"
+          },
+          "default": "['es', 'he']"
+        },
+        {
+          "kind": "variable",
+          "name": "{ getLocale, setLocale }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "{ getLocale, setLocale }",
+          "declaration": {
+            "name": "{ getLocale, setLocale }",
+            "module": "src/localize/runtime.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/source-locale.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "smokeGreeting",
+          "parameters": [
+            {
+              "name": "name",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "smokeGreeting",
+          "declaration": {
+            "name": "smokeGreeting",
+            "module": "src/localize/source-locale.ts"
           }
         }
       ]
@@ -6670,6 +7336,7 @@
               "kind": "field",
               "name": "subscribers",
               "privacy": "private",
+              "readonly": true,
               "default": "new Set<Subscriber>()"
             },
             {
@@ -7487,347 +8154,73 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/localize/locale-store.ts",
+      "path": "src/loader/loader.ts",
       "declarations": [
-        {
-          "kind": "variable",
-          "name": "LOCALE_STORAGE_KEY",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-locale'"
-        },
-        {
-          "kind": "variable",
-          "name": "LOCALE_CHANGE_EVENT",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-locale-changed'"
-        },
-        {
-          "kind": "variable",
-          "name": "SUPPORTED_LOCALES",
-          "type": {
-            "text": "[sourceLocale, ...targetLocales]"
-          },
-          "default": "[sourceLocale, ...targetLocales]"
-        },
-        {
-          "kind": "variable",
-          "name": "LOCALE_LABELS",
-          "type": {
-            "text": "Readonly<Record<ElohimLocale, string>>"
-          },
-          "default": "{ en: 'English', es: 'Español', he: 'עברית', }",
-          "description": "Native-script labels — intentionally NOT localized (each language names itself)."
-        },
-        {
-          "kind": "function",
-          "name": "detectLocale",
-          "return": {
-            "type": {
-              "text": "ElohimLocale"
-            }
-          },
-          "description": "navigator.language 'es-MX' → 'es' when supported, else the en source locale."
-        },
         {
           "kind": "class",
           "description": "",
-          "name": "LocaleStore",
+          "name": "Loader",
           "members": [
             {
               "kind": "field",
-              "name": "_locale",
-              "type": {
-                "text": "ElohimLocale"
-              },
-              "privacy": "private"
-            },
-            {
-              "kind": "field",
-              "name": "_destroyed",
+              "name": "verifyCid",
               "type": {
                 "text": "boolean"
               },
               "privacy": "private",
-              "default": "false"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "readonly": true,
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "_onStorage",
-              "type": {
-                "text": "(e: StorageEvent) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "_onLocaleChange",
-              "type": {
-                "text": "(e: Event) => void"
-              },
-              "privacy": "private",
               "readonly": true
             },
             {
               "kind": "method",
-              "name": "destroy",
+              "name": "resolve",
               "return": {
                 "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getLocaleStore()) is intentionally never destroyed."
-            },
-            {
-              "kind": "field",
-              "name": "locale",
-              "type": {
-                "text": "ElohimLocale"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "set",
-              "return": {
-                "type": {
-                  "text": "void"
+                  "text": "Promise<LoaderResolution>"
                 }
               },
               "parameters": [
                 {
-                  "name": "locale",
+                  "name": "cid",
                   "type": {
-                    "text": "ElohimLocale"
+                    "text": "string"
                   }
                 }
               ]
             },
             {
               "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to locale changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "adopt",
+              "name": "verifyCidMatches",
               "privacy": "private",
               "return": {
                 "type": {
-                  "text": "void"
+                  "text": "Promise<void>"
                 }
               },
               "parameters": [
                 {
-                  "name": "locale",
+                  "name": "cid",
                   "type": {
-                    "text": "ElohimLocale"
+                    "text": "string"
                   }
-                }
-              ],
-              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
-            },
-            {
-              "kind": "method",
-              "name": "applyToDocument",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
+                },
                 {
-                  "name": "locale",
+                  "name": "bytes",
                   "type": {
-                    "text": "ElohimLocale"
+                    "text": "Uint8Array"
                   }
                 }
               ]
-            },
-            {
-              "kind": "method",
-              "name": "load",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "ElohimLocale | null"
-                }
-              }
             }
           ]
-        },
-        {
-          "kind": "function",
-          "name": "getLocaleStore",
-          "return": {
-            "type": {
-              "text": "LocaleStore"
-            }
-          },
-          "description": "Module-level singleton — all islands in a document share one store."
         }
       ],
       "exports": [
         {
           "kind": "js",
-          "name": "LOCALE_STORAGE_KEY",
+          "name": "Loader",
           "declaration": {
-            "name": "LOCALE_STORAGE_KEY",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LOCALE_CHANGE_EVENT",
-          "declaration": {
-            "name": "LOCALE_CHANGE_EVENT",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "SUPPORTED_LOCALES",
-          "declaration": {
-            "name": "SUPPORTED_LOCALES",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LOCALE_LABELS",
-          "declaration": {
-            "name": "LOCALE_LABELS",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "detectLocale",
-          "declaration": {
-            "name": "detectLocale",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LocaleStore",
-          "declaration": {
-            "name": "LocaleStore",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "getLocaleStore",
-          "declaration": {
-            "name": "getLocaleStore",
-            "module": "src/localize/locale-store.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/runtime.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "sourceLocale",
-          "type": {
-            "text": "string"
-          },
-          "default": "'en'"
-        },
-        {
-          "kind": "variable",
-          "name": "targetLocales",
-          "type": {
-            "text": "['es', 'he']"
-          },
-          "default": "['es', 'he']"
-        },
-        {
-          "kind": "variable",
-          "name": "{ getLocale, setLocale }"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "sourceLocale",
-          "declaration": {
-            "name": "sourceLocale",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "targetLocales",
-          "declaration": {
-            "name": "targetLocales",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "{ getLocale, setLocale }",
-          "declaration": {
-            "name": "{ getLocale, setLocale }",
-            "module": "src/localize/runtime.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/source-locale.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "smokeGreeting",
-          "parameters": [
-            {
-              "name": "name",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "smokeGreeting",
-          "declaration": {
-            "name": "smokeGreeting",
-            "module": "src/localize/source-locale.ts"
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
           }
         }
       ]
