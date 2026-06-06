@@ -7,7 +7,7 @@ domain: D8
 topic: [epr, routing, routeClaims, redirect, alias, sitemap, conformance, doorway, dispatch]
 cites:
   - epr-route-claims-link-conformance-design | THE spec this plan implements — Slice-3 routing contract (claims, alias law, conformance); plan tasks map to its gap items | sha256:69717bb30c4113be | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md
-  - pillar-epr-decomposition-design | the canonical parent whose §12.3/§12.6/§12.8 get forward-pointer amendments in Task 13 | sha256:f14c5ebe1fc086d8 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
+  - pillar-epr-decomposition-design | the canonical parent whose §12.3/§12.6/§12.8 get forward-pointer amendments in Task 13 | sha256:8029079cea758380 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
   - epr-slice2-universal-address-plan | the landed predecessor plan — Slice-2 surfaces (universal address, client claims, bridge component) this plan builds on and partially retires | sha256:78644191dd11bf3d | path: genesis/docs/superpowers/plans/2026-06-06-epr-slice2-universal-address-plan.md
 ---
 

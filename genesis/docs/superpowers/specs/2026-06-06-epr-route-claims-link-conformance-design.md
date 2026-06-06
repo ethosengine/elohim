@@ -10,7 +10,7 @@ informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
   - genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
 cites:
-  - pillar-epr-decomposition-design | THE parent: §12 URL & Routing Contract whose §12.3/§12.8 routeClaims sketch this spec elevates; refines edge | sha256:f14c5ebe1fc086d8 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
+  - pillar-epr-decomposition-design | THE parent: §12 URL & Routing Contract whose §12.3/§12.8 routeClaims sketch this spec elevates; refines edge | sha256:8029079cea758380 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
   - epr-slice2-universal-address-plan | landed Slice-2 plan: locked decisions (universal address, bridge rationale, /auth vocabulary) this design builds on | sha256:78644191dd11bf3d | path: genesis/docs/superpowers/plans/2026-06-06-epr-slice2-universal-address-plan.md
   - omnibar-consolidation-epr-native-links-design | locked cross-bundle link mechanics (plain href + interceptor, ServingContext) this spec must not contradict | sha256:92df16eea8d9bcf8 | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
   - semantic-computable-links-design | docs-corpus content-addressed link integrity (slug/fingerprint/status) — the model extended here to runtime links (claims-stale isomorphism) | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md

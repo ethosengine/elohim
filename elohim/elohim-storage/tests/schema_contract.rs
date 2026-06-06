@@ -3440,8 +3440,14 @@ fn epr_projection_view_with_route_claims_matches_schema() {
     };
 
     let json = serde_json::to_value(&view).unwrap();
-    assert_eq!(json["routeClaims"]["claims"][0]["contentType"], serde_json::json!("path"));
-    assert_eq!(json["redirectTemplates"][0]["from"], serde_json::json!("/lamad/resource/{id}"));
+    assert_eq!(
+        json["routeClaims"]["claims"][0]["contentType"],
+        serde_json::json!("path")
+    );
+    assert_eq!(
+        json["redirectTemplates"][0]["from"],
+        serde_json::json!("/lamad/resource/{id}")
+    );
     validate_against_schema("views/epr-projection-view.schema.json", &json);
 }
 
