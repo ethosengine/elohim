@@ -1,3 +1,11 @@
+---
+title: Sprint 3 — Storage Replication (Dwelling-Hub Tier) Implementation Notes
+status: landed
+landed_commit: a169ab72c
+verified_by: ci-investigator 2026-06-06 — delivery-stasis claim verification; all T1–T19 commits in the table below resolve in history; documented stubs (find_counter, reciprocity-imbalance log-only, capacity readers) are intentional Sprint 3 boundaries
+created: 2026-05-28
+---
+
 # Sprint 3 — Storage Replication (Dwelling-Hub Tier) Implementation Notes
 
 **Status:** Landed 2026-05-28 (subagent-driven execution)

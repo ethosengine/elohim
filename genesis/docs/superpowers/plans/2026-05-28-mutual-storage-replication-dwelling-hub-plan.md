@@ -1,3 +1,11 @@
+---
+title: Mutual Storage Replication (Dwelling-Hub Tier) Implementation Plan
+status: landed
+landed_commit: a169ab72c
+verified_by: ci-investigator 2026-06-06 — delivery-stasis claim verification; 19/20 tasks verified on disk (T1–T20 commits d51993d90..a169ab72c resolve; services/schemas/migrations/sweettest/a2o features all present). Sole gap — replicates_dwelling_integration.rs (File Structure line ~96) was aspirational, never task-assigned, never committed.
+created: 2026-05-28
+---
+
 # Mutual Storage Replication (Dwelling-Hub Tier) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -93,7 +101,7 @@ elohim/sdk/schemas/v1/views/replica-peer.schema.json            (EDIT — shards
 elohim/sdk/schemas/v1/views/household-resilience-view.schema.json (EDIT — commitmentBackedReplication)
 
 elohim/elohim-storage/tests/
-├── replicates_dwelling_integration.rs                 (NEW — 4 stories)
+├── replicates_dwelling_integration.rs                 (NEW — 4 stories)  <!-- NOT BUILT: never assigned to a task; verified absent 2026-06-06. Coverage landed via T18 sweettest + T19 a2o instead. -->
 ├── peer_capacity_view_integration.rs                  (NEW — 3 stories)
 ├── hub_capacity_view_integration.rs                   (NEW — 2 stories)
 └── distribution_view_extensions_integration.rs        (NEW — 3 stories)

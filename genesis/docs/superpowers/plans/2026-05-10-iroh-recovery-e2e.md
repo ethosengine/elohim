@@ -2,6 +2,8 @@
 title: iroh Phase 11 Cutover Gate #5 — Recovery e2e Cross-Stack Harness
 id: iroh-recovery-e2e
 status: complete
+landed_commit: d5e29fb67
+verified_by: ci-investigator 2026-06-06 — delivery-stasis claim verification; all Rust artifacts on disk (7 test fns in iroh_recovery_cross_stack.rs, multi_stack_fixture wired, recovery::transport tracing, step stubs); feature file later scope-reconciled to held (1064b1e92), deliberate
 # scope is gap-granular (iroh ≠ shem): the iroh transport / loopback fixture / Rust round-trip tests are
 # household-testable now; ONLY the live cross-node e2e tasks (Steps 6.2/6.3/9.2/9.4) carry @requires:shem.
 # No doc-level requires_env → this plan stays on the plate; only those gaps are BLOCKED-BY-ENV. See _lib/env_scope.py.
@@ -578,6 +580,6 @@ Gate results:
 - `cargo test --features p2p,p2p-iroh --test iroh_recovery_cross_stack -- --test-threads=1`: **7 passed, 0 failed** (90s wall clock)
 - `@wip` removed from feature file; scenarios are `@phase11-gate5` permanently
 
-Commits: `d086fd7b4` (initial 7-file harness), follow-up warning-fix + @wip-removal (see worktree HEAD)
+Commits: `d5e29fb67` (initial 7-file harness — the SHA `d086fd7b4` previously recorded here does not exist in history; corrected 2026-06-06 during claim verification), follow-up warning-fix + @wip-removal `b6a60787c`
 
 **Cutover gate #5 closed**: recovery-seed shares traverse whichever transport profile each peer supports.
