@@ -9,6 +9,14 @@ Feature: ProtocolOmniComponent makes protocol context legible at the top of the 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
+  # @wip 2026-06-06: premature — no epr_atoms row for "elohim-host-landing" can exist
+  # today. Every insert path (epr_service::ingest / ingest_with_cache / PUT /api/v1/epr
+  # / P2P cold-fetch) enforces CID integrity (compute_cid == envelope.cid), so a
+  # slug-keyed atom is unbuildable; slug-addressability of EPR atoms is an unmade
+  # design decision (the omnibar plan is frontend-only, zero backend). Blocking work
+  # tracked in genesis/data/timeline/backlog/seed-provenance-anchor-gap.md (landing
+  # EPR seed path + slug-alias design question).
+  @wip
   Scenario: The EPR nav-context endpoint serves a navigation projection
     When I GET "/api/v1/epr/elohim-host-landing/nav-context" from the doorway
     Then the doorway response status is 200
