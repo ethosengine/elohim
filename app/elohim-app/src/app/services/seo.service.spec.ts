@@ -281,6 +281,12 @@ describe('SeoService', () => {
       expect(links.length).toBe(1);
       expect((links[0] as HTMLLinkElement).href).toBe('https://example.com/second');
     });
+
+    it('generates canonical from router.url at the root base href', () => {
+      service.updateSeo({ title: 'T', description: 'D' });
+      const canonical = mockDocument.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+      expect(canonical?.href).toBe('https://elohim.host/test-path');
+    });
   });
 
   // =========================================================================

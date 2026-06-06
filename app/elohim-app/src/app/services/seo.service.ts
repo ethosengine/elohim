@@ -312,11 +312,19 @@ export class SeoService {
   }
 
   /**
-   * Generate canonical URL from current route
+   * Generate canonical URL from current route. Bundles are served under a
+   * base href (lamad: /lamad/) and router.url is base-stripped — re-prefix so
+   * the canonical names the PUBLIC URL (§12.1; SEO absolute URLs are keepers).
    */
   private generateCanonicalUrl(): string {
     const path = this.router.url.split('?')[0]; // Remove query params
-    return `${DEFAULTS.siteUrl}${path}`;
+    const baseUri = this.document.baseURI;
+    const base =
+      baseUri.startsWith('http://') || baseUri.startsWith('https://')
+        ? new URL(baseUri).pathname.replace(/\/$/, '')
+        : '';
+    const publicPath = `${base}${path}`.replace(/\/{2,}/g, '/');
+    return `${DEFAULTS.siteUrl}${publicPath}`;
   }
 
   /**
@@ -400,7 +408,8 @@ export class SeoService {
     createdAt?: string;
     updatedAt?: string;
   }): void {
-    const canonicalUrl = `${DEFAULTS.siteUrl}/resource/${content.id}`;
+    // Universal EPR address (§12.1) — the durable, bundle-agnostic canonical.
+    const canonicalUrl = `${DEFAULTS.siteUrl}/epr/${content.id}`;
     const description = content.summary ?? `${content.title} - ${content.contentType} content`;
 
     this.updateSeo({
