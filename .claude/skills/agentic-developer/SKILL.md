@@ -146,21 +146,20 @@ mcp__jenkins__getBuild jobFullName="elohim-orchestrator/dev"  # or matching bran
 
 Confirm the mode read with the user during the Objective interview — they may have context the build status doesn't reflect ("yes deploy is green but I'm here to fix one specific scenario, run as bring-up"). Mode is recorded in the journal header.
 
-### Multi-candidate observation (current state)
+### Multi-candidate observation (settled design, 2026-06-06)
 
-Integration mode wants `ci-observer` to surface multiple failure candidates,
-not just `primary_failure`. **Today's schema** (`.claude/schemas/haiku-output.schema.json`)
-returns one `primary_failure` and has no `failure_candidates` array, so the
-orchestrator composes the candidate set itself by **dispatching `ci-observer`
-multiple times against the same build with different artifact scopes** (see
-"Iteration loop adaptations in integration mode" → Step 2, and
-`.claude/agents/ci-observer.md` → "Integration-mode dispatch"). That is the
-working path — use it.
-
-The `failure_candidates: array` schema extension is unbuilt future work, not
-a step of this loop. It is NOT tracked in the skill body (anti-dump); if/when
-it's worth doing it belongs in a gap-item or backlog entry, scoped against the
-findings-sentinel spec.
+Integration mode wants multiple failure candidates, and the design is
+**multi-dispatch by construction** (operator decision closing the
+`failure_candidates` schema question): the orchestrator composes the
+candidate set by **dispatching `ci-observer` multiple times against the same
+build with different artifact scopes** (see "Iteration loop adaptations in
+integration mode" → Step 2, and `.claude/agents/ci-observer.md` →
+"Integration-mode dispatch"). This is not a workaround — it keeps the Haiku
+absorber's contract bounded (one artifact, one structural summary, no
+cross-artifact judgment) and puts composition where the tier discipline puts
+judgment: the Opus orchestrator. Haiku dispatches parallelize cheaply; a
+single-dispatch multi-candidate schema would buy little and cost the
+absorber's role clarity.
 
 ## Kickoff (interactive — first 2-3 minutes)
 

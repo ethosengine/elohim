@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""delivery-gate — SessionStart LIGHT advisory (delivery-stasis-loop spec §4.3).
+
+A one-line planning feed for the session: delivery-scoreboard counts plus the
+single highest-leverage opportunity that could be caught in flight. It is
+LEGIBILITY, NOT A TRIGGER — the injected context explicitly instructs the
+session to keep the pilot's direction and only raise an item if it BLOCKS the
+pilot's subject. No network, local-file reads only, <1s, silent at stasis,
+fail-silent always.
+"""
+
+import json
+import os
+import sys
+
+PROJECT = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
+
+def jread(rel, default):
+    try:
+        with open(os.path.join(PROJECT, rel), encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return default
+
+
+def jsonl_count(rel, pred=lambda e: True):
+    path = os.path.join(PROJECT, rel)
+    n = 0
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for raw in fh:
+                try:
+                    if pred(json.loads(raw)):
+                        n += 1
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        pass
+    return n
+
+
+def main():
+    # Doc-budget numbers come from placement-audit's FILTERED judgment (the
+    # session headline) — never recount raw gap-items here (raw totals
+    # include terminal/historical specs and read as thousands of noise).
+    claimed = 0
+    try:
+        import subprocess
+
+        head = subprocess.run(
+            ["python3", os.path.join(PROJECT, ".claude/scripts/memory-kit/placement-audit.py"),
+             "--headline"],
+            capture_output=True, text=True, timeout=10, cwd=PROJECT,
+        ).stdout
+        import re
+
+        m = re.search(r"(\d+)\s+claimed-unverified", head)
+        if m:
+            claimed = int(m.group(1))
+    except Exception:  # noqa: BLE001 — headline parse is best-effort
+        pass
+
+    ci_open = jsonl_count(".claude/data/ci-findings.jsonl", lambda e: e.get("status") == "open")
+    dep_open = jsonl_count(".claude/data/deprecations.jsonl", lambda e: e.get("status") != "fixed")
+
+    # Worst pass-ratio among jobs with a meaningful window.
+    worst_job, worst_ratio = None, None
+    for job, window in (jread(".claude/data/ci-cursor.json", {}).get("recent", {}) or {}).items():
+        if len(window) >= 4:
+            ratio = window.count("SUCCESS") / len(window)
+            if worst_ratio is None or ratio < worst_ratio:
+                worst_job, worst_ratio = job, ratio
+
+    pressures = []
+    if claimed:
+        pressures.append((claimed, f"{claimed} CLAIMED-unverified (→ /deliver)"))
+    if ci_open:
+        pressures.append((ci_open, f"{ci_open} open CI findings (→ ci-failure-triage / shift rails)"))
+    if dep_open:
+        pressures.append((dep_open, f"{dep_open} live dep/sec findings (→ /deprecation-stasis)"))
+    if worst_ratio is not None and worst_ratio < 0.5:
+        pressures.append((10, f"{worst_job} pass_ratio {worst_ratio:.0%} (floor pressure)"))
+
+    if not pressures:
+        return  # stasis — say nothing
+
+    pressures.sort(reverse=True)
+    top = pressures[0][1]
+    summary = " · ".join(p[1].split(" (")[0] for p in pressures[:4])
+
+    context = (
+        f"DELIVERY GATE (advisory, planning-feed only): {summary}. "
+        f"Highest-leverage if the session has room: {top}. "
+        f"Full loop: /delivery-stasis. RULE: this line informs session "
+        f"direction and surfaces what could be caught in flight — it must NOT "
+        f"disrupt or change the pilot's direction unless one of these items "
+        f"is a BLOCKER to the subject the pilot is directing."
+    )
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "SessionStart",
+                    "additionalContext": context,
+                }
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except BaseException:  # noqa: BLE001 — never break session start
+        pass
+    sys.exit(0)

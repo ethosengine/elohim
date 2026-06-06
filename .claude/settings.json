@@ -27,6 +27,12 @@
             "timeout": 90,
             "statusMessage": "Harvesting CI results since cursor...",
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/delivery-gate.py\"",
+            "timeout": 15,
+            "statusMessage": "Delivery gate (advisory)..."
           }
         ]
       }
