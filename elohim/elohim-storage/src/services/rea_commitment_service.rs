@@ -31,6 +31,7 @@ use crate::rea_projection::{first_or_none, parse_json_strings};
 use crate::services::conductor_writes;
 use crate::services::events::{EventBus, StorageEvent};
 use crate::views::ReaCommitmentView;
+use elohim_views::projection::ProjectionMode;
 
 pub struct ReaCommitmentService;
 
@@ -43,6 +44,68 @@ impl ReaCommitmentService {
         hc_lamad: Option<&Arc<HcClient>>,
     ) -> Result<ReaCommitmentView, StorageError> {
         if input.action == PROJECT_EPR_ACTION {
+            // Spec §2.4 + §4: validate BEFORE the commitment row is built.
+            // (Previously this validator existed but was never invoked — the
+            // doc-comment's request-time claim was aspirational.)
+            let meta: serde_json::Value = input
+                .metadata_json
+                .as_deref()
+                .map(serde_json::from_str)
+                .transpose()
+                .map_err(|e| StorageError::Validation(format!("metadataJson parse: {e}")))?
+                .unwrap_or(serde_json::Value::Null);
+            let v_input = crate::db::rea_commitments::ProjectEprValidationInput {
+                url_path: meta
+                    .get("urlPath")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("/")
+                    .to_string(),
+                mode: meta
+                    .get("mode")
+                    .cloned()
+                    .and_then(|v| serde_json::from_value(v).ok())
+                    .unwrap_or(ProjectionMode::Cached),
+                reach: meta
+                    .get("reach")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("commons")
+                    .to_string(),
+                preview_epr_ref: meta
+                    .get("previewEprRef")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+                gate_hints: meta
+                    .get("gateHints")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default(),
+                dead_end: meta
+                    .get("deadEnd")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+                steward_direct_endpoint: meta.get("stewardDirectEndpoint").and_then(|v| {
+                    if v.is_null() {
+                        None
+                    } else {
+                        serde_json::from_value(v.clone()).ok()
+                    }
+                }),
+                redirects_from: meta
+                    .get("redirectsFrom")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default(),
+                redirect_templates: meta
+                    .get("redirectTemplates")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default(),
+                route_claims: meta.get("routeClaims").and_then(|v| {
+                    if v.is_null() {
+                        None
+                    } else {
+                        serde_json::from_value(v.clone()).ok()
+                    }
+                }),
+            };
+            crate::db::rea_commitments::validate_project_epr_commitment(&v_input)?;
             return Self::create_via_conductor(conn, ctx, input, events, hc_lamad).await;
         }
         // Soft gate: conductor round-trip when connected, diesel fallback when not.

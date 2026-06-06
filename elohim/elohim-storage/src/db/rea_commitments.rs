@@ -9,7 +9,8 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use elohim_views::projection::{
-    EprProjectionView, GateHintRef, ProjectionMode, StewardDirectEndpoint,
+    EprProjectionView, GateHintRef, ProjectionMode, RedirectTemplate, RouteClaimGrant,
+    StewardDirectEndpoint,
 };
 
 use super::context::AppContext;
@@ -531,19 +532,34 @@ pub struct ProjectEprValidationInput {
     pub dead_end: bool,
     /// Steward-direct endpoint, required when mode is StewardDirect.
     pub steward_direct_endpoint: Option<StewardDirectEndpoint>,
+    /// Mount-level bare aliases (legacy urlPaths that 302 to url_path).
+    pub redirects_from: Vec<String>,
+    /// Route-level alias templates (spec §4).
+    pub redirect_templates: Vec<RedirectTemplate>,
+    /// Granted claims (spec §3.2) — present for claim-vocabulary validation.
+    pub route_claims: Option<RouteClaimGrant>,
 }
 
 /// Validate a project-epr commitment per the substrate rules (spec §2.4).
 ///
 /// Returns `Ok(())` when the commitment is safe to persist. Returns
 /// `Err(StorageError::Validation(_))` with a human-readable message when any
-/// rule is violated. The four rules are:
+/// rule is violated. The rules are:
 ///
 /// 1. Non-commons reach requires `previewEprRef` OR `gateHints` (non-empty)
 ///    OR `deadEnd=true` — at least one onward path for the person.
 /// 2. `stewardDirect` mode requires `stewardDirectEndpoint`.
 /// 3. `urlPath` must start with `/`.
 /// 4. `urlPath` must not have trailing slash unless it IS `/`.
+/// 5. (spec §4) aliases (`redirects_from` + `redirect_templates[].from`) must
+///    start with `/` and may never collide with a reserved service prefix.
+/// 6. (spec §4) a `redirect_templates[].to` target must be canonical: the
+///    universal `/epr/…` floor, or this projection's mount.
+///
+/// Cross-commitment claim uniqueness (spec §3.3, rule 7) is NOT enforced here:
+/// it needs a per-doorway DB query of existing grants, which the pure validator
+/// has no connection for. It is deferred to the doorway's `replace_all` index
+/// build (Task 8), which warns deterministically on a claim conflict.
 pub fn validate_project_epr_commitment(
     input: &ProjectEprValidationInput,
 ) -> Result<(), StorageError> {
@@ -581,6 +597,58 @@ pub fn validate_project_epr_commitment(
             "urlPath must not have trailing slash (except '/'): {}",
             input.url_path
         )));
+    }
+
+    // Rule 5 (spec §4): aliases may never collide with a reserved service
+    // prefix. The reserved list is pinned by the shared route-claims fixture
+    // (two-layer guard with doorway's is_service_path).
+    const RESERVED_URL_PREFIXES: &[&str] = &[
+        "/epr",
+        "/epr-head",
+        "/db",
+        "/api",
+        "/blob",
+        "/apps",
+        "/status",
+        "/health",
+        "/admin",
+        "/identity",
+        "/threshold",
+        "/sitemap.xml",
+    ];
+    let alias_paths = input
+        .redirects_from
+        .iter()
+        .cloned()
+        .chain(input.redirect_templates.iter().map(|t| t.from.clone()));
+    for alias in alias_paths {
+        if !alias.starts_with('/') {
+            return Err(StorageError::Validation(format!(
+                "alias must start with '/', got: {alias}"
+            )));
+        }
+        if RESERVED_URL_PREFIXES
+            .iter()
+            .any(|p| alias == *p || alias.starts_with(&format!("{p}/")))
+        {
+            return Err(StorageError::Validation(format!(
+                "alias collides with a reserved service prefix: {alias}"
+            )));
+        }
+    }
+
+    // Rule 6 (spec §4): one hop — a redirect template's target must be a
+    // canonical address: the universal /epr floor or this projection's mount.
+    for t in &input.redirect_templates {
+        let canonical = t.to.starts_with("/epr/")
+            || t.to == input.url_path
+            || t.to.starts_with(&format!("{}/", input.url_path));
+        if !canonical {
+            return Err(StorageError::Validation(format!(
+                "redirect template target must be canonical (/epr/… or the mount), got: {}",
+                t.to
+            )));
+        }
     }
 
     Ok(())
@@ -785,9 +853,17 @@ fn commitment_to_projection_view(c: ReaCommitment) -> Result<EprProjectionView, 
             .get("redirectsFrom")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default(),
-        // Task-2 stubs — Task 3 replaces these with the real metadata mapping.
-        redirect_templates: vec![],
-        route_claims: None,
+        redirect_templates: metadata
+            .get("redirectTemplates")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default(),
+        route_claims: metadata.get("routeClaims").and_then(|v| {
+            if v.is_null() {
+                None
+            } else {
+                serde_json::from_value(v.clone()).ok()
+            }
+        }),
         preview_epr_ref: metadata
             .get("previewEprRef")
             .and_then(|v| v.as_str())
@@ -1109,6 +1185,71 @@ mod projection_resolver_tests {
         assert!(!path_matches_prefix("/lam", "/lamad"));
         assert!(!path_matches_prefix("/other", "/lamad"));
     }
+
+    /// Build a full `ReaCommitment` row literal for the mapping tests. No
+    /// `make_test_commitment_row` helper pre-existed; this mirrors the
+    /// `ReaCommitment` model fields exactly (see db::models). `created_at` is a
+    /// `String` on the model, not a chrono type.
+    fn make_test_commitment_row() -> ReaCommitment {
+        ReaCommitment {
+            id: "test-row".into(),
+            h_app_id: "lamad".into(),
+            action: PROJECT_EPR_ACTION.into(),
+            provider: "p".into(),
+            receiver: "p".into(),
+            resource_conforms_to: None,
+            resource_classified_as: None,
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of: Some("doorway:alpha-elohim-host|epr:lamad-spa".into()),
+            medium_of_exchange_id: None,
+            state: "active".into(),
+            finished: 0,
+            note: None,
+            metadata_json: None,
+            dht_anchor_hash: None,
+            created_at: "2026-06-06T00:00:00Z".into(),
+        }
+    }
+
+    #[test]
+    fn projection_view_maps_route_claims_and_redirect_templates_from_metadata() {
+        let metadata = serde_json::json!({
+            "urlPath": "/lamad",
+            "routeClaims": {
+                "schemaVersion": 1,
+                "claimsManifestCid": null,
+                "claims": [{ "contentType": "path", "template": "path/{id}",
+                             "fragments": { "step": "path/{id}/step/{n}" } }]
+            },
+            "redirectTemplates": [{ "from": "/lamad/resource/{id}", "to": "/epr/{id}" }]
+        });
+        let row = ReaCommitment {
+            id: "test-claims".into(),
+            action: "project-epr".into(),
+            provider: "p".into(),
+            receiver: "p".into(),
+            in_scope_of: Some("doorway:alpha-elohim-host|epr:lamad-spa".into()),
+            note: None,
+            metadata_json: Some(metadata.to_string()),
+            ..make_test_commitment_row()
+        };
+        let view = commitment_to_projection_view(row).unwrap();
+        let grant = view.route_claims.expect("granted claims must map");
+        assert_eq!(grant.claims[0].content_type, "path");
+        assert_eq!(
+            grant.claims[0].fragments.get("step").unwrap(),
+            "path/{id}/step/{n}"
+        );
+        assert_eq!(view.redirect_templates[0].from, "/lamad/resource/{id}");
+        assert_eq!(view.redirect_templates[0].to, "/epr/{id}");
+    }
 }
 
 #[cfg(test)]
@@ -1175,7 +1316,69 @@ mod operator_helper_tests {
             gate_hints: hints,
             dead_end,
             steward_direct_endpoint: endpoint,
+            redirects_from: vec![],
+            redirect_templates: vec![],
+            route_claims: None,
         }
+    }
+
+    fn reserved_prefixes_from_fixture() -> Vec<String> {
+        #[derive(serde::Deserialize)]
+        struct F {
+            #[serde(rename = "reservedPrefixes")]
+            reserved_prefixes: Vec<String>,
+        }
+        let raw = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../sdk/fixtures/route-claims.vectors.json"
+        ));
+        serde_json::from_str::<F>(raw)
+            .expect("route-claims fixture must parse")
+            .reserved_prefixes
+    }
+
+    #[test]
+    fn validator_rejects_alias_on_reserved_prefix() {
+        let mut input = make_project_epr_input_for_test("commons", None, vec![], false, None);
+        input.redirects_from = vec!["/epr".into()];
+        let err = validate_project_epr_commitment(&input).expect_err("reserved alias must reject");
+        assert!(
+            err.to_string().contains("reserved"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validator_rejects_redirect_template_chain_target() {
+        let mut input = make_project_epr_input_for_test("commons", None, vec![], false, None);
+        input.redirect_templates = vec![RedirectTemplate {
+            from: "/old/{id}".into(),
+            to: "/older/{id}".into(), // not /epr/... and not the mount → not canonical
+        }];
+        let err =
+            validate_project_epr_commitment(&input).expect_err("non-canonical target must reject");
+        assert!(
+            err.to_string().contains("canonical"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validator_accepts_lamad_legacy_template() {
+        let mut input = make_project_epr_input_for_test("commons", None, vec![], false, None);
+        input.url_path = "/lamad".into();
+        input.redirect_templates = vec![RedirectTemplate {
+            from: "/lamad/resource/{id}".into(),
+            to: "/epr/{id}".into(),
+        }];
+        assert!(validate_project_epr_commitment(&input).is_ok());
+    }
+
+    #[test]
+    fn validator_fixture_reserved_list_is_nonempty() {
+        // Two-layer guard: storage's validator and doorway's is_service_path both
+        // assert against the SAME fixture list (doorway side in Task 8).
+        assert!(reserved_prefixes_from_fixture().iter().any(|p| p == "/epr"));
     }
 
     #[test]
