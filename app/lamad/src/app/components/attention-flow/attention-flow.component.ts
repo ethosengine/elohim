@@ -53,8 +53,13 @@ export class AttentionFlowComponent implements OnInit {
     return '\u{25CF}';
   }
 
-  /** Mint the universal EPR address for an event's content (never a literal). */
-  eprHref(contentId: string): string {
+  /**
+   * Mint the universal EPR address for an event's content (never a literal).
+   * `contentId` is `string | null` on EconomicEventView (some events carry no
+   * content reference); a null id has no addressable target, so emit no href.
+   */
+  eprHref(contentId: string | null): string | null {
+    if (!contentId) return null;
     return eprToUniversalHref({ id: contentId, tier: 'head' });
   }
 
