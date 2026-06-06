@@ -205,7 +205,11 @@ async fn handle_update_state(
             .metadata
             .as_ref()
             .and_then(|m| serde_json::to_string(m).ok())
-            .or_else(|| raw.get("metadataJson").and_then(|v| v.as_str()).map(String::from)),
+            .or_else(|| {
+                raw.get("metadataJson")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+            }),
     };
     let mut conn = get_conn(pool)?;
     let events = services.as_ref().map(|s| s.events.as_ref());
