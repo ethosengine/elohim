@@ -112,17 +112,16 @@ async function rootRendered(device: PlaywrightDevice, testId: string): Promise<b
  * Fetch a URL WITHOUT following redirects, capturing status + headers + body.
  *
  * The shared `fetchApp` (steps/delivery.steps.ts) uses undici's `request`, which
- * already does not auto-follow redirects; this variant pins that contract
- * explicitly (`maxRedirections: 0`) for the Slice-3 doorway-302 assertions,
- * where a followed redirect would erase the 302 status and Location header we
- * need to observe. Same undici transport as `fetchApp` — the AppResponse shape
- * (lower-cased headers, Buffer body) matches so the SHARED responseStore Then
- * assertions resolve it unchanged.
+ * does NOT auto-follow redirects (following requires the redirect interceptor /
+ * a dispatcher option — deliberately not used here). That no-follow contract is
+ * load-bearing for the Slice-3 doorway-302 assertions, where a followed
+ * redirect would erase the 302 status and Location header we need to observe.
+ * Same undici transport as `fetchApp` — the AppResponse shape (lower-cased
+ * headers, Buffer body) matches so the SHARED responseStore Then assertions
+ * resolve it unchanged.
  */
 async function fetchAppNoRedirect(baseUrl: string, path: string): Promise<AppResponse> {
-  const { statusCode, headers, body } = await request(`${baseUrl}${path}`, {
-    maxRedirections: 0,
-  });
+  const { statusCode, headers, body } = await request(`${baseUrl}${path}`);
   const data = Buffer.from(await body.arrayBuffer());
   const flatHeaders: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
