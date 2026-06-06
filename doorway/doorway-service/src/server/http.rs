@@ -1120,6 +1120,7 @@ fn is_service_path(path: &str) -> bool {
         "/db/",
         "/apps/",
         "/epr-head/",
+        "/epr/",
         "/blob/",
         "/pkarr/",
         "/.well-known/",
@@ -1133,7 +1134,15 @@ fn is_service_path(path: &str) -> bool {
     // Note: "/" is intentionally NOT listed here so the EPR router (B13) can
     // match a root projection (url_path="/") before the explicit match arm below.
     // The explicit arm still handles WebSocket upgrades on "/" (dev-mode legacy path).
-    matches!(path, "/admin" | "/status.json")
+    matches!(path, "/admin" | "/status.json" | "/epr" | "/db")
+}
+
+/// §12.1 reserved-prefix guard: a projection's `url_path` may never collide
+/// with a doorway service surface (including the universal `/epr` address).
+/// `"/"` is the sanctioned root mount. Note `/auth/portal` stays legal:
+/// `is_service_path` only owns the exact AUTH_OWNED_PATHS under /auth.
+pub(crate) fn is_reserved_url_path(url_path: &str) -> bool {
+    url_path != "/" && is_service_path(url_path)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1594,6 +1603,27 @@ async fn dispatch_to_projected_epr(
                 .body(Full::new(Bytes::from(r#"{"error":"storage unreachable"}"#)))
                 .expect("infallible 502 response")
         }
+    }
+}
+
+/// §12.1 universal EPR address: GET /epr/{id} serves the ROOT projection's
+/// bundle (the shell), whose `epr/:resourceId` route resolves and renders the
+/// EPR client-side. Doorway-side 302-to-pretty-mount is Slice 3 (routeClaims).
+/// Passing "/" as the request path makes `derive_app_subpath` yield the
+/// projection's entry_file — /epr/{id} is BY DEFINITION a page address.
+async fn dispatch_epr_universal(state: &AppState, request_path: &str) -> Response<Full<Bytes>> {
+    match state.epr_router.dispatch("/") {
+        Some(root) => {
+            tracing::debug!(path = %request_path, root_epr = %root.epr_id,
+                "universal /epr address — serving root bundle");
+            dispatch_to_projected_epr(state, "/", root).await
+        }
+        // No root projection registered — same posture as the bare "/" arm.
+        None => Response::builder()
+            .status(StatusCode::FOUND)
+            .header("Location", "/threshold")
+            .body(Full::new(Bytes::new()))
+            .unwrap(),
     }
 }
 
@@ -2224,6 +2254,11 @@ async fn handle_request(
             return Ok(to_boxed(
                 routes::handle_app_request(Arc::clone(&state), p).await,
             ));
+        }
+
+        // Universal EPR address (§12.1): /epr/{id} → root bundle (shell epr/:id route).
+        (Method::GET, p) if p == "/epr" || p.starts_with("/epr/") => {
+            return Ok(to_boxed(dispatch_epr_universal(&state, p).await));
         }
 
         // EPR Head proxy routes (proxied to elohim-storage)
@@ -3459,5 +3494,36 @@ mod dispatch_classification_tests {
             }
             other => panic!("expected SsrRoute, got {other:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod epr_universal_tests {
+    use super::*;
+
+    // §12.1: /epr is reserved — a service path, never a projection mount.
+    #[test]
+    fn epr_prefix_is_a_service_path() {
+        assert!(is_service_path("/epr"));
+        assert!(is_service_path("/epr/manifesto-foundations"));
+        assert!(is_service_path("/epr/foundations-christian-technology"));
+    }
+
+    #[test]
+    fn epr_head_remains_a_service_path() {
+        // /epr-head/ does NOT start with "/epr/" — the two prefixes are disjoint.
+        assert!(is_service_path("/epr-head/manifesto"));
+    }
+
+    #[test]
+    fn epr_reservation_rejects_projection_mounts() {
+        assert!(is_reserved_url_path("/epr"));
+        assert!(is_reserved_url_path("/epr/anything"));
+        assert!(is_reserved_url_path("/db"));
+        assert!(is_reserved_url_path("/api/v1"));
+        // The root mount and the portal mount stay legal.
+        assert!(!is_reserved_url_path("/"));
+        assert!(!is_reserved_url_path("/auth/portal"));
+        assert!(!is_reserved_url_path("/lamad"));
     }
 }

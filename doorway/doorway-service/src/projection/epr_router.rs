@@ -57,9 +57,17 @@ impl EprRouter {
 
     /// Replace the entire routing table atomically.
     pub fn replace_all(&self, projections: Vec<EprProjectionView>) {
+        // §12.1: reserved service prefixes can never be projection mounts.
+        let (legal, reserved): (Vec<_>, Vec<_>) = projections
+            .into_iter()
+            .partition(|v| !crate::server::http::is_reserved_url_path(&v.url_path));
+        for v in &reserved {
+            tracing::warn!(epr_id = %v.epr_id, url_path = %v.url_path,
+                "skipping projection: url_path collides with a reserved service prefix (§12.1)");
+        }
         let mut table = self.table.write().expect("router lock poisoned");
         table.clear();
-        for p in projections {
+        for p in legal {
             table.insert(p.url_path.clone(), p);
         }
     }
@@ -178,5 +186,28 @@ mod tests {
         assert_eq!(router.len(), 1);
         assert!(router.dispatch("/a").is_none());
         assert_eq!(router.dispatch("/b").unwrap().epr_id, "b");
+    }
+
+    #[test]
+    fn replace_all_skips_reserved_url_path() {
+        // §12.1: a projection registered at /epr (a reserved service prefix) must
+        // be silently dropped; a /lamad projection must survive.
+        let router = EprRouter::new();
+        router.replace_all(vec![
+            make_projection("bad-epr-mount", "/epr"),
+            make_projection("lamad", "/lamad"),
+        ]);
+        // /epr projection must be silently dropped.
+        assert!(
+            router.dispatch("/epr").is_none()
+                || router.dispatch("/epr").map(|p| p.epr_id).as_deref() != Some("bad-epr-mount"),
+            "reserved /epr mount must not be installed in the router"
+        );
+        // /lamad projection must survive.
+        assert_eq!(
+            router.dispatch("/lamad").unwrap().epr_id,
+            "lamad",
+            "legal /lamad mount must remain in the router"
+        );
     }
 }

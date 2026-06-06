@@ -16,6 +16,7 @@
     { "subPath": "v1.2/release-notes", "kind": "route", "note": "dot in NON-final segment does not make it an asset" },
     { "subPath": ".well-known/assetlinks.json", "kind": "asset", "note": "dotted final segment under dotted dir" },
     { "subPath": "search", "kind": "route", "note": "route that collides with a common word" },
-    { "subPath": "path/slug-with.dot", "kind": "asset", "note": "edge: dotted final segment classifies as asset by rule — content ids must not contain dots (documented constraint)" }
+    { "subPath": "path/slug-with.dot", "kind": "asset", "note": "edge: dotted final segment classifies as asset by rule — content ids must not contain dots (documented constraint)" },
+    { "subPath": "epr/manifesto-foundations", "kind": "route", "note": "universal EPR address under the root mount (§12.1 Slice 2)" }
   ]
 }
