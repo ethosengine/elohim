@@ -12,7 +12,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
-import { parseEpr, eprToRoute } from '@elohim/service';
+import { parseEpr, eprToRoute, BUNDLE_ROUTE_CONTEXT } from '@elohim/service';
 
 @Component({
   selector: 'app-epr-resolve-redirect',
@@ -22,6 +22,7 @@ import { parseEpr, eprToRoute } from '@elohim/service';
 export class EprResolveRedirectComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly routeCtx = inject(BUNDLE_ROUTE_CONTEXT);
 
   ngOnInit(): void {
     const uri = this.route.snapshot.queryParamMap.get('uri') ?? '';
@@ -30,8 +31,7 @@ export class EprResolveRedirectComponent implements OnInit {
     const cleaned = uri.replace(/^web\+epr:/, 'epr:');
 
     const ref = parseEpr(cleaned);
-    const appRoute = eprToRoute(ref) ?? ['/resource', ref.id];
-
-    void this.router.navigate(appRoute);
+    const res = eprToRoute(ref, this.routeCtx);
+    void this.router.navigate(res?.commands ?? ['/epr', ref.id]);
   }
 }

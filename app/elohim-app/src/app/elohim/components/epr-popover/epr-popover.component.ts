@@ -94,6 +94,9 @@ import type { EprHead } from '../../models/epr-head.model';
       <a *ngIf="route" [routerLink]="route" class="epr-popover-link" data-testid="epr-popover-link">
         Open resource
       </a>
+      <a *ngIf="!route && href" [href]="href" class="epr-popover-link" data-testid="epr-popover-link">
+        Open resource
+      </a>
     </div>
   `,
   styles: [
@@ -226,8 +229,10 @@ export class EprPopoverComponent {
   /** Position relative to the viewport */
   @Input() position: { top: number; left: number } = { top: 0, left: 0 };
 
-  /** Angular route for the "Open resource" link */
+  /** In-bundle router commands; null when the target is cross-bundle. */
   @Input() route: string[] | null = null;
+  /** Universal address fallback — used when route is null (cross-bundle). */
+  @Input() href: string | null = null;
 
   /** Emitted when the mouse enters the popover */
   @Output() entered = new EventEmitter<void>();

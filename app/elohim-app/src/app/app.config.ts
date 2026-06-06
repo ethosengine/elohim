@@ -24,6 +24,7 @@ import { PerformanceMetricsService } from './elohim/services/performance-metrics
 import { ContentIOModuleWithPlugins } from '@app/lamad/content-io/content-io.module';
 import { LAMAD_HOLOCHAIN_CLIENT } from '@app/lamad/interfaces/cross-pillar.interface';
 import { ECONOMIC_EVENT_FACTORY, EVENT_API } from '@elohim/rea-runtime';
+import { BUNDLE_ROUTE_CONTEXT, type BundleRouteContext } from '@elohim/service';
 import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
 import { StorageApiService } from './elohim/services/storage-api.service';
 
@@ -103,6 +104,12 @@ export const appConfig: ApplicationConfig = {
     // eventApi.emitLamadIntent() which calls POST /api/v1/lamad/events —
     // the conductor-first intent path where the substrate composes REA shape.
     { provide: EVENT_API, useExisting: StorageApiService },
+    // §12.3: the shell claims nothing by type — it OWNS the universal /epr
+    // route, so every unclaimed EPR resolves in-shell to ['/epr', id].
+    {
+      provide: BUNDLE_ROUTE_CONTEXT,
+      useValue: { claims: [], ownsUniversalRoute: true } satisfies BundleRouteContext,
+    },
     // LAMAD_HOLOCHAIN_CLIENT — cross-pillar token consumed by BlobBootstrapService
     // (app.component.ts) and ContentMasteryService (session-migration.service.ts).
     // HolochainClientService is providedIn:'root' in @app/elohim; this useExisting

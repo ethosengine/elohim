@@ -26,7 +26,13 @@ import {
   type IEprUriResolver,
 } from '../interfaces/epr-resolver.interface';
 import { decodeEprHead } from '../utils/epr-codec';
-import { type EprRef, parseEpr, eprToRoute } from '@elohim/service';
+import {
+  type EprRef,
+  parseEpr,
+  eprToRoute,
+  eprToUniversalHref,
+  BUNDLE_ROUTE_CONTEXT,
+} from '@elohim/service';
 
 import { StorageClientService, type StorageContentNode } from './storage-client.service';
 
@@ -37,8 +43,10 @@ export interface ResolvedEpr {
   ref: EprRef;
   /** Transport-specific URL for HTTP fetch (null for P2P-only) */
   url: string;
-  /** Angular route for in-app navigation (null for blob tier) */
+  /** In-bundle router commands (null = cross-bundle or blob tier) */
   route: string[] | null;
+  /** Universal address — always navigable, in every bundle (§12.1) */
+  href: string;
 }
 
 export interface ResolvedContent {
@@ -48,8 +56,10 @@ export interface ResolvedContent {
   content: StorageContentNode;
   /** Blob URL if content has a blob reference */
   blobUrl: string | null;
-  /** Angular route for this content */
-  route: string[];
+  /** In-bundle router commands (null = cross-bundle or blob tier) */
+  route: string[] | null;
+  /** Universal address — always navigable, in every bundle (§12.1) */
+  href: string;
 }
 
 /**
@@ -61,8 +71,10 @@ export interface ResolvedContent {
  * - No path context or not found → standalone resource view
  */
 export interface ContextResolvedRoute {
-  /** Angular route segments for navigation */
-  route: string[];
+  /** In-bundle router commands (null = cross-bundle or blob tier) */
+  route: string[] | null;
+  /** Universal address — always navigable, in every bundle (§12.1) */
+  href: string;
   /** How the link was resolved */
   resolution: 'in-path' | 'cross-path' | 'standalone';
   /** For in-path resolution: the step index within the current path */
@@ -93,6 +105,7 @@ export interface CrossPathMatch {
 export class EprResolverService implements IEprUriResolver, IEprContentResolver {
   private readonly http = inject(HttpClient);
   private readonly storage = inject(StorageClientService);
+  private readonly routeCtx = inject(BUNDLE_ROUTE_CONTEXT);
 
   /**
    * Resolve an epr: URI (or any accepted format) to a transport-specific URL.
@@ -112,10 +125,12 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
    */
   resolveUrl(input: string, blobHash?: string): ResolvedEpr {
     const ref = parseEpr(input);
+    const res = eprToRoute(ref, this.routeCtx);
     return {
       ref,
       url: this.buildUrl(ref, blobHash),
-      route: eprToRoute(ref),
+      route: res?.commands ?? null,
+      href: res?.href ?? eprToUniversalHref(ref),
     };
   }
 
@@ -130,7 +145,8 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
    *   resolver.resolve('epr:manifesto-foundations').subscribe(resolved => {
    *     // resolved.content  → { id, title, description, contentType, blobHash, ... }
    *     // resolved.blobUrl  → "https://doorway.host/blob/sha256-abc..." or null
-   *     // resolved.route    → ['/resource', 'manifesto-foundations']
+   *     // resolved.route    → ['/epr', 'manifesto-foundations'] (shell) or in-bundle commands
+   *     // resolved.href     → '/epr/manifesto-foundations'
    *   });
    */
   resolve(input: string): Observable<ResolvedContent | null> {
@@ -142,9 +158,14 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
 
         const blobHash = this.extractBlobHash(content);
         const blobUrl = blobHash ? this.storage.getBlobUrl(blobHash) : null;
-        const route = eprToRoute(ref) ?? ['/resource', ref.id];
-
-        return of({ ref, content, blobUrl, route });
+        const res = eprToRoute(ref, this.routeCtx, content.contentType);
+        return of({
+          ref,
+          content,
+          blobUrl,
+          route: res?.commands ?? null,
+          href: res?.href ?? eprToUniversalHref(ref),
+        });
       })
     );
   }
@@ -170,6 +191,12 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
    * pillar independent of lamad. The caller (markdown renderer, epr-link component)
    * provides path steps and cross-path results from lamad services.
    *
+   * Route shape comes from the BundleRouteContext claims (§12.3).
+   * In the shell (ownsUniversalRoute, no path claim), in-path/cross-path
+   * targets resolve to /epr/{pathId}#step/{n} so the universal route handles
+   * them. In a lamad bundle (path claim present), they resolve to in-bundle
+   * router commands (['/path', pathId, 'step', n]).
+   *
    * @param input - EPR URI string (e.g., 'epr:rea-foundations')
    * @param currentPathId - Current path ID (null if not in a path)
    * @param currentSteps - Steps of the current path (empty if not in a path)
@@ -184,16 +211,27 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
     const ref = parseEpr(input);
     const targetId = ref.id;
 
+    const stepResolution = (
+      pathId: string,
+      stepIndex: number
+    ): { route: string[] | null; href: string } => {
+      const stepRef: EprRef = {
+        id: pathId,
+        tier: 'head',
+        fragment: { type: 'step', value: String(stepIndex) },
+      };
+      const res = eprToRoute(stepRef, this.routeCtx, 'path');
+      return {
+        route: res?.commands ?? null,
+        href: res?.href ?? eprToUniversalHref(stepRef),
+      };
+    };
+
     // 1. Check current path for the target content
     if (currentPathId) {
       const stepIndex = currentSteps.findIndex(s => s.resourceId === targetId);
       if (stepIndex >= 0) {
-        return {
-          // TODO(#12-6 Slice 2): replace with BundleRouteContext claims — spec §12.3.
-          route: ['/path', currentPathId, 'step', String(stepIndex)],
-          resolution: 'in-path',
-          stepIndex,
-        };
+        return { ...stepResolution(currentPathId, stepIndex), resolution: 'in-path', stepIndex };
       }
     }
 
@@ -201,16 +239,17 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
     if (crossPathMatches && crossPathMatches.length > 0) {
       const match = crossPathMatches[0];
       return {
-        // TODO(#12-6 Slice 2): replace with BundleRouteContext claims — spec §12.3.
-        route: ['/path', match.pathId, 'step', String(match.stepIndex)],
+        ...stepResolution(match.pathId, match.stepIndex),
         resolution: 'cross-path',
         crossPath: match,
       };
     }
 
     // 3. Standalone resource view (fallback)
+    const res = eprToRoute(ref, this.routeCtx);
     return {
-      route: eprToRoute(ref) ?? ['/resource', targetId],
+      route: res?.commands ?? null,
+      href: res?.href ?? eprToUniversalHref(ref),
       resolution: 'standalone',
     };
   }

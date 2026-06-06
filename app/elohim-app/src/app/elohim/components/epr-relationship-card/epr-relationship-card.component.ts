@@ -159,7 +159,7 @@ function resilienceTitle(resilience: ResilienceView): string {
     `,
   ],
   template: `
-    <a class="epr-rel-card" data-testid="epr-relationship-card" [routerLink]="route">
+    <a class="epr-rel-card" data-testid="epr-relationship-card" [routerLink]="route ?? []">
       <div class="epr-rel-card__type" data-testid="epr-rel-card-type">{{ label }}</div>
       <div class="epr-rel-card__title" data-testid="epr-rel-card-title">{{ title }}</div>
       @if (description) {
@@ -210,7 +210,8 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
   title = '';
   description: string | null = null;
   reach: string | null = null;
-  route: string[] = [];
+  route: string[] | null = null;
+  href: string | null = null;
   label = '';
   reachIconValue = '·';
   resilience: ResilienceView | null = null;
@@ -256,7 +257,8 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
     const rel = this.relationship;
     this.label = typeLabel(rel.type);
     this.title = rel.target;
-    this.route = ['/resource', rel.target];
+    this.route = null;
+    this.href = `/epr/${encodeURIComponent(rel.target)}`;
     this.description = null;
     this.reach = null;
     this.reachIconValue = '·';
@@ -282,9 +284,11 @@ export class EprRelationshipCardComponent implements OnChanges, OnDestroy {
           this.description = content.content.description ?? null;
           this.reach = (content.content as { reach?: string }).reach ?? null;
           this.route = content.route;
+          this.href = content.href;
         } else {
           this.title = target;
-          this.route = ['/resource', target];
+          this.route = null;
+          this.href = `/epr/${encodeURIComponent(target)}`;
         }
 
         this.reachIconValue = reachIcon(this.reach);

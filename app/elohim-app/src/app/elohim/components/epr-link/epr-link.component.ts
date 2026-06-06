@@ -38,6 +38,7 @@ import 'elohim-core/register';
 import { type ContextMenuAction } from '@app/qahal';
 
 import { EprResolverService } from '../../services/epr-resolver.service';
+import { EprNavService } from '../../services/epr-nav.service';
 
 import type { ContextMenuItem, ElohimEprLink, EprLinkDisplay } from 'elohim-core';
 
@@ -89,6 +90,7 @@ export class EprLinkComponent implements OnInit, OnDestroy {
 
   private readonly eprResolver = inject(EprResolverService);
   private readonly router = inject(Router);
+  private readonly eprNav = inject(EprNavService);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /**
@@ -118,6 +120,8 @@ export class EprLinkComponent implements OnInit, OnDestroy {
     this.eprResolver.resolve(epr).subscribe(resolved => {
       if (resolved?.route) {
         void this.router.navigate(resolved.route);
+      } else if (resolved) {
+        this.eprNav.navigate(resolved.href);
       }
     });
   };
@@ -183,6 +187,8 @@ export class EprLinkComponent implements OnInit, OnDestroy {
         this.eprResolver.resolve(epr).subscribe(resolved => {
           if (resolved?.route) {
             void this.router.navigate(resolved.route, { fragment: 'network' });
+          } else if (resolved) {
+            this.eprNav.navigate(resolved.href);
           }
         });
         break;
@@ -212,6 +218,8 @@ export class EprLinkComponent implements OnInit, OnDestroy {
     this.eprResolver.resolve(epr).subscribe(resolved => {
       if (resolved?.route) {
         void this.router.navigate(resolved.route);
+      } else if (resolved) {
+        this.eprNav.navigate(resolved.href);
       }
     });
   }

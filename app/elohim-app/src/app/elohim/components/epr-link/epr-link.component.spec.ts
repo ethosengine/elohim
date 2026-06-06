@@ -36,7 +36,8 @@ const mockResolved: ResolvedContent = {
     tags: ['protocol', 'manifesto'],
   } as any,
   blobUrl: null,
-  route: ['/resource', 'manifesto'],
+  route: ['/epr', 'manifesto'],
+  href: '/epr/manifesto',
 };
 
 describe('EprLinkComponent (thin Lit wrapper)', () => {
@@ -97,7 +98,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     await Promise.resolve();
 
     expect(resolverSpy.resolve).toHaveBeenCalledWith('epr:manifesto');
-    expect(routerNavSpy).toHaveBeenCalledWith(['/resource', 'manifesto']);
+    expect(routerNavSpy).toHaveBeenCalledWith(['/epr', 'manifesto']);
   });
 
   it('should not throw on ngOnDestroy', () => {
@@ -137,7 +138,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     await Promise.resolve();
 
     expect(resolverSpy.resolve).toHaveBeenCalledWith('epr:manifesto');
-    expect(routerNavSpy).toHaveBeenCalledWith(['/resource', 'manifesto'], {
+    expect(routerNavSpy).toHaveBeenCalledWith(['/epr', 'manifesto'], {
       fragment: 'network',
     });
   });
