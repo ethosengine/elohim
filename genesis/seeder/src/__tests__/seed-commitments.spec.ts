@@ -24,9 +24,12 @@ describe('buildCustodyCommitmentBody', () => {
     expect(body.receiver).not.toMatch(/^human-/);
   });
 
-  it('resourceClassifiedAs is the raw blob hash with sha256- prefix', () => {
+  it('resourceClassifiedAs is a ValueFlows list holding the sha256- blob hash', () => {
     const body = buildCustodyCommitmentBody(pair);
-    expect(body.resourceClassifiedAs).toBe('sha256-deadbeef');
+    // List shape per CreateReaCommitmentInputView (ValueFlows resourceClassifiedAs
+    // is a classification list) — stored as a JSON array so ReaCommitmentView's
+    // parse-as-array round-trips it.
+    expect(body.resourceClassifiedAs).toEqual(['sha256-deadbeef']);
   });
 
   it('resourceQuantity uses bytes-as-integer with hasUnit "B"', () => {

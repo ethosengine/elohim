@@ -950,6 +950,12 @@ pub struct UpdateReaCommitmentStateView {
     pub state: String,
     #[serde(default)]
     pub finished: Option<bool>,
+    /// Optional metadata reconcile: when present, replaces the row's metadata
+    /// alongside the state transition. Lets idempotent seeders heal rows
+    /// created before metadata persisted correctly (the create-path wire gap,
+    /// shift honest-held 2026-06-06) without a delete/recreate cycle.
+    #[serde(default)]
+    pub metadata: Option<JsonVal>,
 }
 
 /// REA Agreement — API output

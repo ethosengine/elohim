@@ -543,6 +543,7 @@ mod tests {
         let update = UpdateReaCommitmentState {
             state: "active".to_string(),
             finished: None,
+            metadata_json: None,
         };
         let update_result = ReaCommitmentService::update_state(
             &mut conn,

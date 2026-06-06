@@ -312,6 +312,7 @@ impl From<UpdateReaCommitmentStateView> for UpdateReaCommitmentState {
         Self {
             state: v.state,
             finished: v.finished,
+            metadata_json: serialize_json_opt(&v.metadata),
         }
     }
 }

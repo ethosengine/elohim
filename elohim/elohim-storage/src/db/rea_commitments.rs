@@ -120,6 +120,11 @@ pub struct UpdateReaCommitmentState {
     pub state: String,
     #[serde(default)]
     pub finished: Option<bool>,
+    /// Optional metadata reconcile (already-serialized JSON string). When
+    /// present, replaces metadata_json alongside the state write — heals rows
+    /// whose create predated correct metadata persistence.
+    #[serde(default)]
+    pub metadata_json: Option<String>,
 }
 
 // ============================================================================
@@ -551,6 +556,19 @@ pub fn update_commitment_state(
         .set(rea_commitments::state.eq(&update.state))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+    }
+
+    // Optional metadata reconcile — separate statement keeps the state-write
+    // combinations simple (SQLite local writes; two statements are fine).
+    if let Some(ref mj) = update.metadata_json {
+        diesel::update(
+            rea_commitments::table
+                .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+                .filter(rea_commitments::id.eq(id)),
+        )
+        .set(rea_commitments::metadata_json.eq(mj))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Metadata update failed: {}", e)))?;
     }
 
     get_commitment(conn, ctx, id)?

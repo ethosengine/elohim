@@ -110,7 +110,8 @@ interface CommitmentBody {
   provider: string;
   receiver: string;
   resourceConformsTo: 'blob';
-  resourceClassifiedAs: string;
+  /** ValueFlows resourceClassifiedAs is a list — matches CreateReaCommitmentInputView. */
+  resourceClassifiedAs: string[];
   resourceQuantity: { hasNumericalValue: number; hasUnit: 'B' };
   note: string;
   metadata: Record<string, unknown>;
@@ -148,7 +149,7 @@ export function buildCustodyCommitmentBody(pair: CustodyPair): CommitmentBody {
     provider: providerPeerId,
     receiver: receiverPeerId,
     resourceConformsTo: 'blob',
-    resourceClassifiedAs: blob,
+    resourceClassifiedAs: [blob],
     resourceQuantity: { hasNumericalValue: pair.blobSizeBytes, hasUnit: 'B' },
     note: `${pair.providerHumanId} commits to host ${blob} for ${pair.receiverHumanId}`,
     metadata: {
@@ -234,11 +235,17 @@ class CommitmentClient extends DoorwayClient {
     });
   }
 
-  async patchCommitmentState(id: string, state: string): Promise<Response> {
+  async patchCommitmentState(
+    id: string,
+    state: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<Response> {
     return this.fetch(`/api/v1/commitments/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state }),
+      // metadata (when given) reconciles rows created before the create-path
+      // wire fix persisted it — idempotent heal on every re-seed.
+      body: JSON.stringify(metadata ? { state, metadata } : { state }),
     });
   }
 }
@@ -315,7 +322,7 @@ export async function activateCustodyCommitments(
     const body = buildCustodyCommitmentBody(pair);
     const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
 
-    const response = await client.patchCommitmentState(body.id, 'active');
+    const response = await client.patchCommitmentState(body.id, 'active', body.metadata);
 
     if (response.ok) {
       activated += 1;

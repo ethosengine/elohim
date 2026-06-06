@@ -93,12 +93,83 @@ async fn handle_create(
     // via the conductor-first write path in ReaCommitmentService::create
     // (substrate-rea-replication-fix plan, Task 4). Other actions still take
     // the legacy diesel-direct path.
-    let input: CreateReaCommitmentInput = parse_body(req).await?;
+    let raw: serde_json::Value = parse_body(req).await?;
+    let input = normalize_create_input(raw)?;
     let mut conn = get_conn(pool)?;
     let events = services.as_ref().map(|s| s.events.as_ref());
     Ok(from_create_result(
         ReaCommitmentService::create(&mut conn, ctx, input, events, hc_lamad).await,
     ))
+}
+
+/// Normalize a create body into the DB-layer input, honoring BOTH live wire
+/// shapes (shift honest-held 2026-06-06 — the route previously parsed the
+/// DB-layer struct directly, silently swallowing the canonical
+/// `CreateReaCommitmentInputView` fields: `metadata` objects were dropped,
+/// `resourceQuantity` Measure objects were dropped, and plain-string
+/// `resourceClassifiedAs` was stored un-JSON-encoded so the output view's
+/// parse-as-array nulled it on every read):
+///
+/// - **View shape** (canonical, `CreateReaCommitmentInputView` — seeder, a2o
+///   storage-client): `metadata` object, `resourceQuantity`/`effortQuantity`
+///   `{hasNumericalValue, hasUnit}`, `resourceClassifiedAs`/`inScopeOf` arrays.
+/// - **Legacy flat shape** (older steps + seed-projections): `metadataJson`
+///   string, `resourceQuantityValue`/`resourceQuantityUnit`, plain strings for
+///   classifiedAs/inScopeOf.
+///
+/// Strategy: pre-wrap plain-string array fields, parse the view (all-default
+/// fields tolerate legacy bodies), then merge legacy keys for anything the
+/// view shape didn't carry. List-ish columns are stored as JSON-array strings
+/// so they round-trip through `ReaCommitmentView`'s parse.
+fn normalize_create_input(
+    mut raw: serde_json::Value,
+) -> Result<CreateReaCommitmentInput, StorageError> {
+    use elohim_views::shefa::CreateReaCommitmentInputView;
+
+    // Pre-normalize: plain string → one-element array (both fields are
+    // array-typed in the view and array-JSON in storage).
+    for key in ["resourceClassifiedAs", "inScopeOf"] {
+        if let Some(s) = raw.get(key).and_then(|v| v.as_str()).map(String::from) {
+            raw[key] = serde_json::Value::Array(vec![serde_json::Value::String(s)]);
+        }
+    }
+
+    let view: CreateReaCommitmentInputView = serde_json::from_value(raw.clone())
+        .map_err(|e| StorageError::InvalidInput(format!("Invalid commitment body: {e}")))?;
+
+    // The canonical conversion already lives in views_convert/inputs.rs —
+    // the bug was that this route never used it. Delegate, then merge the
+    // legacy flat keys for anything the view shape didn't carry (view fields
+    // win; seed-projections sends both forms and the object form is
+    // authoritative there too).
+    let mut input: CreateReaCommitmentInput = view.into();
+    if input.metadata_json.is_none() {
+        input.metadata_json = raw
+            .get("metadataJson")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+    }
+    if input.resource_quantity_value.is_none() {
+        input.resource_quantity_value = raw
+            .get("resourceQuantityValue")
+            .and_then(|v| v.as_f64())
+            .map(|f| f as f32);
+        input.resource_quantity_unit = raw
+            .get("resourceQuantityUnit")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+    }
+    if input.effort_quantity_value.is_none() {
+        input.effort_quantity_value = raw
+            .get("effortQuantityValue")
+            .and_then(|v| v.as_f64())
+            .map(|f| f as f32);
+        input.effort_quantity_unit = raw
+            .get("effortQuantityUnit")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+    }
+    Ok(input)
 }
 
 async fn handle_get_by_id(
@@ -121,7 +192,21 @@ async fn handle_update_state(
     services: Option<Arc<Services>>,
     hc_lamad: Option<&Arc<HcClient>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let update: UpdateReaCommitmentState = parse_body(req).await?;
+    // Accept both the canonical view shape (`metadata` object — see
+    // UpdateReaCommitmentStateView) and the legacy flat `metadataJson` string.
+    let raw: serde_json::Value = parse_body(req).await?;
+    let view: elohim_views::shefa::UpdateReaCommitmentStateView =
+        serde_json::from_value(raw.clone())
+            .map_err(|e| StorageError::InvalidInput(format!("Invalid state update body: {e}")))?;
+    let update = UpdateReaCommitmentState {
+        state: view.state,
+        finished: view.finished,
+        metadata_json: view
+            .metadata
+            .as_ref()
+            .and_then(|m| serde_json::to_string(m).ok())
+            .or_else(|| raw.get("metadataJson").and_then(|v| v.as_str()).map(String::from)),
+    };
     let mut conn = get_conn(pool)?;
     let events = services.as_ref().map(|s| s.events.as_ref());
     Ok(from_result(
