@@ -13,6 +13,9 @@ import {
   GovernanceApiService,
   provideElohimClient,
   detectClientMode,
+  BUNDLE_ROUTE_CONTEXT,
+  type BundleRouteContext,
+  type EprRef,
 } from '@elohim/service';
 import { AGENT_CONTEXT, ECONOMIC_EVENT_FACTORY, EVENT_API } from '@elohim/rea-runtime';
 import { environment } from '../environments/environment';
@@ -27,6 +30,7 @@ import {
   LAMAD_HOLOCHAIN_CLIENT,
   LAMAD_AFFINITY_TRACKING,
   LAMAD_EPR_RESOLVER,
+  LAMAD_EPR_NAV,
   LAMAD_GOVERNANCE_SIGNAL,
   LAMAD_ELOHIM_PRESENCE,
   LAMAD_HUMAN_CONSENT,
@@ -40,6 +44,7 @@ import {
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { EprNavService } from '@app/elohim/services/epr-nav.service';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
 import { HumanConsentService } from '@app/elohim/services/human-consent.service';
@@ -163,6 +168,22 @@ export const appConfig: ApplicationConfig = {
     { provide: LAMAD_HOLOCHAIN_CLIENT, useExisting: HolochainClientService },
     { provide: LAMAD_AFFINITY_TRACKING, useExisting: AffinityTrackingService },
     { provide: LAMAD_EPR_RESOLVER, useExisting: EprResolverService },
+    { provide: LAMAD_EPR_NAV, useExisting: EprNavService },
+    // §12.3: lamad claims contentType 'path' — everything else is cross-bundle.
+    {
+      provide: BUNDLE_ROUTE_CONTEXT,
+      useValue: {
+        claims: [
+          {
+            contentType: 'path',
+            commands: (ref: EprRef) =>
+              ref.fragment?.type === 'step'
+                ? ['/path', ref.id, 'step', ref.fragment.value]
+                : ['/path', ref.id],
+          },
+        ],
+      } satisfies BundleRouteContext,
+    },
     { provide: LAMAD_GOVERNANCE_SIGNAL, useExisting: GovernanceSignalService },
     { provide: LAMAD_ELOHIM_PRESENCE, useExisting: ElohimPresenceService },
     { provide: LAMAD_HUMAN_CONSENT, useExisting: HumanConsentService },

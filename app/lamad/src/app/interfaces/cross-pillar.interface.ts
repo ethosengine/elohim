@@ -375,6 +375,19 @@ export interface ILamadEprResolver {
 export const LAMAD_EPR_RESOLVER = new InjectionToken<ILamadEprResolver>('LamadEprResolver');
 
 // ============================================================================
+// ILamadEprNav — EPR-aware navigation contract (§12.3)
+// ============================================================================
+
+/** EPR-aware navigation (§12.3): same-bundle → router; cross-bundle → handoff + full load. */
+export interface ILamadEprNav {
+  ownsPath(path: string): boolean;
+  navigate(pathOrCommands: string | readonly unknown[]): void;
+  recordHandoff(): void;
+}
+
+export const LAMAD_EPR_NAV = new InjectionToken<ILamadEprNav>('LamadEprNav');
+
+// ============================================================================
 // ILamadGovernanceSignal — narrow governance signal contract
 // ============================================================================
 
