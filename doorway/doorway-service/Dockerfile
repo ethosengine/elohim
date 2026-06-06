@@ -79,6 +79,13 @@ FROM deps AS check
 RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/deps/doorway* target/release/deps/libdoorway*
 COPY doorway/doorway-service/src ./src
 COPY doorway/doorway-service/templates ./templates
+# Shared test-vector fixtures consumed via `include_str!(concat!(env!("CARGO_MANIFEST_DIR"),
+# "/../../elohim/sdk/fixtures/..."))` in #[cfg(test)] modules (epr_router.rs, server/http.rs).
+# CARGO_MANIFEST_DIR is /app, so the path resolves to /elohim/sdk/fixtures. These are
+# test-only — `cargo build --release` (deps/builder stages) never touches them, so the gap
+# only surfaces here at `cargo test --lib --bins`. Without this COPY the test build aborts:
+# "couldn't read .../route-claims.vectors.json: No such file or directory (os error 2)".
+COPY elohim/sdk/fixtures /elohim/sdk/fixtures
 RUN cargo fmt --check
 RUN RUSTFLAGS="" cargo clippy -- -D warnings -W clippy::all
 RUN RUSTFLAGS="" cargo test --lib --bins
