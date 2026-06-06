@@ -20,6 +20,13 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR/genesis/agentic/bin/pool-preflight.sh\"",
             "timeout": 15000,
             "statusMessage": "Cargo target pool stewardship..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/ci-harvest.py\" --hook",
+            "timeout": 90,
+            "statusMessage": "Harvesting CI results since cursor...",
+            "async": true
           }
         ]
       }

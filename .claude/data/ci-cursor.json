@@ -1,0 +1,18 @@
+{
+ "jobs": {
+  "elohim": 1504,
+  "elohim-edge": 1042,
+  "elohim-genesis": 1101,
+  "elohim-holochain": 1309,
+  "elohim-orchestrator": 1168,
+  "elohim-sophia": 144,
+  "elohim-steward": 1,
+  "elohim-storybook": 140
+ },
+ "green": {
+  "elohim-holochain": 1309,
+  "elohim-sophia": 144,
+  "elohim-storybook": 140
+ },
+ "green_streak": {}
+}
