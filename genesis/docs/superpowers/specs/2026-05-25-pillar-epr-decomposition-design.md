@@ -1,3 +1,12 @@
+---
+title: "Pillar EPR Decomposition — Design"
+id: pillar-epr-decomposition-design
+status: Active
+class: protocol-canonical
+domain: D-epr-apps
+topic: [pillar-bundles, epr-projection, doorway-router, url-routing-contract, epr-link, bundle-split, project-epr-commitment, spa-fallback, universal-epr-address]
+---
+
 # Pillar EPR Decomposition — Design
 
 **Status:** Design (pending implementation plan)
