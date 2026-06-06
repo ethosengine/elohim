@@ -220,7 +220,11 @@ guards in dispatch arms remain forbidden per server/CLAUDE.md):
 | alias template match | one-hop 302 to canonical target first | same |
 
 302-to-pretty-mount happens **only when reach passes** — the resolver owns the gate; mounts
-never see unauthorized traffic; the gate experience is uniform protocol-wide. The `/epr/{id}`
+never see unauthorized traffic; the gate experience is uniform protocol-wide. The anon tier's
+reach-passes set is the substrate's anon-readable rule **{commons, public}** (mirrors storage's
+unauthenticated list filter; reach hierarchy public=6 < commons=7) — one definition per side,
+`anon_reach_readable` doorway-side. (Found live 2026-06-06: commons-only pinning denied public
+content its pretty mount; the wider 3-vocabulary reach reconciliation remains tracked debt.) The `/epr/{id}`
 resolution requires the target's contentType + reach: a **local projection head lookup only**
 (storage `/epr-head/{id}` family — never a DHT walk on the dispatch path), cacheable for
 commons.

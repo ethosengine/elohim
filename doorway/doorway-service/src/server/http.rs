@@ -1494,8 +1494,9 @@ async fn dispatch_to_projected_epr(
 ) -> Response<Full<Bytes>> {
     use elohim_views::projection::ProjectionMode;
 
-    // Reach gate — MVP: only commons is served. Gated projections deferred (§8.2).
-    if projection.reach != "commons" {
+    // Reach gate — MVP: only anon-readable reaches (commons|public, the
+    // substrate's anon rule) are served. Gated projections deferred (§8.2).
+    if !anon_reach_readable(&projection.reach) {
         let body = serde_json::json!({
             "error": "reach-gated",
             "message": "This content requires authorization. Gated EPR serving is not yet implemented."
@@ -1661,8 +1662,20 @@ pub(crate) enum EprUniversalDisposition {
     ServeShell,
 }
 
+/// The anon-readable reach set — the doorway's HALF of the substrate's anon
+/// rule. MUST mirror storage's unauthenticated list filter
+/// (`elohim-storage/src/http.rs` handle_db_content_list:
+/// `reach == "commons" || reach == "public"`); reach hierarchy: public=6,
+/// commons=7 most permissive. One definition per side; the wider 3-vocabulary
+/// reach reconciliation is tracked in memory
+/// `project_reach_enum_drift_reconciliation`.
+pub(crate) fn anon_reach_readable(reach: &str) -> bool {
+    matches!(reach, "commons" | "public")
+}
+
 /// Spec §5.1 — pure, table-data-only (no prefix guards). MVP visitor tier:
-/// anonymous (commons-only); the authed snapshot wires in when gated
+/// anonymous (anon-readable reaches only — commons|public, mirroring
+/// storage's anon filter); the authed snapshot wires in when gated
 /// projections exist (spec: out of scope here, signature stays ready).
 pub(crate) fn classify_epr_universal(
     head: Option<HeadFacts>,
@@ -1671,7 +1684,7 @@ pub(crate) fn classify_epr_universal(
     let reach_passes = head
         .as_ref()
         .and_then(|h| h.reach.as_deref())
-        .map(|r| r == "commons")
+        .map(anon_reach_readable)
         .unwrap_or(false);
     match (reach_passes, claimed_location) {
         (true, Some(location)) => EprUniversalDisposition::RedirectToMount { location },
@@ -1841,15 +1854,31 @@ fn sitemap_response(xml: String, generation: u64) -> Response<Full<Bytes>> {
         .expect("infallible sitemap response")
 }
 
-/// Tolerant commons-id fetch for one claimed contentType. Any failure → empty
-/// (the sitemap omits that type's entries rather than 500ing — fail open).
+/// Tolerant anon-readable-id fetch for one claimed contentType — one query per
+/// reach in the anon-readable set ({commons, public}, see
+/// [`anon_reach_readable`]), merged. Any failure → empty for that reach (the
+/// sitemap omits those entries rather than 500ing — fail open).
 async fn fetch_commons_ids(
     state: &AppState,
     storage_base: &str,
     content_type: &str,
 ) -> Vec<String> {
+    let mut merged = Vec::new();
+    for reach in ["commons", "public"] {
+        merged.extend(fetch_ids_for_reach(state, storage_base, content_type, reach).await);
+    }
+    merged
+}
+
+/// Single-reach tolerant id fetch (see [`fetch_commons_ids`]).
+async fn fetch_ids_for_reach(
+    state: &AppState,
+    storage_base: &str,
+    content_type: &str,
+    reach: &str,
+) -> Vec<String> {
     let url =
-        format!("{storage_base}/db/content?contentType={content_type}&reach=commons&limit=500");
+        format!("{storage_base}/db/content?contentType={content_type}&reach={reach}&limit=500");
     let resp = match state
         .ssr_http_client
         .get(&url)
@@ -3855,6 +3884,28 @@ mod epr_claims_dispatch_tests {
             None,
         );
         assert_eq!(d, EprUniversalDisposition::ServeShell);
+    }
+
+    #[test]
+    fn classify_redirects_public_claimed() {
+        // The substrate's anon-readable set is {commons, public} — storage's
+        // list handler serves BOTH to unauthenticated readers (reach hierarchy:
+        // public=6, commons=7 most permissive). The resolver's anon tier must
+        // mirror that single rule, or public content never gets its pretty
+        // mount (found live: foundations-christian-technology is reach=public).
+        let d = classify_epr_universal(
+            Some(HeadFacts {
+                content_type: Some("path".into()),
+                reach: Some("public".into()),
+            }),
+            Some("/lamad/path/abc".to_string()),
+        );
+        assert_eq!(
+            d,
+            EprUniversalDisposition::RedirectToMount {
+                location: "/lamad/path/abc".into()
+            }
+        );
     }
 
     #[test]
