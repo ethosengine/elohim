@@ -177,9 +177,7 @@ export function claimsFromDeclaration(decl: readonly RouteClaimTemplate[]): Rout
     commands: (ref: EprRef): string[] => {
       const fragTpl = ref.fragment ? d.fragments?.[ref.fragment.type] : undefined;
       const tpl = fragTpl ?? d.template;
-      const substituted = tpl
-        .replace('{id}', ref.id)
-        .replace('{n}', ref.fragment?.value ?? '');
+      const substituted = tpl.replace('{id}', ref.id).replace('{n}', ref.fragment?.value ?? '');
       const segments = substituted.split('/').filter(s => s.length > 0);
       return ['/' + segments[0], ...segments.slice(1)];
     },
