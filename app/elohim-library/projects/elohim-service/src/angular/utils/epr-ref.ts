@@ -180,7 +180,12 @@ export interface EprRouteResolution {
   claimed: boolean;
 }
 
-/** Mint the universal EPR address (§12.1): /epr/{id}[#fragment]. */
+/**
+ * Mint the universal EPR address (§12.1): /epr/{id}[#fragment].
+ * The fragment is deliberately NOT encoded: its structural slashes
+ * (step/2, rel/PREREQUISITE/x) must stay raw for parseEpr round-trips and
+ * the Slice-3 doorway resolver. Fragment VALUES are assumed URL-safe slugs.
+ */
 export function eprToUniversalHref(ref: EprRef): string {
   const frag = ref.fragment ? `#${formatFragment(ref.fragment)}` : '';
   return `/epr/${encodeURIComponent(ref.id)}${frag}`;

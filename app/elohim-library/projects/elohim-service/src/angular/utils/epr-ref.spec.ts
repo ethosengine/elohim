@@ -190,6 +190,24 @@ describe('EprRef', () => {
     it('returns null for blob tier', () => {
       expect(eprToRoute({ id: 'manifesto', tier: 'blob' }, SHELL_CTX)).toBeNull();
     });
+
+    it('doc tier resolves like head (page address, not blob)', () => {
+      const res = eprToRoute({ id: 'x', tier: 'doc' }, EMPTY_CTX);
+      expect(res).toEqual({ commands: null, href: '/epr/x', claimed: false });
+    });
+
+    it('claim wins over ownsUniversalRoute when a context has both', () => {
+      const HYBRID_CTX: BundleRouteContext = {
+        claims: [{ contentType: 'path', commands: ref => ['/path', ref.id] }],
+        ownsUniversalRoute: true,
+      };
+      const claimed = eprToRoute({ id: 'p1', tier: 'head' }, HYBRID_CTX, 'path');
+      expect(claimed?.commands).toEqual(['/path', 'p1']);
+      expect(claimed?.claimed).toBe(true);
+      const unclaimed = eprToRoute({ id: 'c1', tier: 'head' }, HYBRID_CTX, 'concept');
+      expect(unclaimed?.commands).toEqual(['/epr', 'c1']);
+      expect(unclaimed?.claimed).toBe(false);
+    });
   });
 
   describe('eprToUniversalHref', () => {
