@@ -7,7 +7,7 @@ import { PathContext } from '../../models/exploration-context.model';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
-import { LAMAD_EPR_RESOLVER } from '../../interfaces/cross-pillar.interface';
+import { LAMAD_EPR_RESOLVER, LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
 import { of } from 'rxjs';
 import { vi, Mock } from 'vitest';
 
@@ -100,9 +100,13 @@ describe('LessonViewComponent', () => {
               qahal: {},
               relationships: [{ type: 'TEACHES', target: 'bar' }],
             })),
-            resolveInContext: vi.fn().mockReturnValue({ route: ['/resource', 'bar'], resolution: 'standalone' }),
+            resolveInContext: vi.fn().mockReturnValue({ route: null, href: '/epr/bar', resolution: 'standalone' }),
             resolveBlobUrl: vi.fn().mockReturnValue(''),
           },
+        },
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
         },
       ],
     })

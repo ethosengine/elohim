@@ -299,9 +299,13 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
   @property({ attribute: false })
   position: { top: number; left: number } = { top: 0, left: 0 };
 
-  /** Route href for the "Open resource" link (or null for no link) */
+  /** Route href for the "Open resource" link (routerLink, in-bundle) */
   @property()
   route: string | null = null;
+
+  /** Universal href for cross-bundle navigation (plain anchor fallback) */
+  @property()
+  href: string | null = null;
 
   /** Whether the popover is currently visible */
   @property({ type: Boolean, reflect: true })
@@ -387,7 +391,7 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
             `
           : nothing}
 
-        <!-- Footer: link to full resource -->
+        <!-- Footer: link to full resource — router event (in-bundle) or plain anchor (cross-bundle) -->
         ${this.route
           ? html`
               <button
@@ -400,7 +404,18 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
                 Open resource
               </button>
             `
-          : nothing}
+          : this.href
+            ? html`
+                <a
+                  class="link"
+                  part="link"
+                  href=${this.href}
+                  data-testid="epr-popover-link"
+                >
+                  Open resource
+                </a>
+              `
+            : nothing}
       </div>
     `;
   }

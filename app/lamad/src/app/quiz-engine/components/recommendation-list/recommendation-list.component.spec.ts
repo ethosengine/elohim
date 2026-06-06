@@ -6,7 +6,7 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { RecommendationListComponent } from './recommendation-list.component';
-import { LAMAD_EPR_RESOLVER } from '../../../interfaces/cross-pillar.interface';
+import { LAMAD_EPR_RESOLVER, LAMAD_EPR_NAV } from '../../../interfaces/cross-pillar.interface';
 import type { ContentRecommendation } from '../../services/path-adaptation.service';
 
 describe('RecommendationListComponent', () => {
@@ -41,6 +41,10 @@ describe('RecommendationListComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: LAMAD_EPR_RESOLVER, useValue: mockResolver },
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => false), recordHandoff: vi.fn() },
+        },
       ],
     }).compileComponents();
 

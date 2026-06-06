@@ -9,7 +9,7 @@ import { of } from 'rxjs';
 import { MarkdownRendererComponent, TocEntry } from './markdown-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
 import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
-import { LAMAD_EPR_RESOLVER } from '../../interfaces/cross-pillar.interface';
+import { LAMAD_EPR_RESOLVER, LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
 import { PathService } from '../../services/path.service';
 import { PathContextService } from '../../services/path-context.service';
 
@@ -58,10 +58,14 @@ describe('MarkdownRendererComponent', () => {
           useValue: {
             resolve: vi.fn().mockReturnValue(of(null)),
             resolveEprHead: vi.fn().mockReturnValue(of(null)),
-            resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null }),
-            resolveInContext: vi.fn().mockReturnValue({ route: ['/'], resolution: 'standalone' }),
+            resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null, href: '/epr/test' }),
+            resolveInContext: vi.fn().mockReturnValue({ route: null, href: '/epr/test', resolution: 'standalone' }),
             resolveBlobUrl: vi.fn().mockReturnValue(''),
           },
+        },
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => false), recordHandoff: vi.fn() },
         },
       ],
     }).compileComponents();
@@ -443,10 +447,14 @@ describe('MarkdownRendererComponent — cross-path prefetch', () => {
           useValue: {
             resolve: vi.fn().mockReturnValue(of(null)),
             resolveEprHead: vi.fn().mockReturnValue(of(null)),
-            resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null }),
-            resolveInContext: vi.fn().mockReturnValue({ route: ['/'], resolution: 'standalone' }),
+            resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null, href: '/epr/test' }),
+            resolveInContext: vi.fn().mockReturnValue({ route: null, href: '/epr/test', resolution: 'standalone' }),
             resolveBlobUrl: vi.fn().mockReturnValue(''),
           },
+        },
+        {
+          provide: LAMAD_EPR_NAV,
+          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => false), recordHandoff: vi.fn() },
         },
       ],
     }).compileComponents();

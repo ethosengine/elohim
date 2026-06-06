@@ -48,6 +48,7 @@ export interface LamadResolvedEpr {
   ref: EprRef;
   url: string;
   route: string[] | null;
+  href: string;
 }
 
 /** Narrow shape for resolved-content metadata that consumers display. */
@@ -63,12 +64,14 @@ export interface LamadResolvedContent {
   ref: EprRef;
   content: LamadResolvedContentBody;
   blobUrl: string | null;
-  route: string[];
+  route: string[] | null;
+  href: string;
 }
 
 /** Context-aware EPR resolution result. */
 export interface LamadContextResolvedRoute {
-  route: string[];
+  route: string[] | null;
+  href: string;
   resolution: 'in-path' | 'cross-path' | 'standalone';
   stepIndex?: number;
   crossPath?: { pathId: string; stepIndex: number };

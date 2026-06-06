@@ -251,7 +251,7 @@ describe('ContentViewerComponent', () => {
             })),
             resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null }),
             resolve: vi.fn().mockReturnValue(of(null)),
-            resolveInContext: vi.fn().mockReturnValue({ route: ['/resource', 'foo'], resolution: 'standalone' }),
+            resolveInContext: vi.fn().mockReturnValue({ route: null, href: '/epr/foo', resolution: 'standalone' }),
             resolveBlobUrl: vi.fn().mockReturnValue(''),
           },
         },

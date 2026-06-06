@@ -27,7 +27,9 @@ import 'elohim-core/register';
 
 import {
   LAMAD_EPR_RESOLVER,
+  LAMAD_EPR_NAV,
   type ILamadEprResolver,
+  type ILamadEprNav,
   type LamadStepRef,
   type LamadCrossPathMatch,
 } from '../../interfaces/cross-pillar.interface';
@@ -139,6 +141,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private headingElements: HTMLElement[] = [];
   private readonly storageClient = inject(LAMAD_STORAGE_CLIENT);
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
+  private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
   private readonly pathContext = inject(PathContextService);
   private readonly pathService = inject(PathService);
   private readonly router = inject(Router);
@@ -436,7 +439,11 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     );
 
     this.destroyPopover();
-    void this.router.navigate(resolved.route);
+    if (resolved.route) {
+      void this.router.navigate(resolved.route);
+    } else {
+      this.eprNav.navigate(resolved.href);
+    }
   }
 
   /**
@@ -527,11 +534,9 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     this.destroyPopover();
     this.hoveredEprAnchor = anchor; // Restore — destroyPopover clears it
 
-    // Get route synchronously for the "Open resource" link
-    const { route } = this.eprResolver.resolveUrl(eprUri);
-    const routeHref = Array.isArray(route)
-      ? '/' + route.filter(Boolean).join('/').replace(/^\/+/, '')
-      : null;
+    // Route (in-bundle) or universal href (cross-bundle) for the "Open resource" link
+    const { route, href } = this.eprResolver.resolveUrl(eprUri);
+    const routeHref = route ? '/' + route.filter(Boolean).join('/').replace(/^\/+/, '') : href;
 
     // Fetch EPR Head metadata
     this.popoverSub = this.eprResolver.resolveEprHead(eprUri).subscribe(head => {
@@ -559,7 +564,8 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       // the two declarations.
       popover.head = head as unknown as EprHead;
       popover.position = position;
-      popover.route = routeHref;
+      popover.route = route ? routeHref : null;
+      popover.href = href;
       popover.visible = true;
 
       // Cancel pending dismiss when mouse enters the popover panel.
@@ -578,6 +584,8 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
         this.destroyPopover();
         if (route) {
           void this.router.navigate(route);
+        } else if (href) {
+          this.eprNav.navigate(href);
         }
       };
 

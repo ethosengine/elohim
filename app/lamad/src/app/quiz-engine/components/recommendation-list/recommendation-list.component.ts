@@ -34,7 +34,9 @@ import 'elohim-core/register';
 
 import {
   LAMAD_EPR_RESOLVER,
+  LAMAD_EPR_NAV,
   type ILamadEprResolver,
+  type ILamadEprNav,
 } from '../../../interfaces/cross-pillar.interface';
 
 import type { ElohimEprLink } from 'elohim-core';
@@ -128,6 +130,7 @@ export class RecommendationListComponent implements AfterViewInit, OnDestroy {
   @Output() dismiss = new EventEmitter<string>();
 
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
+  private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
   private readonly router = inject(Router);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
 
@@ -136,6 +139,8 @@ export class RecommendationListComponent implements AfterViewInit, OnDestroy {
     this.eprResolver.resolve(epr).subscribe(resolved => {
       if (resolved?.route) {
         void this.router.navigate(resolved.route);
+      } else if (resolved) {
+        this.eprNav.navigate(resolved.href);
       }
     });
   };
