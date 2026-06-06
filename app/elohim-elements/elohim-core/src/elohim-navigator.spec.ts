@@ -66,11 +66,13 @@ describe('<elohim-navigator>', () => {
   });
 
   it('renders no identity tray items without host-supplied routes (blank-slate)', async () => {
-    const el = await fixture<ElohimNavigator>(html`
-      <elohim-navigator></elohim-navigator>
-    `);
-    const trayBtn = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="nav-login"]');
-    expect(trayBtn).to.equal(null);
+    const el = await fixture<ElohimNavigator>(html`<elohim-navigator></elohim-navigator>`);
+    const bubble = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="profile-bubble"]');
+    bubble?.click();
+    await elementUpdated(el);
+    expect(el.shadowRoot?.querySelector('[data-testid="nav-login"]')).to.equal(null);
+    // the tray itself may render (sign-out absent too for anonymous) — the point is no ROUTE items
+    expect(el.shadowRoot?.querySelector('[data-testid="nav-register"]')).to.equal(null);
   });
 
   it('renders profile bubble button', async () => {

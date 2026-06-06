@@ -197,4 +197,26 @@ describe('ElohimNavigatorComponent', () => {
 
     expect(component.showUpgradeModal).toBe(true);
   });
+
+  describe('EPR-aware navigation (cross-bundle rail)', () => {
+    it('switchContext rides eprNav', () => {
+      component.switchContext({ id: 'lamad', name: 'Lamad', icon: '📚', route: '/lamad', tagline: '', available: true } as never);
+      expect(mockEprNav.navigate).toHaveBeenCalledWith('/lamad');
+    });
+
+    it('goToIdentityProfile rides eprNav', () => {
+      component.goToIdentityProfile();
+      expect(mockEprNav.navigate).toHaveBeenCalledWith('/identity/profile');
+    });
+
+    it('goToLogin carries the returnUrl', () => {
+      component.goToLogin();
+      expect(mockEprNav.navigate).toHaveBeenCalledWith(expect.stringMatching(/^\/identity\/login\?returnUrl=/));
+    });
+
+    it('onLogout returns home via eprNav', async () => {
+      await component.onLogout();
+      expect(mockEprNav.navigate).toHaveBeenCalledWith('/');
+    });
+  });
 });
