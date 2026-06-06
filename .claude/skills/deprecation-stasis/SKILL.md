@@ -11,8 +11,12 @@ PostToolUse hook: fingerprint dedupe → ledger; NEW → background
 This sweep is the **deliberate drain**: it walks both stores to stasis the way
 `/memory-stasis-loop` walks the memory disciplines.
 
-**Stasis** := every ledger entry is `fixed`, or `blocked` with a
-still-valid, documented blocker in its cite-sealed canonical backlog entry.
+**Stasis** := the ledger is EMPTY, or contains only `blocked` entries with a
+still-valid, documented blocker in their canonical backlog entry. Fixed items
+DECOMPOSE at close (ledger line + backlog entry deleted; the verifying commit
+is the record; rare chronicle graduation) — everything in the backlog has a
+live trajectory or a status, or it's not there. Terminal tombstones in either
+store are themselves an incoherence to repair.
 
 ## The loop
 
@@ -27,17 +31,23 @@ counts = collections.Counter()
 entries = []
 for l in open('.claude/data/deprecations.jsonl'):
     e = json.loads(l); counts[e.get('status','open')] += 1; entries.append(e)
-print(dict(counts))
+print(dict(counts) or 'EMPTY — stasis (capture side)')
 for e in entries:
-    if e.get('status') != 'fixed':
-        print(e['fp'], e.get('status'), e.get('backlog','(no backlog)'), '-', e['line'][:90])
+    print(e['fp'], e.get('status'), e.get('backlog','(no backlog)'), '-', e['line'][:90])
 EOF
 ls genesis/data/timeline/backlog/deprecation-*.md 2>/dev/null
 ```
 
 Cross-check coherence: every non-`open` ledger entry must point at a backlog
-file whose frontmatter `fingerprints:` includes it and whose `status` agrees.
-Incoherence = the first thing to fix (it breaks the deterministic citation).
+file whose frontmatter `fingerprints:` includes it and whose
+`deprecation_status:` agrees with the ledger status (domain axis, live states
+only). The entry's `status:` field carries the unified delivery gradient
+(`backlog`/`wip` — captured-or-blocked / fix-in-flight) so the shared
+`delivery-status-distribution.py` projection and /converge rank deprecation
+concerns like every other backlog item. Any `fixed`/`stable` tombstone parked
+in either store is a missed decomposition — close it out (delete; chronicle
+first only if genuinely meaningful). Incoherence = the first thing to fix (it
+breaks the deterministic citation).
 
 ### 2. Pick highest-leverage work
 

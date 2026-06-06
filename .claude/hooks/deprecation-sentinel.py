@@ -4,26 +4,34 @@
 Watches Bash tool output for deprecation warnings emitted in flight
 (e.g. Vitest "DEPRECATED `test.poolOptions` was removed in Vitest 4",
 npm "npm warn deprecated", Rust "use of deprecated", Node
-DeprecationWarning) and reconciles them against two stores:
+DeprecationWarning) against two stores with crisp roles:
 
-  1. Ledger (deterministic flag): .claude/data/deprecations.jsonl —
-     one line per fingerprint {ts, fp, line, cmd, status, backlog?}.
-     Status: open → triaged → blocked | fixed (the deprecation-triage
-     agent owns transitions; this hook only appends `open` entries).
-  2. Canonical backlog (the decision record):
-     genesis/data/timeline/backlog/deprecation-*.md — written by the
-     deprecation-triage agent, cite-sealed, status-documented.
+  1. Ledger = the EXISTING-POSITIVES CHECK SURFACE (decides firing):
+     .claude/data/deprecations.jsonl — one line per LIVE fingerprint
+     {ts, fp, line, cmd, status, backlog?}. Status: open → triaged →
+     blocked. A fingerprint PRESENT here suppresses dispatch; a
+     fingerprint ABSENT fires the dev. FIXED items are DELETED from
+     the ledger at close (full memory decomposition — the git commit
+     is the record), so a reintroduced deprecation reads as NEW and
+     correctly re-fires: regression handling for free.
+  2. Canonical backlog = the CLOSE-OF-TRIAGE DECISION SURFACE:
+     genesis/data/timeline/backlog/deprecation-*.md — timeline-
+     CONVENTIONS-conformant entries holding the live trajectory
+     ("Current decision" is the citation line for blocked items).
+     Fixed-no-work-left entries are DELETED (rarely graduated to
+     timeline/chronicle/ when genuinely meaningful) — everything in
+     the backlog has a trajectory or a status, or it's not there.
 
 Behavior:
   * NEW fingerprint  → append to ledger + inject a dispatch directive:
     the session launches the `deprecation-triage` agent (Opus) in the
     BACKGROUND — flag → scope → canonicalize → fix|block — and carries
     on with its current task.
-  * KNOWN fingerprint, not yet fixed → once per session, inject a
-    one-line deterministic citation of the current decision (backlog
-    path + status). No agent dispatch — blocked-and-canonicalized
-    items never re-fire automation; the deprecation-stasis sweep
-    re-checks blockers deliberately.
+  * KNOWN fingerprint (live: open/triaged/blocked) → once per session,
+    inject a one-line deterministic citation of the current decision
+    (backlog path + status). No agent dispatch — blocked-and-
+    canonicalized items never re-fire automation; the
+    deprecation-stasis sweep re-checks blockers deliberately.
   * Command itself mentions deprecation (greps, ledger edits, this
     hook's own tooling) → skip entirely (false-positive guard).
 
@@ -148,7 +156,9 @@ def main() -> None:
                             "status": "open",
                         }
                     )
-            elif entry.get("status") != "fixed":
+            else:
+                # Any ledger presence is a LIVE positive (fixed items are
+                # deleted at close, never parked) — cite, don't re-fire.
                 reencountered.append(entry)
 
     context_parts = []
