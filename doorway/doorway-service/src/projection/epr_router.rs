@@ -198,9 +198,13 @@ mod tests {
             make_projection("lamad", "/lamad"),
         ]);
         // /epr projection must be silently dropped.
+        assert_eq!(
+            router.len(),
+            1,
+            "only the legal /lamad projection must be in the table"
+        );
         assert!(
-            router.dispatch("/epr").is_none()
-                || router.dispatch("/epr").map(|p| p.epr_id).as_deref() != Some("bad-epr-mount"),
+            router.dispatch("/epr").is_none(),
             "reserved /epr mount must not be installed in the router"
         );
         // /lamad projection must survive.

@@ -1611,11 +1611,14 @@ async fn dispatch_to_projected_epr(
 /// EPR client-side. Doorway-side 302-to-pretty-mount is Slice 3 (routeClaims).
 /// Passing "/" as the request path makes `derive_app_subpath` yield the
 /// projection's entry_file — /epr/{id} is BY DEFINITION a page address.
-async fn dispatch_epr_universal(state: &AppState, request_path: &str) -> Response<Full<Bytes>> {
+async fn dispatch_epr_universal(state: &AppState, original_path: &str) -> Response<Full<Bytes>> {
     match state.epr_router.dispatch("/") {
         Some(root) => {
-            tracing::debug!(path = %request_path, root_epr = %root.epr_id,
+            tracing::debug!(path = %original_path, root_epr = %root.epr_id,
                 "universal /epr address — serving root bundle");
+            // Always dispatch as "/" so derive_app_subpath yields entry_file.
+            // The resource id in the original path is resolved client-side by
+            // the shell's epr/:resourceId route.
             dispatch_to_projected_epr(state, "/", root).await
         }
         // No root projection registered — same posture as the bare "/" arm.
