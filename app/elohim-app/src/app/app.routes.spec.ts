@@ -38,6 +38,7 @@ describe('App Routes', () => {
   it('should have the universal epr/:resourceId route (§12.6 Slice 2)', () => {
     const eprRoute = routes.find(r => r.path === 'epr/:resourceId');
     expect(eprRoute).toBeDefined();
+    expect(eprRoute?.loadComponent).toBeDefined();
     expect(eprRoute?.data?.['protocolContent']).toBe(true);
   });
 

@@ -53,7 +53,9 @@ export const routes: Routes = [
       title: 'Content',
     },
   },
-  // Cross-pillar resource viewer (ContentNodes are protocol primitives, not pillar-scoped)
+  // Cross-pillar resource viewer (ContentNodes are protocol primitives, not pillar-scoped).
+  // Legacy surface — durable /resource URLs exist in the wild; new minting targets the
+  // /epr/:resourceId universal address below (same component, §12.3).
   {
     path: 'resource/:resourceId',
     loadComponent: async () =>
