@@ -34,7 +34,8 @@ const resolvedContent = {
     createdAt: '',
     updatedAt: '',
   },
-  route: ['/resource', 'systems-thinking'],
+  route: ['/epr', 'systems-thinking'],
+  href: '/epr/systems-thinking',
   blobUrl: null,
 };
 

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
-import { of } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
 
 import {
   EprResolverService,
@@ -150,15 +150,13 @@ describe('EprResolverService', () => {
   // ── resolve ─────────────────────────────────────────────────────────────
 
   describe('resolve', () => {
-    it('returns null when content is not found', done => {
+    it('returns null when content is not found', async () => {
       storageSpy.getContent.mockReturnValue(of(null));
-      service.resolve('epr:missing-content').subscribe(result => {
-        expect(result).toBeNull();
-        done();
-      });
+      const result = await firstValueFrom(service.resolve('epr:missing-content'));
+      expect(result).toBeNull();
     });
 
-    it('resolves content with route and href (shell context)', done => {
+    it('resolves content with route and href (shell context)', async () => {
       const mockContent = {
         id: 'manifesto',
         title: 'Manifesto',
@@ -169,28 +167,24 @@ describe('EprResolverService', () => {
         tags: [],
       };
       storageSpy.getContent.mockReturnValue(of(mockContent));
-      service.resolve('epr:manifesto').subscribe(result => {
-        expect(result).not.toBeNull();
-        expect(result!.ref.id).toBe('manifesto');
-        expect(result!.content).toBe(mockContent);
-        expect(result!.blobUrl).toBeNull();
-        // Shell owns /epr — article is unclaimed → universal route
-        expect(result!.route).toEqual(['/epr', 'manifesto']);
-        expect(result!.href).toBe('/epr/manifesto');
-        done();
-      });
+      const result = await firstValueFrom(service.resolve('epr:manifesto'));
+      expect(result).not.toBeNull();
+      expect(result!.ref.id).toBe('manifesto');
+      expect(result!.content).toBe(mockContent);
+      expect(result!.blobUrl).toBeNull();
+      // Shell owns /epr — article is unclaimed → universal route
+      expect(result!.route).toEqual(['/epr', 'manifesto']);
+      expect(result!.href).toBe('/epr/manifesto');
     });
 
-    it('resolves blob URL when contentBody is a content address', done => {
+    it('resolves blob URL when contentBody is a content address', async () => {
       const hash = 'sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
       storageSpy.getContent.mockReturnValue(
         of({ id: 'blob-content', contentType: 'article', contentBody: hash, reach: 'public' })
       );
       storageSpy.getBlobUrl.mockReturnValue(`https://doorway.host/blob/${hash}`);
-      service.resolve('epr:blob-content').subscribe(result => {
-        expect(result!.blobUrl).toBe(`https://doorway.host/blob/${hash}`);
-        done();
-      });
+      const result = await firstValueFrom(service.resolve('epr:blob-content'));
+      expect(result!.blobUrl).toBe(`https://doorway.host/blob/${hash}`);
     });
   });
 
