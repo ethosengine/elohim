@@ -317,7 +317,7 @@ export class SeoService {
    * the canonical names the PUBLIC URL (§12.1; SEO absolute URLs are keepers).
    */
   private generateCanonicalUrl(): string {
-    const path = this.router.url.split('?')[0]; // Remove query params
+    const path = this.router.url.split('?')[0].split('#')[0]; // strip query params and fragment
     const baseUri = this.document.baseURI;
     const base =
       baseUri.startsWith('http://') || baseUri.startsWith('https://')
