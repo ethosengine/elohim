@@ -1,6 +1,6 @@
 ---
 name: agentic-developer
-description: First-class overnight agentic developer. Iterates a named Objective against a CI pipeline — observe via Haiku, orchestrate + attempt as Opus, delegate to Sonnet on Opus's discretion. Uses stability-gated "done", path-scoped authority, palette-based command permission, produces a single sprint-result markdown artifact. CI findings rails: consumes the deterministic ci-harvest ledger (.claude/data/ci-findings.jsonl) instead of ad-hoc Jenkins pulls, holds the pass/unstable/fail-ratio FLOOR (never leave touched jobs below where the shift found them) and the brainstorming-confidence CEILING (low-confidence/design-shaped findings route to /brainstorm, not more loops). Invoked by the /shift slash command. Use when "kick off shift X", "run /shift", "start an agentic developer on Y", "drain the CI findings ledger", or supervising a long-running implementation against CI. NOT for one-shot tasks (use direct implementation) or surface CI triage (use ci-triage).
+description: First-class overnight agentic developer. Iterates a named Objective against a CI pipeline — observe via Haiku, orchestrate + attempt as Opus, delegate to Sonnet on Opus's discretion. Stability-gated "done", path-scoped authority, palette-based command permission, deterministic ci-harvest ledger with floor/ceiling rails; produces a single sprint-result markdown artifact. Invoked by the /shift slash command. Use when "kick off shift X", "run /shift", "start an agentic developer on Y", "drain the CI findings ledger", or supervising a long-running implementation against CI. NOT for one-shot tasks (use direct implementation) or surface CI triage (use ci-triage).
 ---
 
 # Agentic Developer
@@ -146,15 +146,21 @@ mcp__jenkins__getBuild jobFullName="elohim-orchestrator/dev"  # or matching bran
 
 Confirm the mode read with the user during the Objective interview — they may have context the build status doesn't reflect ("yes deploy is green but I'm here to fix one specific scenario, run as bring-up"). Mode is recorded in the journal header.
 
-### Follow-up: multi-candidate haiku-output
+### Multi-candidate observation (current state)
 
-Integration mode requires `ci-observer` to return multiple failure candidates per dispatch, not just `primary_failure`. Today the haiku-output schema has `primary_failure: object | null`; it needs an additional `failure_candidates: array` for integration mode (or for any time the orchestrator wants the broader picture). Scope of that change:
+Integration mode wants `ci-observer` to surface multiple failure candidates,
+not just `primary_failure`. **Today's schema** (`.claude/schemas/haiku-output.schema.json`)
+returns one `primary_failure` and has no `failure_candidates` array, so the
+orchestrator composes the candidate set itself by **dispatching `ci-observer`
+multiple times against the same build with different artifact scopes** (see
+"Iteration loop adaptations in integration mode" → Step 2, and
+`.claude/agents/ci-observer.md` → "Integration-mode dispatch"). That is the
+working path — use it.
 
-- Schema change in `.claude/schemas/haiku-output.schema.json` — add optional `failure_candidates` array, each entry shaped like `primary_failure`.
-- Update `.claude/agents/ci-observer.md` to populate it in integration-mode dispatches.
-- Update orchestrator dispatch prompts to opt into multi-candidate mode explicitly.
-
-Until that change lands, integration-mode shifts work by dispatching `ci-observer` multiple times against the same build with different artifact pointers, and the orchestrator manually composing the candidate set.
+The `failure_candidates: array` schema extension is unbuilt future work, not
+a step of this loop. It is NOT tracked in the skill body (anti-dump); if/when
+it's worth doing it belongs in a gap-item or backlog entry, scoped against the
+findings-sentinel spec.
 
 ## Kickoff (interactive — first 2-3 minutes)
 
@@ -260,8 +266,11 @@ When `/shift` invokes this skill:
    `holochain/dna/*` tree) use plain `cargo` — do NOT redirect their
    target dir or `hc dna pack` will break. Palette additions:
    `Bash(CARGO_TARGET_DIR=/projects/.cargo-target-pool/* cargo *)`,
-   `Bash(cargo-pool *)`. Design:
-   `genesis/docs/plans/cargo-target-pool-design.md`.
+   `Bash(cargo-pool *)`. The pool is implemented via the SessionStart/Stop
+   hooks (commit `8ad5f2ca6`); rationale + thresholds are captured in the
+   memory entry `feedback_cargo_target_dir_for_native_builds` (the original
+   `genesis/docs/plans/cargo-target-pool-design.md` was dissolved to git at
+   ceremony run-6).
 
 3. **Run pre-shift readiness check.**
 
@@ -301,7 +310,15 @@ palette union. Decide iteration type:
 
 ### 2. Observe (Haiku dispatch)
 
-Dispatch the `ci-observer` agent (Haiku) for any Jenkins data — build
+**Read the harvested ledger first.** Failure *history* — recurrence counts,
+flake evidence, rolling pass/unstable/fail windows — is already maintained
+deterministically by `ci-harvest.py` in `.claude/data/ci-findings.jsonl` +
+`ci-cursor.json` (see "CI findings rails"). Don't re-derive from Jenkins what
+the ledger already holds; the observer is for the **live per-build absorption**
+the ledger can't give you (this run's structured summary), not for failure
+history.
+
+Dispatch the `ci-observer` agent (Haiku) for live Jenkins data — build
 logs, test results, orchestrator output, changesets. **You never read
 raw Jenkins logs directly.** The observer absorbs the text bomb and
 returns a structured summary on `.claude/schemas/haiku-output.schema.json`.
