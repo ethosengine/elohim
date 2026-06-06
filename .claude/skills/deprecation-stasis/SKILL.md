@@ -1,6 +1,6 @@
 ---
 name: deprecation-stasis
-description: Drive the deprecation/security-concern discipline to stasis in one loop — reconcile the deterministic ledger (.claude/data/deprecations.jsonl) against the canonical backlog (genesis/data/timeline/backlog/deprecation-*.md), dispatch deprecation-triage for the highest-leverage open item, re-check blocked items whose blockers may have cleared, re-measure, repeat until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). Use when "drain the deprecation ledger", "deprecation stasis pass", on a /loop or scheduled routine, or when the sentinel's nudges have accumulated past comfort.
+description: Drive the deprecation/security-concern discipline to stasis in one loop — reconcile the deterministic ledger (.claude/data/deprecations.jsonl) against the canonical backlog (genesis/data/timeline/backlog/{deprecation,security}-*.md), dispatch deprecation-triage for the highest-leverage open item, re-check blocked items whose blockers may have cleared, re-measure, repeat until stasis. Sibling of /memory-stasis-loop (same measure→dispatch→re-measure shape). Use when "drain the deprecation ledger", "deprecation stasis pass", on a /loop or scheduled routine, or when the sentinel's nudges have accumulated past comfort.
 ---
 
 # Deprecation Stasis Sweep
@@ -35,7 +35,7 @@ print(dict(counts) or 'EMPTY — stasis (capture side)')
 for e in entries:
     print(e['fp'], e.get('status'), e.get('backlog','(no backlog)'), '-', e['line'][:90])
 EOF
-ls genesis/data/timeline/backlog/deprecation-*.md 2>/dev/null
+ls genesis/data/timeline/backlog/deprecation-*.md genesis/data/timeline/backlog/security-*.md 2>/dev/null
 ```
 
 Cross-check coherence: every non-`open` ledger entry must point at a backlog

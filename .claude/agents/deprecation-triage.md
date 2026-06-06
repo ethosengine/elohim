@@ -26,9 +26,11 @@ citation) can answer every re-encounter without another agent dispatch.
    deprecation then reads as NEW and correctly re-fires the dev (regression
    handling for free).
 2. **Canonical backlog** (the decision record):
-   `genesis/data/timeline/backlog/deprecation-<slug>.md` — one file per
+   `genesis/data/timeline/backlog/<class>-<slug>.md` (class = `deprecation` |
+   `security`, matching the ledger entry's `class` field) — one file per
    *concern* (a concern may cover several fingerprints: e.g. five npm warnings
-   from one outdated transitive tree). This is the registered `timeline-entity`
+   from one outdated transitive tree, or one advisory summary plus its
+   per-package GHSA lines). This is the registered `timeline-entity`
    managed surface — follow `genesis/data/timeline/CONVENTIONS.md` (backlog
    kind) so the entry flows into the shared delivery-status projection and
    /converge ranking like every other backlog item. Frontmatter (timeline
@@ -36,12 +38,12 @@ citation) can answer every re-encounter without another agent dispatch.
 
    ```yaml
    ---
-   id: "backlog-deprecation-<slug>"
+   id: "backlog-<class>-<slug>"
    kind: "backlog"
    contentType: "backlog-item"
    contentFormat: "markdown"
    title: "<concern, human-readable>"
-   slug: "deprecation-<slug>"
+   slug: "<class>-<slug>"
    written: "YYYY-MM-DD"
    author: "deprecation-triage"
    status: "backlog" | "wip"              # unified delivery gradient (shared kanban axis):
@@ -71,9 +73,10 @@ citation) can answer every re-encounter without another agent dispatch.
 
 1. **Read the ledger entries** for the fingerprint(s) in your dispatch prompt.
 2. **Scope**: Grep/Glob the repo for every usage of the deprecated feature
-   (config keys, APIs, package versions). Check whether an existing
-   `genesis/data/timeline/backlog/deprecation-*.md` already covers this
-   concern — if so EXTEND it (add fingerprints), never fork a duplicate.
+   (config keys, APIs, package versions) or affected dependency. Check
+   whether an existing `genesis/data/timeline/backlog/{deprecation,security}-*.md`
+   already covers this concern — if so EXTEND it (add fingerprints), never
+   fork a duplicate.
 3. **Research**: WebFetch the migration guide if the warning carries a URL;
    otherwise locate the canonical upstream changelog. Bounded effort — you
    need the migration steps and the blast radius, not a dissertation.
@@ -108,6 +111,34 @@ citation) can answer every re-encounter without another agent dispatch.
    commit becomes the only record. NEVER `git push` — the integrator owns
    push. If the worktree has unrelated in-flight changes, stage selectively —
    only files you touched.
+
+## Scale posture — every run drives toward stasis
+
+Security reports arrive BIG (one audit can surface dozens of advisories;
+a GitHub push banner can name hundreds of repo-wide vulnerabilities). Your
+goal each run is neither "triage everything" nor "fix everything" — it is
+the **largest genuine step toward stasis the run supports**. You judge the
+mix; these are the anti-patterns that waste runs:
+
+- **Triage-as-terminal**: producing only a catalog when bounded fixes were
+  sitting right there. If something is cheap and verifiable, land it.
+- **Fix-spree on an unbounded front**: chasing every advisory in one run and
+  finishing none. Land complete, verified closures; leave the rest with live
+  trajectories.
+- **The mega-entry**: one backlog file hiding N independent concerns.
+  Canonicalize by concern (root cause / package / upgrade unit) so each gets
+  its own trajectory, priority, severity.
+- **Re-scanning the canonicalized**: concerns already in the backlog with a
+  current decision don't need re-discovery — extend fingerprint lists, don't
+  re-derive.
+- **Partial work marked done**: a half-applied migration is `wip` or
+  `blocked` with a written next step — never deleted-as-fixed.
+
+A good large-report run typically ends with: every finding canonicalized into
+right-sized concerns with priorities, the bounded wins landed-and-decomposed,
+and the remainder holding documented trajectories the stasis sweep can drive.
+That IS effective progress — the next run starts from trajectories, not from
+zero.
 
 ## Hard rules
 
