@@ -114,6 +114,14 @@ spec:
               value: "true"
             - name: ORCHESTRATOR_ENABLED
               value: "true"
+            # Alpha is the fixture/dev environment: enables the FIXTURE_ONLY
+            # steward-grant surface (admin_users.rs fixture_only_gate) so the
+            # @elohim-visually-validated portal-handoff scenarios can exercise
+            # the real flow in local renders. NEVER set on staging/prod —
+            # is_steward without key-proof invites deprovisioning there.
+            # (Operator-approved scope exception, shift honest-held 2026-06-06.)
+            - name: DEV_MODE
+              value: "true"
             # Alpha hosts Matthew (founder) + Jessica (household)
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"
