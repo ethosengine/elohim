@@ -91,7 +91,7 @@ function allocationKey(contentId: string, stewardPresenceId: string): string {
 // =============================================================================
 
 const CATEGORY_STEWARD_MAP: Record<string, StewardRatio[]> = {
-  // Care economy: Adam (gardener-steward) primary, Susan (family), Matthew (founder), Frank (ecology)
+  // Care economy: Adam (gardener-steward) primary, Jessica (family), Matthew (founder), Frank (ecology)
   'value-scanner': [
     { presenceId: 'adam-firstman', ratio: 0.35 },
     { presenceId: 'jessica-spouse', ratio: 0.25 },
@@ -120,7 +120,7 @@ const CATEGORY_STEWARD_MAP: Record<string, StewardRatio[]> = {
     { presenceId: 'frank-farmer', ratio: 0.20 },
   ],
 
-  // Digital relationships: Eve (courage, family-systems), Susan (community-building), Matthew
+  // Digital relationships: Eve (courage, family-systems), Jessica (community-building), Matthew
   'social-medium': [
     { presenceId: 'eve-firstwoman', ratio: 0.45 },
     { presenceId: 'jessica-spouse', ratio: 0.30 },

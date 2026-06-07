@@ -448,7 +448,22 @@ export class DoorwayClient {
   // -- Stewardship Allocations -----------------------------------------------
 
   async listAllocations(): Promise<AllocationView[]> {
-    return this.get<AllocationView[]>('/db/allocations?active_only=true&limit=10000');
+    // Page through the FULL active set. The persistent alpha table holds
+    // >10k legitimate rows (~3.4k content × ~3.4 stewards), so any single
+    // bounded GET silently truncates — content items straddling the page
+    // boundary lose stewards and their ratio sums break (genesis #1105).
+    // A bigger bare limit only moves the cliff; paging until a short page
+    // cannot truncate.
+    const pageSize = 2000;
+    const all: AllocationView[] = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const page = await this.get<AllocationView[]>(
+        `/db/allocations?active_only=true&limit=${pageSize}&offset=${offset}`
+      );
+      all.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return all;
   }
 
   async getAllocationsForContent(contentId: string): Promise<AllocationView[]> {

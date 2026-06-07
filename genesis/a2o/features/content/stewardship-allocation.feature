@@ -16,7 +16,12 @@ Feature: Content Stewardship Allocation
   Scenario: Value-scanner content has multiple stewards
     When I query stewardship allocations for value-scanner content
     Then Adam should be listed as a steward with the highest ratio
-    And Susan should be listed as a steward
+    # Jessica, not Susan: the seeder's CATEGORY_STEWARD_MAP allocates
+    # jessica-spouse for value-scanner; asserting Susan could never pass
+    # (she has no allocation and no presence mapping). If Susan was the
+    # original intent, that is a seed-map change with allocation-supersede
+    # implications — tracked, not assumed here.
+    And Jessica should be listed as a steward
     And Matthew should be listed as a steward
     And no single steward should have 100% allocation ratio
 
