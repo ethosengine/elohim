@@ -7835,9 +7835,42 @@ impl HttpServer {
             let qahal_ctx = AppContext::new("qahal");
 
             for coll_seed in &package.collectives {
-                // Ensure the collective exists (create stub if needed for seeding)
-                let _ =
-                    collectives::get_collective(&mut conn, &qahal_ctx, &coll_seed.collective_id);
+                // Ensure the FK parent exists before joining. Collective
+                // definitions are seeded to a SINGLE peer (seed-collectives.ts)
+                // while account packages import on each human's own
+                // hash-selected peer — on every other peer the participation
+                // insert hit `FOREIGN KEY constraint failed` (genesis #1105,
+                // jessica-alpha storm; the old code probed get_collective and
+                // discarded the result). Materialize a stub projection row
+                // instead. Probe is app-scope-agnostic (the FK is on bare
+                // collectives(id)); the stub is created under the legacy
+                // "lamad" scope so the projection controller's
+                // CollectiveProjected upsert and seed POSTs (both
+                // lamad-scoped) converge on the same row rather than
+                // PK-colliding on a second scope.
+                match collectives::collective_id_exists(&mut conn, &coll_seed.collective_id) {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        let stub =
+                            collectives::CreateCollectiveInput::stub(&coll_seed.collective_id);
+                        if let Err(e) = collectives::create_collective(
+                            &mut conn,
+                            &AppContext::new("lamad"),
+                            &stub,
+                        ) {
+                            errors.push(format!(
+                                "Failed to materialize collective stub {}: {}",
+                                coll_seed.collective_id, e
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        errors.push(format!(
+                            "Collective existence probe failed for {}: {}",
+                            coll_seed.collective_id, e
+                        ));
+                    }
+                }
 
                 let participation_input = collectives::CreateParticipationInput {
                     id: None,

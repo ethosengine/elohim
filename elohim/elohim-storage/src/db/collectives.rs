@@ -46,6 +46,28 @@ fn default_community_reach() -> String {
     "community".to_string()
 }
 
+impl CreateCollectiveInput {
+    /// Minimal placeholder used to materialize an FK parent for joins
+    /// arriving on a peer that never received the collective definition
+    /// (collective definitions are seeded to a single peer; account packages
+    /// are imported on each human's own peer). The stub is a projection
+    /// placeholder, not truth — `create_collective` is an id-scoped upsert,
+    /// so the authoritative `CollectiveProjected` signal (or a later seed
+    /// POST) converges on the same row.
+    pub fn stub(id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            name: id.to_string(),
+            description: None,
+            governance_layer: default_governance_layer(),
+            constitutional_parent_id: None,
+            reach: default_community_reach(),
+            metadata_json: None,
+            created_by: None,
+        }
+    }
+}
+
 /// Query parameters for listing collectives
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -112,6 +134,23 @@ pub fn get_collective(
         .filter(collectives::id.eq(id))
         .first(conn)
         .optional()
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// App-scope-AGNOSTIC existence probe for FK-parent purposes.
+///
+/// `collective_participations.collective_id` references bare
+/// `collectives(id)` — a parent row under ANY `h_app_id` satisfies the FK
+/// (seed-collectives rows land under the legacy "lamad" scope while
+/// account-import joins run under "qahal"). Use this, not the app-scoped
+/// `get_collective`, when deciding whether a participation insert can land.
+pub fn collective_id_exists(conn: &mut SqliteConnection, id: &str) -> Result<bool, StorageError> {
+    use diesel::dsl::count_star;
+    collectives::table
+        .filter(collectives::id.eq(id))
+        .select(count_star())
+        .first::<i64>(conn)
+        .map(|n| n > 0)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
@@ -507,6 +546,73 @@ mod tests {
             updated.slug.as_deref(),
             Some("family-dowell"),
             "slug round-trips"
+        );
+    }
+
+    /// Regression for the genesis #1105 jessica-alpha FK storm: account
+    /// packages import on each human's own peer, but collective definitions
+    /// are seeded to ONE peer — a participation insert on any other peer has
+    /// no FK parent. The import path must materialize a stub (under the
+    /// scope later writers use) instead of FK-failing; this pins the
+    /// db-layer contract that path relies on.
+    #[test]
+    fn participation_without_parent_fk_fails_and_stub_materializes() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        // Mirror deployed SQLite semantics — the production storm proves FK
+        // enforcement is on there; make the test independent of the
+        // libsqlite3 compile-time default.
+        diesel::sql_query("PRAGMA foreign_keys = ON")
+            .execute(&mut conn)
+            .expect("enable FK enforcement");
+        let lamad_ctx = AppContext::new("lamad");
+        let qahal_ctx = AppContext::new("qahal");
+
+        let part_input = CreateParticipationInput {
+            id: None,
+            collective_id: "household-dowell".to_string(),
+            human_id: "human-jessica-spouse".to_string(),
+            intimacy_level: "connection".to_string(),
+            role_context: None,
+            governance_weight: 1.0,
+            consent_state: "consented".to_string(),
+            metadata_json: None,
+        };
+
+        // The storm shape: no parent row anywhere → FK constraint failure.
+        let err = create_participation(&mut conn, &qahal_ctx, &part_input)
+            .expect_err("participation without FK parent must fail");
+        assert!(
+            err.to_string().contains("FOREIGN KEY constraint failed"),
+            "expected FK failure, got: {err}"
+        );
+
+        // The fix shape: app-scope-agnostic probe → stub under lamad scope →
+        // the qahal-scoped participation insert lands (FK is on bare id).
+        assert!(!collective_id_exists(&mut conn, "household-dowell").expect("probe"));
+        let stub = CreateCollectiveInput::stub("household-dowell");
+        create_collective(&mut conn, &lamad_ctx, &stub).expect("stub create");
+        assert!(collective_id_exists(&mut conn, "household-dowell").expect("probe"));
+        create_participation(&mut conn, &qahal_ctx, &part_input)
+            .expect("participation lands once the stub parent exists");
+
+        // Convergence: the authoritative projection's later lamad-scoped
+        // upsert must hit the SAME row, not PK-collide on a second scope.
+        let projected = CreateCollectiveInput {
+            id: "household-dowell".to_string(),
+            name: "Dowell Household".to_string(),
+            description: Some("projected".to_string()),
+            governance_layer: "family".to_string(),
+            constitutional_parent_id: None,
+            reach: "private".to_string(),
+            metadata_json: None,
+            created_by: None,
+        };
+        let converged =
+            create_collective(&mut conn, &lamad_ctx, &projected).expect("projection upsert");
+        assert_eq!(
+            converged.name, "Dowell Household",
+            "upsert updated the stub"
         );
     }
 
