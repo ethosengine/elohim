@@ -340,23 +340,53 @@ class StewardshipClient extends DoorwayClient {
    * against this set to POST only the genuinely-missing pairs.
    */
   async getContentWithAllocations(): Promise<Set<string>> {
-    const response = await this.fetch('/db/allocations?active_only=true&limit=10000', {
-      method: 'GET',
-    });
+    // PAGINATED — a single `limit=10000` read SILENTLY TRUNCATES once the
+    // (persistent-PVC) allocations table exceeds the page size. A truncated
+    // existing-set makes the caller's idempotency diff INCOMPLETE: genuinely-
+    // present pairs beyond the first page read as "missing" → re-POSTed → the
+    // storage bulk handler returns UNIQUE-constraint `failed`, and (worse) the
+    // run's net-new creates collapse to ~0 while affinity stewards for already-
+    // partially-seeded content are never repaired. That is exactly the failure
+    // observed on elohim-genesis #1100/#1102/#1104 (`Found 10000 existing`,
+    // `Created: 3, Failed: 1725`, value-scanner/fct/public-observer items left
+    // matthew-only). Page through `limit`/`offset` (DB layer wires both —
+    // db/stewardship_allocations.rs AllocationQuery) until a short/empty page.
+    const PAGE_SIZE = 10000;
+    const keys = new Set<string>();
+    let offset = 0;
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        console.log('   Allocations endpoint not available, assuming no existing allocations');
-        return new Set();
+    for (;;) {
+      const response = await this.fetch(
+        `/db/allocations?active_only=true&limit=${PAGE_SIZE}&offset=${offset}`,
+        { method: 'GET' }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('   Allocations endpoint not available, assuming no existing allocations');
+          return new Set();
+        }
+        throw new Error(`Failed to get allocations: ${response.status}`);
       }
-      throw new Error(`Failed to get allocations: ${response.status}`);
+
+      const allocBody = (await response.json()) as unknown;
+      const page = (
+        Array.isArray(allocBody) ? allocBody : ((allocBody as { items?: unknown[] }).items ?? [])
+      ) as Array<{ contentId: string; stewardPresenceId: string }>;
+
+      for (const a of page) {
+        keys.add(`${a.contentId}::${a.stewardPresenceId}`);
+      }
+
+      // A short page (fewer rows than requested) is the last page. An exactly-
+      // full page means there may be more — advance the offset and continue.
+      if (page.length < PAGE_SIZE) {
+        break;
+      }
+      offset += PAGE_SIZE;
     }
 
-    const allocBody = (await response.json()) as unknown;
-    const allocations = (
-      Array.isArray(allocBody) ? allocBody : ((allocBody as { items?: unknown[] }).items ?? [])
-    ) as Array<{ contentId: string; stewardPresenceId: string }>;
-    return new Set(allocations.map((a) => `${a.contentId}::${a.stewardPresenceId}`));
+    return keys;
   }
 
   async presenceExists(presenceId: string): Promise<boolean> {
