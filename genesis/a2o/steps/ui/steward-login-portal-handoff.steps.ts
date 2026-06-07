@@ -652,10 +652,23 @@ Then(
  * The browser completes the OAuth dance at the doorway as
  * relying-party-and-identity-provider (portal unreachable — scenario 3).
  *
- * When no portalHostUrl is handed back, the SPA does NOT navigate away to a
- * portal host; the OAuth dance finishes at the doorway origin. Asserted by the
- * browser remaining on the doorway origin (not the portal host). HTTP mode has
- * no browser ⇒ 'pending'.
+ * The genuine fall-through invariant is **no portal hand-off**: when no
+ * portalHostUrl is handed back, the SPA does NOT navigate to the portal host —
+ * the doorway completes auth as the IdP. This is the clean inverse of
+ * "the browser is redirected to {portal}": the page.route interceptor armed in
+ * the When step (on the portal origin) must NEVER fire, so REDIRECT_ATTEMPT_KEY
+ * stays unset.
+ *
+ * ORIGIN-AGNOSTIC by design. The doorway threshold/login IdP surface is served
+ * on BOTH the doorway origin (doorway-alpha.elohim.host) AND the app origin
+ * (alpha.elohim.host) — the doorway forwards /threshold/* to doorway-app
+ * (routes/threshold.rs) and the app ingress mirrors it (both return the Doorway
+ * Operator Dashboard). The PlaywrightDevice base is appUrl, so the browser sits
+ * on the app origin throughout; a brittle `origin === doorwayOrigin` check tests
+ * the device base, not the product, and can never pass for this app-initiated
+ * flow. "Doorway completes auth as IdP without delegating to a portal" is
+ * faithfully captured as "no portal-host navigation was attempted." HTTP mode
+ * has no browser ⇒ 'pending'.
  *
  * Example:
  *   And the browser completes the OAuth dance at the doorway as
@@ -667,16 +680,31 @@ Then(
     const device = firstPlaywrightDevice(this);
     if (!device) return 'pending';
 
-    await device.page.waitForLoadState('networkidle');
-    const doorway = requireDoorwayUrl(this);
-    const current = new URL(device.page.url());
-    const expectedOrigin = new URL(doorway).origin;
-    assert.strictEqual(
-      current.origin,
-      expectedOrigin,
-      `Expected the OAuth dance to finish at the doorway origin "${expectedOrigin}" ` +
-        `(no portal hand-off) but the browser is at: ${current.href}`
+    // Let the page settle so a (wrongly) attempted portal nav has registered via
+    // the interceptor before we assert its ABSENCE. The When step already armed
+    // the interceptor and waited networkidle; this is a short guard for the
+    // abort-mid-navigation case where networkidle may not have fired.
+    await device.page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
+
+    const attempted = this.contentIds.get(REDIRECT_ATTEMPT_KEY);
+    assert.ok(
+      !attempted,
+      `Expected NO portal hand-off — doorway completes auth as relying-party-and-identity-provider — ` +
+        `but the SPA attempted a client-driven navigation to the portal host: ${attempted}`
     );
+
+    // And the browser must not have landed on the portal host origin itself.
+    const portalHost = this.contentIds.get(REGISTERED_HOST_KEY);
+    if (portalHost) {
+      const current = new URL(device.page.url());
+      const portalOrigin = new URL(portalHost).origin;
+      assert.notStrictEqual(
+        current.origin,
+        portalOrigin,
+        `Browser landed on the portal host origin "${portalOrigin}"; expected doorway-local ` +
+          `completion (no hand-off). Current: ${current.href}`
+      );
+    }
     return undefined;
   }
 );

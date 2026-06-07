@@ -120,46 +120,62 @@ assertion. Enabling dev_mode REVEALED a pre-existing test fiction; it did not
 regress the product. (Confirmed: `account-m5.steps.ts:198` is comment-only;
 `auth_routes.rs:3908` is a live `client.head(&probe_url)`.)
 
-### F2 (`a9a433e7b31c`) — most likely downstream of the empty EprRouter (Concern B)
+### F2 (`a9a433e7b31c`) — a TEST bug (same class as F1), NOT downstream of the router
 
-The fall-through scenario correctly omits `portalHostUrl` (portal unreachable);
-the failure is the browser landing at `https://alpha.elohim.host/threshold/login`
-instead of finishing at the doorway origin. **This is the same empty-EprRouter
-symptom as Concern B** (`ci-genesis-lamad-shell-routing-regression.md`): with the
-router empty, the doorway's no-root-projection fallback 302s to `/threshold`, and
-the OAuth fall-through is caught by that same fallback. Strong hypothesis that the
-Concern B storage fix (heal legacy scope shapes + per-row degradation in
-`find_active_projections`) ALSO clears F2 — to be re-verified against a deployed
-fix. NOT independently confirmed this run.
+**Earlier hypothesis DISPROVEN.** I first guessed F2 was the empty-EprRouter
+`/threshold` fallback and would clear with the Concern B storage fix. Build
+**#1106** (storage fix deployed, router repopulated, sitemap populated) shows F2
+**STILL FAILING** — so it is not the router.
+
+**Verified root cause (2026-06-07):** F2's terminal assertion
+(`steward-login-portal-handoff.steps.ts`, "completes the OAuth dance at the
+doorway") required `page.url().origin === doorwayOrigin`. But the shared When
+step navigates the PlaywrightDevice — whose base is `appUrl` (`doorwayToAppUrl`,
+i.e. `alpha.elohim.host`) — to `/threshold/login`, so the browser sits on the
+**app** origin throughout. And the threshold IdP surface is served on **both**
+origins: the doorway forwards `/threshold/*` to doorway-app
+(`doorway-service/src/routes/threshold.rs`) and the app ingress mirrors it (both
+return 200 "Doorway Operator Dashboard"; verified live on alpha). So the
+origin-equality check tested the device base, not the product — **never
+satisfiable** for this app-initiated flow. Like F1, it only became reachable
+(and thus visibly red) once `DEV_MODE` let the scenario progress past the
+fixture-grant gate at #1104. **Not a product regression.**
+
+**Fix (landed):** replaced the brittle origin-equality with the genuine
+fall-through invariant — **no portal hand-off** (the clean inverse of the
+sibling "the browser is redirected to {portal}"): assert the portal-host
+interceptor never fired (`REDIRECT_ATTEMPT_KEY` unset) and the browser did not
+land on the portal-host origin. Origin-agnostic; real signal (a wrong hand-off
+sets the key → fails). `tsc`/`eslint` clean.
 
 Neither matches a CI/orchestrator anti-patterns museum entry (the four traps are
 infra/measure-class). No museum citation.
 
 ## Current decision
 
-`ci_status: in-progress`.
+`ci_status: in-progress` — BOTH fingerprints now have a landed (unpushed) fix.
+Neither was a product regression; both were never-satisfiable test assertions
+revealed when `DEV_MODE` let the scenarios progress past the fixture-grant gate
+at #1104.
 
-- **F2:** expected to clear with the **Concern B storage fix** (LANDED — see that
-  backlog). Re-verify the portal-unreachable terminal origin after the fixed
-  storage binary deploys to alpha; if it then completes at the doorway origin,
-  close `a9a433e7b31c` by disappearance.
-- **F1:** a **test-precondition gap, not a product regression** — DECISION
-  PENDING with the operator. The doorway's `/healthz` reachability probe is
-  server-side, so a Playwright `page.route` interceptor cannot satisfy it. Three
-  options: (a) a `DEV_MODE`-gated health-probe override on the steward-grant
-  fixture surface so `probe_first_portal_host` trusts a registered host without a
-  live HEAD (makes BOTH the reachable + unreachable scenarios testable);
-  (b) point the test's registered host at a genuinely reachable CI stub;
-  (c) park as a documented test-infra blocker and re-tag the scenario. No F1 code
-  landed this session.
+- **F1** (`ce5f4e6a4d1f`): operator chose option (a) — a `DEV_MODE`-gated
+  portal-health override. Landed `0ce5c23e0` (doorway `routes/admin_dev.rs` +
+  `probe_first_portal_host` decision split + the two a2o step rewrites).
+- **F2** (`a9a433e7b31c`): assertion corrected to the no-portal-hand-off
+  invariant (origin-agnostic). Landed (a2o step-only change).
 
-Ledger left `status: open` for both fingerprints (no `triaged_at_build` stamp) —
-F2 closes by disappearance once the Concern B fix deploys; F1 awaits the operator
-decision.
+Both clear on the NEXT genesis build once the unpushed commits are pushed
+(F1 needs the doorway binary; F2 is test-only so it clears as soon as the suite
+re-runs against any deploy carrying the step change). Confirm by disappearance
+(green-streak ≥3, no recurrence of either fingerprint).
 
 ## Fix trail
 
-- F2: no separate fix — rides the Concern B storage change (`db/rea_commitments.rs`
-  scope healing + per-row degradation).
-- F1: none landed (decision pending — see Current decision).
-- Recurrence reference for the sweep: `last_build` at triage = 1105.
+- F1: `0ce5c23e0` (DEV_MODE portal-health override — doorway + a2o steps).
+- F2: a2o step assertion fix in `steward-login-portal-handoff.steps.ts`
+  (origin-equality → no-hand-off invariant); `tsc`/`eslint` clean. Verified live
+  that `/threshold/login` is served on BOTH origins (the fact that breaks the old
+  assertion). Final proof = next CI run (cannot run live a2o E2E locally).
+- Recurrence reference for the sweep: `last_build` at triage = 1105; the
+  disproven "rides storage fix" hypothesis was settled by #1106 (F2 still red
+  with the router populated).
