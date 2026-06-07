@@ -1801,6 +1801,19 @@ async fn handle_refresh(
     .await
 }
 
+/// Decision arm of the durable-state session-revocation check (`handle_me`):
+/// an explicitly inactive account row revokes the session; an active row or no
+/// row at all (legacy accounts, never-registered native agents) proceeds on
+/// JWT validity alone.
+///
+/// Invariant pinned by `revocation_targets_unique_identifier_not_human_id`:
+/// the row passed here must be selected by the account-unique `identifier`,
+/// never by `human_id`, which collides across hosted accounts under
+/// dev_mode's shared-singleton provisioning.
+fn session_revoked_by_user_doc(user: Option<&UserDoc>) -> bool {
+    matches!(user, Some(u) if !u.is_active)
+}
+
 /// GET /auth/me
 ///
 /// Get current user info from token.
@@ -1850,13 +1863,20 @@ async fn handle_me(req: Request<hyper::body::Incoming>, state: Arc<AppState>) ->
     // shared cross-replica token blacklist (that broader substrate decision is
     // tracked separately). When MongoDB is unavailable we degrade to the prior
     // JWT-only behaviour rather than failing closed for every caller.
+    //
+    // The lookup keys on `identifier` — the register-time uniqueness key (and
+    // the login key, see handle_login) — NOT `human_id`: under dev_mode the
+    // hosted-register path skips per-user provisioning, so every registrant
+    // persists the shared singleton agent's human_id. A human_id-keyed
+    // find_one then resolves an arbitrary (typically still-active) account
+    // and a suspended session keeps authenticating (genesis #1105).
     if let Some(mongo) = &state.mongo {
         if let Ok(collection) = mongo.collection::<UserDoc>(USER_COLLECTION).await {
             match collection
-                .find_one(doc! { "human_id": &claims.human_id })
+                .find_one(doc! { "identifier": &claims.identifier })
                 .await
             {
-                Ok(Some(user)) if !user.is_active => {
+                Ok(user) if session_revoked_by_user_doc(user.as_ref()) => {
                     warn!(
                         "Rejecting /auth/me for suspended user {}",
                         claims.identifier
@@ -2011,8 +2031,11 @@ async fn handle_account(
         }
     };
 
+    // Keyed on the account-unique `identifier`, not `human_id` — under
+    // dev_mode every hosted registrant shares the singleton agent's human_id,
+    // so a human_id lookup returns an arbitrary account (see handle_me).
     let user = match collection
-        .find_one(doc! { "human_id": &claims.human_id })
+        .find_one(doc! { "identifier": &claims.identifier })
         .await
     {
         Ok(Some(u)) => u,
@@ -4416,6 +4439,55 @@ pub fn validate_ws_token(state: &AppState, token: &str) -> Option<Claims> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Regression for genesis #1105 ("Matthew suspends a user"): under
+    /// dev_mode, hosted registration skips per-user provisioning, so EVERY
+    /// account persists the shared singleton agent's human_id. Suspension
+    /// flips `is_active` on one account's unique row; the /auth/me revocation
+    /// lookup must therefore select by the account-unique `identifier` —
+    /// a human_id-keyed find_one resolves an arbitrary (typically still
+    /// active) account and the suspended session keeps authenticating.
+    ///
+    /// This pins the decision arm + selection-key invariant in-memory; the
+    /// live Mongo query is exercised by the a2o auth-lifecycle scenarios.
+    #[test]
+    fn revocation_targets_unique_identifier_not_human_id() {
+        let shared_human_id = "human-dev-singleton".to_string();
+        let mut troublemaker = UserDoc::new(
+            "troublemaker@example.com".into(),
+            "email".into(),
+            "argon2-hash".into(),
+            shared_human_id.clone(),
+            "uhCAk-shared-agent".into(),
+            None,
+        );
+        troublemaker.is_active = false; // adminSetUserStatus(active=false)
+        let matthew = UserDoc::new(
+            "matthew@example.com".into(),
+            "email".into(),
+            "argon2-hash".into(),
+            shared_human_id.clone(),
+            "uhCAk-shared-agent".into(),
+            None,
+        );
+        assert_eq!(
+            troublemaker.human_id, matthew.human_id,
+            "dev-mode collision premise"
+        );
+
+        let accounts = [&troublemaker, &matthew];
+        let by_identifier = |id: &str| accounts.iter().copied().find(|u| u.identifier == id);
+
+        // identifier-keyed selection addresses the suspended account exactly.
+        assert!(session_revoked_by_user_doc(by_identifier(
+            "troublemaker@example.com"
+        )));
+        assert!(!session_revoked_by_user_doc(by_identifier(
+            "matthew@example.com"
+        )));
+        // No row (legacy accounts / native agents) proceeds on JWT validity.
+        assert!(!session_revoked_by_user_doc(None));
+    }
 
     /// Verify that MeResponse serialises with the new trust-mode fields in
     /// camelCase, that `conductorEndpoint` is absent when None, and that the
