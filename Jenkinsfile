@@ -363,9 +363,9 @@ spec:
  containers:
  - name: builder
    image: harbor.ethosengine.com/ethosengine/ci-builder:latest
-   # IfNotPresent: serve from node cache when the registry is unreachable
-   # (2026-06-06 Harbor volume EIO — see orchestrator Jenkinsfile note).
-   imagePullPolicy: IfNotPresent
+   # Always: :latest is a moving tag — a cached node can silently serve a stale
+   # toolchain (#1218 shape). Freshness > outage-resilience (operator, 2026-06-07).
+   imagePullPolicy: Always
    command:
    - cat
    tty: true
