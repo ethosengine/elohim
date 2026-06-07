@@ -105,6 +105,31 @@ async function rawPost(
   return { statusCode, body: text };
 }
 
+/**
+ * Make a raw PUT call and capture the status code + body without throwing —
+ * mirrors rawPost. Used by the dev-mode portal-health override step so a
+ * FIXTURE_ONLY/dev_mode rejection surfaces a clear diagnostic.
+ */
+async function rawPut(
+  baseUrl: string,
+  path: string,
+  payload: unknown,
+  token?: string
+): Promise<{ statusCode: number; body: string }> {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+  };
+  if (token) headers['authorization'] = `Bearer ${token}`;
+
+  const { statusCode, body } = await request(`${baseUrl}${path}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  const text = await body.text();
+  return { statusCode, body: text };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Background / Setup steps
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,9 +220,42 @@ Given(
   }
 );
 
-Given(String.raw`the portal host responds to \/healthz with 200`, function (this: E2EWorld) {
-  // Precondition: test environment has a reachable portal host stub.
-  // This is verified by the redirect scenario assertion.
+Given(String.raw`the portal host responds to \/healthz with 200`, async function (this: E2EWorld) {
+  // Drive the doorway's DEV/FIXTURE-ONLY portal-health override so the steward
+  // login probe treats the registered portal host as reachable WITHOUT a live
+  // HEAD — the fixture host is a non-resolving `.example` origin that a real
+  // /healthz probe could never reach.
+  //
+  // Ordering: in steward-login-portal-handoff.feature this runs in the
+  // Background AFTER "...graduated steward with portal host X" (which records
+  // the host under REGISTERED_HOST_KEY = 'portalHostUrl' and logs the human
+  // in), so the host URL and an auth token are both resolvable here. We fail
+  // LOUDLY if either is missing — silently no-op'ing is the exact bug F1 fixes.
+  const doorway = requireDoorwayUrl(this);
+  const hostUrl = this.contentIds.get('portalHostUrl');
+  if (!hostUrl) {
+    throw new Error(
+      'Cannot set portal-health override: no registered portal host found in world ' +
+        "state (key 'portalHostUrl'). The 'graduated steward with portal host' step " +
+        'must run BEFORE "the portal host responds to /healthz with 200".'
+    );
+  }
+  const token = getFirstAuthToken(this);
+
+  const { statusCode, body } = await rawPut(
+    doorway,
+    '/admin/dev/portal-health',
+    { hostUrl, healthy: true },
+    token
+  );
+  if (statusCode < 200 || statusCode >= 300) {
+    throw new Error(
+      `Failed to set portal-health override (healthy) for "${hostUrl}": PUT ` +
+        `/admin/dev/portal-health → ${statusCode}: ${body}. ` +
+        'A 403 with code "FIXTURE_ONLY" means the doorway is NOT in dev mode — this ' +
+        'override surface is hard-gated off unless dev_mode is set.'
+    );
+  }
 });
 
 Given(String.raw`my portal host does not respond to \/healthz`, function (this: E2EWorld) {

@@ -3,6 +3,7 @@
 pub mod admin;
 pub mod admin_cache;
 pub mod admin_conductors;
+pub mod admin_dev;
 pub mod admin_users;
 pub mod api;
 pub mod apps;

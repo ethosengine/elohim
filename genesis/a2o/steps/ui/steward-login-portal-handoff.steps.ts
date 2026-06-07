@@ -93,6 +93,22 @@ function requireDoorwayUrl(world: E2EWorld): string {
   throw new Error('No doorway registered. Did the Background step run?');
 }
 
+/**
+ * Resolve a bearer token from the first human's first token-bearing device.
+ * The dev-mode portal-health override route is hard-gated by dev_mode (no admin
+ * auth required), but we pass a token when one exists for forward-compatibility.
+ */
+function firstAuthToken(world: E2EWorld): string | undefined {
+  for (const [, human] of world.humans) {
+    for (const device of human.devices) {
+      const anyDevice = device as { token?: string; client?: { token?: string } };
+      if (anyDevice.token) return anyDevice.token;
+      if (anyDevice.client?.token) return anyDevice.client.token;
+    }
+  }
+  return undefined;
+}
+
 /** First Playwright device in the world, or null when not in playwright mode. */
 function firstPlaywrightDevice(world: E2EWorld): PlaywrightDevice | null {
   if (world.deviceMode !== 'playwright') return null;
@@ -303,11 +319,39 @@ Given(
  * Note the wording "the portal host" (account-m5 uses "my portal host"); both
  * record the same unreachable precondition on world state.
  *
+ * This runs in scenario 3 AFTER the Background's "responds to /healthz with 200"
+ * step (which set the override to healthy=true), so it must EXPLICITLY override
+ * the override back to healthy=false — the probe then skips the host and the
+ * /auth/login response omits portalHostUrl. We also keep the legacy world flag.
+ * The PUT is best-effort here: even if the override surface is unreachable the
+ * non-resolving `.example` host's live HEAD still fails, so the fall-through
+ * scenario stays correct either way; but a hard-failure FIXTURE_ONLY response is
+ * still surfaced loudly to avoid a silent mis-set.
+ *
  * Example:
  *   Given the portal host does not respond to /healthz
  */
-Given(String.raw`the portal host does not respond to \/healthz`, function (this: E2EWorld) {
+Given(String.raw`the portal host does not respond to \/healthz`, async function (this: E2EWorld) {
   this.contentIds.set('portalHostUnreachable', 'true');
+
+  const doorway = requireDoorwayUrl(this);
+  const hostUrl = this.contentIds.get(REGISTERED_HOST_KEY);
+  if (!hostUrl) return; // No host recorded ⇒ nothing to override; world flag stands.
+
+  const { statusCode, body } = await rawPut(
+    doorway,
+    '/admin/dev/portal-health',
+    { hostUrl, healthy: false },
+    firstAuthToken(this)
+  );
+  if (statusCode === 403) {
+    throw new Error(
+      `Failed to set portal-health override (unhealthy) for "${hostUrl}": ` +
+        `PUT /admin/dev/portal-health → 403: ${body}. A 403 with code ` +
+        '"FIXTURE_ONLY" means the doorway is NOT in dev mode — this override ' +
+        'surface is hard-gated off unless dev_mode is set.'
+    );
+  }
 });
 
 /**

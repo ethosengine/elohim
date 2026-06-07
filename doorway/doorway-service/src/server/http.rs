@@ -258,6 +258,24 @@ pub struct AppState {
     /// recached. Event-invalidated — never time-expired — so it cannot drift
     /// from dispatch.
     pub sitemap_cache: Arc<tokio::sync::RwLock<Option<(u64, String)>>>,
+
+    /// **DEV/FIXTURE ONLY** portal-host health override (host_url → healthy).
+    ///
+    /// Doorway-local OPERATIONAL state — NOT a projection of any notarized DHT
+    /// entry. `portal_hosts` is Category A (the DHT entry is the source of truth);
+    /// this map never touches it. It exists purely so a2o fixtures can assert a
+    /// portal host as reachable/unreachable WITHOUT standing up a real server at a
+    /// non-resolving `.example` origin, which the live HEAD probe could never reach.
+    ///
+    /// Consulted by `probe_first_portal_host` ONLY when `args.dev_mode` is true:
+    ///   - host present, healthy=true  → return the host (no live HEAD)
+    ///   - host present, healthy=false → skip the host (no live HEAD)
+    ///   - host absent                 → fall back to the real HEAD probe
+    ///
+    /// When `dev_mode` is false the map is ignored entirely, so production
+    /// behaviour is byte-for-byte unchanged. Written via the dev-mode-gated
+    /// `PUT /admin/dev/portal-health` route (`routes::admin_dev`).
+    pub portal_health_override: Arc<tokio::sync::RwLock<std::collections::HashMap<String, bool>>>,
 }
 
 /// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
@@ -393,6 +411,9 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
+            portal_health_override: Arc::new(tokio::sync::RwLock::new(
+                std::collections::HashMap::new(),
+            )),
         }
     }
 
@@ -486,6 +507,9 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
+            portal_health_override: Arc::new(tokio::sync::RwLock::new(
+                std::collections::HashMap::new(),
+            )),
         }
     }
 
@@ -594,6 +618,9 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
+            portal_health_override: Arc::new(tokio::sync::RwLock::new(
+                std::collections::HashMap::new(),
+            )),
         }
     }
 
@@ -705,6 +732,9 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
+            portal_health_override: Arc::new(tokio::sync::RwLock::new(
+                std::collections::HashMap::new(),
+            )),
         })
     }
 
@@ -2397,6 +2427,17 @@ async fn handle_request(
         }
         (Method::POST, "/admin/cache/warm") => {
             to_boxed(routes::admin_cache::cache_warm(Arc::clone(&state)).await)
+        }
+
+        // ====================================================================
+        // DEV/FIXTURE ONLY — doorway-local portal-host health override.
+        // Hard-gated behind dev_mode (403 FIXTURE_ONLY otherwise). Lets a2o
+        // fixtures assert a portal host reachable/unreachable without standing
+        // up a real server at a non-resolving .example origin. Doorway-local
+        // OPERATIONAL state — never touches the notarized portal_hosts entry.
+        // ====================================================================
+        (Method::PUT, "/admin/dev/portal-health") => {
+            to_boxed(routes::admin_dev::handle_set_portal_health(req, Arc::clone(&state)).await)
         }
 
         // ====================================================================

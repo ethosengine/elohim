@@ -3717,7 +3717,8 @@ async fn generate_oauth_token_response(
             .storage_url
             .as_deref()
             .unwrap_or("http://127.0.0.1:8090");
-        probe_first_portal_host(storage_base, agent_pub_key).await
+        let overrides = state.portal_health_override.read().await;
+        probe_first_portal_host(storage_base, agent_pub_key, state.args.dev_mode, &overrides).await
     } else {
         None
     };
@@ -3883,11 +3884,62 @@ async fn handle_portal_host(
     )
 }
 
+/// Per-host probe decision — the pure core of `probe_first_portal_host`.
+///
+/// Split out so the dev-mode-override branch is unit-testable without a live
+/// HTTP server. The live HEAD itself (`ProbeLive`) stays in the async loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PortalProbeDecision {
+    /// Treat this host as reachable — return it immediately, no live HEAD.
+    Return,
+    /// Treat this host as unreachable — skip it, no live HEAD.
+    Skip,
+    /// No override applies — fall back to the real live HEAD probe.
+    ProbeLive,
+}
+
+/// Decide how to probe a single portal host.
+///
+/// The **only** behaviour change from the original live-only probe is gated
+/// behind `dev_mode`: when on AND the host has a doorway-local health override,
+/// the override flag short-circuits the live HEAD (`Return`/`Skip`). With
+/// `dev_mode` off, OR with no override entry for this host, the result is always
+/// `ProbeLive` — so production behaviour is byte-for-byte unchanged.
+///
+/// This consults doorway-local OPERATIONAL state (`AppState::portal_health_override`),
+/// never the notarized `portal_hosts` DHT entry. See that field's doc comment.
+fn portal_probe_decision(
+    dev_mode: bool,
+    override_map: &std::collections::HashMap<String, bool>,
+    host_url: &str,
+) -> PortalProbeDecision {
+    if dev_mode {
+        if let Some(&healthy) = override_map.get(host_url) {
+            return if healthy {
+                PortalProbeDecision::Return
+            } else {
+                PortalProbeDecision::Skip
+            };
+        }
+    }
+    PortalProbeDecision::ProbeLive
+}
+
 /// Probe a portal host URL and return the URL if reachable, or None.
 ///
-/// Used by `handle_exchange_session` to opportunistically populate
-/// `portal_host_url` without a full `handle_portal_host` round-trip.
-async fn probe_first_portal_host(storage_base: &str, agent_pub_key: &str) -> Option<String> {
+/// Used by the login / OAuth-token / session-exchange paths to opportunistically
+/// populate `portal_host_url` without a full `handle_portal_host` round-trip.
+///
+/// `dev_mode` + `override_map` thread doorway-local OPERATIONAL health state
+/// (`AppState::portal_health_override`) into the per-host decision via
+/// `portal_probe_decision`. When `dev_mode` is off the override is ignored and
+/// every host takes the original live HEAD path — production is unchanged.
+async fn probe_first_portal_host(
+    storage_base: &str,
+    agent_pub_key: &str,
+    dev_mode: bool,
+    override_map: &std::collections::HashMap<String, bool>,
+) -> Option<String> {
     let storage_url = format!(
         "{}/api/v1/account/portal-hosts",
         storage_base.trim_end_matches('/')
@@ -3905,15 +3957,21 @@ async fn probe_first_portal_host(storage_base: &str, agent_pub_key: &str) -> Opt
         .ok()?;
 
     for h in &hosts {
-        let probe_url = format!("{}/healthz", h.host_url.trim_end_matches('/'));
-        let probe = tokio::time::timeout(
-            std::time::Duration::from_secs(1),
-            client.head(&probe_url).send(),
-        )
-        .await;
-        if let Ok(Ok(resp)) = probe {
-            if resp.status().is_success() {
-                return Some(h.host_url.clone());
+        match portal_probe_decision(dev_mode, override_map, &h.host_url) {
+            PortalProbeDecision::Return => return Some(h.host_url.clone()),
+            PortalProbeDecision::Skip => continue,
+            PortalProbeDecision::ProbeLive => {
+                let probe_url = format!("{}/healthz", h.host_url.trim_end_matches('/'));
+                let probe = tokio::time::timeout(
+                    std::time::Duration::from_secs(1),
+                    client.head(&probe_url).send(),
+                )
+                .await;
+                if let Ok(Ok(resp)) = probe {
+                    if resp.status().is_success() {
+                        return Some(h.host_url.clone());
+                    }
+                }
             }
         }
     }
@@ -4157,7 +4215,14 @@ async fn handle_exchange_session(
                     .storage_url
                     .as_deref()
                     .unwrap_or("http://127.0.0.1:8090");
-                probe_first_portal_host(storage_base, &agent_pub_key).await
+                let overrides = state.portal_health_override.read().await;
+                probe_first_portal_host(
+                    storage_base,
+                    &agent_pub_key,
+                    state.args.dev_mode,
+                    &overrides,
+                )
+                .await
             } else {
                 None
             };
@@ -4267,7 +4332,8 @@ async fn generate_auth_response(
             .storage_url
             .as_deref()
             .unwrap_or("http://127.0.0.1:8090");
-        probe_first_portal_host(storage_base, agent_pub_key).await
+        let overrides = state.portal_health_override.read().await;
+        probe_first_portal_host(storage_base, agent_pub_key, state.args.dev_mode, &overrides).await
     } else {
         None
     };
@@ -4690,5 +4756,69 @@ mod tests {
         // RFC fields and the existing custom fields are unaffected.
         assert_eq!(json["access_token"], "jwt-token");
         assert_eq!(json["human_id"], "human-susan");
+    }
+
+    // -----------------------------------------------------------------------
+    // F1: DEV_MODE portal-host health-probe override
+    //
+    // The override decision is split into a pure helper so it is unit-testable
+    // without a live HTTP server. The live HEAD path (ProbeLive) is exercised
+    // by the steward-login-portal-handoff a2o scenarios.
+    // -----------------------------------------------------------------------
+
+    use std::collections::HashMap;
+
+    const HOST: &str = "https://matthew.steward.example/account";
+
+    #[test]
+    fn dev_mode_override_healthy_returns_without_live_probe() {
+        let mut overrides = HashMap::new();
+        overrides.insert(HOST.to_string(), true);
+        assert_eq!(
+            portal_probe_decision(true, &overrides, HOST),
+            PortalProbeDecision::Return,
+            "dev_mode + override healthy=true must short-circuit to Return (no live HEAD)"
+        );
+    }
+
+    #[test]
+    fn dev_mode_override_unhealthy_skips_without_live_probe() {
+        let mut overrides = HashMap::new();
+        overrides.insert(HOST.to_string(), false);
+        assert_eq!(
+            portal_probe_decision(true, &overrides, HOST),
+            PortalProbeDecision::Skip,
+            "dev_mode + override healthy=false must Skip this host (no live HEAD)"
+        );
+    }
+
+    #[test]
+    fn dev_mode_absent_override_falls_back_to_live_probe() {
+        let overrides: HashMap<String, bool> = HashMap::new();
+        assert_eq!(
+            portal_probe_decision(true, &overrides, HOST),
+            PortalProbeDecision::ProbeLive,
+            "dev_mode but no override for this host must fall back to the live HEAD probe"
+        );
+    }
+
+    #[test]
+    fn prod_mode_ignores_override_entirely() {
+        // Even with an override present, dev_mode OFF must take the live path —
+        // production behaviour is byte-for-byte unchanged.
+        let mut overrides = HashMap::new();
+        overrides.insert(HOST.to_string(), true);
+        assert_eq!(
+            portal_probe_decision(false, &overrides, HOST),
+            PortalProbeDecision::ProbeLive,
+            "dev_mode OFF must ignore the override map and always probe live"
+        );
+
+        overrides.insert(HOST.to_string(), false);
+        assert_eq!(
+            portal_probe_decision(false, &overrides, HOST),
+            PortalProbeDecision::ProbeLive,
+            "dev_mode OFF must ignore an unhealthy override too"
+        );
     }
 }
