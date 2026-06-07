@@ -90,47 +90,82 @@ through to `**`?) PLUS a not-yet-built designed page the scenario asserts on.
 Neither is a flake; neither matches a museum trap (the four traps are
 infra/measure-class).
 
-## Root cause (suspected — onset window)
+## Root cause (VERIFIED — foreground session, 2026-06-07)
 
-Same onset window as the portal-handoff concern (#1102 clean → #1104 failing),
-same suspect commit cluster (doorway/EPR Slice-2/Slice-3, Jun 5–6):
+NOT the Slice-2/3 dispatch commits (the original triage's suspect list was wrong)
+and NOT gap `#6-2` (that claim was a false negative — see below). **Both
+fingerprints share ONE root cause: alpha's doorway `EprRouter` is empty because a
+single poisoned `rea_commitments` row fails the whole projection set.**
 
-- `bcf1b7a28` universal `/epr/{id}` address — reserved prefix + root-bundle dispatch
-- `385a7485a` Slice-3 dispatch — alias 302 at B13, claims-aware `/epr/{id}` resolver, `/sitemap.xml`
-- `5ccbbd577` fix(doorway): journal derivative cards stop minting pillar mount URLs (§12.3)
-- `28773e763` anon-reach coherence — {commons,public} readable set, single authority
+The chain, verified live and in code:
 
-For the served-title (`606fa2a22a53`): the doorway root/dispatch reshuffle most
-likely changed what `/` resolves to on alpha (serving a non-app shell titled
-"Welcome"). For the doubled-prefix (`a969e96c4361`): the §12.3/§12.4.2 doorway
-fallback behavior for legacy doubled prefixes interacts with the new reserved-
-prefix dispatch; the designed not-found page the scenario targets is also still
-unbuilt (gap `#6-2`). The foreground fix owner with the live repro should
-disentangle: (a) restore the doorway root + doubled-prefix fallback so the shell
-is served and Angular reaches `**`, then (b) the designed-page half is gap `#6-2`
-work (NOT a CI fix — see Current decision).
+1. A `project-epr` commitment row on alpha has
+   `in_scope_of = ["doorway:alpha-elohim-host|epr:elohim-host-landing"]` —
+   **array-wrapped**, not the canonical bare pipe-string
+   `doorway:…|epr:…`. Confirmed live:
+   `GET /db/rea_commitments?action=project-epr&doorwayId=alpha-elohim-host`
+   → `Internal error: Scope missing 'doorway:' prefix: ["doorway:alpha-elohim-host|epr:elohim-host-landing"]`.
+   The wrapping came from a STALE storage binary (pre-`43951281f`, 2026-05-26)
+   that replayed the DHT entry's `in_scope_of_json` (always a JSON array, zome
+   `content_store` line ~11876) verbatim into the SQLite column instead of
+   unwrapping via `first_or_none`. The `IfNotPresent`/`Always` stale-image
+   window (`b23c86c26` era) is how an old binary ran long enough to poison.
+2. `find_active_projections` (`db/rea_commitments.rs`) used
+   `.map(commitment_to_projection_view).collect::<Result<_,_>>()` —
+   **fail-closed**: the array-wrapped row's `parse_projection_scope` errored,
+   so the WHOLE `collect()` returned `Err`. The LIKE filter
+   (`%doorway:…|%`) still matched the wrapped string, so the bad row was in the
+   set and poisoned every sibling.
+3. `find_active_projections` → empty/Err → the doorway's
+   `fetch_projections_from_storage` yields nothing → `EprRouter.replace_all`
+   never populates (sitemap.xml empty `<urlset/>`, generation 0). Confirmed
+   live: `GET /sitemap.xml` → empty urlset.
+4. With an empty router: `/` has no `urlPath:"/"` projection → falls to
+   `/threshold` → serves the doorway **operator dashboard** (title "Welcome")
+   → **F3** (`606fa2a22a53`). And `/lamad` has no mount → the lamad bundle is
+   never served → Angular never boots → its `**` route never renders → **F4**
+   (`a969e96c4361`).
 
-Product-behavior regression; matches NO museum entry. No museum citation.
+**Why "gap #6-2" was a false negative:** the original triage greps
+`app/elohim-app/src` for `data-testid="lamad-not-found"` and finds nothing — but
+`/lamad/lamad/path/…` is served by the SEPARATE `app/lamad/` bundle, whose
+`lamad.routes.ts:208` `**` route loads `LamadNotFoundComponent`, whose template
+(`app/lamad/src/app/components/not-found/lamad-not-found.component.html:1`)
+ALREADY carries `data-testid="lamad-not-found"`. The designed page exists and is
+wired. F4's app side was never broken — once the `/lamad` mount is restored, the
+bundle boots and the not-found render-verifies. **No `#6-2` dependency.**
+
+Product/deploy-data regression; matches NO museum entry. No museum citation.
+
+## Fix (LANDED — foreground session)
+
+Defense-in-depth in `elohim/elohim-storage/src/db/rea_commitments.rs`:
+
+1. **`parse_projection_scope` heals legacy shapes** — a leading `[` is parsed as
+   a JSON array and unwrapped: `["doorway:X|epr:Y"]` → `doorway:X|epr:Y`, and the
+   pre-`66f16ab5e` two-element form `["doorway:X","epr:Y"]` → `doorway:X|epr:Y`.
+   The existing poisoned alpha rows now serve correctly on read (no reseed
+   required, though a reseed also canonicalizes them via `upsert_with_anchor`).
+2. **`find_active_projections` degrades per-row** — `collect::<Result>()`
+   replaced with `filter_map` + `tracing::warn!`. One unparseable row now costs
+   exactly one projection, never the whole router. This is the durable fix: a
+   future poison of any shape can no longer empty the EprRouter.
+
+6 new tests (all green; full `db::rea_commitments::` suite 42/42):
+`parse_projection_scope_{accepts_bare_pipe_string,heals_array_wrapped_pipe_string,heals_two_element_legacy_array,rejects_garbage}`,
+`find_active_projections_{skips_unparseable_rows_instead_of_failing_set,serves_array_wrapped_legacy_row}`.
+
+F3 needs NO app change — `app/elohim-app/src/index.html:5` already titles
+`elohim.host …`; restoring the `/` mount serves the shell and the title follows.
 
 ## Current decision
 
-`ci_status: in-progress`. **The foreground (main) session is actively driving the
-routing/navigation fix as of 2026-06-07.** This run canonicalizes + supplies the
-evidence base only; no code landed (coordination — avoid racing on shared
-doorway/routing files). The served-title and doubled-prefix-fallback halves are
-the routing regression the foreground owns. The "designed not-found page"
-(`data-testid="lamad-not-found"`) half is pre-existing deferred scope tracked in
-`epr-routing-complementary-captures.md` gap `#6-2` (the §6 gate-face UI deferred
-out of Slice-3) — if the foreground restores the fallback-to-`**` behavior but
-the designed page is still unbuilt, fp `a969e96c4361` stays red until gap `#6-2`
-lands; in that case re-scope this entry to `blocked` pointing at gap `#6-2`.
+`ci_status: in-progress` → fix landed locally (commit-only; integrator pushes).
+On deploy of the fixed storage binary, alpha's EprRouter repopulates by healing
+the array-wrapped rows on read; F3 + F4 both clear. **Immediate-recovery option
+for the operator** (without waiting on a full edge rebuild): reseed the
+`project-epr` commitments on alpha (writes bare-string `in_scope_of` back via
+`upsert_with_anchor`), which the CURRENT deployed binary can already parse.
 
-Ledger left `status: open` (no `triaged_at_build` stamp) — no fix landed here.
-The integrator/foreground commit carries the fix; the sweep confirms by
-disappearance (genesis green-streak ≥3, no recurrence).
-
-## Fix trail
-
-- None landed in this triage run (foreground-owned by coordination).
-- Recurrence reference for the sweep once a fix lands: `last_build` at triage = 1105.
-- Cross-link: `epr-routing-complementary-captures.md` (gap `#6-2`, LamadNotFoundComponent designed gate experience) for the not-yet-built designed-page dependency.
+Sweep confirms by disappearance (genesis green-streak ≥3, no recurrence of
+`606fa2a22a53` / `a969e96c4361`). Recurrence reference: `last_build` at triage = 1105.

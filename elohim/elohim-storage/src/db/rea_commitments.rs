@@ -999,10 +999,28 @@ pub fn find_active_projections(
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("DB error: {}", e)))?;
 
-    commitments
+    // Per-row degradation, never whole-set failure (incident #2, 2026-06-07):
+    // a single poisoned scope previously turned this collect() into Err, the
+    // doorway's projection fetch yielded nothing, and the EprRouter served an
+    // EMPTY table — '/' fell to /threshold and every pillar mount 404'd. One
+    // malformed row must cost exactly one projection, not the router.
+    Ok(commitments
         .into_iter()
-        .map(commitment_to_projection_view)
-        .collect()
+        .filter_map(|c| {
+            let row_id = c.id.clone();
+            match commitment_to_projection_view(c) {
+                Ok(view) => Some(view),
+                Err(e) => {
+                    tracing::warn!(
+                        commitment_id = %row_id,
+                        error = %e,
+                        "Skipping unparseable project-epr row; serving the remaining projections"
+                    );
+                    None
+                }
+            }
+        })
+        .collect())
 }
 
 /// Find the project-epr commitment whose urlPath is the longest prefix
@@ -1134,7 +1152,42 @@ fn commitment_to_projection_view(c: ReaCommitment) -> Result<EprProjectionView, 
 ///
 /// Returns `(doorway_id_long_form, epr_id)` where the doorway_id includes
 /// the "doorway:" prefix (e.g. `"doorway:alpha-elohim-host"`).
+///
+/// Heals two known LEGACY shapes before parsing (incident #2, 2026-06-07 —
+/// the alpha EprRouter wipe-out; incident #1 was the NULL-scope era, see the
+/// `find_active_projections` NOTE):
+///
+/// - `["doorway:X|epr:Y"]` — a stale storage binary (pre-43951281f) replayed
+///   the zome's `in_scope_of_json` (always a JSON array) verbatim into the
+///   column instead of unwrapping via `first_or_none`.
+/// - `["doorway:X","epr:Y"]` — the pre-66f16ab5e seeder sent the two scope
+///   refs as separate array elements.
+///
+/// New writes are canonical bare pipe-strings; this tolerance exists so a
+/// legacy row degrades to a served projection instead of a parse error.
 fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError> {
+    let trimmed = scope.trim();
+    if trimmed.starts_with('[') {
+        let items: Vec<String> = serde_json::from_str(trimmed).map_err(|e| {
+            StorageError::Internal(format!(
+                "Malformed projection scope (bad JSON array): {} ({})",
+                scope, e
+            ))
+        })?;
+        let healed = match items.as_slice() {
+            [single] => single.clone(),
+            [doorway, epr] => format!("{}|{}", doorway, epr),
+            _ => {
+                return Err(StorageError::Internal(format!(
+                    "Malformed projection scope (array of {}): {}",
+                    items.len(),
+                    scope
+                )))
+            }
+        };
+        return parse_projection_scope(&healed);
+    }
+
     let parts: Vec<&str> = scope.split('|').collect();
     if parts.len() != 2 {
         return Err(StorageError::Internal(format!(
@@ -1491,6 +1544,118 @@ mod projection_resolver_tests {
         );
         assert_eq!(view.redirect_templates[0].from, "/lamad/resource/{id}");
         assert_eq!(view.redirect_templates[0].to, "/epr/{id}");
+    }
+
+    // =========================================================================
+    // Legacy scope-shape tolerance (incident #2: 2026-06-07 alpha EprRouter
+    // wipe-out; incident #1 was the NULL-scope era, see find_active_projections
+    // NOTE). A stale storage binary (pre-43951281f) replayed the DHT entry's
+    // in_scope_of_json verbatim into the column, persisting
+    // `["doorway:alpha-elohim-host|epr:elohim-host-landing"]` — array-wrapped.
+    // The LIKE filter still matches the wrapped string, so the parse failure
+    // previously failed the WHOLE projection set via collect() and emptied the
+    // doorway EprRouter ('/' fell to /threshold, every /lamad mount 404'd).
+    // Two rules now hold:
+    //   1. parse_projection_scope heals known legacy shapes;
+    //   2. find_active_projections degrades per-row, never whole-set.
+    // =========================================================================
+
+    #[test]
+    fn parse_projection_scope_accepts_bare_pipe_string() {
+        let (doorway, epr) =
+            parse_projection_scope("doorway:alpha-elohim-host|epr:lamad-spa").unwrap();
+        assert_eq!(doorway, "doorway:alpha-elohim-host");
+        assert_eq!(epr, "lamad-spa");
+    }
+
+    #[test]
+    fn parse_projection_scope_heals_array_wrapped_pipe_string() {
+        // The live alpha poisoned shape, verbatim: a stale binary's DHT replay
+        // wrote serde_json::to_string(&vec![scope]) into the column.
+        let (doorway, epr) =
+            parse_projection_scope(r#"["doorway:alpha-elohim-host|epr:elohim-host-landing"]"#)
+                .unwrap();
+        assert_eq!(doorway, "doorway:alpha-elohim-host");
+        assert_eq!(epr, "elohim-host-landing");
+    }
+
+    #[test]
+    fn parse_projection_scope_heals_two_element_legacy_array() {
+        // The pre-66f16ab5e seeder shape: two separate scope strings.
+        let (doorway, epr) =
+            parse_projection_scope(r#"["doorway:alpha-elohim-host","epr:elohim-host-landing"]"#)
+                .unwrap();
+        assert_eq!(doorway, "doorway:alpha-elohim-host");
+        assert_eq!(epr, "elohim-host-landing");
+    }
+
+    #[test]
+    fn parse_projection_scope_rejects_garbage() {
+        assert!(parse_projection_scope("no-pipes-here").is_err());
+        assert!(parse_projection_scope("doorway:a|epr:b|extra").is_err());
+        assert!(parse_projection_scope(r#"["unrelated"]"#).is_err());
+        assert!(parse_projection_scope("[]").is_err());
+        assert!(parse_projection_scope("[not-json").is_err());
+    }
+
+    #[test]
+    fn find_active_projections_skips_unparseable_rows_instead_of_failing_set() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        seed_test_projections(&mut conn, &ctx);
+
+        // A poisoned row the LIKE filter matches but no parser heals (three
+        // pipe segments). One bad row must not empty the router.
+        create_commitment(
+            &mut conn,
+            &ctx,
+            CreateReaCommitmentInput {
+                id: Some("poisoned-scope-row".into()),
+                action: PROJECT_EPR_ACTION.into(),
+                provider: "test-steward".into(),
+                receiver: "test-operator".into(),
+                in_scope_of: Some("doorway:alpha-elohim-host|epr:x|extra".into()),
+                note: Some("poisoned".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let alpha = find_active_projections(&mut conn, &ctx, "alpha-elohim-host").unwrap();
+        assert_eq!(alpha.len(), 2, "good rows must survive a poisoned sibling");
+        assert!(alpha.iter().all(|p| p.epr_id != "x"));
+    }
+
+    #[test]
+    fn find_active_projections_serves_array_wrapped_legacy_row() {
+        // End-to-end through the resolver: the array-wrapped legacy row both
+        // matches the LIKE filter and parses (healed), so it serves.
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+
+        let metadata = serde_json::json!({ "urlPath": "/" });
+        create_commitment(
+            &mut conn,
+            &ctx,
+            CreateReaCommitmentInput {
+                id: Some("legacy-array-row".into()),
+                action: PROJECT_EPR_ACTION.into(),
+                provider: "test-steward".into(),
+                receiver: "test-operator".into(),
+                in_scope_of: Some(
+                    r#"["doorway:alpha-elohim-host|epr:elohim-host-landing"]"#.into(),
+                ),
+                metadata_json: Some(metadata.to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let alpha = find_active_projections(&mut conn, &ctx, "alpha-elohim-host").unwrap();
+        assert_eq!(alpha.len(), 1);
+        assert_eq!(alpha[0].epr_id, "elohim-host-landing");
+        assert_eq!(alpha[0].doorway_id, "doorway:alpha-elohim-host");
+        assert_eq!(alpha[0].url_path, "/");
     }
 }
 
