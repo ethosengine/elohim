@@ -10,10 +10,11 @@ author: "cartographer"
 status: "proposed"
 priority: "high"
 area: "CI/infra"
-recurrence: 2
+recurrence: 3
 source_shifts:
   - "2026-04-28"
   - "2026-05-30"
+  - "2026-06-07"   # Nexus npm-proxy 401 + missing .happ on jammed PVCs — see ci-nexus-harbor-pvc-jam-incident.md
 domain: "operator"
 relatedNodeIds:
   - "memory:feedback_check_helm_chart_status_before_runbooks"
@@ -42,6 +43,15 @@ Operator-domain (registry topology is a cluster change the agent cannot make). T
 recurrence — and the fact that the 2026-05-30 instance blocked an actual delivery (SSR alpha
 deploy on storage EIO, `cf53a76c2`) rather than just a build — is what promotes this from a
 one-off incident to a standing risk worth a backlog slot.
+
+**Scope is the registry substrate, not just Harbor.** The 2026-06-07 recurrence (third)
+showed the SAME failure shape extends to the **Nexus npm proxy**, not only the Harbor OCI
+registry: on jammed PVCs Nexus returned `401 Unauthorized` on `pnpm install` package fetches
+(elohim `Install Dependencies` FAILURE) while the artifact path starved the edge build of its
+`.happ` (elohim-edge "hApp artifact not found"). One outage, two registries, multiple wedged
+pipelines, no self-heal — exactly this entry's SPOF shape. See the incident triage entry
+`ci-nexus-harbor-pvc-jam-incident.md` for the per-build evidence. Treat "registry SPOF" as
+covering both Nexus (npm/proxy) and Harbor (OCI) — they share the PVC-backed substrate.
 
 ## The failure shape
 
