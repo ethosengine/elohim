@@ -516,3 +516,90 @@ Appendix B where applicable), a `sophia-quiz-json` assessment translating a fami
 scenario into protocol terms, and `relatedNodeIds` pointing at the canonical sources above.
 Audience variants (W3C / LAMP / MEAN) differ only in the anchor column's framing, not the
 concept sequence.
+
+## Appendix D — Navigation flows: mechanism → glue → scenario (traceability, informative)
+
+The canonical map from each navigation flow to the mechanism that owns it, the glue code that
+realizes it, and the scenario that validates it. A flow with an empty scenario cell is an
+honest gap (tracked below or in the backlog).
+
+| Flow | Mechanism | Glue code | Validating scenario(s) |
+|---|---|---|---|
+| Cold deep link to a mount route | §12.2 ROUTE/ASSET + `spa_fallback` | doorway `derive_app_subpath` · storage safety-net · `spa-route-discrimination.vectors.json` (two-layer) | deep-link: *shared path URL cold*, *deep link straight to a step* |
+| Asset miss stays honest | §12.2 | same | deep-link: *asset miss stays an honest 404* |
+| Universal address, unclaimed → shell viewer | §5.1 ServeShell | `dispatch_epr_universal`/`classify_epr_universal` · shell `epr/:resourceId` → lamad `ContentViewerComponent` · shell cross-pillar DI bridge (app.config) | deep-link: *renders unclaimed types in the shell viewer* |
+| Universal address, claimed + anon-readable → pretty mount | §3 grant + §5.1 + `anon_reach_readable` | `EprRouter` claims index · grant flow (seeder→commitment→SSE) · 302 arm | deep-link: *302s a claimed type to its pretty mount* |
+| Alias promises (mount + route-template) | §4 | `EprRouter::resolve_alias` · `redirectsFrom`/`redirectTemplates` on the commitment | deep-link: *monolith-era share honored by a notarized alias promise* (+ browser twin) |
+| In-bundle minted links | §7.1 + §8.3 | `eprToRoute`/`eprToUniversalHref` · `claimsFromDeclaration(LAMAD_ROUTE_CLAIMS)` · `lint-route-literals` gate (in `just gate`) · `route-claims.vectors.json` | pinned by vectors + lint; exercised by every render scenario |
+| Cross-bundle anchor + interceptor handoff | omnibar §4.2 | `epr-link-interceptor.ts` (capture-phase, fails open) · `EprNavService` | *View Resource Details* (@wip → un-wip with #6-2) — **nav-stack handoff has NO scenario (gap)** |
+| Fragment upgrade (`#step/n`) | §5.2 (RFC 7231 passthrough + bundle template) | claim `fragments` + bundle router | **NO post-302 fragment-survival scenario (gap)** |
+| Rendered-anchor conformance | §7.5 crawler | NOT BUILT (#7-5) | seed scenario: *View as Content honors the path claim* (operator click-path) |
+| Gate face (gated boundary) | §6 | NOT BUILT (#6-2) | *View Resource Details* @wip-pinned |
+| Sitemap | §7.5 | `render_sitemap` + generation invalidation | deep-link: *sitemap enumerates the claimed static plane* |
+| SEO canonicals / og URLs | §7.1 keepers | seo.service via `eprToUniversalHref` | **NO canonical-correctness scenario (gap; `updateForProfile` bug open)** |
+| EPR-head relationship navigation | §7 (HyperCard) | relationship boxes ← EPR Head | `epr-link-navigation.feature` (authed, 2 scenarios) |
+| Context menu "Open in {pillar}" | parent §7.5 (claims-derived targets) | designed; rides the claims table | NOT BUILT (Slice-3-adjacent) |
+
+## Appendix E — Reference-bearing surfaces & acquisition affordances (the `<script src>`/`<link href>` analog audit, informative)
+
+`<a href>` is one of MANY reference-carrying surfaces. The audit below maps each web surface to
+its protocol analog, its integrity story (the SRI analog), and its gap state.
+
+| Web surface | Protocol analog | Integrity today | State |
+|---|---|---|---|
+| `<script src>` (app code) | bundle blob via projection (`/apps/{epr}/…`, hashed chunks inside) | blob hash verified at INGEST (`blob_store` PUT + reassembly) — **not re-verified at load**; apps-sw cache keyed by bundle hash (v1→v2 white-screen lesson; deterministic-zip + auto-invalidation = known Sprint-2 debt) | partial — load-time verification is an open design question (pair with the #13 link-audit attestation era) |
+| `<script src>` (protocol-native components) | **element-registry manifest** (`tagName→cid`) + elohim-core `Loader` | **CID-verified client-side on every load, hard-fail on mismatch** (`verifyCid` default-on) — a real SRI-by-construction | ✅ strongest story in the stack — **no a2o scenario pins it (gap)** |
+| WASM modules | in-bundle asset (oras-staged at build) | inherits bundle integrity; 404 → TS fallback (observed live) | ✅ acceptable |
+| `<link href>` (styles/fonts/icons) | in-bundle assets | inherits bundle integrity | ✅ |
+| `<link rel=canonical>` / og:meta | minted via `eprToUniversalHref` (§7.1 keeper) | lint-gated minting; correctness un-asserted | gap: canonical-correctness scenario; `updateForProfile` |
+| `<img>/<video src>` in content | `/blob/{hash}` (content-addressed) | ingest-verified; **GET is reach-ungated — capability-by-hash semantics are an UNDOCUMENTED design decision** (a gated EPR's blob hash leaking = access leak; commons replication is the dataplane's job) | **design decision to make explicit (captured)** |
+| `<a download>` / offline | — none — | — | see affordance ladder below |
+| service worker | `apps-sw` (scope `/apps/`): peer-scored delivery + per-file cache | cache keyed by blob hash; Sprint-2 invalidation debt | partial ✅ |
+| ES modules / importmap | Angular build internal | bundle integrity | ✅ |
+| `epr:` URIs in content bodies | `EprResolver.resolveInContext` + relationship boxes | resolver-owned | ✅ scenarios exist |
+| prefetch/preload hints | **epr-summary-hint** envelope (§5.3) — also the AttentionTending decision surface | designed | #5-3 deferred |
+
+**The acquisition-affordance ladder (operator dimensions, 2026-06-07).** A link today offers
+only *browse*. The protocol's link should offer a ladder, each rung composing existing
+substrate primitives:
+
+1. **Browse** — today's click (§5.1 resolution).
+2. **Open in {pillar}** — the §7.5 context menu over the claims table (designed, unbuilt).
+3. **Download / offline** — save locally (Tauri-direct already serves `:8090` doorway-free;
+   browser offline = apps-sw cache + automerge offline-first for content). No UI affordance
+   exists.
+4. **Pin as peer ("save and replicate")** — downloading BECOMES provisioning: a REA *provide*
+   commitment (`content:<reach>` provide rows — the Epic-B seam) + quilt custody
+   (tiered-quilt, D5). The affordance turns a reader into a replication peer.
+5. **Sync a cluster (parent EPR)** — an album / course / module is an EPR-head graph walk
+   (relationships + path steps; `GateHintRelation::ContentToSync` is the existing vocabulary
+   hook): fetch the closure, pin it as one custody unit.
+
+**Multipeer transport (the torrent question, evidence-based 2026-06-07):**
+
+- **Today**: apps-sw fetches a *scored* peer list (`/api/v1/peers/delivery`) and walks it in
+  **sequential failover** — peer-aware, single-stream, whole-zip. No striping.
+- **Substrate primitives already present**: `sharding.rs` + `p2p/blob_protocol.rs` +
+  reassembly-verified `blob_store` (storage); **`elohim-bitswap`** (libp2p 0.54 port) — wired
+  into **steward/node only**, not storage/browser delivery; RS(N,K) erasure quilt designed
+  (tiered-quilt, D5).
+- **Doorway stays single-target by gospel** (no fan-out) — swarm assembly belongs to the
+  substrate (storage P2P) and the client delivery layer (apps-sw striping across scored
+  peers), never the doorway.
+- **Gap**: composing these into torrent-style parallel chunk striping (scored peers ×
+  shard-ranged requests × hash-verified assembly) is designed-for but unbuilt — captured with
+  the affordance ladder as one brainstorm seed (it is the bandwidth story FOR rungs 3–5).
+
+**The async PULL queue (operator framing, 2026-06-07).** The substrate already has the WRITE
+half: the publish **drain** queue (`status.drain {total, published, pending}`, watched by the
+seeder's `wait-for-drain`) — local writes reconcile outward to peers. Rungs 3–5 are its mirror:
+an **async pull queue** — a declared *desired-content set* (a pin, a cluster closure, an
+offline subscription) reconciling INWARD with the same shape: `{total, fetched, pending}`,
+resumable, prioritized, bandwidth-aware (the multipeer striping above is its transport),
+hash-verified per item, and observable with the same wait-for semantics. This is the
+P1 reconciliation-controller pattern pointed at the local node: the desired-set is the
+manifest, the pull queue is the controller, `ContentToSync` gate hints and parent-EPR walks
+feed it. Completing a pull at reach=commons naturally flips the node to *providing* (rung 4 —
+the REA provide commitment), closing the read→host loop the protocol's economics expect.
+One brainstorm seed covers the family: affordance ladder + pull queue + multipeer striping.
+
