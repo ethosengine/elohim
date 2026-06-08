@@ -8818,6 +8818,16 @@ impl HttpServer {
                 Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {}", e))),
             };
 
+        // Canonicalize to the bare content id: the EPR link surface carries an
+        // `epr:` prefix, but the whole reconcile→dispatch→completion loop keys
+        // on the bare `content.id` (seed ids are unprefixed). Strip at the
+        // boundary so a pin's head_ref always matches the content projection.
+        let head_ref = input
+            .head_ref
+            .strip_prefix("epr:")
+            .unwrap_or(&input.head_ref)
+            .to_string();
+
         let kind = input.kind.unwrap_or_else(|| "item".to_string());
 
         if kind == "cluster" {
@@ -8846,7 +8856,7 @@ impl HttpServer {
                 // the wired agent identity (self.p2p_handle.agent_pubkey) so pins
                 // are keyed to the real agent, not a shared "local-device".
                 agent_pub_key: "local-device".to_string(),
-                head_ref: input.head_ref,
+                head_ref,
                 kind,
                 closure_rule_json: input.closure_rule.map(|v| {
                     serde_json::to_string(&v.0).expect("serializing a JSON Value is infallible")

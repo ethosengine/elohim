@@ -42,17 +42,18 @@ export class AcquisitionService {
    * Returns the capability that was used so callers can surface feedback.
    */
   async download(eprRef: string): Promise<AcquisitionCapability> {
+    // Canonicalize to the bare content id: the EPR link surface carries an
+    // `epr:` prefix, but the reconcile/dispatch/completion loop keys on bare
+    // content.id. Strip here so both peer and browser paths are coherent.
+    const id = eprRef.replace(/^epr:/, '');
     const base = this.storage.getStorageBaseUrl();
 
     if (this.capability() === 'peer') {
-      await firstValueFrom(
-        this.http.post(`${base}/api/v1/pins`, { headRef: eprRef, kind: 'item' })
-      );
+      await firstValueFrom(this.http.post(`${base}/api/v1/pins`, { headRef: id, kind: 'item' }));
       return 'peer';
     }
 
     // Browser: warm the SW cache lane via normal content fetch path.
-    const id = eprRef.replace(/^epr:/, '');
     const resp = await fetch(`${base}/db/content/${encodeURIComponent(id)}`);
     if (!resp.ok) {
       throw new Error(`[AcquisitionService] cache-warm failed for ${eprRef}: ${resp.status}`);

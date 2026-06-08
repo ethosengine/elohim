@@ -47,18 +47,32 @@ describe('AcquisitionService', () => {
   });
 
   describe('download() — peer path', () => {
-    it('POSTs to /api/v1/pins with {headRef, kind:"item"} and returns "peer"', async () => {
+    it('POSTs to /api/v1/pins with bare headRef (epr: prefix stripped) and returns "peer"', async () => {
       storageMock.connectionMode = 'direct';
 
       const resultPromise = service.download('epr:test-content-1');
 
       const req = httpMock.expectOne('http://localhost:8888/api/v1/pins');
       expect(req.request.method).toBe('POST');
-      expect(req.request.body).toEqual({ headRef: 'epr:test-content-1', kind: 'item' });
+      // The epr: prefix must be stripped so headRef matches the bare content.id
+      // used by the reconcile→dispatch→completion loop.
+      expect(req.request.body).toEqual({ headRef: 'test-content-1', kind: 'item' });
       req.flush({});
 
       const result = await resultPromise;
       expect(result).toBe('peer');
+    });
+
+    it('strips the "epr:" prefix when building the peer pin POST body', async () => {
+      storageMock.connectionMode = 'direct';
+
+      const resultPromise = service.download('epr:some-doc');
+
+      const req = httpMock.expectOne('http://localhost:8888/api/v1/pins');
+      expect(req.request.body).toEqual({ headRef: 'some-doc', kind: 'item' });
+      req.flush({});
+
+      await resultPromise;
     });
   });
 

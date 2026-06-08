@@ -38,6 +38,13 @@
 //! (`@requires:household-nodes @wip` in
 //! `genesis/a2o/features/delivery/acquisition-pins.feature`) will complete
 //! the two-node story when that stack is available.
+//!
+//! ## Seam coverage note
+//!
+//! This test uses bare content ids throughout (no `epr:` prefix). The HTTP
+//! boundary normalization that strips the prefix from incoming POST bodies is
+//! proven in `acquisition_pins_http.rs` §7. Together these two tests cover the
+//! full seam: boundary strips → bare id stored → reconcile/completion loop matches.
 
 use std::collections::HashSet;
 
