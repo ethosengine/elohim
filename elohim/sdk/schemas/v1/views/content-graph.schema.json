@@ -14,7 +14,7 @@
     "totalNodes": {
       "type": "integer",
       "minimum": 0,
-      "description": "Total number of nodes in the graph, including the root."
+      "description": "Number of related nodes (neighbour count; the root is implicit and not counted)."
     },
     "related": {
       "type": "array",

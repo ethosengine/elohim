@@ -1209,6 +1209,8 @@ fn view_schemas_declare_source_of_truth() {
         // Sprint 3: per-peer and hub storage capacity projections
         "views/peer-capacity-view.schema.json",
         "views/hub-capacity-view.schema.json",
+        // Native content-graph seam (Task A9): multi-provenance composite read
+        "views/content-graph.schema.json",
     ];
 
     for schema_name in &view_schemas {
@@ -5321,4 +5323,46 @@ fn household_resilience_with_commitment_backed_replication_validates() {
         }
     });
     validate_against_schema("views/household-resilience-view.schema.json", &payload);
+}
+
+// ── Content-graph view (native content-graph seam, Task A9) ───────────────────
+//
+// Source of truth: multi-provenance composite read (explicit edges are Category A
+// DHT Relationship entries; computed edges are Category C derived-on-read). The
+// view is a read projection, never persisted. `inferenceSource` is validated
+// against the cross-file `../enums/inference-source.schema.json` $ref, which the
+// harness resolves via inline_refs (enums/ is in the ref map). `totalNodes` is
+// the neighbour count (root excluded — `related.len()` flat-read semantics).
+
+#[test]
+fn content_graph_view_matches_schema() {
+    use elohim_views::lamad::{ContentGraphNodeView, ContentGraphView};
+
+    let view = ContentGraphView {
+        root_id: "confession".to_string(),
+        related: vec![
+            // Explicit, author-declared edge (Category A DHT Relationship).
+            ContentGraphNodeView {
+                content_id: "theology".to_string(),
+                relationship_type: "RELATES_TO".to_string(),
+                confidence: 1.0,
+                inference_source: "explicit".to_string(),
+                depth: 1,
+                children: vec![],
+            },
+            // Computed shared-tag proximity edge (Category C derived-on-read).
+            ContentGraphNodeView {
+                content_id: "repentance".to_string(),
+                relationship_type: "RELATES_TO".to_string(),
+                confidence: 0.42,
+                inference_source: "tag".to_string(),
+                depth: 1,
+                children: vec![],
+            },
+        ],
+        total_nodes: 2,
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/content-graph.schema.json", &json);
 }
