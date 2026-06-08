@@ -300,7 +300,7 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
 
       /* Discovered (computed) — visually muted/exploratory, distinct from authored */
       .discovered .section-header {
-        color: var(--text-tertiary, #80868b);
+        color: var(--lamad-text-tertiary, #80868b);
         font-style: italic;
         border-bottom-style: dashed;
       }

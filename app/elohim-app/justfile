@@ -45,11 +45,29 @@ fmt:
 lint-routes:
     node ../../scripts/lint-route-literals.mjs src ../lamad/src
 
+# A11y paired-color RATCHET: a new color/background literal must bind to a
+# theme-reactive token (--lamad-*/--elohim-*/--el-*/--primary/--accent), so it
+# adapts to html[data-theme]. Grandfathers the shell's pre-existing legacy debt
+# (genesis backlog: a11y-contrast-gate) and blocks NEW theme-blind colors as they
+# land — the static backstop the epr-raw-node dark-on-dark bug lacked. Diffs vs
+# the dev integration base; degrades to a no-op when that base isn't fetched.
+lint-a11y:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    base=$(git merge-base HEAD origin/dev 2>/dev/null || git merge-base HEAD dev 2>/dev/null || echo "")
+    if [ -z "$base" ]; then echo "lint-a11y: no dev base to diff — skipping ratchet"; exit 0; fi
+    node ../../scripts/lint-a11y-color.mjs --diff "$base" src ../lamad/src
+
+# Run the a11y-color canary in full (non-ratchet) over an already-clean subtree —
+# the /epr viewer surface migrated 2026-06-08. Use to CI-conform a clean subtree.
+lint-a11y-strict *DIRS:
+    node ../../scripts/lint-a11y-color.mjs {{DIRS}}
+
 # Rebuild workspace deps that elohim-app consumes via dist/.
 # @elohim/storage-client's dist/ is gitignored, so type changes in its
 # src/generated/ don't reach consumers until tsc reruns. Fast (~5s).
 deps:
     pnpm --filter @elohim/storage-client build
 
-# Quality gate: route-literal lint + dep freshness + build + test
-gate: lint-routes deps build test
+# Quality gate: route-literal lint + a11y-color ratchet + dep freshness + build + test
+gate: lint-routes lint-a11y deps build test

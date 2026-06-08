@@ -1,10 +1,22 @@
-/* Blank-slate raw-node inspector — no pillar chrome. Plain, legible, accessible. */
+/* Raw-node inspector — plain, legible, accessible.
+ *
+ * "Blank-slate" = no PILLAR chrome (no lamad nav/mastery), NOT theme-blind. The
+ * surface is a self-contained readable panel: it binds to the shell's
+ * data-theme-reactive token surface (`--lamad-*`, defined in styles.css for
+ * :root / body[data-theme]) so it reads on both the dark constellation canvas
+ * and the light theme — and it sets its OWN paired background + foreground, so
+ * contrast never depends on the ambient (gradient) canvas behind it. The
+ * `--epr-raw-*` vars stay as the override seam; their fallbacks resolve to the
+ * theme tokens, then to a light-mode literal for token-less contexts (tests). */
 
 .epr-raw {
   max-width: 760px;
-  margin: 0 auto;
-  padding: 24px 20px 64px;
-  color: var(--epr-raw-fg, #1f2430);
+  margin: 24px auto;
+  padding: 24px 24px 48px;
+  background: var(--epr-raw-bg, var(--lamad-bg-secondary, #fff));
+  color: var(--epr-raw-fg, var(--lamad-text-primary, #1f2430));
+  border: 1px solid var(--epr-raw-border, var(--lamad-border, #e5e7eb));
+  border-radius: 12px;
   font-size: 0.95rem;
   line-height: 1.55;
 }
@@ -13,21 +25,22 @@
   font-size: 1.4rem;
   font-weight: 700;
   margin: 0 0 4px;
+  color: var(--epr-raw-fg, var(--lamad-text-primary, #1f2430));
 }
 
 .epr-raw__subtitle {
   margin: 0 0 24px;
-  color: var(--epr-raw-muted, #6b7280);
+  color: var(--epr-raw-muted, var(--lamad-text-tertiary, #6b7280));
 }
 
 .epr-raw__status {
-  color: var(--epr-raw-muted, #6b7280);
+  color: var(--epr-raw-muted, var(--lamad-text-tertiary, #6b7280));
 }
 
 .epr-raw__section {
   margin: 0 0 20px;
   padding: 0 0 16px;
-  border-bottom: 1px solid var(--epr-raw-border, #e5e7eb);
+  border-bottom: 1px solid var(--epr-raw-border, var(--lamad-border, #e5e7eb));
 }
 
 .epr-raw__section:last-of-type {
@@ -39,7 +52,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--epr-raw-heading, #6b7280);
+  color: var(--epr-raw-heading, var(--lamad-text-secondary, #4b5563));
   margin: 0 0 10px;
 }
 
@@ -52,12 +65,13 @@
 
 .epr-raw__dl dt {
   font-weight: 600;
-  color: var(--epr-raw-muted, #6b7280);
+  color: var(--epr-raw-muted, var(--lamad-text-tertiary, #6b7280));
 }
 
 .epr-raw__dl dd {
   margin: 0;
   overflow-wrap: anywhere;
+  color: var(--epr-raw-fg, var(--lamad-text-primary, #1f2430));
 }
 
 .epr-raw__list {
@@ -72,11 +86,13 @@
 }
 
 .epr-raw__link {
-  color: var(--epr-raw-link, #2563eb);
+  color: var(--epr-raw-link, var(--lamad-text-primary, #2563eb));
   text-decoration: underline;
+  text-decoration-color: var(--epr-raw-link-underline, var(--lamad-accent-primary, #2563eb));
+  text-underline-offset: 2px;
 }
 
 .epr-raw__muted {
-  color: var(--epr-raw-muted, #6b7280);
+  color: var(--epr-raw-muted, var(--lamad-text-tertiary, #6b7280));
   font-style: italic;
 }

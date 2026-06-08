@@ -43,14 +43,19 @@ module.exports = {
     // ============================================================
     // ACCESSIBILITY RULES - Matching SonarQube css:S7924
     // ============================================================
-    'a11y/media-prefers-reduced-motion': 'warn',
-    'a11y/no-outline-none': 'error',          // Don't remove focus outlines
-    'a11y/selector-pseudo-class-focus': 'warn', // Focus styles should exist
+    // NOTE: stylelint rule config is `true`/`null` (+ optional { severity }),
+    // NOT ESLint's 'warn'/'error' strings. The previous string values threw
+    // "Invalid Option" and silently disabled these rules — a real enforcement
+    // gap (it's how the epr-raw-node contrast bug had no static backstop).
+    'a11y/media-prefers-reduced-motion': [true, { severity: 'warning' }],
+    'a11y/no-outline-none': true, // Don't remove focus outlines (error severity)
+    'a11y/selector-pseudo-class-focus': [true, { severity: 'warning' }], // Focus styles should exist
 
-    // Color contrast checking (css:S7924)
-    // Note: stylelint-a11y's contrast checking has limitations compared to SonarQube's
-    // SonarQube does full WCAG AA contrast calculation
-    'a11y/font-size-is-readable': 'warn',
+    // Color contrast (css:S7924). stylelint-a11y's static contrast check can't
+    // resolve var() chains across themes or model the color-scheme canvas — the
+    // both-themes render gate (Layer 2, genesis backlog: a11y-contrast-gate) and
+    // the lint-a11y-color paired-token canary cover what it can't.
+    'a11y/font-size-is-readable': [true, { severity: 'warning' }],
 
     // ============================================================
     // MODERN CSS SYNTAX - Keep strict for quality

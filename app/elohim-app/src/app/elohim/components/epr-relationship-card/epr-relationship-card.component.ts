@@ -97,11 +97,11 @@ function resilienceTitle(resilience: ResilienceView): string {
         display: block;
         text-decoration: none;
         color: inherit;
-        border: 1px solid var(--epr-card-border, #dde1e7);
+        border: 1px solid var(--epr-card-border, var(--lamad-border, #dde1e7));
         border-radius: 8px;
         padding: 10px 12px;
         transition: box-shadow 0.15s ease;
-        background: var(--epr-card-bg, #fff);
+        background: var(--epr-card-bg, var(--lamad-bg-secondary, #fff));
       }
       .epr-rel-card:hover {
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
@@ -111,13 +111,13 @@ function resilienceTitle(resilience: ResilienceView): string {
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.04em;
-        color: var(--epr-card-type-color, #6b7280);
+        color: var(--epr-card-type-color, var(--lamad-text-tertiary, #6b7280));
         margin-bottom: 2px;
       }
       .epr-rel-card__title {
         font-size: 0.92rem;
         font-weight: 600;
-        color: var(--epr-card-title-color, #1a202c);
+        color: var(--epr-card-title-color, var(--lamad-text-primary, #1a202c));
         margin-bottom: 2px;
         overflow: hidden;
         display: -webkit-box;
@@ -126,7 +126,7 @@ function resilienceTitle(resilience: ResilienceView): string {
       }
       .epr-rel-card__desc {
         font-size: 0.8rem;
-        color: var(--epr-card-desc-color, #6b7280);
+        color: var(--epr-card-desc-color, var(--lamad-text-tertiary, #6b7280));
         overflow: hidden;
         display: -webkit-box;
         -webkit-line-clamp: 2;
@@ -144,17 +144,17 @@ function resilienceTitle(resilience: ResilienceView): string {
         cursor: default;
       }
       .epr-rel-card__badge--resilience-green {
-        color: var(--epr-resilience-green, #16a34a);
+        color: var(--epr-resilience-green, #16a34a); /* a11y-color-ok: semantic resilience-status palette (non-text indicator) */
       }
       .epr-rel-card__badge--resilience-yellow {
-        color: var(--epr-resilience-yellow, #ca8a04);
+        color: var(--epr-resilience-yellow, #ca8a04); /* a11y-color-ok: semantic resilience-status palette (non-text indicator) */
       }
       .epr-rel-card__badge--resilience-none {
-        color: var(--epr-resilience-none, #9ca3af);
+        color: var(--epr-resilience-none, #9ca3af); /* a11y-color-ok: semantic resilience-status palette (non-text indicator) */
       }
       .epr-rel-card__badge--peers {
         font-size: 0.72rem;
-        color: var(--epr-card-desc-color, #6b7280);
+        color: var(--epr-card-desc-color, var(--lamad-text-tertiary, #6b7280));
       }
     `,
   ],

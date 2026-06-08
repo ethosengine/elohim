@@ -143,7 +143,7 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
         align-items: center;
         gap: 0.25rem;
         padding: 0.75rem 0.5rem;
-        background: var(--primary, #4285f4);
+        background: var(--lamad-accent-primary, #4285f4);
         color: white;
         border: none;
         border-radius: var(--radius-md, 8px) 0 0 var(--radius-md, 8px);
@@ -169,8 +169,8 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
 
       /* Exploration panel */
       .exploration-panel {
-        background: var(--surface-elevated, #fff);
-        border-left: 1px solid var(--border-color, #e9ecef);
+        background: var(--lamad-bg-secondary, #fff);
+        border-left: 1px solid var(--lamad-border, #e9ecef);
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -205,14 +205,14 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
         align-items: center;
         justify-content: space-between;
         padding: 1rem;
-        border-bottom: 1px solid var(--border-color, #e9ecef);
+        border-bottom: 1px solid var(--lamad-border, #e9ecef);
       }
 
       .panel-title {
         margin: 0;
         font-size: 1rem;
         font-weight: 600;
-        color: var(--text-primary, #202124);
+        color: var(--lamad-text-primary, #202124);
       }
 
       .panel-close {
@@ -224,13 +224,13 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
         background: none;
         border: none;
         font-size: 1.5rem;
-        color: var(--text-secondary, #5f6368);
+        color: var(--lamad-text-secondary, #5f6368);
         cursor: pointer;
         border-radius: var(--radius-sm, 4px);
       }
 
       .panel-close:hover {
-        background: var(--surface-hover, #f1f3f4);
+        background: var(--lamad-surface-hover, #f1f3f4);
       }
 
       .panel-content {
@@ -254,7 +254,7 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        color: var(--text-tertiary, #80868b);
+        color: var(--lamad-text-tertiary, #80868b);
       }
 
       .panel-actions {
@@ -270,18 +270,18 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
         justify-content: center;
         gap: 0.5rem;
         padding: 0.75rem 1rem;
-        background: var(--surface-secondary, #f8f9fa);
-        border: 1px solid var(--border-color, #e9ecef);
+        background: var(--lamad-bg-tertiary, #f8f9fa);
+        border: 1px solid var(--lamad-border, #e9ecef);
         border-radius: var(--radius-md, 8px);
-        color: var(--text-primary, #202124);
+        color: var(--lamad-text-primary, #202124);
         font-weight: 500;
         cursor: pointer;
         transition: all 0.15s ease;
       }
 
       .btn-explore-graph:hover {
-        background: var(--primary, #4285f4);
-        border-color: var(--primary, #4285f4);
+        background: var(--lamad-accent-primary, #4285f4);
+        border-color: var(--lamad-accent-primary, #4285f4);
         color: white;
       }
 
@@ -323,7 +323,7 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
           display: block;
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(0, 0, 0, 0.4); /* a11y-color-ok: fixed modal scrim backdrop, theme-agnostic */
           z-index: 25;
           opacity: 0;
           animation: fadeIn 0.2s ease forwards;

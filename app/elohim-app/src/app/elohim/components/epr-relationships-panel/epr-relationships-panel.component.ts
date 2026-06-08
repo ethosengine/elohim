@@ -74,7 +74,7 @@ function buildGroups(relationships: EprRelationship[]): RelationshipGroup[] {
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: var(--epr-panel-heading-color, #6b7280);
+        color: var(--epr-panel-heading-color, var(--lamad-text-secondary, #6b7280));
         margin: 0 0 8px;
       }
 
