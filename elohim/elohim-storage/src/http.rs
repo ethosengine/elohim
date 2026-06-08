@@ -8808,17 +8808,73 @@ impl HttpServer {
     }
 
     /// DELETE /api/v1/pins/{id} — soft-delete a pin by marking it "removed".
+    ///
+    /// Un-pin IS real revocation (Slice-2b T10): after flipping the pin to
+    /// `removed`, if the pin carries a `commitment_cid` back-reference (the
+    /// `replicates-commons` offer the provide reconciler authored for it), this
+    /// authors a `revokes-commitment` targeting that CID through the conductor.
+    /// The revocation's projection (`mishpat_projection::parse_revokes_commitment`)
+    /// sets `revoked_at` on the target row, so the prioritizer stops serving it
+    /// and the bounds validator refuses it.
+    ///
+    /// This is the AUTHORITATIVE un-pin revocation path (targets the pin's
+    /// `commitment_cid` directly). It is distinct from the reconciler's
+    /// stranded-row safety-net arm, which revokes a live commitment whose logical
+    /// key has left the desired set. Best-effort: a conductor failure must NOT
+    /// fail the un-pin — the next provide-reconcile tick's stranded-row arm is
+    /// the backstop. Prior accepted ProvideAnnounce events stand (no retroactive
+    /// change — the audit trail keeps which commitment was revoked).
     async fn handle_remove_pin(&self, id_str: &str) -> Result<Response<Full<Bytes>>, StorageError> {
         let id: i32 = id_str
             .parse()
             .map_err(|_| StorageError::InvalidInput(format!("invalid pin id: '{}'", id_str)))?;
 
         let mut conn = self.get_diesel_conn()?;
+
+        // Capture the notarized offer back-reference BEFORE flipping status so we
+        // can withdraw the commons offer (author a revokes-commitment).
+        let offer_cid: Option<String> = db::acquisition_pins::list_all_pins(&mut conn)
+            .map_err(|e| StorageError::Database(e.to_string()))?
+            .into_iter()
+            .find(|p| p.id == id)
+            .and_then(|p| p.commitment_cid);
+
         let rows = db::acquisition_pins::set_pin_status(&mut conn, id, "removed")
             .map_err(|e| StorageError::Database(e.to_string()))?;
 
         if rows == 0 {
             return Ok(response::not_found(&format!("pin {} not found", id)));
+        }
+        drop(conn);
+
+        // Withdraw the commons offer: author a revokes-commitment targeting the
+        // pin's commitment_cid. Best-effort — the provide reconciler's stranded-
+        // row revoke arm is the backstop if the conductor is unavailable here.
+        if let (Some(target_cid), Some(hc)) = (
+            offer_cid,
+            self.hc_registry.as_ref().and_then(|r| r.lamad.clone()),
+        ) {
+            let signed_at = crate::db::models::current_timestamp();
+            let payload_json = crate::services::conductor_commitment_author::build_revoke_payload(
+                &target_cid,
+                &signed_at,
+            );
+            let input = crate::services::conductor_writes::CreateMishpatCommitmentInput {
+                action: "revokes-commitment".to_string(),
+                payload_json,
+                signed_at,
+            };
+            if let Err(e) =
+                crate::services::conductor_writes::call_create_commitment(&hc, input).await
+            {
+                tracing::warn!(
+                    target: "elohim_storage::provide",
+                    pin = id,
+                    target_cid = %target_cid,
+                    error = %e,
+                    "un-pin: revokes-commitment author failed; reconciler stranded-row arm will retry"
+                );
+            }
         }
 
         Ok(response::ok(&serde_json::json!({ "removed": id })))
@@ -12035,5 +12091,48 @@ mod session_exchange_tests {
             "/session/exchange must NOT be declared in build_manifest() — it is \
              reached at the portal-host origin, never doorway-proxied"
         );
+    }
+
+    // Slice-2b T10: un-pin flips the pin to removed and preserves the
+    // commitment_cid back-reference (the revoke author targets it but does not
+    // erase the audit link). No hc_registry is wired on test_server(), so the
+    // conductor author hook is skipped — the local projection effects are what
+    // this test asserts (the conductor round-trip is proven by the T1 sweettest).
+    #[tokio::test]
+    async fn remove_pin_marks_removed_and_preserves_offer_backref() {
+        let server = test_server().await;
+
+        let created = server
+            .test_handle_create_pin_raw(r#"{"headRef":"epr:album-1","kind":"item"}"#)
+            .await;
+        assert_eq!(created.status, 201, "pin create must succeed (201 Created)");
+
+        // Back-fill a commitment_cid (simulating the provide reconciler having
+        // authored a replicates-commons offer for this pin).
+        let pin_id: i32 = {
+            let mut conn = server.get_diesel_conn().expect("conn");
+            let all = db::acquisition_pins::list_all_pins(&mut conn).expect("list");
+            db::acquisition_pins::set_commitment_cid(&mut conn, all[0].id, "anchor:offer-1")
+                .expect("backfill");
+            all[0].id
+        };
+
+        let removed = server.test_handle_remove_pin(&pin_id.to_string()).await;
+        assert_eq!(removed.status, 200, "remove must succeed");
+
+        let mut conn = server.get_diesel_conn().expect("conn");
+        let all = db::acquisition_pins::list_all_pins(&mut conn).expect("list");
+        assert_eq!(all[0].status, "removed", "pin must be flipped to removed");
+        // The back-reference is preserved — the revocation targets it, but the
+        // audit link to which commitment was revoked is kept.
+        assert_eq!(all[0].commitment_cid.as_deref(), Some("anchor:offer-1"));
+    }
+
+    // Removing a non-existent pin returns 404 (no author call possible).
+    #[tokio::test]
+    async fn remove_unknown_pin_returns_404() {
+        let server = test_server().await;
+        let removed = server.test_handle_remove_pin("99999").await;
+        assert_eq!(removed.status, 404, "removing an unknown pin must 404");
     }
 }
