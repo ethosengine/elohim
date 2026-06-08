@@ -1,10 +1,50 @@
-# HANDOFF — EPR acquisition: Slice 1 DONE (held) · Slice 2a HALTED on a substrate finding → brainstorm next
+# HANDOFF — EPR acquisition: Slice 1 + Slice 2a COMPLETE → Slice 2b is the clean follow-on
 
-_Last updated: 2026-06-08 · Author: Claude Opus · Branch: `dev` (committed, NOT pushed — integrator owns push) · Session mode: **execution halted at a verified architectural finding → handing into a /brainstorm**._
+_Last updated: 2026-06-08 · Author: Claude Opus · Branch: `dev` (pushed; CI verifying) · Session mode: **Slice 2a rail complete + pushed → Slice 2b ready to plan**._
 
 ---
 
-## ⏸ Slice 2a HALTED at T3 — the commitment-system bridge must be designed first (operator chose brainstorm)
+## ✅ Slice 2a COMPLETE — the REA compute-bounds rail (the data-transaction gate)
+
+The foundational rail §6.5 described is built, reviewed, and CI-pushed. **The bounds-validator now works in
+production** (the `ConductorCommitmentFetcher` stub is replaced), a notarized in-window commitment CLEARS the
+gate, and a revoked/un-notarized one is REFUSED — proven through the REAL fetcher+validator in a composition
+e2e (`tests/mishpat_bounds_gate_chain.rs`). This is the gate on the *transaction of data*: an EconomicEvent
+`bounded_by` a Mishpat compute-commitment, free/in-kind within the commitment's bounds. Commits (on `dev`):
+
+- `22dfc00db` T3 — `economic_event_emit_service` (bounds-validated conductor-path emit; `fulfills`+metadata binding).
+- `ba7e947ac` T4 — `mishpat_commitments` projection table (notarization-preserving upsert).
+- `75a187961`+`3ce46d290` T5 — Mishpat `post_commit` emits `CommitmentCommitted` → storage `signals.rs` →
+  `mishpat_projection` parses payload → table (notarized, `proposed`); fail-closed on missing bounds/timestamps;
+  the conductor↔storage serde wire is test-pinned.
+- `72792a1a3` T6 — `ProjectionCommitmentFetcher` (reads the projection; **fail-closed on null `dht_anchor_hash`** —
+  bounds never clears on un-notarized provenance).
+- `29237a44f` T7 — projection-driven graduation (a `bounded_by` event projecting flips the Mishpat commitment
+  proposed→active; the act of providing IS the acceptance; SQL state is projection, the event is truth).
+- `7c599a6ee` T8 — composition e2e + gates (1406 lib + integration/e2e green, clippy/fmt/WASM clean).
+
+**The canonical two-layer model is now real in code:** `Mishpat::Commitment` = compute-bounds policy envelope
+(projected to `mishpat_commitments`, what bounds_validator checks via `bounded_by`); content_store
+`Commitment`/`EconomicEvent` = the REA/VF economic fact (`fulfills`). History-record-worthy ("why both
+commitment writers exist") — backlog note in `epr-routing-complementary-captures.md`.
+
+## ▶ NEXT: Slice 2b (clean follow-on, plan it)
+
+On the proven 2a rail, Slice 2b builds the **user-facing provide loop** (spec §1.2/§6.1/§13):
+- **Mint `replicates-commons`** as a Mishpat action (content-scoped + capacity-pledge payload variants; mirror
+  `replicates-dwelling`'s coordinator+integrity validators + schema) — Mishpat zome WASM work (`just pack`;
+  DNA hash changes, sweettest-only here).
+- **Pin sync-back**: on a commons device-pin (Slice 1's `acquisition_pins`) syncing back, author the
+  content-scoped `replicates-commons` Mishpat commitment, then emit the first `ProvideAnnounce` EconomicEvent
+  (`economic_event_emit_service`, T3) bounded_by it → the projection graduates it to active (T7).
+- **Scorer arm**: widen `replication_prioritizer::active_commitments_for_provider` to load `replicates-commons`
+  rows from `mishpat_commitments` + the reserved `Medium` tier (content-identity matching, not recipient-hub).
+- **Rung-4 UI**: pin-as-peer action + per-pin progress affordance (consumer of `.pull` counts).
+- Commons-only v1 (capability-by-hash quarantined, §1.4/§14).
+
+---
+
+## (archived) Slice 2a HALTED-then-resolved trail
 
 Slice 2a (REA emit/graduation rails) executed T1–T3 (all correct, committed) then the **verify-don't-assume**
 discipline surfaced a foundational finding that stops coherent progress on T4–T7:
