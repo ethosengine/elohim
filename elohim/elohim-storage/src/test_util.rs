@@ -56,7 +56,9 @@ pub struct P2PTestHarness {
 /// used in peer_selection tests).
 ///
 /// For each peer an active REA commitment is inserted for `content:commons` so
-/// that `PeerSelection` can find them.
+/// peer-selection sees a provider, plus a notarized `replicates-commons`
+/// commitment in `mishpat_commitments` (recipient == head_ref) so the commons
+/// scorer arm has a row to load.
 ///
 /// Returns a `P2PTestHarness` with:
 /// - `pool`: the seeded database
@@ -124,6 +126,37 @@ pub async fn spawn_p2p_with_peers(pool: DbPool, peers: &[(&str, &str, &str)]) ->
             ))
             .execute(&mut conn)
             .expect("insert rea_commitment");
+
+        // Insert a notarized replicates-commons commitment so the commons
+        // scorer arm (active_commitments_for_provider → mishpat_commitments)
+        // has a real row to load. recipient == head_ref (spec contract). The
+        // legacy rea_commitments "provide" row above is left intact because
+        // peer_selection/household_resilience still filter action == "provide".
+        let commons_cid = format!("commons-{agent_key}-head");
+        diesel::insert_or_ignore_into(crate::db::diesel_schema::mishpat_commitments::table)
+            .values((
+                crate::db::diesel_schema::mishpat_commitments::cid.eq(&commons_cid),
+                crate::db::diesel_schema::mishpat_commitments::action.eq("replicates-commons"),
+                crate::db::diesel_schema::mishpat_commitments::scope.eq("replicates-commons"),
+                crate::db::diesel_schema::mishpat_commitments::provider.eq(*agent_key),
+                crate::db::diesel_schema::mishpat_commitments::recipient.eq("head:commons-fixture"),
+                crate::db::diesel_schema::mishpat_commitments::bounds_json
+                    .eq(r#"{"rate_per_minute":60,"reach_ceiling":"commons"}"#),
+                crate::db::diesel_schema::mishpat_commitments::valid_from
+                    .eq("2026-01-01T00:00:00Z"),
+                crate::db::diesel_schema::mishpat_commitments::valid_until
+                    .eq("2027-01-01T00:00:00Z"),
+                crate::db::diesel_schema::mishpat_commitments::revoked_at.eq(None::<String>),
+                crate::db::diesel_schema::mishpat_commitments::state.eq("active"),
+                crate::db::diesel_schema::mishpat_commitments::dht_anchor_hash
+                    .eq(Some(format!("{commons_cid}-anchor"))),
+                crate::db::diesel_schema::mishpat_commitments::created_at
+                    .eq("2026-01-01T00:00:00Z"),
+                crate::db::diesel_schema::mishpat_commitments::updated_at
+                    .eq("2026-01-01T00:00:00Z"),
+            ))
+            .execute(&mut conn)
+            .expect("insert replicates-commons commitment");
     }
 
     let p2p = crate::p2p::P2PHandle::for_testing();
