@@ -1737,6 +1737,9 @@ mod mishpat_signal_tests {
     use diesel::connection::SimpleConnection;
     use diesel::prelude::*;
     use diesel::sqlite::SqliteConnection;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
     fn setup_test_conn() -> SqliteConnection {
         let mut conn =
@@ -2102,6 +2105,161 @@ mod mishpat_signal_tests {
             }
             _ => panic!("Expected ChallengeOutcomeCreated variant"),
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // CommitmentCommitted tests (I1 — signal serde boundary coverage)
+    // -------------------------------------------------------------------------
+    //
+    // These tests guard the `#[serde(tag="type", content="payload")]` wire
+    // crossing from conductor → storage. Every other MishpatSignal variant has
+    // matching coverage; CommitmentCommitted previously had none — a silent drift
+    // in field names would have broken the projection without any test failure.
+
+    fn setup_commitments_conn() -> SqliteConnection {
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory SQLite");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    fn make_commitment_signal(
+        action_hash: &str,
+        entry_hash: &str,
+        action: &str,
+        scope: &str,
+    ) -> MishpatSignal {
+        // Build a delegates-compute payload_json with all required fields.
+        let payload_json = serde_json::json!({
+            "action": action,
+            "scope": scope,
+            "provider": "agent:matthew-steward",
+            "recipient": "agent:deploy-svc",
+            "bounds": {
+                "epr_scope": ["epr:lamad-spa"],
+                "reach_ceiling": "commons",
+                "rate_per_hour": 30,
+                "rotation_ttl_days": 90
+            },
+            "valid_from": "2026-05-28T00:00:00Z",
+            "valid_until": "2026-08-26T00:00:00Z"
+        })
+        .to_string();
+
+        MishpatSignal::CommitmentCommitted {
+            action_hash: action_hash.to_string(),
+            entry_hash: entry_hash.to_string(),
+            author: "uhCAkAUTHOR".to_string(),
+            commitment: crate::mishpat_projection::CommitmentPayload {
+                action: action.to_string(),
+                payload_json,
+                // epoch-seconds string, not ISO-8601
+                signed_at: "1748390400".to_string(),
+            },
+        }
+    }
+
+    /// I1a — serde tag/content shape for CommitmentCommitted must round-trip.
+    ///
+    /// Verifies the exact JSON wire shape the mishpat zome emits (lib.rs ~:1604):
+    /// `{"type":"CommitmentCommitted","payload":{action_hash, entry_hash, commitment:{action, payload_json, signed_at}, author}}`
+    #[test]
+    fn commitment_committed_serde_tag_matches_dna_wire_format() {
+        let payload_json_str = r#"{"action":"delegates-compute","scope":"republish-epr","provider":"agent:alice","recipient":"agent:bob","bounds":{"reach_ceiling":"commons","rate_per_hour":30},"valid_from":"2026-05-28T00:00:00Z","valid_until":"2026-08-26T00:00:00Z"}"#;
+
+        let wire = serde_json::json!({
+            "type": "CommitmentCommitted",
+            "payload": {
+                "action_hash": "uhCkkCOMMIT",
+                "entry_hash": "uhCEkCOMMIT",
+                "author": "uhCAkCOMMIT",
+                "commitment": {
+                    "action": "delegates-compute",
+                    "payload_json": payload_json_str,
+                    "signed_at": "1748390400"
+                }
+            }
+        });
+
+        let signal: MishpatSignal = serde_json::from_value(wire).unwrap();
+        match signal {
+            MishpatSignal::CommitmentCommitted {
+                action_hash,
+                entry_hash,
+                author,
+                commitment,
+            } => {
+                assert_eq!(action_hash, "uhCkkCOMMIT");
+                assert_eq!(entry_hash, "uhCEkCOMMIT");
+                assert_eq!(author, "uhCAkCOMMIT");
+                assert_eq!(commitment.action, "delegates-compute");
+                // epoch-seconds, not ISO-8601
+                assert_eq!(commitment.signed_at, "1748390400");
+                assert!(!commitment.payload_json.is_empty());
+            }
+            _ => panic!("Expected CommitmentCommitted variant"),
+        }
+    }
+
+    /// I1b — CommitmentCommitted signal projects one mishpat_commitments row.
+    ///
+    /// Verifies the full dispatch path: `handle_mishpat_signal` → inline parse
+    /// → `mishpat_commitments::upsert_with_anchor` → row with correct fields.
+    #[test]
+    fn commitment_committed_projects_row() {
+        let mut conn = setup_commitments_conn();
+        let signal = make_commitment_signal(
+            "uhCkkCOM1",
+            "uhCEkCOM1",
+            "delegates-compute",
+            "republish-epr",
+        );
+
+        handle_mishpat_signal(&mut conn, "app", signal).unwrap();
+
+        let row = crate::db::mishpat_commitments::get_by_cid(&mut conn, "uhCEkCOM1")
+            .unwrap()
+            .expect("Row must be present after CommitmentCommitted signal");
+
+        assert_eq!(row.cid, "uhCEkCOM1");
+        assert_eq!(row.action, "delegates-compute");
+        assert_eq!(row.scope, "republish-epr");
+        assert_eq!(row.provider, "agent:matthew-steward");
+        assert_eq!(row.state, "proposed");
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some("uhCkkCOM1"),
+            "dht_anchor_hash must equal action_hash"
+        );
+        // bounds_json must be valid non-empty JSON
+        let bounds: serde_json::Value =
+            serde_json::from_str(&row.bounds_json).expect("bounds_json must be valid JSON");
+        assert_eq!(bounds["reach_ceiling"], "commons");
+    }
+
+    /// I1c — CommitmentCommitted is idempotent: re-delivering the signal must
+    /// not duplicate the row.
+    #[test]
+    fn commitment_committed_is_idempotent() {
+        let mut conn = setup_commitments_conn();
+        let signal = make_commitment_signal(
+            "uhCkkCOM2",
+            "uhCEkCOM2",
+            "delegates-compute",
+            "republish-epr",
+        );
+
+        handle_mishpat_signal(&mut conn, "app", signal.clone()).unwrap();
+        handle_mishpat_signal(&mut conn, "app", signal).unwrap();
+
+        // Row must exist exactly once — get_by_cid returning Some proves exactly one row.
+        let row = crate::db::mishpat_commitments::get_by_cid(&mut conn, "uhCEkCOM2")
+            .unwrap()
+            .expect("Row must exist after two deliveries");
+        assert_eq!(
+            row.cid, "uhCEkCOM2",
+            "Re-delivered CommitmentCommitted must not duplicate the row"
+        );
     }
 }
 

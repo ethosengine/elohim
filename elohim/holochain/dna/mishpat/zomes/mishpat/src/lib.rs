@@ -1320,11 +1320,13 @@ pub enum MishpatSignal {
     },
     /// Emitted when a Commitment entry is committed (Slice-2a T5).
     ///
-    /// elohim-storage `mishpat_projection::handle_commitment_committed` receives
-    /// this signal and projects the commitment into the `mishpat_commitments`
-    /// SQLite table with `dht_anchor_hash = action_hash` (notarised provenance).
-    /// This is what makes the `ProjectionCommitmentFetcher` (T6) have data in
-    /// production. Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §6.5.
+    /// elohim-storage's `signals.rs` dispatches this signal via
+    /// `mishpat_projection::parse_commitment_payload` →
+    /// `mishpat_commitments::upsert_with_anchor`, projecting the commitment
+    /// into the `mishpat_commitments` SQLite table with
+    /// `dht_anchor_hash = action_hash` (notarised provenance). This is what
+    /// makes the `ProjectionCommitmentFetcher` (T6) have data in production.
+    /// Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §6.5.
     CommitmentCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
