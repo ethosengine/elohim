@@ -102,7 +102,7 @@ This is DHT-native (the revocation is notarized, not projection-only) and sets t
 
 2a's `graduate_to_active` only flips a **SQL column** — no DHT `CommitmentByState` link is authored, so "link is truth, SQL is projection" (parent §6.5) is currently aspirational and the SQL column is the de-facto truth (loss-of-state-on-replay risk). **Design intent (comprehensive scope chosen by operator):** on graduation, `rea_projection` calls a new `call_create_commitment_state_link` wrapper → a Mishpat coordinator fn authoring an immutable `CommitmentByState` link (anchor = commitment CID; payload = new state + timestamp + the `ProvideAnnounce` event hash). The SQL `state` becomes a write-through cache rebuilt from the link on restart.
 
-> **Operator descope option:** if 2b should stay tighter, this single item may be **deferred** — keep projection-only `state` for v1 with a documented replay-risk comment and a follow-on ticket. Everything else in 2b is independent of this choice. (Flagged for spec-review.)
+> **Decision (2026-06-08, operator):** **author the link in 2b** — confirmed. Projection-only state is not acceptable for v1; the SQL `state` column becomes a write-through cache rebuilt from the `CommitmentByState` link on restart. Task 11 stays in scope.
 
 ### 6.5 Commons content-identity matching — *reconciler-context-fed* (was a blocker; simplified)
 
@@ -216,10 +216,10 @@ This is DHT-native (the revocation is notarized, not projection-only) and sets t
 - **Capability-by-hash / gated pinning** — quarantined (parent §1.4/§14); commons-only v1.
 - **RS-band striping** (>64 MB) — separate transport spec.
 
-## 14. Open decisions for the operator (at spec-review)
+## 14. Operator decisions — RESOLVED (2026-06-08)
 
-1. **Graduation truth (§6.4):** author the `CommitmentByState` DHT link in 2b (comprehensive, substrate-correct, partly retrofits 2a) — **default** — or **defer** with documented projection-only state for v1? (The only item where descope is clean.)
-2. **CI storage-test stage (§2.1/§10):** add `cargo nextest run -p elohim-storage` to CI as part of 2b, or file-and-defer the coverage gap? (Default: file the backlog item; add the stage if you want 2b's e2e CI-gated.)
+1. **Graduation truth (§6.4): RESOLVED → author the `CommitmentByState` link in 2b.** Substrate-correct; closes the 2a shortcut. Task 11 in scope.
+2. **CI storage-test stage (§2.1/§10): RESOLVED → file the backlog item, lean on sweettests.** Behavioral proof lands as sweettests (CI-covered) + local storage e2e; `ci-storage-workspace-tests-uncovered` filed for a dedicated follow-on. No Jenkinsfile work pulled into 2b.
 
 ## 15. References & spawned backlog
 
