@@ -4225,14 +4225,57 @@ impl HttpServer {
                 .into_owned()
                 .collect();
 
-        let relationship_types: Option<Vec<String>> = params
+        // Edge-type filter: comma list -> Vec<String>; empty after trimming -> None
+        // (None means "resolver default whitelist", NOT "all edge types").
+        let types_vec: Vec<String> = params
             .get("types")
-            .map(|s| s.split(',').map(|t| t.trim().to_string()).collect());
+            .map(|s| {
+                s.split(',')
+                    .map(|t| t.trim().to_string())
+                    .filter(|t| !t.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let types_opt: Option<&[String]> = if types_vec.is_empty() {
+            None
+        } else {
+            Some(&types_vec)
+        };
+
+        // SAFE DEFAULTS + CLAMPS. The caps below are the trust boundary: they
+        // close the `usize as i64` -> `LIMIT -1` truncation an attacker could
+        // otherwise trigger with a huge/negative cap. depth default 1 (current
+        // behaviour) capped at 3; computed OFF by default (the Angular sidebar
+        // opts in with `computed=true`); max_computed hard-ceilinged at 100.
+        let depth = params
+            .get("depth")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(1)
+            .min(3);
+        let include_computed = params
+            .get("computed")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(false);
+        let min_shared_tags = params
+            .get("minSharedTags")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(1)
+            .max(1) as usize;
+        let max_computed = params
+            .get("maxComputed")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(25)
+            .min(100) as usize;
 
         Ok(response::from_result(
-            services
-                .relationship
-                .get_graph(content_id, relationship_types.as_deref()),
+            services.relationship.get_graph_query(
+                content_id,
+                depth,
+                include_computed,
+                min_shared_tags,
+                max_computed,
+                types_opt,
+            ),
         ))
     }
 

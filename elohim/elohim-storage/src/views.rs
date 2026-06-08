@@ -283,15 +283,13 @@ pub use elohim_views::shefa::*;
 // The NativeGraphResolver (graph_engine) produces ResolvedNeighborhood /
 // ResolvedEdge; the HTTP read shape is the ts-rs ContentGraphView /
 // ContentGraphNodeView (camelCase, carrying inferenceSource + depth). These
-// shims are the resolver→wire boundary. They are wired into
-// RelationshipService::get_graph by Task A8 (which also retires the legacy
-// plain-serde ContentGraph structs in relationship_service.rs).
+// shims are the resolver→wire boundary. They back RelationshipService::get_graph
+// / get_graph_with_depth / get_graph_query (the legacy plain-serde ContentGraph
+// structs they replaced are retired).
 // ContentGraphNodeView / ContentGraphView are already in scope via the
 // `pub use elohim_views::lamad::*;` glob re-export above.
 use crate::graph_engine::{ResolvedEdge, ResolvedNeighborhood};
 
-// dead_code-allowed: unused until Task A8 wires get_graph to the resolver.
-#[allow(dead_code)]
 impl From<&ResolvedEdge> for ContentGraphNodeView {
     fn from(e: &ResolvedEdge) -> Self {
         Self {
@@ -307,8 +305,6 @@ impl From<&ResolvedEdge> for ContentGraphNodeView {
     }
 }
 
-// dead_code-allowed: unused until Task A8 wires get_graph to the resolver.
-#[allow(dead_code)]
 impl From<ResolvedNeighborhood> for ContentGraphView {
     fn from(n: ResolvedNeighborhood) -> Self {
         let related: Vec<ContentGraphNodeView> = n.edges.iter().map(Into::into).collect();

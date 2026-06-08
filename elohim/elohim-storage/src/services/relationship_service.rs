@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::db::{content_diesel, context::AppContext, relationships_diesel, DbPool};
 use crate::error::StorageError;
+use crate::views::ContentGraphView;
 
 use super::events::{EventBus, StorageEvent};
 
@@ -15,12 +16,23 @@ pub struct RelationshipService {
     pool: DbPool,
     ctx: AppContext,
     events: Arc<EventBus>,
+    /// The content-graph seam. Diesel-backed today (`NativeGraphResolver`); a
+    /// future Cozo/datalog/embedding engine is just another `dyn` impl. Holding
+    /// it behind the trait keeps `get_graph*` transport-/engine-neutral.
+    resolver: Arc<dyn crate::graph_engine::ContentGraphResolver>,
 }
 
 impl RelationshipService {
     /// Create a new relationship service
     pub fn new(pool: DbPool, ctx: AppContext, events: Arc<EventBus>) -> Self {
-        Self { pool, ctx, events }
+        let resolver: Arc<dyn crate::graph_engine::ContentGraphResolver> =
+            Arc::new(crate::graph_engine::NativeGraphResolver::new(pool.clone()));
+        Self {
+            pool,
+            ctx,
+            events,
+            resolver,
+        }
     }
 
     /// Get a connection from the pool
@@ -67,60 +79,74 @@ impl RelationshipService {
         })
     }
 
-    /// Get content graph starting from a root node
+    /// Get content graph starting from a root node (direct neighbors only).
     ///
-    /// Note: The Diesel module doesn't have a graph traversal function.
-    /// This returns a flat list of relationships for the content node,
-    /// structured as a simple graph with depth=1.
+    /// Delegates to the `ContentGraphResolver` seam: a flat list of depth-1
+    /// explicit neighbors, projected to the provenance-honest `ContentGraphView`
+    /// (each node carries its own `inferenceSource` + `depth`). Computed/tag
+    /// discovery is OFF here — see `get_graph_query` for the richer entrypoint.
     pub fn get_graph(
         &self,
         content_id: &str,
         relationship_types: Option<&[String]>,
-    ) -> Result<ContentGraph, StorageError> {
-        let mut conn = self.conn()?;
-        let rels = relationships_diesel::get_outgoing_relationships(
-            &mut conn,
-            &self.ctx,
-            content_id,
+    ) -> Result<ContentGraphView, StorageError> {
+        let q = crate::graph_engine::GraphQuery {
+            root_id: content_id,
+            max_depth: 1,
             relationship_types,
-        )?;
-
-        let related: Vec<ContentGraphNode> = rels
-            .iter()
-            .map(|r| ContentGraphNode {
-                content_id: r.target_id.clone(),
-                relationship_type: r.relationship_type.clone(),
-                confidence: r.confidence as f64,
-                children: vec![],
-            })
-            .collect();
-
-        let total_nodes = related.len();
-        Ok(ContentGraph {
-            root_id: content_id.to_string(),
-            related,
-            total_nodes,
-        })
+            include_computed: false,
+            max_computed: 25,
+            min_shared_tags: 1,
+        };
+        Ok(self.resolver.resolve_neighborhood(&self.ctx, &q)?.into())
     }
 
-    /// Get graph with depth limiting (multi-level traversal)
+    /// Get graph with depth limiting (multi-level explicit traversal).
+    ///
+    /// Depth-bounded BFS over stored relationships (the resolver hard-caps depth
+    /// at 3 internally). Computed/tag discovery is OFF; use `get_graph_query` to
+    /// opt into it.
     pub fn get_graph_with_depth(
         &self,
         content_id: &str,
         max_depth: u32,
         relationship_types: Option<&[String]>,
-    ) -> Result<ContentGraph, StorageError> {
-        if max_depth == 0 {
-            return Ok(ContentGraph {
-                root_id: content_id.to_string(),
-                related: vec![],
-                total_nodes: 0,
-            });
-        }
+    ) -> Result<ContentGraphView, StorageError> {
+        let q = crate::graph_engine::GraphQuery {
+            root_id: content_id,
+            max_depth,
+            relationship_types,
+            include_computed: false,
+            max_computed: 25,
+            min_shared_tags: 1,
+        };
+        Ok(self.resolver.resolve_neighborhood(&self.ctx, &q)?.into())
+    }
 
-        // For now, just return depth=1 graph
-        // TODO: Implement recursive traversal with visited set to prevent cycles
-        self.get_graph(content_id, relationship_types)
+    /// Richer content-graph entrypoint: explicit BFS + optional tag-discovery.
+    ///
+    /// The HTTP route (`GET /db/relationships/graph/{id}`) delegates here. All
+    /// caps are the caller's responsibility to clamp BEFORE calling — the route
+    /// bounds `depth`, `max_computed`, and `min_shared_tags` so an attacker can
+    /// never pass a huge/negative cap into the SQL `LIMIT`.
+    pub fn get_graph_query(
+        &self,
+        content_id: &str,
+        depth: u32,
+        include_computed: bool,
+        min_shared_tags: usize,
+        max_computed: usize,
+        relationship_types: Option<&[String]>,
+    ) -> Result<ContentGraphView, StorageError> {
+        let q = crate::graph_engine::GraphQuery {
+            root_id: content_id,
+            max_depth: depth,
+            relationship_types,
+            include_computed,
+            max_computed,
+            min_shared_tags,
+        };
+        Ok(self.resolver.resolve_neighborhood(&self.ctx, &q)?.into())
     }
 
     // =========================================================================
@@ -363,26 +389,62 @@ impl RelationshipService {
     }
 }
 
-/// Content graph node for tree traversal
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct ContentGraphNode {
-    pub content_id: String,
-    pub relationship_type: String,
-    pub confidence: f64,
-    pub children: Vec<ContentGraphNode>,
-}
-
-/// Content graph output
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct ContentGraph {
-    pub root_id: String,
-    pub related: Vec<ContentGraphNode>,
-    pub total_nodes: usize,
-}
-
 /// Relationship statistics
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct RelationshipStats {
     pub total_count: u64,
     pub by_type: std::collections::HashMap<String, i64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::relationships_diesel::test_harness::{
+        insert_content_with_tags, insert_relationship, test_pool_ctx,
+    };
+
+    /// End-to-end composition through the service seam: `get_graph_query` must
+    /// fold BOTH provenance classes into one `ContentGraphView` —
+    /// - Z via an authored X→Z edge (`inferenceSource == "explicit"`), and
+    /// - Y via tag overlap with X, no authored edge (`inferenceSource == "tag"`).
+    /// This proves `RelationshipService` delegates to the resolver and returns
+    /// the promoted ts-rs view, not the retired plain-serde struct.
+    #[test]
+    fn get_graph_query_folds_explicit_and_tag_provenance() {
+        let (pool, ctx, _tmp) = test_pool_ctx();
+
+        {
+            let mut conn = pool.get().expect("conn");
+            // X shares tags with Y (no authored edge -> tag discovery).
+            insert_content_with_tags(&mut conn, &ctx, "X", &["grace", "sin"]);
+            insert_content_with_tags(&mut conn, &ctx, "Y", &["grace", "sin"]);
+            // X has an authored edge to Z (explicit).
+            insert_relationship(&mut conn, &ctx, "X", "Z", "RELATES_TO", "explicit");
+        }
+
+        let svc = RelationshipService::new(pool, ctx, Arc::new(EventBus::new()));
+        let graph = svc
+            .get_graph_query("X", 2, true, 1, 25, None)
+            .expect("resolve neighborhood");
+
+        assert_eq!(graph.root_id, "X");
+
+        let z = graph
+            .related
+            .iter()
+            .find(|n| n.content_id == "Z")
+            .expect("Z reached via explicit edge");
+        assert_eq!(z.inference_source, "explicit");
+
+        let y = graph
+            .related
+            .iter()
+            .find(|n| n.content_id == "Y")
+            .expect("Y discovered via tag overlap");
+        assert_eq!(y.inference_source, "tag");
+
+        // Flat read: total_nodes is the neighbour count, children stays empty.
+        assert_eq!(graph.total_nodes, graph.related.len());
+        assert!(graph.related.iter().all(|n| n.children.is_empty()));
+    }
 }
