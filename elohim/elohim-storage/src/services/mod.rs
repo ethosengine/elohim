@@ -37,6 +37,7 @@ pub mod device_capacity; // Phase 4 T7 — available bytes helper
 pub mod disposition_service;
 pub mod distribution;
 pub mod distribution_view;
+pub mod economic_event_emit_service; // Slice-2a T3 — bounds-validated conductor-path emit
 pub mod economic_event_service;
 pub mod elohim_gate;
 pub mod epr_compose;
