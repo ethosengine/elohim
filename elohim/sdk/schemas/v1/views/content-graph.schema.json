@@ -2,7 +2,7 @@
   "$id": "epr:schema:view:content-graph",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ContentGraph",
-  "description": "Content relationship graph rooted at a given content id. Source of truth: DHT link traversal (Derived via link, Category A2). Computed on read from relationship entries; not independently persisted.",
+  "description": "Content relationship graph rooted at a given content id. Source of truth: multi-provenance composite read. Explicit edges (inferenceSource=explicit) are Category A (DHT-notarized Relationship entries); computed edges (tag, semantic, system) are Category C (derived on read, not independently persisted); path edges are A2 (derived via link). The view itself is a read projection, never persisted.",
   "type": "object",
   "required": ["rootId", "related", "totalNodes"],
   "additionalProperties": false,
