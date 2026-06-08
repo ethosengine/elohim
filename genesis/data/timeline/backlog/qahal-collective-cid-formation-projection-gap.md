@@ -5,11 +5,13 @@ contentType: "backlog-item"
 contentFormat: "markdown"
 title: "household-formation E2E — collective_cid never stamped on family-dowell: CollectiveProjected signal path needs ceremony/peer-subscription verification"
 slug: "qahal-collective-cid-formation-projection-gap"
-written: "2026-06-07"
+written: "2026-06-08"
 author: "tackle-top-three investigation (wf_e3cc3753-f1a + follow-up agent)"
-status: "open"
+status: "backlog"
 priority: "high"
 jobs: [elohim-genesis]
+relatedNodeIds:
+  - "backlog-seed-provenance-anchor-gap"
 tags: [qahal, household-formation, collective-cid, reconcile-controller, dna-signal, e2e, app-scope]
 cites:
   - genesis/a2o/features/qahal/household-formation.feature
@@ -24,7 +26,27 @@ Two scenarios fail in `features/qahal/household-formation.feature`: "All three
 members are affirmed participants" and "The household collective is coherent —
 family-layer, CID-stamped". The 2026-06-07 investigation proved these do NOT
 trace to the jessica-alpha FK storm (fixed by the stub-materialize change in
-`do_account_import` — see `participation_without_parent_fk_fails_and_stub_materializes`).
+`do_account_import` `23b1ba135` — see
+`participation_without_parent_fk_fails_and_stub_materializes`).
+
+**SEPARATE from the provenance gate — do NOT merge.** This is the
+`CollectiveProjected` DNA-signal → reconcile-controller `collective_cid` stamp path
+(`controller.rs:760-783`/`816-837`), a distinct mechanism from `require_provenance`
+content reads. It is *why household-formation x2 persist despite* the FK fix
+`23b1ba135`. The `relatedNodeIds` link to `seed-provenance-anchor-gap` is a
+sibling-context pointer (both are alpha-stack/seed-coherence reds surfaced in the same
+#1104→#1106 sweep), **not** a sub-capture relationship.
+
+**HOUSEHOLD-PROVABLE — not BLOCKED-BY-ENV (corrected 2026-06-08).** An earlier note called
+this blocked-on-degraded-cluster; that was wrong. The feature is tagged
+`@requires:household-nodes` (`cluster-state.yaml`: `available: true`) and it RUNS — and fails.
+The whole signal path is **intra-household**: matthew's imagodei conductor → matthew's storage
+peer's subscription (`main.rs:1861,1898`), all on `household-nodes`. No shem, no 6-peer soak,
+no federation involved. The mesh is live (doorway-alpha /health, 2026-06-08: p2p peerCount 2,
+conductor 4/4, discoveryComplete). So this is a **real household-substrate bug to fix on the
+stable architecture**, not an env-block to hold — exactly the kind of deep-on-the-floor bug the
+household triad exists to surface. The verification questions in §"To verify" run against the
+healthy household now; they do not need shem.
 
 ## Mechanism (evidence-backed, medium confidence on the live trigger)
 
