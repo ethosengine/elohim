@@ -40,7 +40,7 @@ use async_trait::async_trait;
 
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
-use crate::services::commitment_fetcher::ProjectionCommitmentFetcher;
+use crate::services::commitment_fetcher::ConductorCommitmentFetcher;
 use crate::services::conductor_writes::{self, CreateMishpatCommitmentInput};
 use crate::services::economic_event_emit_service::{self, EmitEconomicEventInput};
 use crate::services::provide_reconcile::{
@@ -179,9 +179,24 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         // A PURE provide: no counterparty content-store commitment, so
         // `content_store_commitment_cid = None` → `fulfills == []` (no spurious
         // EventFulfillsCommitment link). `bounded_by` is the new Mishpat
-        // commitment CID. Production fetcher + rate history are projection/diesel
-        // backed (mirrors a real HTTP caller: api/epr.rs, api/diagnostics_bounds.rs).
-        let fetcher = ProjectionCommitmentFetcher::new(self.pool.clone());
+        // commitment CID (the `entry_hash` returned above — see
+        // `create_commitment_returning_cid`).
+        //
+        // CRITICAL: this emit's bounds check fetches the commitment we JUST
+        // authored. Its projection into `mishpat_commitments` lands
+        // ASYNCHRONOUSLY (post-commit signal → subscriber → upsert), so a
+        // `ProjectionCommitmentFetcher` (read-side, projection-backed) would race
+        // the signal and return `Ok(None)` → CommitmentNotFound → the emit fails
+        // and the whole author call rolls back, even though the commitment IS
+        // notarised. We therefore use the `ConductorCommitmentFetcher`, which
+        // reads the entry directly from the conductor via `get_commitment`
+        // (keyed by the `entry_hash` CID) — available the instant
+        // `create_commitment` returns. The projection-backed read path remains
+        // correct for third-party (read-path) bounds checks elsewhere; only this
+        // self-referential, just-authored case needs the conductor read.
+        let fetcher = ConductorCommitmentFetcher {
+            hc_client: self.hc.clone(),
+        };
         let rate = DieselRateHistory {
             pool: self.pool.clone(),
         };
