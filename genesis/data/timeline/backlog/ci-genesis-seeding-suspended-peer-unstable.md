@@ -58,12 +58,13 @@ directly in the seed/verify peer set, independent of the remote-only banner cont
 
 Net: adam is held from both stages → no 120s wait → those two UNSTABLEs disappear when shem is down.
 
-## Why NOT landed this shift
-The overnight shift was **push-blocked** (standing commit-only boundary). A multi-function Groovy/CPS
-Jenkinsfile change is **unvalidatable without a push** (Che has no Jenkins/Groovy runner), and a wrong
-edit would break the genesis pipeline on the next push — worse than the known UNSTABLE. Per the
-agentic rails (above-the-ceiling = can't-validate → document, don't blind-commit), the precise fix is
-captured here for the operator to apply + CI-validate.
+## Status: LANDED 2026-06-08 (operator authorized the push)
+Implemented in `genesis/Jenkinsfile`: `readJSON` CPS fix (line ~236) + `suspendedHumanIds()` helper +
+the authoritative suspension filter on the seed set in BOTH `runContentSeedStage` and
+`runVerifySeedingStage`. Brace-balanced (delta 0 vs HEAD); Groovy not locally runnable (Che) →
+**CI is the validator** (the genesis build confirms; push is authorized so iterate if it errors).
+`ci_status: in-progress` → confirm by disappearance of the "skipped unreachable: human-adam-firstman"
+UNSTABLE in the next genesis build's Seed Database + Verify Seeding stages.
 
 ## Scope note
 This removes only the 2 suspended-peer-skip UNSTABLEs. Genesis stays UNSTABLE from the DOMINANT cause

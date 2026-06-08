@@ -233,13 +233,33 @@ def remoteOnlyHumanRecords() {
     def path = 'genesis/orchestrator/data/deployments.json'
     if (!fileExists(path)) { return [] }
     try {
-        def data = new groovy.json.JsonSlurper().parseText(readFile(path))
+        // readJSON (not JsonSlurper) — JsonSlurper's LazyMap is CPS-non-serializable across
+        // Jenkins pipeline step boundaries, so it threw + returned [] every build (the silent
+        // "remoteOnlyHumanRecords() parse failed" warning). readJSON is the in-file CPS-safe pattern.
+        def data = readJSON(file: path)
         return (data.humans ?: []).findAll { h ->
             def nt = h.nodeTypes ?: []
             !h.suspended && nt && nt.every { it == 'remote' }
         }
     } catch (Exception e) {
         echo "WARN: remoteOnlyHumanRecords() parse failed: ${e.message}"
+        return []
+    }
+}
+
+/** humanIds marked `suspended` in deployments.json — the AUTHORITATIVE
+ * is-this-human-exercise-able flag (e.g. suspendedBy:scope-reconcile:shem). A
+ * suspended human is never a seed/verify target: holding it from the peer set
+ * stops the 120s storage-wait + the partial-cluster UNSTABLE that fires for a
+ * known-suspended peer (e.g. adam while shem is down). readJSON (CPS-safe). */
+def suspendedHumanIds() {
+    def path = 'genesis/orchestrator/data/deployments.json'
+    if (!fileExists(path)) { return [] }
+    try {
+        def data = readJSON(file: path)
+        return (data.humans ?: []).findAll { it.suspended }.collect { it.humanId }.findAll { it }.sort()
+    } catch (Exception e) {
+        echo "WARN: suspendedHumanIds() parse failed: ${e.message}"
         return []
     }
 }
@@ -318,8 +338,18 @@ def probeSubstrateScope() {
     ])
     archiveArtifacts(artifacts: 'substrate-status.json', allowEmptyArchive: true, fingerprint: true)
 
+    // Reduced-scope is no longer a build-result UNSTABLE (EPR-shift 2026-06-08, operator-blessed
+    // proposal): the cybernetic scope reconciler already moves shem-only personas to HELD
+    // (deployments.json `suspended` = scope-reconcile:shem), so a run that is green on the in-scope
+    // (household) plate is a legitimate SUCCESS — not a per-run failure. The reduced-scope fact stays
+    // fully visible via the loud banner above + the archived substrate-status.json (reducedScope:true)
+    // + the build description below; the build RESULT now reflects the in-scope work (the downstream
+    // seed/verify/a2o stages still mark UNSTABLE on their own real failures). This un-pins genesis from
+    // permanent-UNSTABLE-while-shem-is-down, which had masked real signal (shem-down vs a2o-broke).
     if (remoteComputeStatus == 'unavailable') {
-        unstable("Remote pool (shem) unavailable — running reduced scope; ${skipped.size()} remote-only personas auto-skipped")
+        currentBuild.description = ((currentBuild.description ?: '') +
+            " · reduced-scope (shem down; ${skipped.size()} remote-only held)").trim()
+        echo "ℹ️  Reduced scope (shem down) is NOT a build UNSTABLE — the scope reconciler holds the shem plate; the build result reflects the in-scope household work. (See substrate-status.json.)"
     }
 }
 
@@ -339,6 +369,17 @@ def probeSubstrateScope() {
  */
 def runContentSeedStage() {
     def humans = getHumanStorageUrls('alpha')
+    // Authoritative suspension gate: deployments.json `suspended` is the single source of truth for
+    // is-this-human-exercise-able. Drop suspended humans (e.g. adam, suspendedBy:scope-reconcile:shem)
+    // from the seed set entirely — the seeder must never wait 120s on / mark UNSTABLE for a known-
+    // suspended peer's dead storage. (Independent of the remote-only-shem banner reconciliation below,
+    // which intentionally names only the not-yet-suspended set — see remoteOnlyHumanRecords.)
+    def suspendedIds = suspendedHumanIds()
+    def heldSuspended = humans.findAll { suspendedIds.contains(it.humanId) }.collect { it.humanId }
+    if (!heldSuspended.isEmpty()) {
+        echo "⏸️  Holding suspended peer(s) from the seed set: ${heldSuspended.join(', ')} (deployments.json suspended — not exercise-able)."
+        humans = humans.findAll { !suspendedIds.contains(it.humanId) }
+    }
     def genesisPeers = humans.findAll { it.genesisPeer == true }
 
     // Substrate-aware genesis set: a remote-only genesis peer (e.g. adam, hard-pinned to shem) cannot
@@ -458,6 +499,11 @@ def runContentSeedStage() {
  */
 def runVerifySeedingStage() {
     def humans = getHumanStorageUrls('alpha')
+    // Authoritative suspension gate (mirror of runContentSeedStage): a suspended human is never a
+    // verify target — drop it so verification doesn't mark UNSTABLE for a known-suspended peer's
+    // unreachable storage (deployments.json `suspended` is the source of truth).
+    def suspendedIds = suspendedHumanIds()
+    humans = humans.findAll { !suspendedIds.contains(it.humanId) }
     def genesisPeers = humans.findAll { it.genesisPeer == true }
     if (genesisPeers.isEmpty()) {
         error("No genesis peer found in topology — at least one human in deployments.json must have genesisPeer:true (and must not be suspended).")
