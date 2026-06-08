@@ -4,9 +4,7 @@
 
 **Bringing your own context?** Let an AI read this repo, ask what *you* care about, then tell you why the Elohim Protocol might matter to you — and how you could get involved.
 
-[![Ask Claude about elohim](https://img.shields.io/badge/Ask_Claude_about_elohim-D97757?style=for-the-badge&logo=claude&logoColor=white)](https://claude.ai/new?q=Read%20https%3A%2F%2Fgithub.com%2Fethosengine%2Felohim.%20Before%20explaining%20anything%2C%20ask%20me%20who%20I%20am%20and%20what%20I%20care%20about.%20Then%20tell%20me%20why%20the%20Elohim%20Protocol%20might%20matter%20to%20me%20and%20how%20I%20could%20get%20involved%2C%20through%20that%20lens.)
-
-<sub>recommended</sub>
+[![Ask Claude about elohim](https://img.shields.io/badge/Ask_Claude_about_elohim-D97757?style=for-the-badge&logo=claude&logoColor=white)](https://claude.ai/new?q=Read%20https%3A%2F%2Fgithub.com%2Fethosengine%2Felohim.%20Before%20explaining%20anything%2C%20ask%20me%20who%20I%20am%20and%20what%20I%20care%20about.%20Then%20tell%20me%20why%20the%20Elohim%20Protocol%20might%20matter%20to%20me%20and%20how%20I%20could%20get%20involved%2C%20through%20that%20lens.) &nbsp;&nbsp;*recommended*
 
 [![Ask ChatGPT about elohim](https://img.shields.io/badge/Ask_ChatGPT_about_elohim-000000?logo=openai&logoColor=white)](https://chatgpt.com/?q=Read%20https%3A%2F%2Fgithub.com%2Fethosengine%2Felohim.%20Before%20explaining%20anything%2C%20ask%20me%20who%20I%20am%20and%20what%20I%20care%20about.%20Then%20tell%20me%20why%20the%20Elohim%20Protocol%20might%20matter%20to%20me%20and%20how%20I%20could%20get%20involved%2C%20through%20that%20lens.)
 
