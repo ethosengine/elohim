@@ -11,17 +11,22 @@
 //! This keeps mutual hosting free/in-kind within reach (not PirateBay) and
 //! lets ValueFlows hook into produced content with contributor attribution.
 //!
-//! # Binding strategy
+//! # Binding strategy — `fulfills` ≠ `bounded_by`
 //!
-//! [`CreateReaEconomicEventInput`] has **no `bounded_by` field**.  The
-//! commitment binding is two-pronged:
+//! [`CreateReaEconomicEventInput`] has **no `bounded_by` field**.  Two distinct
+//! bindings, driven by two distinct fields:
 //!
-//! 1. **Structural** — `fulfills: vec![commitment_cid]` causes the coordinator
-//!    zome to create `EventFulfillsCommitment` DHT links (content_store zome,
-//!    ~:12124).  This is the on-chain relationship the VF resolver uses.
-//! 2. **Annotation** — `metadata_json: Some(json!({"bounded_by": cid}))` is
-//!    the human-readable reference that diagnostics and downstream projections
-//!    can read without resolving DHT links.
+//! 1. **`fulfills` (structural)** — `fulfills: vec![content_store_commitment_cid]`
+//!    causes the coordinator zome to create `EventFulfillsCommitment` DHT links
+//!    (content_store zome, ~:12124).  This is a COUNTERPARTY relationship: a
+//!    content-store commitment the event settles, the on-chain link the VF
+//!    resolver uses.  A **pure provide** (ProvideAnnounce, no counterparty) sets
+//!    `content_store_commitment_cid = None` → `fulfills == []` (no link).
+//! 2. **`bounded_by` (annotation)** — `metadata_json: {"bounded_by": commitment_cid}`
+//!    always carries the Mishpat `commitment_cid` (the `replicates-commons` /
+//!    `delegates-compute` bounds the event is gated against).  This is present
+//!    for BOTH pure provides and counterparty exchanges — it is the bounds
+//!    reference, not a fulfilment, and is independent of `fulfills`.
 //!
 //! # CommitmentFetcher production status
 //!
@@ -64,6 +69,15 @@ pub struct EmitEconomicEventInput {
     pub has_point_in_time: String,
     /// CID of the `Mishpat::Commitment` that bounds this event.
     pub commitment_cid: String,
+    /// CID of the **content-store** commitment this event *fulfills*, if any.
+    ///
+    /// For a counterparty exchange this is `Some(cid)` and drives the structural
+    /// `fulfills` binding (the coordinator zome creates `EventFulfillsCommitment`
+    /// DHT links). For a **pure provide** (a ProvideAnnounce with no
+    /// counterparty) this is `None` → `fulfills == []` (no spurious link). The
+    /// `bounded_by` annotation always remains [`Self::commitment_cid`] (the
+    /// Mishpat commitment), independent of this field.
+    pub content_store_commitment_cid: Option<String>,
     /// EPR identifier targeted by this event.
     pub target_epr_id: String,
     /// Reach level claimed by the event (must be ≤ `bounds.reach_ceiling`).
@@ -106,12 +120,18 @@ pub fn build_event_input(
     input: &EmitEconomicEventInput,
 ) -> shefa_types::CreateReaEconomicEventInput {
     // `fulfills` carries the structural DHT binding: the coordinator zome
-    // creates EventFulfillsCommitment links from these commitment IDs.
-    let fulfills = vec![input.commitment_cid.clone()];
+    // creates EventFulfillsCommitment links from these commitment IDs. A pure
+    // provide has no counterparty content-store commitment, so fulfills is empty.
+    let fulfills = input
+        .content_store_commitment_cid
+        .clone()
+        .map(|c| vec![c])
+        .unwrap_or_default();
 
     // `metadata_json` carries the human-readable annotation so diagnostics
     // and projection consumers can resolve the bounded_by reference without
-    // traversing DHT links.
+    // traversing DHT links. bounded_by is ALWAYS the Mishpat commitment_cid,
+    // independent of fulfills (which is the content-store counterparty, if any).
     let metadata_json = Some(serde_json::json!({"bounded_by": input.commitment_cid}).to_string());
 
     shefa_types::CreateReaEconomicEventInput {
@@ -224,6 +244,7 @@ mod tests {
             receiver: "agent:receiver-y".into(),
             has_point_in_time: "2026-05-28T12:00:00Z".into(),
             commitment_cid: "commitment-cid-abc".into(),
+            content_store_commitment_cid: Some("commitment-cid-abc".into()),
             target_epr_id: "epr:lamad-spa".into(),
             reach: "commons".into(),
         }
@@ -320,5 +341,66 @@ mod tests {
         assert_eq!(built.provider, input.provider);
         assert_eq!(built.receiver, input.receiver);
         assert_eq!(built.has_point_in_time, input.has_point_in_time);
+    }
+
+    // -----------------------------------------------------------------------
+    // T7: pure provide — content_store_commitment_cid=None ⇒ fulfills==[]
+    //
+    // A ProvideAnnounce has NO counterparty commitment to fulfill, but is still
+    // bounded_by the replicates-commons Mishpat CID (metadata annotation). The
+    // builder must produce an EMPTY fulfills (no spurious EventFulfillsCommitment
+    // link) while keeping bounded_by = commitment_cid.
+    // -----------------------------------------------------------------------
+    #[test]
+    fn pure_provide_has_empty_fulfills_but_keeps_bounded_by() {
+        let mut input = sample_input();
+        input.content_store_commitment_cid = None; // pure provide — no counterparty
+
+        let built = build_event_input(&input);
+
+        // No counterparty commitment ⇒ no EventFulfillsCommitment link.
+        assert!(
+            built.fulfills.is_empty(),
+            "pure provide must have empty fulfills, got {:?}",
+            built.fulfills
+        );
+
+        // bounded_by annotation still carries the Mishpat commitment CID.
+        let meta_json = built.metadata_json.expect("metadata_json must be set");
+        let meta: serde_json::Value =
+            serde_json::from_str(&meta_json).expect("metadata_json must be valid JSON");
+        assert_eq!(
+            meta.get("bounded_by").and_then(|v| v.as_str()),
+            Some("commitment-cid-abc"),
+            "bounded_by must remain the Mishpat commitment_cid even for a pure provide"
+        );
+
+        // The built input must still be a structurally valid CreateReaEconomicEventInput
+        // (scalar fields pass through unchanged).
+        assert_eq!(built.id, input.id);
+        assert_eq!(built.action, input.action);
+        assert_eq!(built.provider, input.provider);
+    }
+
+    #[test]
+    fn fulfilling_provide_carries_content_store_cid_in_fulfills() {
+        let mut input = sample_input();
+        input.content_store_commitment_cid = Some("content-store-cid-xyz".to_string());
+
+        let built = build_event_input(&input);
+
+        // A fulfilling event puts the content-store commitment in fulfills…
+        assert_eq!(
+            built.fulfills,
+            vec!["content-store-cid-xyz".to_string()],
+            "fulfills must carry the content_store_commitment_cid when present"
+        );
+        // …while bounded_by stays the Mishpat commitment_cid.
+        let meta_json = built.metadata_json.expect("metadata_json must be set");
+        let meta: serde_json::Value = serde_json::from_str(&meta_json).unwrap();
+        assert_eq!(
+            meta.get("bounded_by").and_then(|v| v.as_str()),
+            Some("commitment-cid-abc")
+        );
     }
 }
