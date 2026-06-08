@@ -17,7 +17,7 @@ cites:
   - genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
   - doorway-stewardship-chain-design | grant/snapshot precedent: Commitment+Attestation chain, JWT fast-path, supersession — the visitor-reach and grant mechanics template | sha256:f90729e7a9887de8 | path: genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
-  - records-lifecycle-design | link lifecycle precedent: intentionally-degraded vs maintained, closure rejection, redaction markers — the alias retirement lens | sha256:3ebe9ccf2611bc02 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
+  - records-lifecycle-design | link lifecycle precedent: intentionally-degraded vs maintained, closure rejection, redaction markers — the alias retirement lens | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
   - genesis/docs/architecture/rea-compute-commitment-primitive.md
   - genesis/docs/architecture/stewardship-over-sovereignty.md
   - genesis/docs/architecture/pillar-bundle-split-runbook.md
@@ -602,4 +602,3 @@ manifest, the pull queue is the controller, `ContentToSync` gate hints and paren
 feed it. Completing a pull at reach=commons naturally flips the node to *providing* (rung 4 —
 the REA provide commitment), closing the read→host loop the protocol's economics expect.
 One brainstorm seed covers the family: affordance ladder + pull queue + multipeer striping.
-

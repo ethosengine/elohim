@@ -12,10 +12,10 @@ refines:
   - genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md
 cites:
   - experience-story-epr-design | defines EPR = EntityPortalReference (the content-addressed Resource this spec resolves) + contentFormat on ContentNode (the focal-render dispatch key) | sha256:b1dc5838ffab2e5d | path: genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md
-  - records-lifecycle-design | the typed-relation vocabulary + lifecycle this spec walks as the lens-edges; the graph substrate the resolver traverses | sha256:3ebe9ccf2611bc02 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
+  - records-lifecycle-design | the typed-relation vocabulary + lifecycle this spec walks as the lens-edges; the graph substrate the resolver traverses | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
   - pillar-epr-decomposition-design | §12.1 is the single-leg 302 behavior this spec corrects; §12.6 the universal /epr address being made lens-complete | sha256:8029079cea758380 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
   - epr-route-claims-link-conformance-design | the claims-302 (Model A) this spec demotes to a leg-preserving context lens; §5.1 classifier is the compose target for resolver dispatch | sha256:30b7cd1baf222922 | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md
-  - epr-acquisition-pull-queue-design | §5.1 ClusterClosure is the bounded typed-relation closure-walk the resolver reuses; the dual-pin offline floor the focal render must satisfy | sha256:fc4a0cdd9828a377 | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
+  - epr-acquisition-pull-queue-design | §5.1 ClusterClosure is the bounded typed-relation closure-walk the resolver reuses; the dual-pin offline floor the focal render must satisfy | sha256:fc4a0cdd9828a377 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
   - genesis/data/timeline/backlog/epr-routing-complementary-captures.md
   - .claude/skills/epr-content-addressing/SKILL.md
 ---

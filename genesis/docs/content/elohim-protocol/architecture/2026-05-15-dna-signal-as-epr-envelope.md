@@ -25,7 +25,7 @@ informs:
 T18 introduces a new `DnaSignal::KeyRevocation(KeyRevocationEnvelope)` emitted
 alongside the existing `RecoveryV2Signal::KeyRevocationEffective` at every
 producer site in the imagodei coordinator zome. The new signal frames the
-wire message as an EPR (Elohim Provenance Record): the authoring elohim's
+wire message as an EPR (Elohim Protocol Record): the authoring elohim's
 attestation over a content-addressed (CID) subject, signed at emit time with
 the calling agent's lair-managed ed25519 key.
 

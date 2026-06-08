@@ -201,6 +201,8 @@ Throughout Part A and Part B, we use **Event** and **Resource** semantically (th
 
 ## A.1 EPR (Elohim Protocol Record)
 
+> **Naming.** "Record" is the at-rest, notarized half of the term; the link primitive itself is the **Elohim Protocol *Reference*** (href's accountable cousin). Both expansions are canonical, kept on purpose — see the protocol specification, Part II ("On the name — two answers, on purpose"). Reference → Record is the same atom at compose-time and at rest.
+
 ### 1. What it is
 
 An EPR is the substrate's **vessel** — a notarized record on the DHT that holds *state* and *identity*. Implemented as a `Content` entry with a `content_type` discriminator (`content_type: "household"`, `"video"`, `"account"`, `"site"`, etc.). Per the substrate's "no new DHT entry types" commitment, every new EPR-shape is a new manifest-declared `content_type` value, not a new entry type. EPRs accumulate Events and Resources under their custody (via `parent_epr_cid` from Gap 1/2), participate in reach-coupling (visibility scoping), and traverse lifecycle transitions (active → subordinate-of-parent → shelved → closed).
