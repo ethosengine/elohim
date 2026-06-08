@@ -50,7 +50,7 @@
 .content-viewer-container.focused-view-active .viewer-tabs,
 .content-viewer-container.focused-view-active .affinity-panel,
 .content-viewer-container.focused-view-active .paths-section,
-.content-viewer-container.focused-view-active .related-section,
+.content-viewer-container.focused-view-active app-exploration-sidebar,
 .content-viewer-container.focused-view-active .feedback-section {
   display: none !important;
 }
@@ -526,6 +526,37 @@
 /* Tab Content */
 .tab-content {
   min-height: 300px;
+}
+
+/* Content tab layout: main content stream + pinned exploration rail.
+   The rail (app-exploration-sidebar[collapsible=false] → .pinned) needs a flex
+   row with the content as flex:1 and the rail flex-shrink:0 so its 100%-height
+   / fixed-width resolve. */
+.content-tab-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.content-tab-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The pinned exploration rail sits beside the content stream. The sidebar's
+   :host uses display:contents, so the width/height live on its inner .pinned
+   panel; this keeps the rail from stretching and gives the panel a height to
+   resolve against. */
+.content-tab-layout app-exploration-sidebar {
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+/* Collapse to a single column on narrow viewports — the rail drops below. */
+@media (max-width: 900px) {
+  .content-tab-layout {
+    flex-direction: column;
+  }
 }
 
 .trust-tab-placeholder,

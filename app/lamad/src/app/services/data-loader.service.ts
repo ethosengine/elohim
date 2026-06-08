@@ -233,6 +233,15 @@ export class DataLoaderService {
   private attestationCache$: Observable<ContentAttestation[]> | null = null;
   private readonly attestationsByContentCache = new Map<string, ContentAttestation[]>();
   private graphCache$: Observable<ContentGraph> | null = null;
+  /**
+   * Per-root graph cache for node-rooted neighborhood queries (mini-graph).
+   * The parameterless whole-graph cache above is reserved for the default
+   * (manifesto) root; node-rooted graphs are cached here keyed by root id so a
+   * `/epr/{id}` mini-graph slices the CURRENT node's neighborhood, not always
+   * manifesto's.
+   */
+  private readonly rootedGraphCache = new Map<string, Observable<ContentGraph>>();
+  private readonly ROOTED_GRAPH_CACHE_MAX_SIZE = 32;
   private pathIndexCache$: Observable<PathIndex> | null = null;
 
   // NOTE: LRU cache logic removed - ContentService handles caching
@@ -858,6 +867,7 @@ export class DataLoaderService {
     this.attestationCache$ = null;
     this.attestationsByContentCache.clear();
     this.graphCache$ = null;
+    this.rootedGraphCache.clear();
     this.relationshipByNodeCache.clear();
     this.resolvedRelationshipByNodeCache.clear();
     this.pathIndexCache$ = null;
@@ -1348,6 +1358,9 @@ export class DataLoaderService {
   private readonly relationshipByNodeCache = new Map<string, Observable<ContentRelationship[]>>();
   private readonly RELATIONSHIP_CACHE_MAX_SIZE = 100;
 
+  /** Default whole-graph traversal seed (broad knowledge-graph entry point). */
+  private readonly DEFAULT_GRAPH_ROOT = 'manifesto';
+
   /**
    * Load the full content graph for exploration.
    *
@@ -1356,21 +1369,41 @@ export class DataLoaderService {
    *
    * Note: Prefer getRelationshipsForNode() for single-node queries to avoid
    * loading the entire graph.
+   *
+   * @param rootId Optional traversal root. When omitted the graph is seeded at
+   *   the default ('manifesto') root and served from the shared whole-graph
+   *   cache (exploration surfaces). When provided (mini-graph neighborhood via
+   *   RelatedConceptsService), the graph is rooted at that node so its
+   *   neighborhood is the CURRENT node's, not always manifesto's.
    */
-  getGraph(): Observable<ContentGraph> {
-    if (!this.graphCache$) {
-      if (true) {
-        // Content graph served from projection tier
-        // Build graph from Holochain relationships
-        this.graphCache$ = this.buildGraphFromHolochain().pipe(
+  getGraph(rootId?: string): Observable<ContentGraph> {
+    if (rootId && rootId !== this.DEFAULT_GRAPH_ROOT) {
+      let cached = this.rootedGraphCache.get(rootId);
+      if (!cached) {
+        if (this.rootedGraphCache.size >= this.ROOTED_GRAPH_CACHE_MAX_SIZE) {
+          const firstKey = this.rootedGraphCache.keys().next().value;
+          if (firstKey) {
+            this.rootedGraphCache.delete(firstKey);
+          }
+        }
+        cached = this.buildGraphFromHolochain(rootId).pipe(
           shareReplay(1),
-          catchError(_err => {
-            return of(this.createEmptyGraph());
-          })
+          catchError(_err => of(this.createEmptyGraph()))
         );
-      } else {
-        this.graphCache$ = of(this.createEmptyGraph());
+        this.rootedGraphCache.set(rootId, cached);
       }
+      return cached;
+    }
+
+    if (!this.graphCache$) {
+      // Content graph served from projection tier — build from Holochain
+      // relationships, seeded at the default root.
+      this.graphCache$ = this.buildGraphFromHolochain().pipe(
+        shareReplay(1),
+        catchError(_err => {
+          return of(this.createEmptyGraph());
+        })
+      );
     }
     return this.graphCache$;
   }
@@ -1643,9 +1676,9 @@ export class DataLoaderService {
   /**
    * Build ContentGraph from content service.
    */
-  private buildGraphFromHolochain(): Observable<ContentGraph> {
-    // Get content graph starting from manifesto root
-    return this.contentService.getContentGraph('manifesto').pipe(
+  private buildGraphFromHolochain(rootId: string = this.DEFAULT_GRAPH_ROOT): Observable<ContentGraph> {
+    // Get content graph starting from the requested root (default: manifesto).
+    return this.contentService.getContentGraph(rootId).pipe(
       map(graph => {
         if (!graph) {
           return this.createEmptyGraph();

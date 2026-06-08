@@ -17,9 +17,9 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 // @coverage: 90.5% (2026-03-03)
 
-import { catchError, switchMap, takeUntil } from 'rxjs/operators';
+import { switchMap, takeUntil } from 'rxjs/operators';
 
-import { BehaviorSubject, Observable, Subject, Subscription, firstValueFrom, forkJoin, of } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, Subscription, firstValueFrom, of } from 'rxjs';
 
 import 'elohim-core/register';
 
@@ -95,8 +95,8 @@ import {
 } from '../../services/resilience.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
+import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
-import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 // EPR relationships panel lives in the elohim pillar (cross-pillar composition-
 // root import, sanctioned by lamad/tsconfig.json @app/elohim alias). It renders
 // the EPR Head's typed relationships as grouped, navigable cards.
@@ -114,7 +114,7 @@ import type { ContentStewardshipView } from '@elohim/storage-client/generated';
     CommonModule,
     RouterModule,
     ContentDownloadComponent,
-    MiniGraphComponent,
+    ExplorationSidebarComponent,
     FocusedViewToggleComponent,
     ResilienceSnapshotComponent,
     DistributionBadgeComponent,
@@ -129,7 +129,6 @@ export class ContentViewerComponent
 {
   node: ContentNode | null = null;
   affinity = 0;
-  relatedNodes: ContentNode[] = [];
   isLoading = true;
   error: string | null = null;
 
@@ -510,8 +509,10 @@ export class ContentViewerComponent
           // Mark content as "seen" for mastery tracking
           this.agentService.markContentSeen(nodeId).pipe(takeUntil(this.destroy$)).subscribe();
 
-          // Load related nodes
-          this.loadRelatedNodes(contentNode.relatedNodeIds);
+          // Related content is now surfaced by the shared
+          // <app-exploration-sidebar> (concept graph + discovered edges),
+          // which fetches its own neighborhood from node.id — no inline
+          // related-nodes load here.
 
           // Load EPR relationships (protocol-level relationships from EPR Head)
           this.loadEprRelationships(contentNode.id);
@@ -985,32 +986,6 @@ export class ContentViewerComponent
   }
 
   /**
-   * Load related content nodes
-   */
-  private loadRelatedNodes(relatedIds: string[]): void {
-    if (!relatedIds || relatedIds.length === 0) {
-      this.relatedNodes = [];
-      return;
-    }
-
-    // Load related nodes in parallel (limit to 5)
-    const loadObservables = relatedIds
-      .slice(0, 5)
-      .map(id => this.dataLoader.getContent(id).pipe(catchError(() => of(null))));
-
-    forkJoin(loadObservables)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: nodes => {
-          this.relatedNodes = nodes.filter((n): n is ContentNode => n !== null);
-        },
-        error: () => {
-          this.relatedNodes = [];
-        },
-      });
-  }
-
-  /**
    * Load EPR relationships from the EPR Head for this content.
    */
   private loadEprRelationships(contentId: string): void {
@@ -1281,6 +1256,15 @@ export class ContentViewerComponent
 
     // Navigate to the selected content (cross-bundle: shell resource viewer).
     this.eprNav.navigate(`/epr/${encodeURIComponent(nodeId)}`); // route-literal-ok: sanctioned EprNavService universal /epr/{id} nav (cross-bundle resource viewer), not a raw literal mint
+  }
+
+  /**
+   * A neighboring content was chosen from the shared exploration sidebar
+   * (mini-graph node click OR related-concepts navigate). Same semantics as a
+   * mini-graph selection — reuse the detour-aware navigation.
+   */
+  onSidebarExplore(contentId: string): void {
+    this.onGraphNodeSelected(contentId);
   }
 
   /**

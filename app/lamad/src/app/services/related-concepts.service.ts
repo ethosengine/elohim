@@ -510,7 +510,9 @@ export class RelatedConceptsService {
       return of(cached);
     }
 
-    return this.getGraph().pipe(
+    // Root the underlying graph at the focus node so the mini-graph slices the
+    // CURRENT node's neighborhood (not always the default/manifesto root's).
+    return this.getGraph(contentId).pipe(
       map(graph => {
         const result = this.buildNeighborhoodGraph(
           graph,
@@ -565,9 +567,18 @@ export class RelatedConceptsService {
 
   /**
    * Get cached graph observable.
-   * Builds relationship index on first load for O(1) lookups.
+   *
+   * The parameterless whole-graph path builds a relationship index on first
+   * load for O(1) lookups (shared across the type/has-related queries). The
+   * node-rooted path (mini-graph neighborhood) returns a graph seeded at
+   * `rootId` and does NOT touch the shared index — its slicing falls back to a
+   * per-graph linear lookup, so a `/epr/{id}` neighborhood reflects the current
+   * node, not the default root.
    */
-  private getGraph(): Observable<ContentGraph> {
+  private getGraph(rootId?: string): Observable<ContentGraph> {
+    if (rootId) {
+      return this.dataLoader.getGraph(rootId).pipe(take(1));
+    }
     this.graph$ ??= this.dataLoader.getGraph().pipe(
       take(1),
       tap(graph => this.buildRelationshipIndex(graph)),

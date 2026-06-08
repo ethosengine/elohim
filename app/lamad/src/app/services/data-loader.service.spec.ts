@@ -431,6 +431,47 @@ describe('DataLoaderService', () => {
     });
   });
 
+  // The mini-graph neighborhood (RelatedConceptsService.getNeighborhood) roots
+  // the underlying graph at the CURRENT node so a /epr/{id} view shows that
+  // node's neighborhood, not always the default (manifesto) root's. getGraph()
+  // forwards its root to the resolver graph endpoint.
+  describe('getGraph (root forwarding)', () => {
+    beforeEach(() => {
+      mockContentService.getContentGraph.mockReturnValue(
+        of({ rootId: 'x', related: [], totalNodes: 0 })
+      );
+    });
+
+    it('requests the graph rooted at the passed content id', async () => {
+      await new Promise<void>(resolve => {
+        service.getGraph('confession').subscribe(() => {
+          expect(mockContentService.getContentGraph).toHaveBeenCalledWith('confession');
+          resolve();
+        });
+      });
+    });
+
+    it('defaults to the manifesto root when no id is passed', async () => {
+      await new Promise<void>(resolve => {
+        service.getGraph().subscribe(() => {
+          expect(mockContentService.getContentGraph).toHaveBeenCalledWith('manifesto');
+          resolve();
+        });
+      });
+    });
+
+    it('caches per-root so distinct nodes do not collide', async () => {
+      await new Promise<void>(resolve => {
+        service.getGraph('confession').subscribe(() => resolve());
+      });
+      await new Promise<void>(resolve => {
+        service.getGraph('manifesto').subscribe(() => resolve());
+      });
+      expect(mockContentService.getContentGraph).toHaveBeenCalledWith('confession');
+      expect(mockContentService.getContentGraph).toHaveBeenCalledWith('manifesto');
+    });
+  });
+
   // B2b (post-fix): getResolvedRelationshipsForNode is a DISJOINT MERGE of two
   // sources — the LIST endpoint (getRelationships, 'both') for authored
   // explicit/structural edges in BOTH directions, AND the resolver graph

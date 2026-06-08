@@ -256,7 +256,9 @@
       </div>
 
       <!-- Content Tab -->
-      <section *ngSwitchCase="'content'">
+      <section *ngSwitchCase="'content'" class="content-tab-layout">
+        <!-- Main content stream (flex:1; the pinned exploration rail sits beside it) -->
+        <div class="content-tab-main">
         <!-- Main content -->
         <div class="content-body">
           <!-- Dynamic renderer host - renders content via registered renderers -->
@@ -397,27 +399,6 @@
           </div>
         </div>
 
-        <!-- Related content -->
-        <div *ngIf="relatedNodes.length > 0" class="related-section">
-          <h2>🔗 Related Content</h2>
-          <div class="related-grid">
-            <button
-              *ngFor="let relatedNode of relatedNodes"
-              class="related-card"
-              (click)="viewRelatedContent(relatedNode)"
-              (keydown.enter)="viewRelatedContent(relatedNode)"
-              type="button"
-            >
-              <div class="related-header">
-                <span class="related-type">{{ relatedNode.contentType }}</span>
-                <span class="related-affinity">{{ getRelatedNodeAffinity(relatedNode.id) }}%</span>
-              </div>
-              <h3 class="related-title">{{ relatedNode.title }}</h3>
-              <p class="related-description">{{ relatedNode.description }}</p>
-            </button>
-          </div>
-        </div>
-
         <!-- EPR Relationships (protocol-level content relationships) -->
         <!--
           Real Angular component from the elohim pillar (app-epr-relationships-panel).
@@ -436,6 +417,21 @@
             [relationships]="eprRelationships"
           ></app-epr-relationships-panel>
         </div>
+        </div>
+
+        <!--
+          Shared exploration sidebar (mini-graph + related concepts + explore).
+          The PRIMARY relation surface for the standalone viewer: a pinned rail
+          (collapsible=false) beside the content stream. Its related-concepts
+          panel routes through the resolver with computed=true, so explicit
+          (authored) + discovered (tag) edges populate automatically.
+        -->
+        <app-exploration-sidebar
+          [contentId]="node.id"
+          [collapsible]="false"
+          (exploreContent)="onSidebarExplore($event)"
+          (exploreInGraph)="exploreInGraph()"
+        ></app-exploration-sidebar>
       </section>
 
       <!-- Trust/Attestations Tab -->
@@ -799,34 +795,12 @@
           data-testid="viewer-content-analytics"
         ></elohim-content-analytics>
 
-        <div class="network-header">
-          <h3>Content Neighborhood</h3>
-          <p>Explore related concepts in the knowledge graph</p>
-        </div>
-
-        <div class="mini-graph-container">
-          <app-mini-graph
-            *ngIf="node"
-            [focusNodeId]="node.id"
-            [depth]="1"
-            [maxNodes]="20"
-            [height]="350"
-            (nodeSelected)="onGraphNodeSelected($event)"
-            (exploreRequested)="exploreInGraph()"
-          ></app-mini-graph>
-        </div>
-
-        <div class="network-actions">
-          <button
-            type="button"
-            class="btn-explore-graph"
-            (click)="exploreInGraph()"
-            data-testid="viewer-explore-graph"
-          >
-            <span class="icon">🔭</span>
-            Explore in Full Graph
-          </button>
-        </div>
+        <!--
+          The content neighborhood (mini-graph) + "Explore in Full Graph" moved
+          to the shared <app-exploration-sidebar> on the Content tab, which now
+          owns the concept-graph + discovery surface. The Network tab keeps the
+          resilience/shard map + attention analytics.
+        -->
       </section>
     </div>
   </div>

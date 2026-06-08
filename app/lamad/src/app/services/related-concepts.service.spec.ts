@@ -581,11 +581,17 @@ describe('RelatedConceptsService', () => {
         });
       }));
 
-    it('should show hasGraph=true after neighborhood query', () =>
+    // A neighborhood query now roots the underlying graph at the focus node
+    // (so /epr/{id} shows the CURRENT node's neighborhood), which deliberately
+    // does NOT warm the shared whole-graph singleton — it caches the sliced
+    // neighborhood instead. hasGraph therefore stays false; neighborhoodCacheSize
+    // is the invariant that grows.
+    it('caches the neighborhood (without warming the shared whole-graph) after a neighborhood query', () =>
       new Promise<void>(done => {
         service.getNeighborhood('concept-1').subscribe(() => {
           const stats = service.getCacheStats();
-          expect(stats.hasGraph).toBe(true);
+          expect(stats.neighborhoodCacheSize).toBeGreaterThan(0);
+          expect(stats.hasGraph).toBe(false);
           done();
         });
       }));

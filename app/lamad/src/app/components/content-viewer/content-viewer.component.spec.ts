@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { ContentViewerComponent } from './content-viewer.component';
+import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
@@ -27,6 +29,27 @@ import { LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { vi, Mock } from 'vitest';
 import { AttentionTrackerService, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
 import { GovernanceApiService } from '@elohim/service';
+
+// Mock the shared exploration sidebar. The standalone content-viewer delegates
+// its primary relation surface (mini-graph + related concepts + explore button)
+// to this component now. The real sidebar pulls RelatedConceptsService ->
+// DataLoaderService -> ElohimClient when rendered, so it is swapped for a mock
+// here (mirroring lesson-view's B4 override); the content-viewer spec only
+// verifies the sidebar is rendered and wired. The sidebar's internal
+// composition is covered by exploration-sidebar.component.spec.ts.
+@Component({ selector: 'app-exploration-sidebar', standalone: true, template: '' })
+class MockExplorationSidebarComponent {
+  @Input() contentId!: string;
+  @Input() collapsible = true;
+  @Input() open = false;
+  @Output() openChange = new EventEmitter<boolean>();
+  @Input() compact = true;
+  @Input() relatedLimit = 4;
+  @Input() graphDepth = 1;
+  @Input() graphHeight = 180;
+  @Output() exploreContent = new EventEmitter<string>();
+  @Output() exploreInGraph = new EventEmitter<void>();
+}
 
 describe('ContentViewerComponent', () => {
   let component: ContentViewerComponent;
@@ -269,7 +292,15 @@ describe('ContentViewerComponent', () => {
           useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
         },
       ],
-    }).compileComponents();
+    })
+      // Swap the real exploration sidebar for a mock (shallow render). The real
+      // sidebar's data-fetching chain (RelatedConceptsService -> DataLoaderService
+      // -> ElohimClient) is out of scope here; its composition has its own spec.
+      .overrideComponent(ContentViewerComponent, {
+        remove: { imports: [ExplorationSidebarComponent] },
+        add: { imports: [MockExplorationSidebarComponent] },
+      })
+      .compileComponents();
 
     affinityServiceSpy = TestBed.inject(LAMAD_AFFINITY_TRACKING);
     agentServiceSpy = TestBed.inject(LAMAD_AGENT);
@@ -312,17 +343,70 @@ describe('ContentViewerComponent', () => {
       expect(affinityServiceSpy.trackView).toHaveBeenCalledWith('test-content-1');
     }));
 
-    it('should load related nodes', fakeAsync(() => {
-      dataLoaderSpy.getContent.mockImplementation((id: string) => {
-        if (id === 'test-content-1') return of(mockContentNode);
-        if (id === 'related-1') return of(mockRelatedNode);
-        return of(null as any);
-      });
-
+    it('renders the shared exploration sidebar as a pinned rail rooted at the node id', fakeAsync(() => {
       fixture.detectChanges();
       tick();
+      fixture.detectChanges();
 
-      expect(component.relatedNodes.length).toBe(1);
+      const sidebar = fixture.debugElement.query(
+        el => el.name === 'app-exploration-sidebar',
+      );
+      expect(sidebar).toBeTruthy();
+      const sidebarInstance = sidebar.componentInstance as MockExplorationSidebarComponent;
+      expect(sidebarInstance.contentId).toBe('test-content-1');
+      expect(sidebarInstance.collapsible).toBe(false);
+    }));
+
+    it('re-emits sidebar exploreContent through the detour-aware navigation', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const sidebar = fixture.debugElement.query(
+        el => el.name === 'app-exploration-sidebar',
+      );
+      const sidebarInstance = sidebar.componentInstance as MockExplorationSidebarComponent;
+
+      sidebarInstance.exploreContent.emit('neighbor-1');
+      expect(eprNavSpy.navigate).toHaveBeenCalledWith('/epr/neighbor-1');
+    }));
+
+    it('wires sidebar exploreInGraph to the graph explorer', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const sidebar = fixture.debugElement.query(
+        el => el.name === 'app-exploration-sidebar',
+      );
+      const sidebarInstance = sidebar.componentInstance as MockExplorationSidebarComponent;
+
+      sidebarInstance.exploreInGraph.emit();
+      expect(routerSpy.navigate).toHaveBeenCalledWith(
+        ['/explore'],
+        expect.objectContaining({
+          queryParams: expect.objectContaining({ focus: 'test-content-1' }),
+        }),
+      );
+    }));
+
+    it('does NOT render the retired inline related-content grid', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const grid = fixture.nativeElement.querySelector('.related-section');
+      expect(grid).toBeFalsy();
+    }));
+
+    it('does NOT render a duplicate mini-graph in the Network tab', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      component.setActiveTab('network');
+      fixture.detectChanges();
+
+      const miniGraph = fixture.nativeElement.querySelector('app-mini-graph');
+      expect(miniGraph).toBeFalsy();
     }));
 
     it('should handle content load error', fakeAsync(() => {
@@ -872,18 +956,6 @@ describe('ContentViewerComponent', () => {
   });
 
   describe('loading states and errors', () => {
-    it('should handle related nodes load error', fakeAsync(() => {
-      dataLoaderSpy.getContent.mockImplementation((id: string) => {
-        if (id === 'test-content-1') return of(mockContentNode);
-        return throwError(() => new Error('Failed'));
-      });
-
-      fixture.detectChanges();
-      tick();
-
-      expect(component.relatedNodes).toEqual([]);
-    }));
-
     it('should handle containing paths load error', fakeAsync(() => {
       contentServiceSpy.getContainingPathsSummary.mockReturnValue(
         throwError(() => new Error('Failed'))
@@ -921,44 +993,6 @@ describe('ContentViewerComponent', () => {
     }));
   });
 
-  describe('empty related nodes', () => {
-    it('should handle content with no related nodes', fakeAsync(() => {
-      const nodeWithoutRelated = { ...mockContentNode, relatedNodeIds: [] };
-      dataLoaderSpy.getContent.mockReturnValue(of(nodeWithoutRelated));
-
-      fixture.detectChanges();
-      tick();
-
-      expect(component.relatedNodes).toEqual([]);
-    }));
-
-    it('should handle content with null related node IDs', fakeAsync(() => {
-      const nodeWithNullRelated = { ...mockContentNode, relatedNodeIds: null as any };
-      dataLoaderSpy.getContent.mockReturnValue(of(nodeWithNullRelated));
-
-      fixture.detectChanges();
-      tick();
-
-      expect(component.relatedNodes).toEqual([]);
-    }));
-
-    it('should limit related nodes to 5', fakeAsync(() => {
-      const nodeWithManyRelated = {
-        ...mockContentNode,
-        relatedNodeIds: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7'],
-      };
-      dataLoaderSpy.getContent.mockImplementation((id: string) => {
-        if (id === 'test-content-1') return of(nodeWithManyRelated);
-        return of(mockRelatedNode);
-      });
-
-      fixture.detectChanges();
-      tick();
-
-      // Should call getContent for max 5 related nodes + 1 for main content
-      expect(dataLoaderSpy.getContent).toHaveBeenCalledTimes(6);
-    }));
-  });
 
   describe('Content Flags', () => {
     it('should return empty array when node has no flags', () => {
