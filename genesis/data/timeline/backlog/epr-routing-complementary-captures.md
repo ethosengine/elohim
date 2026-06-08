@@ -56,3 +56,8 @@ Doorway) unless noted. One line each:
 ## EPR Slice-1 implementation captures (2026-06-08, open-in-pillar affordance)
 
 - **Open-in-pillar is lamad-claims-only; a cross-pillar claims registry would generalize it** — the `ContentViewerComponent` "Open in {pillar}" affordance mints its cross-bundle deep-dive HREF from `LAMAD_ROUTE_CLAIMS` (the lamad bundle's own granted claim templates), so it only fires for lamad-claimed types (today: `path`). A shell-held global claims registry (every pillar's granted templates, keyed by contentType) would let any viewer offer the right pillar's deep-dive for any claimed type; the bundle shell doesn't hold that registry today. Surfaced by Slice-1 task.
+
+## EPR Slice-1 review follow-ups (2026-06-08, lens-complete resolver)
+
+- **`getOpenInPillar()` is a template-called method (not memoized)** — `ContentViewerComponent` (Default CD) calls `getOpenInPillar()` from the template, re-deriving `claimsFromDeclaration(LAMAD_ROUTE_CLAIMS)` each change-detection tick. Pure + 1-element array so the cost is trivial and behavior correct; matches the component's existing template-method style. Follow-up: cache in ngOnChanges (depends only on `node.contentType`) or move to OnPush. Non-blocking.
+- **`element-registry-manifest` renderer silently unwired (pre-existing)** — `LAMAD_RENDERER_MAP` maps `element-registry-manifest → ElohimElementRegistryComponent`, but that component is absent from `renderer-initializer`'s `RENDERER_COMPONENTS`, so the `if (component)` guard skips it → content of that format falls to the raw fallback (same class the Slice-1 `epr-composite` fill just fixed for paths). NOT introduced by Slice 1. Follow-up: wire the component or document the known gap with a spec assertion.
