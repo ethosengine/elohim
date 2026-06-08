@@ -784,6 +784,27 @@ pub fn upsert_with_anchor(
 // Stats
 // ============================================================================
 
+/// Which of `ids` exist in the local content projection (acquisition presence diff).
+///
+/// Returns a HashSet of ids that are already present locally. Used by
+/// `run_acquisition_reconcile` to diff the pin's desired set against what the
+/// node already holds, so only genuine gaps are enqueued for fetch.
+pub fn content_ids_present(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+) -> QueryResult<std::collections::HashSet<String>> {
+    if ids.is_empty() {
+        return Ok(Default::default());
+    }
+    let found: Vec<String> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq_any(ids))
+        .select(content::id)
+        .load(conn)?;
+    Ok(found.into_iter().collect())
+}
+
 /// Get content count for an app
 pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content::table

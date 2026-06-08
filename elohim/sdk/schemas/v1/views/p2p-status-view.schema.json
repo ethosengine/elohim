@@ -81,6 +81,25 @@
     "dedupTotalSeen": {
       "type": "integer",
       "description": "D.7 dedup LRU: cumulative insert calls (new + duplicate). Ratio (dedupTotalSeen - dedupUniqueLen) / dedupTotalSeen approximates duplication rate."
+    },
+    "pull": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Acquisition pull-queue rollup (spec 2026-06-07-epr-acquisition-pull-queue-design §4.3-4.4). null = cannot compute = keep waiting, never caught-up.",
+          "required": ["total", "fetched", "pending", "failed", "caughtUp"],
+          "properties": {
+            "total":   { "type": "integer" },
+            "fetched": { "type": "integer" },
+            "pending": { "type": "integer" },
+            "failed":  { "type": "integer" },
+            "caughtUp": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        { "type": "null" }
+      ],
+      "description": "Acquisition pull-queue rollup. null when state cannot be computed — treat as 'keep waiting', NEVER as caught up (spec §4.3)."
     }
   },
   "additionalProperties": false

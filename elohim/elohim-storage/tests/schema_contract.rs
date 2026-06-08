@@ -16,6 +16,7 @@
 // task-level mutex (wrong granularity for cross-runtime env-var contention).
 #![allow(clippy::await_holding_lock)]
 
+use elohim_storage::p2p::acquisition::PullStatusInfo;
 use elohim_storage::p2p::replication::ReplicationStatus;
 use elohim_storage::p2p::DrainStatusInfo;
 use elohim_storage::P2PStatusInfo;
@@ -202,6 +203,13 @@ fn p2p_status_view_matches_schema() {
             published: 95,
             pending: 5,
         }),
+        pull: Some(PullStatusInfo {
+            total: 3,
+            fetched: 2,
+            pending: 1,
+            failed: 0,
+            caught_up: false,
+        }),
         sync_paused: false,
         dedup_unique_len: 42,
         dedup_total_seen: 55,
@@ -225,6 +233,7 @@ fn p2p_status_view_with_null_drain() {
         relay_mode: "disabled".to_string(),
         replication: ReplicationStatus::default(),
         drain: None,
+        pull: None,
         sync_paused: true,
         dedup_unique_len: 0,
         dedup_total_seen: 0,

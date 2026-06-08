@@ -47,6 +47,7 @@ fn test_status() -> P2PStatusInfo {
         relay_mode: "client".to_string(),
         replication: ReplicationStatus::default(),
         drain: None,
+        pull: None,
         sync_paused: false,
         dedup_unique_len: 0,
         dedup_total_seen: 0,

@@ -507,6 +507,12 @@ pub struct P2PNode {
     /// drain_gap_queue() consumes from this at a rate bounded by
     /// MAX_REPLICATION_INFLIGHT, decoupling discovery from dispatch.
     gap_queue: ReplicationGapQueue,
+    /// Acquisition stream state (spec §4) — sibling of replication_state.
+    acquisition: acquisition::AcquisitionState,
+    /// content ids dispatched for acquisition, keyed by request id
+    pending_acquisition_fetches: PendingReplicationFetchMap,
+    /// acquisition gap queue (priority-ordered at enqueue time)
+    acquisition_queue: ReplicationGapQueue,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// Discovered peers with delivery capabilities (populated from mDNS + identify)
@@ -704,6 +710,9 @@ pub struct P2PStatusInfo {
     /// Consumers should treat None as "data not available" (e.g., wait or
     /// avoid using this peer as a load signal), NOT as "caught up".
     pub drain: Option<DrainStatusInfo>,
+    /// Acquisition pull-queue rollup — None when state cannot be computed.
+    /// Consumers treat None as "keep waiting", NEVER as caught up (spec §4.3).
+    pub pull: Option<acquisition::PullStatusInfo>,
     /// True when sync/replication is paused for backpressure (bulk write in progress).
     pub sync_paused: bool,
     /// D.7 dedup LRU: number of unique CIDs currently in the dedup window.
@@ -1097,6 +1106,7 @@ impl P2PHandle {
             relay_mode: "client".to_string(),
             replication: crate::p2p::replication::ReplicationStatus::default(),
             drain: None,
+            pull: None,
             sync_paused: false,
             dedup_unique_len: 0,
             dedup_total_seen: 0,
@@ -1619,6 +1629,7 @@ impl P2PNode {
             relay_mode: config.relay_mode.to_string(),
             replication: replication::ReplicationStatus::default(),
             drain: None,
+            pull: None,
             sync_paused: false,
             dedup_unique_len: 0,
             dedup_total_seen: 0,
@@ -1678,6 +1689,11 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             gap_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
+            acquisition: acquisition::AcquisitionState::new(),
+            pending_acquisition_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+            acquisition_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             extraction_cache: None,
             delivery_peers: Arc::new(DashMap::new()),
             identify_cache: Arc::new(DashMap::new()),
@@ -2082,6 +2098,14 @@ impl P2PNode {
         // (no-ops) when the queue is empty.
         let mut gap_dispatch_interval = tokio::time::interval(Duration::from_secs(5));
         gap_dispatch_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // Acquisition reconcile: diff active pins against local inventory (spec §4.2).
+        let mut acquisition_reconcile_interval = tokio::time::interval(Duration::from_secs(60));
+        acquisition_reconcile_interval
+            .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // Acquisition dispatch: drain the acquisition queue every 5 seconds.
+        let mut acquisition_dispatch_interval = tokio::time::interval(Duration::from_secs(5));
+        acquisition_dispatch_interval
+            .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Delay first tick by the full retry interval so it doesn't race with the
         // initial dials queued by start(). start() owns t=0 dialing; this loop owns
         // subsequent attempts.
@@ -2204,6 +2228,18 @@ impl P2PNode {
                         debug!("Skipping gap dispatch (backpressure)");
                     } else {
                         self.drain_gap_queue().await;
+                    }
+                }
+                _ = acquisition_reconcile_interval.tick() => {
+                    drop(swarm);
+                    if !self.sync_paused.load(Ordering::Acquire) {
+                        self.run_acquisition_reconcile().await;
+                    }
+                }
+                _ = acquisition_dispatch_interval.tick() => {
+                    drop(swarm);
+                    if !self.sync_paused.load(Ordering::Acquire) {
+                        self.drain_acquisition_queue().await;
                     }
                 }
                 _ = drain_interval.tick() => {
@@ -3683,6 +3719,11 @@ impl P2PNode {
                                             .lock()
                                             .await
                                             .remove(&request_id);
+                                        // Also remove from acquisition in-flight (if that stream dispatched it)
+                                        self.pending_acquisition_fetches
+                                            .lock()
+                                            .await
+                                            .remove(&request_id);
 
                                         let pool = match self.db_pool.as_ref() {
                                             Some(p) => p,
@@ -3690,6 +3731,7 @@ impl P2PNode {
                                                 self.replication_state
                                                     .mark_failed(&content_id)
                                                     .await;
+                                                self.acquisition.mark_failed(&content_id).await;
                                                 return;
                                             }
                                         };
@@ -3699,6 +3741,7 @@ impl P2PNode {
                                                 self.replication_state
                                                     .mark_failed(&content_id)
                                                     .await;
+                                                self.acquisition.mark_failed(&content_id).await;
                                                 return;
                                             }
                                         };
@@ -3728,6 +3771,13 @@ impl P2PNode {
                                             Ok(result) => {
                                                 if result.inserted > 0 || result.skipped > 0 {
                                                     self.replication_state
+                                                        .mark_completed(&content_id)
+                                                        .await;
+                                                    // Byte-arrival fan-out: acquisition stream gets
+                                                    // the completion regardless of which stream
+                                                    // requested the fetch (cheap no-op if no pin
+                                                    // wants this id — spec §4.2 R-A).
+                                                    self.acquisition
                                                         .mark_completed(&content_id)
                                                         .await;
 
@@ -3800,6 +3850,7 @@ impl P2PNode {
                                                     self.replication_state
                                                         .mark_failed(&content_id)
                                                         .await;
+                                                    self.acquisition.mark_failed(&content_id).await;
                                                 }
                                             }
                                             Err(e) => {
@@ -3807,11 +3858,21 @@ impl P2PNode {
                                                 self.replication_state
                                                     .mark_failed(&content_id)
                                                     .await;
+                                                self.acquisition.mark_failed(&content_id).await;
                                             }
                                         }
                                         self.replication_state.update_caught_up().await;
                                     }
                                     ShardResponse::ContentNotFound => {
+                                        // Remove from acquisition tracking first (if it was an acquisition fetch)
+                                        if let Some(acq_id) = self
+                                            .pending_acquisition_fetches
+                                            .lock()
+                                            .await
+                                            .remove(&request_id)
+                                        {
+                                            self.acquisition.mark_failed(&acq_id).await;
+                                        }
                                         if let Some(content_id) = self
                                             .pending_replication_fetches
                                             .lock()
@@ -3885,6 +3946,16 @@ impl P2PNode {
                     debug!(content_id = %content_id, error = ?error, "Replication fetch failed at transport level");
                     self.replication_state.mark_failed(&content_id).await;
                     self.replication_state.update_caught_up().await;
+                }
+                // Clean up acquisition state if this was an acquisition fetch
+                if let Some(content_id) = self
+                    .pending_acquisition_fetches
+                    .lock()
+                    .await
+                    .remove(&request_id)
+                {
+                    debug!(content_id = %content_id, error = ?error, "Acquisition fetch failed at transport level");
+                    self.acquisition.mark_failed(&content_id).await;
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::ShardProtocol(
@@ -6545,6 +6616,96 @@ impl P2PNode {
         }
     }
 
+    /// Acquisition reconcile (spec §4.2): load active pins, resolve item-pin
+    /// wants (Slice 1: head_ref IS the item id; cluster pins are rejected at
+    /// POST time), diff against local presence, enqueue gaps priority-ordered.
+    /// Pure local computation — no network here (R-H).
+    async fn run_acquisition_reconcile(&self) {
+        let Some(ref pool) = self.db_pool else { return };
+        let Ok(mut conn) = pool.get() else { return };
+
+        let pins = match crate::db::acquisition_pins::list_active_pins(&mut conn) {
+            Ok(p) => p,
+            Err(e) => {
+                debug!(error = %e, "acquisition reconcile: pin load failed");
+                return;
+            }
+        };
+        let pin_wants: Vec<(i32, Vec<String>)> = pins
+            .iter()
+            .filter(|p| p.kind == "item")
+            .map(|p| (p.id, vec![p.head_ref.clone()]))
+            .collect();
+
+        let want_ids: Vec<String> = pin_wants
+            .iter()
+            .flat_map(|(_, ids)| ids.iter().cloned())
+            .collect();
+        let app_ctx = crate::db::AppContext::default_lamad();
+        let local_has =
+            match crate::db::content_diesel::content_ids_present(&mut conn, &app_ctx, &want_ids) {
+                Ok(set) => set,
+                Err(e) => {
+                    debug!(error = %e, "acquisition reconcile: presence query failed");
+                    return;
+                }
+            };
+
+        let to_dispatch = self.acquisition.reconcile(pin_wants, &local_has).await;
+        if !to_dispatch.is_empty() {
+            let mut q = self.acquisition_queue.lock().await;
+            for id in to_dispatch {
+                if !q.contains(&id) {
+                    q.push_back(id);
+                }
+            }
+        }
+    }
+
+    /// Acquisition dispatch (spec §4.2): shared-rails budget, round-robin
+    /// GetContent across connected peers — same wire request the replication
+    /// stream uses; streams differ in WHAT they want, not HOW they fetch.
+    async fn drain_acquisition_queue(&self) {
+        let budget = reconcile_rails::DispatchBudget::new(acquisition::MAX_ACQUISITION_INFLIGHT);
+        let peers: Vec<PeerId> = {
+            let swarm = self.swarm.read().await;
+            swarm.connected_peers().cloned().collect()
+        };
+        if peers.is_empty() {
+            return; // peer-gated (R-E)
+        }
+        let in_flight = self.pending_acquisition_fetches.lock().await.len();
+        let available = budget.available(in_flight);
+        if available == 0 {
+            return;
+        }
+        let to_dispatch: Vec<String> = {
+            let mut queue = self.acquisition_queue.lock().await;
+            if queue.is_empty() {
+                return;
+            }
+            let len = queue.len();
+            queue.drain(..available.min(len)).collect()
+        };
+        for (i, id) in to_dispatch.iter().enumerate() {
+            if !self.acquisition.wants(id).await {
+                continue;
+            }
+            let peer = peers[i % peers.len()];
+            let request = ShardRequest::GetContent { id: id.clone() };
+            let mut swarm = self.swarm.write().await;
+            let request_id = swarm
+                .behaviour_mut()
+                .shard_protocol
+                .send_request(&peer, request);
+            drop(swarm);
+            self.pending_acquisition_fetches
+                .lock()
+                .await
+                .insert(request_id, id.clone());
+        }
+    }
+
     /// Refresh the status snapshot (called from event loop)
     async fn refresh_status(&self) {
         let swarm = self.swarm.read().await;
@@ -6599,6 +6760,7 @@ impl P2PNode {
         };
 
         let (dedup_unique_len, dedup_total_seen) = self.dedup.stats();
+        let pull = Some(self.acquisition.rollup().await);
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
             listen_addresses,
@@ -6611,6 +6773,7 @@ impl P2PNode {
             relay_mode: self.config.relay_mode.to_string(),
             replication,
             drain,
+            pull,
             sync_paused: self.sync_paused.load(Ordering::Acquire),
             dedup_unique_len,
             dedup_total_seen,
