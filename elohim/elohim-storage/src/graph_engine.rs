@@ -6,7 +6,7 @@
 use std::collections::{HashSet, VecDeque};
 
 use crate::db::context::AppContext;
-use crate::db::{relationships_diesel, DbPool};
+use crate::db::{relationships_diesel, DbPool, PooledConn};
 use crate::error::StorageError;
 
 /// One edge in a resolved neighborhood, discriminated by `inference_source`.
@@ -79,12 +79,7 @@ impl NativeGraphResolver {
     }
 
     /// Get a connection from the pool (mirrors `RelationshipService::conn`).
-    fn conn(
-        &self,
-    ) -> Result<
-        diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::SqliteConnection>>,
-        StorageError,
-    > {
+    fn conn(&self) -> Result<PooledConn, StorageError> {
         self.pool
             .get()
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))
@@ -101,6 +96,7 @@ impl NativeGraphResolver {
         ctx: &AppContext,
         query: &GraphQuery<'_>,
     ) -> Result<Vec<ResolvedEdge>, StorageError> {
+        // Connection is held across the BFS; safe because depth is hard-capped at 3.
         let mut conn = self.conn()?;
         let depth_cap = query.max_depth.min(3); // hard cap — bounded traversal
 
@@ -126,12 +122,12 @@ impl NativeGraphResolver {
                     let edge_depth = depth + 1;
                     out.push(ResolvedEdge {
                         target_id: r.target_id.clone(),
-                        relationship_type: r.relationship_type.clone(),
+                        relationship_type: r.relationship_type,
                         confidence: r.confidence as f64,
                         inference_source: if r.inference_source.is_empty() {
                             "explicit".to_string()
                         } else {
-                            r.inference_source.clone()
+                            r.inference_source
                         },
                         depth: edge_depth,
                     });
@@ -191,5 +187,74 @@ mod tests {
         assert!(by.contains(&("B", 1)), "B at depth 1");
         assert!(by.contains(&("C", 2)), "C at depth 2 (de-stubbed)");
         assert!(n.edges.iter().all(|e| e.inference_source == "explicit"));
+    }
+
+    /// BFS must terminate on cycles and never double-emit any node.
+    /// A→B and B→A form a cycle. With max_depth 2 and root A pre-seeded in
+    /// visited, the back-edge B→A is suppressed; only B is emitted (at depth 1).
+    #[test]
+    fn bfs_cycle_does_not_loop() {
+        let (pool, ctx, _tmp) = test_pool_ctx();
+
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_relationship(&mut conn, &ctx, "A", "B", "RELATES_TO", "explicit");
+            insert_relationship(&mut conn, &ctx, "B", "A", "RELATES_TO", "explicit");
+        }
+
+        let resolver = NativeGraphResolver::new(pool);
+        let q = GraphQuery {
+            include_computed: false,
+            max_depth: 2,
+            ..GraphQuery::new("A")
+        };
+        // Must terminate (no infinite loop).
+        let n = resolver.resolve_neighborhood(&ctx, &q).unwrap();
+
+        // B is reachable at depth 1.
+        assert!(
+            n.edges.iter().any(|e| e.target_id == "B" && e.depth == 1),
+            "B should be emitted at depth 1"
+        );
+        // Root A must never appear as a target (pre-seeded in visited).
+        assert!(
+            !n.edges.iter().any(|e| e.target_id == "A"),
+            "root A must not appear as a target"
+        );
+        // No node is double-emitted.
+        let targets: Vec<_> = n.edges.iter().map(|e| &e.target_id).collect();
+        let unique: std::collections::HashSet<_> = targets.iter().collect();
+        assert_eq!(targets.len(), unique.len(), "no double-emitted targets");
+    }
+
+    /// Diamond topology: A→B, A→C, B→D, C→D. D must appear exactly once
+    /// (the visited-set dedup across the two paths to D).
+    #[test]
+    fn diamond_emits_target_once() {
+        let (pool, ctx, _tmp) = test_pool_ctx();
+
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_relationship(&mut conn, &ctx, "A", "B", "RELATES_TO", "explicit");
+            insert_relationship(&mut conn, &ctx, "A", "C", "RELATES_TO", "explicit");
+            insert_relationship(&mut conn, &ctx, "B", "D", "RELATES_TO", "explicit");
+            insert_relationship(&mut conn, &ctx, "C", "D", "RELATES_TO", "explicit");
+        }
+
+        let resolver = NativeGraphResolver::new(pool);
+        let q = GraphQuery {
+            include_computed: false,
+            max_depth: 2,
+            ..GraphQuery::new("A")
+        };
+        let n = resolver.resolve_neighborhood(&ctx, &q).unwrap();
+
+        let d_edges: Vec<_> = n.edges.iter().filter(|e| e.target_id == "D").collect();
+        assert_eq!(
+            d_edges.len(),
+            1,
+            "D must appear exactly once (visited-set dedup)"
+        );
+        assert_eq!(d_edges[0].depth, 2, "D is at depth 2");
     }
 }
