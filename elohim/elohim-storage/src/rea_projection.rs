@@ -26,7 +26,7 @@
 
 use chrono::Utc;
 use serde::Deserialize;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::db::agreements::{self, CreateAgreementInput};
 use crate::db::content_diesel::{self, ContentProjectionPatch};
@@ -401,6 +401,23 @@ pub fn handle_rea_signal(
                 }
             }
 
+            // Spec §6.5 — projection-driven graduation: extract bounded_by
+            // BEFORE moving event fields into the input struct.  bounded_by is
+            // carried in metadata_json as `{"bounded_by": "<cid>"}` (emit service
+            // annotation binding — the emit service puts it there for diagnostics
+            // and projection consumers; it is the source the local SQL bounded_by
+            // column is populated from when writing via the HTTP path).
+            let bounded_by_cid: Option<String> = event
+                .metadata_json
+                .as_deref()
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+                .and_then(|v| {
+                    v.get("bounded_by")
+                        .and_then(|b| b.as_str())
+                        .map(str::to_string)
+                })
+                .filter(|s| !s.is_empty());
+
             let input = CreateEconomicEventInput {
                 id: Some(event.id),
                 action: event.action,
@@ -431,6 +448,21 @@ pub fn handle_rea_signal(
                 scope_collab_cid: None,
             };
             economic_events::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
+
+            // The act of providing IS the acceptance: a bounded_by event projecting
+            // graduates its Mishpat commitment proposed → active (spec §6.5). No-op
+            // if the commitment isn't yet projected or isn't 'proposed'.
+            if let Some(ref bounded) = bounded_by_cid {
+                if let Err(e) =
+                    crate::db::mishpat_commitments::graduate_to_active(&mut conn, bounded)
+                {
+                    debug!(
+                        error = %e,
+                        cid = %bounded,
+                        "graduation projection: graduate_to_active failed"
+                    );
+                }
+            }
         }
         ReaProjectionSignal::ContentCommitted {
             action_hash,

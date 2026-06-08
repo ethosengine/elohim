@@ -129,6 +129,22 @@ pub fn set_revoked_at(conn: &mut SqliteConnection, cid: &str, ts: &str) -> Query
         .execute(conn)
 }
 
+/// Graduate a Mishpat commitment proposed → active (the projection reflecting
+/// "this commitment now has a notarized provide event" — the event is truth,
+/// this column is projection; spec §6.5). Idempotent + guarded: only flips a
+/// row currently in 'proposed' (never downgrades an active/cancelled/breached
+/// commitment). Returns rows affected (0 if not proposed or cid absent).
+pub fn graduate_to_active(conn: &mut SqliteConnection, cid: &str) -> QueryResult<usize> {
+    let now = current_timestamp();
+    diesel::update(
+        mc::mishpat_commitments
+            .filter(mc::cid.eq(cid))
+            .filter(mc::state.eq("proposed")),
+    )
+    .set((mc::state.eq("active"), mc::updated_at.eq(&now)))
+    .execute(conn)
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -215,6 +231,86 @@ mod tests {
             row.dht_anchor_hash.as_deref(),
             Some("h1"),
             "dht_anchor_hash must be preserved when the incoming upsert carries None"
+        );
+    }
+
+    #[test]
+    fn graduate_only_flips_proposed() {
+        let mut conn = test_conn();
+
+        // ── Case 1: 'proposed' row → flips to 'active' ──────────────────────
+        let cid_proposed = "commitment:graduate-proposed";
+        upsert_with_anchor(&mut conn, sample_commitment(cid_proposed, Some("h-p1")))
+            .expect("upsert proposed");
+        // Precondition: state is 'proposed'.
+        let pre = get_by_cid(&mut conn, cid_proposed)
+            .expect("get pre")
+            .expect("row must exist");
+        assert_eq!(pre.state, "proposed");
+
+        let affected = graduate_to_active(&mut conn, cid_proposed).expect("graduate proposed");
+        assert_eq!(affected, 1, "graduate_to_active must flip exactly one row");
+
+        let row = get_by_cid(&mut conn, cid_proposed)
+            .expect("get post")
+            .expect("row must exist after graduation");
+        assert_eq!(
+            row.state, "active",
+            "state must be 'active' after graduation"
+        );
+
+        // ── Case 2: idempotent — graduate again returns 0 rows ───────────────
+        let second = graduate_to_active(&mut conn, cid_proposed).expect("second graduate");
+        assert_eq!(
+            second, 0,
+            "second graduate_to_active must be a no-op (0 rows)"
+        );
+
+        let row2 = get_by_cid(&mut conn, cid_proposed)
+            .expect("get after idempotent")
+            .expect("row must still exist");
+        assert_eq!(
+            row2.state, "active",
+            "state must remain 'active' after idempotent call"
+        );
+
+        // ── Case 3: 'active' row from birth → not downgraded ────────────────
+        let cid_active = "commitment:already-active";
+        let mut already_active = sample_commitment(cid_active, Some("h-a1"));
+        already_active.state = "active".to_string();
+        upsert_with_anchor(&mut conn, already_active).expect("upsert active");
+
+        let affected_active =
+            graduate_to_active(&mut conn, cid_active).expect("graduate already-active");
+        assert_eq!(
+            affected_active, 0,
+            "graduate_to_active must not touch an already-active row"
+        );
+
+        let row_active = get_by_cid(&mut conn, cid_active)
+            .expect("get active after graduate")
+            .expect("row must exist");
+        assert_eq!(row_active.state, "active", "state must remain 'active'");
+
+        // ── Case 4: 'cancelled' row → unchanged ─────────────────────────────
+        let cid_cancelled = "commitment:cancelled";
+        let mut cancelled = sample_commitment(cid_cancelled, Some("h-c1"));
+        cancelled.state = "cancelled".to_string();
+        upsert_with_anchor(&mut conn, cancelled).expect("upsert cancelled");
+
+        let affected_cancelled =
+            graduate_to_active(&mut conn, cid_cancelled).expect("graduate cancelled");
+        assert_eq!(
+            affected_cancelled, 0,
+            "graduate_to_active must not touch a cancelled row"
+        );
+
+        let row_cancelled = get_by_cid(&mut conn, cid_cancelled)
+            .expect("get cancelled after graduate")
+            .expect("row must exist");
+        assert_eq!(
+            row_cancelled.state, "cancelled",
+            "state must remain 'cancelled'"
         );
     }
 
