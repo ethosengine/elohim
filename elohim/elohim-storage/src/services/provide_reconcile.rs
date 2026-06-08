@@ -36,6 +36,13 @@ use tokio::sync::Mutex;
 use crate::db::DbPool;
 use crate::error::StorageError;
 
+/// Pin `kind` the provide loop authors offers for (single-item pins). Cluster
+/// pins are a later slice and never enter the desired set.
+const PIN_KIND_ITEM: &str = "item";
+/// Pin `status` that is eligible for a commons offer (removed/paused pins are
+/// excluded; a removed pin's offer is revoked, not re-authored).
+const PIN_STATUS_ACTIVE: &str = "active";
+
 /// Lifecycle of one logical provide `(provider, head_ref)` as the reconciler
 /// observes it. Category C (in-memory; recomputed on restart from the
 /// projection + pin tables). `Projected`/`Active` distinguish a freshly
@@ -128,6 +135,11 @@ pub struct DesiredProvide {
     pub pin_id: i32,
     pub head_ref: String,
     /// Pre-existing commitment_cid back-reference (set on a prior tick).
+    ///
+    /// Read by the T10 un-pin revoke path (`http::handle_remove_pin`), which
+    /// targets this CID directly to author a `revokes-commitment` when the pin is
+    /// removed. Now wired — kept here so the desired set carries the back-ref
+    /// even for callers that only observe.
     pub commitment_cid: Option<String>,
 }
 
@@ -234,11 +246,34 @@ impl ProvideReconciler {
             match author.author_commons(&req).await {
                 Ok(cid) => {
                     authored += 1;
-                    // Back-fill the pin's commitment_cid back-reference.
-                    if let Ok(mut conn) = pool.get() {
-                        let _ = crate::db::acquisition_pins::set_commitment_cid(
-                            &mut conn, d.pin_id, &cid,
-                        );
+                    // Back-fill the pin's commitment_cid back-reference. The T10
+                    // un-pin revoke path reads this, so a silent failure here
+                    // would later strand the offer (un-pin couldn't target it) —
+                    // warn loudly. The reconciler's stranded-row revoke arm is
+                    // the eventual backstop, but the back-ref is the fast path.
+                    match pool.get() {
+                        Ok(mut conn) => {
+                            if let Err(e) = crate::db::acquisition_pins::set_commitment_cid(
+                                &mut conn, d.pin_id, &cid,
+                            ) {
+                                tracing::warn!(
+                                    target: "elohim_storage::provide",
+                                    pin_id = d.pin_id,
+                                    commitment_cid = %cid,
+                                    error = %e,
+                                    "provide reconcile: set_commitment_cid back-fill failed; \
+                                     un-pin revoke will fall back to the stranded-row arm"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                target: "elohim_storage::provide",
+                                pin_id = d.pin_id,
+                                error = %e,
+                                "provide reconcile: pool.get failed for commitment_cid back-fill"
+                            );
+                        }
                     }
                 }
                 Err(e) => {
@@ -355,7 +390,7 @@ impl ProvideReconciler {
         commons_head_refs: &HashSet<String>,
     ) -> Vec<DesiredProvide> {
         pins.iter()
-            .filter(|p| p.kind == "item" && p.status == "active")
+            .filter(|p| p.kind == PIN_KIND_ITEM && p.status == PIN_STATUS_ACTIVE)
             .filter(|p| caught_up_head_refs.contains(&p.head_ref))
             .filter(|p| commons_head_refs.contains(&p.head_ref))
             .map(|p| DesiredProvide {
