@@ -15,10 +15,13 @@
  *
  * Termination condition:
  *   pull !== null
+ *   && pull.caughtUp                    (byte-arrival complete: fetched === total, total > 0)
  *   && pull.total >= expectedMinTotal   (guards zero-desired-set seeds)
- *   && pull.pending === 0
  *
  * All three conditions must hold on the same poll response.
+ *
+ * A pin whose content can't be fetched (failed, retries exhausted) never
+ * reports caughtUp and correctly TIMES OUT rather than false-completing (R-A).
  *
  * P2P readiness is NOT the seeder's concern — the acquisition state machine
  * handles peer formation and fetch dispatch. This helper only waits on the
@@ -89,9 +92,10 @@ export async function waitForPull(
           // Broken node signal — do NOT treat as "done".
           console.log(`waitForPull: pull=null (peer DB unavailable), waiting...`);
         } else {
-          lastSeenPull = status.pull;
+          const pull = status.pull;
+          lastSeenPull = pull;
           sawNonNullPull = true;
-          const { total, fetched, pending } = status.pull;
+          const { total, fetched, pending } = pull;
           // Only log when progress changes, to keep pipeline output readable.
           if (pending !== lastLoggedPending) {
             const peersSuffix =
@@ -103,9 +107,9 @@ export async function waitForPull(
             );
             lastLoggedPending = pending;
           }
-          if (pending === 0 && total >= expectedMinTotal) {
-            console.log(`waitForPull: complete — ${total} rows pulled`);
-            return status.pull;
+          if (pull.caughtUp && pull.total >= expectedMinTotal) {
+            console.log(`waitForPull: complete — ${pull.fetched}/${pull.total} fetched`);
+            return pull;
           }
         }
       }

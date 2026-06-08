@@ -156,16 +156,15 @@ async fn item_pin_completes_on_byte_arrival() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §2  Negative guard — a failed fetch never increments fetched count
+// §2  Negative guard — a failed fetch never increments fetched count or caught_up
 //
-// Proves: a pin for an id that never byte-arrives does NOT increment fetched.
+// Proves: a pin for an id that never byte-arrives does NOT increment fetched,
+// AND does NOT report caught_up (spec R-A: byte-arrival complete means
+// fetched == total, not merely pending == 0).
 //
-// Implementation note: `caught_up = pending == 0 && total > 0` — after
-// mark_failed removes the item from pending, `caught_up` transiently reads
-// `true` ("nothing in flight right now"). This is correct: the next reconcile
-// cycle re-enqueues the failed item (back-off semantics) and caught_up flips
-// back to false. The invariant this test asserts is the one that matters for
-// the R-A spec: `fetched` never increments unless bytes actually arrive.
+// With the old `pending == 0 && total > 0` formula, mark_failed would
+// transiently set caught_up=true (items leave pending before re-queue).
+// The corrected `fetched == total` formula closes that window entirely.
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -213,10 +212,9 @@ async fn failed_fetch_never_increments_fetched_count() {
     // will re-enter on next reconcile cycle — not immediately re-queued).
     acq.mark_failed(content_id).await;
 
-    // Core invariant (spec R-A): fetched must NOT increment on a failed fetch.
-    // caught_up may transiently read true here (pending==0 && total>0) — that
-    // is correct and will flip back to false on the next reconcile cycle that
-    // re-enqueues the still-unmet item.
+    // Core invariant (spec R-A): fetched must NOT increment on a failed fetch,
+    // and caught_up must NOT be true even though pending is transiently 0 —
+    // the fix (fetched==total gate) prevents false-completion in this window.
     let r2 = acq.rollup().await;
     assert_eq!(
         r2.fetched, 0,
@@ -226,6 +224,10 @@ async fn failed_fetch_never_increments_fetched_count() {
     assert_eq!(
         r2.failed, 1,
         "failed count must be 1 after one failed attempt"
+    );
+    assert!(
+        !r2.caught_up,
+        "failed fetch must not false-complete (R-A) — pending==0 but fetched < total"
     );
 }
 

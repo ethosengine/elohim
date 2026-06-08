@@ -162,9 +162,11 @@ impl AcquisitionState {
             s.pending += c.pending as i32;
             s.failed += c.failed as i32;
         }
-        // total == 0 is resolved-empty, a DISTINCT state — NOT caught_up
-        // (spec §4.3/§10: a zero-item desired set must never false-complete).
-        s.caught_up = s.pending == 0 && s.total > 0;
+        // Caught-up means BYTE-ARRIVAL complete: every wanted item fetched
+        // (spec R-A — never false-complete). A failed item (fetched < total
+        // with pending transiently 0 before re-queue) must NOT report caught_up.
+        // total == 0 (resolved-empty) is likewise not caught_up.
+        s.caught_up = s.total > 0 && s.fetched == s.total;
         s
     }
 
@@ -182,7 +184,7 @@ impl AcquisitionState {
                     fetched: c.completed as i32,
                     pending: c.pending as i32,
                     failed: c.failed as i32,
-                    caught_up: c.pending == 0 && total > 0,
+                    caught_up: total > 0 && (c.completed as i32) == total,
                 }
             })
             .collect();
@@ -242,6 +244,25 @@ mod tests {
         assert!(!r.caught_up, "zero-item desired set must not be caught_up");
         let pins = acq.per_pin().await;
         assert_eq!(pins.len(), 1);
+        assert!(!pins[0].caught_up);
+    }
+
+    #[tokio::test]
+    async fn failed_item_is_not_caught_up_despite_empty_pending() {
+        // R-A: an item that failed its fetch (removed from pending until the
+        // next reconcile re-queues it) leaves fetched < total — the pull must
+        // NOT report caught_up even though pending is transiently 0.
+        let acq = AcquisitionState::new();
+        let local = std::collections::HashSet::new();
+        acq.reconcile(vec![(1, vec!["need".into()])], &local).await;
+        acq.mark_failed("need").await;
+        let r = acq.rollup().await;
+        assert_eq!((r.total, r.fetched, r.pending, r.failed), (1, 0, 0, 1));
+        assert!(
+            !r.caught_up,
+            "a failed (unfetched) item must not be caught_up (R-A)"
+        );
+        let pins = acq.per_pin().await;
         assert!(!pins[0].caught_up);
     }
 
