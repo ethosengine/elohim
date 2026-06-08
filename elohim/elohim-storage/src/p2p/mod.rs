@@ -51,6 +51,7 @@ pub mod reach_authorization;
 pub mod recovery_invitation;
 pub mod recovery_revocation;
 pub mod recovery_rotation;
+pub mod reconcile_rails;
 pub mod replication;
 pub mod revocation_attestation_message;
 pub mod shamir_transport;
