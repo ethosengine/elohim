@@ -70,6 +70,25 @@ pub async fn call_create_rea_commitment(
         .await
 }
 
+/// Emit a REA EconomicEvent through the conductor (vs the diesel-direct
+/// `economic_events::record_event`, which writes no DHT anchor). The DNA
+/// coordinator `create_rea_economic_event` (content_store/src/lib.rs:12124)
+/// resolves `input.fulfills` (commitment IDs) into EventFulfillsCommitment DHT
+/// links and emits ProjectionSignal::ReaEconomicEventCommitted (~:10892) →
+/// the storage projection upserts with dht_anchor_hash (rea_projection.rs).
+pub async fn call_create_rea_economic_event(
+    hc: &Arc<HcClient>,
+    input: &shefa_types::CreateReaEconomicEventInput,
+) -> Result<Vec<u8>, StorageError> {
+    let payload = rmp_serde::to_vec_named(input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode CreateReaEconomicEventInput: {e}"
+        ))
+    })?;
+    hc.call_zome(ZOME_NAME, "create_rea_economic_event", payload)
+        .await
+}
+
 /// Round-trip `update_rea_commitment_state` through the local conductor.
 ///
 /// The zome's update_entry produces a new ActionHash for the same logical
