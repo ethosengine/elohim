@@ -3508,6 +3508,9 @@ pub struct AcquisitionPin {
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+    /// action_hash of the notarized replicates-commons Commitment the provide
+    /// reconciler authored for this pin. NULL until authored (Slice 2b).
+    pub commitment_cid: Option<String>,
 }
 
 /// Insertable row for `acquisition_pins` (omits `id` — AUTOINCREMENT, and

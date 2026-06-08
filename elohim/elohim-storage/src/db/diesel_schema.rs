@@ -1783,6 +1783,7 @@ diesel::table! {
         status -> Text,
         created_at -> Text,
         updated_at -> Text,
+        commitment_cid -> Nullable<Text>,
     }
 }
 

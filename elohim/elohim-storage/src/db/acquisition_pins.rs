@@ -78,6 +78,24 @@ pub fn set_pin_status(
         .execute(conn)
 }
 
+/// Back-fill the notarized commitment back-reference on a pin after the
+/// provide reconciler authors its replicates-commons Commitment.
+///
+/// Returns the number of rows affected (0 if the id does not exist).
+pub fn set_commitment_cid(
+    conn: &mut SqliteConnection,
+    pin_id: i32,
+    commitment_cid: &str,
+) -> QueryResult<usize> {
+    let now = current_timestamp();
+    diesel::update(pins::acquisition_pins.filter(pins::id.eq(pin_id)))
+        .set((
+            pins::commitment_cid.eq(commitment_cid),
+            pins::updated_at.eq(&now),
+        ))
+        .execute(conn)
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -150,5 +168,41 @@ mod tests {
         let active2 = list_active_pins(&mut conn).expect("list after re-pin");
         assert_eq!(active2.len(), 1, "revived pin must appear in active list");
         assert_eq!(active2[0].status, "active");
+    }
+
+    #[test]
+    fn commitment_cid_defaults_null_and_set_backfills() {
+        let mut conn = test_conn();
+
+        // A fresh pin is born without a commitment_cid (NULL).
+        let pin = upsert_pin(&mut conn, sample_pin(1)).expect("upsert");
+        assert!(
+            pin.commitment_cid.is_none(),
+            "a fresh pin must have NULL commitment_cid (notarized shadow not yet authored)"
+        );
+
+        // Back-fill the commitment_cid after the reconciler authors the
+        // replicates-commons Commitment.
+        let affected = set_commitment_cid(&mut conn, pin.id, "uhCkk-commons-commit-1")
+            .expect("set_commitment_cid");
+        assert_eq!(affected, 1, "set_commitment_cid must affect exactly one row");
+
+        let reread = list_all_pins(&mut conn).expect("list_all");
+        assert_eq!(reread.len(), 1);
+        assert_eq!(
+            reread[0].commitment_cid.as_deref(),
+            Some("uhCkk-commons-commit-1"),
+            "commitment_cid must reflect the back-filled value"
+        );
+
+        // Re-upsert (re-pin) must NOT clobber the commitment_cid — only
+        // updated_at/priority/status are refreshed on conflict.
+        upsert_pin(&mut conn, sample_pin(9)).expect("re-upsert");
+        let after_repin = list_all_pins(&mut conn).expect("list_all after re-pin");
+        assert_eq!(
+            after_repin[0].commitment_cid.as_deref(),
+            Some("uhCkk-commons-commit-1"),
+            "re-pin must preserve the notarized commitment_cid back-reference"
+        );
     }
 }
