@@ -1,6 +1,47 @@
-# HANDOFF — EPR acquisition pull-queue: Slice 1 DONE (held for push) → Slice 2 planning
+# HANDOFF — EPR acquisition: Slice 1 DONE (held) · Slice 2a HALTED on a substrate finding → brainstorm next
 
-_Last updated: 2026-06-08 · Author: Claude Opus · Branch: `dev` (Slice-1 committed, NOT pushed — integrator owns push) · Session mode: **implementing → handing into Slice-2 planning**._
+_Last updated: 2026-06-08 · Author: Claude Opus · Branch: `dev` (committed, NOT pushed — integrator owns push) · Session mode: **execution halted at a verified architectural finding → handing into a /brainstorm**._
+
+---
+
+## ⏸ Slice 2a HALTED at T3 — the commitment-system bridge must be designed first (operator chose brainstorm)
+
+Slice 2a (REA emit/graduation rails) executed T1–T3 (all correct, committed) then the **verify-don't-assume**
+discipline surfaced a foundational finding that stops coherent progress on T4–T7:
+
+**There are TWO commitment systems with an unbuilt bridge:**
+- **content_store `Commitment`** (elohim DNA) — REA/ValueFlows accounting. The EconomicEvent's `fulfills`
+  link points HERE (`EventFulfillsCommitment`, same-DNA).
+- **Mishpat `Commitment`** (mishpat DNA) — the compute-commitment with **bounds** (payload_json,
+  valid_from/until, revoked_at). `bounds_validator` checks THIS. `replicates-commons`/`replicates-dwelling`
+  ride this entry type (per `replicates_dwelling_service.rs`'s blueprint).
+
+A ProvideAnnounce event `fulfills` a content_store commitment but the bounds-gate checks a Mishpat
+commitment — **different entities, nothing bridges them.** Three compounding gaps the spec assumed away:
+1. `ConductorCommitmentFetcher` is a **stub** (`ConductorUnreachable`, never-completed Sprint-1 TODO) — the
+   bounds-gate is fail-closed-safe but non-functional in production.
+2. **No Mishpat-commitment projection**: `rea_commitments` lacks `revoked_at` / `valid_from-until` / `bounds`.
+   A `ProjectionCommitmentFetcher` needs that table built + populated from the Mishpat `create_commitment` signal.
+3. **Graduation mismatch**: `call_update_rea_commitment_state` is content_store; the bounds-bearing commitment
+   is the immutable Mishpat one (own state model). T4's graduation primitive may target the wrong system.
+
+**Next move (operator-chosen): `/brainstorm` the commitment-system architecture** (p2p-design-gate): two
+systems + bridge (Mishpat-commitment projection + ProjectionCommitmentFetcher + cross-DNA event↔commitment
+reference) vs unify; where graduation lives for an immutable Mishpat commitment. Seed = this finding + T1–T3.
+
+### Slice 2a commits landed (correct, on `dev`, held)
+- `81fae5372` T1 — sweettest probe proving `create_rea_economic_event` fires (found: binding is `fulfills` +
+  `metadata_json`, NO `bounded_by` field).
+- `cbf357506` T2 — `call_create_rea_economic_event` conductor wrapper.
+- `22dfc00db` T3 — `economic_event_emit_service` (bounds-validated, gate structurally guaranteed by `?`;
+  one non-blocking nit: test `emit_refuses_revoked_commitment_before_conductor` tests the validator in
+  isolation, not `emit` — rename or note when resumed).
+These three sit cleanly on top of whatever bridge the brainstorm lands; nothing wasted.
+
+### Sweettest build env (for the next implementer — differs from storage)
+`RUSTFLAGS=""` · `CARGO_TARGET_DIR=/tmp/<somewhere-outside-/projects>` (the /projects volume has the
+fingerprint-ENOENT quirk) · `BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/clang/21/include"` · plain `cargo test` ·
+register tests via `[[test]]` in `elohim/holochain/tests/sweettest/Cargo.toml` (integration binaries, not mods).
 
 ---
 
