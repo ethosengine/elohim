@@ -119,6 +119,22 @@ impl GapTracker {
     pub fn wants(&self, id: &str) -> bool {
         self.pending.contains(id)
     }
+
+    /// Distinct ids currently in flight (in `pending`). Used by the per-EPR
+    /// rollup to union across pins of the same head_ref (shared ids dedupe).
+    pub fn pending_ids(&self) -> Vec<String> {
+        self.pending.iter().cloned().collect()
+    }
+
+    /// Distinct ids byte-arrival complete (in `completed`).
+    pub fn completed_ids(&self) -> Vec<String> {
+        self.completed.iter().cloned().collect()
+    }
+
+    /// Distinct ids that have failed at least once (keys of `failed`).
+    pub fn failed_ids(&self) -> Vec<String> {
+        self.failed.keys().cloned().collect()
+    }
 }
 
 /// Slot-backpressure helper (R-E): dispatch rate becomes a natural function
