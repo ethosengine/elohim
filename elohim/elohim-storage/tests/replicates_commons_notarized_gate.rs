@@ -9,7 +9,7 @@
 //! are the two-leg gate for the provide loop. Spec §6.5.
 
 use elohim_storage::db::mishpat_commitments;
-use elohim_storage::mishpat_projection::parse_commitment_payload;
+use elohim_storage::mishpat_projection::{parse_commitment_payload, CommitmentProjection};
 use elohim_storage::services::bounds_validator::{self, EventForValidation};
 use elohim_storage::services::commitment_fetcher::{
     CommitmentFetcher, ProjectionCommitmentFetcher,
@@ -45,13 +45,17 @@ async fn notarized_replicates_commons_clears_bounds_via_projection_fetcher() {
     //    get_commitment returns as `action_hash`.
     let entry_hash = "uhCEk-commons-entry-1";
     let action_hash = "uhCkk-commons-action-1";
-    let row = parse_commitment_payload(
+    let row = match parse_commitment_payload(
         "replicates-commons",
         &replicates_commons_payload(),
         entry_hash,
         action_hash,
     )
-    .expect("replicates-commons payload must parse into a NewMishpatCommitment");
+    .expect("replicates-commons payload must parse into a NewMishpatCommitment")
+    {
+        CommitmentProjection::Upsert(r) => r,
+        other => panic!("expected Upsert, got {other:?}"),
+    };
 
     assert_eq!(row.cid, entry_hash);
     assert_eq!(
@@ -103,17 +107,20 @@ async fn unnotarized_replicates_commons_is_refused() {
     {
         let mut conn = pool.get().expect("pool conn");
         // Hand-craft a NULL-anchor row (what a storage-only insert would look like).
-        let row = parse_commitment_payload(
+        let row = match parse_commitment_payload(
             "replicates-commons",
             &replicates_commons_payload(),
             "uhCEk-unanchored",
             "ignored",
         )
-        .map(|mut r| {
-            r.dht_anchor_hash = None;
-            r
-        })
-        .expect("parse");
+        .expect("parse")
+        {
+            CommitmentProjection::Upsert(mut r) => {
+                r.dht_anchor_hash = None;
+                r
+            }
+            other => panic!("expected Upsert, got {other:?}"),
+        };
         mishpat_commitments::upsert_with_anchor(&mut conn, row).expect("upsert");
     }
     let fetcher = ProjectionCommitmentFetcher::new(pool);

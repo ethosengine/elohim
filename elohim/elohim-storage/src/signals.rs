@@ -612,33 +612,51 @@ pub fn handle_mishpat_signal(
             commitment,
         } => {
             // Delegate to the dedicated projection handler in mishpat_projection.
-            // That module owns the payload-parse logic and calls upsert_with_anchor.
-            // We pass a temporary single-connection pool substitute by building
-            // NewMishpatCommitment inline here so this function stays synchronous
-            // and conn-oriented (matching the other arms), avoiding an async boundary.
-            let new_row = match crate::mishpat_projection::parse_commitment_payload(
+            // That module owns the payload-parse logic. The router returns a
+            // CommitmentProjection: most actions Upsert a new row; a
+            // revokes-commitment action Revokes a target row (sets revoked_at).
+            // We stay synchronous and conn-oriented (matching the other arms),
+            // avoiding an async boundary.
+            match crate::mishpat_projection::parse_commitment_payload(
                 &commitment.action,
                 &commitment.payload_json,
                 &entry_hash,
                 &action_hash,
             ) {
-                Ok(row) => row,
+                Ok(crate::mishpat_projection::CommitmentProjection::Upsert(new_row)) => {
+                    crate::db::mishpat_commitments::upsert_with_anchor(conn, new_row)
+                        .map_err(|e| StorageError::Database(e.to_string()))?;
+                    tracing::info!(
+                        cid = %entry_hash,
+                        action_hash = %action_hash,
+                        "handle_mishpat_signal: CommitmentCommitted projected → mishpat_commitments"
+                    );
+                }
+                Ok(crate::mishpat_projection::CommitmentProjection::Revoke {
+                    target_cid,
+                    signed_at,
+                }) => {
+                    let affected = crate::db::mishpat_commitments::set_revoked_at(
+                        conn,
+                        &target_cid,
+                        &signed_at,
+                    )
+                    .map_err(|e| StorageError::Database(e.to_string()))?;
+                    tracing::info!(
+                        target_cid = %target_cid,
+                        action_hash = %action_hash,
+                        affected,
+                        "handle_mishpat_signal: revokes-commitment projected → set_revoked_at"
+                    );
+                }
                 Err(e) => {
                     tracing::warn!(
                         error = %e,
                         action_hash = %action_hash,
                         "handle_mishpat_signal: CommitmentCommitted payload parse failed — skipped"
                     );
-                    return Ok(());
                 }
-            };
-            crate::db::mishpat_commitments::upsert_with_anchor(conn, new_row)
-                .map_err(|e| StorageError::Database(e.to_string()))?;
-            tracing::info!(
-                cid = %entry_hash,
-                action_hash = %action_hash,
-                "handle_mishpat_signal: CommitmentCommitted projected → mishpat_commitments"
-            );
+            }
             Ok(())
         }
     }
