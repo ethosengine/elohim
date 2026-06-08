@@ -28,6 +28,7 @@
 //! node.start().await?;
 //! ```
 
+pub mod acquisition;
 pub mod adapters;
 pub mod attention_tending;
 pub mod behaviour;
