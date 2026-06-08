@@ -5,29 +5,28 @@ import { RendererRegistryService } from '../../renderers/renderer-registry.servi
 import { ContentNode } from '../../models/content-node.model';
 import { PathContext } from '../../models/exploration-context.model';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
-import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
+import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
 import { LAMAD_EPR_RESOLVER, LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
 import { of } from 'rxjs';
 import { vi, Mock } from 'vitest';
 
-// Mock components
-@Component({ selector: 'app-mini-graph', standalone: true, template: '' })
-class MockMiniGraphComponent {
-  @Input() focusNodeId!: string;
-  @Input() depth = 1;
-  @Input() height = 180;
-  @Output() nodeSelected = new EventEmitter<string>();
-  @Output() exploreRequested = new EventEmitter<void>();
-}
-
-@Component({ selector: 'app-related-concepts-panel', standalone: true, template: '' })
-class MockRelatedConceptsPanelComponent {
+// Mock the shared exploration sidebar. Lesson-view delegates the entire
+// exploration surface (mini-graph + related concepts + explore button) to this
+// component now, so the lesson-view spec only verifies it is rendered, wired,
+// and that its outputs re-emit through lesson-view's own outputs. The sidebar's
+// internal composition is covered by exploration-sidebar.component.spec.ts.
+@Component({ selector: 'app-exploration-sidebar', standalone: true, template: '' })
+class MockExplorationSidebarComponent {
   @Input() contentId!: string;
-  @Input() showHierarchy = true;
+  @Input() collapsible = true;
+  @Input() open = false;
+  @Output() openChange = new EventEmitter<boolean>();
   @Input() compact = true;
-  @Input() limit = 4;
-  @Output() navigate = new EventEmitter<string>();
+  @Input() relatedLimit = 4;
+  @Input() graphDepth = 1;
+  @Input() graphHeight = 180;
+  @Output() exploreContent = new EventEmitter<string>();
+  @Output() exploreInGraph = new EventEmitter<void>();
 }
 
 // Note: EprRelationshipsPanelComponent, GateFeedbackTriggerComponent, and
@@ -112,14 +111,16 @@ describe('LessonViewComponent', () => {
     })
       // Override component imports to use mocks for shallow testing
       // This prevents deep dependency injection chains that require complex setup.
-      // Lit elements (elohim-epr-relationships-panel etc.) are handled by
-      // CUSTOM_ELEMENTS_SCHEMA on LessonViewComponent — no mock needed.
+      // The shared exploration sidebar pulls in RelatedConceptsService ->
+      // DataLoaderService -> ElohimClient when rendered for real, so it is swapped
+      // for a mock here. Lit elements (elohim-epr-relationships-panel etc.) are
+      // handled by CUSTOM_ELEMENTS_SCHEMA on LessonViewComponent — no mock needed.
       .overrideComponent(LessonViewComponent, {
         remove: {
-          imports: [RelatedConceptsPanelComponent, MiniGraphComponent],
+          imports: [ExplorationSidebarComponent],
         },
         add: {
-          imports: [MockMiniGraphComponent, MockRelatedConceptsPanelComponent],
+          imports: [MockExplorationSidebarComponent],
         },
       })
       .compileComponents();
@@ -330,14 +331,14 @@ describe('LessonViewComponent', () => {
     });
   });
 
-  describe('exploration panel', () => {
+  describe('exploration sidebar', () => {
     beforeEach(() => {
       // Set content BEFORE first detectChanges (required input)
       component.content = mockContent;
       fixture.detectChanges();
     });
 
-    it('should toggle exploration panel', () => {
+    it('should toggle exploration panel state', () => {
       expect(component.explorationPanelOpen).toBe(false);
       component.toggleExplorationPanel();
       expect(component.explorationPanelOpen).toBe(true);
@@ -345,28 +346,77 @@ describe('LessonViewComponent', () => {
       expect(component.explorationPanelOpen).toBe(false);
     });
 
-    it('should show panel toggle button', () => {
+    it('should render the shared exploration sidebar in path mode', () => {
       const compiled = fixture.nativeElement as HTMLElement;
-      const toggleBtn = compiled.querySelector('.panel-toggle');
-      expect(toggleBtn).toBeTruthy();
+      const sidebar = compiled.querySelector('app-exploration-sidebar');
+      expect(sidebar).toBeTruthy();
     });
 
-    it('should include mini-graph in panel', () => {
-      const compiled = fixture.nativeElement as HTMLElement;
-      const miniGraph = compiled.querySelector('app-mini-graph');
-      expect(miniGraph).toBeTruthy();
+    it('should pass the content id to the sidebar', () => {
+      const sidebar = fixture.debugElement.children[0].query(
+        el => el.name === 'app-exploration-sidebar',
+      );
+      expect(sidebar).toBeTruthy();
+      const sidebarInstance = sidebar.componentInstance as MockExplorationSidebarComponent;
+      expect(sidebarInstance.contentId).toBe(mockContent.id);
+      expect(sidebarInstance.collapsible).toBe(true);
+      expect(sidebarInstance.compact).toBe(true);
+      expect(sidebarInstance.relatedLimit).toBe(4);
+      expect(sidebarInstance.graphDepth).toBe(1);
+      expect(sidebarInstance.graphHeight).toBe(180);
     });
 
-    it('should include related concepts panel', () => {
-      const compiled = fixture.nativeElement as HTMLElement;
-      const relatedPanel = compiled.querySelector('app-related-concepts-panel');
-      expect(relatedPanel).toBeTruthy();
+    it('should two-way bind the open state through the sidebar', () => {
+      const sidebar = fixture.debugElement.children[0].query(
+        el => el.name === 'app-exploration-sidebar',
+      );
+      const sidebarInstance = sidebar.componentInstance as MockExplorationSidebarComponent;
+
+      sidebarInstance.openChange.emit(true);
+      expect(component.explorationPanelOpen).toBe(true);
+
+      sidebarInstance.openChange.emit(false);
+      expect(component.explorationPanelOpen).toBe(false);
     });
 
-    it('should have explore in graph button', () => {
+    it('should re-emit exploreContent from the sidebar', () =>
+      new Promise<void>(done => {
+        const sidebar = fixture.debugElement.children[0].query(
+          el => el.name === 'app-exploration-sidebar',
+        );
+        const sidebarInstance = sidebar.componentInstance as MockExplorationSidebarComponent;
+
+        component.exploreContent.subscribe(id => {
+          expect(id).toBe('neighbor-1');
+          done();
+        });
+
+        sidebarInstance.exploreContent.emit('neighbor-1');
+      }));
+
+    it('should re-emit exploreInGraph from the sidebar', () =>
+      new Promise<void>(done => {
+        const sidebar = fixture.debugElement.children[0].query(
+          el => el.name === 'app-exploration-sidebar',
+        );
+        const sidebarInstance = sidebar.componentInstance as MockExplorationSidebarComponent;
+
+        component.exploreInGraph.subscribe(() => {
+          expect(true).toBe(true);
+          done();
+        });
+
+        sidebarInstance.exploreInGraph.emit();
+      }));
+
+    it('should suppress the sidebar in standalone mode', () => {
+      component.explorationMode = 'standalone';
+      // OnPush change detection requires explicit marking after a direct set.
+      (component as any).cdr.markForCheck();
+      fixture.detectChanges();
       const compiled = fixture.nativeElement as HTMLElement;
-      const exploreBtn = compiled.querySelector('.btn-explore-graph');
-      expect(exploreBtn).toBeTruthy();
+      const sidebar = compiled.querySelector('app-exploration-sidebar');
+      expect(sidebar).toBeNull();
     });
   });
 
@@ -789,24 +839,9 @@ describe('LessonViewComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should have aria attributes on panel toggle', () => {
-      const compiled = fixture.nativeElement as HTMLElement;
-      const toggle = compiled.querySelector('.panel-toggle');
-      expect(toggle?.getAttribute('aria-expanded')).toBe('false');
-      expect(toggle?.getAttribute('aria-controls')).toBe('exploration-panel');
-    });
-
-    it('should update aria-expanded when panel opens', () => {
-      expect(component.explorationPanelOpen).toBe(false);
-      component.toggleExplorationPanel();
-      expect(component.explorationPanelOpen).toBe(true);
-      // OnPush change detection requires explicit marking
-      (component as any).cdr.markForCheck();
-      fixture.detectChanges();
-      const compiled = fixture.nativeElement as HTMLElement;
-      const toggle = compiled.querySelector('.panel-toggle');
-      expect(toggle?.getAttribute('aria-expanded')).toBe('true');
-    });
+    // The exploration panel's toggle/aria-expanded affordances moved into the
+    // shared <app-exploration-sidebar> (covered by its own spec). Lesson-view's
+    // own a11y surface is the content heading hierarchy.
 
     it('should have proper heading hierarchy', () => {
       const compiled = fixture.nativeElement as HTMLElement;

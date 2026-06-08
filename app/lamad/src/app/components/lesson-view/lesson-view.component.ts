@@ -38,8 +38,7 @@ import {
   InteractiveRenderer,
   RendererCompletionEvent,
 } from '../../renderers/renderer-registry.service';
-import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
-import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
+import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
 
 import type { EprHead, EprRelationship } from '@elohim/storage-client';
 // TODO: Quiz engine requires Perseus/React dependencies - enable when ready
@@ -82,8 +81,7 @@ interface InlineQuizCompletionEvent {
   imports: [
     CommonModule,
     RouterModule,
-    RelatedConceptsPanelComponent,
-    MiniGraphComponent,
+    ExplorationSidebarComponent,
     // TODO: InlineQuizComponent - requires Perseus/React dependencies
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -93,7 +91,6 @@ interface InlineQuizCompletionEvent {
       class="lesson-view"
       [class.has-path-context]="pathContext"
       [class.standalone]="explorationMode === 'standalone'"
-      [class.panel-open]="explorationPanelOpen"
     >
       <!-- Main content area -->
       <div class="lesson-main">
@@ -194,78 +191,21 @@ interface InlineQuizCompletionEvent {
         }
       </div>
 
-      <!-- Exploration panel toggle (mobile) -->
-      <button
-        class="panel-toggle"
-        (click)="toggleExplorationPanel()"
-        [attr.aria-expanded]="explorationPanelOpen"
-        aria-controls="exploration-panel"
-        data-testid="lesson-toggle-panel"
-      >
-        <span class="toggle-icon">{{ explorationPanelOpen ? '→' : '←' }}</span>
-        <span class="toggle-label">{{ explorationPanelOpen ? 'Hide' : 'Explore' }}</span>
-      </button>
-
-      <!-- Exploration sidebar -->
-      <aside
-        id="exploration-panel"
-        class="exploration-panel"
-        [class.collapsed]="!explorationPanelOpen"
-      >
-        <div class="panel-header">
-          <h2 class="panel-title">Explore</h2>
-          <button
-            class="panel-close"
-            (click)="toggleExplorationPanel()"
-            aria-label="Close exploration panel"
-            data-testid="lesson-panel-close"
-          >
-            ×
-          </button>
-        </div>
-
-        <div class="panel-content">
-          <!-- Mini Graph -->
-          <section class="panel-section graph-section">
-            <h3 class="section-title">Concept Map</h3>
-            <app-mini-graph
-              [focusNodeId]="content.id"
-              [depth]="1"
-              [height]="180"
-              (nodeSelected)="onGraphNodeClick($event)"
-              (exploreRequested)="onExploreInGraphClick()"
-            ></app-mini-graph>
-          </section>
-
-          <!-- Related Concepts -->
-          <section class="panel-section related-section">
-            <h3 class="section-title">Related Concepts</h3>
-            <app-related-concepts-panel
-              [contentId]="content.id"
-              [showHierarchy]="true"
-              [compact]="true"
-              [limit]="4"
-              (navigate)="onRelatedConceptClick($event)"
-            ></app-related-concepts-panel>
-          </section>
-
-          <!-- Explore in Full Graph button -->
-          <div class="panel-actions">
-            <button
-              class="btn-explore-graph"
-              (click)="onExploreInGraphClick()"
-              data-testid="lesson-explore-graph"
-            >
-              <span class="btn-icon">🔭</span>
-              Explore in Full Graph
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Backdrop for mobile -->
-      @if (explorationPanelOpen) {
-        <div class="panel-backdrop" (click)="toggleExplorationPanel()" aria-hidden="true"></div>
+      <!-- Shared exploration sidebar (mini-graph + related concepts + explore).
+           Suppressed in standalone mode, matching the legacy
+           standalone display-none rule on the old inline panel. -->
+      @if (explorationMode !== 'standalone') {
+        <app-exploration-sidebar
+          [contentId]="content.id"
+          [collapsible]="true"
+          [(open)]="explorationPanelOpen"
+          [compact]="true"
+          [relatedLimit]="4"
+          [graphDepth]="1"
+          [graphHeight]="180"
+          (exploreContent)="onRelatedConceptClick($event)"
+          (exploreInGraph)="onExploreInGraphClick()"
+        ></app-exploration-sidebar>
       }
     </div>
   `,
@@ -427,213 +367,18 @@ interface InlineQuizCompletionEvent {
         white-space: pre-wrap;
       }
 
-      /* Panel toggle button */
-      .panel-toggle {
-        position: fixed;
-        right: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.25rem;
-        padding: 0.75rem 0.5rem;
-        background: var(--primary, #4285f4);
-        color: white;
-        border: none;
-        border-radius: var(--radius-md, 8px) 0 0 var(--radius-md, 8px);
-        cursor: pointer;
-        z-index: 20;
-        transition: all 0.2s ease;
-      }
+      /* The exploration sidebar's chrome (toggle/panel/backdrop/responsive
+         breakpoints) lives in app-exploration-sidebar. Its host uses
+         display: contents, so the inner .exploration-panel resolves its
+         pinned/off-canvas positioning against this .lesson-view flex container,
+         keeping the desktop rail in-flow beside .lesson-main exactly as before. */
 
-      .panel-toggle:hover {
-        padding-right: 0.75rem;
-      }
-
-      .toggle-icon {
-        font-size: 1rem;
-      }
-
-      .toggle-label {
-        writing-mode: vertical-rl;
-        text-orientation: mixed;
-        font-size: 0.75rem;
-        font-weight: 500;
-      }
-
-      .lesson-view.panel-open .panel-toggle {
-        right: 320px;
-      }
-
-      /* Exploration panel */
-      .exploration-panel {
-        position: fixed;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        width: 320px;
-        background: var(--surface-elevated, #fff);
-        border-left: 1px solid var(--border-color, #e9ecef);
-        display: flex;
-        flex-direction: column;
-        transform: translateX(100%);
-        transition: transform 0.3s ease;
-        z-index: 30;
-        overflow: hidden;
-      }
-
-      .exploration-panel:not(.collapsed) {
-        transform: translateX(0);
-      }
-
-      .panel-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1rem;
-        border-bottom: 1px solid var(--border-color, #e9ecef);
-      }
-
-      .panel-title {
-        margin: 0;
-        font-size: 1rem;
-        font-weight: 600;
-        color: var(--text-primary, #202124);
-      }
-
-      .panel-close {
-        width: 2rem;
-        height: 2rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: none;
-        border: none;
-        font-size: 1.5rem;
-        color: var(--text-secondary, #5f6368);
-        cursor: pointer;
-        border-radius: var(--radius-sm, 4px);
-      }
-
-      .panel-close:hover {
-        background: var(--surface-hover, #f1f3f4);
-      }
-
-      .panel-content {
-        flex: 1;
-        overflow-y: auto;
-        padding: 1rem;
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
-      }
-
-      .panel-section {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-
-      .section-title {
-        margin: 0;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--text-tertiary, #80868b);
-      }
-
-      .panel-actions {
-        margin-top: auto;
-        padding-top: 1rem;
-        border-top: 1px solid var(--border-color, #e9ecef);
-      }
-
-      .btn-explore-graph {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1rem;
-        background: var(--surface-secondary, #f8f9fa);
-        border: 1px solid var(--border-color, #e9ecef);
-        border-radius: var(--radius-md, 8px);
-        color: var(--text-primary, #202124);
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.15s ease;
-      }
-
-      .btn-explore-graph:hover {
-        background: var(--primary, #4285f4);
-        border-color: var(--primary, #4285f4);
-        color: white;
-      }
-
-      .btn-icon {
-        font-size: 1.125rem;
-      }
-
-      /* Backdrop */
-      .panel-backdrop {
-        display: none;
-      }
-
-      /* Desktop layout (panel always visible) */
+      /* Desktop layout — drop the main column's right padding when the rail is
+         pinned (path mode), matching the legacy behavior. */
       @media (min-width: 1024px) {
-        .panel-toggle {
-          display: none;
-        }
-
-        .exploration-panel {
-          position: relative;
-          transform: none;
-          width: 320px;
-          flex-shrink: 0;
-        }
-
-        .exploration-panel.collapsed {
-          display: none;
-        }
-
         .lesson-view:not(.standalone) .lesson-main {
           padding-right: 0;
         }
-      }
-
-      /* Mobile layout */
-      @media (max-width: 1023px) {
-        .exploration-panel {
-          width: 100%;
-          max-width: 360px;
-        }
-
-        .panel-backdrop {
-          display: block;
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.4);
-          z-index: 25;
-          opacity: 0;
-          animation: fadeIn 0.2s ease forwards;
-        }
-
-        @keyframes fadeIn {
-          to {
-            opacity: 1;
-          }
-        }
-      }
-
-      /* Standalone mode (no sidebar) */
-      .lesson-view.standalone .exploration-panel {
-        display: none;
-      }
-
-      .lesson-view.standalone .panel-toggle {
-        display: none;
       }
     `,
   ],
