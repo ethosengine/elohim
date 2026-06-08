@@ -261,6 +261,11 @@ export const CONTENT_VIEWER = {
   ROOT: 'content-viewer',
 } as const;
 
+/** Raw-node inspector (elohim-app: epr-raw-node.component, shell-rendered at /epr/:id/raw). */
+export const RAW_NODE = {
+  ROOT: 'epr-raw-node', // EPR shown AS an atom — the raw subview, never a 302 to a pillar mount
+} as const;
+
 // Content viewer (elohim-app: content-viewer.component.html)
 export const VIEWER = {
   BACK_HOME: 'viewer-back-home',

@@ -43,6 +43,7 @@ import {
   NOT_FOUND,
   PATH_NAV,
   PATH_OVERVIEW,
+  RAW_NODE,
 } from '../../src/framework/pages/selectors.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
@@ -309,6 +310,28 @@ Then('the cross-pillar resource viewer renders', async function (this: E2EWorld)
   assert.ok(
     rendered,
     `Expected the cross-pillar resource viewer to render (data-testid="${CONTENT_VIEWER.ROOT}"); ` +
+      `URL is "${device.page.url()}"`
+  );
+});
+
+/**
+ * "Then the lamad raw-node inspector renders" — the /epr/{id}/raw subview
+ * resolved to the shell's raw-node inspector (the doorway served the shell for
+ * the /raw subview — never a 302 to a pillar mount — and the shell's
+ * epr/:resourceId/raw route rendered the EPR as an atom). Render-verified by the
+ * inspector's root testid. (EPR Slice 0.)
+ *
+ * Example: Then the lamad raw-node inspector renders
+ */
+Then('the lamad raw-node inspector renders', async function (this: E2EWorld) {
+  const device = await ensureVisitor(this);
+  if (!device) {
+    return PENDING;
+  }
+  const rendered = await rootRendered(device, RAW_NODE.ROOT);
+  assert.ok(
+    rendered,
+    `Expected the raw-node inspector to render (data-testid="${RAW_NODE.ROOT}"); ` +
       `URL is "${device.page.url()}"`
   );
 });

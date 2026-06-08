@@ -113,19 +113,29 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     Then the response status is 200
     And the response body contains "/lamad/path/foundations-christian-technology"
 
-  @browser-only
-  Scenario: View as Content from the path overview honors the path claim
-    # Rendered-anchor coverage (operator click-path, 2026-06-06): the overview's
-    # "View as Content" anchor minted /epr/path-{id} — a NONEXISTENT id (the
-    # path's content id IS the bare id; broken since the Slice-1 era, surfaced
-    # by a human click — exactly the class the #7-5 conformance crawler will
-    # generalize). Post-Slice-3 truth: the bare path id is a CLAIMED type, so
-    # /epr/{path-id} 302s back to the pretty mount (§12.1) — following the link
-    # lands on the rendered path overview again. (Whether a claimed type should
-    # offer a "View as Content" affordance at all is a lamad UX question —
-    # captured in epr-routing-complementary-captures.)
+  @browser-only @regression
+  Scenario: View as Content opens the raw-node inspector, not a round-trip
+    # EPR Slice 0 (lens-complete-epr-resolution): the overview's "View as Content"
+    # minted the claims-aware universal address, which 302s a CLAIMED path back to
+    # its OWN pretty mount — a round-trip to itself (the UX contradiction captured
+    # 2026-06-06 in epr-routing-complementary-captures; the earlier /epr/path-{id}
+    # nonexistent-id bug it first exposed is fixed). It now mints the raw subview,
+    # so following the link lands on the raw-node inspector: the EPR shown AS an
+    # atom (id/CID, format, provenance), distinct from the rich path experience.
+    # Guards the round-trip from returning.
     Given a learner opens the deep link "/lamad/path/foundations-christian-technology" cold
     Then the lamad path overview renders
     When the learner follows the View as Content link
-    Then the lamad path overview renders
+    Then the lamad raw-node inspector renders
+
+  @browser-only @regression
+  Scenario: The universal raw address renders the node inspector, never a 302
+    # EPR Slice 0: /epr/{id}/raw is the raw-node inspector. The doorway serves the
+    # shell for the /raw subview — never a 302 to a pillar mount, even for a
+    # CLAIMED type — and the shell's epr/:resourceId/raw route renders the atom.
+    # Contrast the bare "/epr/{id}" sibling above, where a claimed type 302s to
+    # its mount: same EPR, different subview, different surface.
+    Given a learner opens the deep link "/epr/foundations-christian-technology/raw"
+    Then the lamad raw-node inspector renders
+    And the rendered surface is not a raw error response
 
