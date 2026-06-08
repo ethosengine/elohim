@@ -17,7 +17,8 @@
 //! The Commitment entry has three fields on the DHT wire:
 //! - `action` — action discriminator string ("delegates-compute", etc.)
 //! - `payload_json` — JSON string holding the action-specific policy envelope
-//! - `signed_at` — ISO-8601 timestamp from the coordinator
+//! - `signed_at` — epoch-seconds string from `sys_time()` in the coordinator
+//!   (e.g. "1748390400"), NOT ISO-8601
 //!
 //! For `delegates-compute` the payload carries `scope`, `provider`,
 //! `recipient`, `bounds` (object), `valid_from`, `valid_until`.
@@ -43,12 +44,9 @@
 //!                "author": "..." } }
 //! ```
 
-use tracing::{debug, info, warn};
+use tracing::warn;
 
-use crate::db::mishpat_commitments;
 use crate::db::models::NewMishpatCommitment;
-use crate::db::DbPool;
-use crate::error::StorageError;
 
 // ============================================================================
 // Wire mirror of DNA Commitment entry
@@ -68,7 +66,9 @@ pub struct CommitmentPayload {
     /// JSON-encoded policy envelope specific to `action`. Parsed by
     /// `parse_commitment_payload` to extract scope/provider/recipient/bounds.
     pub payload_json: String,
-    /// ISO-8601 signing timestamp from `sys_time()` in the coordinator.
+    /// Epoch-seconds string from `sys_time()` in the coordinator (e.g. "1748390400").
+    /// NOT ISO-8601. The bounds validator uses `valid_from`/`valid_until` from
+    /// the inner `payload_json` (which ARE ISO-8601); this field is metadata only.
     pub signed_at: String,
 }
 
@@ -192,10 +192,12 @@ fn parse_delegates_compute(
         .ok_or_else(|| "delegates-compute payload missing 'valid_until'".to_string())?
         .to_string();
     // `bounds` is the full policy object; round-trip to compact JSON for storage.
+    // Fail-closed: a notarized row with absent bounds would let T6 grant an
+    // empty-bounds pass — require the field rather than silently defaulting.
     let bounds_json = payload
         .get("bounds")
         .map(|b| b.to_string())
-        .unwrap_or_else(|| "{}".to_string());
+        .ok_or_else(|| "delegates-compute payload missing 'bounds'".to_string())?;
 
     Ok(NewMishpatCommitment {
         cid: entry_hash.to_string(),
@@ -284,11 +286,13 @@ fn parse_acknowledges_reach_change(
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    // Point-in-time: valid_from = valid_until = signed_at from payload or fallback to now.
+    // Point-in-time: valid_from = valid_until = signed_at from payload.
+    // Fail-closed: a notarized row with empty validity timestamps is invalid —
+    // require the field rather than silently allowing an anchor with no time bounds.
     let signed_at = payload
         .get("signed_at")
         .and_then(|v| v.as_str())
-        .unwrap_or("")
+        .ok_or_else(|| "acknowledges-reach-change payload missing 'signed_at'".to_string())?
         .to_string();
 
     Ok(NewMishpatCommitment {
@@ -304,61 +308,6 @@ fn parse_acknowledges_reach_change(
         state: "proposed".to_string(),
         dht_anchor_hash: Some(action_hash.to_string()),
     })
-}
-
-// ============================================================================
-// Signal handler
-// ============================================================================
-
-/// Handle a `CommitmentCommitted` signal from the mishpat DNA.
-///
-/// Acquires a pool connection, parses the payload, and calls
-/// `mishpat_commitments::upsert_with_anchor`. Errors are logged as warnings
-/// and not propagated — a single malformed signal must not crash the stream.
-pub fn handle_commitment_committed(
-    action_hash: &str,
-    entry_hash: &str,
-    commitment: &CommitmentPayload,
-    pool: &DbPool,
-) -> Result<(), StorageError> {
-    debug!(
-        action = %commitment.action,
-        entry_hash = %entry_hash,
-        action_hash = %action_hash,
-        "mishpat_projection: CommitmentCommitted received"
-    );
-
-    let new_row = match parse_commitment_payload(
-        &commitment.action,
-        &commitment.payload_json,
-        entry_hash,
-        action_hash,
-    ) {
-        Ok(row) => row,
-        Err(e) => {
-            warn!(
-                error = %e,
-                action_hash = %action_hash,
-                "mishpat_projection: payload parse failed — signal dropped"
-            );
-            return Ok(()); // non-fatal: don't crash the stream
-        }
-    };
-
-    let mut conn = pool
-        .get()
-        .map_err(|e| StorageError::Internal(format!("Pool error in mishpat_projection: {e}")))?;
-
-    mishpat_commitments::upsert_with_anchor(&mut conn, new_row)
-        .map_err(|e| StorageError::Database(e.to_string()))?;
-
-    info!(
-        cid = %entry_hash,
-        action_hash = %action_hash,
-        "mishpat_projection: CommitmentCommitted projected → mishpat_commitments"
-    );
-
-    Ok(())
 }
 
 // ============================================================================
@@ -516,6 +465,29 @@ mod tests {
         assert_eq!(bounds["rotation_ttl_days"], 90);
     }
 
+    #[test]
+    fn parse_replicates_dwelling_missing_provider_fails() {
+        let payload = serde_json::json!({
+            "action": "replicates-dwelling",
+            // "provider_dwelling_hub_id" deliberately omitted
+            "recipient_dwelling_hub_id": "hub:B",
+            "capacity_bytes": 50_000_000_000u64,
+            "valid_from": "2026-05-28T00:00:00Z",
+            "valid_until": "2026-08-26T00:00:00Z"
+        })
+        .to_string();
+
+        let result = parse_commitment_payload("replicates-dwelling", &payload, "eh1", "ah1");
+        assert!(
+            result.is_err(),
+            "missing provider_dwelling_hub_id must return Err"
+        );
+        assert!(
+            result.unwrap_err().contains("provider_dwelling_hub_id"),
+            "error must mention 'provider_dwelling_hub_id'"
+        );
+    }
+
     // ── acknowledges-reach-change ─────────────────────────────────────────────
 
     fn acknowledges_reach_change_payload() -> String {
@@ -601,19 +573,24 @@ mod tests {
 
     /// Guard: the JSON wire shape from the DNA's `CommitmentCommitted` signal
     /// must decode into our storage-side `CommitmentPayload` struct.
+    ///
+    /// `signed_at` is an epoch-seconds string from `sys_time()` in the coordinator
+    /// (e.g. "1748390400"), NOT ISO-8601. The bounds validator uses `valid_from`/
+    /// `valid_until` from the inner `payload_json` for time-based checks.
     #[test]
     fn decode_commitment_payload_from_dna_wire_shape() {
         let wire = serde_json::json!({
             "action": "delegates-compute",
             "payload_json": "{\"action\":\"delegates-compute\",\"scope\":\"republish-epr\",\"provider\":\"agent:alice\",\"recipient\":\"agent:bob\",\"bounds\":{\"epr_scope\":[\"epr:lamad-spa\"],\"reach_ceiling\":\"commons\",\"rate_per_hour\":30,\"rotation_ttl_days\":90},\"valid_from\":\"2026-05-28T00:00:00Z\",\"valid_until\":\"2026-08-26T00:00:00Z\"}",
-            "signed_at": "2026-05-28T10:00:00Z"
+            "signed_at": "1748390400"
         });
 
         let payload: CommitmentPayload = serde_json::from_value(wire)
             .expect("DNA wire shape must decode into CommitmentPayload");
 
         assert_eq!(payload.action, "delegates-compute");
-        assert_eq!(payload.signed_at, "2026-05-28T10:00:00Z");
+        // epoch-seconds string, not ISO-8601
+        assert_eq!(payload.signed_at, "1748390400");
         assert!(!payload.payload_json.is_empty());
     }
 }
