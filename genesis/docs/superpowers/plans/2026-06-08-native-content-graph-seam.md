@@ -21,12 +21,15 @@ cites:
 ## Build & Test Conventions (read once)
 
 - **Branch:** all work on `feat/native-content-graph-seam` (already created). Commit per task.
-- **elohim-storage cargo:** from `/projects/elohim/elohim/elohim-storage`, set the pool slot and KEEP the default RUSTFLAGS (the custom getrandom backend — do NOT clear it for elohim-storage):
+- **elohim-storage cargo:** from `/projects/elohim/elohim/elohim-storage`. CONFIRMED in A2: the cargo-pool slot hits a `/projects`-volume `.fingerprint` ENOENT race in this container, and `cargo-pool key` prints a MULTI-LINE block (so `$(cargo-pool key)` inline is broken). Use a stable `/tmp` target dir, reused across tasks so it stays warm:
   ```bash
-  export CARGO_TARGET_DIR="$(cargo-pool key)"   # per-worktree pool slot; avoids 30G legacy target balloon
-  cargo test --lib <filter>                      # plain cargo (this container has no working nextest)
+  export CARGO_TARGET_DIR=/tmp/ge-target   # warm after A2's cold build; persists across tasks/subagents on the shared FS
+  # KEEP the default RUSTFLAGS (custom getrandom) — do NOT clear it for elohim-storage.
+  cargo check --lib            # faster than build for a compile-verify
+  cargo test --lib <filter>    # plain cargo (no working nextest in this container)
   ```
-- **ts-rs export** (from `/projects/elohim/elohim/elohim-views`): `CARGO_TARGET_DIR="$(cargo-pool key)" cargo test export_bindings`.
+  Cold builds exceed the 10-min foreground Bash cap → run cargo via `run_in_background: true` and poll; incremental artifacts persist so a re-run resumes. Never run two cargo processes against the same target dir concurrently.
+- **ts-rs export** (from `/projects/elohim/elohim/elohim-views`): `CARGO_TARGET_DIR=/tmp/ev-target cargo test export_bindings` (same /tmp-target rationale).
 - **Schema codegen** (repo root): `pnpm run schema:codegen:ts` and `pnpm run schema:validate`.
 - **lamad Angular** (from `/projects/elohim/app/lamad`): confirm the runner in `package.json`; tests are vitest — `pnpm exec vitest run <pattern>` (verify the `--config` path from package.json `test` script before first run).
 - **seeder** (from `/projects/elohim/genesis/seeder`): `pnpm run validate`, then targeted seed (Task C2).
