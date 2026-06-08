@@ -29,6 +29,7 @@ pub mod bootstrap_manifests;
 pub mod bounds_validator;
 pub mod cluster_view;
 pub mod commitment_fetcher;
+pub mod conductor_commitment_author; // Slice-2b — production CommitmentAuthor (conductor-backed provide loop)
 pub mod conductor_writes; // 2026-05-26-substrate-rea-replication-fix — facade for HTTP→conductor zome calls
 pub mod connectivity; // Phase 4 T6 — libp2p connected-peers snapshot helper
 pub mod constitutional_ratio_registry;

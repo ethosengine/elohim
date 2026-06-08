@@ -761,6 +761,118 @@ async fn async_main(
                     );
                 }
 
+                // ── Slice-2b provide-loop AUTHORING tick ─────────────────────
+                //
+                // The P1 reconciliation controller's WRITE half: every ~60s,
+                // derive the caught-up commons pin set and author the
+                // `replicates-commons` Commitment + ProvideAnnounce for any
+                // desired key with no live actual row. Logical-key dedup against
+                // the live projection is the author-once guarantee (restart-safe).
+                //
+                // This lives here (not in P2PNode) because the conductor author
+                // seam (`registry.lamad`) is only available in this composition
+                // scope — P2PNode::run_provide_reconcile keeps calling observe()
+                // for latch hydration only. Requires lamad HcClient + db pool +
+                // self_cid; absent any, the loop is not spawned.
+                //
+                // Caught-up proxy: for an `item` pin, local content presence IS
+                // the durable, DB-queryable signal that byte arrival completed.
+                // `content_ids_with_reach(.., "commons")` answers present-AND-
+                // commons in one query, which is exactly the desired-set gate.
+                match (
+                    registry.lamad.clone(),
+                    db_pool.clone(),
+                    config.self_cid.clone(),
+                ) {
+                    (Some(lamad_hc), Some(provide_pool), Some(self_cid))
+                        if !self_cid.is_empty() =>
+                    {
+                        let author = std::sync::Arc::new(
+                            elohim_storage::services::conductor_commitment_author::ConductorCommitmentAuthor::new(
+                                lamad_hc,
+                                self_cid.clone(),
+                                provide_pool.clone(),
+                            ),
+                        );
+                        let reconciler = std::sync::Arc::new(
+                            elohim_storage::services::provide_reconcile::ProvideReconciler::new(),
+                        );
+                        let self_cid_for_log = self_cid.clone();
+                        let mut provide_shutdown = shutdown_tx.subscribe();
+                        tokio::spawn(async move {
+                            use tokio::time::{interval, Duration, MissedTickBehavior};
+                            let mut ticker = interval(Duration::from_secs(60));
+                            ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                            let app_ctx = elohim_storage::db::AppContext::default_lamad();
+                            loop {
+                                tokio::select! {
+                                    _ = ticker.tick() => {
+                                        // Derive desired set: active `item` pins
+                                        // whose content is locally present AND
+                                        // commons-reach (the caught-up proxy).
+                                        let desired = {
+                                            let mut conn = match provide_pool.get() {
+                                                Ok(c) => c,
+                                                Err(e) => {
+                                                    tracing::warn!(error = %e, "provide author tick: db conn failed (retry next tick)");
+                                                    continue;
+                                                }
+                                            };
+                                            let pins = match elohim_storage::db::acquisition_pins::list_active_pins(&mut conn) {
+                                                Ok(p) => p,
+                                                Err(e) => {
+                                                    tracing::warn!(error = %e, "provide author tick: pin load failed (retry next tick)");
+                                                    continue;
+                                                }
+                                            };
+                                            let head_refs: Vec<String> = pins.iter().map(|p| p.head_ref.clone()).collect();
+                                            let commons_present = elohim_storage::db::content_diesel::content_ids_with_reach(
+                                                &mut conn, &app_ctx, &head_refs, "commons",
+                                            )
+                                            .unwrap_or_default();
+                                            // present-and-commons doubles as both
+                                            // the caught-up and commons gate.
+                                            elohim_storage::services::provide_reconcile::ProvideReconciler::derive_desired(
+                                                &pins, &commons_present, &commons_present,
+                                            )
+                                        };
+                                        if desired.is_empty() {
+                                            continue;
+                                        }
+                                        match reconciler.reconcile_provides(&provide_pool, &*author, &self_cid, &desired).await {
+                                            Ok(authored) if authored > 0 => {
+                                                tracing::info!(
+                                                    target: "elohim_storage::provide",
+                                                    authored,
+                                                    desired = desired.len(),
+                                                    "provide author tick: authored new replicates-commons commitments"
+                                                );
+                                            }
+                                            Ok(_) => {}
+                                            Err(e) => {
+                                                tracing::warn!(error = %e, "provide author tick: reconcile failed (retry next tick)");
+                                            }
+                                        }
+                                    }
+                                    _ = provide_shutdown.recv() => {
+                                        tracing::debug!("provide author tick: shutdown signal received, exiting");
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                        info!(
+                            self_cid = %self_cid_for_log,
+                            "Slice-2b provide-loop authoring tick started (60s interval, shutdown-aware)"
+                        );
+                    }
+                    _ => {
+                        info!(
+                            "Slice-2b provide-loop authoring tick disabled: requires lamad HcClient + db pool + non-empty self_cid"
+                        );
+                    }
+                }
+
                 // Stash the registry in shared state for HTTP handlers.
                 hc_registry_for_http = Some(registry);
             }

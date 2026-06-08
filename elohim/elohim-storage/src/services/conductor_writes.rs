@@ -167,6 +167,41 @@ pub struct CreateMishpatCommitmentInput {
     pub signed_at: String,
 }
 
+/// Typed decode of the `mishpat::create_commitment` coordinator return
+/// (`CommitmentOutput { action_hash, entry_hash }`).
+///
+/// The coordinator returns native `ActionHash`/`EntryHash` HoloHash types (not
+/// base64 strings — that is only the *signal* wire shape). Decoding into these
+/// typed fields lets callers derive the canonical base64 `uhCkk…` CID via the
+/// HoloHash `Display` impl (`format!("{}", out.action_hash)`), exactly mirroring
+/// how `rea_commitment_service` decodes `shefa_types::ReaCommitmentOutput`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CreateCommitmentOutput {
+    pub action_hash: holochain_types::prelude::ActionHash,
+    pub entry_hash: holochain_types::prelude::EntryHash,
+}
+
+/// Round-trip the Mishpat `create_commitment` coordinator and decode the new
+/// commitment's `action_hash` to its canonical base64 CID string.
+///
+/// This is the typed convenience over [`call_create_commitment`] for callers
+/// (e.g. the production `CommitmentAuthor`) that need the new commitment CID as
+/// the pin back-reference and the `bounded_by` annotation. The base64 form is
+/// derived from the HoloHash `Display` impl — the same value the post-commit
+/// projection stores as `dht_anchor_hash`.
+pub async fn create_commitment_returning_cid(
+    hc: &Arc<HcClient>,
+    input: CreateMishpatCommitmentInput,
+) -> Result<String, StorageError> {
+    let bytes = call_create_commitment(hc, input).await?;
+    let out: CreateCommitmentOutput = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode CreateCommitmentOutput: {e}"
+        ))
+    })?;
+    Ok(format!("{}", out.action_hash))
+}
+
 /// Wire mirror of the `mishpat::get_commitment` output. Used by
 /// [`crate::services::commitment_fetcher::ConductorCommitmentFetcher::fetch`] to
 /// read a notarized commitment back.
