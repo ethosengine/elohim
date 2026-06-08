@@ -1480,11 +1480,11 @@ export class DataLoaderService {
       }
 
       const request = this.fetchResolvedRelationshipsForNode(contentId, depth).pipe(
-        shareReplay(1),
         catchError(_err => {
           this.resolvedRelationshipByNodeCache.delete(cacheKey);
           return of([]);
-        })
+        }),
+        shareReplay(1),
       );
 
       this.resolvedRelationshipByNodeCache.set(cacheKey, request);
@@ -1507,7 +1507,9 @@ export class DataLoaderService {
     contentId: string,
     depth: number
   ): Observable<ContentRelationship[]> {
-    const explicitBoth$ = this.fetchRelationshipsForNode(contentId, 'both');
+    const explicitBoth$ = this.fetchRelationshipsForNode(contentId, 'both').pipe(
+      catchError(() => of([]))
+    );
     const computedGraph$ = this.contentService
       .getContentGraph(contentId, { computed: true, depth })
       .pipe(
@@ -1555,7 +1557,7 @@ export class DataLoaderService {
     node: ContentGraphNode
   ): ContentRelationship {
     return {
-      id: `${rootId}->${node.contentId}`,
+      id: `${rootId}->${node.contentId}:${node.relationshipType}`,
       sourceNodeId: rootId,
       targetNodeId: node.contentId,
       relationshipType: node.relationshipType as ContentRelationshipType,
