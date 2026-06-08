@@ -418,9 +418,14 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/']);
   }
 
-  /** Mint the universal EPR address for this path's content (never a literal). */
+  /**
+   * Mint the "View as Content" address — the raw-node inspector (the `raw`
+   * subview), never a literal. A bare universal address would 302 back to this
+   * very path mount (the claim owns `contentType: 'path'`, §12.1 round-trip);
+   * the `raw` subview shows the EPR as an atom instead. (EPR Slice 0.)
+   */
   eprHref(id: string): string {
-    return eprToUniversalHref({ id, tier: 'head' });
+    return eprToUniversalHref({ id, tier: 'head', subview: 'raw' });
   }
 
   /**

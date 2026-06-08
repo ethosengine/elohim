@@ -42,6 +42,14 @@ export interface EprRef {
   reach?: string;
   /** Graph position: step, chapter, or relationship */
   fragment?: EprFragment;
+  /**
+   * Universal-address subview. Default (omitted) is the claims-aware address
+   * (`/epr/{id}`), which 302s a claimed type to its pretty pillar mount. `'raw'`
+   * targets the raw-node inspector (`/epr/{id}/raw`) — the EPR shown AS an atom,
+   * which the doorway always serves to the shell (never 302s). Used by the
+   * "View as Content" affordance so it stops round-tripping back to the mount.
+   */
+  subview?: 'raw';
 }
 
 const EPR_PREFIX = 'epr:';
@@ -214,8 +222,11 @@ export interface EprRouteResolution {
  * the Slice-3 doorway resolver. Fragment VALUES are assumed URL-safe slugs.
  */
 export function eprToUniversalHref(ref: EprRef): string {
+  // `/raw` is a path subview (the raw-node inspector), so it precedes any
+  // fragment: /epr/{id}/raw#step/3. Default omits it → the claims-aware address.
+  const sub = ref.subview === 'raw' ? '/raw' : '';
   const frag = ref.fragment ? `#${formatFragment(ref.fragment)}` : '';
-  return `/epr/${encodeURIComponent(ref.id)}${frag}`;
+  return `/epr/${encodeURIComponent(ref.id)}${sub}${frag}`;
 }
 
 /**

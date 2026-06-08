@@ -233,6 +233,21 @@ describe('EprRef', () => {
     it('URI-encodes the id', () => {
       expect(eprToUniversalHref({ id: 'a b', tier: 'head' })).toBe('/epr/a%20b');
     });
+    it('targets the raw-node inspector for the raw subview', () => {
+      expect(eprToUniversalHref({ id: 'manifesto', tier: 'head', subview: 'raw' })).toBe(
+        '/epr/manifesto/raw'
+      );
+    });
+    it('places /raw before the fragment', () => {
+      expect(
+        eprToUniversalHref({
+          id: 'p',
+          tier: 'head',
+          subview: 'raw',
+          fragment: { type: 'step', value: '3' },
+        })
+      ).toBe('/epr/p/raw#step/3');
+    });
   });
 
   describe('eprToDid', () => {
