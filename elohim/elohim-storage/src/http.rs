@@ -8723,6 +8723,8 @@ impl HttpServer {
 
     /// GET /api/v1/pins — list all pins with optional per-pin pull enrichment.
     async fn handle_list_pins(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Wire shape {pins, pull}: clients correlate pull[].pinId → pins[].id
+        // (two parallel lists, joined by pin id; pull is null without p2p).
         let mut conn = self.get_diesel_conn()?;
         let pins = db::acquisition_pins::list_all_pins(&mut conn)
             .map_err(|e| StorageError::Database(e.to_string()))?;
@@ -8811,8 +8813,10 @@ impl HttpServer {
         body_bytes: &[u8],
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         let input: elohim_views::acquisition::CreatePinInputView =
-            serde_json::from_slice(body_bytes)
-                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+            match serde_json::from_slice(body_bytes) {
+                Ok(v) => v,
+                Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {}", e))),
+            };
 
         let kind = input.kind.unwrap_or_else(|| "item".to_string());
 
@@ -8838,12 +8842,15 @@ impl HttpServer {
         let pin = db::acquisition_pins::upsert_pin(
             &mut conn,
             db::models::NewAcquisitionPin {
+                // Slice 1: single-device identity placeholder. TODO(slice-2): use
+                // the wired agent identity (self.p2p_handle.agent_pubkey) so pins
+                // are keyed to the real agent, not a shared "local-device".
                 agent_pub_key: "local-device".to_string(),
                 head_ref: input.head_ref,
                 kind,
-                closure_rule_json: input
-                    .closure_rule
-                    .map(|v| serde_json::to_string(&v.0).unwrap_or_default()),
+                closure_rule_json: input.closure_rule.map(|v| {
+                    serde_json::to_string(&v.0).expect("serializing a JSON Value is infallible")
+                }),
                 priority: input.priority.unwrap_or(1),
             },
         )

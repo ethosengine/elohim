@@ -14,6 +14,7 @@
 //! 3. POST /api/v1/pins {"headRef":"epr:c","kind":"cluster"} → 501, mentions slice-3.
 //! 4. GET /api/v1/pins → 200, exactly one active pin for epr:x, pull field present.
 //! 5. DELETE /api/v1/pins/{id} → 200; GET shows that pin status=="removed".
+//! 6. POST /api/v1/pins with malformed body → 400 JSON error (not 500).
 
 use elohim_storage::http::HttpServer;
 use elohim_storage::test_util::test_pool;
@@ -222,5 +223,33 @@ async fn delete_pin_soft_deletes_and_remains_in_list() {
         active.is_empty(),
         "no active pins after delete; got: {:?}",
         active
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §6  POST with malformed body → 400 JSON error (not 500)
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn post_malformed_json_returns_400() {
+    let server = build_server().await;
+
+    // Send a body that is not valid JSON at all.
+    let resp = server.test_handle_create_pin_raw("{not json").await;
+
+    assert_eq!(
+        resp.status,
+        400,
+        "malformed POST body must return 400, not 500; body: {:?}",
+        std::str::from_utf8(&resp.body)
+    );
+
+    // The response body must be valid JSON with an "error" field.
+    let body: serde_json::Value =
+        serde_json::from_slice(&resp.body).expect("400 response must itself be valid JSON");
+    assert!(
+        body.get("error").is_some(),
+        "400 body must contain an 'error' field; got: {}",
+        body
     );
 }

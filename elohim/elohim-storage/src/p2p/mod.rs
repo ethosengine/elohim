@@ -1132,6 +1132,7 @@ impl P2PHandle {
             delivery_peers: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
+            // Stub state — NOT shared with any P2PNode; acquisition_per_pin() always empty here.
             acquisition: acquisition::AcquisitionState::new(),
         }
     }
@@ -1157,6 +1158,7 @@ impl P2PHandle {
             delivery_peers: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
+            // Stub state — NOT shared with any P2PNode; acquisition_per_pin() always empty here.
             acquisition: acquisition::AcquisitionState::new(),
         }
     }
