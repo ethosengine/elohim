@@ -16,12 +16,19 @@
 
 use crate::error::StorageError;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Fetch priority for an advertised blob. Ordering is meaningful: the enqueue
+/// gate treats anything strictly above `Skip` as fetch-worthy. Declaration
+/// order is ascending — `Skip < Medium < High`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FetchPriority {
-    High,
-    #[allow(dead_code)] // reserved: commons-tier follow-up
-    Medium,
+    /// Below the fetch floor — never enqueued.
     Skip,
+    /// Commons-tier: fetched only during an active acquisition pull (the
+    /// content id is supplied as scoring context). Not fetched on passive
+    /// gossip replication.
+    Medium,
+    /// Dwelling-tier: a `replicates-dwelling` commitment recipient/scope match.
+    High,
 }
 
 #[derive(Debug, Clone)]
@@ -36,10 +43,13 @@ pub struct AdvertisedBlob {
 #[derive(Debug, Clone)]
 pub struct ActiveCommitment {
     pub commitment_cid: String,
-    pub action: String, // "replicates-dwelling" etc.
+    pub action: String, // "replicates-dwelling" | "replicates-commons"
     pub recipient_hub_id: String,
     pub scope_epr_kinds: Option<Vec<String>>,
     pub bytes_per_blob_max: Option<u64>,
+    /// Present only for `replicates-commons`: the content head_ref this
+    /// commitment covers. `None` for dwelling commitments.
+    pub head_ref: Option<String>,
 }
 
 /// Load the local peer's active `replicates-dwelling` commitments from `rea_commitments`.
@@ -54,10 +64,12 @@ pub fn active_commitments_for_provider(
     conn: &mut diesel::SqliteConnection,
     self_cid: &str,
 ) -> Result<Vec<ActiveCommitment>, StorageError> {
+    use crate::db::diesel_schema::mishpat_commitments::dsl as mc;
     use crate::db::diesel_schema::rea_commitments::dsl as rc;
     use diesel::prelude::*;
     use elohim_views::replicates_dwelling::ReplicatesDwellingPayload;
 
+    // -- Arm 1: replicates-dwelling (rea_commitments) — unchanged behaviour.
     let rows: Vec<crate::db::models::ReaCommitment> = rc::rea_commitments
         .filter(rc::provider.eq(self_cid))
         .filter(rc::action.eq("replicates-dwelling"))
@@ -90,15 +102,56 @@ pub fn active_commitments_for_provider(
             recipient_hub_id: payload.recipient_dwelling_hub_id,
             scope_epr_kinds: payload.scope_filter.epr_kinds,
             bytes_per_blob_max: payload.scope_filter.bytes_per_blob_max,
+            head_ref: None,
         });
     }
+
+    // -- Arm 2: replicates-commons (mishpat_commitments). Notarized only:
+    // require dht_anchor_hash NOT NULL so un-notarized rows never drive a fetch
+    // (the commons path is conductor-authored, unlike dwelling's storage-direct
+    // rowid fallback). The `recipient` column holds the content head_ref.
+    let commons: Vec<crate::db::models::MishpatCommitment> = mc::mishpat_commitments
+        .filter(mc::provider.eq(self_cid))
+        .filter(mc::action.eq("replicates-commons"))
+        .filter(mc::dht_anchor_hash.is_not_null())
+        .filter(mc::revoked_at.is_null())
+        .load(conn)
+        .map_err(|e| {
+            StorageError::Database(format!("active_commitments_for_provider commons: {e}"))
+        })?;
+
+    for row in commons {
+        // dht_anchor_hash is guaranteed non-null by the filter; prefer it as the cid.
+        let cid = row
+            .dht_anchor_hash
+            .clone()
+            .unwrap_or_else(|| row.cid.clone());
+        out.push(ActiveCommitment {
+            commitment_cid: cid,
+            action: row.action,
+            recipient_hub_id: row.recipient.clone(),
+            scope_epr_kinds: None,
+            bytes_per_blob_max: None,
+            head_ref: Some(row.recipient),
+        });
+    }
+
     Ok(out)
 }
 
+/// Score an advertised blob against the local peer's active commitments.
+///
+/// Dwelling commitments score `High` via recipient-hub/scope/size matching
+/// (unchanged). Commons commitments score `Medium` only when `content_id_ctx`
+/// — the head_ref of an in-flight acquisition pull — equals the commitment's
+/// `head_ref`. Passive gossip replication passes `content_id_ctx == None`, so
+/// commons never fires there (no greedy whole-commons fetch).
 pub fn score_advertised_blob(
     advertised: &AdvertisedBlob,
     active_commitments: &[ActiveCommitment],
+    content_id_ctx: Option<&str>,
 ) -> FetchPriority {
+    // Dwelling tier (High) — unchanged.
     for commitment in active_commitments {
         if commitment.action != "replicates-dwelling" {
             continue;
@@ -128,7 +181,20 @@ pub fn score_advertised_blob(
         }
         return FetchPriority::High;
     }
-    // Commons-tier eligible — deferred. Sprint 3 always returns Skip when no dwelling match.
+
+    // Commons tier (Medium) — fires only during an active acquisition pull, when
+    // the head_ref under acquisition is supplied as context.
+    if let Some(ctx) = content_id_ctx {
+        for commitment in active_commitments {
+            if commitment.action != "replicates-commons" {
+                continue;
+            }
+            if commitment.head_ref.as_deref() == Some(ctx) {
+                return FetchPriority::Medium;
+            }
+        }
+    }
+
     FetchPriority::Skip
 }
 
@@ -336,6 +402,7 @@ mod tests {
             recipient_hub_id: "collective:hubH".into(),
             scope_epr_kinds: Some(vec!["Content".into()]),
             bytes_per_blob_max: Some(10_000_000),
+            head_ref: None,
         };
         let matching = AdvertisedBlob {
             blob_cid: sha256_wire_str('a'),
@@ -353,12 +420,12 @@ mod tests {
         };
 
         assert_eq!(
-            score_advertised_blob(&matching, std::slice::from_ref(&commitment)),
+            score_advertised_blob(&matching, std::slice::from_ref(&commitment), None),
             FetchPriority::High,
             "hint matching active commitment → High"
         );
         assert_eq!(
-            score_advertised_blob(&non_matching, &[commitment]),
+            score_advertised_blob(&non_matching, &[commitment], None),
             FetchPriority::Skip,
             "non-matching hub → Skip"
         );
@@ -378,6 +445,7 @@ mod tests {
             recipient_hub_id: recipient.into(),
             scope_epr_kinds: Some(vec!["Content".into()]),
             bytes_per_blob_max: Some(1_000_000_000),
+            head_ref: None,
         }
     }
 
@@ -395,33 +463,226 @@ mod tests {
     fn high_when_recipient_and_scope_match() {
         let c = commitment("replicates-dwelling", "hub:B");
         let a = ad("hub:B", "Content", 500_000_000);
-        assert_eq!(score_advertised_blob(&a, &[c]), FetchPriority::High);
+        assert_eq!(score_advertised_blob(&a, &[c], None), FetchPriority::High);
     }
 
     #[test]
     fn skip_when_no_matching_recipient() {
         let c = commitment("replicates-dwelling", "hub:B");
         let a = ad("hub:Z", "Content", 100);
-        assert_eq!(score_advertised_blob(&a, &[c]), FetchPriority::Skip);
+        assert_eq!(score_advertised_blob(&a, &[c], None), FetchPriority::Skip);
     }
 
     #[test]
     fn skip_when_blob_exceeds_size_ceiling() {
         let c = commitment("replicates-dwelling", "hub:B");
         let a = ad("hub:B", "Content", 5_000_000_000); // > 1GB max
-        assert_eq!(score_advertised_blob(&a, &[c]), FetchPriority::Skip);
+        assert_eq!(score_advertised_blob(&a, &[c], None), FetchPriority::Skip);
     }
 
     #[test]
     fn skip_when_kind_not_in_scope() {
         let c = commitment("replicates-dwelling", "hub:B");
         let a = ad("hub:B", "EconomicEvent", 100);
-        assert_eq!(score_advertised_blob(&a, &[c]), FetchPriority::Skip);
+        assert_eq!(score_advertised_blob(&a, &[c], None), FetchPriority::Skip);
     }
 
     #[test]
     fn skip_when_no_commitments() {
         let a = ad("hub:B", "Content", 100);
-        assert_eq!(score_advertised_blob(&a, &[]), FetchPriority::Skip);
+        assert_eq!(score_advertised_blob(&a, &[], None), FetchPriority::Skip);
+    }
+
+    // -----------------------------------------------------------------------
+    // Slice 2b T12: commons-tier scoring
+    // -----------------------------------------------------------------------
+
+    fn commons_commitment(head_ref: &str) -> ActiveCommitment {
+        ActiveCommitment {
+            commitment_cid: "comm:commons-1".into(),
+            action: "replicates-commons".into(),
+            recipient_hub_id: head_ref.into(), // recipient column == head_ref
+            scope_epr_kinds: None,
+            bytes_per_blob_max: None,
+            head_ref: Some(head_ref.into()),
+        }
+    }
+
+    #[test]
+    fn fetch_priority_orders_high_above_medium_above_skip() {
+        assert!(FetchPriority::High > FetchPriority::Medium);
+        assert!(FetchPriority::Medium > FetchPriority::Skip);
+        assert!(FetchPriority::High > FetchPriority::Skip);
+        // Ordering used by the enqueue gate: only Skip is the floor.
+        assert_eq!(
+            [
+                FetchPriority::Skip,
+                FetchPriority::High,
+                FetchPriority::Medium
+            ]
+            .iter()
+            .max()
+            .copied(),
+            Some(FetchPriority::High)
+        );
+    }
+
+    #[test]
+    fn commons_scored_medium_on_content_id_match() {
+        let c = commons_commitment("head:epr-XYZ");
+        // A commons advertisement carries no recipient_hub_id_hint; the match is
+        // purely the active-acquisition content id passed as context.
+        let a = AdvertisedBlob {
+            blob_cid: sha256_wire_str('c'),
+            source_peer_cid: "peer:source".into(),
+            blob_size_bytes: Some(2_000_000),
+            recipient_hub_id_hint: None,
+            epr_kind_hint: None,
+        };
+        assert_eq!(
+            score_advertised_blob(&a, std::slice::from_ref(&c), Some("head:epr-XYZ")),
+            FetchPriority::Medium,
+            "replicates-commons + content_id_ctx == head_ref → Medium"
+        );
+    }
+
+    #[test]
+    fn commons_skipped_when_no_content_id_ctx() {
+        // Passive gossip replication passes content_id_ctx = None: commons never
+        // fires, so the local peer does not greedily fetch every commons blob.
+        let c = commons_commitment("head:epr-XYZ");
+        let a = AdvertisedBlob {
+            blob_cid: sha256_wire_str('d'),
+            source_peer_cid: "peer:source".into(),
+            blob_size_bytes: Some(2_000_000),
+            recipient_hub_id_hint: None,
+            epr_kind_hint: None,
+        };
+        assert_eq!(
+            score_advertised_blob(&a, &[c], None),
+            FetchPriority::Skip,
+            "no content_id_ctx (passive replication) → commons does not fire"
+        );
+    }
+
+    #[test]
+    fn commons_skipped_when_content_id_mismatch() {
+        let c = commons_commitment("head:epr-XYZ");
+        let a = AdvertisedBlob {
+            blob_cid: sha256_wire_str('e'),
+            source_peer_cid: "peer:source".into(),
+            blob_size_bytes: Some(2_000_000),
+            recipient_hub_id_hint: None,
+            epr_kind_hint: None,
+        };
+        assert_eq!(
+            score_advertised_blob(&a, &[c], Some("head:OTHER")),
+            FetchPriority::Skip,
+            "content_id_ctx for a different head_ref → Skip"
+        );
+    }
+
+    #[test]
+    fn dwelling_path_unchanged_with_content_ctx_present() {
+        // A dwelling commitment still scores High via the hub-hint path even when
+        // an unrelated content_id_ctx is supplied — commons ctx must not perturb it.
+        let c = commitment("replicates-dwelling", "hub:B");
+        let a = ad("hub:B", "Content", 500_000_000);
+        assert_eq!(
+            score_advertised_blob(&a, &[c], Some("head:irrelevant")),
+            FetchPriority::High,
+            "dwelling High path is unaffected by content_id_ctx"
+        );
+    }
+
+    fn insert_replicates_commons_commitment(
+        conn: &mut diesel::SqliteConnection,
+        cid: &str,
+        provider: &str,
+        head_ref: &str,
+        dht_anchor_hash: Option<&str>,
+        revoked_at: Option<&str>,
+    ) {
+        use crate::db::diesel_schema::mishpat_commitments;
+        use diesel::prelude::*;
+        diesel::insert_into(mishpat_commitments::table)
+            .values((
+                mishpat_commitments::cid.eq(cid),
+                mishpat_commitments::action.eq("replicates-commons"),
+                mishpat_commitments::scope.eq("replicates-commons"),
+                mishpat_commitments::provider.eq(provider),
+                mishpat_commitments::recipient.eq(head_ref), // recipient == head_ref
+                mishpat_commitments::bounds_json
+                    .eq(r#"{"rate_per_minute":60,"reach_ceiling":"commons"}"#),
+                mishpat_commitments::valid_from.eq("2026-01-01T00:00:00Z"),
+                mishpat_commitments::valid_until.eq("2027-01-01T00:00:00Z"),
+                mishpat_commitments::revoked_at.eq(revoked_at),
+                mishpat_commitments::state.eq("active"),
+                mishpat_commitments::dht_anchor_hash.eq(dht_anchor_hash),
+                mishpat_commitments::created_at.eq("2026-01-01T00:00:00Z"),
+                mishpat_commitments::updated_at.eq("2026-01-01T00:00:00Z"),
+            ))
+            .execute(conn)
+            .expect("insert replicates-commons commitment");
+    }
+
+    #[test]
+    fn commons_commitment_loaded_only_when_notarized_and_not_revoked() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        // Notarized, live → loaded.
+        insert_replicates_commons_commitment(
+            &mut conn,
+            "cid-commons-ok",
+            "agent:uhCAkCommons",
+            "head:epr-OK",
+            Some("anchor-ok"),
+            None,
+        );
+        // Un-notarized (NULL anchor) → excluded.
+        insert_replicates_commons_commitment(
+            &mut conn,
+            "cid-commons-unnotarized",
+            "agent:uhCAkCommons",
+            "head:epr-UNNOTARIZED",
+            None,
+            None,
+        );
+        // Revoked → excluded.
+        insert_replicates_commons_commitment(
+            &mut conn,
+            "cid-commons-revoked",
+            "agent:uhCAkCommons",
+            "head:epr-REVOKED",
+            Some("anchor-rev"),
+            Some("2026-02-01T00:00:00Z"),
+        );
+
+        let commitments = active_commitments_for_provider(&mut conn, "agent:uhCAkCommons").unwrap();
+
+        assert_eq!(
+            commitments.len(),
+            1,
+            "only the notarized, live commons row loads"
+        );
+        let c = &commitments[0];
+        assert_eq!(c.action, "replicates-commons");
+        assert_eq!(c.commitment_cid, "anchor-ok", "prefers dht_anchor_hash");
+        assert_eq!(c.head_ref.as_deref(), Some("head:epr-OK"));
+        assert_eq!(c.recipient_hub_id, "head:epr-OK");
+
+        // And it scores Medium under the matching acquisition context.
+        let a = AdvertisedBlob {
+            blob_cid: sha256_wire_str('f'),
+            source_peer_cid: "peer:source".into(),
+            blob_size_bytes: Some(1_000),
+            recipient_hub_id_hint: None,
+            epr_kind_hint: None,
+        };
+        assert_eq!(
+            score_advertised_blob(&a, &commitments, Some("head:epr-OK")),
+            FetchPriority::Medium
+        );
     }
 }
