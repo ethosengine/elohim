@@ -2583,7 +2583,10 @@ impl P2PNode {
                 epr_kind_hint: hint.and_then(|h| h.epr_kind.clone()),
             };
 
-            if score_advertised_blob(&advertised, &commitments) != FetchPriority::High {
+            // Passive gossip replication: commons does not fire (content_id_ctx
+            // = None). Only dwelling matches reach High here; the gate admits
+            // anything above Skip so the future active-pull path (Medium) works.
+            if score_advertised_blob(&advertised, &commitments, None) == FetchPriority::Skip {
                 continue;
             }
 

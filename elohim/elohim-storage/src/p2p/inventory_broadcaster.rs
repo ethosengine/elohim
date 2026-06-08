@@ -485,9 +485,10 @@ mod tests {
             recipient_hub_id: "collective:hubH".into(),
             scope_epr_kinds: Some(vec!["Content".into()]),
             bytes_per_blob_max: Some(10_000_000),
+            head_ref: None,
         };
         assert_eq!(
-            score_advertised_blob(&advertised, &[commitment]),
+            score_advertised_blob(&advertised, &[commitment], None),
             FetchPriority::High,
             "a gather_hints-produced kind must match a schema-valid scope filter"
         );
