@@ -266,6 +266,12 @@ export const RAW_NODE = {
   ROOT: 'epr-raw-node', // EPR shown AS an atom — the raw subview, never a 302 to a pillar mount
 } as const;
 
+/** Lens-complete /epr/{id} viewer surfaces (lamad: PathViewerComponent + ContentViewerComponent). */
+export const LENS_VIEWER = {
+  COMPOSITE_OUTLINE: 'epr-composite-outline', // focal epr-composite render (a path AS its outline)
+  OPEN_IN_PILLAR: 'epr-open-in-pillar', // the "Open in {pillar}" lens affordance (claimed types)
+} as const;
+
 // Content viewer (elohim-app: content-viewer.component.html)
 export const VIEWER = {
   BACK_HOME: 'viewer-back-home',

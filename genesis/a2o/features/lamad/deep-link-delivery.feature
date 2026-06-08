@@ -50,12 +50,18 @@ Feature: Deep links to lamad land on the rendered page, not a 404 shell
     Then the response status is 404
     And the response body is JSON, not an index.html shell
 
-  @browser-only
-  Scenario: Universal EPR address 302s a claimed type to its pretty mount
-    # Spec §5.1 (Slice 3): claimed commons contentType → 302 to the mount.
-    # The browser follows the redirect; the learner lands on the path overview.
+  @browser-only @regression
+  Scenario: Universal EPR address renders a claimed type lens-complete, not a 302
+    # EPR Slice 1 (lens-complete-epr-resolution): the claims-302 is DEMOTED. A
+    # claimed type (a path) at the bare /epr/{id} no longer bounces to its pretty
+    # pillar mount (knowledge-only) — it serves the lens-complete shell viewer:
+    # the focal content rendered AS its epr-composite outline + the pillar offered
+    # as ONE lens ("Open in {pillar}"), the four-leg coupling honored at resolve.
+    # (Inverts the Slice-3 302 this scenario used to assert; the pretty mount stays
+    # directly reachable + via the lens. The /epr/{id}/raw atom view is a sibling.)
     Given a learner opens the deep link "/epr/foundations-christian-technology"
-    Then the lamad path overview renders
+    Then the lamad composite outline renders
+    And the Open in pillar lens is offered
     And the rendered surface is not a raw error response
 
   @browser-only

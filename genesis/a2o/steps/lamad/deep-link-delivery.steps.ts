@@ -40,6 +40,7 @@ import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.
 import { Human } from '../../src/framework/human.js';
 import {
   CONTENT_VIEWER,
+  LENS_VIEWER,
   NOT_FOUND,
   PATH_NAV,
   PATH_OVERVIEW,
@@ -310,6 +311,48 @@ Then('the cross-pillar resource viewer renders', async function (this: E2EWorld)
   assert.ok(
     rendered,
     `Expected the cross-pillar resource viewer to render (data-testid="${CONTENT_VIEWER.ROOT}"); ` +
+      `URL is "${device.page.url()}"`
+  );
+});
+
+/**
+ * "Then the lamad composite outline renders" — a claimed epr-composite (a path)
+ * at the bare universal /epr/{id} now serves the lens-complete shell viewer (the
+ * claims-302 is demoted, EPR Slice 1), and the focal lens renders the path AS its
+ * composite outline (PathViewerComponent), NOT a 302 to the pillar mount.
+ * Render-verified by the outline's root testid.
+ *
+ * Example: Then the lamad composite outline renders
+ */
+Then('the lamad composite outline renders', async function (this: E2EWorld) {
+  const device = await ensureVisitor(this);
+  if (!device) {
+    return PENDING;
+  }
+  const rendered = await rootRendered(device, LENS_VIEWER.COMPOSITE_OUTLINE);
+  assert.ok(
+    rendered,
+    `Expected the focal epr-composite outline to render (data-testid="${LENS_VIEWER.COMPOSITE_OUTLINE}"); ` +
+      `URL is "${device.page.url()}"`
+  );
+});
+
+/**
+ * "Then the Open in pillar lens is offered" — the lens-complete viewer offers the
+ * pillar deep-dive as ONE lens (the "Open in {pillar}" affordance) for a claimed
+ * type, instead of force-302-ing to it. Render-verified by the affordance testid.
+ *
+ * Example: And the Open in pillar lens is offered
+ */
+Then('the Open in pillar lens is offered', async function (this: E2EWorld) {
+  const device = await ensureVisitor(this);
+  if (!device) {
+    return PENDING;
+  }
+  const offered = await rootRendered(device, LENS_VIEWER.OPEN_IN_PILLAR);
+  assert.ok(
+    offered,
+    `Expected the "Open in pillar" lens affordance (data-testid="${LENS_VIEWER.OPEN_IN_PILLAR}"); ` +
       `URL is "${device.page.url()}"`
   );
 });
