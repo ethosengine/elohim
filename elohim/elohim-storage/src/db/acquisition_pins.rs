@@ -64,6 +64,21 @@ pub fn list_all_pins(conn: &mut SqliteConnection) -> QueryResult<Vec<Acquisition
     pins::acquisition_pins.order(pins::id.asc()).load(conn)
 }
 
+/// Fetch a single pin by its integer id, regardless of status.
+///
+/// Returns `Ok(None)` when no pin carries that id. This is the indexed lookup
+/// `handle_remove_pin` (T10) uses to read a pin's `commitment_cid` before
+/// flipping its status — far cheaper than loading the whole table and scanning.
+pub fn get_pin_by_id(
+    conn: &mut SqliteConnection,
+    pin_id: i32,
+) -> QueryResult<Option<AcquisitionPin>> {
+    pins::acquisition_pins
+        .filter(pins::id.eq(pin_id))
+        .first::<AcquisitionPin>(conn)
+        .optional()
+}
+
 /// Update the status of a single pin by its integer id.
 ///
 /// Returns the number of rows affected (0 if the id does not exist).
@@ -171,6 +186,35 @@ mod tests {
     }
 
     #[test]
+    fn get_pin_by_id_returns_row_or_none() {
+        let mut conn = test_conn();
+
+        // Unknown id → None (no scan, no panic).
+        assert!(
+            get_pin_by_id(&mut conn, 999)
+                .expect("query must not error")
+                .is_none(),
+            "unknown id must return None"
+        );
+
+        // Insert a pin, then fetch it by its assigned id.
+        let pin = upsert_pin(&mut conn, sample_pin(3)).expect("upsert");
+        let fetched = get_pin_by_id(&mut conn, pin.id)
+            .expect("query must not error")
+            .expect("existing pin must be found by id");
+        assert_eq!(fetched.id, pin.id);
+        assert_eq!(fetched.head_ref, "epr:album-1");
+
+        // The lookup is status-agnostic: a 'removed' pin is still found by id
+        // (so handle_remove_pin can read its commitment_cid before/after flip).
+        set_pin_status(&mut conn, pin.id, "removed").expect("set removed");
+        let after_remove = get_pin_by_id(&mut conn, pin.id)
+            .expect("query must not error")
+            .expect("removed pin must still be found by id");
+        assert_eq!(after_remove.status, "removed");
+    }
+
+    #[test]
     fn commitment_cid_defaults_null_and_set_backfills() {
         let mut conn = test_conn();
 
@@ -185,7 +229,10 @@ mod tests {
         // replicates-commons Commitment.
         let affected = set_commitment_cid(&mut conn, pin.id, "uhCkk-commons-commit-1")
             .expect("set_commitment_cid");
-        assert_eq!(affected, 1, "set_commitment_cid must affect exactly one row");
+        assert_eq!(
+            affected, 1,
+            "set_commitment_cid must affect exactly one row"
+        );
 
         let reread = list_all_pins(&mut conn).expect("list_all");
         assert_eq!(reread.len(), 1);

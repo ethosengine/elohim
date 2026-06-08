@@ -8832,11 +8832,10 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
 
         // Capture the notarized offer back-reference BEFORE flipping status so we
-        // can withdraw the commons offer (author a revokes-commitment).
-        let offer_cid: Option<String> = db::acquisition_pins::list_all_pins(&mut conn)
+        // can withdraw the commons offer (author a revokes-commitment). Indexed
+        // lookup by id — not a full-table scan.
+        let offer_cid: Option<String> = db::acquisition_pins::get_pin_by_id(&mut conn, id)
             .map_err(|e| StorageError::Database(e.to_string()))?
-            .into_iter()
-            .find(|p| p.id == id)
             .and_then(|p| p.commitment_cid);
 
         let rows = db::acquisition_pins::set_pin_status(&mut conn, id, "removed")
