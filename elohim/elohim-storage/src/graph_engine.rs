@@ -4,6 +4,7 @@
 //! a computed edge can never be persisted through it.
 
 use std::collections::{HashSet, VecDeque};
+use std::sync::OnceLock;
 
 use serde::Deserialize;
 
@@ -19,14 +20,16 @@ use crate::error::StorageError;
 // Cozo/datalog resolver will consume the SAME spec behind the same trait — the
 // spec is the model, the resolver is one engine over it.
 
-/// One raw edge declaration in graph.json. Only `type` (the edge kind) is read
-/// here; `from`/`to`/`indexed`/etc. are part of the spec but not consumed by
-/// the Pass-1 whitelist. `#[serde(default)]` on the struct is unnecessary —
-/// every edge in the spec carries `type`.
+/// One raw edge declaration in graph.json. `from`/`to` are read so that the
+/// loader can filter to content↔content edges only (both endpoints `EprHead`).
+/// `MASTERY_OF` has `from: ContributorDID` and must NOT enter the traversal
+/// whitelist — a content-rooted BFS must never leak out to learner-identity nodes.
 #[derive(Debug, Deserialize)]
 struct RawEdge {
     #[serde(rename = "type")]
     kind: String,
+    from: String,
+    to: String,
 }
 
 /// The top-level graph.json shape: a `"edges"` array (plus `nodes`, `indexes`,
@@ -43,22 +46,44 @@ pub struct GraphSpec {
     edge_types: Vec<String>,
 }
 
+static GRAPH_SPEC: OnceLock<GraphSpec> = OnceLock::new();
+
 impl GraphSpec {
+    /// Return the lazily-initialized `GraphSpec`, parsed from `graph.json` at
+    /// most once per process. Matches the `OnceLock`/`get_or_init` pattern used
+    /// by `signal_weight_registry` and `constitutional_ratio_registry`.
+    pub fn get() -> &'static GraphSpec {
+        GRAPH_SPEC.get_or_init(GraphSpec::load)
+    }
+
     /// Load the spec, embedded at compile time. The path is resolved relative to
     /// THIS source file (`src/graph_engine.rs`):
     /// `realpath --relative-to=elohim/elohim-storage/src \
     ///   elohim/sdk/domains/lamad/manifest/graph.json`
     /// => `../../sdk/domains/lamad/manifest/graph.json` (verified 2026-06-08).
-    pub fn load() -> Self {
+    ///
+    /// Only content↔content edges (both `from` and `to` == `"EprHead"`) are
+    /// admitted to the whitelist. `MASTERY_OF` (`from: ContributorDID`) is
+    /// intentionally excluded: a content-rooted BFS must never traverse out to
+    /// learner-identity nodes.
+    fn load() -> Self {
         const RAW: &str = include_str!("../../sdk/domains/lamad/manifest/graph.json");
-        let parsed: RawGraphSpec =
-            serde_json::from_str(RAW).expect("lamad manifest graph.json parses as RawGraphSpec");
+        let parsed: RawGraphSpec = serde_json::from_str(RAW).expect(
+            "elohim/sdk/domains/lamad/manifest/graph.json must parse as RawGraphSpec \
+             (check for malformed JSON)",
+        );
         Self {
-            edge_types: parsed.edges.into_iter().map(|e| e.kind).collect(),
+            edge_types: parsed
+                .edges
+                .into_iter()
+                .filter(|e| e.from == "EprHead" && e.to == "EprHead")
+                .map(|e| e.kind)
+                .collect(),
         }
     }
 
-    /// The declared edge-type vocabulary (e.g. PREREQUISITE, TEACHES, …).
+    /// The declared content↔content edge-type vocabulary
+    /// (e.g. PREREQUISITE, TEACHES, CONTAINS, REFERENCES, SUPERSEDES).
     pub fn edge_types(&self) -> &[String] {
         &self.edge_types
     }
@@ -86,6 +111,10 @@ pub struct ResolvedNeighborhood {
 pub struct GraphQuery<'a> {
     pub root_id: &'a str,
     pub max_depth: u32,
+    /// Edge types to traverse.
+    /// - `Some(list)`: traverse only these types (caller override).
+    /// - `None`: use the resolver's default whitelist (RELATES_TO ∪ graph.json content↔content vocabulary).
+    /// NOTE: `None` does NOT mean "traverse all stored edge types".
     pub relationship_types: Option<&'a [String]>,
     pub include_computed: bool,
     pub max_computed: usize,
@@ -143,7 +172,7 @@ impl NativeGraphResolver {
     pub fn new(pool: DbPool) -> Self {
         let mut default_types: Vec<String> = vec!["RELATES_TO".to_string()];
         let mut seen: HashSet<String> = default_types.iter().cloned().collect();
-        for kind in GraphSpec::load().edge_types() {
+        for kind in GraphSpec::get().edge_types() {
             if seen.insert(kind.clone()) {
                 default_types.push(kind.clone());
             }
@@ -341,9 +370,11 @@ mod tests {
     /// The declarative spec (graph.json) must expose its edge vocabulary so the
     /// native resolver can use it as a traversal whitelist. This is the "bring the
     /// genesis model alive" assertion — the JSON stops being dead spec.
+    /// Additionally asserts that MASTERY_OF (ContributorDID→EprHead) is excluded —
+    /// a content-rooted BFS must never traverse out to learner-identity nodes.
     #[test]
     fn graph_spec_exposes_edge_vocabulary() {
-        let spec = GraphSpec::load();
+        let spec = GraphSpec::get();
         let kinds = spec.edge_types();
         for k in [
             "PREREQUISITE",
@@ -354,6 +385,10 @@ mod tests {
         ] {
             assert!(kinds.iter().any(|t| t == k), "{k} declared in graph.json");
         }
+        assert!(
+            !kinds.iter().any(|t| t == "MASTERY_OF"),
+            "MASTERY_OF (contributor->concept) must NOT be in the content-graph whitelist"
+        );
     }
 
     /// Pass 2 core payoff: two nodes that share tags with NO authored edge
