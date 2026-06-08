@@ -1670,69 +1670,6 @@ async fn dispatch_to_projected_epr(
     }
 }
 
-/// Head facts for the /epr/{id} resolver — fetched from storage's LOCAL
-/// projection only (never a DHT walk on the dispatch path, spec §5.1 R1).
-/// Tolerant deserialization: a shape mismatch yields None fields → ServeShell
-/// (fail open toward the floor).
-#[derive(Debug, Clone, serde::Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct HeadFacts {
-    #[serde(default)]
-    pub content_type: Option<String>,
-    #[serde(default)]
-    pub reach: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum EprUniversalDisposition {
-    /// Claimed + reach passes → 302 to the pretty mount (browser carries the
-    /// fragment per RFC 7231 — the doorway never sees or needs it, spec §5.2).
-    RedirectToMount { location: String },
-    /// Everything else: the shell renders (universal viewer or gate face).
-    ServeShell,
-}
-
-/// The subview requested under a universal `/epr/{id}` address. `Default` is the
-/// bare address (claims-aware: a claimed target 302s to its pretty mount). Any
-/// non-empty suffix is a SHELL-rendered inspector view (`/epr/{id}/raw` is the
-/// raw-node inspector) — it must NEVER 302 to a pillar mount, or the shell never
-/// gets the chance to render it and the request round-trips back into `/epr`.
-/// Fail OPEN: unknown suffixes resolve to `Raw` (ServeShell) so a new subview
-/// works the moment the shell adds a route, without a doorway change.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum EprSubview {
-    Default,
-    Raw,
-}
-
-/// Pure split of a universal `/epr/{id}[/subview...]` path into its id segment
-/// and requested subview. The id is the FIRST segment (stays percent-encoded);
-/// only the SUFFIX handling differs from the bare-address path. An empty or
-/// missing suffix is `Default`; `raw` (and, fail-open, any other non-empty
-/// suffix) is `Raw`. Table-data only — no IO.
-pub(crate) fn parse_epr_path(original_path: &str) -> (&str, EprSubview) {
-    let tail = original_path.strip_prefix("/epr/").unwrap_or("");
-    let mut segments = tail.split('/');
-    let id = segments.next().unwrap_or("");
-    let subview = match segments.next() {
-        // Bare `/epr/{id}` (or a trailing slash with nothing after) → Default.
-        None | Some("") => EprSubview::Default,
-        Some("raw") => EprSubview::Raw,
-        Some(other) => {
-            // Fail open to the shell: an unknown subview still serves the bundle
-            // so it works the instant the shell adds a route. Logged so a new
-            // subview surfacing here is noticed (not silently absorbed).
-            tracing::debug!(
-                subview = %other,
-                path = %original_path,
-                "unknown /epr/{{id}}/<subview> — failing open to shell (treated as raw inspector)"
-            );
-            EprSubview::Raw
-        }
-    };
-    (id, subview)
-}
-
 /// The anon-readable reach set — the doorway's HALF of the substrate's anon
 /// rule. MUST mirror storage's unauthenticated list filter
 /// (`elohim-storage/src/http.rs` handle_db_content_list:
@@ -1744,99 +1681,50 @@ pub(crate) fn anon_reach_readable(reach: &str) -> bool {
     matches!(reach, "commons" | "public")
 }
 
-/// Spec §5.1 — pure, table-data-only (no prefix guards). MVP visitor tier:
-/// anonymous (anon-readable reaches only — commons|public, mirroring
-/// storage's anon filter); the authed snapshot wires in when gated
-/// projections exist (spec: out of scope here, signature stays ready).
-pub(crate) fn classify_epr_universal(
-    head: Option<HeadFacts>,
-    claimed_location: Option<String>,
-    subview: EprSubview,
-) -> EprUniversalDisposition {
-    // A subview is an explicit request for the shell-rendered inspector — it
-    // overrides the claims-aware 302 unconditionally (regardless of claim or
-    // reach). Without this short-circuit `/epr/{id}/raw` would 302 to the pretty
-    // mount and the shell would never get the chance to render the raw node.
-    if subview != EprSubview::Default {
-        return EprUniversalDisposition::ServeShell;
-    }
-    let reach_passes = head
-        .as_ref()
-        .and_then(|h| h.reach.as_deref())
-        .map(anon_reach_readable)
-        .unwrap_or(false);
-    match (reach_passes, claimed_location) {
-        (true, Some(location)) => EprUniversalDisposition::RedirectToMount { location },
-        _ => EprUniversalDisposition::ServeShell,
-    }
+/// The universal `/epr/{id}` address ALWAYS serves the shell (EPR Slice 1,
+/// operator decision 2026-06-08: the universal-address claims-302 is DEMOTED).
+/// Before this, a claimed, commons-reach target (e.g. a path) 302'd to its
+/// pretty pillar mount (`/lamad/path/{id}`) — which meant a claimed type never
+/// reached the lens-complete shell viewer; it bounced to the knowledge-only
+/// pillar (the four-leg coupling violation). Now the universal address serves
+/// the shell for BOTH the bare `/epr/{id}` and the `/epr/{id}/raw` inspector;
+/// the shell renders the lens-complete viewer and offers its own "Open in
+/// {pillar}" affordance, and its Angular routing distinguishes the two subviews.
+/// The doorway therefore no longer consults head facts, content type, or the
+/// claims table here — the only branch left is purely whether a ROOT projection
+/// exists to serve: `Some(root)` serves the root projection's bundle (the
+/// shell); `None` means no root mount is registered, so the caller falls back to
+/// `/threshold`. Pure, table-data-only (no IO) so the contract is unit-testable
+/// without an `AppState`. (The legacy `/lamad/resource/{id}` → `/epr/{id}`
+/// alias-302 and the sitemap's per-claimed-id entries are a DIFFERENT dispatch
+/// path and keep the claims table — only the universal-address 302 is removed.)
+fn epr_universal_root(
+    router: &crate::projection::EprRouter,
+) -> Option<elohim_views::projection::EprProjectionView> {
+    router.dispatch("/")
 }
 
-/// §12.1 universal EPR address + Slice 3 claims (spec §5.1): a claimed,
-/// commons-reach target 302s to its pretty mount; everything else serves the
-/// ROOT projection's bundle (the shell renders the viewer or gate face).
+/// §12.1 universal EPR address: `/epr/{id}` (and `/epr/{id}/raw`) serve the ROOT
+/// projection's bundle — the shell renders the lens-complete viewer. The
+/// claims-302 to a pretty pillar mount is demoted (EPR Slice 1); the universal
+/// address no longer redirects. No root projection registered → `/threshold`.
 async fn dispatch_epr_universal(state: &AppState, original_path: &str) -> Response<Full<Bytes>> {
-    // Split /epr/{id}[/subview...] — id is the first segment (stays
-    // percent-encoded); a subview (e.g. /raw) forces the shell to render so the
-    // inspector route is reachable instead of round-tripping to a pretty mount.
-    let (id, subview) = parse_epr_path(original_path);
-
-    // Head facts: one LOCAL storage lookup (storage caches /db/content 300s).
-    let head = if id.is_empty() {
-        None
-    } else {
-        fetch_head_facts(state, id).await
-    };
-    let claimed = head
-        .as_ref()
-        .and_then(|h| h.content_type.as_deref())
-        .and_then(|ct| state.epr_router.claimed_mount_location(ct, id));
-
-    match classify_epr_universal(head, claimed, subview) {
-        EprUniversalDisposition::RedirectToMount { location } => {
-            tracing::debug!(path = %original_path, location = %location,
-                "universal /epr address — 302 to claimed pretty mount (Slice 3)");
-            Response::builder()
-                .status(StatusCode::FOUND)
-                .header("Location", location)
-                // Commons-only by construction here; cacheable (R1 for crawlers).
-                .header("cache-control", "public, max-age=300")
-                .body(Full::new(Bytes::new()))
-                .unwrap()
+    match epr_universal_root(&state.epr_router) {
+        Some(root) => {
+            tracing::debug!(path = %original_path,
+                "universal /epr address — serving shell (root projection bundle)");
+            dispatch_to_projected_epr(state, "/", root).await
         }
-        EprUniversalDisposition::ServeShell => match state.epr_router.dispatch("/") {
-            Some(root) => dispatch_to_projected_epr(state, "/", root).await,
-            None => Response::builder()
+        None => {
+            tracing::debug!(path = %original_path,
+                "universal /epr address — no root projection, falling back to /threshold");
+            Response::builder()
                 .status(StatusCode::FOUND)
                 .header("Location", "/threshold")
                 .body(Full::new(Bytes::new()))
-                .unwrap(),
-        },
+                .unwrap()
+        }
     }
-}
-
-/// Tolerant local head lookup. Any failure → None (fail open to the shell).
-async fn fetch_head_facts(state: &AppState, id: &str) -> Option<HeadFacts> {
-    let storage_url = state
-        .args
-        .storage_url
-        .as_deref()?
-        .trim_end_matches('/')
-        .to_string();
-    let url = format!("{storage_url}/db/content/{id}");
-    let resp = state
-        .ssr_http_client
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-        .ok()?;
-    if !resp.status().is_success() {
-        return None;
-    }
-    let v: serde_json::Value = resp.json().await.ok()?;
-    // Unwrap a possible envelope; tolerate either shape.
-    let body = v.get("item").unwrap_or(&v);
-    serde_json::from_value(body.clone()).ok()
 }
 
 /// Render the doorway sitemap (spec §7.5) — a DERIVED projection of the routing
@@ -3944,171 +3832,106 @@ mod epr_universal_tests {
 mod epr_claims_dispatch_tests {
     use super::*;
 
+    // EPR Slice 1 — the universal `/epr/{id}` claims-302 is DEMOTED (operator
+    // decision 2026-06-08). The universal address now serves the shell
+    // UNCONDITIONALLY (bare `/epr/{id}` and `/epr/{id}/raw` alike) — a claimed,
+    // commons-reach type that USED to 302 to its pretty pillar mount
+    // (`/lamad/path/{id}`) now reaches the lens-complete shell viewer instead of
+    // bouncing to the knowledge-only pillar. The doorway no longer consults head
+    // facts, content type, or the claims table on the universal-address path;
+    // the only branch left is "root projection present → serve shell; absent →
+    // /threshold". These tests INVERT the Slice-0 tests (which asserted
+    // RedirectToMount for claimed commons/public types).
+
+    /// A commons-reach `/lamad` mount that CLAIMS the `path` content type — i.e.
+    /// exactly the projection that minted the `/lamad/path/{id}` 302 the old
+    /// universal-address behavior produced. Used to prove the demotion: even with
+    /// this claim live, the universal address serves the shell, never the mount.
+    fn router_with_path_claiming_root() -> crate::projection::EprRouter {
+        use elohim_views::projection::{
+            EprProjectionView, ProjectionMode, RouteClaimGrant, RouteClaimTemplate,
+        };
+        let router = crate::projection::EprRouter::new();
+        let mut lamad = EprProjectionView {
+            commitment_id: "test-lamad".into(),
+            epr_id: "lamad".into(),
+            doorway_id: "doorway:test".into(),
+            // Root mount: the bundle the shell is served from for /epr/{id}.
+            url_path: "/".into(),
+            mode: ProjectionMode::Cached,
+            reach: "commons".into(),
+            base_href: "/".into(),
+            entry_file: "index.html".into(),
+            spa_fallback: true,
+            redirects_from: vec![],
+            redirect_templates: vec![],
+            route_claims: None,
+            preview_epr_ref: None,
+            gate_hints: vec![],
+            dead_end: false,
+            steward_direct_endpoint: None,
+            seeded_at: "2026-06-06T00:00:00Z".into(),
+            seeded_by: "test".into(),
+        };
+        // Claim the `path` content type — the would-302 condition of Slice 0.
+        lamad.route_claims = Some(RouteClaimGrant {
+            schema_version: 1,
+            claims_manifest_cid: None,
+            claims: vec![RouteClaimTemplate {
+                content_type: "path".into(),
+                template: "path/{id}".into(),
+                fragments: Default::default(),
+            }],
+        });
+        router.replace_all(vec![lamad]);
+        router
+    }
+
     #[test]
-    fn classify_redirects_claimed_commons() {
-        let d = classify_epr_universal(
-            Some(HeadFacts {
-                content_type: Some("path".into()),
-                reach: Some("commons".into()),
-            }),
-            Some("/lamad/path/abc".to_string()), // pre-resolved claimed location
-            EprSubview::Default,
-        );
+    fn universal_address_serves_shell_for_claimed_commons_type() {
+        // INVERTS classify_redirects_claimed_commons: a claimed `path` (commons)
+        // no longer 302s to /lamad/path/{id}; the universal address resolves to
+        // the ROOT projection (the shell). The claim is still in the table (the
+        // sitemap uses it) — it just no longer drives a universal-address 302.
+        let router = router_with_path_claiming_root();
+        // Sanity: the claim IS live (so this is genuinely the would-302 case).
+        // The claim mounts under the claiming projection's url_path (the root
+        // mount `/` here, so the minted location is `/path/abc`). The point is
+        // only that a claimed-mount location EXISTS — the demoted universal
+        // address no longer turns it into a 302; the sitemap still uses it.
         assert_eq!(
-            d,
-            EprUniversalDisposition::RedirectToMount {
-                location: "/lamad/path/abc".into()
-            }
+            router.claimed_mount_location("path", "abc"),
+            Some("/path/abc".to_string()),
+            "claim must remain in the table (sitemap depends on it)"
         );
-    }
-
-    #[test]
-    fn classify_serves_shell_for_unclaimed_commons() {
-        let d = classify_epr_universal(
-            Some(HeadFacts {
-                content_type: Some("concept".into()),
-                reach: Some("commons".into()),
-            }),
-            None,
-            EprSubview::Default,
+        let root = epr_universal_root(&router);
+        assert!(
+            root.is_some(),
+            "universal /epr/{{id}} for a claimed commons type now serves the shell (root projection), not a mount 302"
         );
-        assert_eq!(d, EprUniversalDisposition::ServeShell);
+        assert_eq!(root.unwrap().url_path, "/");
     }
 
     #[test]
-    fn classify_redirects_public_claimed() {
-        // The substrate's anon-readable set is {commons, public} — storage's
-        // list handler serves BOTH to unauthenticated readers (reach hierarchy:
-        // public=6, commons=7 most permissive). The resolver's anon tier must
-        // mirror that single rule, or public content never gets its pretty
-        // mount (found live: foundations-christian-technology is reach=public).
-        let d = classify_epr_universal(
-            Some(HeadFacts {
-                content_type: Some("path".into()),
-                reach: Some("public".into()),
-            }),
-            Some("/lamad/path/abc".to_string()),
-            EprSubview::Default,
+    fn universal_address_serves_shell_regardless_of_subview() {
+        // The doorway no longer distinguishes the subview: bare /epr/{id} and
+        // /epr/{id}/raw both serve the shell (the shell's Angular routing does the
+        // distinguishing). One outcome for the universal address: serve the root.
+        let router = router_with_path_claiming_root();
+        // The resolver is purely root-driven — the same root regardless of which
+        // /epr/* path the request carried (bare, /raw, or any subview).
+        assert!(epr_universal_root(&router).is_some());
+    }
+
+    #[test]
+    fn universal_address_falls_back_to_threshold_without_root() {
+        // Unchanged behavior: no ROOT projection registered → None, which the
+        // dispatcher turns into a 302 to /threshold (the operator dashboard).
+        let router = crate::projection::EprRouter::new();
+        assert!(
+            epr_universal_root(&router).is_none(),
+            "no root projection → fall back to /threshold"
         );
-        assert_eq!(
-            d,
-            EprUniversalDisposition::RedirectToMount {
-                location: "/lamad/path/abc".into()
-            }
-        );
-    }
-
-    #[test]
-    fn classify_never_redirects_gated_targets() {
-        // Spec §5.1: 302 only when reach passes — anon never passes non-commons.
-        let d = classify_epr_universal(
-            Some(HeadFacts {
-                content_type: Some("path".into()),
-                reach: Some("household:x".into()),
-            }),
-            Some("/lamad/path/abc".to_string()),
-            EprSubview::Default,
-        );
-        assert_eq!(d, EprUniversalDisposition::ServeShell);
-    }
-
-    #[test]
-    fn classify_serves_shell_when_head_unknown() {
-        // Fail open toward the floor (spec §9): no head facts → shell.
-        assert_eq!(
-            classify_epr_universal(None, None, EprSubview::Default),
-            EprUniversalDisposition::ServeShell
-        );
-    }
-
-    // EPR Slice 0 — raw-node inspector. A subview suffix forces the shell to
-    // render so the Angular shell receives the route, instead of 302-ing to the
-    // pretty pillar mount (which round-trips back into /epr — the bug we kill).
-
-    #[test]
-    fn classify_raw_subview_serves_shell_even_when_claimed() {
-        // NEW behavior: /epr/{id}/raw on a CLAIMED, commons-reach (would-302)
-        // target must serve the shell, NOT redirect — the shell renders the raw
-        // node. This is exactly the case that 302'd before the subview existed.
-        let d = classify_epr_universal(
-            Some(HeadFacts {
-                content_type: Some("path".into()),
-                reach: Some("commons".into()),
-            }),
-            Some("/lamad/path/abc".to_string()),
-            EprSubview::Raw,
-        );
-        assert_eq!(
-            d,
-            EprUniversalDisposition::ServeShell,
-            "raw subview must serve the shell even when the target is claimed + commons"
-        );
-    }
-
-    #[test]
-    fn classify_raw_subview_serves_shell_for_public_claimed() {
-        // Same override for the public-reach claimed case.
-        let d = classify_epr_universal(
-            Some(HeadFacts {
-                content_type: Some("path".into()),
-                reach: Some("public".into()),
-            }),
-            Some("/lamad/path/abc".to_string()),
-            EprSubview::Raw,
-        );
-        assert_eq!(d, EprUniversalDisposition::ServeShell);
-    }
-
-    #[test]
-    fn parse_epr_path_bare_address_is_default() {
-        let (id, subview) = parse_epr_path("/epr/abc");
-        assert_eq!(id, "abc");
-        assert_eq!(subview, EprSubview::Default);
-    }
-
-    #[test]
-    fn parse_epr_path_trailing_slash_is_default() {
-        // `/epr/abc/` (empty suffix) is still the bare address.
-        let (id, subview) = parse_epr_path("/epr/abc/");
-        assert_eq!(id, "abc");
-        assert_eq!(subview, EprSubview::Default);
-    }
-
-    #[test]
-    fn parse_epr_path_raw_subview() {
-        let (id, subview) = parse_epr_path("/epr/abc/raw");
-        assert_eq!(id, "abc");
-        assert_eq!(subview, EprSubview::Raw);
-    }
-
-    #[test]
-    fn parse_epr_path_raw_with_extra_segments_is_raw() {
-        // Deeper paths under the raw inspector stay Raw; id is still the first.
-        let (id, subview) = parse_epr_path("/epr/abc/raw/x");
-        assert_eq!(id, "abc");
-        assert_eq!(subview, EprSubview::Raw);
-    }
-
-    #[test]
-    fn parse_epr_path_unknown_subview_fails_open_to_raw() {
-        // Fail open to the shell for an unrecognized subview (logged at debug).
-        let (id, subview) = parse_epr_path("/epr/abc/foo");
-        assert_eq!(id, "abc");
-        assert_eq!(subview, EprSubview::Raw);
-    }
-
-    #[test]
-    fn parse_epr_path_keeps_id_percent_encoded() {
-        // The id stays percent-encoded — a %2F inside the id is NOT a segment
-        // boundary (split is on literal '/'), so the id is preserved verbatim and
-        // never double-decoded. Locks the "id stays percent-encoded" contract.
-        let (id, subview) = parse_epr_path("/epr/a%2Fb/raw");
-        assert_eq!(id, "a%2Fb");
-        assert_eq!(subview, EprSubview::Raw);
-
-        let (bare_id, bare_sub) = parse_epr_path("/epr/a%2Fb");
-        assert_eq!(bare_id, "a%2Fb");
-        assert_eq!(bare_sub, EprSubview::Default);
     }
 
     #[test]
