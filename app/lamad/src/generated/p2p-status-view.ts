@@ -61,6 +61,16 @@ export interface P2PStatusView {
    * D.7 dedup LRU: cumulative insert calls (new + duplicate). Ratio (dedupTotalSeen - dedupUniqueLen) / dedupTotalSeen approximates duplication rate.
    */
   dedupTotalSeen: number;
+  /**
+   * Acquisition pull-queue rollup. null when state cannot be computed — treat as 'keep waiting', NEVER as caught up (spec §4.3).
+   */
+  pull?: {
+    total: number;
+    fetched: number;
+    pending: number;
+    failed: number;
+    caughtUp: boolean;
+  } | null;
 }
 /**
  * Identity-driven content replication progress
