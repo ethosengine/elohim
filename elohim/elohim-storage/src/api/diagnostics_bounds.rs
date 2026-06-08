@@ -1,17 +1,18 @@
 //! Diagnostic route: POST /api/v1/diagnostics/validate-bounds.
 //!
 //! Accepts a `ValidateBoundsRequest` (an `EventForValidation` payload), runs
-//! `bounds_validator::validate` against the production `ConductorCommitmentFetcher`
-//! and `DieselRateHistory`, and returns a `BoundsValidationResultView` reporting
-//! pass/fail + per-check status + first violation (if any).
+//! `bounds_validator::validate` against the production `ProjectionCommitmentFetcher`
+//! (reads the `mishpat_commitments` projection table — P1: storage is the
+//! projection of DHT truth) and `DieselRateHistory`, and returns a
+//! `BoundsValidationResultView` reporting pass/fail + per-check status + first
+//! violation (if any).
 //!
 //! Source of truth: pure function result; no persisted entity.
 //!
-//! Per Sprint 2 plan: until Sprint 1 wires `ConductorCommitmentFetcher` to a real
-//! `mishpat::get_commitment` zome call, this route will always return
-//! `pass: false, violation.kind: "commitment_not_found"` (or "conductor_unreachable"
-//! depending on how the production fetcher fails). That's the correct behavior
-//! for the current substrate state.
+//! Note: un-notarized rows (`dht_anchor_hash IS NULL`) cause the fetcher to
+//! return `FetchError::NotarizedRequired`, which `bounds_validator` maps to
+//! `ViolationKind::CommitmentNotFound` (fail-closed — spec §6.5). Commitments
+//! not yet in the projection table return `Ok(None)` → same violation.
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -23,9 +24,9 @@ use crate::db::DbPool;
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::services::bounds_validator::{validate, BoundsViolation, EventForValidation};
-use crate::services::commitment_fetcher::ConductorCommitmentFetcher;
+use crate::services::commitment_fetcher::ProjectionCommitmentFetcher;
 use crate::services::rate_history::DieselRateHistory;
-use elohim_views::bounds::{BoundsChecksView, BoundsValidationResultView, BoundsViolationView};
+use elohim_views::bounds::{BoundsValidationResultView, BoundsViolationView};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,7 +64,12 @@ pub async fn handle(
     req: Request<Incoming>,
     method: Method,
     pool: &DbPool,
-    hc_lamad: Option<&Arc<HcClient>>,
+    // hc_lamad is retained in the signature for API compatibility; the
+    // production fetcher now reads the mishpat_commitments projection table
+    // (P1 path) rather than a live conductor call. The conductor path
+    // (ConductorCommitmentFetcher) will be re-wired in T8/Sprint-1 once the
+    // mishpat::get_commitment zome function lands.
+    _hc_lamad: Option<&Arc<HcClient>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     if method != Method::POST {
         return Ok(Response::builder()
@@ -88,23 +94,10 @@ pub async fn handle(
     let event: EventForValidation = request.event.into();
 
     // Build production dependencies.
-    let hc_client = match hc_lamad {
-        Some(h) => h.clone(),
-        None => {
-            // No conductor wired — return a violation-shaped response rather than 500
-            let view = BoundsValidationResultView {
-                pass: false,
-                commitment_cid: event.bounded_by.clone(),
-                violation: Some(BoundsViolationView {
-                    kind: elohim_views::bounds::ViolationKind::CommitmentNotFound,
-                    summary: "conductor not wired (Sprint 1 dependency)".into(),
-                }),
-                checks: BoundsChecksView::default(),
-            };
-            return ok_json(&view);
-        }
-    };
-    let fetcher = ConductorCommitmentFetcher { hc_client };
+    // ProjectionCommitmentFetcher reads the mishpat_commitments projection
+    // table (P1: storage as reconciliation controller). Bounds-checks read
+    // the read-optimised cache, not a live conductor.
+    let fetcher = ProjectionCommitmentFetcher::new(pool.clone());
     let rate = DieselRateHistory { pool: pool.clone() };
 
     // Run validate

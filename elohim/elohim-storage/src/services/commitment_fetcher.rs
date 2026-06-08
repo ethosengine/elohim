@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::db::DbPool;
+
 /// A Mishpat::Commitment record fetched from the conductor.
 ///
 /// Mirrors the REA Commitment shape bounded to a compute-class scope.
@@ -46,6 +48,13 @@ pub enum FetchError {
     ConductorUnreachable(String),
     #[error("malformed commitment record: {0}")]
     MalformedRecord(String),
+    /// The row exists in the projection table but carries a NULL
+    /// `dht_anchor_hash`, meaning it has not yet been notarized on the DHT.
+    ///
+    /// `bounds_validator` maps this to `ViolationKind::CommitmentNotFound`
+    /// (fail-closed): a bounds-gate is NEVER cleared on un-notarized provenance.
+    #[error("commitment not notarized (null dht_anchor_hash): {0}")]
+    NotarizedRequired(String),
 }
 
 /// Fetches a [`CommitmentRecord`] by its CID from the Mishpat zome.
@@ -82,6 +91,76 @@ impl CommitmentFetcher for ConductorCommitmentFetcher {
         Err(FetchError::ConductorUnreachable(
             "ConductorCommitmentFetcher not yet wired — Sprint 1 dependency".into(),
         ))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Production implementation: projection-table backed (Slice 2a T6)
+// ---------------------------------------------------------------------------
+
+/// Production `CommitmentFetcher`: reads the `mishpat_commitments` projection
+/// table (the read-optimised cache of DHT-notarised compute-bounds commitments —
+/// P1: storage is the projection of DHT truth). Bounds-checks read here, NOT
+/// from a live conductor (`depin_contracts_are_policy`: operational loops READ
+/// bounds).
+///
+/// **GUARD**: a row with `dht_anchor_hash IS NULL` is un-notarized/storage-only.
+/// The fetcher returns [`FetchError::NotarizedRequired`] for such rows so a
+/// bounds-gate is NEVER cleared on un-notarized provenance (fail-closed).
+/// Spec §6.5.
+pub struct ProjectionCommitmentFetcher {
+    pool: DbPool,
+}
+
+impl ProjectionCommitmentFetcher {
+    pub fn new(pool: DbPool) -> Self {
+        Self { pool }
+    }
+}
+
+/// Pure mapping from a `MishpatCommitment` row to a `CommitmentRecord`.
+///
+/// Factored out so the null-anchor guard and field mapping can be unit-tested
+/// without a live DB pool.  Returns `Err(FetchError::NotarizedRequired)` when
+/// `row.dht_anchor_hash` is `None`.
+pub fn record_from_row(
+    row: crate::db::models::MishpatCommitment,
+) -> Result<CommitmentRecord, FetchError> {
+    if row.dht_anchor_hash.is_none() {
+        return Err(FetchError::NotarizedRequired(format!(
+            "commitment {} is storage-only (null dht_anchor_hash) — not notarized",
+            row.cid
+        )));
+    }
+    let bounds: serde_json::Value = serde_json::from_str(&row.bounds_json)
+        .map_err(|e| FetchError::ConductorUnreachable(format!("bounds_json parse: {e}")))?;
+    Ok(CommitmentRecord {
+        cid: row.cid,
+        action: row.action,
+        scope: row.scope,
+        provider: row.provider,
+        recipient: row.recipient,
+        bounds,
+        valid_from: row.valid_from,
+        valid_until: row.valid_until,
+        revoked_at: row.revoked_at,
+    })
+}
+
+#[async_trait]
+impl CommitmentFetcher for ProjectionCommitmentFetcher {
+    async fn fetch(&self, cid: &str) -> Result<Option<CommitmentRecord>, FetchError> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| FetchError::ConductorUnreachable(format!("db pool: {e}")))?;
+        let row = crate::db::mishpat_commitments::get_by_cid(&mut conn, cid)
+            .map_err(|e| FetchError::ConductorUnreachable(format!("query: {e}")))?;
+        let Some(row) = row else {
+            // Not found → Ok(None); bounds_validator maps this to CommitmentNotFound.
+            return Ok(None);
+        };
+        record_from_row(row).map(Some)
     }
 }
 
@@ -169,5 +248,144 @@ mod tests {
         let mock = MockCommitmentFetcher::new();
         let result = mock.fetch("commitment-cid-unknown").await.unwrap();
         assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // record_from_row pure-fn tests (guard logic + field mapping)
+    // -----------------------------------------------------------------------
+
+    fn sample_mishpat_row(cid: &str, anchor: Option<&str>) -> crate::db::models::MishpatCommitment {
+        crate::db::models::MishpatCommitment {
+            cid: cid.to_string(),
+            action: "delegates-compute".to_string(),
+            scope: "republish-epr".to_string(),
+            provider: "agent:matthew-steward".to_string(),
+            recipient: "agent:deploy-svc".to_string(),
+            bounds_json: r#"{"epr_scope":["epr:lamad-spa"],"reach_ceiling":"commons","rate_per_hour":30,"rotation_ttl_days":90}"#.to_string(),
+            valid_from: "2026-06-01T00:00:00Z".to_string(),
+            valid_until: "2026-09-01T00:00:00Z".to_string(),
+            revoked_at: None,
+            state: "active".to_string(),
+            dht_anchor_hash: anchor.map(str::to_string),
+            created_at: "2026-06-07T00:00:00Z".to_string(),
+            updated_at: "2026-06-07T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn record_from_row_maps_notarized_row_to_record() {
+        let row = sample_mishpat_row("cid:abc", Some("anchor:hash1"));
+        let record = record_from_row(row).expect("notarized row must succeed");
+        assert_eq!(record.cid, "cid:abc");
+        assert_eq!(record.action, "delegates-compute");
+        assert_eq!(record.scope, "republish-epr");
+        assert_eq!(record.provider, "agent:matthew-steward");
+        assert_eq!(record.recipient, "agent:deploy-svc");
+        assert_eq!(record.valid_from, "2026-06-01T00:00:00Z");
+        assert_eq!(record.valid_until, "2026-09-01T00:00:00Z");
+        assert!(record.revoked_at.is_none());
+        // bounds parsed to Value
+        assert_eq!(record.bounds["rate_per_hour"], 30);
+        assert_eq!(record.bounds["reach_ceiling"], "commons");
+    }
+
+    #[test]
+    fn record_from_row_refuses_null_anchor_row() {
+        // GUARD: un-notarized row must never clear a bounds-gate (spec §6.5).
+        let row = sample_mishpat_row("cid:unanchored", None);
+        let err = record_from_row(row).expect_err("null dht_anchor_hash must return Err");
+        assert!(
+            matches!(err, FetchError::NotarizedRequired(_)),
+            "expected NotarizedRequired, got: {err:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ProjectionCommitmentFetcher pool-backed tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn fetches_notarized_commitment() {
+        let pool = crate::test_util::test_pool();
+        // Seed a notarized row directly via upsert.
+        {
+            let mut conn = pool.get().expect("pool conn");
+            crate::db::mishpat_commitments::upsert_with_anchor(
+                &mut conn,
+                crate::db::models::NewMishpatCommitment {
+                    cid: "cid:notarized-1".to_string(),
+                    action: "delegates-compute".to_string(),
+                    scope: "republish-epr".to_string(),
+                    provider: "agent:matthew-steward".to_string(),
+                    recipient: "agent:deploy-svc".to_string(),
+                    bounds_json: r#"{"epr_scope":["epr:lamad-spa"],"reach_ceiling":"commons","rate_per_hour":30,"rotation_ttl_days":90}"#.to_string(),
+                    valid_from: "2026-06-01T00:00:00Z".to_string(),
+                    valid_until: "2026-09-01T00:00:00Z".to_string(),
+                    revoked_at: None,
+                    state: "active".to_string(),
+                    dht_anchor_hash: Some("anchor:dht-hash-abc".to_string()),
+                },
+            )
+            .expect("upsert");
+        }
+
+        let fetcher = ProjectionCommitmentFetcher::new(pool);
+        let record = fetcher
+            .fetch("cid:notarized-1")
+            .await
+            .expect("fetch must succeed")
+            .expect("notarized row must be present");
+
+        assert_eq!(record.cid, "cid:notarized-1");
+        assert_eq!(record.action, "delegates-compute");
+        assert_eq!(record.bounds["rate_per_hour"], 30);
+        assert!(record.revoked_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn refuses_null_anchor_row() {
+        // GUARD: storage-only row (no dht_anchor_hash) must fail closed.
+        let pool = crate::test_util::test_pool();
+        {
+            let mut conn = pool.get().expect("pool conn");
+            crate::db::mishpat_commitments::upsert_with_anchor(
+                &mut conn,
+                crate::db::models::NewMishpatCommitment {
+                    cid: "cid:unanchored-1".to_string(),
+                    action: "delegates-compute".to_string(),
+                    scope: "republish-epr".to_string(),
+                    provider: "agent:matthew".to_string(),
+                    recipient: "agent:deploy-svc".to_string(),
+                    bounds_json: r#"{"rate_per_hour":10}"#.to_string(),
+                    valid_from: "2026-06-01T00:00:00Z".to_string(),
+                    valid_until: "2026-09-01T00:00:00Z".to_string(),
+                    revoked_at: None,
+                    state: "proposed".to_string(),
+                    dht_anchor_hash: None, // un-notarized
+                },
+            )
+            .expect("upsert");
+        }
+
+        let fetcher = ProjectionCommitmentFetcher::new(pool);
+        let err = fetcher
+            .fetch("cid:unanchored-1")
+            .await
+            .expect_err("un-notarized row must return Err");
+        assert!(
+            matches!(err, FetchError::NotarizedRequired(_)),
+            "expected NotarizedRequired, got: {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_cid_returns_none() {
+        let pool = crate::test_util::test_pool();
+        let fetcher = ProjectionCommitmentFetcher::new(pool);
+        let result = fetcher
+            .fetch("cid:does-not-exist")
+            .await
+            .expect("fetch must not error for missing cid");
+        assert!(result.is_none(), "unknown cid must return Ok(None)");
     }
 }

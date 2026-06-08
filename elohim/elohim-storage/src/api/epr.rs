@@ -632,15 +632,12 @@ async fn put_epr(
                 .to_string();
 
             // Build the substrate fetcher + rate-history wrappers from the
-            // available dependencies. Same inline-construction pattern as
-            // api/diagnostics_bounds.rs (S2.T6).
+            // available dependencies.
+            // TODO(slice-2a T6-wire): swap to ProjectionCommitmentFetcher once
+            // pool is accessible here (requires threading DbPool through this
+            // code path — tracked for the e2e task T8). The diagnostics_bounds
+            // route is already wired to ProjectionCommitmentFetcher (T6 done).
             let hc_lamad: Option<Arc<crate::hc_client::HcClient>> = None;
-            // TODO(Sprint 1 / Task post-T7): inject hc_lamad from the route caller
-            // signature once HcClientRegistry is accessible here. Until then the
-            // ConductorCommitmentFetcher will always report ConductorUnreachable,
-            // which is the substrate-correct behavior for republish-epr without
-            // an authorizing Commitment (rejects every Z.D deploy until the
-            // mishpat::get_commitment wiring lands).
             match hc_lamad {
                 Some(hc_client) => {
                     let fetcher = crate::services::commitment_fetcher::ConductorCommitmentFetcher {

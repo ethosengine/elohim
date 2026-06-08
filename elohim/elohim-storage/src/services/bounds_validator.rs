@@ -141,6 +141,17 @@ pub async fn validate<F: CommitmentFetcher, R: RateHistory>(
                 checks,
             });
         }
+        Err(FetchError::NotarizedRequired(msg)) => {
+            // Un-notarized row: fail-closed — same as not found from the
+            // validator's perspective (spec §6.5: a bounds-gate is NEVER
+            // cleared on un-notarized provenance).
+            return Err(BoundsViolation {
+                kind: ViolationKind::CommitmentNotFound,
+                commitment_cid: event.bounded_by.clone(),
+                summary: format!("commitment not notarized: {msg}"),
+                checks,
+            });
+        }
     };
 
     // 2. Revocation check (cheap; most likely to short-circuit) --------------
