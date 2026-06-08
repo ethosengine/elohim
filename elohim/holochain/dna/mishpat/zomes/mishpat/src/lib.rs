@@ -1300,12 +1300,13 @@ pub fn create_statement_vote(input: CreateStatementVoteInput) -> ExternResult<St
 // All writes now go exclusively to elohim DNA via consolidated attestation store.
 // Query functions removed — Stage F will query elohim::get_attestations_for_subject.
 
-/// Signal emitted when a ChallengeOutcome is committed.
+/// Signal emitted when a ChallengeOutcome or Commitment is committed.
 ///
 /// GateDecisionCreated and GateDecisionChallengeCreated variants removed (Stage C) —
 /// those entry types now live on elohim DNA and elohim-storage projects from
 /// elohim's content_store signals.
 /// elohim-storage Task 11.2 handles ChallengeOutcome projection from this signal.
+/// elohim-storage Slice-2a T5 handles CommitmentCommitted projection from this signal.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type", content = "payload")]
 pub enum MishpatSignal {
@@ -1315,6 +1316,19 @@ pub enum MishpatSignal {
         action_hash: ActionHash,
         entry_hash: EntryHash,
         entry: mishpat_integrity::ChallengeOutcome,
+        author: AgentPubKey,
+    },
+    /// Emitted when a Commitment entry is committed (Slice-2a T5).
+    ///
+    /// elohim-storage `mishpat_projection::handle_commitment_committed` receives
+    /// this signal and projects the commitment into the `mishpat_commitments`
+    /// SQLite table with `dht_anchor_hash = action_hash` (notarised provenance).
+    /// This is what makes the `ProjectionCommitmentFetcher` (T6) have data in
+    /// production. Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §6.5.
+    CommitmentCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        commitment: mishpat_integrity::Commitment,
         author: AgentPubKey,
     },
 }
@@ -1545,12 +1559,22 @@ pub fn get_outcomes_by_verdict(
     Ok(results)
 }
 
-/// Post-commit hook — emits MishpatSignal::ChallengeOutcomeCreated for each
-/// committed ChallengeOutcome so elohim-storage can project it.
+/// Post-commit hook — emits `MishpatSignal` variants for each committed entry
+/// so elohim-storage can project them into SQLite.
+///
+/// Handles:
+/// - `ChallengeOutcome` → `MishpatSignal::ChallengeOutcomeCreated` (Phase 11 T11.1)
+/// - `Commitment`       → `MishpatSignal::CommitmentCommitted`      (Slice-2a T5)
 ///
 /// GateDecisionAttestation and GateDecisionChallenge arms removed (Stage C) —
 /// those entry types now live on elohim DNA and elohim-storage projects from
 /// elohim's content_store signals.
+///
+/// Each `to_app_option` call is independent: a record that matches `Commitment`
+/// will not also match `ChallengeOutcome` (different entry type discriminants),
+/// so the two arms are mutually exclusive in practice, but the code is safe even
+/// if that invariant were somehow violated (both would emit, both are idempotent
+/// on the storage side).
 #[hdk_extern]
 pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<()> {
     for signed_action in committed_actions {
@@ -1569,6 +1593,24 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             None => continue,
         };
 
+        // ── Commitment ────────────────────────────────────────────────────────
+        // Slice-2a T5: emit so elohim-storage can project into mishpat_commitments.
+        if let Some(commitment) = record
+            .entry()
+            .to_app_option::<mishpat_integrity::Commitment>()
+            .ok()
+            .flatten()
+        {
+            let _ = emit_signal(MishpatSignal::CommitmentCommitted {
+                action_hash: action_hash.clone(),
+                entry_hash: entry_hash.clone(),
+                commitment,
+                author: author.clone(),
+            });
+        }
+
+        // ── ChallengeOutcome ──────────────────────────────────────────────────
+        // Phase 11 T11.1: emit so elohim-storage can project into challenge_outcomes.
         if let Some(entry) = record
             .entry()
             .to_app_option::<mishpat_integrity::ChallengeOutcome>()

@@ -494,6 +494,17 @@ pub enum MishpatSignal {
         author: String,
         entry: ChallengeOutcomeEntry,
     },
+    /// Commitment DHT entry was recorded — project into mishpat_commitments (Slice-2a T5).
+    ///
+    /// Emitted by the mishpat coordinator `post_commit` hook for each committed
+    /// `Commitment` entry. `entry_hash` is the content-addressed identity used
+    /// as `cid` in the projection row; `action_hash` becomes `dht_anchor_hash`.
+    CommitmentCommitted {
+        action_hash: String,
+        entry_hash: String,
+        author: String,
+        commitment: crate::mishpat_projection::CommitmentPayload,
+    },
 }
 
 /// Dispatch a `MishpatSignal` into the SQLite projection.
@@ -592,6 +603,42 @@ pub fn handle_mishpat_signal(
                 updated_at: now,
             };
             crate::db::challenge_outcomes::upsert(conn, &row)?;
+            Ok(())
+        }
+        MishpatSignal::CommitmentCommitted {
+            action_hash,
+            entry_hash,
+            author: _,
+            commitment,
+        } => {
+            // Delegate to the dedicated projection handler in mishpat_projection.
+            // That module owns the payload-parse logic and calls upsert_with_anchor.
+            // We pass a temporary single-connection pool substitute by building
+            // NewMishpatCommitment inline here so this function stays synchronous
+            // and conn-oriented (matching the other arms), avoiding an async boundary.
+            let new_row = match crate::mishpat_projection::parse_commitment_payload(
+                &commitment.action,
+                &commitment.payload_json,
+                &entry_hash,
+                &action_hash,
+            ) {
+                Ok(row) => row,
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        action_hash = %action_hash,
+                        "handle_mishpat_signal: CommitmentCommitted payload parse failed — skipped"
+                    );
+                    return Ok(());
+                }
+            };
+            crate::db::mishpat_commitments::upsert_with_anchor(conn, new_row)
+                .map_err(|e| StorageError::Database(e.to_string()))?;
+            tracing::info!(
+                cid = %entry_hash,
+                action_hash = %action_hash,
+                "handle_mishpat_signal: CommitmentCommitted projected → mishpat_commitments"
+            );
             Ok(())
         }
     }
