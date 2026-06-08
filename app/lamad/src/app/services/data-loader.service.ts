@@ -900,6 +900,7 @@ export class DataLoaderService {
     pathCacheSize: number;
     contentCacheSize: number;
     relationshipCacheSize: number;
+    rootedGraphCacheSize: number;
     hasGraph: boolean;
     hasPathIndex: boolean;
     hasContentIndex: boolean;
@@ -909,6 +910,7 @@ export class DataLoaderService {
       pathCacheSize: this.pathCache.size,
       contentCacheSize: this.contentCache.size,
       relationshipCacheSize: this.relationshipByNodeCache.size,
+      rootedGraphCacheSize: this.rootedGraphCache.size,
       hasGraph: this.graphCache$ !== null,
       hasPathIndex: this.pathIndexCache$ !== null,
       hasContentIndex: this.contentIndexCache$ !== null,
@@ -924,6 +926,7 @@ export class DataLoaderService {
       pathCacheSize: number;
       contentCacheSize: number;
       relationshipCacheSize: number;
+      rootedGraphCacheSize: number;
     };
     indexedDB: {
       available: boolean;
@@ -940,6 +943,7 @@ export class DataLoaderService {
         pathCacheSize: this.pathCache.size,
         contentCacheSize: this.contentCache.size,
         relationshipCacheSize: this.relationshipByNodeCache.size,
+        rootedGraphCacheSize: this.rootedGraphCache.size,
       },
       indexedDB: {
         available: idbStats.isAvailable,
@@ -1354,7 +1358,7 @@ export class DataLoaderService {
   // Graph Loading (for Exploration Service)
   // =========================================================================
 
-  /** LRU cache for per-node relationship queries */
+  /** FIFO size cap for per-node relationship queries (oldest-inserted evicted; not access-promoted) */
   private readonly relationshipByNodeCache = new Map<string, Observable<ContentRelationship[]>>();
   private readonly RELATIONSHIP_CACHE_MAX_SIZE = 100;
 
@@ -1465,7 +1469,7 @@ export class DataLoaderService {
       .pipe(map(results => (results ?? []).map(r => this.transformToContentRelationship(r))));
   }
 
-  /** LRU cache for per-node RESOLVED (computed) relationship queries */
+  /** FIFO size cap for per-node RESOLVED (computed) relationship queries (oldest-inserted evicted; not access-promoted) */
   private readonly resolvedRelationshipByNodeCache = new Map<
     string,
     Observable<ContentRelationship[]>
@@ -1666,10 +1670,12 @@ export class DataLoaderService {
           this.resolvedRelationshipByNodeCache.delete(key);
         }
       }
+      this.rootedGraphCache.delete(contentId);
     } else {
       // Clear entire cache
       this.relationshipByNodeCache.clear();
       this.resolvedRelationshipByNodeCache.clear();
+      this.rootedGraphCache.clear();
     }
   }
 

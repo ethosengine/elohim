@@ -557,6 +557,12 @@
   .content-tab-layout {
     flex-direction: column;
   }
+
+  /* Prevent the pinned sidebar rail from overflowing the column on narrow screens. */
+  .content-tab-layout app-exploration-sidebar {
+    max-width: 100%;
+    width: 100%;
+  }
 }
 
 .trust-tab-placeholder,
