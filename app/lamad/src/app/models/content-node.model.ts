@@ -34,6 +34,7 @@ import {
   CONTENT_FORMATS as WIRE_CONTENT_FORMATS,
   type ContentType as WireContentType,
   type ContentFormat as WireContentFormat,
+  type InferenceSource,
 } from '../../generated/schema-enums';
 
 import type { ContentBlob, ContentSteward } from './content-extensions.model';
@@ -518,6 +519,12 @@ export interface ContentRelationship {
   sourceNodeId: string;
   targetNodeId: string;
   relationshipType: ContentRelationshipType;
+  /**
+   * How this edge was inferred (canonical generated vocabulary):
+   * `explicit` (authored, Category A) vs computed `tag`/`path`/`semantic`/`system` (Category C).
+   * Carried through from the wire (one-field pass-through); drives the discovered bucket.
+   */
+  inferenceSource?: InferenceSource;
   metadata?: Record<string, unknown>;
 }
 
@@ -695,6 +702,13 @@ export interface ContentRelationshipDetail {
 
 /**
  * RelationshipInferenceSource - How a relationship was discovered.
+ *
+ * @deprecated Hand-written drift vs the canonical generated `InferenceSource`
+ * (`explicit | path | tag | semantic | system`) in `generated/schema-enums`.
+ * New code should use `InferenceSource`. This legacy vocabulary
+ * (`author | structural | semantic | usage | citation | system`) still types
+ * the older `ContentRelationshipDetail` / `RelationshipQuery` / `CreateRelationshipInput`
+ * surfaces; full retirement is a separate reconciliation (tracked for B-slice follow-up).
  */
 export type RelationshipInferenceSource =
   | 'author' // Explicitly defined by content author

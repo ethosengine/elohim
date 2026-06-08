@@ -73,6 +73,12 @@ export interface RelatedConceptsResult {
   /** Parent concepts that contain this one (CONTAINS incoming) */
   parents: ContentNode[];
 
+  /**
+   * Computed (discovered) neighbors — edges with a non-authored inferenceSource
+   * (e.g. `tag`/`path`/`semantic`). Rendered as "Discovered" rather than authored.
+   */
+  discovered: ContentNode[];
+
   /** All raw relationship edges for graph visualization */
   allRelationships: RelationshipEdge[];
 }

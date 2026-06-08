@@ -290,6 +290,7 @@ export class RelatedConceptsPanelComponent implements OnChanges, OnDestroy {
     related: [],
     children: [],
     parents: [],
+    discovered: [],
     allRelationships: [],
   };
 

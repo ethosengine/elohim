@@ -654,4 +654,67 @@ describe('RelatedConceptsService', () => {
         }
       }));
   });
+
+  describe('discovered bucket (inferenceSource)', () => {
+    // Minimal real node lookup matching categorizeRelationships' Map signature.
+    const discoveryNodes: Map<string, ContentNode> = new Map([
+      [
+        'theology',
+        {
+          id: 'theology',
+          title: 'Theology',
+          description: 'Authored neighbor',
+          contentType: 'concept',
+          contentFormat: 'markdown',
+          content: '# Theology',
+          tags: [],
+          relatedNodeIds: [],
+          metadata: {},
+        },
+      ],
+      [
+        'tagmate',
+        {
+          id: 'tagmate',
+          title: 'Tag Mate',
+          description: 'Computed (tag-derived) neighbor',
+          contentType: 'concept',
+          contentFormat: 'markdown',
+          content: '# Tag Mate',
+          tags: [],
+          relatedNodeIds: [],
+          metadata: {},
+        },
+      ],
+    ]);
+
+    it('routes tag-source edges into discovered', () => {
+      const rels = [
+        {
+          id: 'r1',
+          sourceNodeId: 'confession',
+          targetNodeId: 'theology',
+          relationshipType: ContentRelationshipType.RELATES_TO,
+          inferenceSource: 'explicit',
+        },
+        {
+          id: 'r2',
+          sourceNodeId: 'confession',
+          targetNodeId: 'tagmate',
+          relationshipType: ContentRelationshipType.RELATES_TO,
+          inferenceSource: 'tag',
+        },
+      ] as ContentRelationship[];
+
+      const result = (service as any).categorizeRelationships(
+        'confession',
+        rels,
+        discoveryNodes,
+        10
+      );
+
+      expect(result.discovered.map((n: ContentNode) => n.id)).toContain('tagmate');
+      expect(result.discovered.map((n: ContentNode) => n.id)).not.toContain('theology');
+    });
+  });
 });

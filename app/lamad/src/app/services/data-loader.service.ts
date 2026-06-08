@@ -1439,6 +1439,7 @@ export class DataLoaderService {
     targetId: string;
     relationshipType: string;
     confidence?: number;
+    inferenceSource?: string;
     metadata?: Record<string, unknown>;
   }): ContentRelationship {
     return {
@@ -1446,6 +1447,8 @@ export class DataLoaderService {
       sourceNodeId: rel.sourceId,
       targetNodeId: rel.targetId,
       relationshipType: rel.relationshipType as ContentRelationshipType,
+      // One-field pass-through from the wire — never transform/rename.
+      inferenceSource: rel.inferenceSource as ContentRelationship['inferenceSource'],
       metadata: rel.metadata,
     };
   }

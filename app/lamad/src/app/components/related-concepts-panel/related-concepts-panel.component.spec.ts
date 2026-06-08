@@ -22,6 +22,7 @@ describe('RelatedConceptsPanelComponent', () => {
         related: [],
         children: [],
         parents: [],
+        discovered: [],
         allRelationships: [],
       })
     );

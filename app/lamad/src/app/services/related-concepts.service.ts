@@ -27,7 +27,13 @@ import {
 /**
  * Category names for relationship categorization.
  */
-type CategoryName = 'prerequisites' | 'extensions' | 'related' | 'children' | 'parents';
+type CategoryName =
+  | 'prerequisites'
+  | 'extensions'
+  | 'related'
+  | 'children'
+  | 'parents'
+  | 'discovered';
 
 /**
  * Context for querying relationships in a graph.
@@ -99,6 +105,8 @@ interface CategoryCollectors {
   readonly children: ContentNode[];
   /** Parent nodes (hierarchical) */
   readonly parents: ContentNode[];
+  /** Discovered (computed, non-authored) nodes */
+  readonly discovered: ContentNode[];
 }
 
 /**
@@ -372,10 +380,30 @@ export class RelatedConceptsService {
       if (!node) continue;
 
       allRelationships.push(this.createRelationshipEdge(rel, relType));
+
+      // Computed (non-authored) edges route to the discovered bucket, skipping
+      // the authored prerequisite/related/etc. categorization below.
+      if (this.isDiscovered(rel.inferenceSource)) {
+        this.addToCategory(node, categories.discovered, limit, true);
+        continue;
+      }
+
       this.applyCategorizationRules(node, relType, isOutgoing, categories, limit);
     }
 
     return { ...categories, allRelationships };
+  }
+
+  /**
+   * Whether an edge was computed (discovered) rather than authored.
+   *
+   * Authored: `explicit` (canonical) and legacy `author` → NOT discovered.
+   * Everything else present (`tag`/`path`/`semantic` + legacy
+   * `structural`/`usage`/`citation`) → discovered. Handles BOTH the canonical
+   * generated `InferenceSource` vocabulary and the legacy hand-written one.
+   */
+  private isDiscovered(src?: string): boolean {
+    return src != null && src !== 'explicit' && src !== 'author';
   }
 
   /**
@@ -388,6 +416,7 @@ export class RelatedConceptsService {
       related: [],
       children: [],
       parents: [],
+      discovered: [],
     };
   }
 
@@ -573,6 +602,7 @@ export class RelatedConceptsService {
       related: [],
       children: [],
       parents: [],
+      discovered: [],
     };
 
     const queryOptions: QueryOptions = {
@@ -615,6 +645,7 @@ export class RelatedConceptsService {
       related: collectors.related,
       children: collectors.children,
       parents: collectors.parents,
+      discovered: collectors.discovered,
       allRelationships: collectors.allRelationships,
     };
   }
