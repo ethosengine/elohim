@@ -3,8 +3,9 @@
 //! Tracks what content this node should have vs what it has, and manages
 //! the fetch queue for pulling missing content from peers.
 
+use super::reconcile_rails::GapTracker;
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use ts_rs::TS;
@@ -27,44 +28,30 @@ pub struct ReplicationStatus {
     pub caught_up: bool,
 }
 
-/// Internal replication state (not serialized directly)
-#[derive(Debug, Default)]
-struct ReplicationInner {
-    /// Content IDs discovered from peers, not yet in local DB
-    pending: HashSet<String>,
-    /// Content IDs successfully written to local DB
-    completed: HashSet<String>,
-    /// Content IDs that failed with retry count
-    failed: HashMap<String, u32>,
-    /// Set after first successful discovery + fetch cycle with no remaining gaps
-    caught_up: bool,
-    /// Content IDs already known to be in local DB (skip during discovery)
-    local_ids: HashSet<String>,
-}
-
 const MAX_RETRIES: u32 = 3;
 
-/// Thread-safe replication state manager
+/// Thread-safe replication state manager — thin wrapper over the shared
+/// reconcile_rails::GapTracker (spec §4.1: one controller pattern, extracted).
 #[derive(Debug, Clone)]
 pub struct ReplicationState {
-    inner: Arc<RwLock<ReplicationInner>>,
+    inner: Arc<RwLock<GapTracker>>,
 }
 
 impl ReplicationState {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(RwLock::new(ReplicationInner::default())),
+            inner: Arc::new(RwLock::new(GapTracker::new(MAX_RETRIES))),
         }
     }
 
     /// Snapshot current status for API reporting
     pub async fn status(&self) -> ReplicationStatus {
-        let inner = self.inner.read().await;
+        let c = self.inner.read().await.counts();
         ReplicationStatus {
-            pending: inner.pending.len(),
-            completed: inner.completed.len(),
-            failed: inner.failed.len(),
-            caught_up: inner.caught_up,
+            pending: c.pending,
+            completed: c.completed,
+            failed: c.failed,
+            caught_up: c.caught_up,
         }
     }
 
@@ -82,74 +69,33 @@ impl ReplicationState {
     /// inventory exchange completes — otherwise the seeder would pass before
     /// any content has actually replicated.
     pub async fn set_local_ids(&self, ids: HashSet<String>) {
-        let had_content = !ids.is_empty();
-        let mut inner = self.inner.write().await;
-        inner.local_ids = ids;
-        if had_content && inner.pending.is_empty() {
-            inner.caught_up = true;
-        }
+        self.inner.write().await.set_local_ids_with(ids, true);
     }
 
     /// Discover content from a peer inventory. Returns IDs that are new gaps.
-    ///
-    /// All remote IDs are scanned; already-known items (local, completed,
-    /// in-flight pending, or exhausted retries) are skipped. New gaps are added
-    /// to `pending` and returned so the caller can enqueue them for dispatch.
-    /// Throttling is handled by `drain_gap_queue` — not here.
     pub async fn discover(&self, remote_ids: Vec<String>) -> Vec<String> {
-        let mut inner = self.inner.write().await;
-        let mut new_gaps = Vec::new();
-        for id in remote_ids {
-            if inner.local_ids.contains(&id)
-                || inner.completed.contains(&id)
-                || inner.pending.contains(&id)
-            {
-                continue;
-            }
-            if inner.failed.get(&id).copied().unwrap_or(0) >= MAX_RETRIES {
-                continue;
-            }
-            inner.pending.insert(id.clone());
-            new_gaps.push(id);
-        }
-        // Maintain the invariant: caught_up=false whenever pending is non-empty.
-        // `set_local_ids` can flip caught_up=true on a restored pod; without
-        // this guard, a subsequent inventory exchange that uncovers new gaps
-        // would leave caught_up stuck at true until a mark_completed/mark_failed
-        // path called update_caught_up.
-        if !new_gaps.is_empty() {
-            inner.caught_up = false;
-        }
-        new_gaps
+        self.inner.write().await.discover(remote_ids)
     }
 
     /// Mark a content ID as successfully replicated
     pub async fn mark_completed(&self, id: &str) {
-        let mut inner = self.inner.write().await;
-        inner.pending.remove(id);
-        inner.failed.remove(id);
-        inner.completed.insert(id.to_string());
-        inner.local_ids.insert(id.to_string());
+        self.inner.write().await.mark_completed(id);
     }
 
     /// Mark a content ID as failed (will retry up to MAX_RETRIES).
     ///
-    /// Items are removed from pending but NOT re-queued here. `discover()` will
-    /// re-include them on the next replication cycle (when the peer re-advertises
-    /// its inventory) if `fail_count < MAX_RETRIES`. This prevents a burst of
-    /// timed-out requests from being immediately re-dispatched, which was the
-    /// mechanism that caused replication to freeze at a partial completion count.
+    /// Items are removed from pending but NOT re-queued here. `discover()`
+    /// re-includes them on the next cycle if `fail_count < MAX_RETRIES` —
+    /// this prevents a burst of timed-out requests from being immediately
+    /// re-dispatched, which was the mechanism that froze replication at a
+    /// partial completion count.
     pub async fn mark_failed(&self, id: &str) {
-        let mut inner = self.inner.write().await;
-        inner.pending.remove(id);
-        let count = inner.failed.entry(id.to_string()).or_insert(0);
-        *count += 1;
+        self.inner.write().await.mark_failed(id);
     }
 
     /// Check if all discovered content is fetched or exhausted retries
     pub async fn update_caught_up(&self) {
-        let mut inner = self.inner.write().await;
-        inner.caught_up = inner.pending.is_empty();
+        self.inner.write().await.update_caught_up();
     }
 }
 
