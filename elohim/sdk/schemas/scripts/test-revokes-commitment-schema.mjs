@@ -68,4 +68,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('PASS: revokes-commitment schema (8 cases)');
+console.log('PASS: revokes-commitment schema (7 cases)');

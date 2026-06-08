@@ -30,8 +30,7 @@ pub struct CommitmentOutput {
 
 #[hdk_extern]
 pub fn create_commitment(input: CreateCommitmentInput) -> ExternResult<CommitmentOutput> {
-    validate_commitment_payload(&input)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
+    validate_commitment_payload(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     let entry = Commitment {
         action: input.action.clone(),
@@ -91,6 +90,11 @@ fn validate_replicates_commons(payload: &serde_json::Value) -> Result<(), String
         if !bounds.contains_key(field) {
             return Err(format!("bounds missing required field: {field}"));
         }
+    }
+    // rate_per_minute must be a positive rate — a zero rate is a no-op
+    // commitment (mirrors replicates-dwelling's positive-quantity guards).
+    if bounds["rate_per_minute"].as_u64().unwrap_or(0) == 0 {
+        return Err("replicates-commons bounds.rate_per_minute must be > 0".into());
     }
     if bounds["reach_ceiling"].as_str().unwrap_or("") != "commons" {
         return Err("bounds.reach_ceiling must equal 'commons'".into());
@@ -212,7 +216,12 @@ fn validate_delegates_compute(payload: &serde_json::Value) -> Result<(), String>
         .get("bounds")
         .and_then(|b| b.as_object())
         .ok_or_else(|| "bounds must be object".to_string())?;
-    for field in ["epr_scope", "reach_ceiling", "rate_per_hour", "rotation_ttl_days"] {
+    for field in [
+        "epr_scope",
+        "reach_ceiling",
+        "rate_per_hour",
+        "rotation_ttl_days",
+    ] {
         if !bounds.contains_key(field) {
             return Err(format!("bounds missing required field: {field}"));
         }
@@ -237,7 +246,13 @@ fn validate_delegates_compute(payload: &serde_json::Value) -> Result<(), String>
 }
 
 fn validate_acknowledges_reach_change(payload: &serde_json::Value) -> Result<(), String> {
-    let required = ["action", "acknowledger", "target_epr_cid", "new_reach", "signed_at"];
+    let required = [
+        "action",
+        "acknowledger",
+        "target_epr_cid",
+        "new_reach",
+        "signed_at",
+    ];
     for field in required {
         if payload.get(field).is_none() {
             return Err(format!(
@@ -249,28 +264,41 @@ fn validate_acknowledges_reach_change(payload: &serde_json::Value) -> Result<(),
         return Err("action field must equal 'acknowledges-reach-change'".into());
     }
     let valid_reach = [
-        "private", "self", "intimate", "trusted", "familiar", "community", "public", "commons",
+        "private",
+        "self",
+        "intimate",
+        "trusted",
+        "familiar",
+        "community",
+        "public",
+        "commons",
     ];
     let new_reach = payload["new_reach"].as_str().unwrap_or("");
     if !valid_reach.contains(&new_reach) {
-        return Err(format!(
-            "new_reach '{}' not a known reach value",
-            new_reach
-        ));
+        return Err(format!("new_reach '{}' not a known reach value", new_reach));
     }
     Ok(())
 }
 
 fn validate_replicates_dwelling(payload: &serde_json::Value) -> Result<(), String> {
     let required = [
-        "action", "provider_dwelling_hub_id", "recipient_dwelling_hub_id",
-        "provider_role", "capacity_bytes", "scope_filter",
-        "valid_from", "valid_until", "grace_period_days",
-        "rotation_ttl_days", "ratio_attestation",
+        "action",
+        "provider_dwelling_hub_id",
+        "recipient_dwelling_hub_id",
+        "provider_role",
+        "capacity_bytes",
+        "scope_filter",
+        "valid_from",
+        "valid_until",
+        "grace_period_days",
+        "rotation_ttl_days",
+        "ratio_attestation",
     ];
     for field in required {
         if payload.get(field).is_none() {
-            return Err(format!("replicates-dwelling missing required field: {field}"));
+            return Err(format!(
+                "replicates-dwelling missing required field: {field}"
+            ));
         }
     }
     if payload["action"] != "replicates-dwelling" {
@@ -283,7 +311,10 @@ fn validate_replicates_dwelling(payload: &serde_json::Value) -> Result<(), Strin
         return Err(format!("provider_role '{provider_role}' not in enum"));
     }
     if provider_role == "collective_steward" {
-        let via = payload.get("via_collective_hub_id").and_then(|v| v.as_str()).unwrap_or("");
+        let via = payload
+            .get("via_collective_hub_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         if via.is_empty() {
             return Err("collective_steward requires non-empty via_collective_hub_id".into());
         }
@@ -296,17 +327,25 @@ fn validate_replicates_dwelling(payload: &serde_json::Value) -> Result<(), Strin
     }
 
     // ratio_attestation: required sub-fields + sum-to-100
-    let attestation = payload.get("ratio_attestation").and_then(|v| v.as_object())
+    let attestation = payload
+        .get("ratio_attestation")
+        .and_then(|v| v.as_object())
         .ok_or("ratio_attestation must be object")?;
-    for f in ["commons_pct", "dwelling_pct", "collective_pct", "free_pct", "effective_ratio_cid"] {
+    for f in [
+        "commons_pct",
+        "dwelling_pct",
+        "collective_pct",
+        "free_pct",
+        "effective_ratio_cid",
+    ] {
         if !attestation.contains_key(f) {
             return Err(format!("ratio_attestation missing field: {f}"));
         }
     }
-    let commons    = attestation["commons_pct"].as_u64().unwrap_or(0);
-    let dwelling   = attestation["dwelling_pct"].as_u64().unwrap_or(0);
+    let commons = attestation["commons_pct"].as_u64().unwrap_or(0);
+    let dwelling = attestation["dwelling_pct"].as_u64().unwrap_or(0);
     let collective = attestation["collective_pct"].as_u64().unwrap_or(0);
-    let free       = attestation["free_pct"].as_u64().unwrap_or(0);
+    let free = attestation["free_pct"].as_u64().unwrap_or(0);
     if commons + dwelling + collective + free != 100 {
         return Err(format!(
             "ratio_attestation pct sum {} != 100",
@@ -315,7 +354,11 @@ fn validate_replicates_dwelling(payload: &serde_json::Value) -> Result<(), Strin
     }
 
     // scope_filter must be object (curation policy; can be empty)
-    if !payload.get("scope_filter").map(|v| v.is_object()).unwrap_or(false) {
+    if !payload
+        .get("scope_filter")
+        .map(|v| v.is_object())
+        .unwrap_or(false)
+    {
         return Err("scope_filter must be object".into());
     }
 
@@ -626,6 +669,35 @@ mod tests {
     }
 
     #[test]
+    fn replicates_commons_content_carrying_ratio_attestation_rejected() {
+        // The content variant carries no ratio_attestation; a stray one is rejected.
+        let mut payload = well_formed_commons_content_payload();
+        payload["ratio_attestation"] = serde_json::json!({
+            "commons_pct": 20, "dwelling_pct": 40, "collective_pct": 25, "free_pct": 15,
+            "effective_ratio_cid": "bafkrei-x"
+        });
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_commons_zero_rate_rejected() {
+        // bounds.rate_per_minute == 0 is a no-op commitment and is rejected.
+        let mut payload = well_formed_commons_content_payload();
+        payload["bounds"]["rate_per_minute"] = serde_json::json!(0);
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
     fn replicates_commons_capacity_zero_bytes_rejected() {
         let mut payload = well_formed_commons_capacity_payload();
         payload["commons_bytes"] = serde_json::json!(0);
@@ -652,7 +724,10 @@ mod tests {
     #[test]
     fn replicates_commons_capacity_missing_effective_ratio_cid_rejected() {
         let mut payload = well_formed_commons_capacity_payload();
-        payload["ratio_attestation"].as_object_mut().unwrap().remove("effective_ratio_cid");
+        payload["ratio_attestation"]
+            .as_object_mut()
+            .unwrap()
+            .remove("effective_ratio_cid");
         let input = CreateCommitmentInput {
             action: "replicates-commons".to_string(),
             payload_json: payload.to_string(),
