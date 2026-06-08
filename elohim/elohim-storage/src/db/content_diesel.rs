@@ -789,6 +789,9 @@ pub fn upsert_with_anchor(
 /// Returns a HashSet of ids that are already present locally. Used by
 /// `run_acquisition_reconcile` to diff the pin's desired set against what the
 /// node already holds, so only genuine gaps are enqueued for fetch.
+///
+/// NOTE: callers must keep ids.len() under SQLITE_MAX_VARIABLE_NUMBER (~999 on
+/// older SQLite); chunk the query if cluster-pin closures bring large id sets.
 pub fn content_ids_present(
     conn: &mut SqliteConnection,
     ctx: &AppContext,

@@ -2099,6 +2099,8 @@ impl P2PNode {
         let mut gap_dispatch_interval = tokio::time::interval(Duration::from_secs(5));
         gap_dispatch_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Acquisition reconcile: diff active pins against local inventory (spec §4.2).
+        // First tick fires at t=0 (parity with gap_dispatch_interval); it
+        // no-ops cheaply when no pins are registered yet.
         let mut acquisition_reconcile_interval = tokio::time::interval(Duration::from_secs(60));
         acquisition_reconcile_interval
             .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -6641,6 +6643,8 @@ impl P2PNode {
             .iter()
             .flat_map(|(_, ids)| ids.iter().cloned())
             .collect();
+        // Slice 1: all pinned content lives in the lamad app — revisit the
+        // app-scope here if cross-app pins land.
         let app_ctx = crate::db::AppContext::default_lamad();
         let local_has =
             match crate::db::content_diesel::content_ids_present(&mut conn, &app_ctx, &want_ids) {
@@ -6650,6 +6654,9 @@ impl P2PNode {
                     return;
                 }
             };
+        // DB work is done; drop the connection before the reconcile await so
+        // it isn't held across the acquisition write-lock.
+        drop(conn);
 
         let to_dispatch = self.acquisition.reconcile(pin_wants, &local_has).await;
         if !to_dispatch.is_empty() {
@@ -6687,8 +6694,11 @@ impl P2PNode {
             let len = queue.len();
             queue.drain(..available.min(len)).collect()
         };
+        let mut skipped = 0usize;
+        let mut sent = 0usize;
         for (i, id) in to_dispatch.iter().enumerate() {
             if !self.acquisition.wants(id).await {
+                skipped += 1;
                 continue;
             }
             let peer = peers[i % peers.len()];
@@ -6703,6 +6713,13 @@ impl P2PNode {
                 .lock()
                 .await
                 .insert(request_id, id.clone());
+            sent += 1;
+        }
+        if skipped > 0 {
+            debug!(
+                sent,
+                skipped, "Acquisition dispatch: skipped no-longer-wanted items"
+            );
         }
     }
 
