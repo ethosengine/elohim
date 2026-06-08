@@ -48,10 +48,10 @@ pub mod kad_store;
 pub mod observation_gossip;
 pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod reach_authorization;
+pub mod reconcile_rails;
 pub mod recovery_invitation;
 pub mod recovery_revocation;
 pub mod recovery_rotation;
-pub mod reconcile_rails;
 pub mod replication;
 pub mod revocation_attestation_message;
 pub mod shamir_transport;

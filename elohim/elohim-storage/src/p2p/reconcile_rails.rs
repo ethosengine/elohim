@@ -30,7 +30,10 @@ pub struct GapCounts {
 
 impl GapTracker {
     pub fn new(max_retries: u32) -> Self {
-        Self { max_retries, ..Default::default() }
+        Self {
+            max_retries,
+            ..Default::default()
+        }
     }
 
     pub fn counts(&self) -> GapCounts {
@@ -45,6 +48,8 @@ impl GapTracker {
     /// Register IDs already present locally. `flip_caught_up_if_restored`
     /// preserves replication.rs's restored-pod semantics; the acquisition
     /// stream passes `false` (a pin is never caught-up before reconcile).
+    /// Does NOT drain `pending` of ids now present in `local_ids`; callers
+    /// pair this with `mark_completed` for cross-stream byte-arrivals.
     pub fn set_local_ids_with(&mut self, ids: HashSet<String>, flip_caught_up_if_restored: bool) {
         let had_content = !ids.is_empty();
         self.local_ids = ids;
@@ -107,7 +112,10 @@ impl GapTracker {
         self.caught_up = self.pending.is_empty();
     }
 
-    /// True if this tracker still wants `id` (pending now or retryable later).
+    /// True if this tracker currently has `id` in flight (in `pending`).
+    /// Does NOT return true for retryable-next-cycle items — a failed-but-
+    /// retryable id was removed from `pending` and re-enters only on the next
+    /// `reconcile_desired`/`discover` call. Used as a dispatch-time filter.
     pub fn wants(&self, id: &str) -> bool {
         self.pending.contains(id)
     }
