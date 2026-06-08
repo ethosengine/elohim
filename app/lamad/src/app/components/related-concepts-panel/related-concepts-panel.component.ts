@@ -166,6 +166,32 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
             </div>
           </section>
         }
+
+        <!-- Discovered Section (computed edges — DISCOVERY, not authored truth) -->
+        @if (result.discovered.length > 0) {
+          <section class="relationship-section discovered">
+            <h4 class="section-header">
+              <span class="section-icon">✨</span>
+              Discovered — you might also explore
+              <span class="section-count">({{ result.discovered.length }})</span>
+            </h4>
+            <div class="section-content">
+              @for (concept of result.discovered; track concept.id) {
+                <div
+                  class="discovered-card-wrapper"
+                  data-testid="discovered-concept-card"
+                  [attr.inference-source]="discoveredInferenceSource"
+                >
+                  <app-concept-card
+                    [concept]="concept"
+                    [compact]="compact"
+                    (navigate)="onNavigate($event)"
+                  ></app-concept-card>
+                </div>
+              }
+            </div>
+          </section>
+        }
       }
     </div>
   `,
@@ -261,6 +287,20 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
       .children .section-header {
         color: var(--text-secondary, #5f6368);
       }
+
+      /* Discovered (computed) — visually muted/exploratory, distinct from authored */
+      .discovered .section-header {
+        color: var(--text-tertiary, #80868b);
+        font-style: italic;
+        border-bottom-style: dashed;
+      }
+
+      .discovered .discovered-card-wrapper {
+        position: relative;
+        border-left: 2px dashed var(--border-color, #e9ecef);
+        padding-left: 0.5rem;
+        opacity: 0.92;
+      }
     `,
   ],
 })
@@ -279,6 +319,18 @@ export class RelatedConceptsPanelComponent implements OnChanges, OnDestroy {
 
   /** Emitted when a concept is clicked */
   @Output() navigate = new EventEmitter<string>();
+
+  /**
+   * Static inference-source marker for discovered cards.
+   *
+   * The `discovered` bucket is `ContentNode[]` (no per-node source), but every
+   * node in it routed through `RelatedConceptsService.isDiscovered` — i.e. it is
+   * non-authored by construction. We surface a single honest non-`explicit`
+   * marker so consumers (and the a2o) can distinguish DISCOVERY from authored
+   * truth. If a precise per-node source is ever needed, enrich the bucket in the
+   * service to `Array<{ node; source }>` and bind `concept.source` here instead.
+   */
+  readonly discoveredInferenceSource = 'discovered';
 
   /** Loading state */
   isLoading = true;
@@ -319,7 +371,8 @@ export class RelatedConceptsPanelComponent implements OnChanges, OnDestroy {
       this.result.extensions.length === 0 &&
       this.result.related.length === 0 &&
       this.result.children.length === 0 &&
-      this.result.parents.length === 0
+      this.result.parents.length === 0 &&
+      this.result.discovered.length === 0
     );
   }
 
