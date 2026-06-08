@@ -221,9 +221,15 @@ contract).
 - `total: null` ⇒ closure not yet resolved ⇒ **keep waiting** (never caughtUp).
 - `total: 0` (resolved-empty) is a DISTINCT state from unresolved-null and surfaces as a
   warning-grade outcome — a zero-link closure must never false-complete silently.
-- `caughtUp` ⇔ `total` concrete ∧ `pending == 0` ∧ `total ≥ expectedMin` (the wait-for-drain
-  anti-false-positive guard, generalized: for a cluster pin, expectedMin = the resolved closure
-  count; for a single-item pin, 1).
+- `caughtUp` ⇔ **byte-arrival complete**: `total > 0 ∧ fetched == total` (every wanted item's
+  sha256-verified bytes durably stored) ∧ `total ≥ expectedMin`. This is `pending == 0` AND
+  `failed == 0` by construction, but stated as `fetched == total` deliberately: a **failed**
+  item is removed from `pending` until the next reconcile re-queues it, so a naive `pending == 0`
+  test would false-complete in that transient window with `fetched < total` — violating R-A.
+  caughtUp tracks *bytes that arrived*, never *queue momentarily empty*. For a cluster pin
+  expectedMin = the resolved closure count; for a single-item pin, 1. **`wait-for-*` terminates
+  on `caughtUp`** (not `pending == 0`): content that can never be fetched (retries exhausted)
+  never reports caughtUp and correctly TIMES OUT — the honest outcome, not a false success.
 - Restart recomputes everything (Category C): no persisted queue, no resumption bug class.
 
 ### §4.4 Wire surface (designed last)
