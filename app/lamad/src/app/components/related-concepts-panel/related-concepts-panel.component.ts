@@ -72,12 +72,14 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
             </h4>
             <div class="section-content">
               @for (concept of result.prerequisites; track concept.id) {
-                <app-concept-card
-                  [concept]="concept"
-                  relationshipType="PREREQUISITE"
-                  [compact]="compact"
-                  (navigate)="onNavigate($event)"
-                ></app-concept-card>
+                <div class="authored-card-wrapper" data-testid="related-concept-card">
+                  <app-concept-card
+                    [concept]="concept"
+                    relationshipType="PREREQUISITE"
+                    [compact]="compact"
+                    (navigate)="onNavigate($event)"
+                  ></app-concept-card>
+                </div>
               }
             </div>
           </section>
@@ -93,12 +95,14 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
             </h4>
             <div class="section-content">
               @for (concept of result.parents; track concept.id) {
-                <app-concept-card
-                  [concept]="concept"
-                  relationshipType="CONTAINS"
-                  [compact]="compact"
-                  (navigate)="onNavigate($event)"
-                ></app-concept-card>
+                <div class="authored-card-wrapper" data-testid="related-concept-card">
+                  <app-concept-card
+                    [concept]="concept"
+                    relationshipType="CONTAINS"
+                    [compact]="compact"
+                    (navigate)="onNavigate($event)"
+                  ></app-concept-card>
+                </div>
               }
             </div>
           </section>
@@ -114,12 +118,14 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
             </h4>
             <div class="section-content">
               @for (concept of result.related; track concept.id) {
-                <app-concept-card
-                  [concept]="concept"
-                  relationshipType="RELATES_TO"
-                  [compact]="compact"
-                  (navigate)="onNavigate($event)"
-                ></app-concept-card>
+                <div class="authored-card-wrapper" data-testid="related-concept-card">
+                  <app-concept-card
+                    [concept]="concept"
+                    relationshipType="RELATES_TO"
+                    [compact]="compact"
+                    (navigate)="onNavigate($event)"
+                  ></app-concept-card>
+                </div>
               }
             </div>
           </section>
@@ -135,12 +141,14 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
             </h4>
             <div class="section-content">
               @for (concept of result.extensions; track concept.id) {
-                <app-concept-card
-                  [concept]="concept"
-                  relationshipType="EXTENDS"
-                  [compact]="compact"
-                  (navigate)="onNavigate($event)"
-                ></app-concept-card>
+                <div class="authored-card-wrapper" data-testid="related-concept-card">
+                  <app-concept-card
+                    [concept]="concept"
+                    relationshipType="EXTENDS"
+                    [compact]="compact"
+                    (navigate)="onNavigate($event)"
+                  ></app-concept-card>
+                </div>
               }
             </div>
           </section>
@@ -156,12 +164,14 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
             </h4>
             <div class="section-content">
               @for (concept of result.children; track concept.id) {
-                <app-concept-card
-                  [concept]="concept"
-                  relationshipType="CONTAINS"
-                  [compact]="compact"
-                  (navigate)="onNavigate($event)"
-                ></app-concept-card>
+                <div class="authored-card-wrapper" data-testid="related-concept-card">
+                  <app-concept-card
+                    [concept]="concept"
+                    relationshipType="CONTAINS"
+                    [compact]="compact"
+                    (navigate)="onNavigate($event)"
+                  ></app-concept-card>
+                </div>
               }
             </div>
           </section>

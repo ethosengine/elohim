@@ -455,6 +455,26 @@ export const MARKDOWN = {
   TOC_TOGGLE: 'markdown-toc-toggle',
   TOC_CLOSE: 'markdown-toc-close',
   BACK_TO_TOP: 'markdown-back-to-top',
+  // The rendered markdown body. No data-testid (a content container, not an
+  // interactive element); locate via this class. Render-verifies "the markdown
+  // content body is rendered".
+  CONTENT: '.markdown-content', // CSS selector — used via locate(), not testId()
+} as const;
+
+// Shared exploration sidebar (lamad: exploration-sidebar.component.ts +
+// related-concepts-panel.component.ts). The SAME sidebar renders beside content
+// on BOTH the standalone /epr/{id} content-viewer AND the path-step lesson-view.
+// AUTHORED neighbors (explicit relatedNodeIds) surface as related-concept-card;
+// DISCOVERED (computed tag) neighbors surface as discovered-concept-card carrying
+// an inference-source attribute that is NOT "explicit".
+export const EXPLORATION = {
+  SIDEBAR: 'exploration-sidebar', // root <aside> — render-verifies the sidebar mounted
+  EXPLORE_GRAPH: 'exploration-explore-graph', // "Explore in Full Graph" button
+  RELATED_CONCEPT_CARD: 'related-concept-card', // authored neighbor (explicit edge)
+  DISCOVERED_CONCEPT_CARD: 'discovered-concept-card', // computed neighbor (tag edge)
+  // The inference-source attribute lives ON the discovered card wrapper; for
+  // discovered (non-authored) cards it is never "explicit".
+  INFERENCE_SOURCE_ATTR: 'inference-source',
 } as const;
 
 // Code editor (elohim-app: default-code-editor.component.html)

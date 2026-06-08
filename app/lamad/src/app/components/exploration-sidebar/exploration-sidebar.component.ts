@@ -64,6 +64,7 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
       [class.collapsible]="collapsible"
       [class.pinned]="!collapsible"
       [class.collapsed]="collapsible && !open"
+      data-testid="exploration-sidebar"
     >
       <div class="panel-header">
         <h2 class="panel-title">Explore</h2>

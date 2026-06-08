@@ -9,13 +9,74 @@
  */
 
 import { BasePage } from './base.page.js';
-import { EPR } from './selectors.js';
+import { EPR, EXPLORATION, MARKDOWN } from './selectors.js';
 
 export class EprContentPage extends BasePage {
   /** Wait until at least one EPR link is rendered on the page. */
   async waitForReady(): Promise<void> {
     // EPR links in markdown use data-epr attribute (not data-testid)
     await this.locate('[data-epr]').first().waitFor({ state: 'visible', timeout: 15_000 });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Markdown body
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Whether the rendered markdown content body is visible — proves the doctrinal
+   * markdown rendered (the markdown renderer, independent of the epr-composite /
+   * PathViewer keystone).
+   */
+  async isMarkdownBodyRendered(timeoutMs = 15_000): Promise<boolean> {
+    return this.locate(MARKDOWN.CONTENT)
+      .first()
+      .waitFor({ state: 'visible', timeout: timeoutMs })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Shared exploration sidebar — authored + discovered neighbors
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Whether the shared exploration sidebar is mounted and visible. */
+  async isSidebarVisible(timeoutMs = 15_000): Promise<boolean> {
+    return this.testId(EXPLORATION.SIDEBAR)
+      .first()
+      .waitFor({ state: 'visible', timeout: timeoutMs })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /**
+   * Texts of the AUTHORED related-concept cards (explicit relatedNodeIds edges).
+   * Scoped to within the sidebar so it never picks up unrelated cards.
+   */
+  async getAuthoredConceptTexts(): Promise<string[]> {
+    const cards = this.testId(EXPLORATION.SIDEBAR).locator(
+      `[data-testid="${EXPLORATION.RELATED_CONCEPT_CARD}"]`
+    );
+    return (await cards.allTextContents()).map(t => t.trim());
+  }
+
+  /** Count of DISCOVERED (computed tag) concept cards in the sidebar. */
+  async getDiscoveredConceptCount(): Promise<number> {
+    return this.testId(EXPLORATION.SIDEBAR)
+      .locator(`[data-testid="${EXPLORATION.DISCOVERED_CONCEPT_CARD}"]`)
+      .count();
+  }
+
+  /**
+   * The inference-source attribute on the first discovered concept card.
+   * For a discovered (non-authored) neighbor this is never "explicit".
+   * Returns null when no discovered card is present.
+   */
+  async getFirstDiscoveredInferenceSource(): Promise<string | null> {
+    const first = this.testId(EXPLORATION.SIDEBAR)
+      .locator(`[data-testid="${EXPLORATION.DISCOVERED_CONCEPT_CARD}"]`)
+      .first();
+    if ((await first.count()) === 0) return null;
+    return first.getAttribute(EXPLORATION.INFERENCE_SOURCE_ATTR);
   }
 
   /** Get count of EPR links visible on the page. */
