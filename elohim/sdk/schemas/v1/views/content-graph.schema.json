@@ -1,0 +1,63 @@
+{
+  "$id": "epr:schema:view:content-graph",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentGraph",
+  "description": "Content relationship graph rooted at a given content id. Source of truth: DHT link traversal (Derived via link, Category A2). Computed on read from relationship entries; not independently persisted.",
+  "type": "object",
+  "required": ["rootId", "related", "totalNodes"],
+  "additionalProperties": false,
+  "properties": {
+    "rootId": {
+      "type": "string",
+      "description": "CID of the root content node from which the graph was resolved."
+    },
+    "totalNodes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of nodes in the graph, including the root."
+    },
+    "related": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ContentGraphNode" },
+      "description": "Direct neighbours of the root node, each carrying their own recursive children."
+    }
+  },
+  "$defs": {
+    "ContentGraphNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contentId", "relationshipType", "confidence", "inferenceSource", "depth", "children"],
+      "properties": {
+        "contentId": {
+          "type": "string",
+          "description": "CID of this related content node."
+        },
+        "relationshipType": {
+          "type": "string",
+          "description": "Semantic relationship label (e.g. CONTAINS, RELATES_TO, VALIDATES)."
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score for this relationship edge [0, 1]."
+        },
+        "inferenceSource": {
+          "type": "string",
+          "enum": ["explicit", "path", "tag", "semantic", "system"],
+          "description": "How this edge was derived: explicit = author-declared; path = co-occurrence in a learning path; tag = shared-tag proximity; semantic = embedding-distance; system = system-generated (e.g. prerequisite inference)."
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Graph depth of this node relative to the root (root neighbours = 1)."
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ContentGraphNode" },
+          "description": "Recursive child nodes at depth + 1."
+        }
+      }
+    }
+  }
+}
