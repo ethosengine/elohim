@@ -800,7 +800,10 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
     description: description,
     // Sparse: store hash reference, Full: store entire content
     // html5-app: always store the content object with slug/entryPoint
-    contentBody: useSparsePattern ? `sha256:${blobEntry.hash}` : contentString,
+    // Emit the canonical `sha256-{hex}` content-address form. The deprecated
+    // `sha256:` colon form is accept-on-input only — never produced (spec
+    // Appendix E; blobEntry.hash is bare 64-char hex from genesis-pack).
+    contentBody: useSparsePattern ? `sha256-${blobEntry.hash}` : contentString,
     contentFormat: normalizeContentFormat(concept.contentFormat, concept.contentType),
     tags: concept.tags || [],
     reach: 'public',
