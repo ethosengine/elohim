@@ -76,6 +76,20 @@ export const routes: Routes = [
       ),
     data: { protocolContent: true },
   },
+  // Raw-node inspector (§12.6 Slice 0) — shows the EPR AS AN ATOM (its own
+  // fields/provenance), distinct from the rich pillar viewer above. Doorway
+  // serves the shell for /epr/{id}/raw (landed separately). Distinct segment
+  // count from the bare epr/:resourceId route, so ordering is fine; kept above
+  // the ** catch-all. Same resourceId param name.
+  {
+    path: 'epr/:resourceId/raw',
+    loadComponent: async () =>
+      import('./elohim/components/epr-raw-node/epr-raw-node.component').then(
+        m => m.EprRawNodeComponent
+      ),
+    data: { protocolContent: true },
+    title: 'Raw node',
+  },
   // Spatial map — cross-pillar geospatial view (Places, resources, governance)
   {
     path: 'map',

@@ -1,0 +1,82 @@
+/* Blank-slate raw-node inspector — no pillar chrome. Plain, legible, accessible. */
+
+.epr-raw {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+  color: var(--epr-raw-fg, #1f2430);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.epr-raw__title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.epr-raw__subtitle {
+  margin: 0 0 24px;
+  color: var(--epr-raw-muted, #6b7280);
+}
+
+.epr-raw__status {
+  color: var(--epr-raw-muted, #6b7280);
+}
+
+.epr-raw__section {
+  margin: 0 0 20px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--epr-raw-border, #e5e7eb);
+}
+
+.epr-raw__section:last-of-type {
+  border-bottom: none;
+}
+
+.epr-raw__heading {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--epr-raw-heading, #6b7280);
+  margin: 0 0 10px;
+}
+
+.epr-raw__dl {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.epr-raw__dl dt {
+  font-weight: 600;
+  color: var(--epr-raw-muted, #6b7280);
+}
+
+.epr-raw__dl dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.epr-raw__list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.epr-raw__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+
+.epr-raw__link {
+  color: var(--epr-raw-link, #2563eb);
+  text-decoration: underline;
+}
+
+.epr-raw__muted {
+  color: var(--epr-raw-muted, #6b7280);
+  font-style: italic;
+}

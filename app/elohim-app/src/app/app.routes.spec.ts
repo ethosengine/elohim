@@ -31,8 +31,8 @@ describe('App Routes', () => {
   it('should have correct number of routes', () => {
     // home, community, shefa, identity, account, doorway, avodah,
     // auth/callback, deliver/:slug, resource/:resourceId, epr/:resourceId,
-    // map, resolve, and 404 catch-all
-    expect(routes.length).toBe(14);
+    // epr/:resourceId/raw, map, resolve, and 404 catch-all
+    expect(routes.length).toBe(15);
   });
 
   it('should have the universal epr/:resourceId route (§12.6 Slice 2)', () => {
@@ -40,6 +40,16 @@ describe('App Routes', () => {
     expect(eprRoute).toBeDefined();
     expect(eprRoute?.loadComponent).toBeDefined();
     expect(eprRoute?.data?.['protocolContent']).toBe(true);
+  });
+
+  it('should have the raw-node inspector route epr/:resourceId/raw (§12.6 Slice 0)', () => {
+    const rawRoute = routes.find(r => r.path === 'epr/:resourceId/raw');
+    expect(rawRoute).toBeDefined();
+    expect(rawRoute?.loadComponent).toBeDefined();
+    // Above the ** catch-all so the inspector path actually resolves.
+    const catchAllIndex = routes.findIndex(r => r.path === '**');
+    const rawIndex = routes.findIndex(r => r.path === 'epr/:resourceId/raw');
+    expect(rawIndex).toBeLessThan(catchAllIndex);
   });
 
   it('should have an auth callback route for OAuth', () => {

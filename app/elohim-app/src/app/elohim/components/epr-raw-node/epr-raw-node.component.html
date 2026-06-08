@@ -1,0 +1,179 @@
+@switch (status()) {
+  @case ('loading') {
+    <div class="epr-raw" data-testid="epr-raw-loading" aria-busy="true">
+      <p class="epr-raw__status">Loading EPR…</p>
+    </div>
+  }
+
+  @case ('not-found') {
+    <main class="epr-raw" data-testid="epr-raw-not-found">
+      <h1 class="epr-raw__title">EPR not found</h1>
+      <p class="epr-raw__status">
+        No record exists for
+        <code class="epr-raw__code">{{ resourceId }}</code>
+        .
+      </p>
+    </main>
+  }
+
+  @case ('error') {
+    <main class="epr-raw" data-testid="epr-raw-error" role="alert">
+      <h1 class="epr-raw__title">Could not load EPR</h1>
+      <p class="epr-raw__status">
+        Something went wrong fetching
+        <code class="epr-raw__code">{{ resourceId }}</code>
+        .
+      </p>
+    </main>
+  }
+
+  @case ('loaded') {
+    @if (node(); as n) {
+      <main class="epr-raw" data-testid="epr-raw-node">
+        <h1 class="epr-raw__title">Raw node</h1>
+        <p class="epr-raw__subtitle">
+          Inspecting
+          <code class="epr-raw__code">{{ n.id }}</code>
+          as a protocol atom.
+        </p>
+
+        <!-- Identity -->
+        <section class="epr-raw__section" aria-labelledby="epr-raw-h-identity">
+          <h2 id="epr-raw-h-identity" class="epr-raw__heading">Identity</h2>
+          <dl class="epr-raw__dl">
+            <dt>Address</dt>
+            <dd>
+              <code class="epr-raw__code">{{ n.id }}</code>
+            </dd>
+
+            <dt>Content hash</dt>
+            <dd>
+              @if (n.blobHash) {
+                <a
+                  class="epr-raw__link"
+                  data-testid="epr-raw-blob-link"
+                  [href]="blobHref(n.blobHash)"
+                >
+                  <code class="epr-raw__code">{{ n.blobHash }}</code>
+                </a>
+              } @else {
+                <span class="epr-raw__muted">no blob</span>
+              }
+            </dd>
+
+            @if (n.blobCid) {
+              <dt>Content ID (CID)</dt>
+              <dd>
+                <code class="epr-raw__code">{{ n.blobCid }}</code>
+              </dd>
+            }
+
+            <dt>Size</dt>
+            <dd>
+              @if (n.contentSizeBytes !== null) {
+                {{ n.contentSizeBytes }} bytes
+              } @else {
+                <span class="epr-raw__muted">unknown</span>
+              }
+            </dd>
+          </dl>
+        </section>
+
+        <!-- Type -->
+        <section class="epr-raw__section" aria-labelledby="epr-raw-h-type">
+          <h2 id="epr-raw-h-type" class="epr-raw__heading">Type</h2>
+          <dl class="epr-raw__dl">
+            <dt>Content type</dt>
+            <dd>{{ n.contentType }}</dd>
+            <dt>Content format</dt>
+            <dd>{{ n.contentFormat }}</dd>
+          </dl>
+        </section>
+
+        <!-- Reach / validation -->
+        <section class="epr-raw__section" aria-labelledby="epr-raw-h-reach">
+          <h2 id="epr-raw-h-reach" class="epr-raw__heading">Reach &amp; validation</h2>
+          <dl class="epr-raw__dl">
+            <dt>Reach</dt>
+            <dd>{{ n.reach ?? 'unknown' }}</dd>
+            <dt>Validation status</dt>
+            <dd>{{ n.validationStatus ?? 'unknown' }}</dd>
+          </dl>
+        </section>
+
+        <!-- Relations -->
+        <section class="epr-raw__section" aria-labelledby="epr-raw-h-relations">
+          <h2 id="epr-raw-h-relations" class="epr-raw__heading">Relations</h2>
+          @if (n.relatedNodeIds.length > 0) {
+            <ul class="epr-raw__list" data-testid="epr-raw-relations">
+              @for (relId of n.relatedNodeIds; track relId) {
+                <li>
+                  <a
+                    class="epr-raw__link"
+                    data-testid="epr-raw-relation-link"
+                    [routerLink]="['/epr', relId]"
+                  >
+                    {{ relId }}
+                  </a>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="epr-raw__muted" data-testid="epr-raw-relations-empty">
+              No related nodes recorded.
+            </p>
+          }
+        </section>
+
+        <!-- Provenance -->
+        <section
+          class="epr-raw__section"
+          data-testid="epr-raw-provenance"
+          aria-labelledby="epr-raw-h-provenance"
+        >
+          <h2 id="epr-raw-h-provenance" class="epr-raw__heading">Provenance</h2>
+          <dl class="epr-raw__dl">
+            <dt>Created by</dt>
+            <dd>
+              @if (n.createdBy) {
+                <code class="epr-raw__code">{{ n.createdBy }}</code>
+              } @else {
+                <span class="epr-raw__muted">unattributed</span>
+              }
+            </dd>
+
+            <dt>Created at</dt>
+            <dd>{{ n.createdAt }}</dd>
+
+            <dt>Updated at</dt>
+            <dd>{{ n.updatedAt }}</dd>
+
+            <dt>DHT anchor</dt>
+            <dd>
+              @if (n.dhtAnchorHash) {
+                <code class="epr-raw__code">{{ n.dhtAnchorHash }}</code>
+              } @else {
+                <span class="epr-raw__muted">not yet anchored</span>
+              }
+            </dd>
+          </dl>
+        </section>
+
+        <!-- Metadata -->
+        <section class="epr-raw__section" aria-labelledby="epr-raw-h-metadata">
+          <h2 id="epr-raw-h-metadata" class="epr-raw__heading">Metadata</h2>
+          @if (metadata().length > 0) {
+            <dl class="epr-raw__dl" data-testid="epr-raw-metadata">
+              @for (entry of metadata(); track entry.key) {
+                <dt>{{ entry.key }}</dt>
+                <dd>{{ entry.value }}</dd>
+              }
+            </dl>
+          } @else {
+            <p class="epr-raw__muted">No metadata recorded.</p>
+          }
+        </section>
+      </main>
+    }
+  }
+}
