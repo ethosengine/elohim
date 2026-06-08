@@ -34,6 +34,39 @@ pub struct ContentView {
     pub dht_anchor_hash: Option<String>,
 }
 
+/// One node in a content relationship graph.
+///
+/// Wire shape for `content-graph.schema.json` `$defs/ContentGraphNode`. Carries
+/// the resolver's `inferenceSource` (explicit | path | tag | semantic | system)
+/// and `depth` so the boundary is provenance-honest. `children` is recursive
+/// (depth + 1). Built from `ResolvedEdge` via a `From` shim in
+/// `elohim-storage/src/views.rs`.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContentGraphNodeView {
+    pub content_id: String,
+    pub relationship_type: String,
+    pub confidence: f64,
+    pub inference_source: String,
+    pub depth: u32,
+    pub children: Vec<ContentGraphNodeView>,
+}
+
+/// Content relationship graph rooted at a given content id.
+///
+/// Wire shape for `content-graph.schema.json`. A multi-provenance composite
+/// read projection (never persisted). Built from `ResolvedNeighborhood` via a
+/// `From` shim in `elohim-storage/src/views.rs`.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContentGraphView {
+    pub root_id: String,
+    pub related: Vec<ContentGraphNodeView>,
+    pub total_nodes: usize,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]

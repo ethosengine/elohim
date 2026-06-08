@@ -275,3 +275,48 @@ pub use elohim_views::lamad::*;
 pub use elohim_views::qahal::*;
 pub use elohim_views::shared::*;
 pub use elohim_views::shefa::*;
+
+// ============================================================================
+// Content-graph resolver → view conversions
+// ============================================================================
+//
+// The NativeGraphResolver (graph_engine) produces ResolvedNeighborhood /
+// ResolvedEdge; the HTTP read shape is the ts-rs ContentGraphView /
+// ContentGraphNodeView (camelCase, carrying inferenceSource + depth). These
+// shims are the resolver→wire boundary. They are wired into
+// RelationshipService::get_graph by Task A8 (which also retires the legacy
+// plain-serde ContentGraph structs in relationship_service.rs).
+// ContentGraphNodeView / ContentGraphView are already in scope via the
+// `pub use elohim_views::lamad::*;` glob re-export above.
+use crate::graph_engine::{ResolvedEdge, ResolvedNeighborhood};
+
+// dead_code-allowed: unused until Task A8 wires get_graph to the resolver.
+#[allow(dead_code)]
+impl From<&ResolvedEdge> for ContentGraphNodeView {
+    fn from(e: &ResolvedEdge) -> Self {
+        Self {
+            content_id: e.target_id.clone(),
+            relationship_type: e.relationship_type.clone(),
+            confidence: e.confidence,
+            inference_source: e.inference_source.clone(),
+            depth: e.depth,
+            // Flat edge list from the resolver; recursive nesting is composed
+            // by the caller (A8) if/when it groups by depth. Pass 1 is flat.
+            children: vec![],
+        }
+    }
+}
+
+// dead_code-allowed: unused until Task A8 wires get_graph to the resolver.
+#[allow(dead_code)]
+impl From<ResolvedNeighborhood> for ContentGraphView {
+    fn from(n: ResolvedNeighborhood) -> Self {
+        let related: Vec<ContentGraphNodeView> = n.edges.iter().map(Into::into).collect();
+        let total_nodes = related.len();
+        Self {
+            root_id: n.root_id,
+            related,
+            total_nodes,
+        }
+    }
+}
