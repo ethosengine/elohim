@@ -3,7 +3,10 @@
 //! Category C) edges. Read-only: this trait has no write method by design —
 //! a computed edge can never be persisted through it.
 
+use std::collections::{HashSet, VecDeque};
+
 use crate::db::context::AppContext;
+use crate::db::{relationships_diesel, DbPool};
 use crate::error::StorageError;
 
 /// One edge in a resolved neighborhood, discriminated by `inference_source`.
@@ -55,4 +58,138 @@ pub trait ContentGraphResolver: Send + Sync {
         ctx: &AppContext,
         query: &GraphQuery<'_>,
     ) -> Result<ResolvedNeighborhood, StorageError>;
+}
+
+/// The Diesel-backed resolver. Holds the pool exactly like `RelationshipService`
+/// (`pool: DbPool`); `AppContext` is the per-call tenant scope, forwarded into the
+/// diesel functions — it is NOT a connection source.
+///
+/// Pass 1 (this slice): explicit edges via depth-bounded BFS over stored
+/// relationships. Pass 2 (tag-discovery, Category C) is added in A4 — that is why
+/// `include_computed` / `max_computed` / `min_shared_tags` on the query are read
+/// but not yet acted upon here.
+pub struct NativeGraphResolver {
+    pool: DbPool,
+}
+
+impl NativeGraphResolver {
+    /// Build a resolver over a connection pool (mirrors `RelationshipService::new`).
+    pub fn new(pool: DbPool) -> Self {
+        Self { pool }
+    }
+
+    /// Get a connection from the pool (mirrors `RelationshipService::conn`).
+    fn conn(
+        &self,
+    ) -> Result<
+        diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::SqliteConnection>>,
+        StorageError,
+    > {
+        self.pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))
+    }
+
+    /// Pass 1: explicit edges via depth-bounded BFS.
+    ///
+    /// Walks stored relationships breadth-first from `root_id`, emitting one
+    /// `ResolvedEdge` per first-discovery of a target (cycle-safe via a visited
+    /// set; the root is pre-seeded so a self-cycle never re-emits it). Depth is
+    /// hard-capped at 3 regardless of `query.max_depth`.
+    fn explicit_edges(
+        &self,
+        ctx: &AppContext,
+        query: &GraphQuery<'_>,
+    ) -> Result<Vec<ResolvedEdge>, StorageError> {
+        let mut conn = self.conn()?;
+        let depth_cap = query.max_depth.min(3); // hard cap — bounded traversal
+
+        let mut visited: HashSet<String> = HashSet::new();
+        visited.insert(query.root_id.to_string());
+
+        let mut out: Vec<ResolvedEdge> = Vec::new();
+        let mut frontier: VecDeque<(String, u32)> = VecDeque::new();
+        frontier.push_back((query.root_id.to_string(), 0));
+
+        while let Some((node, depth)) = frontier.pop_front() {
+            if depth >= depth_cap {
+                continue;
+            }
+            let rels = relationships_diesel::get_outgoing_relationships(
+                &mut conn,
+                ctx,
+                &node,
+                query.relationship_types,
+            )?;
+            for r in rels {
+                if visited.insert(r.target_id.clone()) {
+                    let edge_depth = depth + 1;
+                    out.push(ResolvedEdge {
+                        target_id: r.target_id.clone(),
+                        relationship_type: r.relationship_type.clone(),
+                        confidence: r.confidence as f64,
+                        inference_source: if r.inference_source.is_empty() {
+                            "explicit".to_string()
+                        } else {
+                            r.inference_source.clone()
+                        },
+                        depth: edge_depth,
+                    });
+                    frontier.push_back((r.target_id, edge_depth));
+                }
+            }
+        }
+
+        Ok(out)
+    }
+}
+
+impl ContentGraphResolver for NativeGraphResolver {
+    fn resolve_neighborhood(
+        &self,
+        ctx: &AppContext,
+        query: &GraphQuery<'_>,
+    ) -> Result<ResolvedNeighborhood, StorageError> {
+        // Pass 1: explicit edges. Pass 2 (computed/tag) is wired in A4.
+        let edges = self.explicit_edges(ctx, query)?;
+        Ok(ResolvedNeighborhood {
+            root_id: query.root_id.to_string(),
+            edges,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::relationships_diesel::test_harness::{insert_relationship, test_pool_ctx};
+
+    #[test]
+    fn explicit_bfs_reaches_depth_two() {
+        let (pool, ctx, _tmp) = test_pool_ctx();
+
+        // A -> B -> C, all explicit RELATES_TO edges.
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_relationship(&mut conn, &ctx, "A", "B", "RELATES_TO", "explicit");
+            insert_relationship(&mut conn, &ctx, "B", "C", "RELATES_TO", "explicit");
+        }
+
+        let resolver = NativeGraphResolver::new(pool);
+        let q = GraphQuery {
+            include_computed: false,
+            max_depth: 2,
+            ..GraphQuery::new("A")
+        };
+        let n = resolver.resolve_neighborhood(&ctx, &q).unwrap();
+
+        let by: std::collections::BTreeSet<_> = n
+            .edges
+            .iter()
+            .map(|e| (e.target_id.as_str(), e.depth))
+            .collect();
+        assert!(by.contains(&("B", 1)), "B at depth 1");
+        assert!(by.contains(&("C", 2)), "C at depth 2 (de-stubbed)");
+        assert!(n.edges.iter().all(|e| e.inference_source == "explicit"));
+    }
 }

@@ -527,6 +527,99 @@ pub fn relationship_stats_by_source(
         .map_err(|e| StorageError::Internal(format!("Stats query failed: {}", e)))
 }
 
+/// Test harness shared with sibling modules (e.g. `graph_engine::tests`).
+///
+/// The `relationships` table DDL mirrors the production migration closely
+/// enough to exercise real Diesel queries against in-memory-equivalent
+/// SQLite. We use a temp **file** (not `:memory:`) so every connection a
+/// `DbPool` hands out observes the same database — `:memory:` would give
+/// each pooled connection a separate, empty database.
+#[cfg(test)]
+pub(crate) mod test_harness {
+    use super::*;
+    use crate::db::DbPool;
+    use diesel::r2d2::{ConnectionManager, Pool};
+    use diesel::sqlite::SqliteConnection;
+    use diesel::Connection;
+
+    /// SQL creating the `relationships` table (kept in sync with `setup_test_db`).
+    const RELATIONSHIPS_DDL: &str = r#"
+        CREATE TABLE relationships (
+            id TEXT PRIMARY KEY NOT NULL,
+            h_app_id TEXT NOT NULL DEFAULT 'lamad',
+            source_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            relationship_type TEXT NOT NULL,
+            confidence REAL NOT NULL DEFAULT 1.0,
+            inference_source TEXT NOT NULL DEFAULT 'explicit',
+            is_bidirectional INTEGER NOT NULL DEFAULT 0,
+            inverse_relationship_id TEXT,
+            provenance_chain_json TEXT,
+            governance_layer TEXT,
+            reach TEXT NOT NULL DEFAULT 'commons',
+            metadata_json TEXT,
+            dht_anchor_hash TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    "#;
+
+    /// A temp-file-backed pool plus a `lamad` `AppContext`. The returned
+    /// `NamedTempFile` MUST be kept alive by the caller for the pool's
+    /// lifetime (dropping it deletes the backing database file).
+    pub(crate) fn test_pool_ctx() -> (DbPool, AppContext, tempfile::NamedTempFile) {
+        let tmp = tempfile::NamedTempFile::new().expect("create temp db file");
+        let url = tmp.path().to_str().expect("temp path utf8").to_string();
+
+        // Seed the schema on a direct connection before building the pool, so
+        // the table exists for every connection the pool later hands out.
+        let mut seed = SqliteConnection::establish(&url).expect("open temp db");
+        diesel::sql_query(RELATIONSHIPS_DDL)
+            .execute(&mut seed)
+            .expect("create relationships table");
+        // `create_relationship` upserts via ON CONFLICT, which needs this index.
+        diesel::sql_query(
+            "CREATE UNIQUE INDEX idx_rel_unique ON relationships(h_app_id, source_id, target_id, relationship_type)",
+        )
+        .execute(&mut seed)
+        .expect("create unique index");
+
+        let manager = ConnectionManager::<SqliteConnection>::new(&url);
+        let pool = Pool::builder()
+            .max_size(4)
+            .build(manager)
+            .expect("build test pool");
+
+        (pool, AppContext::default_lamad(), tmp)
+    }
+
+    /// Insert one explicit relationship row directly. Returns nothing; panics
+    /// on failure (test-only helper).
+    pub(crate) fn insert_relationship(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        source_id: &str,
+        target_id: &str,
+        relationship_type: &str,
+        inference_source: &str,
+    ) {
+        let input = CreateRelationshipInput {
+            id: None,
+            source_id: source_id.to_string(),
+            target_id: target_id.to_string(),
+            relationship_type: relationship_type.to_string(),
+            confidence: 1.0,
+            inference_source: inference_source.to_string(),
+            is_bidirectional: false,
+            provenance_chain_json: None,
+            governance_layer: None,
+            reach: "commons".to_string(),
+            metadata_json: None,
+        };
+        create_relationship(conn, ctx, input).expect("insert relationship");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
