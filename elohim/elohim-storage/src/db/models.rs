@@ -13,11 +13,12 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::diesel_schema::{
-    access_grants, agreements, appeals, apps, challenges, collective_participations, collectives,
-    comments, content, content_attestations, content_mastery, content_tags, contributor_dashboards,
-    contributor_presences, custodian_metrics, custodian_shares, device_policies, discussions,
-    economic_events, enum_registry, governance_dispositions, governance_signals, governance_states,
-    hazards, human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
+    access_grants, acquisition_pins, agreements, appeals, apps, challenges,
+    collective_participations, collectives, comments, content, content_attestations,
+    content_mastery, content_tags, contributor_dashboards, contributor_presences,
+    custodian_metrics, custodian_shares, device_policies, discussions, economic_events,
+    enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
+    human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
     local_sessions, mutuality_audit_log, node_stewardship, observation_diversity_summary,
     observation_entries, observation_sessions, observations, peer_blob_inventory,
     peer_identity_bindings, peer_inventory_cursor, placement_gaps, places, portal_hosts,
@@ -3493,8 +3494,9 @@ pub struct NewMutualityAuditLogRow<'a> {
 // ============================================================================
 
 /// Queryable row from the `acquisition_pins` table.
-#[derive(Debug, Clone, Queryable, Identifiable, Serialize)]
-#[diesel(table_name = crate::db::diesel_schema::acquisition_pins)]
+#[derive(Debug, Clone, Queryable, Identifiable, Selectable, Serialize)]
+#[diesel(table_name = acquisition_pins)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct AcquisitionPin {
     pub id: i32,
     pub agent_pub_key: String,
@@ -3508,9 +3510,9 @@ pub struct AcquisitionPin {
 }
 
 /// Insertable row for `acquisition_pins` (omits `id` — AUTOINCREMENT, and
-/// `status`/`created_at`/`updated_at` which carry SQL defaults).
+/// `status`/`created_at`/`updated_at` which are set explicitly in `upsert_pin`).
 #[derive(Debug, Clone, Insertable)]
-#[diesel(table_name = crate::db::diesel_schema::acquisition_pins)]
+#[diesel(table_name = acquisition_pins)]
 pub struct NewAcquisitionPin {
     pub agent_pub_key: String,
     pub head_ref: String,

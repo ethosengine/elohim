@@ -12,16 +12,29 @@ use super::models::{current_timestamp, AcquisitionPin, NewAcquisitionPin};
 /// Idempotent upsert on the composite identity (agent, head_ref, kind).
 ///
 /// Re-pinning the same identity refreshes priority and closure_rule_json and
-/// revives a 'removed' pin back to 'active'.  The `updated_at` timestamp is
-/// computed in Rust (matching the codebase pattern — see `current_timestamp()`
-/// in models.rs) rather than via bare SQL.
+/// revives a 'removed' pin back to 'active'.
+///
+/// Timestamps are always computed in Rust via `current_timestamp()` so every
+/// row in the table uses the same ISO 8601 `YYYY-MM-DDTHH:MM:SSZ` format.
+/// The insert path sets both `created_at` and `updated_at` explicitly (via a
+/// tuple-values insert) to avoid the SQL `datetime('now')` default that
+/// produces a different format (`YYYY-MM-DD HH:MM:SS`).  On conflict only
+/// `updated_at` is refreshed — `created_at` is never mutated on re-pin.
 pub fn upsert_pin(
     conn: &mut SqliteConnection,
     new: NewAcquisitionPin,
 ) -> QueryResult<AcquisitionPin> {
     let now = current_timestamp();
     diesel::insert_into(pins::acquisition_pins)
-        .values(&new)
+        .values((
+            pins::agent_pub_key.eq(&new.agent_pub_key),
+            pins::head_ref.eq(&new.head_ref),
+            pins::kind.eq(&new.kind),
+            pins::closure_rule_json.eq(&new.closure_rule_json),
+            pins::priority.eq(new.priority),
+            pins::created_at.eq(&now),
+            pins::updated_at.eq(&now),
+        ))
         .on_conflict((pins::agent_pub_key, pins::head_ref, pins::kind))
         .do_update()
         .set((
@@ -127,6 +140,10 @@ mod tests {
             active.is_empty(),
             "removed pin must not appear in active list"
         );
+
+        // Removed pins must still appear in list_all (soft-delete, not hard-delete).
+        let all = list_all_pins(&mut conn).expect("list_all after remove");
+        assert_eq!(all.len(), 1, "removed pin must remain in list_all");
 
         // Re-upsert same identity — must revive to active.
         upsert_pin(&mut conn, sample_pin(1)).expect("re-upsert after remove");
