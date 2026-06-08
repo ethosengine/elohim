@@ -509,6 +509,10 @@ pub struct P2PNode {
     gap_queue: ReplicationGapQueue,
     /// Acquisition stream state (spec §4) — sibling of replication_state.
     acquisition: acquisition::AcquisitionState,
+    /// Provide-loop reconciler (Slice 2b): caught-up commons pins → notarized
+    /// replicates-commons Commitments. Logical-key dedup survives restart; the
+    /// in-memory latch is a per-process optimisation only.
+    provide_reconciler: crate::services::provide_reconcile::ProvideReconciler,
     /// content ids dispatched for acquisition, keyed by request id
     pending_acquisition_fetches: PendingReplicationFetchMap,
     /// acquisition gap queue (priority-ordered at enqueue time)
@@ -1705,6 +1709,7 @@ impl P2PNode {
             )),
             gap_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             acquisition: acquisition::AcquisitionState::new(),
+            provide_reconciler: crate::services::provide_reconcile::ProvideReconciler::new(),
             pending_acquisition_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
@@ -2119,6 +2124,11 @@ impl P2PNode {
         let mut acquisition_reconcile_interval = tokio::time::interval(Duration::from_secs(60));
         acquisition_reconcile_interval
             .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // Provide reconcile: caught-up commons pins → notarized
+        // replicates-commons Commitments (spec slice-2b §provide-loop). Same
+        // 60s cadence as acquisition; logical-key dedup survives restart.
+        let mut provide_reconcile_interval = tokio::time::interval(Duration::from_secs(60));
+        provide_reconcile_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Acquisition dispatch: drain the acquisition queue every 5 seconds.
         let mut acquisition_dispatch_interval = tokio::time::interval(Duration::from_secs(5));
         acquisition_dispatch_interval
@@ -2251,6 +2261,12 @@ impl P2PNode {
                     drop(swarm);
                     if !self.sync_paused.load(Ordering::Acquire) {
                         self.run_acquisition_reconcile().await;
+                    }
+                }
+                _ = provide_reconcile_interval.tick() => {
+                    drop(swarm);
+                    if !self.sync_paused.load(Ordering::Acquire) {
+                        self.run_provide_reconcile().await;
                     }
                 }
                 _ = acquisition_dispatch_interval.tick() => {
@@ -6684,6 +6700,82 @@ impl P2PNode {
                 }
             }
         }
+    }
+
+    /// Provide-loop tick: derive the caught-up commons desired set and run the
+    /// reconciler. Author seam wiring (HcClient) is threaded by the conductor
+    /// composition; absent it, the pass is a no-op derive (the reconciler's
+    /// behaviour is unit-tested in services::provide_reconcile).
+    async fn run_provide_reconcile(&self) {
+        let Some(ref pool) = self.db_pool else { return };
+        let Some(self_cid) = self.config.self_cid.clone() else {
+            return;
+        };
+        let Ok(mut conn) = pool.get() else { return };
+
+        let pins = match crate::db::acquisition_pins::list_active_pins(&mut conn) {
+            Ok(p) => p,
+            Err(e) => {
+                debug!(error = %e, "provide reconcile: pin load failed");
+                return;
+            }
+        };
+        drop(conn);
+
+        // caught-up head_refs from the live acquisition rollup.
+        let caught_up: std::collections::HashSet<String> = self
+            .acquisition
+            .per_pin()
+            .await
+            .into_iter()
+            .filter(|s| s.caught_up)
+            .filter_map(|s| {
+                pins.iter()
+                    .find(|p| p.id == s.pin_id)
+                    .map(|p| p.head_ref.clone())
+            })
+            .collect();
+
+        // commons-reach head_refs from local content projection.
+        let head_refs: Vec<String> = pins.iter().map(|p| p.head_ref.clone()).collect();
+        let commons: std::collections::HashSet<String> = {
+            let Ok(mut conn) = pool.get() else { return };
+            let app_ctx = crate::db::AppContext::default_lamad();
+            crate::db::content_diesel::content_ids_present(&mut conn, &app_ctx, &head_refs)
+                .unwrap_or_default()
+        };
+
+        let desired = crate::services::provide_reconcile::ProvideReconciler::derive_desired(
+            &pins, &caught_up, &commons,
+        );
+        if desired.is_empty() {
+            return;
+        }
+
+        // Keep the per-key stage latch current against the live DHT projection
+        // (restart-safe stage re-derivation). No HcClient author seam is
+        // composed on P2PNode yet, so this observe-only pass does not author;
+        // the conductor-composed path drives `reconcile_provides` with a live
+        // CommitmentAuthor. The diff/dedup behaviour is unit-tested in
+        // services::provide_reconcile.
+        let needs = match self
+            .provide_reconciler
+            .observe(pool, &self_cid, &desired)
+            .await
+        {
+            Ok(n) => n,
+            Err(e) => {
+                debug!(error = %e, "provide reconcile: observe pass failed");
+                return;
+            }
+        };
+        debug!(
+            target: "elohim_storage::provide",
+            self_cid = %self_cid,
+            desired = desired.len(),
+            needs_commitment = needs,
+            "provide reconcile: latched desired set (live author seam pending conductor wiring)"
+        );
     }
 
     /// Acquisition dispatch (spec §4.2): shared-rails budget, round-robin

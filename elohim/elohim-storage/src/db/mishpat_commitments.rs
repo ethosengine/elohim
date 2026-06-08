@@ -145,6 +145,25 @@ pub fn graduate_to_active(conn: &mut SqliteConnection, cid: &str) -> QueryResult
     .execute(conn)
 }
 
+/// Load this provider's live (non-revoked) `replicates-commons` commitments.
+///
+/// "Live" = `action == "replicates-commons"` AND `provider == self` AND
+/// `revoked_at IS NULL`. State is intentionally NOT filtered — both 'proposed'
+/// (authored, not yet graduated) and 'active' (graduated by a provide event)
+/// count as a live provide for logical-key dedup; only revocation removes a row
+/// from the actual set (spec §provide-loop). The provide reconciler diffs the
+/// `(provider, recipient)` logical keys of these rows against its desired set.
+pub fn live_commons_provides_for_provider(
+    conn: &mut SqliteConnection,
+    provider: &str,
+) -> QueryResult<Vec<MishpatCommitment>> {
+    mc::mishpat_commitments
+        .filter(mc::action.eq("replicates-commons"))
+        .filter(mc::provider.eq(provider))
+        .filter(mc::revoked_at.is_null())
+        .load(conn)
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -347,6 +366,49 @@ mod tests {
             row.revoked_at.as_deref(),
             Some(ts),
             "revoked_at must reflect the supplied timestamp"
+        );
+    }
+
+    #[test]
+    fn live_commons_provides_lists_non_revoked_by_provider_recipient() {
+        let mut conn = test_conn();
+
+        let mut active = sample_commitment("cid:commons-live", Some("anchor-live"));
+        active.action = "replicates-commons".to_string();
+        active.scope = "replicates-commons".to_string();
+        active.provider = "agent:self".to_string();
+        active.recipient = "epr:album-1".to_string();
+        active.state = "proposed".to_string();
+        upsert_with_anchor(&mut conn, active).expect("upsert live commons");
+
+        // A revoked row for the SAME logical key must NOT count as live.
+        let mut revoked = sample_commitment("cid:commons-revoked", Some("anchor-rev"));
+        revoked.action = "replicates-commons".to_string();
+        revoked.provider = "agent:self".to_string();
+        revoked.recipient = "epr:album-1".to_string();
+        revoked.revoked_at = Some("2026-06-10T00:00:00Z".to_string());
+        upsert_with_anchor(&mut conn, revoked).expect("upsert revoked commons");
+
+        // A dwelling commitment must NOT appear (action filter).
+        let mut dwelling = sample_commitment("cid:dwelling", Some("anchor-dw"));
+        dwelling.provider = "agent:self".to_string();
+        dwelling.recipient = "epr:album-1".to_string();
+        upsert_with_anchor(&mut conn, dwelling).expect("upsert dwelling");
+
+        let live = live_commons_provides_for_provider(&mut conn, "agent:self").expect("query");
+        assert_eq!(
+            live.len(),
+            1,
+            "exactly one non-revoked replicates-commons row"
+        );
+        assert_eq!(live[0].recipient, "epr:album-1");
+        assert_eq!(live[0].cid, "cid:commons-live");
+
+        // A different provider sees nothing.
+        let other = live_commons_provides_for_provider(&mut conn, "agent:other").expect("query");
+        assert!(
+            other.is_empty(),
+            "provider filter must exclude other agents"
         );
     }
 }
