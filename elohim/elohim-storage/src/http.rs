@@ -990,6 +990,17 @@ impl HttpServer {
                 }
             }
 
+            // Acquisition DevicePins (spec §1.1, §4.4) — OWN NODE ONLY.
+            // Deliberately absent from build_manifest(); a doorway MUST NEVER
+            // serve another agent's pins. Matched before the /api/v1/ catch-all
+            // so these routes are DB-only (airplane-mode): no p2p feature gate.
+            (Method::GET, "/api/v1/pins") => self.handle_list_pins().await,
+            (Method::POST, "/api/v1/pins") => self.handle_create_pin(req).await,
+            (Method::DELETE, p) if p.starts_with("/api/v1/pins/") => {
+                let id_str = p.trim_start_matches("/api/v1/pins/").to_string();
+                self.handle_remove_pin(&id_str).await
+            }
+
             // Observation Session API -- must be matched before the /api/v1/ catch-all
             (method, p) if p.starts_with("/api/v1/observations") => {
                 if let Some(ref pool) = self.db_pool {
@@ -8692,6 +8703,192 @@ impl HttpServer {
     /// Not guarded by `#[cfg(test)]` — see note above.
     pub fn db_pool(&self) -> Option<crate::db::DbPool> {
         self.db_pool.clone()
+    }
+
+    // ── Acquisition DevicePin handlers (spec §1.1, §4.4) ─────────────────────
+    // Own-node only. Airplane-mode property: all three handlers touch only the
+    // local `acquisition_pins` SQLite table — no network, no conductor.
+
+    /// POST /api/v1/pins — create or idempotently re-pin a DevicePin.
+    async fn handle_create_pin(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+        self.handle_create_pin_bytes(&body.to_bytes()).await
+    }
+
+    /// GET /api/v1/pins — list all pins with optional per-pin pull enrichment.
+    async fn handle_list_pins(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+        let pins = db::acquisition_pins::list_all_pins(&mut conn)
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+        let pin_views: Vec<_> = pins.into_iter().map(pin_to_view).collect();
+
+        // Per-pin pull enrichment: read from the live AcquisitionState when p2p is
+        // available; null otherwise (airplane-mode contract).
+        #[cfg(feature = "p2p")]
+        let pull: Option<Vec<crate::p2p::acquisition::PinPullStatus>> = {
+            if let Some(ref handle) = self.p2p_handle {
+                Some(handle.acquisition_per_pin().await)
+            } else {
+                None
+            }
+        };
+        #[cfg(not(feature = "p2p"))]
+        let pull: Option<Vec<crate::p2p::acquisition::PinPullStatus>> = None;
+
+        let body = serde_json::json!({
+            "pins": pin_views,
+            "pull": pull,
+        });
+        Ok(response::ok(&body))
+    }
+
+    /// DELETE /api/v1/pins/{id} — soft-delete a pin by marking it "removed".
+    async fn handle_remove_pin(&self, id_str: &str) -> Result<Response<Full<Bytes>>, StorageError> {
+        let id: i32 = id_str
+            .parse()
+            .map_err(|_| StorageError::InvalidInput(format!("invalid pin id: '{}'", id_str)))?;
+
+        let mut conn = self.get_diesel_conn()?;
+        let rows = db::acquisition_pins::set_pin_status(&mut conn, id, "removed")
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        if rows == 0 {
+            return Ok(response::not_found(&format!("pin {} not found", id)));
+        }
+
+        Ok(response::ok(&serde_json::json!({ "removed": id })))
+    }
+
+    /// Expose test entry points for the pins handlers.
+    /// Not guarded by `#[cfg(test)]` — integration test binaries compile the
+    /// library without `cfg(test)` set (only the binary itself carries that flag).
+    pub async fn test_handle_list_pins(&self) -> HttpTestResponse {
+        match self.handle_list_pins().await {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+
+    pub async fn test_handle_create_pin_raw(&self, json: &str) -> HttpTestResponse {
+        // `Incoming` cannot be constructed directly in tests; delegate to the
+        // inner bytes helper which bypasses the body-read step.
+        match self.handle_create_pin_bytes(json.as_bytes()).await {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+
+    /// Inner helper — parse body bytes and run create_pin logic.
+    /// Shared by the real handler (which gets bytes from Incoming) and the test helper.
+    async fn handle_create_pin_bytes(
+        &self,
+        body_bytes: &[u8],
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let input: elohim_views::acquisition::CreatePinInputView =
+            serde_json::from_slice(body_bytes)
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        let kind = input.kind.unwrap_or_else(|| "item".to_string());
+
+        if kind == "cluster" {
+            return Ok(response::json_response(
+                StatusCode::NOT_IMPLEMENTED,
+                &serde_json::json!({
+                    "error": "cluster pins require the slice-3 closure resolver (spec §5) — not yet implemented"
+                }),
+            ));
+        }
+
+        if kind != "item" {
+            return Ok(response::json_response(
+                StatusCode::BAD_REQUEST,
+                &serde_json::json!({
+                    "error": format!("unknown pin kind '{}'; valid values: item, cluster", kind)
+                }),
+            ));
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        let pin = db::acquisition_pins::upsert_pin(
+            &mut conn,
+            db::models::NewAcquisitionPin {
+                agent_pub_key: "local-device".to_string(),
+                head_ref: input.head_ref,
+                kind,
+                closure_rule_json: input
+                    .closure_rule
+                    .map(|v| serde_json::to_string(&v.0).unwrap_or_default()),
+                priority: input.priority.unwrap_or(1),
+            },
+        )
+        .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        Ok(response::created(&pin_to_view(pin)))
+    }
+
+    pub async fn test_handle_remove_pin(&self, id_str: &str) -> HttpTestResponse {
+        match self.handle_remove_pin(id_str).await {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+}
+
+/// Map a DB `AcquisitionPin` model to its wire view.
+///
+/// `closure_rule_json` is parsed from a JSON string to `serde_json::Value`
+/// so TypeScript receives a real object, not a JSON-string-inside-JSON.
+fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinView {
+    elohim_views::acquisition::PinView {
+        id: p.id,
+        agent_pub_key: p.agent_pub_key,
+        head_ref: p.head_ref,
+        kind: p.kind,
+        closure_rule: p
+            .closure_rule_json
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+            .map(elohim_views::shared::JsonVal),
+        priority: p.priority,
+        status: p.status,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
     }
 }
 

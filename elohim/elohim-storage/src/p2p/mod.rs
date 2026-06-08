@@ -982,12 +982,23 @@ pub struct P2PHandle {
     /// `set_last_gossiped_inventory`. The diagnostic endpoint reads this to
     /// compute filesystem parity without needing live P2P connectivity.
     last_gossiped: Arc<std::sync::RwLock<Vec<String>>>,
+    /// Shared acquisition state — cloned from the node's `AcquisitionState`
+    /// (which is Arc-backed internally). Used by `acquisition_per_pin()` to
+    /// serve GET /api/v1/pins without requiring a p2p command round-trip.
+    acquisition: acquisition::AcquisitionState,
 }
 
 impl P2PHandle {
     /// Get the latest P2P status snapshot
     pub fn status(&self) -> P2PStatusInfo {
         self.status_rx.borrow().clone()
+    }
+
+    /// Per-pin acquisition pull progress for GET /api/v1/pins enrichment.
+    /// Returns the live per-pin status vector from the shared AcquisitionState.
+    /// Empty when no pins have been reconciled yet (e.g. immediately after startup).
+    pub async fn acquisition_per_pin(&self) -> Vec<acquisition::PinPullStatus> {
+        self.acquisition.per_pin().await
     }
 
     /// Return the local libp2p PeerId as a base58-encoded string.
@@ -1121,6 +1132,7 @@ impl P2PHandle {
             delivery_peers: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
+            acquisition: acquisition::AcquisitionState::new(),
         }
     }
 
@@ -1145,6 +1157,7 @@ impl P2PHandle {
             delivery_peers: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
+            acquisition: acquisition::AcquisitionState::new(),
         }
     }
 
@@ -6477,6 +6490,8 @@ impl P2PNode {
             delivery_peers: Arc::clone(&self.delivery_peers),
             sync_paused: Arc::clone(&self.sync_paused),
             last_gossiped: Arc::clone(&self.last_gossiped),
+            // Clone shares the Arc<RwLock<...>> inside AcquisitionState.
+            acquisition: self.acquisition.clone(),
         }
     }
 
