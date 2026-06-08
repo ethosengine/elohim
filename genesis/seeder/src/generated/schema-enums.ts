@@ -249,6 +249,11 @@ export const ALL_ENGAGEMENT_TYPES = [
 export const ENGAGEMENT_TYPES = ALL_ENGAGEMENT_TYPES;
 export type EngagementType = (typeof ALL_ENGAGEMENT_TYPES)[number];
 
+export const CORE_INFERENCE_SOURCES = ['explicit', 'path', 'tag', 'semantic'] as const;
+export const ALL_INFERENCE_SOURCES = ['explicit', 'path', 'tag', 'semantic', 'system'] as const;
+export const INFERENCE_SOURCES = ALL_INFERENCE_SOURCES;
+export type InferenceSource = (typeof ALL_INFERENCE_SOURCES)[number];
+
 export const CORE_INSTRUMENT_ARCHETYPES = [
   'retention-check',
   'outcome-correlation',
