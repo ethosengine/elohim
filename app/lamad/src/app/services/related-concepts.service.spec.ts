@@ -754,5 +754,54 @@ describe('RelatedConceptsService', () => {
       expect(result.discovered.map((n: ContentNode) => n.id)).toContain('tagmate');
       expect(result.discovered.map((n: ContentNode) => n.id)).not.toContain('theology');
     });
+
+    // End-to-end (lazy path): the merged resolved set carries an INCOMING explicit
+    // edge (container CONTAINS confession) AND a computed tag edge. Through
+    // getRelatedConcepts, the incoming explicit lands in its authored bucket
+    // (parents/Part-Of) and the tag lands in discovered — the disjoint-merge contract.
+    it('lands incoming explicit in parents AND tag in discovered via getRelatedConcepts', () =>
+      new Promise<void>(done => {
+        const container: ContentNode = {
+          id: 'container',
+          title: 'Container',
+          description: 'Authored parent (incoming CONTAINS)',
+          contentType: 'concept',
+          contentFormat: 'markdown',
+          content: '# Container',
+          tags: [],
+          relatedNodeIds: [],
+          metadata: {},
+        };
+
+        dataLoaderSpy.getResolvedRelationshipsForNode.mockReturnValue(
+          of([
+            {
+              id: 'rel-incoming',
+              sourceNodeId: 'container',
+              targetNodeId: 'confession',
+              relationshipType: ContentRelationshipType.CONTAINS,
+              inferenceSource: 'explicit',
+            },
+            {
+              id: 'rel-tag',
+              sourceNodeId: 'confession',
+              targetNodeId: 'tagmate',
+              relationshipType: ContentRelationshipType.RELATES_TO,
+              inferenceSource: 'tag',
+            },
+          ] as ContentRelationship[])
+        );
+        dataLoaderSpy.getContent.mockImplementation((id: string) => {
+          if (id === 'container') return of(container);
+          if (id === 'tagmate') return of(discoveryNodes.get('tagmate')!);
+          return throwError(() => new Error('Not found'));
+        });
+
+        service.getRelatedConcepts('confession').subscribe(result => {
+          expect(result.parents.map(n => n.id)).toContain('container');
+          expect(result.discovered.map(n => n.id)).toContain('tagmate');
+          done();
+        });
+      }));
   });
 });

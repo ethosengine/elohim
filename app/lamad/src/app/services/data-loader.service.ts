@@ -1439,18 +1439,31 @@ export class DataLoaderService {
   >();
 
   /**
-   * Get RESOLVED relationships for a single node from the resolver graph endpoint.
+   * Get RESOLVED relationships for a single node — a DISJOINT MERGE of two sources:
    *
-   * Unlike {@link getRelationshipsForNode} (which sources the LIST endpoint and
-   * returns only STORED explicit/structural rows), this routes through
-   * `getContentGraph(contentId, { computed: true })` so the resolver's COMPUTED
-   * tag edges (`inferenceSource:"tag"`, Category C) reach the related-concepts
-   * panel and route to its `discovered` bucket. Each graph `related` node is
-   * mapped to a `ContentRelationship` rooted at `contentId`.
+   * 1. **Explicit, both directions** — the LIST endpoint via
+   *    {@link fetchRelationshipsForNode}(contentId, 'both'): all STORED
+   *    explicit/structural edges, INCOMING and outgoing. This is the authored
+   *    source (Category A); incoming edges (e.g. `concept-6 CONTAINS concept-1`)
+   *    feed the `parents`/Part-Of bucket and MUST survive.
+   * 2. **Computed discovery only** — from `getContentGraph(contentId,
+   *    { computed: true })`, ONLY the edges whose source is discovered
+   *    (`inferenceSource` present and NOT `explicit`/`author`, e.g. `tag`),
+   *    rooted at `contentId`. These flow to the `discovered` bucket.
+   *
+   * The two sets are disjoint by `inferenceSource` (list = explicit/structural;
+   * graph-filtered = computed), so the concatenation needs no dedup — with a
+   * belt-and-suspenders guard dropping any computed edge whose target already
+   * appears as an explicit edge.
+   *
+   * Rationale: the resolver graph endpoint is OUTGOING-traversal only. Sourcing
+   * the panel ENTIRELY from it dropped incoming explicit edges (the B2b
+   * regression). The architecturally-clean fix is resolver `direction=both`
+   * support; until then we merge here.
    *
    * @param contentId - The content node ID to get relationships for
    * @param depth - Resolver traversal depth (default 2)
-   * @returns Observable of ContentRelationship[] (outgoing from contentId)
+   * @returns Observable of ContentRelationship[] (explicit both-direction + computed outgoing)
    */
   getResolvedRelationshipsForNode(
     contentId: string,
@@ -1481,18 +1494,52 @@ export class DataLoaderService {
   }
 
   /**
-   * Fetch resolved (computed) relationships from the resolver graph endpoint and
-   * project each graph node into a `ContentRelationship`.
+   * Merge the authored LIST source (explicit, both directions) with the
+   * resolver graph's COMPUTED-only edges (see {@link getResolvedRelationshipsForNode}).
+   *
+   * The list path restores incoming explicit edges the outgoing-only graph
+   * endpoint drops; the graph path contributes computed discovery edges the list
+   * endpoint never returns. The two sets are disjoint by `inferenceSource`; a
+   * belt-and-suspenders guard drops any computed edge whose target already
+   * appears as an explicit edge.
    */
   private fetchResolvedRelationshipsForNode(
     contentId: string,
     depth: number
   ): Observable<ContentRelationship[]> {
-    return this.contentService.getContentGraph(contentId, { computed: true, depth }).pipe(
-      map(graph =>
-        (graph?.related ?? []).map(node => this.graphNodeToContentRelationship(contentId, node))
-      )
+    const explicitBoth$ = this.fetchRelationshipsForNode(contentId, 'both');
+    const computedGraph$ = this.contentService
+      .getContentGraph(contentId, { computed: true, depth })
+      .pipe(
+        map(graph =>
+          (graph?.related ?? [])
+            // Computed discovery only — drop the graph's explicit/authored edges;
+            // those come (both directions) from the LIST source instead.
+            .filter(node => this.isComputedInference(node.inferenceSource))
+            .map(node => this.graphNodeToContentRelationship(contentId, node))
+        )
+      );
+
+    return forkJoin([explicitBoth$, computedGraph$]).pipe(
+      map(([explicitBoth, computed]) => {
+        // Disjoint by inferenceSource, so no dedup is strictly needed; the guard
+        // drops any computed edge whose target already appears as an explicit one.
+        const explicitTargets = new Set(explicitBoth.map(rel => rel.targetNodeId));
+        const computedOnly = computed.filter(rel => !explicitTargets.has(rel.targetNodeId));
+        return [...explicitBoth, ...computedOnly];
+      })
     );
+  }
+
+  /**
+   * Whether a resolver graph node's `inferenceSource` marks it as COMPUTED
+   * (discovered) rather than authored. Mirrors RelatedConceptsService.isDiscovered:
+   * authored = `explicit` (canonical) / `author` (legacy); everything else present
+   * (`tag`/`path`/`semantic`/…) is computed. Absent source → treat as authored
+   * (not computed), so it is left to the LIST source.
+   */
+  private isComputedInference(src?: string): boolean {
+    return src != null && src !== 'explicit' && src !== 'author';
   }
 
   /**

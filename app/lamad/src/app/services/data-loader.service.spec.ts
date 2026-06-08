@@ -431,22 +431,23 @@ describe('DataLoaderService', () => {
     });
   });
 
-  // B2b: the related-concepts panel must source relationships from the resolver
-  // graph endpoint (computed=true) so the resolver's computed tag edges
-  // (inferenceSource:"tag", Category C) reach the panel and route to `discovered`.
-  // The LIST endpoint (getRelationships) only returns STORED explicit/structural
-  // rows; it NEVER returns the resolver's computed edges.
-  describe('getResolvedRelationshipsForNode (computed graph source)', () => {
-    it('should source relationships from getContentGraph with computed=true', async () => {
+  // B2b (post-fix): getResolvedRelationshipsForNode is a DISJOINT MERGE of two
+  // sources — the LIST endpoint (getRelationships, 'both') for authored
+  // explicit/structural edges in BOTH directions, AND the resolver graph
+  // endpoint (getContentGraph, computed=true) for COMPUTED-only discovery edges
+  // (inferenceSource:"tag", Category C). The graph endpoint is outgoing-only, so
+  // the list source is what restores INCOMING explicit edges (the regression).
+  describe('getResolvedRelationshipsForNode (disjoint merge: list-both + computed graph)', () => {
+    it('should call BOTH the list endpoint (both directions) AND the computed graph endpoint', async () => {
       mockContentService.getContentGraph.mockReturnValue(
         of({
           rootId: 'concept-1',
           related: [
             {
-              contentId: 'explicit-target',
+              contentId: 'tag-discovered-target',
               relationshipType: 'RELATES_TO',
-              confidence: 1,
-              inferenceSource: 'explicit',
+              confidence: 0.6,
+              inferenceSource: 'tag',
               depth: 1,
               children: [],
             },
@@ -461,20 +462,38 @@ describe('DataLoaderService', () => {
             'concept-1',
             expect.objectContaining({ computed: true, depth: 2 })
           );
-          // Must NOT use the LIST endpoint for this path.
-          expect(mockContentService.getRelationships).not.toHaveBeenCalled();
+          // The list endpoint, queried in BOTH directions, restores incoming explicit edges.
+          expect(mockContentService.getRelationships).toHaveBeenCalledWith('concept-1', 'both');
           resolve();
         });
       });
     });
 
-    it('should carry inferenceSource:"tag" through from the resolver graph node', async () => {
+    // The core regression guard: an INCOMING explicit edge (other CONTAINS
+    // concept-1) is dropped by the outgoing-only graph endpoint. The list-both
+    // source must restore it so the parents/Part-Of bucket survives — while the
+    // tag edge from the graph still flows for discovery.
+    it('should restore an INCOMING explicit edge from list-both AND keep the computed tag edge', async () => {
+      mockContentService.getRelationships.mockReturnValue(
+        of([
+          {
+            id: 'rel-incoming',
+            sourceId: 'concept-6',
+            targetId: 'concept-1',
+            relationshipType: 'CONTAINS',
+            confidence: 1,
+            inferenceSource: 'explicit',
+          },
+        ])
+      );
       mockContentService.getContentGraph.mockReturnValue(
         of({
           rootId: 'concept-1',
           related: [
+            // Graph echoes an explicit OUTGOING edge — must be filtered out (the
+            // list source owns explicit edges); only the tag edge survives here.
             {
-              contentId: 'explicit-target',
+              contentId: 'explicit-outgoing',
               relationshipType: 'RELATES_TO',
               confidence: 1,
               inferenceSource: 'explicit',
@@ -498,14 +517,52 @@ describe('DataLoaderService', () => {
         service.getResolvedRelationshipsForNode('concept-1', 2).subscribe(rels => resolve(rels));
       });
 
+      // Incoming explicit edge restored from list-both (feeds parents/Part-Of).
+      const incomingEdge = relationships.find(
+        r => r.sourceNodeId === 'concept-6' && r.targetNodeId === 'concept-1'
+      );
+      expect(incomingEdge).toBeDefined();
+      expect(incomingEdge.relationshipType).toBe('CONTAINS');
+      expect(incomingEdge.inferenceSource).toBe('explicit');
+
+      // Computed tag edge still flows for discovery.
+      const tagEdge = relationships.find(r => r.targetNodeId === 'tag-discovered-target');
+      expect(tagEdge).toBeDefined();
+      expect(tagEdge.inferenceSource).toBe('tag');
+      expect(tagEdge.sourceNodeId).toBe('concept-1');
+
+      // The graph's explicit-outgoing echo is filtered out (list owns explicit).
+      const graphExplicit = relationships.find(r => r.targetNodeId === 'explicit-outgoing');
+      expect(graphExplicit).toBeUndefined();
+    });
+
+    it('should carry inferenceSource:"tag" through from the resolver graph node', async () => {
+      mockContentService.getContentGraph.mockReturnValue(
+        of({
+          rootId: 'concept-1',
+          related: [
+            {
+              contentId: 'tag-discovered-target',
+              relationshipType: 'RELATES_TO',
+              confidence: 0.6,
+              inferenceSource: 'tag',
+              depth: 1,
+              children: [],
+            },
+          ],
+          totalNodes: 2,
+        })
+      );
+
+      const relationships = await new Promise<any[]>(resolve => {
+        service.getResolvedRelationshipsForNode('concept-1', 2).subscribe(rels => resolve(rels));
+      });
+
       const tagEdge = relationships.find(r => r.targetNodeId === 'tag-discovered-target');
       expect(tagEdge).toBeDefined();
       expect(tagEdge.inferenceSource).toBe('tag');
       expect(tagEdge.sourceNodeId).toBe('concept-1');
       expect(tagEdge.relationshipType).toBe('RELATES_TO');
-
-      const explicitEdge = relationships.find(r => r.targetNodeId === 'explicit-target');
-      expect(explicitEdge?.inferenceSource).toBe('explicit');
     });
   });
 });
