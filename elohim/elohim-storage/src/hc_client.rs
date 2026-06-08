@@ -510,6 +510,60 @@ impl HcClient {
             .await
     }
 
+    /// Subscribe to MishpatSignals emitted by the mishpat DNA's coordinator
+    /// (`mishpat` zome `post_commit` hook). Routes `CommitmentCommitted` (and the
+    /// gate-decision / challenge variants) to `signals::handle_mishpat_signal`,
+    /// which projects the commitment into `mishpat_commitments` with
+    /// `dht_anchor_hash = action_hash`.
+    ///
+    /// `AppWebsocket::on_signal` is registered per app-websocket connection and
+    /// receives EVERY `Signal::App` emitted by ANY cell in the app — it does NOT
+    /// filter by cell or role. So although the mishpat zome lives in the mishpat
+    /// role cell (a different DNA than this client's connected role), its
+    /// post-commit signal still arrives here, as long as the mishpat cell is part
+    /// of the same installed app. Non-mishpat signals (Infrastructure, REA,
+    /// content) fail to decode as `MishpatSignal` and are logged at debug and
+    /// dropped — each has its own dedicated subscriber.
+    ///
+    /// Without this subscriber the `mishpat_commitments` projection is never
+    /// populated by live authoring: the provide reconciler's
+    /// `live_commons_provides_for_provider` dedup query stays empty (re-authoring
+    /// every tick → unbounded commitment proliferation) and rea graduation never
+    /// fires. Slice-2b code-review fix.
+    pub async fn subscribe_mishpat_signals<F>(&self, handler: F) -> String
+    where
+        F: Fn(crate::signals::MishpatSignal) + Send + Sync + 'static,
+    {
+        use holochain_types::signal::Signal;
+
+        self.app_ws
+            .on_signal(move |signal| {
+                if let Signal::App { signal, .. } = signal {
+                    let bytes: Vec<u8> = signal.into_inner().into();
+                    match rmp_serde::from_slice::<serde_json::Value>(&bytes) {
+                        Ok(value) => {
+                            match serde_json::from_value::<crate::signals::MishpatSignal>(
+                                value.clone(),
+                            ) {
+                                Ok(mishpat) => handler(mishpat),
+                                Err(e) => {
+                                    debug!(
+                                        error = %e,
+                                        value = %value,
+                                        "Received app signal not matching MishpatSignal — ignoring"
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            debug!(error = %e, "Failed to msgpack-decode app signal");
+                        }
+                    }
+                }
+            })
+            .await
+    }
+
     /// Quick health check - just verify conductor is responsive
     pub async fn ping(&self) -> Result<(), StorageError> {
         // Use list_apps as a simple ping

@@ -755,6 +755,69 @@ async fn async_main(
                             "ElohimContentSignal subscriber disabled: shared DB pool unavailable"
                         );
                     }
+
+                    // Slice-2b code-review fix — subscribe to MishpatSignals
+                    // (CommitmentCommitted + gate-decision/challenge variants) and
+                    // project them via signals::handle_mishpat_signal, which parses
+                    // the commitment payload and upserts into `mishpat_commitments`
+                    // with dht_anchor_hash = action_hash (or sets revoked_at for a
+                    // revokes-commitment).
+                    //
+                    // `on_signal` is app-wide: the mishpat zome lives in the mishpat
+                    // role cell (a different DNA), but its post-commit signal still
+                    // arrives on THIS client's app websocket because the conductor
+                    // delivers every Signal::App from any cell in the installed app.
+                    //
+                    // Without this, live authoring (the provide-loop tick + HTTP
+                    // commitment writes) creates the DHT entry but the projection
+                    // never lands. Consequence: the reconciler's
+                    // `live_commons_provides_for_provider` dedup stays empty →
+                    // re-authors every 60s → unbounded commitment proliferation;
+                    // and rea graduation never fires. (Pre-existing 2a gap: the
+                    // projection was only ever exercised by direct-row test
+                    // fixtures, never a live signal subscriber. Wired here.)
+                    if let Some(subscriber_pool) = db_pool.clone() {
+                        let hc_sub = hc.clone();
+                        let mishpat_app_id = args.app_id.clone();
+                        tokio::spawn(async move {
+                            let pool = subscriber_pool;
+                            let app_id = mishpat_app_id;
+                            let handle_id = hc_sub
+                                .subscribe_mishpat_signals(
+                                    move |signal: elohim_storage::signals::MishpatSignal| {
+                                        match pool.get() {
+                                            Ok(mut conn) => {
+                                                if let Err(e) =
+                                                    elohim_storage::signals::handle_mishpat_signal(
+                                                        &mut conn, &app_id, signal,
+                                                    )
+                                                {
+                                                    warn!(
+                                                        error = %e,
+                                                        "MishpatSignal projection failed"
+                                                    );
+                                                }
+                                            }
+                                            Err(e) => warn!(
+                                                error = %e,
+                                                "Failed to acquire DB connection for mishpat signal projection"
+                                            ),
+                                        }
+                                    },
+                                )
+                                .await;
+                            info!(
+                                subscription_id = %handle_id,
+                                "MishpatSignal subscriber registered (projects CommitmentCommitted → mishpat_commitments with dht_anchor_hash)"
+                            );
+                        });
+                    } else {
+                        warn!(
+                            "MishpatSignal subscriber disabled: shared DB pool unavailable \
+                             — live-authored commitments will create DHT entries but never \
+                             project to mishpat_commitments (provide-loop dedup stays empty)"
+                        );
+                    }
                 } else {
                     warn!(
                         "PeerStatus heartbeat disabled: infrastructure HcClient unavailable in registry"
