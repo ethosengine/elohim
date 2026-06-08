@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:revokes-commitment",
+  "title": "RevokesCommitmentCommitment",
+  "description": "Payload shape for a Mishpat::Commitment entry with action='revokes-commitment'. Notarizes the retraction of a prior Commitment identified by target_cid — the substrate-correct revocation arm (Commitments are immutable, so a revocation is itself a new Commitment, not an update). Source of truth: Holochain DHT (Mishpat zome, existing Commitment entry type — action discriminator distinguishes). Spec: genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md §4.",
+  "type": "object",
+  "required": ["action", "target_cid", "signed_at"],
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "type": "string",
+      "const": "revokes-commitment",
+      "description": "Action discriminator. Fixed at 'revokes-commitment' for this commitment kind."
+    },
+    "target_cid": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID (commitment_cid) of the Commitment being revoked. The projection sets revoked_at on the matching row."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional human-readable reason for the revocation."
+    },
+    "signed_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO-8601 timestamp the revocation was signed. Passed explicitly into the Commitment entry (never derived from sys_time)."
+    }
+  }
+}

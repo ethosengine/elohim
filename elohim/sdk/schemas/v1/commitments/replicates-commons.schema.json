@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:replicates-commons",
+  "title": "ReplicatesCommonsCommitment",
+  "description": "Payload shape for a Mishpat::Commitment entry with action='replicates-commons'. The EPR provide-loop commitment: a peer commits to replicate a commons-reach EPR (content variant) or to offer hosting capacity to the commons (capacity variant). Source of truth: Holochain DHT (Mishpat zome, existing Commitment entry type — action discriminator distinguishes; no new entry type). oneOf union on `variant`. NOTE: the author does NOT supply `epr_scope`; the effective bounds.epr_scope is derived as [head_ref] at projection time (a content-scoped commons commitment is inherently scoped to its head_ref). Spec: genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md §4.",
+  "type": "object",
+  "required": ["action", "variant", "bounds"],
+  "properties": {
+    "action": {
+      "type": "string",
+      "const": "replicates-commons",
+      "description": "Action discriminator. Fixed at 'replicates-commons' for this commitment kind."
+    },
+    "variant": {
+      "type": "string",
+      "enum": ["content", "capacity"],
+      "description": "Union discriminator. 'content' = pure provide of a specific commons EPR (head_ref); 'capacity' = hosting-capacity offer to the commons (commons_bytes + ratio_attestation)."
+    },
+    "bounds": {
+      "type": "object",
+      "required": ["rate_per_minute", "reach_ceiling"],
+      "additionalProperties": false,
+      "properties": {
+        "rate_per_minute": { "type": "integer", "minimum": 1 },
+        "reach_ceiling": { "type": "string", "const": "commons" }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "title": "ContentVariant",
+      "description": "Pure provide of one commons EPR. The author supplies only rate_per_minute + reach_ceiling in bounds; the effective epr_scope is derived as [head_ref] at projection time (not author-supplied).",
+      "required": ["variant", "head_ref", "reach"],
+      "additionalProperties": false,
+      "properties": {
+        "action": true,
+        "bounds": true,
+        "variant": { "const": "content" },
+        "head_ref": { "type": "string", "minLength": 1 },
+        "closure_rule": { "type": "string", "minLength": 1 },
+        "reach": { "type": "string", "const": "commons" }
+      }
+    },
+    {
+      "title": "CapacityVariant",
+      "required": ["variant", "commons_bytes", "ratio_attestation"],
+      "additionalProperties": false,
+      "properties": {
+        "action": true,
+        "bounds": true,
+        "variant": { "const": "capacity" },
+        "commons_bytes": { "type": "integer", "minimum": 1 },
+        "ratio_attestation": {
+          "type": "object",
+          "required": ["commons_pct", "dwelling_pct", "collective_pct", "free_pct", "effective_ratio_cid"],
+          "additionalProperties": false,
+          "properties": {
+            "commons_pct":         { "type": "integer", "minimum": 0, "maximum": 100 },
+            "dwelling_pct":        { "type": "integer", "minimum": 0, "maximum": 100 },
+            "collective_pct":      { "type": "integer", "minimum": 0, "maximum": 100 },
+            "free_pct":            { "type": "integer", "minimum": 0, "maximum": 100 },
+            "effective_ratio_cid": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  ]
+}
