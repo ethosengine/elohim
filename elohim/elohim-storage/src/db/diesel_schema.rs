@@ -1747,6 +1747,28 @@ diesel::table! {
     }
 }
 
+// Mishpat::Commitment projection — compute-bounds commitment cache (Category A, DHT projection).
+// Source of truth: Holochain DHT (mishpat DNA Commitment entry). Populated from
+// create_commitment post-commit signal. A NULL dht_anchor_hash means un-notarized.
+// Migration: 2026-06-09-000000_mishpat_commitments
+diesel::table! {
+    mishpat_commitments (cid) {
+        cid -> Text,
+        action -> Text,
+        scope -> Text,
+        provider -> Text,
+        recipient -> Text,
+        bounds_json -> Text,
+        valid_from -> Text,
+        valid_until -> Text,
+        revoked_at -> Nullable<Text>,
+        state -> Text,
+        dht_anchor_hash -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
 // DevicePin — airplane-mode-durable local want (Category B, agent-scoped). No dht_anchor_hash.
 // Source of truth: local SQLite. Notarized shadow is a provide-content Commitment (Slice 2).
 // Migration: 2026-06-07-000000_acquisition_pins
@@ -1810,6 +1832,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     local_sessions,
     manifests,
     mechanism_selection,
+    mishpat_commitments,
     mutuality_audit_log,
     node_stewardship,
     audit_observations,

@@ -167,6 +167,11 @@ pub mod mutuality_audit_log;
 // Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §1.1, §3
 pub mod acquisition_pins;
 
+// Mishpat::Commitment projection — compute-bounds commitment cache (Category A DHT projection)
+// Populated from create_commitment post-commit signal. NULL dht_anchor_hash = un-notarized.
+// Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §6.5.
+pub mod mishpat_commitments;
+
 use std::path::Path;
 use std::time::Duration;
 

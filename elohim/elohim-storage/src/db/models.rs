@@ -19,14 +19,15 @@ use super::diesel_schema::{
     custodian_metrics, custodian_shares, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
-    local_sessions, mutuality_audit_log, node_stewardship, observation_diversity_summary,
-    observation_entries, observation_sessions, observations, peer_blob_inventory,
-    peer_identity_bindings, peer_inventory_cursor, placement_gaps, places, portal_hosts,
-    precedents, premium_gates, proposal_options, proposals, ranked_votes, rea_commitments,
-    recovery_requests, recovery_witnesses, relationships, responsibility_demand_configs,
-    revocation_votes, risk_alerts, schedules, shard_locations, shard_manifests, spatial_contexts,
-    statement_votes, statements, steward_credentials, stewarded_nodes, stewardship_allocations,
-    token_balances, token_decay_events, token_mint_events, token_transfers, votes,
+    local_sessions, mishpat_commitments, mutuality_audit_log, node_stewardship,
+    observation_diversity_summary, observation_entries, observation_sessions, observations,
+    peer_blob_inventory, peer_identity_bindings, peer_inventory_cursor, placement_gaps, places,
+    portal_hosts, precedents, premium_gates, proposal_options, proposals, ranked_votes,
+    rea_commitments, recovery_requests, recovery_witnesses, relationships,
+    responsibility_demand_configs, revocation_votes, risk_alerts, schedules, shard_locations,
+    shard_manifests, spatial_contexts, statement_votes, statements, steward_credentials,
+    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
+    token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -3519,4 +3520,62 @@ pub struct NewAcquisitionPin {
     pub kind: String,
     pub closure_rule_json: Option<String>,
     pub priority: i32,
+}
+
+// ============================================================================
+// MishpatCommitment — mishpat_commitments (Slice 2a T4)
+// Category A DHT projection. Source of truth: Holochain DHT (mishpat DNA
+// Commitment entry). Populated from the create_commitment post-commit signal.
+// A NULL dht_anchor_hash means un-notarized — ProjectionCommitmentFetcher
+// refuses a bounds-pass on such rows.
+// Columns mirror the CommitmentRecord contract (commitment_fetcher.rs).
+// Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §6.5.
+// ============================================================================
+
+/// Queryable row from the `mishpat_commitments` table.
+///
+/// `bounds_json` is the raw JSON policy envelope (rate limits, reach ceiling,
+/// rotation TTL, etc.). Callers convert it to `serde_json::Value` before
+/// passing to the bounds validator.
+#[derive(Debug, Clone, Queryable, Identifiable, Selectable, Serialize)]
+#[diesel(table_name = mishpat_commitments)]
+#[diesel(primary_key(cid))]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct MishpatCommitment {
+    pub cid: String,
+    pub action: String,
+    pub scope: String,
+    pub provider: String,
+    pub recipient: String,
+    pub bounds_json: String,
+    pub valid_from: String,
+    pub valid_until: String,
+    pub revoked_at: Option<String>,
+    pub state: String,
+    /// Source of truth: DHT (Commitment entry in mishpat DNA). Classification: A (Notarized).
+    /// NULL means un-notarized; ProjectionCommitmentFetcher refuses a bounds-pass on NULL rows.
+    pub dht_anchor_hash: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Insertable row for `mishpat_commitments`.
+///
+/// `state` defaults to `'proposed'` at the DB level; callers may override for
+/// pre-graduated rows. `created_at`/`updated_at` are set explicitly in
+/// `upsert_with_anchor` via `current_timestamp()` to ensure ISO-8601 format.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = mishpat_commitments)]
+pub struct NewMishpatCommitment {
+    pub cid: String,
+    pub action: String,
+    pub scope: String,
+    pub provider: String,
+    pub recipient: String,
+    pub bounds_json: String,
+    pub valid_from: String,
+    pub valid_until: String,
+    pub revoked_at: Option<String>,
+    pub state: String,
+    pub dht_anchor_hash: Option<String>,
 }
