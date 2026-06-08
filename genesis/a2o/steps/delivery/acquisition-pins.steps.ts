@@ -44,7 +44,10 @@ interface RawResponse {
 }
 
 /** POST JSON to elohim-storage, return raw status + body text. */
-async function storagePostRaw(path: string, payload: Record<string, unknown>): Promise<RawResponse> {
+async function storagePostRaw(
+  path: string,
+  payload: Record<string, unknown>
+): Promise<RawResponse> {
   const { statusCode, body } = await request(`${storageUrl()}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -77,39 +80,37 @@ const pinResponseStore = new WeakMap<E2EWorld, RawResponse>();
 // ---------------------------------------------------------------------------
 
 When(
-  'I POST a pin for {string} to /api/v1/pins',
+  'I POST a pin for {string} to \\/api\\/v1\\/pins',
   async function (this: E2EWorld, headRef: string) {
     const resp = await storagePostRaw('/api/v1/pins', { headRef });
     pinResponseStore.set(this, resp);
   }
 );
 
-Then(
-  'the pin response status is {int}',
-  function (this: E2EWorld, expectedStatus: number) {
-    const resp = pinResponseStore.get(this);
-    assert.ok(resp, 'No pin response captured — run a "When I POST a pin" step first');
-    assert.equal(
-      resp.status,
-      expectedStatus,
-      `Expected status ${expectedStatus} but got ${resp.status}; body: ${resp.body.slice(0, 200)}`
-    );
-  }
-);
+Then('the pin response status is {int}', function (this: E2EWorld, expectedStatus: number) {
+  const resp = pinResponseStore.get(this);
+  assert.ok(resp, 'No pin response captured — run a "When I POST a pin" step first');
+  assert.equal(
+    resp.status,
+    expectedStatus,
+    `Expected status ${expectedStatus} but got ${resp.status}; body: ${resp.body.slice(0, 200)}`
+  );
+});
 
 Then(
-  'GET /api/v1/pins lists one active pin for {string}',
+  'GET \\/api\\/v1\\/pins lists one active pin for {string}',
   async function (this: E2EWorld, headRef: string) {
     const { status, body } = await storageGetJson('/api/v1/pins');
     assert.equal(status, 200, `GET /api/v1/pins returned ${status}`);
 
     const payload = body as Record<string, unknown>;
     const pins = payload['pins'] as Array<Record<string, unknown>>;
-    assert.ok(Array.isArray(pins), `"pins" must be an array; got ${JSON.stringify(payload).slice(0, 200)}`);
-
-    const active = pins.filter(
-      (p) => p['status'] === 'active' && p['headRef'] === headRef
+    assert.ok(
+      Array.isArray(pins),
+      `"pins" must be an array; got ${JSON.stringify(payload).slice(0, 200)}`
     );
+
+    const active = pins.filter(p => p['status'] === 'active' && p['headRef'] === headRef);
     assert.equal(
       active.length,
       1,
@@ -123,24 +124,21 @@ Then(
 // ---------------------------------------------------------------------------
 
 When(
-  'I POST a pin with kind {string} for {string} to /api/v1/pins',
+  'I POST a pin with kind {string} for {string} to \\/api\\/v1\\/pins',
   async function (this: E2EWorld, kind: string, headRef: string) {
     const resp = await storagePostRaw('/api/v1/pins', { headRef, kind });
     pinResponseStore.set(this, resp);
   }
 );
 
-Then(
-  'the pin response body mentions {string}',
-  function (this: E2EWorld, fragment: string) {
-    const resp = pinResponseStore.get(this);
-    assert.ok(resp, 'No pin response captured — run a "When I POST a pin" step first');
-    assert.ok(
-      resp.body.includes(fragment),
-      `Expected response body to mention "${fragment}"; got: ${resp.body.slice(0, 300)}`
-    );
-  }
-);
+Then('the pin response body mentions {string}', function (this: E2EWorld, fragment: string) {
+  const resp = pinResponseStore.get(this);
+  assert.ok(resp, 'No pin response captured — run a "When I POST a pin" step first');
+  assert.ok(
+    resp.body.includes(fragment),
+    `Expected response body to mention "${fragment}"; got: ${resp.body.slice(0, 300)}`
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Scenario 3 — two-node byte-arrival (@wip @requires:household-nodes)
@@ -151,28 +149,19 @@ Then(
 // fixture requires the full household stack which is out of scope for slice 1.
 // ---------------------------------------------------------------------------
 
-Given(
-  'two connected storage peers where only peer A holds {string}',
-  function (_headRef: string) {
-    // Pending: requires a live two-node household stack (E2E_PEER_B_STORAGE_URL).
-    // The Rust test acquisition_pull_e2e.rs is the binding regression.
-    return 'pending';
-  }
-);
+Given('two connected storage peers where only peer A holds {string}', function (_headRef: string) {
+  // Pending: requires a live two-node household stack (E2E_PEER_B_STORAGE_URL).
+  // The Rust test acquisition_pull_e2e.rs is the binding regression.
+  return 'pending';
+});
 
-When(
-  'peer B pins {string}',
-  function (_headRef: string) {
-    return 'pending';
-  }
-);
+When('peer B pins {string}', function (_headRef: string) {
+  return 'pending';
+});
 
-When(
-  'the pull queue drains',
-  function () {
-    return 'pending';
-  }
-);
+When('the pull queue drains', function () {
+  return 'pending';
+});
 
 Then(
   "peer B's pull status shows fetched {int} of total {int}",
@@ -181,9 +170,6 @@ Then(
   }
 );
 
-Then(
-  "the content row exists in peer B's local projection",
-  function () {
-    return 'pending';
-  }
-);
+Then("the content row exists in peer B's local projection", function () {
+  return 'pending';
+});

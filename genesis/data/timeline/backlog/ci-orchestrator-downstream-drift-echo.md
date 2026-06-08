@@ -10,13 +10,14 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "low"
 ci_status: blocked
-fingerprints: [4508f1172d15, b169c3b9034c]
+fingerprints: [4508f1172d15, b169c3b9034c, ddd8ed2cbdc7]
 jobs: [elohim-orchestrator]
 relatedNodeIds: []
-tags: [ci, elohim-orchestrator, reconcile-build-graph, downstream-echo, museum-trap-1, not-a-root-cause]
+tags: [ci, elohim-orchestrator, reconcile-build-graph, post-flight-health-check, downstream-echo, museum-trap-1, not-a-root-cause]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1167/
   - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1168/
+  - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1192/
   - genesis/orchestrator/README.md
   - genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md
 ---
@@ -28,9 +29,10 @@ cites:
 ```
 4508f1172d15  elohim-orchestrator — red build, stage:Reconcile Build Graph   (1164–1167)
 b169c3b9034c  elohim-orchestrator — red build, stage:elohim-genesis          (1168)
+ddd8ed2cbdc7  elohim-orchestrator — red build, stage:Post-flight Health Check (1188–1192, seen 5)
 ```
 
-Both builds are **UNSTABLE** (the harvester's "red build" label is its
+All builds are **UNSTABLE** (the harvester's "red build" label is its
 classifier token; the actual result is UNSTABLE — confirmed via the build API).
 
 - #1167, **Reconcile Build Graph**: `📊 BUILD GRAPH RECONCILIATION — verdict:
@@ -43,6 +45,16 @@ classifier token; the actual result is UNSTABLE — confirmed via the build API)
   `Investigation pointers: • elohim-genesis FAILURE — …/elohim-genesis/job/dev/
   1101/`. Orchestrator's own status UNSTABLE: "Genesis failed - seeding or
   tests may have issues."
+- #1192, **Post-flight Health Check** (fp `ddd8ed2cbdc7`): the stage is
+  `catchError`-wrapped (orchestrator log #1192 line 225) and emits `unstable()`
+  (line 260) with `WARNING: 1 service(s) unhealthy after deployment`. The one
+  unhealthy service is `elohim-edge: HTTP 000` — `curl https://alpha-edge.elohim.host/health`
+  returns `000` (unreachable). `doorway-staging.elohim.host/health` returns a
+  `503 Service Temporarily Unavailable`. **Crucially `doorway-alpha.elohim.host/health`
+  returns HTTP 200 with `conductor.connected:true, connected_workers:4, peerCount:2`**
+  (line 286) — the alpha doorway itself is healthy; only the edge-node `/health`
+  and staging are down. Summary: `SERVICES: 2/3 healthy`, result `Finished:
+  UNSTABLE` (never FAILURE — the boundary held).
 
 ## Verdict
 
@@ -80,10 +92,22 @@ anti-pattern (the deepest trap). The correct move is to let the four real
 concerns close (one substrate-blocked, three already-fixed-await-confirm); the
 orchestrator's drift verdict clears on the same green streak.
 
-Both fingerprints set `status: blocked` in the ledger (blocker: upstream
-children — see the four cited backlog entries). No `triaged_at_build` (nothing
-landed in the orchestrator). Recurrence tracks the children and is expected until
-they clear — not an orchestrator re-fire bug.
+All three fingerprints set `status: blocked` in the ledger (blocker: upstream
+children — see the cited backlog entries). No `triaged_at_build` (nothing landed
+in the orchestrator). Recurrence tracks the children and is expected until they
+clear — not an orchestrator re-fire bug.
+
+For the new fingerprint `ddd8ed2cbdc7` (Post-flight Health Check, builds
+1188–1192), the unhealthy service is the **alpha-edge node** (`alpha-edge.elohim.host/health`
+= HTTP 000) plus **doorway-staging** (503). Both are operator-owned substrate:
+the edge/staging health is the same degraded-alpha condition canonicalized in
+`ci-alpha-cluster-degraded-substrate.md` (operator-owned, never `kubectl` from
+dev — the repo manifests in `genesis/manifests/` are the only cleanup surface).
+The Post-flight stage is doing exactly its job: surfacing edge-down as
+orchestrator-UNSTABLE while the alpha doorway (the seeded backend) is verified
+healthy (200, conductor-connected). Blocker: alpha-edge/staging availability
+(operator). It clears when those endpoints come back; the harvester confirms by
+green streak.
 
 ## Fix trail
 
