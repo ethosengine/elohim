@@ -30,6 +30,7 @@ pub mod lamad;
 pub mod peer_capacity;
 pub mod projection;
 pub mod qahal;
+pub mod replicates_commons;
 pub mod replicates_dwelling;
 pub mod shared;
 pub mod shefa;
