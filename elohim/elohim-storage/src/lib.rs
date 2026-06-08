@@ -96,6 +96,7 @@ pub mod http;
 pub mod identity_handshake_service;
 pub mod import_handler;
 pub mod metadata;
+pub mod mishpat_projection; // Mishpat commitment projection handler (DHT → SQLite sync, Slice-2a T5)
 pub mod observation; // Observation/Event Layer — peer-witnessed evidence (Track 2 substrate)
 pub mod rea_projection; // REA projection signal handler (DHT → SQLite sync)
 pub mod shard_service;
