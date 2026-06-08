@@ -25,9 +25,32 @@ commitment — **different entities, nothing bridges them.** Three compounding g
 3. **Graduation mismatch**: `call_update_rea_commitment_state` is content_store; the bounds-bearing commitment
    is the immutable Mishpat one (own state model). T4's graduation primitive may target the wrong system.
 
-**Next move (operator-chosen): `/brainstorm` the commitment-system architecture** (p2p-design-gate): two
-systems + bridge (Mishpat-commitment projection + ProjectionCommitmentFetcher + cross-DNA event↔commitment
-reference) vs unify; where graduation lives for an immutable Mishpat commitment. Seed = this finding + T1–T3.
+**RESOLVED 2026-06-08 (brainstorm pre-step — compose, don't fork; full reframe in spec §6.5):** this is
+NOT new architecture — the two-commitment split is **canonical** (`compute-commitment-substrate-floor-design`
++ `rea-compute-substrate-native-roadmap`): **Mishpat::Commitment = the policy-envelope / compute-bounds
+substrate primitive** (what `bounds_validator` checks, what `replicates-commons` rides); **content_store
+Commitment/EconomicEvent = the REA/VF economic fact**. One event references BOTH (`bounded_by`→Mishpat in
+metadata; `fulfills`→content_store). The bridge = the `rea-compute-substrate-native-roadmap`'s **unfinished
+Sprint-1 stubs**: the **Mishpat-commitment projection** (table w/ `dht_anchor_hash`+bounds+valid_from/until+
+revoked_at, fed by the Mishpat `create_commitment` post-commit signal) + the **`ProjectionCommitmentFetcher`**
+(replace the `ConductorUnreachable` stub; reads the projection, **guarded by `dht_anchor_hash`** so a
+null-anchor un-notarized row never clears a bounds-gate — P1 + `depin_contracts_are_policy`). **Graduation
+(answered):** Holochain immutability ⇒ state transitions author **new link entries on `CommitmentByState`
+anchors** (`records-lifecycle-design` §A.5/§5); the SQL `state` column is projection, the link is truth; the
+first `ProvideAnnounce` EconomicEvent IS the acceptance (authors the state-link). Design-around: the announce
+must `fulfills`/`bounded_by` a REAL notarized commitment, never a projection-only ghost (the CoordinationEnvelope
+failure-shape).
+
+**RE-SCOPED Slice 2a (resume here, fresh context):** finish the roadmap's **Mishpat-commitment projection +
+`ProjectionCommitmentFetcher` + `CommitmentByState` graduation** (NOT the old "wire content_store
+call_update_rea_commitment_state" T4 — that targets the wrong system). T1–T3 stay valid on top. First step:
+**verify the live `ConductorCommitmentFetcher` + `CommitmentFetcher` trait against
+`elohim/elohim-storage/src/services/bounds_validator.rs`** (palace is behind the 2026-06-02 mine). Then mint
+`replicates-commons` as a Mishpat action (Slice 2b) on the proven projection+fetcher. The "why both commitment
+writers exist" decision is **history-record-worthy** when it lands (backlog note in
+`epr-routing-complementary-captures.md`). The old Slice-2a plan file
+(`2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md`) is SUPERSEDED by §6.5 — re-plan against §6.5, don't
+execute its T4–T7 as written.
 
 ### Slice 2a commits landed (correct, on `dev`, held)
 - `81fae5372` T1 — sweettest probe proving `create_rea_economic_event` fires (found: binding is `fulfills` +

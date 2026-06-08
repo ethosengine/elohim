@@ -27,6 +27,9 @@ cites:
   - genesis/docs/content/elohim-protocol/protocol-specification.md
   - genesis/docs/content/elohim-protocol/architecture/cluster-topology.md
   - doorway/CLAUDE.md
+  - rea-compute-substrate-native-roadmap | 2026-05-28-rea-compute-substrate-native-roadmap | sha256:64e5ffe3b8756e6e | path: genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md
+  - compute-commitment-substrate-floor-design | Substrate Floor / Elohim Ceiling | sha256:614e30134ee0d7ab | path: genesis/docs/content/elohim-protocol/architecture/2026-05-04-compute-commitment-substrate-floor-design.md
+  - sprint2-bounds-validator-standing-aggregator | 2026-05-28-sprint2-bounds-validator-standing-aggregator | sha256:8923ad357ea4ee80 | path: genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md
 ---
 
 # EPR Acquisition Family — Dual Pins, the Async Pull Queue & the Striping Seam
@@ -372,6 +375,50 @@ bounds-on-emit + scorer-data) that lands and is verified on `household-nodes` FI
 then builds the `replicates-commons` content-scoped action + the pin sync-back + the scorer arm +
 rung-4 UI *on top of the proven 2a rail* — honoring the "verify instance-1, don't assume it"
 caveat (§6.1). Plan: `2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md`.
+
+### §6.5 Two-commitment-system reconciliation [brainstorm finding 2026-06-08 — execution-halted-at-T3, then composed]
+
+Executing Slice 2a (T1–T3 landed) surfaced — and a /brainstorm pre-step resolved — that the rail
+table above under-modeled the commitment substrate. **There are two commitment writers, and the
+split is canonical (per `compute-commitment-substrate-floor-design` + `rea-compute-substrate-native-roadmap`),
+not a bug to unify:**
+
+- **`Mishpat::Commitment`** (mishpat DNA) is THE compute-commitment **substrate primitive** — the
+  **policy envelope**: `payload_json` bounds, `valid_from/until`, `revoked_at`, scope; validated by
+  the single substrate-side `bounds_validator`. `replicates-dwelling` rides it; **`replicates-commons`
+  must too** (Slice 2b mints it here, mirroring the dwelling-hub schema). The roadmap's thesis:
+  *"one substrate primitive (`Mishpat::Commitment` + `bounded_by` event back-reference + single
+  bounds validator) … all events carry `bounded_by`."*
+- **content_store `Commitment` / `EconomicEvent`** (elohim DNA) is the **REA/ValueFlows economic
+  fact** — provider/receiver/resource/quantity; the event's `fulfills` link points here.
+
+**One event references BOTH, orthogonally:** `bounded_by` (in `metadata_json` → the
+`economic_events.bounded_by` column) → the **Mishpat** policy commitment (what the bounds-gate
+checks); `fulfills` → the **content_store** REA commitment (accounting; may be empty for a pure
+provide). The historical failure to design around (`CoordinationEnvelope` bypass): a `ProvideAnnounce`
+must `fulfills`/`bounded_by` a **real notarized** commitment, never a projection-only ghost — the
+unbridged state IS the bug.
+
+**The genuine Slice-2a work is therefore the `rea-compute-substrate-native-roadmap`'s unfinished
+Sprint-1 stubs, composed (not forked):**
+
+| Corrected rail | What to build (compose onto the roadmap) |
+|---|---|
+| **Mishpat-commitment projection** | a projection table carrying `dht_anchor_hash` + `payload_json` bounds + `valid_from/until` + `revoked_at` + `state`, populated from the Mishpat `create_commitment` post-commit signal (the canonical DHT-first → projection wiring, `notary-anchors-sdk-boundary-design`). `rea_commitments` lacks these columns. |
+| **`ProjectionCommitmentFetcher`** | replace the `ConductorCommitmentFetcher` stub (`ConductorUnreachable`) — bounds-checks READ the projection (P1 reconciliation-controller; `depin_contracts_are_policy` "operational loops read bounds, never create contract entities"), **guarded by `dht_anchor_hash`**: refuse a bounds-pass on a null-anchor (un-notarized) row. |
+| **Graduation (`proposed → active/accepted`)** | NOT a mutable status column as truth. Holochain immutability ⇒ state transitions author **new link entries on `CommitmentByState` anchors** (`records-lifecycle-design` §A.5/§5, `COMMITMENT_STATES` 6-state machine); the SQL `state` column is the **projection**, the link/event is **truth**. For a self-directed commons commitment, **the first `ProvideAnnounce` EconomicEvent IS the acceptance** (§6.1 confirmed) — it authors the state-link; the projection reflects `active`. |
+
+T1–T3 (probe, `call_create_rea_economic_event` wrapper, bounds-validated `economic_event_emit_service`)
+remain valid and sit on top of this. The emit service's `bounded_by` annotation already targets the
+Mishpat CID; what's missing is the projection + fetcher + the `CommitmentByState` graduation, plus
+minting `replicates-commons` as a Mishpat action (Slice 2b). **Slice 2a is re-scoped to finish the
+roadmap's Mishpat-commitment projection + `ProjectionCommitmentFetcher` + `CommitmentByState`
+graduation** (verify the live `ConductorCommitmentFetcher`/trait against
+`bounds_validator.rs` first — palace is behind 2026-06-02). The "why both commitment writers exist"
+decision is **history-record-worthy** (currently pattern-only in the corpus). Compose-targets:
+`refines:` `2026-05-28-sprint2-bounds-validator-standing-aggregator` (the `CommitmentFetcher` seam);
+`cites:` `rea-compute-substrate-native-roadmap`, `records-lifecycle-design` (CommitmentByState),
+`compute-commitment-substrate-floor-design`.
 
 ---
 
