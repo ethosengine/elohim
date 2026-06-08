@@ -110,7 +110,14 @@ export class EprRawNodeComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly storage = inject(StorageClientService);
 
-  /** The requested EPR address/slug from the route. */
+  /**
+   * The requested EPR address/slug from the route. Read from the SNAPSHOT (not
+   * the paramMap Observable) deliberately: this inspector is a dead-end surface —
+   * relation links target the bare `/epr/{relId}` (the rich viewer), never a
+   * raw→raw `/epr/{relId}/raw` neighbor — so the component is never reused across
+   * a param change. If raw-to-raw navigation is ever added, switch this to the
+   * paramMap Observable + restructure the state signal.
+   */
   readonly resourceId = this.route.snapshot.paramMap.get('resourceId') ?? '';
 
   private readonly state = toSignal(

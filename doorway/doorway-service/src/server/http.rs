@@ -4098,6 +4098,20 @@ mod epr_claims_dispatch_tests {
     }
 
     #[test]
+    fn parse_epr_path_keeps_id_percent_encoded() {
+        // The id stays percent-encoded — a %2F inside the id is NOT a segment
+        // boundary (split is on literal '/'), so the id is preserved verbatim and
+        // never double-decoded. Locks the "id stays percent-encoded" contract.
+        let (id, subview) = parse_epr_path("/epr/a%2Fb/raw");
+        assert_eq!(id, "a%2Fb");
+        assert_eq!(subview, EprSubview::Raw);
+
+        let (bare_id, bare_sub) = parse_epr_path("/epr/a%2Fb");
+        assert_eq!(bare_id, "a%2Fb");
+        assert_eq!(bare_sub, EprSubview::Default);
+    }
+
+    #[test]
     fn sitemap_xml_renders_mounts_and_claimed_entries() {
         use elohim_views::projection::{
             EprProjectionView, ProjectionMode, RouteClaimGrant, RouteClaimTemplate,

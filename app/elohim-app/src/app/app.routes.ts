@@ -78,9 +78,10 @@ export const routes: Routes = [
   },
   // Raw-node inspector (§12.6 Slice 0) — shows the EPR AS AN ATOM (its own
   // fields/provenance), distinct from the rich pillar viewer above. Doorway
-  // serves the shell for /epr/{id}/raw (landed separately). Distinct segment
-  // count from the bare epr/:resourceId route, so ordering is fine; kept above
-  // the ** catch-all. Same resourceId param name.
+  // serves the shell for /epr/{id}/raw (landed separately). Three segments, so
+  // it cannot cross-match the two-segment epr/:resourceId route regardless of
+  // order; the only ordering constraint is that BOTH stay above the ** catch-all
+  // (they do). Same resourceId param name.
   {
     path: 'epr/:resourceId/raw',
     loadComponent: async () =>
