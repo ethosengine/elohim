@@ -3,8 +3,11 @@
 // genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md):
 // links are MINTED (eprToRoute / eprToUniversalHref / claims), never literal.
 // Generalizes the pillar-bundle-split runbook §4.4 router-literal canary.
-// Keepers: a line containing `route-literal-ok: <reason>` is exempt; <base href>,
-// SEO canonical generators, and doc comments should carry the pragma.
+// Keepers: a line containing `route-literal-ok: <reason>` is exempt; <base href>
+// and SEO canonical generators should carry the pragma. Comment lines (JSDoc /
+// `//` / block) are skipped wholesale — they describe the URL surface, they don't
+// mint it; the canary targets LIVE minting, not prose (commented-out mint code is
+// dead code, not the canary's concern).
 import { execSync } from 'node:child_process';
 
 const TARGETS = process.argv.slice(2);
@@ -43,6 +46,11 @@ for (const dir of TARGETS) {
     for (const line of out.split('\n').filter(Boolean)) {
       if (line.includes('route-literal-ok:')) continue;
       if (line.includes('.spec.ts:')) continue; // tests assert minted output
+      // Skip comment lines — they describe the URL surface, they don't mint it.
+      // grep -n form is `<file>:<lineno>:<content>`; strip the prefix, then a
+      // trimmed content starting with `*` (JSDoc), `//`, `/*`, or `*/` is a comment.
+      const content = line.replace(/^[^:]+:\d+:/, '').trimStart();
+      if (/^(\*|\/\/|\/\*)/.test(content)) continue;
       console.error(`route literal: ${line}`);
       failures += 1;
     }

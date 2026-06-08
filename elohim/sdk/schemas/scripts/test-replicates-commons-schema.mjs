@@ -31,6 +31,9 @@ const contentVariant = {
   head_ref: 'bafyhead-lamad-spa',
   closure_rule: 'transitive-1',
   reach: 'commons',
+  provider: 'agent:provider-x',
+  valid_from: '2026-06-01T00:00:00Z',
+  valid_until: '2026-09-01T00:00:00Z',
   bounds: {
     rate_per_minute: 30,
     reach_ceiling: 'commons',
@@ -75,6 +78,15 @@ check(
   (() => {
     const v = { ...contentVariant };
     delete v.head_ref;
+    return v;
+  })(),
+  false,
+);
+check(
+  'content variant missing valid_from',
+  (() => {
+    const v = { ...contentVariant };
+    delete v.valid_from;
     return v;
   })(),
   false,
@@ -126,4 +138,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('PASS: replicates-commons schema (12 cases)');
+console.log('PASS: replicates-commons schema (13 cases)');

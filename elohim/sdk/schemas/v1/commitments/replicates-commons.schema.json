@@ -29,8 +29,8 @@
   "oneOf": [
     {
       "title": "ContentVariant",
-      "description": "Pure provide of one commons EPR. The author supplies only rate_per_minute + reach_ceiling in bounds; the effective epr_scope is derived as [head_ref] at projection time (not author-supplied).",
-      "required": ["variant", "head_ref", "reach"],
+      "description": "Pure provide of one commons EPR. The author supplies only rate_per_minute + reach_ceiling in bounds; the effective epr_scope is derived as [head_ref] at projection time (not author-supplied). The policy envelope fields provider/valid_from/valid_until are required: the storage projection (parse_replicates_commons) reads them fail-closed and bounds_validator check 3 needs the validity window.",
+      "required": ["variant", "head_ref", "reach", "provider", "valid_from", "valid_until"],
       "additionalProperties": false,
       "properties": {
         "action": true,
@@ -38,7 +38,10 @@
         "variant": { "const": "content" },
         "head_ref": { "type": "string", "minLength": 1 },
         "closure_rule": { "type": "string", "minLength": 1 },
-        "reach": { "type": "string", "const": "commons" }
+        "reach": { "type": "string", "const": "commons" },
+        "provider": { "type": "string", "minLength": 1 },
+        "valid_from": { "type": "string", "minLength": 1 },
+        "valid_until": { "type": "string", "minLength": 1 }
       }
     },
     {

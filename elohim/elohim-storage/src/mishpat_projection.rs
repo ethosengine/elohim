@@ -375,13 +375,29 @@ fn parse_replicates_commons(
             // `epr_scope: [head_ref]`. This is the substrate-correct bridge from the
             // Slice-2b schema (which carries `rate_per_minute` + `reach_ceiling`) to the
             // validator's 7-check shape. `reach_ceiling` (commons) clears check 5.
-            let bounds_json = serde_json::json!({
+            //
+            // Rate-bound bridge: the commons schema carries `rate_per_minute`, but
+            // bounds_validator check 6 reads `rate_per_hour`. Emit BOTH —
+            // `rate_per_minute` for audit/display and the derived
+            // `rate_per_hour = rate_per_minute * 60` so check 6 actually enforces.
+            // When no rate is declared, omit `rate_per_hour` entirely (don't emit a
+            // null) so check 6 is genuinely skipped rather than reading a null bound.
+            let rate_per_minute = payload
+                .pointer("/bounds/rate_per_minute")
+                .and_then(|v| v.as_u64());
+            let mut bounds = serde_json::json!({
                 "epr_scope": [head_ref],
-                "rate_per_minute": payload.pointer("/bounds/rate_per_minute"),
                 "reach_ceiling": payload.pointer("/bounds/reach_ceiling"),
                 "closure_rule": payload.get("closure_rule"),
-            })
-            .to_string();
+            });
+            if let Some(rpm) = rate_per_minute {
+                let bounds_obj = bounds
+                    .as_object_mut()
+                    .expect("json! object literal is always an object");
+                bounds_obj.insert("rate_per_minute".to_string(), serde_json::json!(rpm));
+                bounds_obj.insert("rate_per_hour".to_string(), serde_json::json!(rpm * 60));
+            }
+            let bounds_json = bounds.to_string();
             let valid_from = payload
                 .get("valid_from")
                 .and_then(|v| v.as_str())
@@ -408,6 +424,18 @@ fn parse_replicates_commons(
             })
         }
         "capacity" => {
+            // Defense-in-depth reach check (SOFT): the typed `Capacity` view may
+            // omit `reach`, so we only reject when it is present-and-wrong. A
+            // commons capacity pledge that declares a non-commons reach must not
+            // land (mirrors the content arm's hard reach gate).
+            if let Some(reach) = payload.get("reach").and_then(|v| v.as_str()) {
+                if reach != "commons" {
+                    return Err(format!(
+                        "replicates-commons capacity reach must be 'commons', got '{reach}'"
+                    ));
+                }
+            }
+
             let commons_bytes = payload
                 .get("commons_bytes")
                 .and_then(|v| v.as_u64())
@@ -485,6 +513,9 @@ fn parse_revokes_commitment(payload: &serde_json::Value) -> Result<CommitmentPro
         .and_then(|v| v.as_str())
         .ok_or_else(|| "revokes-commitment payload missing 'signed_at'".to_string())?
         .to_string();
+    if signed_at.is_empty() {
+        return Err("revokes-commitment 'signed_at' must not be empty".to_string());
+    }
 
     Ok(CommitmentProjection::Revoke {
         target_cid,
@@ -805,6 +836,47 @@ mod tests {
         assert_eq!(bounds["epr_scope"][0], "epr:lamad-spa-head-cid");
         assert_eq!(bounds["reach_ceiling"], "commons");
         assert_eq!(bounds["rate_per_minute"], 60);
+        // Rate-bound bridge: bounds_validator check 6 reads `rate_per_hour`, so the
+        // projection must derive it as rate_per_minute * 60 (60 * 60 == 3600).
+        assert_eq!(
+            bounds["rate_per_hour"], 3600,
+            "rate_per_hour must be rate_per_minute * 60 so check 6 enforces"
+        );
+    }
+
+    #[test]
+    fn parse_replicates_commons_content_no_rate_omits_rate_per_hour() {
+        // When no rate is declared, the projection must NOT emit a null
+        // `rate_per_hour` — it omits the key entirely so bounds_validator check 6
+        // is genuinely skipped (rather than reading a null bound).
+        let payload = serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": "epr:lamad-spa-head-cid",
+            "reach": "commons",
+            "bounds": { "reach_ceiling": "commons" },
+            "provider": "agent:provider-x",
+            "valid_from": "2026-06-01T00:00:00Z",
+            "valid_until": "2026-09-01T00:00:00Z"
+        })
+        .to_string();
+
+        let row = unwrap_upsert(
+            parse_commitment_payload("replicates-commons", &payload, "eh-norate", "ah-norate")
+                .expect("content payload without a rate must still parse"),
+        );
+
+        let bounds: serde_json::Value =
+            serde_json::from_str(&row.bounds_json).expect("bounds_json must be valid JSON");
+        assert!(
+            bounds.get("rate_per_hour").is_none(),
+            "rate_per_hour must be OMITTED (not null) when no rate is declared, got: {}",
+            row.bounds_json
+        );
+        assert!(
+            bounds.get("rate_per_minute").is_none(),
+            "rate_per_minute must be omitted when no rate is declared"
+        );
     }
 
     #[test]
@@ -965,6 +1037,34 @@ mod tests {
         assert!(
             result.unwrap_err().contains("commons_bytes"),
             "error must mention 'commons_bytes'"
+        );
+    }
+
+    #[test]
+    fn parse_replicates_commons_capacity_wrong_reach_fails() {
+        // Defense-in-depth: a capacity pledge that declares a non-commons reach
+        // must be rejected (soft check — only fires when `reach` is present).
+        let payload = serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "capacity",
+            "commons_bytes": 25_000_000_000u64,
+            "reach": "household",
+            "bounds": { "rate_per_minute": 6, "reach_ceiling": "commons" },
+            "ratio_attestation": {
+                "commons_pct": 20, "dwelling_pct": 40, "collective_pct": 25, "free_pct": 15,
+                "effective_ratio_cid": "bafkrei-ratio"
+            }
+        })
+        .to_string();
+
+        let result = parse_commitment_payload("replicates-commons", &payload, "eh1", "ah1");
+        assert!(
+            result.is_err(),
+            "capacity with non-commons reach must return Err"
+        );
+        assert!(
+            result.unwrap_err().contains("reach"),
+            "error must mention 'reach'"
         );
     }
 
