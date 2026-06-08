@@ -172,9 +172,11 @@ pub struct CreateMishpatCommitmentInput {
 ///
 /// The coordinator returns native `ActionHash`/`EntryHash` HoloHash types (not
 /// base64 strings — that is only the *signal* wire shape). Decoding into these
-/// typed fields lets callers derive the canonical base64 `uhCkk…` CID via the
-/// HoloHash `Display` impl (`format!("{}", out.action_hash)`), exactly mirroring
-/// how `rea_commitment_service` decodes `shefa_types::ReaCommitmentOutput`.
+/// typed fields lets callers derive the canonical base64 `uhCkk…`/`uhCEk…` CIDs
+/// via the HoloHash `Display` impl. The **`entry_hash`** is the canonical
+/// commitment CID (what the projection stores as `cid` and every consumer keys
+/// off — see [`create_commitment_returning_cid`]); the `action_hash` is the
+/// provenance anchor the projection stores separately as `dht_anchor_hash`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateCommitmentOutput {
     pub action_hash: holochain_types::prelude::ActionHash,
@@ -182,13 +184,26 @@ pub struct CreateCommitmentOutput {
 }
 
 /// Round-trip the Mishpat `create_commitment` coordinator and decode the new
-/// commitment's `action_hash` to its canonical base64 CID string.
+/// commitment's `entry_hash` to its canonical base64 CID string.
 ///
 /// This is the typed convenience over [`call_create_commitment`] for callers
 /// (e.g. the production `CommitmentAuthor`) that need the new commitment CID as
-/// the pin back-reference and the `bounded_by` annotation. The base64 form is
-/// derived from the HoloHash `Display` impl — the same value the post-commit
-/// projection stores as `dht_anchor_hash`.
+/// the pin back-reference (`pin.commitment_cid`), the `bounded_by` annotation on
+/// emitted economic events, and the `target_cid` for a later revocation.
+///
+/// We return the **`entry_hash`**, NOT the `action_hash`. The content-addressed
+/// `entry_hash` is the canonical commitment CID: the post-commit projection
+/// writes the `mishpat_commitments` row with `cid = entry_hash` (and stores the
+/// `action_hash` separately as `dht_anchor_hash`), and EVERY downstream consumer
+/// keys off `cid`:
+/// - [`crate::services::commitment_fetcher::ProjectionCommitmentFetcher::fetch`]
+///   / `get_by_cid` → `mc::cid.eq(cid)`
+/// - rea graduation → `graduate_to_active(conn, bounded_by)` → `cid.eq(bounded_by)`
+/// - T10 revocation → `set_revoked_at(conn, target_cid)` → `cid.eq(target_cid)`
+///
+/// Returning the `action_hash` here would mint a `bounded_by`/`commitment_cid`
+/// that resolves to no row (the projection is keyed by `entry_hash`), breaking
+/// the bounds check, graduation, and revocation.
 pub async fn create_commitment_returning_cid(
     hc: &Arc<HcClient>,
     input: CreateMishpatCommitmentInput,
@@ -199,7 +214,7 @@ pub async fn create_commitment_returning_cid(
             "conductor_writes: decode CreateCommitmentOutput: {e}"
         ))
     })?;
-    Ok(format!("{}", out.action_hash))
+    Ok(format!("{}", out.entry_hash))
 }
 
 /// Wire mirror of the `mishpat::get_commitment` output. Used by
