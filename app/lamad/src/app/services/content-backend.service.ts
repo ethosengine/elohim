@@ -72,12 +72,19 @@ export interface Relationship {
 }
 
 /**
- * Content graph node
+ * Content graph node.
+ *
+ * Mirrors the generated `ContentGraphNodeView` wire shape. `inferenceSource`
+ * carries the resolver's provenance (`explicit` | `path` | `tag` | `semantic` |
+ * `system`) so computed (Category C) edges stay distinguishable from authored
+ * (Category A) ones downstream (drives the related-concepts `discovered` bucket).
  */
 export interface ContentGraphNode {
   contentId: string;
   relationshipType: string;
   confidence: number;
+  inferenceSource?: string;
+  depth?: number;
   children: ContentGraphNode[];
 }
 
@@ -88,6 +95,19 @@ export interface ContentGraph {
   rootId: string;
   related: ContentGraphNode[];
   totalNodes: number;
+}
+
+/**
+ * Options for the resolver graph endpoint.
+ *
+ * `computed: true` asks the resolver to compose computed (Category C, e.g.
+ * `inferenceSource:"tag"`) edges alongside the stored explicit/structural ones.
+ * `depth` bounds the traversal; `types` filters relationship kinds.
+ */
+export interface GetContentGraphOptions {
+  computed?: boolean;
+  depth?: number;
+  types?: string[];
 }
 
 // =============================================================================
@@ -237,6 +257,8 @@ interface RawContentGraphNodeData {
   contentId?: string;
   relationshipType?: string;
   confidence?: number;
+  inferenceSource?: string;
+  depth?: number;
   children?: RawContentGraphNodeData[];
 }
 
@@ -515,16 +537,32 @@ export class ContentBackendService {
   }
 
   /**
-   * Get content graph starting from a root node
+   * Get content graph starting from a root node.
+   *
+   * Hits the RESOLVER graph endpoint `GET /db/relationships/graph/{id}`. With
+   * `computed: true` the resolver composes explicit (Category A) AND computed
+   * tag (Category C) edges — the only path on which `inferenceSource:"tag"`
+   * edges reach the UI. Without it, the endpoint returns stored edges only.
+   * The LIST endpoint (`getRelationships`) NEVER returns computed edges.
    */
   getContentGraph(
     contentId: string,
-    relationshipTypes?: string[]
+    opts: GetContentGraphOptions = {}
   ): Observable<ContentGraph | null> {
-    let url = `/db/relationships/graph/${contentId}`;
-    if (relationshipTypes?.length) {
-      url += `?types=${relationshipTypes.join(',')}`;
+    const params = new URLSearchParams();
+    if (opts.computed) {
+      params.set('computed', 'true');
     }
+    if (opts.depth != null) {
+      params.set('depth', String(opts.depth));
+    }
+    if (opts.types?.length) {
+      params.set('types', opts.types.join(','));
+    }
+    const query = params.toString();
+    const url = query
+      ? `/db/relationships/graph/${contentId}?${query}`
+      : `/db/relationships/graph/${contentId}`;
 
     return from(this.client.fetch<RawContentGraphData>(url)).pipe(
       map(data => (data ? this.transformContentGraph(data) : null)),
@@ -889,6 +927,10 @@ export class ContentBackendService {
       contentId: data.contentId ?? '',
       relationshipType: data.relationshipType ?? '',
       confidence: data.confidence ?? 1,
+      // Provenance pass-through from the wire — never transform/rename. Drives
+      // the resolver's computed-vs-authored distinction (Category C vs A).
+      inferenceSource: data.inferenceSource,
+      depth: data.depth,
       children: (data.children ?? []).map(child => this.transformContentGraphNode(child)),
     };
   }

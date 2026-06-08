@@ -698,7 +698,7 @@ export class PathAdaptationService {
     // populate asynchronously and consumers observe via getRecommendations$().
     for (const contentScore of strugglingConcepts) {
       this.contentService
-        .getContentGraph(contentScore.contentId, this.config.graphRelationshipTypes)
+        .getContentGraph(contentScore.contentId, { types: this.config.graphRelationshipTypes })
         .subscribe(graph => {
           const newRecs = this.buildRecommendations(graph, contentScore, result);
           this.mergeRecommendations(state, newRecs);

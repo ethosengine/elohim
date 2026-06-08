@@ -549,7 +549,7 @@ describe('PathAdaptationService (story-first)', () => {
 
       expect(contentServiceSpy.getContentGraph).toHaveBeenCalledWith(
         'concept-trust',
-        ['PREREQUISITE', 'REINFORCES']
+        { types: ['PREREQUISITE', 'REINFORCES'] }
       );
     });
 

@@ -189,19 +189,22 @@ describe('RelatedConceptsService', () => {
     dataLoaderSpy = {
       getGraph: vi.fn(),
       getRelationshipsForNode: vi.fn(),
+      getResolvedRelationshipsForNode: vi.fn(),
       getContent: vi.fn(),
     };
 
     dataLoaderSpy.getGraph.mockReturnValue(of(mockGraph));
-    dataLoaderSpy.getRelationshipsForNode.mockReturnValue(
-      of([
-        mockRelationships.get('rel-1')!,
-        mockRelationships.get('rel-2')!,
-        mockRelationships.get('rel-3')!,
-        mockRelationships.get('rel-4')!,
-        mockRelationships.get('rel-5')!,
-      ])
-    );
+    // B2b: the panel's lazy path now sources from the resolver graph endpoint
+    // (computed=true) via getResolvedRelationshipsForNode — NOT the LIST endpoint.
+    const lazyRelationships = of([
+      mockRelationships.get('rel-1')!,
+      mockRelationships.get('rel-2')!,
+      mockRelationships.get('rel-3')!,
+      mockRelationships.get('rel-4')!,
+      mockRelationships.get('rel-5')!,
+    ]);
+    dataLoaderSpy.getRelationshipsForNode.mockReturnValue(lazyRelationships);
+    dataLoaderSpy.getResolvedRelationshipsForNode.mockReturnValue(lazyRelationships);
     dataLoaderSpy.getContent.mockImplementation((id: string) => {
       const node = mockNodes.get(id);
       return node ? of(node) : throwError(() => new Error('Not found'));
@@ -239,7 +242,42 @@ describe('RelatedConceptsService', () => {
     it('should use lazy loading for simple queries', () =>
       new Promise<void>(done => {
         service.getRelatedConcepts('concept-1', { limit: 5 }).subscribe(() => {
-          expect(dataLoaderSpy.getRelationshipsForNode).toHaveBeenCalled();
+          expect(dataLoaderSpy.getResolvedRelationshipsForNode).toHaveBeenCalled();
+          done();
+        });
+      }));
+
+    // B2b: a computed tag edge (inferenceSource:"tag", Category C) sourced from
+    // the resolver graph endpoint must route to the `discovered` bucket end-to-end.
+    it('should route resolver tag edges to the discovered bucket', () =>
+      new Promise<void>(done => {
+        dataLoaderSpy.getResolvedRelationshipsForNode.mockReturnValue(
+          of([
+            // Authored explicit edge → NOT discovered.
+            {
+              id: 'rel-explicit',
+              sourceNodeId: 'concept-1',
+              targetNodeId: 'concept-2',
+              relationshipType: ContentRelationshipType.RELATES_TO,
+              inferenceSource: 'explicit',
+              metadata: {},
+            },
+            // Computed tag edge → discovered.
+            {
+              id: 'rel-tag',
+              sourceNodeId: 'concept-1',
+              targetNodeId: 'concept-3',
+              relationshipType: ContentRelationshipType.RELATES_TO,
+              inferenceSource: 'tag',
+              metadata: {},
+            },
+          ] as ContentRelationship[])
+        );
+
+        service.getRelatedConcepts('concept-1').subscribe(result => {
+          const discoveredIds = result.discovered.map(n => n.id);
+          expect(discoveredIds).toContain('concept-3');
+          expect(discoveredIds).not.toContain('concept-2');
           done();
         });
       }));
@@ -296,7 +334,7 @@ describe('RelatedConceptsService', () => {
         service.getRelatedConcepts('concept-1').subscribe(() => {
           service.getRelatedConcepts('concept-1').subscribe(() => {
             // Second call should use cache
-            expect(dataLoaderSpy.getRelationshipsForNode).toHaveBeenCalledTimes(1);
+            expect(dataLoaderSpy.getResolvedRelationshipsForNode).toHaveBeenCalledTimes(1);
             done();
           });
         });
@@ -316,7 +354,7 @@ describe('RelatedConceptsService', () => {
       new Promise<void>(done => {
         service.getRelatedConcepts('concept-1', { includeContent: true }).subscribe(result => {
           // Should use lazy loading but include content in results
-          expect(dataLoaderSpy.getRelationshipsForNode).toHaveBeenCalled();
+          expect(dataLoaderSpy.getResolvedRelationshipsForNode).toHaveBeenCalled();
           // Verify that content is present (not stripped)
           if (result.related.length > 0) {
             expect(result.related[0].content).not.toBe('');
@@ -369,7 +407,7 @@ describe('RelatedConceptsService', () => {
             metadata: {},
           },
         ];
-        dataLoaderSpy.getRelationshipsForNode.mockReturnValue(of(biRelationships));
+        dataLoaderSpy.getResolvedRelationshipsForNode.mockReturnValue(of(biRelationships));
 
         service.getRelatedConcepts('concept-1').subscribe(result => {
           const relatedIds = result.related.map(n => n.id);
@@ -573,7 +611,7 @@ describe('RelatedConceptsService', () => {
         };
         dataLoaderSpy.getGraph.mockReturnValue(of(emptyGraph));
         // Also mock empty relationships for lazy loading path
-        dataLoaderSpy.getRelationshipsForNode.mockReturnValue(of([]));
+        dataLoaderSpy.getResolvedRelationshipsForNode.mockReturnValue(of([]));
 
         service.getRelatedConcepts('concept-1').subscribe(result => {
           expect(result.prerequisites.length).toBe(0);
@@ -585,7 +623,7 @@ describe('RelatedConceptsService', () => {
 
     it('should handle relationship load error in lazy loading', () =>
       new Promise<void>(done => {
-        dataLoaderSpy.getRelationshipsForNode.mockReturnValue(
+        dataLoaderSpy.getResolvedRelationshipsForNode.mockReturnValue(
           throwError(() => new Error('Load failed'))
         );
 
@@ -619,7 +657,7 @@ describe('RelatedConceptsService', () => {
             metadata: {},
           },
         ];
-        dataLoaderSpy.getRelationshipsForNode.mockReturnValue(of(relationshipsWithMissing));
+        dataLoaderSpy.getResolvedRelationshipsForNode.mockReturnValue(of(relationshipsWithMissing));
         dataLoaderSpy.getContent.mockImplementation((id: string) => {
           if (id === 'missing-node') {
             return throwError(() => new Error('Not found'));

@@ -146,6 +146,8 @@ describe('DataLoaderService', () => {
       getPath: vi.fn(),
       queryPaths: vi.fn(),
       getAllPaths: vi.fn(),
+      getRelationships: vi.fn(),
+      getContentGraph: vi.fn(),
     };
     mockContentService.getContent.mockReturnValue(of(null));
     mockContentService.queryContent.mockReturnValue(of([]));
@@ -154,6 +156,8 @@ describe('DataLoaderService', () => {
     mockContentService.getPath.mockReturnValue(of(null));
     mockContentService.queryPaths.mockReturnValue(of([]));
     mockContentService.getAllPaths.mockReturnValue(of([]));
+    mockContentService.getRelationships.mockReturnValue(of([]));
+    mockContentService.getContentGraph.mockReturnValue(of(null));
 
     // ElohimClient mock
     mockElohimClient = {
@@ -424,6 +428,84 @@ describe('DataLoaderService', () => {
   describe('clearCache', () => {
     it('should clear internal caches without error', () => {
       expect(() => service.clearCache()).not.toThrow();
+    });
+  });
+
+  // B2b: the related-concepts panel must source relationships from the resolver
+  // graph endpoint (computed=true) so the resolver's computed tag edges
+  // (inferenceSource:"tag", Category C) reach the panel and route to `discovered`.
+  // The LIST endpoint (getRelationships) only returns STORED explicit/structural
+  // rows; it NEVER returns the resolver's computed edges.
+  describe('getResolvedRelationshipsForNode (computed graph source)', () => {
+    it('should source relationships from getContentGraph with computed=true', async () => {
+      mockContentService.getContentGraph.mockReturnValue(
+        of({
+          rootId: 'concept-1',
+          related: [
+            {
+              contentId: 'explicit-target',
+              relationshipType: 'RELATES_TO',
+              confidence: 1,
+              inferenceSource: 'explicit',
+              depth: 1,
+              children: [],
+            },
+          ],
+          totalNodes: 2,
+        })
+      );
+
+      await new Promise<void>(resolve => {
+        service.getResolvedRelationshipsForNode('concept-1', 2).subscribe(() => {
+          expect(mockContentService.getContentGraph).toHaveBeenCalledWith(
+            'concept-1',
+            expect.objectContaining({ computed: true, depth: 2 })
+          );
+          // Must NOT use the LIST endpoint for this path.
+          expect(mockContentService.getRelationships).not.toHaveBeenCalled();
+          resolve();
+        });
+      });
+    });
+
+    it('should carry inferenceSource:"tag" through from the resolver graph node', async () => {
+      mockContentService.getContentGraph.mockReturnValue(
+        of({
+          rootId: 'concept-1',
+          related: [
+            {
+              contentId: 'explicit-target',
+              relationshipType: 'RELATES_TO',
+              confidence: 1,
+              inferenceSource: 'explicit',
+              depth: 1,
+              children: [],
+            },
+            {
+              contentId: 'tag-discovered-target',
+              relationshipType: 'RELATES_TO',
+              confidence: 0.6,
+              inferenceSource: 'tag',
+              depth: 1,
+              children: [],
+            },
+          ],
+          totalNodes: 3,
+        })
+      );
+
+      const relationships = await new Promise<any[]>(resolve => {
+        service.getResolvedRelationshipsForNode('concept-1', 2).subscribe(rels => resolve(rels));
+      });
+
+      const tagEdge = relationships.find(r => r.targetNodeId === 'tag-discovered-target');
+      expect(tagEdge).toBeDefined();
+      expect(tagEdge.inferenceSource).toBe('tag');
+      expect(tagEdge.sourceNodeId).toBe('concept-1');
+      expect(tagEdge.relationshipType).toBe('RELATES_TO');
+
+      const explicitEdge = relationships.find(r => r.targetNodeId === 'explicit-target');
+      expect(explicitEdge?.inferenceSource).toBe('explicit');
     });
   });
 });

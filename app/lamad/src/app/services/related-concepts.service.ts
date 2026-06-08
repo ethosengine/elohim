@@ -307,7 +307,13 @@ export class RelatedConceptsService {
 
   /**
    * Lazy load related concepts for a single node without loading full graph.
-   * Uses DataLoaderService.getRelationshipsForNode() for efficient queries.
+   *
+   * Sources relationships from the RESOLVER graph endpoint via
+   * DataLoaderService.getResolvedRelationshipsForNode() (computed=true) so the
+   * resolver's COMPUTED tag edges (`inferenceSource:"tag"`, Category C) flow in
+   * and `categorizeRelationships` routes them to the `discovered` bucket. The
+   * LIST endpoint returns only stored explicit/structural rows and would leave
+   * `discovered` empty against real data.
    */
   private lazyLoadRelatedConcepts(
     contentId: string,
@@ -315,8 +321,8 @@ export class RelatedConceptsService {
   ): Observable<RelatedConceptsResult> {
     const { limit = 10, includeContent = false } = options;
 
-    // Query relationships for this node (both directions)
-    return this.dataLoader.getRelationshipsForNode(contentId, 'both').pipe(
+    // Query relationships for this node via the resolver graph endpoint.
+    return this.dataLoader.getResolvedRelationshipsForNode(contentId, 2).pipe(
       switchMap(relationships => {
         // Collect unique node IDs to load
         const nodeIds = new Set<string>();

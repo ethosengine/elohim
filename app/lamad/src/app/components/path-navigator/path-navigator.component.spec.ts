@@ -177,6 +177,7 @@ describe('PathNavigatorComponent', () => {
             getAgentProgress: vi.fn(),
             getRelatedConcepts: vi.fn().mockReturnValue(of([])),
             getRelationshipsForNode: vi.fn().mockReturnValue(of([])),
+            getResolvedRelationshipsForNode: vi.fn().mockReturnValue(of([])),
             getGraph: vi.fn().mockReturnValue(of({ nodes: [], edges: [] })),
           },
         },

@@ -47,6 +47,7 @@ import { Agent, AgentProgress, AgentAttestation } from '@elohim/service/angular/
 
 import { ContentResolverService } from './content-resolver.service';
 import { ContentBackendService } from './content-backend.service';
+import type { ContentGraphNode } from './content-backend.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
@@ -858,6 +859,7 @@ export class DataLoaderService {
     this.attestationsByContentCache.clear();
     this.graphCache$ = null;
     this.relationshipByNodeCache.clear();
+    this.resolvedRelationshipByNodeCache.clear();
     this.pathIndexCache$ = null;
     this.contentIndexCache$ = null;
     // Note: Holochain content cache removed — content served from projection tier
@@ -1430,6 +1432,90 @@ export class DataLoaderService {
       .pipe(map(results => (results ?? []).map(r => this.transformToContentRelationship(r))));
   }
 
+  /** LRU cache for per-node RESOLVED (computed) relationship queries */
+  private readonly resolvedRelationshipByNodeCache = new Map<
+    string,
+    Observable<ContentRelationship[]>
+  >();
+
+  /**
+   * Get RESOLVED relationships for a single node from the resolver graph endpoint.
+   *
+   * Unlike {@link getRelationshipsForNode} (which sources the LIST endpoint and
+   * returns only STORED explicit/structural rows), this routes through
+   * `getContentGraph(contentId, { computed: true })` so the resolver's COMPUTED
+   * tag edges (`inferenceSource:"tag"`, Category C) reach the related-concepts
+   * panel and route to its `discovered` bucket. Each graph `related` node is
+   * mapped to a `ContentRelationship` rooted at `contentId`.
+   *
+   * @param contentId - The content node ID to get relationships for
+   * @param depth - Resolver traversal depth (default 2)
+   * @returns Observable of ContentRelationship[] (outgoing from contentId)
+   */
+  getResolvedRelationshipsForNode(
+    contentId: string,
+    depth = 2
+  ): Observable<ContentRelationship[]> {
+    const cacheKey = `${contentId}:${depth}`;
+
+    if (!this.resolvedRelationshipByNodeCache.has(cacheKey)) {
+      if (this.resolvedRelationshipByNodeCache.size >= this.RELATIONSHIP_CACHE_MAX_SIZE) {
+        const firstKey = this.resolvedRelationshipByNodeCache.keys().next().value;
+        if (firstKey) {
+          this.resolvedRelationshipByNodeCache.delete(firstKey);
+        }
+      }
+
+      const request = this.fetchResolvedRelationshipsForNode(contentId, depth).pipe(
+        shareReplay(1),
+        catchError(_err => {
+          this.resolvedRelationshipByNodeCache.delete(cacheKey);
+          return of([]);
+        })
+      );
+
+      this.resolvedRelationshipByNodeCache.set(cacheKey, request);
+    }
+
+    return this.resolvedRelationshipByNodeCache.get(cacheKey)!;
+  }
+
+  /**
+   * Fetch resolved (computed) relationships from the resolver graph endpoint and
+   * project each graph node into a `ContentRelationship`.
+   */
+  private fetchResolvedRelationshipsForNode(
+    contentId: string,
+    depth: number
+  ): Observable<ContentRelationship[]> {
+    return this.contentService.getContentGraph(contentId, { computed: true, depth }).pipe(
+      map(graph =>
+        (graph?.related ?? []).map(node => this.graphNodeToContentRelationship(contentId, node))
+      )
+    );
+  }
+
+  /**
+   * Project a resolver graph node into a ContentRelationship rooted at `contentId`.
+   *
+   * The graph endpoint is outgoing-traversal: each `related` node is the target
+   * of an edge FROM the root. `inferenceSource` is carried through unchanged
+   * (one-field pass-through) so `categorizeRelationships` routes computed edges
+   * to `discovered`.
+   */
+  private graphNodeToContentRelationship(
+    rootId: string,
+    node: ContentGraphNode
+  ): ContentRelationship {
+    return {
+      id: `${rootId}->${node.contentId}`,
+      sourceNodeId: rootId,
+      targetNodeId: node.contentId,
+      relationshipType: node.relationshipType as ContentRelationshipType,
+      inferenceSource: node.inferenceSource as ContentRelationship['inferenceSource'],
+    };
+  }
+
   /**
    * Transform ContentService Relationship to ContentRelationship model.
    */
@@ -1493,9 +1579,15 @@ export class DataLoaderService {
           this.relationshipByNodeCache.delete(key);
         }
       }
+      for (const key of this.resolvedRelationshipByNodeCache.keys()) {
+        if (key.startsWith(`${contentId}:`)) {
+          this.resolvedRelationshipByNodeCache.delete(key);
+        }
+      }
     } else {
       // Clear entire cache
       this.relationshipByNodeCache.clear();
+      this.resolvedRelationshipByNodeCache.clear();
     }
   }
 
