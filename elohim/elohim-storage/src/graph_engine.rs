@@ -174,8 +174,21 @@ impl NativeGraphResolver {
         .get_result::<RootTagCount>(&mut conn)?
         .n;
 
+        // One row of the tag-overlap self-join: a co-occurring content id and the
+        // number of tags it shares with the root.
+        #[derive(diesel::QueryableByName)]
+        struct TagOverlapRow {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            content_id: String,
+            #[diesel(sql_type = diesel::sql_types::BigInt)]
+            shared: i64,
+        }
+
         // Self-join: count tags each OTHER content node shares with the root,
         // scoped to the same app/tenant, keep those at/above the threshold.
+        // ORDER BY includes a tiebreaker (ct2.content_id ASC) for determinism.
+        // LIMIT is inflated by exclude.len() so the Rust-side filter cannot starve
+        // the cap; .take(max_computed) after the filter enforces the true cap.
         let rows: Vec<TagOverlapRow> = diesel::sql_query(
             "SELECT ct2.content_id AS content_id, COUNT(*) AS shared \
              FROM content_tags ct1 \
@@ -183,18 +196,19 @@ impl NativeGraphResolver {
                AND ct1.h_app_id = ct2.h_app_id AND ct2.content_id <> ct1.content_id \
              WHERE ct1.h_app_id = ? AND ct1.content_id = ? \
              GROUP BY ct2.content_id HAVING shared >= ? \
-             ORDER BY shared DESC LIMIT ?",
+             ORDER BY shared DESC, ct2.content_id ASC LIMIT ?",
         )
         .bind::<Text, _>(app)
         .bind::<Text, _>(query.root_id)
         .bind::<BigInt, _>(query.min_shared_tags as i64)
-        .bind::<BigInt, _>(query.max_computed as i64)
+        .bind::<diesel::sql_types::BigInt, _>((query.max_computed + exclude.len()) as i64)
         .load(&mut conn)?;
 
         let denom = root_tag_count.max(1) as f64;
         Ok(rows
             .into_iter()
             .filter(|r| !exclude.contains(&r.content_id))
+            .take(query.max_computed)
             .map(|r| ResolvedEdge {
                 target_id: r.content_id,
                 relationship_type: "RELATES_TO".to_string(),
@@ -206,16 +220,6 @@ impl NativeGraphResolver {
     }
 }
 
-/// One row of the tag-overlap self-join: a co-occurring content id and the
-/// number of tags it shares with the root.
-#[derive(diesel::QueryableByName)]
-struct TagOverlapRow {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    content_id: String,
-    #[diesel(sql_type = diesel::sql_types::BigInt)]
-    shared: i64,
-}
-
 impl ContentGraphResolver for NativeGraphResolver {
     fn resolve_neighborhood(
         &self,
@@ -224,21 +228,27 @@ impl ContentGraphResolver for NativeGraphResolver {
     ) -> Result<ResolvedNeighborhood, StorageError> {
         // Pass 1: explicit edges (Category A — notarized, may be persisted).
         let explicit = self.explicit_edges(ctx, query)?;
-        let mut edges = explicit.clone();
 
         // Pass 2: tag-discovery edges (Category C — recompute-on-read, never
         // persisted). Short-circuit entirely when computed edges are off.
         if query.include_computed {
             // Explicit precedence: never re-emit an explicitly-reached node (or
-            // the root itself) as a tag edge.
+            // the root itself) as a tag edge. Build `seen` from &explicit, then
+            // MOVE explicit into edges (no clone).
             let mut seen: HashSet<String> = explicit.iter().map(|e| e.target_id.clone()).collect();
             seen.insert(query.root_id.to_string());
-            edges.extend(self.computed_tag_edges(ctx, query, &seen)?);
+            let computed = self.computed_tag_edges(ctx, query, &seen)?;
+            let mut edges = explicit; // move, not clone
+            edges.extend(computed);
+            return Ok(ResolvedNeighborhood {
+                root_id: query.root_id.to_string(),
+                edges,
+            });
         }
 
         Ok(ResolvedNeighborhood {
             root_id: query.root_id.to_string(),
-            edges,
+            edges: explicit,
         })
     }
 }
