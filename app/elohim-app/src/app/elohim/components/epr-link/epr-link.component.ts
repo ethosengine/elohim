@@ -107,7 +107,8 @@ export class EprLinkComponent implements OnInit, OnDestroy {
         { id: 'open', label: 'Open' },
         { id: 'about', label: 'About this EPR' },
         { id: 'copy', label: 'Copy EPR link' },
-        // Rung 2: claims-routed open-in (generic floor; per-pillar enumerated menu is Slice-3 work).
+        // Rung 2 (spec §8): generic floor — routes identically to 'open' via
+        // claims-aware nav today; the per-pillar enumerated sub-menu is Slice 3.
         { id: 'open-in', label: 'Open in app' },
         // Rung 3: acquisition / download for offline.
         { id: 'download', label: 'Download for offline' },

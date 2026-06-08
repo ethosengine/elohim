@@ -53,7 +53,10 @@ export class AcquisitionService {
 
     // Browser: warm the SW cache lane via normal content fetch path.
     const id = eprRef.replace(/^epr:/, '');
-    await fetch(`${base}/db/content/${encodeURIComponent(id)}`);
+    const resp = await fetch(`${base}/db/content/${encodeURIComponent(id)}`);
+    if (!resp.ok) {
+      throw new Error(`[AcquisitionService] cache-warm failed for ${eprRef}: ${resp.status}`);
+    }
     return 'browser';
   }
 }

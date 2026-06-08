@@ -89,3 +89,7 @@ export { ScheduleService } from './schedule.service';
 
 // Service Worker bridge (HTML5 app cache invalidation)
 export { SwBridgeService } from './sw-bridge.service';
+
+// Acquisition affordances (rung-3 download disposition — spec §8)
+export { AcquisitionService } from './acquisition.service';
+export type { AcquisitionCapability } from './acquisition.service';

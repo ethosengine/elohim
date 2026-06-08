@@ -90,5 +90,17 @@ describe('AcquisitionService', () => {
 
       fetchSpy.mockRestore();
     });
+
+    it('rejects when the browser cache-warm gets a non-ok status', async () => {
+      storageMock.connectionMode = 'doorway';
+
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('Not Found', { status: 404 }));
+
+      await expect(service.download('epr:missing')).rejects.toThrow('404');
+
+      fetchSpy.mockRestore();
+    });
   });
 });
