@@ -354,6 +354,25 @@ audits.
 - Reciprocity is observable, not enforced-unilateral: completing a pull at commons naturally
   flips the node to providing; the gradient economics reward the loop rather than gate it.
 
+### §6.4 Substrate-prerequisite split — Slice 2a (rails) then Slice 2b (the action) [planning finding 2026-06-08]
+
+Planning §6 surfaced (with file:line proof) that §6 assumed REA rails that are **storage-side
+unwired**, even though the DNA side is ready. The substrate map:
+
+| Rail | DNA (elohim content_store) | Storage side | Slice 2a work |
+|---|---|---|---|
+| EconomicEvent create | ✅ `create_rea_economic_event` (`lib.rs:12124`) + `ReaEconomicEventCommitted` signal (`:10892`) | ❌ no conductor-emit wrapper (only diesel-direct `record_event`, state `recorded`, no anchor) | add `call_create_rea_economic_event` wrapper + a conductor-path emit service |
+| Commitment state transition | — | ✅ `call_update_rea_commitment_state` wrapper EXISTS | wire graduation: on first `bounded_by` event projecting, flip the proposed commitment → active |
+| `bounded_by` | enforced in `create_rea_economic_event` metadata validation (`lib.rs:12146`); column on `economic_events` (`+bounded_by` migration) | projection populates from the entry | run `bounds_validator::validate` (7-check) on the emit path so revoked/out-of-bounds events are refused |
+| Commitment→content scorer data | — | ❌ STUB: `DistributionDetails.replication_commitments` = `[]`, `commitment_backed_replication` = zeros (instance-1 deferred the rea_commitments-by-content query) | finish the query so the scorer can see commitment backing |
+
+These rails are **general-purpose** (they also unblock the dwelling-hub instance-1 stubs), so they
+are factored into a foundational **Slice 2a** (REA economic-event emit + commitment graduation +
+bounds-on-emit + scorer-data) that lands and is verified on `household-nodes` FIRST. **Slice 2b**
+then builds the `replicates-commons` content-scoped action + the pin sync-back + the scorer arm +
+rung-4 UI *on top of the proven 2a rail* — honoring the "verify instance-1, don't assume it"
+caveat (§6.1). Plan: `2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md`.
+
 ---
 
 ## §7 The dwelling escalation (designed contract, deferred implementation)
