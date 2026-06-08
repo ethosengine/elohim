@@ -60,28 +60,132 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
         "acknowledges-reach-change" => validate_acknowledges_reach_change(&payload),
         "replicates-dwelling" => validate_replicates_dwelling(&payload),
         "replicates-commons" => validate_replicates_commons(&payload),
+        "revokes-commitment" => validate_revokes_commitment(&payload),
         other => Err(format!(
             "commitments::validate_commitment_payload unhandled action: {other}"
         )),
     }
 }
 
-/// Minimal gate-passing validator for the `replicates-commons` action so the
-/// Slice-2b T1 conductor round-trip notarizes the content-variant payload. The
-/// variant-specific checks (capacity donut sum-to-100, closure_rule, etc.) land
-/// in their dedicated Slice-2b task; this mirrors `validate_replicates_dwelling`'s
-/// hand-rolled style.
+/// Validator for the `replicates-commons` action (EPR provide loop, Slice-2b T3).
+/// Variant-dispatch on `variant` ("content" | "capacity"), reach-must-be-commons,
+/// and (capacity only) ratio_attestation sum-to-100 + effective_ratio_cid present.
+/// Mirrors `validate_replicates_dwelling`'s hand-rolled style.
+///
+/// Note: the author does NOT supply `epr_scope`. For a content-scoped commons
+/// commitment the effective `bounds.epr_scope` is derived as `[head_ref]` at
+/// projection time (the storage `parse_replicates_commons` projection), so the
+/// bounds-validator's epr_scope check is satisfied downstream — never required
+/// in the author-facing payload here.
 fn validate_replicates_commons(payload: &serde_json::Value) -> Result<(), String> {
     if payload["action"] != "replicates-commons" {
         return Err("action field must equal 'replicates-commons'".into());
     }
-    // reach must be commons (the variant-specific checks land in a later task;
-    // this is the minimal gate-passing guard so the round-trip notarizes).
-    if payload.get("reach").and_then(|v| v.as_str()) != Some("commons") {
-        return Err("replicates-commons requires reach == 'commons'".into());
+
+    // bounds: required object with rate_per_minute and reach_ceiling="commons".
+    let bounds = payload
+        .get("bounds")
+        .and_then(|b| b.as_object())
+        .ok_or_else(|| "replicates-commons bounds must be object".to_string())?;
+    for field in ["rate_per_minute", "reach_ceiling"] {
+        if !bounds.contains_key(field) {
+            return Err(format!("bounds missing required field: {field}"));
+        }
     }
-    if payload.get("variant").and_then(|v| v.as_str()).is_none() {
-        return Err("replicates-commons requires a 'variant' discriminator".into());
+    if bounds["reach_ceiling"].as_str().unwrap_or("") != "commons" {
+        return Err("bounds.reach_ceiling must equal 'commons'".into());
+    }
+
+    // variant dispatch.
+    let variant = payload["variant"].as_str().unwrap_or("");
+    match variant {
+        "content" => {
+            for field in ["head_ref", "reach"] {
+                if payload.get(field).is_none() {
+                    return Err(format!(
+                        "replicates-commons content variant missing field: {field}"
+                    ));
+                }
+            }
+            if payload["head_ref"].as_str().unwrap_or("").is_empty() {
+                return Err("replicates-commons head_ref must be non-empty".into());
+            }
+            // commons-reach is the ONLY admissible reach for the commons provide loop.
+            if payload["reach"].as_str().unwrap_or("") != "commons" {
+                return Err("replicates-commons content reach must equal 'commons'".into());
+            }
+            // content variant carries NO ratio_attestation.
+            if payload.get("ratio_attestation").is_some() {
+                return Err(
+                    "replicates-commons content variant must not carry ratio_attestation".into(),
+                );
+            }
+            Ok(())
+        }
+        "capacity" => {
+            // commons_bytes > 0.
+            let bytes = payload["commons_bytes"].as_u64().unwrap_or(0);
+            if bytes == 0 {
+                return Err("replicates-commons commons_bytes must be > 0".into());
+            }
+            // ratio_attestation: required sub-fields + sum-to-100 (mirrors replicates-dwelling).
+            let attestation = payload
+                .get("ratio_attestation")
+                .and_then(|v| v.as_object())
+                .ok_or("replicates-commons capacity variant requires ratio_attestation object")?;
+            for f in [
+                "commons_pct",
+                "dwelling_pct",
+                "collective_pct",
+                "free_pct",
+                "effective_ratio_cid",
+            ] {
+                if !attestation.contains_key(f) {
+                    return Err(format!("ratio_attestation missing field: {f}"));
+                }
+            }
+            if attestation["effective_ratio_cid"]
+                .as_str()
+                .unwrap_or("")
+                .is_empty()
+            {
+                return Err("ratio_attestation effective_ratio_cid must be non-empty".into());
+            }
+            let commons = attestation["commons_pct"].as_u64().unwrap_or(0);
+            let dwelling = attestation["dwelling_pct"].as_u64().unwrap_or(0);
+            let collective = attestation["collective_pct"].as_u64().unwrap_or(0);
+            let free = attestation["free_pct"].as_u64().unwrap_or(0);
+            if commons + dwelling + collective + free != 100 {
+                return Err(format!(
+                    "ratio_attestation pct sum {} != 100",
+                    commons + dwelling + collective + free
+                ));
+            }
+            Ok(())
+        }
+        other => Err(format!(
+            "replicates-commons variant '{other}' not in enum (content|capacity)"
+        )),
+    }
+}
+
+fn validate_revokes_commitment(payload: &serde_json::Value) -> Result<(), String> {
+    if payload["action"] != "revokes-commitment" {
+        return Err("action field must equal 'revokes-commitment'".into());
+    }
+    let target = payload
+        .get("target_cid")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if target.is_empty() {
+        return Err("revokes-commitment target_cid must be non-empty".into());
+    }
+    let signed = payload
+        .get("signed_at")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if signed.is_empty() {
+        return Err("revokes-commitment signed_at must be present".into());
     }
     Ok(())
 }
@@ -443,6 +547,173 @@ mod tests {
         payload["ratio_attestation"]["commons_pct"] = serde_json::json!(30); // sum becomes 110
         let input = CreateCommitmentInput {
             action: "replicates-dwelling".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    // =========================================================================
+    // replicates-commons tests (content + capacity variants)
+    // =========================================================================
+
+    fn well_formed_commons_content_payload() -> serde_json::Value {
+        serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": "bafyhead-lamad-spa",
+            "closure_rule": "transitive-1",
+            "reach": "commons",
+            "bounds": { "rate_per_minute": 30, "reach_ceiling": "commons" }
+        })
+    }
+
+    fn well_formed_commons_capacity_payload() -> serde_json::Value {
+        serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "capacity",
+            "commons_bytes": 50_000_000_000u64,
+            "bounds": { "rate_per_minute": 30, "reach_ceiling": "commons" },
+            "ratio_attestation": {
+                "commons_pct": 20, "dwelling_pct": 40, "collective_pct": 25, "free_pct": 15,
+                "effective_ratio_cid": "bafkrei-x"
+            }
+        })
+    }
+
+    #[test]
+    fn replicates_commons_content_well_formed_validates() {
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: well_formed_commons_content_payload().to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_ok());
+    }
+
+    #[test]
+    fn replicates_commons_capacity_well_formed_validates() {
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: well_formed_commons_capacity_payload().to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_ok());
+    }
+
+    #[test]
+    fn replicates_commons_content_reach_not_commons_rejected() {
+        let mut payload = well_formed_commons_content_payload();
+        payload["reach"] = serde_json::json!("community");
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_commons_content_missing_head_ref_rejected() {
+        let mut payload = well_formed_commons_content_payload();
+        payload.as_object_mut().unwrap().remove("head_ref");
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_commons_capacity_zero_bytes_rejected() {
+        let mut payload = well_formed_commons_capacity_payload();
+        payload["commons_bytes"] = serde_json::json!(0);
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_commons_capacity_ratio_sum_not_100_rejected() {
+        let mut payload = well_formed_commons_capacity_payload();
+        payload["ratio_attestation"]["commons_pct"] = serde_json::json!(30); // sum 110
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_commons_capacity_missing_effective_ratio_cid_rejected() {
+        let mut payload = well_formed_commons_capacity_payload();
+        payload["ratio_attestation"].as_object_mut().unwrap().remove("effective_ratio_cid");
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn replicates_commons_unknown_variant_rejected() {
+        let mut payload = well_formed_commons_content_payload();
+        payload["variant"] = serde_json::json!("bogus");
+        let input = CreateCommitmentInput {
+            action: "replicates-commons".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    // =========================================================================
+    // revokes-commitment tests
+    // =========================================================================
+
+    fn well_formed_revokes_payload() -> serde_json::Value {
+        serde_json::json!({
+            "action": "revokes-commitment",
+            "target_cid": "bafyhead-target-commitment",
+            "reason": "pin removed",
+            "signed_at": "2026-06-10T00:00:00Z"
+        })
+    }
+
+    #[test]
+    fn revokes_commitment_well_formed_validates() {
+        let input = CreateCommitmentInput {
+            action: "revokes-commitment".to_string(),
+            payload_json: well_formed_revokes_payload().to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_ok());
+    }
+
+    #[test]
+    fn revokes_commitment_empty_target_cid_rejected() {
+        let mut payload = well_formed_revokes_payload();
+        payload["target_cid"] = serde_json::json!("");
+        let input = CreateCommitmentInput {
+            action: "revokes-commitment".to_string(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
+        };
+        assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    #[test]
+    fn revokes_commitment_missing_signed_at_rejected() {
+        let mut payload = well_formed_revokes_payload();
+        payload.as_object_mut().unwrap().remove("signed_at");
+        let input = CreateCommitmentInput {
+            action: "revokes-commitment".to_string(),
             payload_json: payload.to_string(),
             signed_at: "2026-06-10T00:00:00Z".to_string(),
         };

@@ -147,6 +147,11 @@ path = "src/tests/rea_event_emit_graduation_test.rs"
 name = "replicates_commons_round_trip_test"
 path = "src/tests/replicates_commons_round_trip_test.rs"
 
+# Slice-2b T3: replicates-commons + revokes-commitment + Commitment immutability seatbelt
+[[test]]
+name = "replicates_commons_substrate_correct_test"
+path = "src/tests/replicates_commons_substrate_correct_test.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).

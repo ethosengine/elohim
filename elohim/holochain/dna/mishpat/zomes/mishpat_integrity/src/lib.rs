@@ -666,6 +666,54 @@ fn validate_commitment_entry(commitment: &Commitment) -> ExternResult<ValidateCa
             ));
         }
     }
+    // Slice-2b: replicates-commons defense-in-depth (substring-only — serde_json
+    // is dev-only here; coordinator does full schema validation, integrity catches
+    // a direct-source-chain bypass).
+    if commitment.action == "replicates-commons" {
+        let meta = commitment.payload_json.trim();
+        if meta.is_empty() || !meta.starts_with('{') {
+            return Ok(ValidateCallbackResult::Invalid(
+                "replicates-commons requires payload_json as a JSON object".into(),
+            ));
+        }
+        // Must carry a variant discriminator (content|capacity).
+        let has_content = meta.contains("\"variant\":\"content\"")
+            || meta.contains("\"variant\": \"content\"");
+        let has_capacity = meta.contains("\"variant\":\"capacity\"")
+            || meta.contains("\"variant\": \"capacity\"");
+        if !has_content && !has_capacity {
+            return Ok(ValidateCallbackResult::Invalid(
+                "replicates-commons variant must be content or capacity".into(),
+            ));
+        }
+        // reach_ceiling must be commons (commons provide loop only).
+        let commons_ceiling = meta.contains("\"reach_ceiling\":\"commons\"")
+            || meta.contains("\"reach_ceiling\": \"commons\"");
+        if !commons_ceiling {
+            return Ok(ValidateCallbackResult::Invalid(
+                "replicates-commons reach_ceiling must be commons".into(),
+            ));
+        }
+    }
+    // Slice-2b: revokes-commitment defense-in-depth.
+    if commitment.action == "revokes-commitment" {
+        let meta = commitment.payload_json.trim();
+        if meta.is_empty() || !meta.starts_with('{') {
+            return Ok(ValidateCallbackResult::Invalid(
+                "revokes-commitment requires payload_json as a JSON object".into(),
+            ));
+        }
+        if !meta.contains("target_cid") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "revokes-commitment requires target_cid field".into(),
+            ));
+        }
+        if meta.contains("\"target_cid\":\"\"") || meta.contains("\"target_cid\": \"\"") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "revokes-commitment target_cid must be non-empty".into(),
+            ));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
