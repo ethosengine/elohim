@@ -1692,6 +1692,47 @@ pub(crate) enum EprUniversalDisposition {
     ServeShell,
 }
 
+/// The subview requested under a universal `/epr/{id}` address. `Default` is the
+/// bare address (claims-aware: a claimed target 302s to its pretty mount). Any
+/// non-empty suffix is a SHELL-rendered inspector view (`/epr/{id}/raw` is the
+/// raw-node inspector) — it must NEVER 302 to a pillar mount, or the shell never
+/// gets the chance to render it and the request round-trips back into `/epr`.
+/// Fail OPEN: unknown suffixes resolve to `Raw` (ServeShell) so a new subview
+/// works the moment the shell adds a route, without a doorway change.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum EprSubview {
+    Default,
+    Raw,
+}
+
+/// Pure split of a universal `/epr/{id}[/subview...]` path into its id segment
+/// and requested subview. The id is the FIRST segment (stays percent-encoded);
+/// only the SUFFIX handling differs from the bare-address path. An empty or
+/// missing suffix is `Default`; `raw` (and, fail-open, any other non-empty
+/// suffix) is `Raw`. Table-data only — no IO.
+pub(crate) fn parse_epr_path(original_path: &str) -> (&str, EprSubview) {
+    let tail = original_path.strip_prefix("/epr/").unwrap_or("");
+    let mut segments = tail.split('/');
+    let id = segments.next().unwrap_or("");
+    let subview = match segments.next() {
+        // Bare `/epr/{id}` (or a trailing slash with nothing after) → Default.
+        None | Some("") => EprSubview::Default,
+        Some("raw") => EprSubview::Raw,
+        Some(other) => {
+            // Fail open to the shell: an unknown subview still serves the bundle
+            // so it works the instant the shell adds a route. Logged so a new
+            // subview surfacing here is noticed (not silently absorbed).
+            tracing::debug!(
+                subview = %other,
+                path = %original_path,
+                "unknown /epr/{{id}}/<subview> — failing open to shell (treated as raw inspector)"
+            );
+            EprSubview::Raw
+        }
+    };
+    (id, subview)
+}
+
 /// The anon-readable reach set — the doorway's HALF of the substrate's anon
 /// rule. MUST mirror storage's unauthenticated list filter
 /// (`elohim-storage/src/http.rs` handle_db_content_list:
@@ -1710,7 +1751,15 @@ pub(crate) fn anon_reach_readable(reach: &str) -> bool {
 pub(crate) fn classify_epr_universal(
     head: Option<HeadFacts>,
     claimed_location: Option<String>,
+    subview: EprSubview,
 ) -> EprUniversalDisposition {
+    // A subview is an explicit request for the shell-rendered inspector — it
+    // overrides the claims-aware 302 unconditionally (regardless of claim or
+    // reach). Without this short-circuit `/epr/{id}/raw` would 302 to the pretty
+    // mount and the shell would never get the chance to render the raw node.
+    if subview != EprSubview::Default {
+        return EprUniversalDisposition::ServeShell;
+    }
     let reach_passes = head
         .as_ref()
         .and_then(|h| h.reach.as_deref())
@@ -1726,13 +1775,10 @@ pub(crate) fn classify_epr_universal(
 /// commons-reach target 302s to its pretty mount; everything else serves the
 /// ROOT projection's bundle (the shell renders the viewer or gate face).
 async fn dispatch_epr_universal(state: &AppState, original_path: &str) -> Response<Full<Bytes>> {
-    // Extract the id segment: /epr/{id}[/...] — id stays percent-encoded.
-    let id = original_path
-        .strip_prefix("/epr/")
-        .unwrap_or("")
-        .split('/')
-        .next()
-        .unwrap_or("");
+    // Split /epr/{id}[/subview...] — id is the first segment (stays
+    // percent-encoded); a subview (e.g. /raw) forces the shell to render so the
+    // inspector route is reachable instead of round-tripping to a pretty mount.
+    let (id, subview) = parse_epr_path(original_path);
 
     // Head facts: one LOCAL storage lookup (storage caches /db/content 300s).
     let head = if id.is_empty() {
@@ -1745,7 +1791,7 @@ async fn dispatch_epr_universal(state: &AppState, original_path: &str) -> Respon
         .and_then(|h| h.content_type.as_deref())
         .and_then(|ct| state.epr_router.claimed_mount_location(ct, id));
 
-    match classify_epr_universal(head, claimed) {
+    match classify_epr_universal(head, claimed, subview) {
         EprUniversalDisposition::RedirectToMount { location } => {
             tracing::debug!(path = %original_path, location = %location,
                 "universal /epr address — 302 to claimed pretty mount (Slice 3)");
@@ -3906,6 +3952,7 @@ mod epr_claims_dispatch_tests {
                 reach: Some("commons".into()),
             }),
             Some("/lamad/path/abc".to_string()), // pre-resolved claimed location
+            EprSubview::Default,
         );
         assert_eq!(
             d,
@@ -3923,6 +3970,7 @@ mod epr_claims_dispatch_tests {
                 reach: Some("commons".into()),
             }),
             None,
+            EprSubview::Default,
         );
         assert_eq!(d, EprUniversalDisposition::ServeShell);
     }
@@ -3940,6 +3988,7 @@ mod epr_claims_dispatch_tests {
                 reach: Some("public".into()),
             }),
             Some("/lamad/path/abc".to_string()),
+            EprSubview::Default,
         );
         assert_eq!(
             d,
@@ -3958,6 +4007,7 @@ mod epr_claims_dispatch_tests {
                 reach: Some("household:x".into()),
             }),
             Some("/lamad/path/abc".to_string()),
+            EprSubview::Default,
         );
         assert_eq!(d, EprUniversalDisposition::ServeShell);
     }
@@ -3966,9 +4016,85 @@ mod epr_claims_dispatch_tests {
     fn classify_serves_shell_when_head_unknown() {
         // Fail open toward the floor (spec §9): no head facts → shell.
         assert_eq!(
-            classify_epr_universal(None, None),
+            classify_epr_universal(None, None, EprSubview::Default),
             EprUniversalDisposition::ServeShell
         );
+    }
+
+    // EPR Slice 0 — raw-node inspector. A subview suffix forces the shell to
+    // render so the Angular shell receives the route, instead of 302-ing to the
+    // pretty pillar mount (which round-trips back into /epr — the bug we kill).
+
+    #[test]
+    fn classify_raw_subview_serves_shell_even_when_claimed() {
+        // NEW behavior: /epr/{id}/raw on a CLAIMED, commons-reach (would-302)
+        // target must serve the shell, NOT redirect — the shell renders the raw
+        // node. This is exactly the case that 302'd before the subview existed.
+        let d = classify_epr_universal(
+            Some(HeadFacts {
+                content_type: Some("path".into()),
+                reach: Some("commons".into()),
+            }),
+            Some("/lamad/path/abc".to_string()),
+            EprSubview::Raw,
+        );
+        assert_eq!(
+            d,
+            EprUniversalDisposition::ServeShell,
+            "raw subview must serve the shell even when the target is claimed + commons"
+        );
+    }
+
+    #[test]
+    fn classify_raw_subview_serves_shell_for_public_claimed() {
+        // Same override for the public-reach claimed case.
+        let d = classify_epr_universal(
+            Some(HeadFacts {
+                content_type: Some("path".into()),
+                reach: Some("public".into()),
+            }),
+            Some("/lamad/path/abc".to_string()),
+            EprSubview::Raw,
+        );
+        assert_eq!(d, EprUniversalDisposition::ServeShell);
+    }
+
+    #[test]
+    fn parse_epr_path_bare_address_is_default() {
+        let (id, subview) = parse_epr_path("/epr/abc");
+        assert_eq!(id, "abc");
+        assert_eq!(subview, EprSubview::Default);
+    }
+
+    #[test]
+    fn parse_epr_path_trailing_slash_is_default() {
+        // `/epr/abc/` (empty suffix) is still the bare address.
+        let (id, subview) = parse_epr_path("/epr/abc/");
+        assert_eq!(id, "abc");
+        assert_eq!(subview, EprSubview::Default);
+    }
+
+    #[test]
+    fn parse_epr_path_raw_subview() {
+        let (id, subview) = parse_epr_path("/epr/abc/raw");
+        assert_eq!(id, "abc");
+        assert_eq!(subview, EprSubview::Raw);
+    }
+
+    #[test]
+    fn parse_epr_path_raw_with_extra_segments_is_raw() {
+        // Deeper paths under the raw inspector stay Raw; id is still the first.
+        let (id, subview) = parse_epr_path("/epr/abc/raw/x");
+        assert_eq!(id, "abc");
+        assert_eq!(subview, EprSubview::Raw);
+    }
+
+    #[test]
+    fn parse_epr_path_unknown_subview_fails_open_to_raw() {
+        // Fail open to the shell for an unrecognized subview (logged at debug).
+        let (id, subview) = parse_epr_path("/epr/abc/foo");
+        assert_eq!(id, "abc");
+        assert_eq!(subview, EprSubview::Raw);
     }
 
     #[test]
