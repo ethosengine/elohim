@@ -239,6 +239,12 @@ pub const ALL_ENGAGEMENT_TYPES: &[&str] = &[
     "view", "quiz", "practice", "discuss", "create", "peer", "teach", "apply",
 ];
 
+/// Core inferencesource — DHT-notarized: these four match the INFERENCE_SOURCES constant in content_store_integrity zome and are enforced by relationship integrity validation.
+pub const CORE_INFERENCE_SOURCES: &[&str] = &["explicit", "path", "tag", "semantic"];
+
+/// All inferencesource — includes storage-only and extensible.
+pub const ALL_INFERENCE_SOURCES: &[&str] = &["explicit", "path", "tag", "semantic", "system"];
+
 /// Core instrumentarchetype — All six archetypes are protocol primitives — they define the categories of questions a system must ask about itself.
 pub const CORE_INSTRUMENT_ARCHETYPES: &[&str] = &[
     "retention-check",

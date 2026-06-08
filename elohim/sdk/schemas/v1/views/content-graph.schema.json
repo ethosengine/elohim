@@ -43,8 +43,7 @@
           "description": "Confidence score for this relationship edge [0, 1]."
         },
         "inferenceSource": {
-          "type": "string",
-          "enum": ["explicit", "path", "tag", "semantic", "system"],
+          "$ref": "../enums/inference-source.schema.json",
           "description": "How this edge was derived: explicit = author-declared; path = co-occurrence in a learning path; tag = shared-tag proximity; semantic = embedding-distance; system = system-generated (e.g. prerequisite inference)."
         },
         "depth": {
