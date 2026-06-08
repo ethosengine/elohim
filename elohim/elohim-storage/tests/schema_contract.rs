@@ -270,6 +270,41 @@ fn replication_status_view_matches_schema() {
     validate_against_schema("views/replication-status-view.schema.json", &json);
 }
 
+// ── EPR pull status (Slice 2b T13) ──────────────────────────────
+#[test]
+fn epr_pull_status_view_matches_schema() {
+    use elohim_views::acquisition::EprPullStatusView;
+    let view = EprPullStatusView {
+        epr_id: "epr:bafyHead".to_string(),
+        total: Some(5),
+        fetched: 3,
+        pending: 2,
+        failed: 0,
+        caught_up: Some(false),
+    };
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/epr-pull-status.schema.json", &json);
+}
+
+#[test]
+fn epr_pull_status_view_null_total_serializes() {
+    // total/caughtUp are Option (None = "cannot compute" tri-state, spec §4.3).
+    use elohim_views::acquisition::EprPullStatusView;
+    let view = EprPullStatusView {
+        epr_id: "epr:bafyHead".to_string(),
+        total: None,
+        fetched: 0,
+        pending: 0,
+        failed: 0,
+        caught_up: None,
+    };
+    let json = serde_json::to_value(&view).unwrap();
+    // total and caughtUp present as null — schema allows ["integer","null"] / ["boolean","null"].
+    assert!(json.get("total").unwrap().is_null());
+    assert!(json.get("caughtUp").unwrap().is_null());
+    validate_against_schema("views/epr-pull-status.schema.json", &json);
+}
+
 // ── Peer views ──────────────────────────────────────────────────
 
 #[cfg(feature = "p2p")]
@@ -1211,6 +1246,8 @@ fn view_schemas_declare_source_of_truth() {
         "views/hub-capacity-view.schema.json",
         // Native content-graph seam (Task A9): multi-provenance composite read
         "views/content-graph.schema.json",
+        // Slice 2b T13: per-EPR pull progress (own-node only)
+        "views/epr-pull-status.schema.json",
     ];
 
     for schema_name in &view_schemas {
