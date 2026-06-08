@@ -96,6 +96,9 @@ impl AcquisitionState {
                 .trackers
                 .entry(pin_id)
                 .or_insert_with(|| GapTracker::new(MAX_RETRIES));
+            // TODO(cluster-pins): clones local_has once per pin — fine for
+            // Slice-1 item pins (tiny sets); revisit with a shared Arc or a
+            // borrow variant when cluster closures bring large desired sets.
             tracker.set_local_ids(local_has.clone());
             let gaps = tracker.reconcile_desired(want_ids);
             to_dispatch.extend(gaps);
@@ -118,6 +121,9 @@ impl AcquisitionState {
     }
 
     pub async fn mark_failed(&self, content_id: &str) {
+        // No update_caught_up here (unlike mark_completed): a failed item
+        // removed from pending does not satisfy the drain contract — only a
+        // byte-arrival completion earns caught_up.
         let mut inner = self.inner.write().await;
         if let Some(pin_ids) = inner.wanted_by.get(content_id).cloned() {
             for pin_id in pin_ids {
@@ -156,7 +162,9 @@ impl AcquisitionState {
             s.pending += c.pending as i32;
             s.failed += c.failed as i32;
         }
-        s.caught_up = s.pending == 0;
+        // total == 0 is resolved-empty, a DISTINCT state — NOT caught_up
+        // (spec §4.3/§10: a zero-item desired set must never false-complete).
+        s.caught_up = s.pending == 0 && s.total > 0;
         s
     }
 
@@ -167,13 +175,14 @@ impl AcquisitionState {
             .iter()
             .map(|(pin_id, t)| {
                 let c = t.counts();
+                let total = *inner.totals.get(pin_id).unwrap_or(&0) as i32;
                 PinPullStatus {
                     pin_id: *pin_id,
-                    total: *inner.totals.get(pin_id).unwrap_or(&0) as i32,
+                    total,
                     fetched: c.completed as i32,
                     pending: c.pending as i32,
                     failed: c.failed as i32,
-                    caught_up: c.pending == 0,
+                    caught_up: c.pending == 0 && total > 0,
                 }
             })
             .collect();
@@ -218,6 +227,22 @@ mod tests {
         acq.mark_completed("shared").await;
         let pins = acq.per_pin().await;
         assert!(pins.iter().all(|p| p.caught_up && p.fetched == 1));
+    }
+
+    #[tokio::test]
+    async fn resolved_empty_desired_set_is_not_caught_up() {
+        // A pin whose desired set resolves to zero items (e.g. an empty
+        // cluster closure) must surface as resolved-empty, NOT caught_up
+        // (spec §4.3/§10 — never silently false-complete).
+        let acq = AcquisitionState::new();
+        let local = std::collections::HashSet::new();
+        acq.reconcile(vec![(1, vec![])], &local).await;
+        let r = acq.rollup().await;
+        assert_eq!(r.total, 0);
+        assert!(!r.caught_up, "zero-item desired set must not be caught_up");
+        let pins = acq.per_pin().await;
+        assert_eq!(pins.len(), 1);
+        assert!(!pins[0].caught_up);
     }
 
     #[tokio::test]
