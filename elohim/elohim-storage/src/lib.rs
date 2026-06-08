@@ -57,6 +57,11 @@ pub mod epr_service;
 pub mod error;
 pub mod graduation; // Graduation evaluator — observations to attestations/events
 
+// The native content-graph seam — read-only trait + resolved-edge value types.
+// Unconditional (NOT graph-native-gated): the trait is the interface a native
+// impl lives behind; it references only AppContext + StorageError.
+pub mod graph_engine;
+
 // Graph-native projection substrate (CozoDB embedded; default-on)
 #[cfg(feature = "graph-native")]
 pub mod graph;
