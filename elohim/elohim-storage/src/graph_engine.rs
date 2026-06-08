@@ -138,6 +138,82 @@ impl NativeGraphResolver {
 
         Ok(out)
     }
+
+    /// Pass 2: tag co-occurrence discovery (Category C).
+    ///
+    /// Surfaces content nodes that share at least `min_shared_tags` tags with the
+    /// root but have NO authored edge to it — the edges that make this a discovery
+    /// surface rather than a replay of hand-authored links. These edges are
+    /// **recomputed on every read and NEVER persisted**: no `create_relationship`,
+    /// no write, no `dht_anchor_hash`. `exclude` carries the explicit targets (plus
+    /// the root) so an explicitly-reached node is never also emitted as a tag edge
+    /// (explicit precedence). Capped at `max_computed`, depth fixed at 1.
+    fn computed_tag_edges(
+        &self,
+        ctx: &AppContext,
+        query: &GraphQuery<'_>,
+        exclude: &HashSet<String>,
+    ) -> Result<Vec<ResolvedEdge>, StorageError> {
+        use diesel::prelude::*;
+        use diesel::sql_types::{BigInt, Text};
+
+        let mut conn = self.conn()?;
+        let app = &ctx.h_app_id;
+
+        // Root tag count — the confidence denominator. Clean COUNT query.
+        #[derive(diesel::QueryableByName)]
+        struct RootTagCount {
+            #[diesel(sql_type = BigInt)]
+            n: i64,
+        }
+        let root_tag_count: i64 = diesel::sql_query(
+            "SELECT COUNT(*) AS n FROM content_tags WHERE h_app_id = ? AND content_id = ?",
+        )
+        .bind::<Text, _>(app)
+        .bind::<Text, _>(query.root_id)
+        .get_result::<RootTagCount>(&mut conn)?
+        .n;
+
+        // Self-join: count tags each OTHER content node shares with the root,
+        // scoped to the same app/tenant, keep those at/above the threshold.
+        let rows: Vec<TagOverlapRow> = diesel::sql_query(
+            "SELECT ct2.content_id AS content_id, COUNT(*) AS shared \
+             FROM content_tags ct1 \
+             JOIN content_tags ct2 ON ct1.tag = ct2.tag \
+               AND ct1.h_app_id = ct2.h_app_id AND ct2.content_id <> ct1.content_id \
+             WHERE ct1.h_app_id = ? AND ct1.content_id = ? \
+             GROUP BY ct2.content_id HAVING shared >= ? \
+             ORDER BY shared DESC LIMIT ?",
+        )
+        .bind::<Text, _>(app)
+        .bind::<Text, _>(query.root_id)
+        .bind::<BigInt, _>(query.min_shared_tags as i64)
+        .bind::<BigInt, _>(query.max_computed as i64)
+        .load(&mut conn)?;
+
+        let denom = root_tag_count.max(1) as f64;
+        Ok(rows
+            .into_iter()
+            .filter(|r| !exclude.contains(&r.content_id))
+            .map(|r| ResolvedEdge {
+                target_id: r.content_id,
+                relationship_type: "RELATES_TO".to_string(),
+                confidence: (r.shared as f64 / denom).clamp(0.0, 1.0),
+                inference_source: "tag".to_string(),
+                depth: 1,
+            })
+            .collect())
+    }
+}
+
+/// One row of the tag-overlap self-join: a co-occurring content id and the
+/// number of tags it shares with the root.
+#[derive(diesel::QueryableByName)]
+struct TagOverlapRow {
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    content_id: String,
+    #[diesel(sql_type = diesel::sql_types::BigInt)]
+    shared: i64,
 }
 
 impl ContentGraphResolver for NativeGraphResolver {
@@ -146,8 +222,20 @@ impl ContentGraphResolver for NativeGraphResolver {
         ctx: &AppContext,
         query: &GraphQuery<'_>,
     ) -> Result<ResolvedNeighborhood, StorageError> {
-        // Pass 1: explicit edges. Pass 2 (computed/tag) is wired in A4.
-        let edges = self.explicit_edges(ctx, query)?;
+        // Pass 1: explicit edges (Category A — notarized, may be persisted).
+        let explicit = self.explicit_edges(ctx, query)?;
+        let mut edges = explicit.clone();
+
+        // Pass 2: tag-discovery edges (Category C — recompute-on-read, never
+        // persisted). Short-circuit entirely when computed edges are off.
+        if query.include_computed {
+            // Explicit precedence: never re-emit an explicitly-reached node (or
+            // the root itself) as a tag edge.
+            let mut seen: HashSet<String> = explicit.iter().map(|e| e.target_id.clone()).collect();
+            seen.insert(query.root_id.to_string());
+            edges.extend(self.computed_tag_edges(ctx, query, &seen)?);
+        }
+
         Ok(ResolvedNeighborhood {
             root_id: query.root_id.to_string(),
             edges,
@@ -158,7 +246,98 @@ impl ContentGraphResolver for NativeGraphResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::relationships_diesel::test_harness::{insert_relationship, test_pool_ctx};
+    use crate::db::relationships_diesel::test_harness::{
+        insert_content_with_tags, insert_relationship, test_pool_ctx,
+    };
+
+    /// Pass 2 core payoff: two nodes that share tags with NO authored edge
+    /// between them must still be discovered, tagged `inference_source == "tag"`
+    /// at `depth == 1` (same-root similarity, not a transitive walk).
+    #[test]
+    fn tag_overlap_discovers_unlinked_neighbor() {
+        let (pool, ctx, _tmp) = test_pool_ctx();
+
+        // X and Y both tagged [grace, sin]; NO relationship between them.
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_content_with_tags(&mut conn, &ctx, "X", &["grace", "sin"]);
+            insert_content_with_tags(&mut conn, &ctx, "Y", &["grace", "sin"]);
+        }
+
+        let resolver = NativeGraphResolver::new(pool);
+        let q = GraphQuery {
+            include_computed: true,
+            min_shared_tags: 2,
+            ..GraphQuery::new("X")
+        };
+        let n = resolver.resolve_neighborhood(&ctx, &q).unwrap();
+
+        let y = n
+            .edges
+            .iter()
+            .find(|e| e.target_id == "Y")
+            .expect("Y discovered via tag overlap");
+        assert_eq!(y.inference_source, "tag", "discovered edge is a tag edge");
+        assert_eq!(y.depth, 1, "tag-discovery edges are depth 1");
+    }
+
+    /// Explicit precedence: when X and Y share a tag AND there is an authored
+    /// X→Y edge, Y must appear EXACTLY ONCE — as the explicit edge. The tag
+    /// edge to Y is suppressed by the `seen`/exclude set.
+    #[test]
+    fn explicit_precedence_over_computed() {
+        let (pool, ctx, _tmp) = test_pool_ctx();
+
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_content_with_tags(&mut conn, &ctx, "X", &["grace"]);
+            insert_content_with_tags(&mut conn, &ctx, "Y", &["grace"]);
+            // Authored edge — Y is reachable explicitly too.
+            insert_relationship(&mut conn, &ctx, "X", "Y", "RELATES_TO", "explicit");
+        }
+
+        let resolver = NativeGraphResolver::new(pool);
+        let q = GraphQuery {
+            include_computed: true,
+            min_shared_tags: 1,
+            ..GraphQuery::new("X")
+        };
+        let n = resolver.resolve_neighborhood(&ctx, &q).unwrap();
+
+        let y_edges: Vec<_> = n.edges.iter().filter(|e| e.target_id == "Y").collect();
+        assert_eq!(y_edges.len(), 1, "Y appears exactly once (explicit wins)");
+        assert_eq!(
+            y_edges[0].inference_source, "explicit",
+            "the surviving Y edge is the explicit one"
+        );
+    }
+
+    /// Gating: with `include_computed: false`, Pass 2 must be short-circuited
+    /// entirely — no edge may carry `inference_source == "tag"`, even when
+    /// tag-sharing content exists.
+    #[test]
+    fn include_computed_false_yields_no_tag_edges() {
+        let (pool, ctx, _tmp) = test_pool_ctx();
+
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_content_with_tags(&mut conn, &ctx, "X", &["grace"]);
+            insert_content_with_tags(&mut conn, &ctx, "Y", &["grace"]);
+        }
+
+        let resolver = NativeGraphResolver::new(pool);
+        let q = GraphQuery {
+            include_computed: false,
+            min_shared_tags: 1,
+            ..GraphQuery::new("X")
+        };
+        let n = resolver.resolve_neighborhood(&ctx, &q).unwrap();
+
+        assert!(
+            !n.edges.iter().any(|e| e.inference_source == "tag"),
+            "no tag edges when include_computed is false"
+        );
+    }
 
     #[test]
     fn explicit_bfs_reaches_depth_two() {

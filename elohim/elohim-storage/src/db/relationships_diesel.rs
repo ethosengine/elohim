@@ -618,6 +618,78 @@ pub(crate) mod test_harness {
         };
         create_relationship(conn, ctx, input).expect("insert relationship");
     }
+
+    /// Insert one `content` row plus its `content_tags` rows directly, with NO
+    /// relationship — so tests can build tag-sharing nodes that the Pass 2
+    /// tag-discovery query (Category C) must surface on its own.
+    ///
+    /// Idempotently creates the `content` and `content_tags` tables first
+    /// (`test_pool_ctx` only seeds `relationships`), so this helper is
+    /// self-contained on a fresh pool. Test-only; panics on failure.
+    pub(crate) fn insert_content_with_tags(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        id: &str,
+        tags: &[&str],
+    ) {
+        diesel::sql_query(
+            r#"
+            CREATE TABLE IF NOT EXISTS content (
+                id TEXT PRIMARY KEY NOT NULL,
+                h_app_id TEXT NOT NULL DEFAULT 'lamad',
+                title TEXT NOT NULL,
+                description TEXT,
+                content_type TEXT NOT NULL DEFAULT 'concept',
+                content_format TEXT NOT NULL DEFAULT 'markdown',
+                content_body TEXT,
+                blob_hash TEXT,
+                blob_cid TEXT,
+                content_size_bytes INTEGER,
+                metadata_json TEXT,
+                reach TEXT NOT NULL DEFAULT 'public',
+                validation_status TEXT NOT NULL DEFAULT 'valid',
+                created_by TEXT,
+                dht_anchor_hash TEXT,
+                p2p_published_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            "#,
+        )
+        .execute(conn)
+        .expect("create content table");
+
+        diesel::sql_query(
+            r#"
+            CREATE TABLE IF NOT EXISTS content_tags (
+                h_app_id TEXT NOT NULL DEFAULT 'lamad',
+                content_id TEXT NOT NULL,
+                tag TEXT NOT NULL,
+                PRIMARY KEY (h_app_id, content_id, tag)
+            )
+            "#,
+        )
+        .execute(conn)
+        .expect("create content_tags table");
+
+        diesel::sql_query("INSERT INTO content (id, h_app_id, title) VALUES (?, ?, ?)")
+            .bind::<diesel::sql_types::Text, _>(id)
+            .bind::<diesel::sql_types::Text, _>(&ctx.h_app_id)
+            .bind::<diesel::sql_types::Text, _>(id)
+            .execute(conn)
+            .expect("insert content row");
+
+        for tag in tags {
+            diesel::sql_query(
+                "INSERT INTO content_tags (h_app_id, content_id, tag) VALUES (?, ?, ?)",
+            )
+            .bind::<diesel::sql_types::Text, _>(&ctx.h_app_id)
+            .bind::<diesel::sql_types::Text, _>(id)
+            .bind::<diesel::sql_types::Text, _>(*tag)
+            .execute(conn)
+            .expect("insert content_tag row");
+        }
+    }
 }
 
 #[cfg(test)]
