@@ -1005,6 +1005,18 @@ impl P2PHandle {
         self.acquisition.per_pin().await
     }
 
+    /// Per-EPR acquisition pull progress for GET /api/v1/pins/{eprId}/pull.
+    /// `pin_heads` is the pin_id→head_ref map the HTTP handler reads from the
+    /// local acquisition_pins table. Returns None when no active tracker
+    /// belongs to `epr_id` (handler maps None → 404).
+    pub async fn acquisition_per_epr(
+        &self,
+        epr_id: &str,
+        pin_heads: &std::collections::HashMap<i32, String>,
+    ) -> Option<elohim_views::acquisition::EprPullStatusView> {
+        self.acquisition.per_epr(epr_id, pin_heads).await
+    }
+
     /// Return the local libp2p PeerId as a base58-encoded string.
     ///
     /// Used by `HttpServer` to populate `AppContext::local_libp2p_peer_id` so

@@ -295,3 +295,56 @@ async fn post_pin_strips_epr_prefix_from_head_ref() {
         val["headRef"]
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §8  GET /api/v1/pins/{eprId}/pull — own-node-only per-EPR progress (T13)
+//
+// Without a wired p2p handle there is no live AcquisitionState to read, so the
+// handler returns 404 for any EPR. This proves the airplane-mode + own-node-only
+// shape: the route exists, touches only local DB for the pin→head map, and
+// yields a sane "nothing pulling" 404 (not a 500) when there is no pull state.
+// The grouping/dedupe math itself is unit-tested in p2p::acquisition::tests
+// (per_epr_groups_by_head_ref_counting_shared_content_once et al.).
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn epr_pull_unknown_epr_is_404() {
+    // Built without a wired p2p handle → no AcquisitionState → 404 for any EPR.
+    let server = build_server().await;
+    let resp = server.test_handle_epr_pull("epr:does-not-exist").await;
+    assert_eq!(
+        resp.status,
+        404,
+        "unknown/un-tracked EPR must be 404, body: {:?}",
+        String::from_utf8_lossy(&resp.body)
+    );
+}
+
+#[tokio::test]
+async fn epr_pull_pinned_but_no_p2p_is_404() {
+    // Even with a pin present in the local table, the absence of a live p2p
+    // AcquisitionState means there is no pull progress to report → 404 (the
+    // own-node-only airplane-mode contract; never a 500).
+    let server = build_server().await;
+    let create = server
+        .test_handle_create_pin_raw(r#"{"headRef":"epr:x"}"#)
+        .await;
+    assert_eq!(create.status, 201, "seed pin must succeed");
+
+    // Query by the bare id and by the epr:-prefixed id — both normalize to "x"
+    // at the boundary and both 404 without a wired AcquisitionState.
+    let bare = server.test_handle_epr_pull("x").await;
+    assert_eq!(
+        bare.status,
+        404,
+        "no p2p → no pull state → 404; body: {:?}",
+        String::from_utf8_lossy(&bare.body)
+    );
+    let prefixed = server.test_handle_epr_pull("epr:x").await;
+    assert_eq!(
+        prefixed.status,
+        404,
+        "epr: prefix must normalize to the bare id; body: {:?}",
+        String::from_utf8_lossy(&prefixed.body)
+    );
+}

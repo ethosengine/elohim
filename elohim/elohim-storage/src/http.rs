@@ -996,6 +996,16 @@ impl HttpServer {
             // so these routes are DB-only (airplane-mode): no p2p feature gate.
             (Method::GET, "/api/v1/pins") => self.handle_list_pins().await,
             (Method::POST, "/api/v1/pins") => self.handle_create_pin(req).await,
+            // GET /api/v1/pins/{eprId}/pull — per-EPR pull progress (own node
+            // only). Matched before the bare-id catch-all so the `/pull` suffix
+            // routes here, not to a pin-id parse.
+            (Method::GET, p) if p.starts_with("/api/v1/pins/") && p.ends_with("/pull") => {
+                let epr_id = p
+                    .trim_start_matches("/api/v1/pins/")
+                    .trim_end_matches("/pull")
+                    .to_string();
+                self.handle_epr_pull(&epr_id).await
+            }
             (Method::DELETE, p) if p.starts_with("/api/v1/pins/") => {
                 let id_str = p.trim_start_matches("/api/v1/pins/").to_string();
                 self.handle_remove_pin(&id_str).await
@@ -8807,6 +8817,49 @@ impl HttpServer {
         Ok(response::ok(&body))
     }
 
+    /// GET /api/v1/pins/{eprId}/pull — per-EPR pull progress (own node only).
+    /// Deliberately absent from build_manifest(): a doorway MUST NEVER serve
+    /// another agent's pull state. Groups all pins of `epr_id` by head_ref and
+    /// counts shared content once (spec §4.3 / Slice 2b T13).
+    ///
+    /// The `epr:` prefix is stripped at the boundary so the queried id matches
+    /// the bare `head_ref` stored by handle_create_pin (which strips it on POST).
+    async fn handle_epr_pull(&self, epr_id: &str) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Canonicalize to the bare content id (epr: stripped) — pins store
+        // head_ref bare, so the lookup key must be bare too.
+        let epr_id = epr_id.strip_prefix("epr:").unwrap_or(epr_id);
+
+        // pin_id → head_ref from the local table (own-node, airplane-mode).
+        let mut conn = self.get_diesel_conn()?;
+        let pins = db::acquisition_pins::list_all_pins(&mut conn)
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+        let pin_heads: std::collections::HashMap<i32, String> =
+            pins.into_iter().map(|p| (p.id, p.head_ref)).collect();
+        drop(conn);
+
+        #[cfg(feature = "p2p")]
+        let view = {
+            if let Some(ref handle) = self.p2p_handle {
+                handle.acquisition_per_epr(epr_id, &pin_heads).await
+            } else {
+                None
+            }
+        };
+        #[cfg(not(feature = "p2p"))]
+        let view: Option<elohim_views::acquisition::EprPullStatusView> = {
+            let _ = &pin_heads; // unused without p2p
+            None
+        };
+
+        match view {
+            Some(v) => Ok(response::ok(&v)),
+            None => Ok(response::not_found(&format!(
+                "no active pull state for EPR '{}'",
+                epr_id
+            ))),
+        }
+    }
+
     /// DELETE /api/v1/pins/{id} — soft-delete a pin by marking it "removed".
     ///
     /// Un-pin IS real revocation (Slice-2b T10): after flipping the pin to
@@ -8983,6 +9036,25 @@ impl HttpServer {
 
     pub async fn test_handle_remove_pin(&self, id_str: &str) -> HttpTestResponse {
         match self.handle_remove_pin(id_str).await {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+
+    /// Test entry point for the EPR pull handler (mirrors test_handle_list_pins;
+    /// not #[cfg(test)]-gated — integration binaries compile the lib without it).
+    pub async fn test_handle_epr_pull(&self, epr_id: &str) -> HttpTestResponse {
+        match self.handle_epr_pull(epr_id).await {
             Ok(resp) => {
                 let status = resp.status().as_u16();
                 let body = http_body_util::BodyExt::collect(resp.into_body())

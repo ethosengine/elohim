@@ -442,6 +442,10 @@ mod tests {
         assert_eq!(a.total, Some(1));
         assert_eq!(a.fetched, 0);
         assert_eq!(a.failed, 1);
-        assert_eq!(a.caught_up, Some(false), "failed item must not be caught_up");
+        assert_eq!(
+            a.caught_up,
+            Some(false),
+            "failed item must not be caught_up"
+        );
     }
 }
