@@ -6,6 +6,7 @@ import { LAMAD_RENDERER_MAP } from '../generated/manifest-types';
 import { GherkinRendererComponent } from './gherkin-renderer/gherkin-renderer.component';
 import { IframeRendererComponent } from './iframe-renderer/iframe-renderer.component';
 import { MarkdownRendererComponent } from './markdown-renderer/markdown-renderer.component';
+import { PathViewerComponent } from './path-viewer/path-viewer.component';
 import { ContentRenderer, RendererRegistryService } from './renderer-registry.service';
 
 /**
@@ -17,7 +18,7 @@ const RENDERER_COMPONENTS: Record<string, Type<ContentRenderer>> = {
   GherkinRendererComponent: GherkinRendererComponent,
   SophiaRendererComponent: SophiaRendererComponent,
   IframeRendererComponent: IframeRendererComponent,
-  // PathViewerComponent: PathViewerComponent, // TODO: wire when path renderer is built
+  PathViewerComponent: PathViewerComponent,
 };
 
 /**

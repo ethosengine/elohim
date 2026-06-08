@@ -1,0 +1,40 @@
+<article class="path-outline" data-testid="epr-composite-outline">
+  <header class="path-outline__header">
+    <h1 class="path-outline__title">{{ node.title }}</h1>
+    <p class="path-outline__description" *ngIf="node.description">{{ node.description }}</p>
+  </header>
+
+  <!-- Graceful empty / parse-failure state — never a crash, never raw JSON. -->
+  <p class="path-outline__empty" *ngIf="isEmpty" data-testid="epr-composite-empty">
+    This path has no sections yet.
+  </p>
+
+  <ol class="path-outline__sections" *ngIf="!isEmpty">
+    <li class="path-outline__section" *ngFor="let section of sections">
+      <h2 class="path-outline__section-title" *ngIf="section.title">
+        {{ section.title }}
+        <span
+          class="path-outline__duration"
+          *ngIf="section.estimatedDuration"
+          aria-label="estimated duration"
+        >
+          {{ section.estimatedDuration }}
+        </span>
+      </h2>
+
+      <p class="path-outline__section-description" *ngIf="section.description">
+        {{ section.description }}
+      </p>
+
+      <ul class="path-outline__items" *ngIf="section.items.length">
+        <li class="path-outline__item" *ngFor="let item of section.items">
+          <a class="path-outline__item-link" [attr.href]="item.href" [attr.data-epr-ref]="item.ref">
+            <span class="path-outline__item-title">{{ item.title || item.ref }}</span>
+            <span class="path-outline__item-role" *ngIf="item.role">{{ item.role }}</span>
+          </a>
+          <p class="path-outline__item-narrative" *ngIf="item.narrative">{{ item.narrative }}</p>
+        </li>
+      </ul>
+    </li>
+  </ol>
+</article>

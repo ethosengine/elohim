@@ -1,0 +1,110 @@
+/* =============================================================================
+   Path Viewer (epr-composite focal outline)
+   A legible table-of-contents lens, NOT the full path player.
+   ============================================================================= */
+
+.path-outline {
+  display: block;
+  width: 100%;
+  max-width: 60rem;
+  margin: 0 auto;
+  color: var(--lamad-text-primary, inherit);
+}
+
+.path-outline__header {
+  margin-bottom: 1.5rem;
+}
+
+.path-outline__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.path-outline__description {
+  margin: 0;
+  color: var(--lamad-text-secondary, inherit);
+  opacity: 0.85;
+}
+
+.path-outline__empty {
+  padding: 1rem 0;
+  font-style: italic;
+  color: var(--lamad-text-secondary, inherit);
+  opacity: 0.8;
+}
+
+/* Sections — an ordered table of contents. List markers suppressed; the h2
+   headings carry the structure. */
+.path-outline__sections {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.path-outline__section {
+  margin-bottom: 2rem;
+  border-top: 1px solid var(--lamad-border, rgb(0 0 0 / 10%));
+  padding-top: 1rem;
+}
+
+.path-outline__section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.path-outline__duration {
+  font-size: 0.8rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.path-outline__section-description {
+  margin: 0 0 0.75rem;
+  color: var(--lamad-text-secondary, inherit);
+  opacity: 0.85;
+}
+
+.path-outline__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.path-outline__item {
+  padding: 0.5rem 0;
+}
+
+.path-outline__item-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--lamad-accent-primary, inherit);
+  text-decoration: none;
+}
+
+.path-outline__item-link:hover,
+.path-outline__item-link:focus-visible {
+  text-decoration: underline;
+}
+
+.path-outline__item-title {
+  font-weight: 600;
+}
+
+.path-outline__item-role {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.65;
+}
+
+.path-outline__item-narrative {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--lamad-text-secondary, inherit);
+  opacity: 0.85;
+}

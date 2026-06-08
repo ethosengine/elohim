@@ -57,4 +57,8 @@ describe('RendererInitializerService', () => {
   it('should register video-embed format', () => {
     expect(registry.canRender('video-embed')).toBe(true);
   });
+
+  it('should register epr-composite format (via path viewer)', () => {
+    expect(registry.canRender('epr-composite')).toBe(true);
+  });
 });
