@@ -5,9 +5,64 @@
 
 use std::collections::{HashSet, VecDeque};
 
+use serde::Deserialize;
+
 use crate::db::context::AppContext;
 use crate::db::{relationships_diesel, DbPool, PooledConn};
 use crate::error::StorageError;
+
+// ── GraphSpec: the declarative content-graph model (graph.json) ──────────────
+//
+// `graph.json` is the single source of WHICH edge kinds exist; the native
+// resolver is HOW they are walked. Today this native resolver consumes the
+// spec's edge vocabulary as its Pass-1 traversal whitelist. A future
+// Cozo/datalog resolver will consume the SAME spec behind the same trait — the
+// spec is the model, the resolver is one engine over it.
+
+/// One raw edge declaration in graph.json. Only `type` (the edge kind) is read
+/// here; `from`/`to`/`indexed`/etc. are part of the spec but not consumed by
+/// the Pass-1 whitelist. `#[serde(default)]` on the struct is unnecessary —
+/// every edge in the spec carries `type`.
+#[derive(Debug, Deserialize)]
+struct RawEdge {
+    #[serde(rename = "type")]
+    kind: String,
+}
+
+/// The top-level graph.json shape: a `"edges"` array (plus `nodes`, `indexes`,
+/// `rules` which this loader ignores — serde drops unknown fields by default).
+#[derive(Debug, Deserialize)]
+struct RawGraphSpec {
+    edges: Vec<RawEdge>,
+}
+
+/// The declarative content-graph model loaded from the lamad manifest's
+/// `graph.json`. Holds the declared edge-type vocabulary; the native resolver
+/// uses it as the default traversal whitelist.
+pub struct GraphSpec {
+    edge_types: Vec<String>,
+}
+
+impl GraphSpec {
+    /// Load the spec, embedded at compile time. The path is resolved relative to
+    /// THIS source file (`src/graph_engine.rs`):
+    /// `realpath --relative-to=elohim/elohim-storage/src \
+    ///   elohim/sdk/domains/lamad/manifest/graph.json`
+    /// => `../../sdk/domains/lamad/manifest/graph.json` (verified 2026-06-08).
+    pub fn load() -> Self {
+        const RAW: &str = include_str!("../../sdk/domains/lamad/manifest/graph.json");
+        let parsed: RawGraphSpec =
+            serde_json::from_str(RAW).expect("lamad manifest graph.json parses as RawGraphSpec");
+        Self {
+            edge_types: parsed.edges.into_iter().map(|e| e.kind).collect(),
+        }
+    }
+
+    /// The declared edge-type vocabulary (e.g. PREREQUISITE, TEACHES, …).
+    pub fn edge_types(&self) -> &[String] {
+        &self.edge_types
+    }
+}
 
 /// One edge in a resolved neighborhood, discriminated by `inference_source`.
 #[derive(Debug, Clone, PartialEq)]
@@ -70,12 +125,33 @@ pub trait ContentGraphResolver: Send + Sync {
 /// but not yet acted upon here.
 pub struct NativeGraphResolver {
     pool: DbPool,
+    /// The default Pass-1 traversal whitelist, used when a query passes
+    /// `relationship_types: None`. Precomputed once at construction as
+    /// `"RELATES_TO"` (the seeded reality) ∪ `GraphSpec::edge_types()` (the
+    /// declared vocabulary from graph.json), de-duplicated. A caller that
+    /// passes `Some(explicit_list)` overrides this entirely.
+    default_types: Vec<String>,
 }
 
 impl NativeGraphResolver {
     /// Build a resolver over a connection pool (mirrors `RelationshipService::new`).
+    ///
+    /// Computes the default traversal whitelist by unioning the seeded
+    /// `RELATES_TO` edge with the declared vocabulary from `graph.json`. The
+    /// union is de-duplicated so `RELATES_TO` appears exactly once even if a
+    /// future spec lists it.
     pub fn new(pool: DbPool) -> Self {
-        Self { pool }
+        let mut default_types: Vec<String> = vec!["RELATES_TO".to_string()];
+        let mut seen: HashSet<String> = default_types.iter().cloned().collect();
+        for kind in GraphSpec::load().edge_types() {
+            if seen.insert(kind.clone()) {
+                default_types.push(kind.clone());
+            }
+        }
+        Self {
+            pool,
+            default_types,
+        }
     }
 
     /// Get a connection from the pool (mirrors `RelationshipService::conn`).
@@ -107,16 +183,18 @@ impl NativeGraphResolver {
         let mut frontier: VecDeque<(String, u32)> = VecDeque::new();
         frontier.push_back((query.root_id.to_string(), 0));
 
+        // Caller override wins; otherwise traverse the declarative whitelist
+        // (RELATES_TO ∪ graph.json vocabulary) rather than every edge kind.
+        let types: Option<&[String]> = query
+            .relationship_types
+            .or(Some(self.default_types.as_slice()));
+
         while let Some((node, depth)) = frontier.pop_front() {
             if depth >= depth_cap {
                 continue;
             }
-            let rels = relationships_diesel::get_outgoing_relationships(
-                &mut conn,
-                ctx,
-                &node,
-                query.relationship_types,
-            )?;
+            let rels =
+                relationships_diesel::get_outgoing_relationships(&mut conn, ctx, &node, types)?;
             for r in rels {
                 if visited.insert(r.target_id.clone()) {
                     let edge_depth = depth + 1;
@@ -259,6 +337,24 @@ mod tests {
     use crate::db::relationships_diesel::test_harness::{
         insert_content_with_tags, insert_relationship, test_pool_ctx,
     };
+
+    /// The declarative spec (graph.json) must expose its edge vocabulary so the
+    /// native resolver can use it as a traversal whitelist. This is the "bring the
+    /// genesis model alive" assertion — the JSON stops being dead spec.
+    #[test]
+    fn graph_spec_exposes_edge_vocabulary() {
+        let spec = GraphSpec::load();
+        let kinds = spec.edge_types();
+        for k in [
+            "PREREQUISITE",
+            "TEACHES",
+            "CONTAINS",
+            "REFERENCES",
+            "SUPERSEDES",
+        ] {
+            assert!(kinds.iter().any(|t| t == k), "{k} declared in graph.json");
+        }
+    }
 
     /// Pass 2 core payoff: two nodes that share tags with NO authored edge
     /// between them must still be discovered, tagged `inference_source == "tag"`
