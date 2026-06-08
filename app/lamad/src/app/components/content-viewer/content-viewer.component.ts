@@ -58,8 +58,10 @@ import type {
   FeedbackContext,
   MechanismSelection,
 } from 'elohim-core';
-import { GovernanceApiService } from '@elohim/service';
+import { GovernanceApiService, claimsFromDeclaration, epr } from '@elohim/service';
 import { AttentionTrackerService, EventService } from '@elohim/rea-runtime';
+
+import { LAMAD_ROUTE_CLAIMS } from '../../route-claims.declaration';
 
 import type {
   ContentAnalyticsLoader,
@@ -1066,6 +1068,35 @@ export class ContentViewerComponent
    */
   getAffinityPercentage(): number {
     return Math.round(this.affinity * 100);
+  }
+
+  /**
+   * "Open in {pillar}" affordance — one lens among the legs.
+   *
+   * The /epr/{id} viewer is the universal cross-pillar lens. When the viewed
+   * content's contentType is CLAIMED by this (lamad) pillar, we additionally
+   * offer a cross-bundle link to the rich pillar deep-dive. This is a pure UI
+   * projection: the link is MINTED from the GRANTED claim template
+   * (claimsFromDeclaration) + the node's own id — no parallel route map, no
+   * minted identity. Returns null for unclaimed types (the universal viewer
+   * IS their home; nothing to open).
+   *
+   * Bounded to the lamad-claimed case only. Generalizing to every pillar's
+   * claims needs a global claims registry the bundle shell doesn't hold today
+   * (see genesis/data/timeline/backlog/epr-routing-complementary-captures.md).
+   */
+  getOpenInPillar(): { href: string; pillarName: string } | null {
+    if (!this.node) return null;
+    const claim = claimsFromDeclaration(LAMAD_ROUTE_CLAIMS).find(
+      c => c.contentType === this.node?.contentType,
+    );
+    if (!claim) return null;
+    // BUNDLE-RELATIVE commands (e.g. ['/path', id]); the cross-bundle pillar
+    // mount = lamad base + relative commands → /lamad/path/{id}. Plain href
+    // (full doorway load) — see EPR-app bundle rails (cross-bundle CONTENT
+    // links are href, never routerLink).
+    const base = '/lamad'; // route-literal-ok: cross-bundle pillar base for the granted claim mount (Open-in-pillar lens)
+    return { href: base + claim.commands(epr(this.node.id)).join('/'), pillarName: 'Lamad' };
   }
 
   /**

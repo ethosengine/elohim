@@ -46,6 +46,23 @@
         >
           ← Return to {{ pathContext?.pathTitle }}
         </button>
+
+        <!--
+          "Open in {pillar}" — one lens among the legs. Shown only when this
+          pillar CLAIMS the content's type (today: path). Cross-bundle CONTENT
+          link → plain href (full doorway load), NEVER routerLink; the epr-link
+          interceptor records the handoff. Secondary affordance, not the
+          primary content.
+        -->
+        @if (getOpenInPillar(); as pillarMount) {
+          <a
+            class="open-in-pillar-link"
+            [attr.href]="pillarMount.href"
+            data-testid="epr-open-in-pillar"
+          >
+            Open in {{ pillarMount.pillarName }} ↗
+          </a>
+        }
       </div>
 
       <div class="header-main">

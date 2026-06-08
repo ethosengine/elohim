@@ -1227,4 +1227,59 @@ describe('ContentViewerComponent', () => {
       ).toBeFalsy();
     }));
   });
+
+  // "Open in {pillar}" affordance — one lens among the legs. When the viewed
+  // content's contentType is CLAIMED by the lamad pillar (today: only 'path'),
+  // offer a cross-bundle deep-dive link to the rich pillar mount. Unclaimed
+  // types get NO affordance: the universal viewer IS their home.
+  describe('open-in-pillar affordance', () => {
+    const PILLAR_AFFORDANCE = '[data-testid="epr-open-in-pillar"]';
+
+    it('renders a cross-bundle "Open in Lamad" link for a lamad-claimed type (path)', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      component.node = {
+        ...(component.node as ContentNode),
+        id: 'foundations-christian-technology',
+        contentType: 'path',
+      };
+      component.isLoading = false;
+      fixture.detectChanges();
+
+      const link = fixture.nativeElement.querySelector(PILLAR_AFFORDANCE) as HTMLAnchorElement;
+      expect(link).toBeTruthy();
+      // Cross-bundle: a plain href (full doorway load), never a routerLink.
+      expect(link.getAttribute('href')).toBe('/lamad/path/foundations-christian-technology');
+      // a11y: a real anchor with discernible text, not a bare icon.
+      expect(link.tagName.toLowerCase()).toBe('a');
+      expect(link.textContent?.trim()).toContain('Open in Lamad');
+    }));
+
+    it('omits the affordance for an unclaimed type (concept)', fakeAsync(() => {
+      // mockContentNode.contentType is 'concept' — not in LAMAD_ROUTE_CLAIMS.
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(component.node?.contentType).toBe('concept');
+      expect(fixture.nativeElement.querySelector(PILLAR_AFFORDANCE)).toBeFalsy();
+    }));
+
+    it('omits the affordance for another unclaimed type (unit)', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      component.node = {
+        ...(component.node as ContentNode),
+        contentType: 'unit',
+      };
+      component.isLoading = false;
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector(PILLAR_AFFORDANCE)).toBeFalsy();
+    }));
+  });
 });

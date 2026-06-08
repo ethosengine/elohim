@@ -1192,6 +1192,30 @@
   box-shadow: 0 4px 12px rgb(99 102 241 / 30%);
 }
 
+/* "Open in {pillar}" — secondary affordance (one lens among the legs). Ghost
+   styling keeps it subordinate to the primary content; sits to the right of
+   the back/return actions. */
+.open-in-pillar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-left: auto;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--lamad-accent-primary, #6366f1);
+  border-radius: 8px;
+  color: var(--lamad-accent-primary, #6366f1);
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.open-in-pillar-link:hover {
+  background: var(--lamad-accent-primary, #6366f1);
+  color: white;
+}
+
 /* Network Tab */
 .network-tab {
   display: flex;
