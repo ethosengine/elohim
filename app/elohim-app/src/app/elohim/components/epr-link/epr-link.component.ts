@@ -37,8 +37,9 @@ import 'elohim-core/register';
 
 import { type ContextMenuAction } from '@app/qahal';
 
-import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
+import { AcquisitionService } from '../../services/acquisition.service';
 import { EprNavService } from '../../services/epr-nav.service';
+import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
 
 import type { ContextMenuItem, ElohimEprLink, EprLinkDisplay } from 'elohim-core';
 
@@ -91,6 +92,7 @@ export class EprLinkComponent implements OnInit, OnDestroy {
   private readonly eprResolver = inject(EprResolverService);
   private readonly router = inject(Router);
   private readonly eprNav = inject(EprNavService);
+  private readonly acquisition = inject(AcquisitionService);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /**
@@ -105,6 +107,10 @@ export class EprLinkComponent implements OnInit, OnDestroy {
         { id: 'open', label: 'Open' },
         { id: 'about', label: 'About this EPR' },
         { id: 'copy', label: 'Copy EPR link' },
+        // Rung 2: claims-routed open-in (generic floor; per-pillar enumerated menu is Slice-3 work).
+        { id: 'open-in', label: 'Open in app' },
+        // Rung 3: acquisition / download for offline.
+        { id: 'download', label: 'Download for offline' },
         { id: 'network', label: 'View network & resilience' },
         { id: 'relationships', label: 'See relationships' },
         { id: 'steward', label: 'Steward this content' },
@@ -167,6 +173,10 @@ export class EprLinkComponent implements OnInit, OnDestroy {
   private handleMenuSelect(id: string, epr: string): void {
     switch (id) {
       case 'open':
+      // Rung 2: claims-routed open-in (generic floor — routes via the same
+      // claims-aware navigation as 'open'; per-pillar enumerated menu is Slice-3).
+      // falls through
+      case 'open-in':
         this.navigateToResource(epr);
         break;
       case 'about':
@@ -175,6 +185,13 @@ export class EprLinkComponent implements OnInit, OnDestroy {
       case 'copy':
         void navigator.clipboard?.writeText(epr).catch(() => {
           // Clipboard write can reject (permissions / insecure context); no-op.
+        });
+        break;
+      case 'download':
+        // Rung 3: acquisition disposition — peer path pins to /api/v1/pins;
+        // browser path warms the SW cache lane.
+        void this.acquisition.download(epr).catch(() => {
+          console.warn('[EprLink] download failed for', epr);
         });
         break;
       case 'network':

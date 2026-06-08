@@ -23,6 +23,7 @@ import { type ContextMenuAction } from '@app/qahal';
 import { EprLinkComponent } from './epr-link.component';
 import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
 import { EprNavService } from '../../services/epr-nav.service';
+import { AcquisitionService } from '../../services/acquisition.service';
 
 const mockResolved: ResolvedContent = {
   ref: { id: 'manifesto', tier: 'doc' },
@@ -47,16 +48,19 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
   let resolverSpy: { resolve: ReturnType<typeof vi.fn> };
   let routerNavSpy: ReturnType<typeof vi.spyOn>;
   let eprNavSpy: { navigate: ReturnType<typeof vi.fn> };
+  let acquisitionSpy: { download: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     resolverSpy = { resolve: vi.fn().mockReturnValue(of(mockResolved)) };
     eprNavSpy = { navigate: vi.fn() };
+    acquisitionSpy = { download: vi.fn().mockResolvedValue('browser') };
 
     await TestBed.configureTestingModule({
       imports: [EprLinkComponent, RouterModule.forRoot([])],
       providers: [
         { provide: EprResolverService, useValue: resolverSpy },
         { provide: EprNavService, useValue: eprNavSpy },
+        { provide: AcquisitionService, useValue: acquisitionSpy },
       ],
     }).compileComponents();
 
@@ -218,5 +222,54 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
       'epr-menu-select',
       expect.any(Function),
     );
+  });
+
+  it('should include "open-in" and "download" in the context menu action list', () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const lit = (fixture.nativeElement as HTMLElement).querySelector(
+      'elohim-epr-link',
+    ) as HTMLElement & { contextMenuItems?: { id: string }[] };
+    const ids = lit.contextMenuItems!.map(i => i.id);
+    expect(ids).toContain('open-in');
+    expect(ids).toContain('download');
+    // Built-in three remain first.
+    expect(ids.slice(0, 3)).toEqual(['open', 'about', 'copy']);
+  });
+
+  it('should call AcquisitionService.download with the epr on a "download" selection', async () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.dispatchEvent(
+      new CustomEvent('epr-menu-select', {
+        detail: { id: 'download', epr: 'epr:test-1' },
+        bubbles: true,
+      }),
+    );
+    // Allow the microtask queue to drain so the void-promise handler runs.
+    await Promise.resolve();
+
+    expect(acquisitionSpy.download).toHaveBeenCalledWith('epr:test-1');
+  });
+
+  it('should navigate via navigateToResource on an "open-in" selection', async () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.dispatchEvent(
+      new CustomEvent('epr-menu-select', {
+        detail: { id: 'open-in', epr: 'epr:manifesto' },
+        bubbles: true,
+      }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(resolverSpy.resolve).toHaveBeenCalledWith('epr:manifesto');
+    expect(routerNavSpy).toHaveBeenCalledWith(['/epr', 'manifesto']);
   });
 });
