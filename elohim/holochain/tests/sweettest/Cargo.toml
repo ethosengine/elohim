@@ -137,6 +137,11 @@ path = "src/tests/session_human_via_route.rs"
 name = "replicates_dwelling_substrate_correct_test"
 path = "src/tests/replicates_dwelling_substrate_correct_test.rs"
 
+# Slice-2a T1: probe — create_rea_economic_event coordinator fires in-process
+[[test]]
+name = "rea_event_emit_graduation_test"
+path = "src/tests/rea_event_emit_graduation_test.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
