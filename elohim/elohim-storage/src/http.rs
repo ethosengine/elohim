@@ -4204,6 +4204,14 @@ impl HttpServer {
     }
 
     /// GET /db/relationships/graph/{content_id} - Get content graph
+    ///
+    /// Query parameters:
+    /// - `depth`: BFS depth limit, default 1, capped at 3.
+    /// - `computed`: include tag-discovery neighbours; accepts `true|1|yes|on`
+    ///   (case-insensitive). Anything else (or absent) = false.
+    /// - `minSharedTags`: minimum shared tags for tag-discovery, default 1.
+    /// - `maxComputed`: max tag-discovered neighbours, default 25, capped at 100.
+    /// - `types`: comma-separated edge-type whitelist; absent = resolver default.
     async fn handle_db_content_graph(
         &self,
         req: Request<Incoming>,
@@ -4252,9 +4260,15 @@ impl HttpServer {
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(1)
             .min(3);
+        // computed: accepts true|1|yes|on (case-insensitive); anything else (or absent) = false
         let include_computed = params
             .get("computed")
-            .and_then(|v| v.parse::<bool>().ok())
+            .map(|v| {
+                matches!(
+                    v.trim().to_ascii_lowercase().as_str(),
+                    "true" | "1" | "yes" | "on"
+                )
+            })
             .unwrap_or(false);
         let min_shared_tags = params
             .get("minSharedTags")

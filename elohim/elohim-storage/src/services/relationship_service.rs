@@ -106,6 +106,8 @@ impl RelationshipService {
     /// Depth-bounded BFS over stored relationships (the resolver hard-caps depth
     /// at 3 internally). Computed/tag discovery is OFF; use `get_graph_query` to
     /// opt into it.
+    ///
+    /// Passing `max_depth = 0` returns an empty graph (root only, no traversal).
     pub fn get_graph_with_depth(
         &self,
         content_id: &str,
@@ -138,6 +140,10 @@ impl RelationshipService {
         max_computed: usize,
         relationship_types: Option<&[String]>,
     ) -> Result<ContentGraphView, StorageError> {
+        debug_assert!(
+            depth <= 3 && max_computed <= 100 && min_shared_tags >= 1,
+            "get_graph_query expects clamped params (depth<=3, max_computed<=100, min_shared_tags>=1)"
+        );
         let q = crate::graph_engine::GraphQuery {
             root_id: content_id,
             max_depth: depth,
@@ -435,6 +441,7 @@ mod tests {
             .find(|n| n.content_id == "Z")
             .expect("Z reached via explicit edge");
         assert_eq!(z.inference_source, "explicit");
+        assert_eq!(z.depth, 1);
 
         let y = graph
             .related
@@ -442,6 +449,7 @@ mod tests {
             .find(|n| n.content_id == "Y")
             .expect("Y discovered via tag overlap");
         assert_eq!(y.inference_source, "tag");
+        assert_eq!(y.depth, 1);
 
         // Flat read: total_nodes is the neighbour count, children stays empty.
         assert_eq!(graph.total_nodes, graph.related.len());

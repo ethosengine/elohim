@@ -308,6 +308,8 @@ impl From<&ResolvedEdge> for ContentGraphNodeView {
 impl From<ResolvedNeighborhood> for ContentGraphView {
     fn from(n: ResolvedNeighborhood) -> Self {
         let related: Vec<ContentGraphNodeView> = n.edges.iter().map(Into::into).collect();
+        // NOTE: schema description says "including root"; this is neighbour-count only (flat read).
+        // The schema description is corrected in A9 — do NOT add +1 here (root is implicit/excluded).
         let total_nodes = related.len();
         Self {
             root_id: n.root_id,
