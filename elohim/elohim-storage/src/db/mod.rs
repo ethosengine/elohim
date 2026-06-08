@@ -163,6 +163,10 @@ pub mod translation_observations;
 // Sprint 3 — Mutual Storage Replication §6.2: sweep telemetry (Category C operational)
 pub mod mutuality_audit_log;
 
+// EPR Acquisition Pull Queue — DevicePin store (Category B local, airplane-mode creatable)
+// Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §1.1, §3
+pub mod acquisition_pins;
+
 use std::path::Path;
 use std::time::Duration;
 

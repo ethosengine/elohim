@@ -1747,7 +1747,25 @@ diesel::table! {
     }
 }
 
+// DevicePin — airplane-mode-durable local want (Category B, agent-scoped). No dht_anchor_hash.
+// Source of truth: local SQLite. Notarized shadow is a provide-content Commitment (Slice 2).
+// Migration: 2026-06-07-000000_acquisition_pins
+diesel::table! {
+    acquisition_pins (id) {
+        id -> Integer,
+        agent_pub_key -> Text,
+        head_ref -> Text,
+        kind -> Text,
+        closure_rule_json -> Nullable<Text>,
+        priority -> Integer,
+        status -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
+    acquisition_pins,
     accumulation_status,
     content_engagement_stats,
     access_grants,

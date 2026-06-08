@@ -3483,3 +3483,38 @@ pub struct NewMutualityAuditLogRow<'a> {
     pub signaled_at: Option<&'a str>,
     pub swept_at: &'a str,
 }
+
+// ============================================================================
+// DevicePin — acquisition_pins (EPR Acquisition Pull Queue, spec §1.1, §3)
+// Category B agent-scoped local store. Airplane-mode property: nothing here
+// touches p2p, the conductor, or the network — pure local SQLite.
+// No dht_anchor_hash: the notarized shadow is a provide-content Commitment
+// written at sync-back (Slice 2), not this row.
+// ============================================================================
+
+/// Queryable row from the `acquisition_pins` table.
+#[derive(Debug, Clone, Queryable, Identifiable, Serialize)]
+#[diesel(table_name = crate::db::diesel_schema::acquisition_pins)]
+pub struct AcquisitionPin {
+    pub id: i32,
+    pub agent_pub_key: String,
+    pub head_ref: String,
+    pub kind: String,
+    pub closure_rule_json: Option<String>,
+    pub priority: i32,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Insertable row for `acquisition_pins` (omits `id` — AUTOINCREMENT, and
+/// `status`/`created_at`/`updated_at` which carry SQL defaults).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = crate::db::diesel_schema::acquisition_pins)]
+pub struct NewAcquisitionPin {
+    pub agent_pub_key: String,
+    pub head_ref: String,
+    pub kind: String,
+    pub closure_rule_json: Option<String>,
+    pub priority: i32,
+}
