@@ -1810,7 +1810,7 @@ pub struct HubSummary {
 /// - Dwelling  → peer has a notarized `humans.household_id` binding
 /// - Collective → peer has a notarized `collective_participations` binding
 /// - Computed  → no notarized membership found; single-device participant or
-///               operator-configured ad-hoc role
+///   operator-configured ad-hoc role
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]

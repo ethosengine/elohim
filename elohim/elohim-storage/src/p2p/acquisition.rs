@@ -114,6 +114,8 @@ impl AcquisitionState {
             for pin_id in pin_ids {
                 if let Some(t) = inner.trackers.get_mut(&pin_id) {
                     t.mark_completed(content_id);
+                    // keeps the tracker's own bit fresh for symmetry with replication;
+                    // the acquisition rollup recomputes independently (see rollup()).
                     t.update_caught_up();
                 }
             }
@@ -162,6 +164,9 @@ impl AcquisitionState {
             s.pending += c.pending as i32;
             s.failed += c.failed as i32;
         }
+        // caught_up is recomputed here from byte-arrival (fetched == total), NOT read from
+        // the per-tracker GapTracker.caught_up bit (which the replication stream maintains
+        // on a pending-based formula). The two are intentionally independent.
         // Caught-up means BYTE-ARRIVAL complete: every wanted item fetched
         // (spec R-A — never false-complete). A failed item (fetched < total
         // with pending transiently 0 before re-queue) must NOT report caught_up.
