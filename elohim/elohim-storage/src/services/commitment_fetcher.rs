@@ -81,6 +81,22 @@ pub struct ConductorCommitmentFetcher {
     pub hc_client: Arc<crate::hc_client::HcClient>,
 }
 
+/// Derive a commitment's `scope` from its action discriminator, mirroring the
+/// projection path (`mishpat_projection::parse_replicates_commons` and friends).
+///
+/// For actions whose schema has no top-level `scope` field — `replicates-commons`,
+/// `replicates-dwelling` — the projection hard-codes `scope = action`. The two
+/// production `CommitmentFetcher` impls (conductor-backed and projection-backed)
+/// MUST return the SAME `scope` for the same DHT entry, so this helper is the one
+/// place that decision lives. For all other actions the caller's `payload_scope`
+/// closure supplies the top-level `scope` field from the payload envelope.
+fn derive_scope(action: &str, payload_scope: impl FnOnce() -> String) -> String {
+    match action {
+        "replicates-commons" | "replicates-dwelling" => action.to_string(),
+        _ => payload_scope(),
+    }
+}
+
 #[async_trait]
 impl CommitmentFetcher for ConductorCommitmentFetcher {
     async fn fetch(&self, cid: &str) -> Result<Option<CommitmentRecord>, FetchError> {
@@ -107,8 +123,8 @@ impl CommitmentFetcher for ConductorCommitmentFetcher {
 
         Ok(Some(CommitmentRecord {
             cid: out.entry_hash,
+            scope: derive_scope(&out.action, || str_field("scope")),
             action: out.action,
-            scope: str_field("scope"),
             provider: str_field("provider"),
             recipient: str_field("recipient"),
             bounds: payload
@@ -164,7 +180,7 @@ pub fn record_from_row(
         )));
     }
     let bounds: serde_json::Value = serde_json::from_str(&row.bounds_json)
-        .map_err(|e| FetchError::ConductorUnreachable(format!("bounds_json parse: {e}")))?;
+        .map_err(|e| FetchError::MalformedRecord(format!("bounds_json parse: {e}")))?;
     Ok(CommitmentRecord {
         cid: row.cid,
         action: row.action,
@@ -279,6 +295,38 @@ mod tests {
         let mock = MockCommitmentFetcher::new();
         let result = mock.fetch("commitment-cid-unknown").await.unwrap();
         assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // derive_scope parity guard
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn derive_scope_replicates_commons_ignores_payload_field() {
+        // The replicates-commons schema has NO top-level `scope`; the conductor
+        // path must NOT fall through to the (empty) payload field — it must
+        // derive `scope == action`, matching parse_replicates_commons which
+        // hard-codes `scope: "replicates-commons"`. This is the divergence guard.
+        let scope = derive_scope("replicates-commons", || {
+            panic!("payload_scope must not be consulted for replicates-commons")
+        });
+        assert_eq!(scope, "replicates-commons");
+    }
+
+    #[test]
+    fn derive_scope_replicates_dwelling_derives_from_action() {
+        let scope = derive_scope("replicates-dwelling", || {
+            panic!("payload_scope must not be consulted for replicates-dwelling")
+        });
+        assert_eq!(scope, "replicates-dwelling");
+    }
+
+    #[test]
+    fn derive_scope_other_action_uses_payload_field() {
+        // delegates-compute DOES carry a top-level `scope`; the helper must
+        // defer to the payload value.
+        let scope = derive_scope("delegates-compute", || "republish-epr".to_string());
+        assert_eq!(scope, "republish-epr");
     }
 
     // -----------------------------------------------------------------------

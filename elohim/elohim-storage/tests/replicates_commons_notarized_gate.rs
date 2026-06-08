@@ -125,11 +125,9 @@ async fn unnotarized_replicates_commons_is_refused() {
         reach: "commons".to_string(),
         signed_at: "2026-06-15T12:00:00Z".to_string(),
     };
-    let rate = MockRateHistory::new();
     let err = bounds_validator::validate(&event, &fetcher, &MockRateHistory::new())
         .await
         .expect_err("un-notarized (NULL anchor) must NOT clear the bounds gate");
-    let _ = rate;
     assert_eq!(
         err.kind,
         ViolationKind::CommitmentNotFound,

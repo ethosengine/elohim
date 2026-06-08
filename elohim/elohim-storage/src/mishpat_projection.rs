@@ -17,8 +17,10 @@
 //! The Commitment entry has three fields on the DHT wire:
 //! - `action` — action discriminator string ("delegates-compute", etc.)
 //! - `payload_json` — JSON string holding the action-specific policy envelope
-//! - `signed_at` — epoch-seconds string from `sys_time()` in the coordinator
-//!   (e.g. "1748390400"), NOT ISO-8601
+//! - `signed_at` — caller-supplied timestamp string passed straight through the
+//!   coordinator (as of T1, ISO-8601, e.g. "2026-06-10T00:00:00Z"). The bounds
+//!   validator uses `valid_from`/`valid_until` from the inner `payload_json` for
+//!   time-based checks; this field is metadata only.
 //!
 //! For `delegates-compute` the payload carries `scope`, `provider`,
 //! `recipient`, `bounds` (object), `valid_from`, `valid_until`.
@@ -66,9 +68,10 @@ pub struct CommitmentPayload {
     /// JSON-encoded policy envelope specific to `action`. Parsed by
     /// `parse_commitment_payload` to extract scope/provider/recipient/bounds.
     pub payload_json: String,
-    /// Epoch-seconds string from `sys_time()` in the coordinator (e.g. "1748390400").
-    /// NOT ISO-8601. The bounds validator uses `valid_from`/`valid_until` from
-    /// the inner `payload_json` (which ARE ISO-8601); this field is metadata only.
+    /// Caller-supplied timestamp string, passed straight through the coordinator
+    /// (as of T1, ISO-8601, e.g. "2026-06-10T00:00:00Z"). The bounds validator
+    /// uses `valid_from`/`valid_until` from the inner `payload_json` for time-based
+    /// checks; this field is metadata only.
     pub signed_at: String,
 }
 
@@ -287,7 +290,7 @@ fn parse_replicates_commons(
     let provider = payload
         .get("provider")
         .and_then(|v| v.as_str())
-        .unwrap_or("")
+        .ok_or_else(|| "replicates-commons payload missing 'provider'".to_string())?
         .to_string();
     // The commons commitment scopes the provide to exactly `head_ref`. The
     // bounds_validator's scope check (4b) reads `epr_scope` as an array; a
@@ -305,12 +308,12 @@ fn parse_replicates_commons(
     let valid_from = payload
         .get("valid_from")
         .and_then(|v| v.as_str())
-        .unwrap_or("")
+        .ok_or_else(|| "replicates-commons payload missing 'valid_from'".to_string())?
         .to_string();
     let valid_until = payload
         .get("valid_until")
         .and_then(|v| v.as_str())
-        .unwrap_or("")
+        .ok_or_else(|| "replicates-commons payload missing 'valid_until'".to_string())?
         .to_string();
 
     Ok(NewMishpatCommitment {
@@ -644,6 +647,53 @@ mod tests {
         );
     }
 
+    #[test]
+    fn parse_replicates_commons_missing_provider_fails() {
+        // Fail-closed: a notarized row with an empty provider must NOT project —
+        // provider is a required field (mirrors the delegates-compute parser).
+        let payload = serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": "epr:lamad-spa-head-cid",
+            "reach": "commons",
+            "bounds": { "rate_per_minute": 60, "reach_ceiling": "commons" },
+            // "provider" deliberately omitted
+            "valid_from": "2026-06-01T00:00:00Z",
+            "valid_until": "2026-09-01T00:00:00Z"
+        })
+        .to_string();
+
+        let result = parse_commitment_payload("replicates-commons", &payload, "eh1", "ah1");
+        assert!(result.is_err(), "missing provider must return Err");
+        assert!(
+            result.unwrap_err().contains("provider"),
+            "error must mention 'provider'"
+        );
+    }
+
+    #[test]
+    fn parse_replicates_commons_missing_valid_from_fails() {
+        // Fail-closed: validity window timestamps are required.
+        let payload = serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": "epr:lamad-spa-head-cid",
+            "reach": "commons",
+            "bounds": { "rate_per_minute": 60, "reach_ceiling": "commons" },
+            "provider": "agent:provider-x",
+            // "valid_from" deliberately omitted
+            "valid_until": "2026-09-01T00:00:00Z"
+        })
+        .to_string();
+
+        let result = parse_commitment_payload("replicates-commons", &payload, "eh1", "ah1");
+        assert!(result.is_err(), "missing valid_from must return Err");
+        assert!(
+            result.unwrap_err().contains("valid_from"),
+            "error must mention 'valid_from'"
+        );
+    }
+
     // ── unknown action ────────────────────────────────────────────────────────
 
     #[test]
@@ -696,23 +746,24 @@ mod tests {
     /// Guard: the JSON wire shape from the DNA's `CommitmentCommitted` signal
     /// must decode into our storage-side `CommitmentPayload` struct.
     ///
-    /// `signed_at` is an epoch-seconds string from `sys_time()` in the coordinator
-    /// (e.g. "1748390400"), NOT ISO-8601. The bounds validator uses `valid_from`/
-    /// `valid_until` from the inner `payload_json` for time-based checks.
+    /// `signed_at` is a caller-supplied timestamp string passed straight through
+    /// the coordinator (as of T1, ISO-8601). It is opaque to the decoder — any
+    /// string decodes — so the bounds validator uses `valid_from`/`valid_until`
+    /// from the inner `payload_json` for time-based checks, not this field.
     #[test]
     fn decode_commitment_payload_from_dna_wire_shape() {
         let wire = serde_json::json!({
             "action": "delegates-compute",
             "payload_json": "{\"action\":\"delegates-compute\",\"scope\":\"republish-epr\",\"provider\":\"agent:alice\",\"recipient\":\"agent:bob\",\"bounds\":{\"epr_scope\":[\"epr:lamad-spa\"],\"reach_ceiling\":\"commons\",\"rate_per_hour\":30,\"rotation_ttl_days\":90},\"valid_from\":\"2026-05-28T00:00:00Z\",\"valid_until\":\"2026-08-26T00:00:00Z\"}",
-            "signed_at": "1748390400"
+            "signed_at": "2026-06-10T00:00:00Z"
         });
 
         let payload: CommitmentPayload = serde_json::from_value(wire)
             .expect("DNA wire shape must decode into CommitmentPayload");
 
         assert_eq!(payload.action, "delegates-compute");
-        // epoch-seconds string, not ISO-8601
-        assert_eq!(payload.signed_at, "1748390400");
+        // caller-supplied timestamp, passed through opaque
+        assert_eq!(payload.signed_at, "2026-06-10T00:00:00Z");
         assert!(!payload.payload_json.is_empty());
     }
 }

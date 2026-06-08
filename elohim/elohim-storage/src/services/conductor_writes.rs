@@ -149,8 +149,10 @@ pub async fn call_update_content(
     hc.call_zome(ZOME_NAME, "update_content", payload).await
 }
 
-/// Zome name hosting the Mishpat commitment coordinator functions
-/// (`create_commitment`, `get_commitment`). Lives in the `mishpat` role.
+/// Coordinator zome name (the mishpat zome, hosted in the mishpat role cell —
+/// role selection happens at HcClient construction). Hosts the Mishpat commitment
+/// coordinator functions (`create_commitment`, `get_commitment`); `call_zome`
+/// dispatches by this zome name.
 const MISHPAT_ZOME: &str = "mishpat";
 
 /// Caller-input wire shape for the Mishpat `create_commitment` coordinator.
