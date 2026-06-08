@@ -1,3 +1,10 @@
+---
+id: constitution
+cites:
+  - elohim-protocol-manifesto | The vision this law operationalizes: the manifesto's crisis diagnosis (Part I) and love-centered alternative that the constitutional architecture exists to encode and enforce. | sha256:5972ed90f0f8e0cc | path: genesis/docs/content/elohim-protocol/manifesto.md
+  - confession | The settled theological warrant for the law: the constitution read as covenant under the Matthew 6:21 treasure-seal, where layer precedence and the universal gate bind even the lawgiver. | sha256:68d7d48b66a1af34 | path: genesis/docs/content/elohim-protocol/confession.md
+  - theology | The law's commitments pressed by disputation: reach gating vs. the prophet (Article 5), layer precedence vs. the seam (Article 8), the gate against its abuse — several answered 'this stands.' | sha256:021aedd2c45998ea | path: genesis/docs/content/elohim-protocol/theology.md
+---
 # The Constitution as System Prompt
 ## Elohim Protocol Constitutional Architecture v0.1
 
@@ -6,6 +13,8 @@
 *"Take my heart now, take and seal it, seal it for thy courts above."* — Robert Robinson, "Come Thou Fount of Every Blessing"
 
 Robert Robinson wrote that hymn knowing his own heart's tendency to wander—and asking for it to be sealed to something permanent. That's exactly what the constitutional architecture does. Not trusting our hearts to stay true on their own, but anchoring them to commitments we made when we were at our best.
+
+> This document is the **law**. It has three companions. [The manifesto](./manifesto.md) is its **vision** — the crisis it answers and the love-centered alternative the architecture exists to operationalize. [The confession](./confession.md) is the **settled theology** the law rests on, stated plainly with its honest edges gathered at the end. [The theology](./theology.md) is the same theology **forged under disputation**, article by article, with the objections pressed at full strength. Read the manifesto for *why*; read this for *how the values are bound*; read the confession and the theology for *the warrant beneath the binding.*
 
 ---
 

@@ -2,6 +2,14 @@
 
 [![Contribute](https://www.eclipse.org/che/contribute.svg)](https://code.ethosengine.com/#https://github.com/ethosengine/elohim/tree/dev) [![Build Status](https://jenkins.ethosengine.com/buildStatus/icon?job=elohim%2Fmain)](https://jenkins.ethosengine.com/view/ethosengine/job/elohim/job/main/) [![Quality Gate Status](https://sonarqube.ethosengine.com/api/project_badges/measure?project=elohim-app&metric=alert_status&token=sqb_4f435ff318c7541e4d9407bcfdc13e7268549493)](https://sonarqube.ethosengine.com/dashboard?id=elohim-app)
 
+**Bringing your own context?** Let an AI read this repo, ask what *you* care about, then tell you why the Elohim Protocol might matter to you — and how you could get involved.
+
+[![Ask Claude — recommended](https://img.shields.io/badge/Ask_Claude-recommended-D97757?style=for-the-badge&logo=claude&logoColor=white)](https://claude.ai/new?q=Read%20https%3A%2F%2Fgithub.com%2Fethosengine%2Felohim.%20Before%20explaining%20anything%2C%20ask%20me%20who%20I%20am%20and%20what%20I%20care%20about.%20Then%20tell%20me%20why%20the%20Elohim%20Protocol%20might%20matter%20to%20me%20and%20how%20I%20could%20get%20involved%2C%20through%20that%20lens.)
+
+[![Ask ChatGPT](https://img.shields.io/badge/Ask_ChatGPT-000000?logo=openai&logoColor=white)](https://chatgpt.com/?q=Read%20https%3A%2F%2Fgithub.com%2Fethosengine%2Felohim.%20Before%20explaining%20anything%2C%20ask%20me%20who%20I%20am%20and%20what%20I%20care%20about.%20Then%20tell%20me%20why%20the%20Elohim%20Protocol%20might%20matter%20to%20me%20and%20how%20I%20could%20get%20involved%2C%20through%20that%20lens.)
+
+[![Ask Perplexity](https://img.shields.io/badge/Ask_Perplexity-20808D?logo=perplexity&logoColor=white)](https://www.perplexity.ai/search?q=Read%20https%3A%2F%2Fgithub.com%2Fethosengine%2Felohim.%20Before%20explaining%20anything%2C%20ask%20me%20who%20I%20am%20and%20what%20I%20care%20about.%20Then%20tell%20me%20why%20the%20Elohim%20Protocol%20might%20matter%20to%20me%20and%20how%20I%20could%20get%20involved%2C%20through%20that%20lens.)
+
 A manifesto for digital infrastructure organized around love - demonstrating how technology can serve human flourishing through distributed architecture and autonomous AI guardians.
 
 ## About
