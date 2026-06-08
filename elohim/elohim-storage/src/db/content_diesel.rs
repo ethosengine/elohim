@@ -808,6 +808,33 @@ pub fn content_ids_present(
     Ok(found.into_iter().collect())
 }
 
+/// Which of `ids` exist locally AND carry the given `reach` (provide-loop gate).
+///
+/// The provide reconciler must only offer to the commons what is GENUINELY
+/// commons-reach: a non-commons locally-present item must NOT mint a spurious
+/// `replicates-commons` commitment. `content_ids_present` answers "do I hold
+/// it?"; this answers "do I hold it AND is it commons?" — the desired-set gate.
+///
+/// NOTE: same SQLITE_MAX_VARIABLE_NUMBER caveat as [`content_ids_present`] —
+/// chunk large id sets.
+pub fn content_ids_with_reach(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+    reach: &str,
+) -> QueryResult<std::collections::HashSet<String>> {
+    if ids.is_empty() {
+        return Ok(Default::default());
+    }
+    let found: Vec<String> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq_any(ids))
+        .filter(content::reach.eq(reach))
+        .select(content::id)
+        .load(conn)?;
+    Ok(found.into_iter().collect())
+}
+
 /// Get content count for an app
 pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content::table
@@ -1086,6 +1113,65 @@ mod tests {
             elohim_manifesto.is_none(),
             "Elohim should NOT find lamad's manifesto"
         );
+    }
+
+    #[test]
+    fn content_ids_with_reach_excludes_non_commons_present_item() {
+        // Provide-loop gate: a locally-present item that is NOT commons-reach must
+        // be excluded from the desired set, so it never mints a spurious
+        // replicates-commons commitment.
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let mk = |id: &str, reach: &str| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: reach.to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+        };
+        create_content(&mut conn, &ctx, mk("epr:commons-1", "commons")).unwrap();
+        create_content(&mut conn, &ctx, mk("epr:private-1", "private")).unwrap();
+        create_content(&mut conn, &ctx, mk("epr:public-1", "public")).unwrap();
+
+        let ids = vec![
+            "epr:commons-1".to_string(),
+            "epr:private-1".to_string(),
+            "epr:public-1".to_string(),
+            "epr:absent".to_string(), // not present at all
+        ];
+
+        // Presence (reach-agnostic) sees the three present items.
+        let present = content_ids_present(&mut conn, &ctx, &ids).unwrap();
+        assert_eq!(present.len(), 3, "three of four ids are locally present");
+
+        // The commons gate sees ONLY the commons item — the private/public
+        // present items are excluded.
+        let commons = content_ids_with_reach(&mut conn, &ctx, &ids, "commons").unwrap();
+        assert_eq!(
+            commons.len(),
+            1,
+            "only the commons-reach item passes the gate"
+        );
+        assert!(commons.contains("epr:commons-1"));
+        assert!(
+            !commons.contains("epr:private-1"),
+            "a non-commons present item must be excluded from the commons gate"
+        );
+        assert!(!commons.contains("epr:public-1"));
+        assert!(!commons.contains("epr:absent"));
+
+        // Empty ids → empty set (no all-rows leak).
+        let empty = content_ids_with_reach(&mut conn, &ctx, &[], "commons").unwrap();
+        assert!(empty.is_empty());
     }
 
     #[test]

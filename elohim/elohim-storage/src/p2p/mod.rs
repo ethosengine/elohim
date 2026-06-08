@@ -6736,13 +6736,19 @@ impl P2PNode {
             })
             .collect();
 
-        // commons-reach head_refs from local content projection.
+        // commons-reach head_refs from local content projection. Filter on
+        // reach == "commons" so a non-commons locally-present item never enters
+        // the desired set (it must not mint a spurious replicates-commons
+        // commitment — the provide loop offers to the commons only what IS
+        // commons).
         let head_refs: Vec<String> = pins.iter().map(|p| p.head_ref.clone()).collect();
         let commons: std::collections::HashSet<String> = {
             let Ok(mut conn) = pool.get() else { return };
             let app_ctx = crate::db::AppContext::default_lamad();
-            crate::db::content_diesel::content_ids_present(&mut conn, &app_ctx, &head_refs)
-                .unwrap_or_default()
+            crate::db::content_diesel::content_ids_with_reach(
+                &mut conn, &app_ctx, &head_refs, "commons",
+            )
+            .unwrap_or_default()
         };
 
         let desired = crate::services::provide_reconcile::ProvideReconciler::derive_desired(
