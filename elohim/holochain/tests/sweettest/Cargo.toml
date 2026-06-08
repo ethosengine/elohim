@@ -142,6 +142,11 @@ path = "src/tests/replicates_dwelling_substrate_correct_test.rs"
 name = "rea_event_emit_graduation_test"
 path = "src/tests/rea_event_emit_graduation_test.rs"
 
+# Slice-2b T1 HARD GATE: replicates-commons conductor round-trip + get_commitment readback
+[[test]]
+name = "replicates_commons_round_trip_test"
+path = "src/tests/replicates_commons_round_trip_test.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).

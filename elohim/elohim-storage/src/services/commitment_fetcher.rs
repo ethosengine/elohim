@@ -72,25 +72,56 @@ pub trait CommitmentFetcher: Send + Sync {
 
 /// Production fetcher — delegates to the local Mishpat zome via the conductor.
 ///
-/// **Not yet wired.** Sprint 1 will add `hc_client::call_zome` on
-/// `mishpat::get_commitment` once the Mishpat::Commitment entry type and
-/// coordinator function exist. Until then this always returns
-/// [`FetchError::ConductorUnreachable`] so callers know the dependency is
-/// unsatisfied rather than silently receiving `None`.
+/// Reads a notarized `Commitment` back through the `mishpat::get_commitment`
+/// coordinator (Slice 2b T1). The coordinator returns `action`, `payload_json`,
+/// and `signed_at`; the policy envelope (provider/recipient/scope/bounds/
+/// validity) lives inside `payload_json` and is parsed here into a
+/// [`CommitmentRecord`] the bounds validator can walk.
 pub struct ConductorCommitmentFetcher {
     pub hc_client: Arc<crate::hc_client::HcClient>,
 }
 
 #[async_trait]
 impl CommitmentFetcher for ConductorCommitmentFetcher {
-    async fn fetch(&self, _cid: &str) -> Result<Option<CommitmentRecord>, FetchError> {
-        // TODO(Sprint 1): wire to hc_client::call_zome on mishpat::get_commitment
-        // once Sprint 1 lands the Mishpat::Commitment entry type and the
-        // get_commitment coordinator function. For Sprint 2 the production
-        // path is a stub; tests run against MockCommitmentFetcher.
-        Err(FetchError::ConductorUnreachable(
-            "ConductorCommitmentFetcher not yet wired — Sprint 1 dependency".into(),
-        ))
+    async fn fetch(&self, cid: &str) -> Result<Option<CommitmentRecord>, FetchError> {
+        let out = crate::services::conductor_writes::get_commitment(&self.hc_client, cid)
+            .await
+            .map_err(|e| FetchError::ConductorUnreachable(format!("get_commitment({cid}): {e}")))?;
+        let Some(out) = out else {
+            // Not on this conductor's DHT view → Ok(None); validator maps to CommitmentNotFound.
+            return Ok(None);
+        };
+
+        // Parse the inner policy envelope. provider/recipient/scope/bounds/validity
+        // live in payload_json (the wire shape is action + payload_json + signed_at).
+        let payload: serde_json::Value = serde_json::from_str(&out.payload_json)
+            .map_err(|e| FetchError::MalformedRecord(format!("payload_json parse: {e}")))?;
+
+        let str_field = |k: &str| {
+            payload
+                .get(k)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string()
+        };
+
+        Ok(Some(CommitmentRecord {
+            cid: out.entry_hash,
+            action: out.action,
+            scope: str_field("scope"),
+            provider: str_field("provider"),
+            recipient: str_field("recipient"),
+            bounds: payload
+                .get("bounds")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+            valid_from: str_field("valid_from"),
+            valid_until: str_field("valid_until"),
+            revoked_at: payload
+                .get("revoked_at")
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
+        }))
     }
 }
 

@@ -438,6 +438,57 @@ pub fn get_precedent_by_id(id: String) -> ExternResult<Option<PrecedentOutput>> 
     Ok(None)
 }
 
+// ============================================================
+// COMMITMENT READBACK (Slice 2b T1 HARD GATE)
+// ============================================================
+
+/// Wire shape returned by `get_commitment`. Carries the `Commitment` payload
+/// plus its `action_hash` — the anchor elohim-storage writes as
+/// `mishpat_commitments.dht_anchor_hash`. Used by `ConductorCommitmentFetcher`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GetCommitmentOutput {
+    pub action_hash: ActionHash,
+    pub entry_hash: EntryHash,
+    pub action: String,
+    pub payload_json: String,
+    pub signed_at: String,
+}
+
+/// Read a notarized `Commitment` back by its base64 `entry_hash` (the value the
+/// elohim-storage projection stores as `mishpat_commitments.cid`). Returns the
+/// record together with its `action_hash` — the anchor elohim-storage writes as
+/// `dht_anchor_hash`. Used by `ConductorCommitmentFetcher::fetch` (Slice 2b T1).
+///
+/// `get(EntryHash, ..)` returns the oldest live record for the content address;
+/// Commitments are immutable (see `validate_update_entry`), so there is exactly
+/// one. `None` when the entry is not yet on this conductor's DHT view.
+#[hdk_extern]
+pub fn get_commitment(cid: String) -> ExternResult<Option<GetCommitmentOutput>> {
+    let entry_hash = EntryHash::try_from(cid.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest(format!("invalid commitment cid: {cid}"))))?;
+
+    let Some(record) = get(entry_hash.clone(), GetOptions::default())? else {
+        return Ok(None);
+    };
+
+    let Some(commitment) = record
+        .entry()
+        .to_app_option::<mishpat_integrity::Commitment>()
+        .ok()
+        .flatten()
+    else {
+        return Ok(None);
+    };
+
+    Ok(Some(GetCommitmentOutput {
+        action_hash: record.action_address().clone(),
+        entry_hash,
+        action: commitment.action,
+        payload_json: commitment.payload_json,
+        signed_at: commitment.signed_at,
+    }))
+}
+
 /// Query precedents
 #[hdk_extern]
 pub fn query_precedents(input: QueryPrecedentsInput) -> ExternResult<Vec<PrecedentOutput>> {

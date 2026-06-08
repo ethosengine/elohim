@@ -14,6 +14,12 @@ use mishpat_integrity::Commitment;
 pub struct CreateCommitmentInput {
     pub action: String,
     pub payload_json: String,
+    /// Caller-supplied ISO-8601 (or epoch-seconds) timestamp. Replaces the
+    /// in-zome `sys_time()` call so the notarized commitment carries a
+    /// deterministic, caller-controlled signing time (Slice 2b T1). The
+    /// projection writes this onto the `mishpat_commitments` row; the bounds
+    /// validator still reads `valid_from`/`valid_until` from `payload_json`.
+    pub signed_at: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -27,11 +33,10 @@ pub fn create_commitment(input: CreateCommitmentInput) -> ExternResult<Commitmen
     validate_commitment_payload(&input)
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
-    let signed_at = sys_time()?.as_seconds_and_nanos().0.to_string();
     let entry = Commitment {
         action: input.action.clone(),
         payload_json: input.payload_json.clone(),
-        signed_at,
+        signed_at: input.signed_at.clone(),
     };
 
     let action_hash = create_entry(&mishpat_integrity::EntryTypes::Commitment(entry.clone()))?;
@@ -54,10 +59,31 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
         // TODO(sprint1-task3): implement acknowledges-reach-change validation
         "acknowledges-reach-change" => validate_acknowledges_reach_change(&payload),
         "replicates-dwelling" => validate_replicates_dwelling(&payload),
+        "replicates-commons" => validate_replicates_commons(&payload),
         other => Err(format!(
             "commitments::validate_commitment_payload unhandled action: {other}"
         )),
     }
+}
+
+/// Minimal gate-passing validator for the `replicates-commons` action so the
+/// Slice-2b T1 conductor round-trip notarizes the content-variant payload. The
+/// variant-specific checks (capacity donut sum-to-100, closure_rule, etc.) land
+/// in their dedicated Slice-2b task; this mirrors `validate_replicates_dwelling`'s
+/// hand-rolled style.
+fn validate_replicates_commons(payload: &serde_json::Value) -> Result<(), String> {
+    if payload["action"] != "replicates-commons" {
+        return Err("action field must equal 'replicates-commons'".into());
+    }
+    // reach must be commons (the variant-specific checks land in a later task;
+    // this is the minimal gate-passing guard so the round-trip notarizes).
+    if payload.get("reach").and_then(|v| v.as_str()) != Some("commons") {
+        return Err("replicates-commons requires reach == 'commons'".into());
+    }
+    if payload.get("variant").and_then(|v| v.as_str()).is_none() {
+        return Err("replicates-commons requires a 'variant' discriminator".into());
+    }
+    Ok(())
 }
 
 fn validate_delegates_compute(payload: &serde_json::Value) -> Result<(), String> {
@@ -218,6 +244,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "delegates-compute".to_string(),
             payload_json: well_formed_delegates_compute_payload().to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(
             validate_commitment_payload(&input).is_ok(),
@@ -230,6 +257,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "delegates-compute".to_string(),
             payload_json: serde_json::json!({"action": "delegates-compute"}).to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(
             validate_commitment_payload(&input).is_err(),
@@ -244,6 +272,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "delegates-compute".to_string(),
             payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(
             validate_commitment_payload(&input).is_err(),
@@ -258,6 +287,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "delegates-compute".to_string(),
             payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(
             validate_commitment_payload(&input).is_err(),
@@ -270,6 +300,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "totally-bogus-action".to_string(),
             payload_json: serde_json::json!({"action": "totally-bogus-action"}).to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
     }
@@ -279,6 +310,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "delegates-compute".to_string(),
             payload_json: "{not valid json".to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
     }
@@ -298,6 +330,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "acknowledges-reach-change".to_string(),
             payload_json: well_formed_acknowledges_payload().to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_ok());
     }
@@ -309,6 +342,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "acknowledges-reach-change".to_string(),
             payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
     }
@@ -320,6 +354,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "acknowledges-reach-change".to_string(),
             payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
     }
@@ -348,6 +383,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "replicates-dwelling".to_string(),
             payload_json: well_formed_replicates_dwelling_payload().to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_ok());
     }
@@ -359,6 +395,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "replicates-dwelling".to_string(),
             payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
     }
@@ -370,6 +407,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "replicates-dwelling".to_string(),
             payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
     }
@@ -382,6 +420,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "replicates-dwelling".to_string(),
             payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_ok());
     }
@@ -393,6 +432,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "replicates-dwelling".to_string(),
             payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
     }
@@ -404,6 +444,7 @@ mod tests {
         let input = CreateCommitmentInput {
             action: "replicates-dwelling".to_string(),
             payload_json: payload.to_string(),
+            signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
     }

@@ -115,6 +115,7 @@ pub fn parse_commitment_payload(
     match action {
         "delegates-compute" => parse_delegates_compute(&payload, entry_hash, action_hash),
         "replicates-dwelling" => parse_replicates_dwelling(&payload, entry_hash, action_hash),
+        "replicates-commons" => parse_replicates_commons(&payload, entry_hash, action_hash),
         "acknowledges-reach-change" => {
             parse_acknowledges_reach_change(&payload, entry_hash, action_hash)
         }
@@ -262,6 +263,62 @@ fn parse_replicates_dwelling(
         scope: "replicates-dwelling".to_string(),
         provider,
         recipient,
+        bounds_json,
+        valid_from,
+        valid_until,
+        revoked_at: None,
+        state: "proposed".to_string(),
+        dht_anchor_hash: Some(action_hash.to_string()),
+    })
+}
+
+fn parse_replicates_commons(
+    payload: &serde_json::Value,
+    entry_hash: &str,
+    action_hash: &str,
+) -> Result<NewMishpatCommitment, String> {
+    // Content variant: recipient == head_ref; bounds carries rate + ceiling.
+    // (Capacity-variant extraction lands in its dedicated task.)
+    let head_ref = payload
+        .get("head_ref")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "replicates-commons content payload missing 'head_ref'".to_string())?
+        .to_string();
+    let provider = payload
+        .get("provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    // The commons commitment scopes the provide to exactly `head_ref`. The
+    // bounds_validator's scope check (4b) reads `epr_scope` as an array; a
+    // single-EPR commons commitment IS scoped to that one EPR, so we project
+    // `epr_scope: [head_ref]`. This is the substrate-correct bridge from the
+    // Slice-2b schema (which carries `rate_per_minute` + `reach_ceiling`) to the
+    // validator's 7-check shape. `reach_ceiling` (commons) clears check 5.
+    let bounds_json = serde_json::json!({
+        "epr_scope": [head_ref],
+        "rate_per_minute": payload.pointer("/bounds/rate_per_minute"),
+        "reach_ceiling": payload.pointer("/bounds/reach_ceiling"),
+        "closure_rule": payload.get("closure_rule"),
+    })
+    .to_string();
+    let valid_from = payload
+        .get("valid_from")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let valid_until = payload
+        .get("valid_until")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    Ok(NewMishpatCommitment {
+        cid: entry_hash.to_string(),
+        action: "replicates-commons".to_string(),
+        scope: "replicates-commons".to_string(),
+        provider,
+        recipient: head_ref,
         bounds_json,
         valid_from,
         valid_until,
@@ -523,6 +580,70 @@ mod tests {
         assert_eq!(row.bounds_json, "{}");
     }
 
+    // ── replicates-commons ────────────────────────────────────────────────────
+
+    fn replicates_commons_content_payload() -> String {
+        serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": "epr:lamad-spa-head-cid",
+            "reach": "commons",
+            "bounds": { "rate_per_minute": 60, "reach_ceiling": "commons" },
+            "provider": "agent:provider-x",
+            "valid_from": "2026-06-01T00:00:00Z",
+            "valid_until": "2026-09-01T00:00:00Z"
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn parse_replicates_commons_content_well_formed() {
+        let row = parse_commitment_payload(
+            "replicates-commons",
+            &replicates_commons_content_payload(),
+            "uhCEk-commons-entry",
+            "uhCkk-commons-action",
+        )
+        .expect("well-formed replicates-commons content payload must parse");
+
+        assert_eq!(row.cid, "uhCEk-commons-entry");
+        assert_eq!(row.action, "replicates-commons");
+        assert_eq!(row.scope, "replicates-commons");
+        assert_eq!(row.provider, "agent:provider-x");
+        // content variant: recipient == head_ref
+        assert_eq!(row.recipient, "epr:lamad-spa-head-cid");
+        assert_eq!(row.valid_from, "2026-06-01T00:00:00Z");
+        assert_eq!(row.valid_until, "2026-09-01T00:00:00Z");
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-commons-action"));
+
+        // bounds_json carries epr_scope=[head_ref] (the validator's scope check
+        // reads this) + reach_ceiling=commons.
+        let bounds: serde_json::Value =
+            serde_json::from_str(&row.bounds_json).expect("bounds_json must be valid JSON");
+        assert_eq!(bounds["epr_scope"][0], "epr:lamad-spa-head-cid");
+        assert_eq!(bounds["reach_ceiling"], "commons");
+        assert_eq!(bounds["rate_per_minute"], 60);
+    }
+
+    #[test]
+    fn parse_replicates_commons_missing_head_ref_fails() {
+        let payload = serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            // "head_ref" deliberately omitted
+            "reach": "commons",
+            "bounds": { "rate_per_minute": 60, "reach_ceiling": "commons" }
+        })
+        .to_string();
+
+        let result = parse_commitment_payload("replicates-commons", &payload, "eh1", "ah1");
+        assert!(result.is_err(), "missing head_ref must return Err");
+        assert!(
+            result.unwrap_err().contains("head_ref"),
+            "error must mention 'head_ref'"
+        );
+    }
+
     // ── unknown action ────────────────────────────────────────────────────────
 
     #[test]
@@ -549,7 +670,7 @@ mod tests {
 
     #[test]
     fn bounds_json_round_trips_to_valid_json() {
-        // All three action types should produce valid JSON bounds_json that
+        // All action types should produce valid JSON bounds_json that
         // serde_json can parse. This guards against serialization regressions.
         for (action, payload) in [
             ("delegates-compute", delegates_compute_payload()),
@@ -558,6 +679,7 @@ mod tests {
                 "acknowledges-reach-change",
                 acknowledges_reach_change_payload(),
             ),
+            ("replicates-commons", replicates_commons_content_payload()),
         ] {
             let row = parse_commitment_payload(action, &payload, "eh", "ah").expect("must parse");
             serde_json::from_str::<serde_json::Value>(&row.bounds_json).unwrap_or_else(|e| {

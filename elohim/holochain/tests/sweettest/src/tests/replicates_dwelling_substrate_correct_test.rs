@@ -65,6 +65,7 @@ const MISHPAT_ZOME: &str = "mishpat";
 struct CreateCommitmentInput {
     pub action: String,
     pub payload_json: String,
+    pub signed_at: String,
 }
 
 /// Mirror of `mishpat::commitments::CommitmentOutput`.
@@ -145,8 +146,7 @@ async fn replicates_dwelling_well_formed_commitment_accepted_and_replicates() ->
     let [(mut ca, a1), (mut cb, a2)] = two_agent_conductors().await?;
 
     // Bootstrap steward = agent A. The mishpat DNA requires a progenitor pubkey.
-    let mishpat_dna =
-        load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
+    let mishpat_dna = load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
 
     let app_a = ca
         .setup_app_for_agent("mishpat-app-alice", a1.clone(), &[mishpat_dna.clone()])
@@ -162,15 +162,12 @@ async fn replicates_dwelling_well_formed_commitment_accepted_and_replicates() ->
     let input = CreateCommitmentInput {
         action: "replicates-dwelling".to_string(),
         payload_json: well_formed_replicates_dwelling_payload(),
+        signed_at: "2026-05-28T00:00:00Z".to_string(),
     };
 
     // `call` panics on Wasm error — any coordinator rejection would surface here.
     let alice_output: CommitmentOutput = ca
-        .call(
-            &cell_a.zome(MISHPAT_ZOME),
-            "create_commitment",
-            input,
-        )
+        .call(&cell_a.zome(MISHPAT_ZOME), "create_commitment", input)
         .await;
 
     assert_eq!(
@@ -236,8 +233,7 @@ async fn replicates_dwelling_bad_ratio_sum_rejected_by_coordinator() -> Result<(
     // Single conductor is sufficient — the negative path does not need DHT replication.
     let [(mut ca, a1), (mut _cb, _a2)] = two_agent_conductors().await?;
 
-    let mishpat_dna =
-        load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
+    let mishpat_dna = load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
 
     let app_a = ca
         .setup_app_for_agent("mishpat-app-alice-neg", a1.clone(), &[mishpat_dna])
@@ -249,15 +245,12 @@ async fn replicates_dwelling_bad_ratio_sum_rejected_by_coordinator() -> Result<(
     let bad_input = CreateCommitmentInput {
         action: "replicates-dwelling".to_string(),
         payload_json: bad_ratio_sum_payload(),
+        signed_at: "2026-05-28T00:00:00Z".to_string(),
     };
 
     // `call_fallible` returns Result<T, _> instead of panicking.
     let result: std::result::Result<CommitmentOutput, _> = ca
-        .call_fallible(
-            &cell_a.zome(MISHPAT_ZOME),
-            "create_commitment",
-            bad_input,
-        )
+        .call_fallible(&cell_a.zome(MISHPAT_ZOME), "create_commitment", bad_input)
         .await;
 
     assert!(

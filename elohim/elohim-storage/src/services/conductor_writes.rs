@@ -149,6 +149,74 @@ pub async fn call_update_content(
     hc.call_zome(ZOME_NAME, "update_content", payload).await
 }
 
+/// Zome name hosting the Mishpat commitment coordinator functions
+/// (`create_commitment`, `get_commitment`). Lives in the `mishpat` role.
+const MISHPAT_ZOME: &str = "mishpat";
+
+/// Caller-input wire shape for the Mishpat `create_commitment` coordinator.
+///
+/// Mirrors `mishpat::commitments::CreateCommitmentInput` field-for-field. The
+/// `payload_json` stays a String across the zome boundary (never a
+/// `serde_json::Value` — see dna/CLAUDE.md MessagePack-at-boundary rule).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CreateMishpatCommitmentInput {
+    pub action: String,
+    pub payload_json: String,
+    pub signed_at: String,
+}
+
+/// Wire mirror of the `mishpat::get_commitment` output. Used by
+/// [`crate::services::commitment_fetcher::ConductorCommitmentFetcher::fetch`] to
+/// read a notarized commitment back.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GetCommitmentOutput {
+    /// Base64 action hash — the value the projection stores as `dht_anchor_hash`.
+    pub action_hash: String,
+    /// Base64 entry hash — the storage `cid`.
+    pub entry_hash: String,
+    pub action: String,
+    pub payload_json: String,
+    pub signed_at: String,
+}
+
+/// Round-trip the Mishpat `create_commitment` coordinator. Returns the raw
+/// `CommitmentOutput` MessagePack bytes (action_hash + entry_hash); callers
+/// that need the anchor decode with `rmp_serde::from_slice`. The post-commit
+/// signal projects the commitment into `mishpat_commitments` with
+/// `dht_anchor_hash = action_hash` (Slice 2b T1).
+pub async fn call_create_commitment(
+    hc: &Arc<HcClient>,
+    input: CreateMishpatCommitmentInput,
+) -> Result<Vec<u8>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode CreateMishpatCommitmentInput: {e}"
+        ))
+    })?;
+    hc.call_zome(MISHPAT_ZOME, "create_commitment", payload)
+        .await
+}
+
+/// Read a notarized Mishpat commitment back by its base64 `cid` (entry_hash)
+/// via the `mishpat::get_commitment` coordinator. `Ok(None)` when the entry is
+/// not on this conductor's DHT view. This is the conductor-backed read path for
+/// [`crate::services::commitment_fetcher::ConductorCommitmentFetcher`].
+pub async fn get_commitment(
+    hc: &Arc<HcClient>,
+    cid: &str,
+) -> Result<Option<GetCommitmentOutput>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&cid.to_string()).map_err(|e| {
+        StorageError::Internal(format!("conductor_writes: encode get_commitment cid: {e}"))
+    })?;
+    let bytes = hc
+        .call_zome(MISHPAT_ZOME, "get_commitment", payload)
+        .await?;
+    let out: Option<GetCommitmentOutput> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!("conductor_writes: decode GetCommitmentOutput: {e}"))
+    })?;
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     /// Asserts that `shefa_types::CreateReaCommitmentInput` survives a
