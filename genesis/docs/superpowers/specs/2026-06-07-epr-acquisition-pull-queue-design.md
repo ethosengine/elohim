@@ -3,12 +3,14 @@ title: EPR Acquisition Family — Dual Pins, the Async Pull Queue & the Striping
 id: epr-acquisition-pull-queue-design
 status: Draft
 class: protocol-canonical
-topic: [acquisition, pull-queue, pin, dual-pin, cluster-sync, closure, multipeer, striping, shard, provide-content, offline, download, affordance-ladder, epr-link, reconcile, desired-set]
+topic: [acquisition, pull-queue, pin, dual-pin, cluster-sync, closure, multipeer, striping, shard, replicates-commons, provide-commitment, offline, download, affordance-ladder, epr-link, reconcile, desired-set]
 domain: D5
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
   - genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
   - genesis/docs/content/elohim-protocol/architecture/2026-05-02-blob-custody-reconciliation-design.md
+  - genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
+  - genesis/docs/architecture/rea-compute-commitment-primitive.md
 refines: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md
 cites:
   - epr-route-claims-link-conformance-design | the parent spec this refines — its Appendix E is the verbatim acquisition-family seed (affordance ladder + pull-queue + striping evidence audit); its R1-R3 gradient invariants and §5.3 hint envelope are inherited rails | sha256:30b7cd1baf222922 | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md
@@ -73,12 +75,24 @@ notarizes its provide half (§6).
 ### §1.2 The provide tier (the notarized shadow)
 
 At sync-back, a commons-reach pin writes its **ProvideCommitment**: an REA Commitment on the
-EXISTING Mishpat entry type with a **minted `provide-content` action discriminator** (the
-rea-compute-commitment 5-step recipe; no new DHT entry types; Mishpat headroom untouched —
-actions are discriminators, not entry types). Downloading BECOMES provisioning: the read→host
-loop the trust-compute gradient expects. The commitment write is **conductor-path with active
-custody semantics** — never the POST-`proposed`-inert trap (a proposed self-pin has no
-counterparty to accept; `proposed` is the wrong default for self-directed custody).
+EXISTING Mishpat entry type authored with the **canonical `replicates-commons` action** — the
+commons tier of the storage graduation gradient (dwelling-hub design §2.1: free → dwelling →
+collective → **commons**). A pin authors the **content-scoped payload variant** of
+`replicates-commons` (a specific head_ref/closure provided at reach=commons), as distinct from
+the *capacity-pledge* variant (a device's bulk commons donut contribution); ONE commons action,
+two payload shapes — composed, not forked (see §6.1). The rea-compute-commitment 5-step recipe
+applies; no new DHT entry types; Mishpat headroom untouched (actions are discriminators, not
+entry types). Downloading BECOMES provisioning: the read→host loop the trust-compute gradient
+expects.
+
+**Graduation = on `ProvideAnnounce` (D4 decided).** A self-directed commons commitment has no
+counterparty to sign acceptance, so instance-1's (`replicates-dwelling`) bilateral-by-reference
+graduation does NOT transfer. Taking *intent-first, observed-state-second* to its end: the
+**act of providing IS the acceptance** — the commitment graduates `proposed → active` when its
+first `ProvideAnnounce` EconomicEvent observably fires (§6.3), never auto-active at author time
+(which would mint standing a node hasn't yet backed with bytes). This also sidesteps the
+**`proposed`-inert trap**: a commitment left at `proposed` scores nothing in the prioritizer and
+lights no provide-rows — graduation is the gate the whole loop waits on.
 
 ### §1.3 The dwelling tier (co-stewardship, a dial — designed here, implemented later)
 
@@ -170,7 +184,7 @@ These are restated as MUSTs of this family; each is evidence-anchored, none is n
 | Entity | Class | Identity | Truth | Projection |
 |---|---|---|---|---|
 | DevicePin | **B** (agent-scoped private) | composite `(agent, head, kind)` | local store | `acquisition_pins` (no dht_anchor) |
-| ProvideCommitment | **A** (existing Commitment entry type, action=`provide-content`) | commitment-body CID | Holochain DHT | `rea_commitments` (dht_anchor: yes) |
+| ProvideCommitment | **A** (existing Commitment entry type, action=`replicates-commons` / content-scoped payload) | commitment-body CID | Holochain DHT | `rea_commitments` (dht_anchor: yes) |
 | DwellingPin | **A** (same entry type, `in_scope_of: household_id`) | commitment-body CID | Holochain DHT | `rea_commitments` (dht_anchor: yes) |
 | ProvideAnnounce | **A** (existing EconomicEvent, `bounded_by: <commitment CID>`) | event CID | Holochain DHT | REA projection |
 | ClusterClosure | **A2 + C** (rule rides the pin body; membership is recomputed projection) | n/a (derived) | derived over typed relation links | none stored |
@@ -287,21 +301,47 @@ The existing-but-unwired `GateHintRelation::ContentToSync` becomes real:
 
 ## §6 Sync-back & the provide tier
 
-### §6.1 The minted action: `provide-content` (5-step recipe)
+### §6.1 The action: content-scoped `replicates-commons` (5-step recipe)
 
-Per the rea-compute-commitment recipe: (1) action discriminator `provide-content`; (2) JSON
-schema for the commitment body (head CID or closure rule, reach=commons [v1], bounds:
-size/duration/bandwidth ceilings); (3) bounds-validator reuse (every subsequent provide
-EconomicEvent carries `bounded_by: <commitment CID>`; the substrate walks the back-ref and
-refuses out-of-bounds events); (4) handler; (5) the new §5 canon row. This **closes the Epic-B
-gap properly**: production `content:<reach>` provide rows finally exist outside `test_util`.
+**Composed, not forked** (compose-lens reconciliation 2026-06-08): the commons tier of the
+dwelling-hub graduation gradient already reserves the **`replicates-commons`** action
+("universal constitutional contribution", dwelling-hub design §2.1 + the §4 floor-check
+follow-up). A pin authors a **content-scoped** `replicates-commons` commitment — the SAME action
+as the *capacity-pledge* variant (bulk commons donut contribution), distinguished only by its
+payload shape. **This Slice 2 IS the commons-tier follow-up sprint** the dwelling-hub design
+named, and it MUST close that design's flagged gap: replace floor-via-declaration
+(`ratio_attestation.commons_pct` accepted as intent) with a backing-pledge requirement (commons
+declarations un-backed by an active `replicates-commons` commitment fail `bounds_validator`).
+
+Per the rea-compute-commitment recipe: (1) action discriminator `replicates-commons` added to
+the Mishpat coordinator + integrity validators (mirror `replicates-dwelling` at
+`mishpat/src/commitments.rs`); (2) JSON schema with a payload **union** —
+`{ variant: "content", head | closure_rule, reach: "commons", bounds }` and
+`{ variant: "capacity", commons_bytes, bounds }` — at
+`elohim/sdk/schemas/v1/commitments/replicates-commons.schema.json`; (3) bounds-validator reuse
+(every subsequent provide EconomicEvent carries `bounded_by: <commitment CID>`; the 7-check
+`bounds_validator::validate` walks the back-ref and refuses out-of-bounds/revoked events);
+(4) coordinator handler; (5) the §5 canon row. This **closes the Epic-B gap properly**:
+production commons provide-rows finally exist outside `test_util` (which used the shorthand
+`action="provide"` — reconcile to `replicates-commons`).
+
+> **Verify the instance-1 rail, don't assume it** (semantic-lens caveat): `replicates-dwelling`
+> is design-complete but verification-incomplete in code (the dwelling-hub plan's 77 unchecked
+> steps + named `commitmentBackedReplication`/`replication_commitments` stubs). Slice 2's first
+> implementation task confirms the conductor-path commitment write + validator actually fire on
+> `household-nodes` BEFORE building the content-scoped variant on top.
 
 ### §6.2 The scorer arm
 
-`score_and_enqueue_snapshot` gains a `provide-content` arm so pins actually light replication
-priority — the evidence-verified gap (the scorer keys exclusively on `replicates-dwelling`
-today). The dwelling tier (§1.3) scores via its own arm when implemented; the two vocabularies
-stay distinct in scoring and in mutuality/capacity audits.
+`replication_prioritizer::active_commitments_for_provider` filters `action == "replicates-dwelling"`
+today; the arm widens it to also load active `replicates-commons` rows and parse the
+content/capacity payload. `score_advertised_blob` is otherwise action-agnostic, but the matching
+axis differs: a content-scoped commons commitment matches the advertised blob by **content
+identity** (head_ref / closure membership), not by recipient-hub — and the scorer's reserved
+**`Medium` tier** (shipped as a reservation in instance-1, High/Skip only) is the commons-tier
+priority slot to implement here. The dwelling tier (§1.3) keeps its own `replicates-dwelling`
+arm; the three commons/dwelling vocabularies stay distinct in scoring and in mutuality/capacity
+audits.
 
 ### §6.3 Announce, reciprocity, revocation
 
@@ -387,7 +427,7 @@ applies to the bands that need it.
 | Device offline mid-pull | queue pauses (peer-gated, no phantom counts); resumes on connectivity; pin state intact (airplane-mode test) |
 | Un-pin mid-pull | queue drains the pin's lanes; revocation per §6.3; bytes GC per device policy |
 | Storage pressure | size-budget refuse-at-resolve (§5.1); device pin creation MAY warn against free space |
-| Gated content pin attempt | UI never offers it (commons-only v1); substrate validator refuses `provide-content` with reach≠commons as defense-in-depth |
+| Gated content pin attempt | UI never offers it (commons-only v1); substrate validator refuses a `replicates-commons` payload with reach≠commons as defense-in-depth |
 | Fresh-empty node claims caughtUp | structurally impossible: `total` requires resolution AND wants-diff requires inventory exchange first (R-A) |
 
 ---
@@ -411,7 +451,7 @@ Land with implementation, per slice:
 9. **WAN cold-fetch across namespaces** — `@requires:alpha-cluster-6peer`.
 10. **Beyond-alpha inventory scale** — `@requires:shem`.
 
-Sweettest covers the `provide-content` mint + scorer arm (zome-sweettest-sync); `reconcile_rails`
+Sweettest covers the `replicates-commons` mint + scorer arm (zome-sweettest-sync); `reconcile_rails`
 gets unit coverage mirroring replication's; the queue's wait-for contract is exercised by
 `wait-for-pull` in seeder tooling.
 
@@ -437,7 +477,7 @@ Gate run 2026-06-07 (mandatory, pre-design). Classifications as §3. Key adjudic
 | Slice | Contents | Env |
 |---|---|---|
 | 1 | `reconcile_rails` extraction + acquisition stream + DevicePin + rungs 2–3 + `.pull` wire + `wait-for-pull` | household-nodes |
-| 2 | `provide-content` mint + scorer arm + sync-back + rung 4 + announce/revocation | household-nodes |
+| 2 | content-scoped `replicates-commons` mint (closes dwelling-hub floor-check gap) + scorer arm (Medium tier) + sync-back (graduate-on-ProvideAnnounce) + rung 4 + revocation | household-nodes |
 | 3 | closure resolver + rung 5 + `contentToSync` producer/consumer | household-nodes |
 | follow-on spec | striping implementation on the §9 seam (`ShardRangeRequest`, per-shard verify, K-of-N) | household-nodes (≥4 peers) |
 | follow-on slice | dwelling escalation UX (§7) on the consent surface | household-nodes |
@@ -473,9 +513,15 @@ scenarios (§11).
    up, network breadth down; striping E2E is multi-node-gated anyway).
 2. **Reach × pin**: commons-only pinning v1; download-for-self at any readable reach;
    capability-by-hash quarantined with a declared extension point.
-3. **Pin action**: mint `provide-content` (5-step recipe) — AND the dual-pin reframe: device
+3. **Pin action**: mint a commitment (5-step recipe) — AND the dual-pin reframe: device
    pin is the durable airplane-mode object; dwelling co-stewardship is a distinct consented
    tier; hubbiness is a dial. (Operator dimension that restructured D1/D2/D4.)
+   **Reconciled 2026-06-08 (compose-lens):** the action is the canonical commons-tier
+   `replicates-commons` (content-scoped payload variant), NOT a new `provide-content` verb — the
+   dwelling-hub graduation gradient already reserves it; this spec's Slice 2 is that commons-tier
+   follow-up. Graduation `proposed → active` happens on the first `ProvideAnnounce` EconomicEvent
+   (D4 decided: act-of-providing = acceptance; a self-directed commons commitment has no
+   counterparty). See §1.2, §6.1.
 4. **Closure rule**: typed relation set + depth cap, bounds in pin body, concrete-count guard.
 5. **Striping seam**: `ShardRangeRequest` on shard_protocol; bitswap complementary-later.
 6. **Queue wire**: per-pin counts + rollup; unified vocab `{total, fetched, pending, failed,

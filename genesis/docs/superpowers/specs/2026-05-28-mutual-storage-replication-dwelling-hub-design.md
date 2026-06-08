@@ -435,6 +435,8 @@ When a peer authors a new `replicates-dwelling` commitment with `capacity_bytes=
 
 The follow-up sprint that lands `replicates-commons` MUST upgrade the floor check to require backing pledges (commons declarations un-backed by active commitments fail bounds_validator). Mark this in the spec close-out and in `project_compute_commitment_first_instance_pivot` memory so the follow-up sprint doesn't ship without closing this gap.
 
+> **That follow-up is the EPR acquisition family, Slice 2** (identified 2026-06-08, `epr-acquisition-pull-queue-design` §6.1). `replicates-commons` is authored with a **polymorphic payload**: the *capacity-pledge* variant (a device's bulk commons donut contribution, this design's intent) AND a *content-scoped* variant (a specific pinned head_ref/closure provided at reach=commons — the acquisition pin's "pin-as-peer" rung). Both satisfy the commons floor; Slice 2 closes the floor-via-declaration gap above (declaration → backing-pledge requirement). Graduation `proposed → active` is **on the first `ProvideAnnounce` EconomicEvent** (a self-directed commons commitment has no counterparty to sign acceptance — instance-1's bilateral-by-reference graduation does not transfer; the *act of providing* is the acceptance).
+
 `ConstitutionalRatioBreach` is the BoundsViolation variant; standing-debit via existing `bad-custody` FeedbackSignal weight (registered in Sprint 2).
 
 ---
