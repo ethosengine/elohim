@@ -181,6 +181,10 @@ def _gap_index() -> dict:
                 rec = json.loads(gf.read_text(encoding="utf-8"))
             except (ValueError, OSError):
                 continue
+            if not isinstance(rec, dict):
+                # A bare items-array (wrapper lost at write) must not kill the
+                # SessionStart scope gate — skip it; placement-audit owns the repair nudge.
+                continue
             rd = rec.get("doc", "")
             if rd:
                 idx[Path(rd).name] = rec

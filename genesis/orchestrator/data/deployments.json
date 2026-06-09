@@ -16,8 +16,6 @@
       ],
       "genesisPeer": true,
       "$genesisPeerComment": "Adam + Matthew form the genesis pair WHEN shem is available: each ingests content directly during seeding so the payload settles across two peers in parallel. Adam is remote-only (nodeTypes:['remote'], pinned to shem), so the seeder now HOLDS adam from the genesis set whenever the remote pool is down (ELOHIM_REMOTE_COMPUTE_STATUS=unavailable / cluster-state.yaml shem:false) and matthew (household) carries genesis alone. The gate is at CONSUMPTION (genesis/Jenkinsfile runContentSeedStage substrate-aware filter), so this static genesisPeer:true stays correct-when-shem-is-up and no longer drifts as shem comes and goes (feedback_shem_down_peers_are_held).",
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "$resumedComment": "shem returned 2026-05-18 (decommissioned 2026-05-04 PSU failure; 40 GiB openebs-hostpath PVC was unrecoverable). Re-enabling on fresh PVC — original seeded chain is lost, so seed will bootstrap a new agent key. Genesis pair (adam+matthew) reactivates without pipeline edit; pipeline tolerates 1..N genesis peers."
     },
     {
@@ -110,8 +108,6 @@
       "nodeTypes": [
         "remote"
       ],
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "$resumedComment": "shem returned 2026-05-18 (decommissioned 2026-05-04; pete-alpha PVC was lost). Re-enabling on fresh PVC — original seeded chain is lost, so seed will bootstrap a new agent key. pete-staging on intel-nuc was previously also gated by this flag and resumes alongside (multi-env distributed strategy unblocked).",
       "edgenodeMemoryRequest": "512Mi",
       "edgenodeMemoryLimit": "1536Mi",
@@ -128,8 +124,6 @@
         "edgenodeCpuLimit": "500m"
       },
       "name": "terrance",
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "role": "tutor",
       "humanLabel": "terrance-tutor",
       "humanId": "human-terrance-tutor",
@@ -157,8 +151,6 @@
       "nodeTypes": [
         "remote"
       ],
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "$resumedComment": "shem returned 2026-05-18 (decommissioned 2026-05-04; frank-alpha PVC was lost). Re-enabling on fresh PVC — original seeded chain is lost, so seed will bootstrap a new agent key. frank-prod on intel-nuc was previously also gated by this flag and resumes alongside.",
       "edgenodeMemoryRequest": "512Mi",
       "edgenodeMemoryLimit": "1536Mi",
@@ -169,8 +161,6 @@
     {
       "$comment": "Introduced 2026-05-18 alongside shem-return reshuffle. Gertrude formalizes the 'grandma standard' archetype that has shaped the resilience epic — the non-technical user who must be served well (memory: project_recovery_grandma_standard, project_subsume_g_f_a_via_it_just_works). She is the reciprocal-recovery counterparty for the Dowell household: gertrude ↔ matthew/jessica/james hold each other's Shamir-split shares for social-derived recovery (memory: project_socially_derived_security, project_graduated_recovery_authority). Dowell-side hub is matthew's device-family-node-base (on-prem family hub); gertrude is modeled here as her always-on hub-class device (device-home-nuc) — she also has a laptop in real life, but the per-human-multi-device topology isn't modeled in deployments yet; the hub holds the Shamir share so the backup relationship is exercisable from this one entry. We have not yet hit high-availability or fully-realized backup, but this single reciprocal relationship is enough to test the full recovery/sharding/login story surface. Structural schema for these stewardship agreements deferred — captured first in canonical stories under genesis/data/stories/ until the field shape crystallizes; humans.schema.json is protocol-law and any extension wants story-first justification.",
       "name": "gertrude",
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "role": "grandma",
       "humanLabel": "gertrude-grandma",
       "humanId": "human-gertrude-grandma",
@@ -190,8 +180,6 @@
     {
       "$comment": "Introduced 2026-05-22 alongside the light-up-the-topology resiliency expansion; re-scoped same day from 'Dowell-household co-steward' to 'aunt to James / sister to Matthew, separate household-susan in the Seattle metro'. Canonical bio (genesis/data/humans/humans.json) describes Susan as Matthew's sister; collectives.json already had household-susan defined as its own compute shard, and humans.json now binds Susan there. Susan lives in Seattle, WA with her husband Caleb and three young children (not yet on the protocol) — see human-caleb-spouse deployment record. Susan-and-Caleb form the Pacific NW leg of a tri-region reciprocal backup chain: Dowell-household (matthew/jessica/james, San Antonio TX) ↔ Susan's household (susan/caleb, Seattle WA) ↔ Gertrude's household (gertrude, San Antonio TX), with Daniel's household (Jessica's brother, Tulsa OK) added as a fifth replicator giving the chain a third independent region. Multi-region geographic separation means no single natural disaster, ISP outage, or regional power failure can take down both halves of any reciprocal pair simultaneously — load-bearing for the 'high-availability' tier of the resilience epic (genesis/docs/content/elohim-protocol/resilience/README.md:146). Typical-steward floor mirrors jessica's $recycledLaptopFloor (device-recycled-laptop). Remote placement (remote/performance) lands Susan on shem when available so she is physically distant from the Dowell on-prem hub — geographic resilience reflected in K8s placement.",
       "name": "susan",
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "role": "aunt",
       "humanLabel": "susan-household",
       "humanId": "human-susan-household",
@@ -211,8 +199,6 @@
     {
       "$comment": "Introduced 2026-05-22. Caleb is Susan's husband, father of three young children (not yet on the protocol). Second deployed peer in household-susan (Seattle WA metro). Two peers per household at this scale is the threshold where a single household survives a single-device failure on its own — caleb + susan together can hold a Shamir share, project content, and remain reachable through any single-device chaos. Until now only Dowell had multi-peer redundancy within a household; this extends that property to a second household and to the Pacific NW region specifically, so multi-regional backup pairs (Dowell-SA ↔ Susan-Seattle) are not single-device-fragile on the remote leg. Typical-steward floor (device-recycled-laptop) matches Susan. Remote placement (remote/performance) co-locates with Susan on shem so the household's two peers share network egress + K8s scheduling pool, which mirrors the way a real-world household has both devices on the same home LAN.",
       "name": "caleb",
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "role": "spouse",
       "humanLabel": "caleb-spouse",
       "humanId": "human-caleb-spouse",
@@ -232,8 +218,6 @@
     {
       "$comment": "Introduced 2026-05-22. Daniel is Jessica's brother (Matthew's brother-in-law), living in the Tulsa, Oklahoma metro. He is the fifth replicator in the reciprocal-backup chain and crucially provides a THIRD independent geographic region: San Antonio TX (Dowell + Gertrude) ↔ Seattle WA (Susan + Caleb) ↔ Tulsa OK (Daniel). Three regions means the chain can absorb the loss of any single region and still hit the Shamir t-of-n quorum threshold from any of the surviving two regions. This is the substrate-level realization of the 'high-availability' bar in the resilience README — not just multi-household but multi-region reciprocal backup. Daniel is a hub-class device-home-nuc (mirroring gertrude/eve/pete) because as a single-peer household his node is the entire household's resilience surface; the home-nuc floor gives him enough memory/CPU headroom to hold Shamir shares + project Dowell content + maintain reach without flapping. Remote/performance placement on shem gives geographic-storyline separation from the Dowell on-prem cluster.",
       "name": "daniel",
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "role": "brother-in-law",
       "humanLabel": "daniel-brother",
       "humanId": "human-daniel-brother",
@@ -253,8 +237,6 @@
     {
       "$comment": "Introduced 2026-05-22. Emma is Daniel's wife, second peer in household-daniel (Tulsa OK metro). Gives the Plains-region leg its own intra-household redundancy: even if one Tulsa device dies, the household stays online to the chain. Mirrors the susan+caleb pattern for household-susan in Seattle. Recycled-laptop archetype (typical-steward floor) gives Emma a different device-shape from Daniel's home-nuc, so the household has device-archetype diversity inside the same region — chaos-test surface where 'home-nuc dies but recycled-laptop survives' is distinguishable.",
       "name": "emma",
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "role": "spouse",
       "humanLabel": "emma-spouse",
       "humanId": "human-emma-spouse",
@@ -274,8 +256,6 @@
     {
       "$comment": "Introduced 2026-05-22 alongside the light-up-the-topology resiliency expansion. Eve formalizes a second household-pair counterparty option beyond gertrude↔dowell. The resilience README (genesis/docs/content/elohim-protocol/resilience/README.md:146) names 'fully-meshed quorum of five or seven share-holders' as the next bar above the single-pair recovery surface; adding eve gives the substrate a second always-on hub that can hold a Shamir share for a different counterparty, unlocking quorum-of-3+ recovery flows. Household-eve (Eden Valley neighborhood) is a separate community from household-matthew (Tech Valley), so the pair also exercises cross-neighborhood reach. Hub-class device-home-nuc mirrors gertrude's archetype — always-on, hub-shaped storage steward. Placement on shem (remote/performance) gives this hub geographic diversity from the on-prem Dowell hub, so a single-site failure cannot take down both halves of any reciprocal pair anchored on eve.",
       "name": "eve",
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "role": "firstwoman",
       "humanLabel": "eve-firstwoman",
       "humanId": "human-eve-firstwoman",
@@ -295,8 +275,6 @@
     {
       "$comment": "Introduced 2026-05-22 alongside the light-up-the-topology resiliency expansion. Nancy realizes the neighborhood-reach composition tier from resilience README Part V — 'a block's worth of households agreeing to steward each other's elder-recovery shares'. Household-nancy is in Tech Valley, the same neighborhood as household-matthew, so neighborhood-reach replication tests have at least two distinct households to spread across (the resilience reducer in elohim/elohim-storage/src/services/household_resilience.rs:99 requires ≥3 households for the 'protected' tier; with matthew, nancy, and at least one of jessica/james stewarding via separate household-id, neighborhood-reach content can now hit protected without needing cross-neighborhood stewards). Typical-steward floor (device-recycled-laptop) mirrors jessica/susan. Edge/performance placement biases toward on-prem to keep Tech Valley physically grouped, but performance fallback to ethosengine keeps the scheduler flexible.",
       "name": "nancy",
-      "suspended": true,
-      "suspendedBy": "scope-reconcile:shem",
       "role": "neighbor",
       "humanLabel": "nancy-neighbor",
       "humanId": "human-nancy-neighbor",

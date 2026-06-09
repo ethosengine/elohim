@@ -19,7 +19,7 @@ resources:
 
   shem:
     role: multi-tenant live P2P canvas — the cross-node proving ground   # project_shem_is_p2p_live_canvas
-    available: false
+    available: true
     provides_node_types: [remote]
     note: offline / inaccessible (operator-declared 2026-06-01). Cross-node P2P scenarios are OUT OF SCOPE
           until it returns — held, NOT regressed.

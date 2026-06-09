@@ -5,7 +5,6 @@ status: active
 created: 2026-06-03
 tier: design-spec
 topic: [admin, api-key, x-api-key, jwt, bootstrap-key, doorway, storage, rea-compute-commitment, delegates-compute, revocation, standing, production-readiness, secrets, threat-model]
-requires_env: none   # design spec; landable on household-compute
 cites:
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
   - genesis/docs/architecture/rea-compute-commitment-primitive.md
