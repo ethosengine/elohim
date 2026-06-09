@@ -877,4 +877,83 @@ mod tests {
         // OnceLock, this still must not panic (the send is best-effort).
         record_pending_state_link("anchor:x", "active", "uhCkk-y", "2026-06-11T00:00:00Z");
     }
+
+    /// End-to-end: `substrate_signal` reaches the SQL `economic_events` row
+    /// via the PRODUCTION DHT-projection path (`ReaEconomicEventCommitted` →
+    /// `handle_rea_signal` → `upsert_with_anchor`), not the fixture projector.
+    ///
+    /// Regression gate: a future read-side aggregate must
+    /// `COALESCE(substrate_signal,'attention')` so pre-migration NULL rows
+    /// bucket correctly under `GROUP BY` (planning note — not implemented here).
+    #[test]
+    fn rea_committed_event_projects_substrate_signal_to_sql() {
+        use diesel::prelude::*;
+
+        use crate::db::context::AppContext;
+        use crate::db::diesel_schema::economic_events;
+        use crate::db::{init_pool, run_migrations};
+
+        // ---- set up an in-memory pool with all migrations applied ----
+        let pool = init_pool(":memory:").expect("in-memory pool");
+        run_migrations(&pool).expect("migrations");
+
+        let ctx = AppContext::new("test-app");
+
+        // ---- build the signal exactly as the DNA post-commit emits it ----
+        let event = EconomicEventEntry {
+            id: "event-substrate-e2e".to_string(),
+            action: "use".to_string(), // non-ack-projection ⇒ no side-projection
+            provider: "agent:test-provider".to_string(),
+            receiver: "agent:test-receiver".to_string(),
+            resource_conforms_to: None,
+            resource_inventoried_as: None,
+            to_resource_inventoried_as: None,
+            resource_classified_as_json: None,
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: Some("2026-06-09T10:00:00Z".to_string()),
+            has_duration: None,
+            input_of: None,
+            output_of: None,
+            fulfills_json: None,
+            realization_of: None,
+            satisfies_json: None,
+            in_scope_of_json: None,
+            note: None,
+            state: None,
+            triggered_by: None,
+            at_location: None,
+            image: None,
+            lamad_event_type: None,
+            metadata_json: None,
+            created_at: None,
+            substrate_signal: Some("attention".to_string()),
+        };
+
+        let signal = ReaProjectionSignal::ReaEconomicEventCommitted {
+            action_hash: "uhCkk-e2e-anchor".to_string(),
+            entry_hash: Some("uhCEk-e2e-entry".to_string()),
+            event,
+            author: Some("uhCAk-e2e-author".to_string()),
+        };
+
+        // ---- drive the REAL production handler ----
+        handle_rea_signal(signal, &pool, &ctx).expect("handle_rea_signal must succeed");
+
+        // ---- assert the projected row carries substrate_signal ----
+        let mut conn = pool.get().expect("pool connection");
+        let got: Option<String> = economic_events::table
+            .select(economic_events::substrate_signal)
+            .first(&mut conn)
+            .expect("row must exist after projection");
+
+        assert_eq!(
+            got.as_deref(),
+            Some("attention"),
+            "substrate_signal must reach SQL on the PRODUCTION DHT path \
+             (ReaEconomicEventCommitted -> upsert_with_anchor), not just the fixture projector"
+        );
+    }
 }

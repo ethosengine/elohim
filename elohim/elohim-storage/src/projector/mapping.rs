@@ -214,6 +214,14 @@ fn shefa_economic_event_column_mapping() -> BTreeMap<String, String> {
     // is omitted from the INSERT, defaulting to NULL. On revocation sweep,
     // the projection row's verified_at is cleared atomically.
     m.insert("verified_at".to_string(), "$verifiedAt".to_string());
+    // Parity with the production DHT-projection path (ReaEconomicEventCommitted →
+    // upsert_with_anchor). The generic project() fixture path uses this mapping;
+    // the production path reads substrate_signal directly from the EconomicEventEntry
+    // field. Both must agree on the camelCase key name.
+    m.insert(
+        "substrate_signal".to_string(),
+        "payload.substrateSignal".to_string(),
+    );
     m
 }
 
