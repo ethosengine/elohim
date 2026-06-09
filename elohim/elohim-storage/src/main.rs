@@ -74,8 +74,12 @@ struct Args {
     #[arg(short, long)]
     config: Option<PathBuf>,
 
-    /// Storage directory
-    #[arg(long)]
+    /// Storage directory (blobs + content.db). In k8s this MUST point at the
+    /// storage-data PVC mount (/data) — the default (dirs::data_local_dir) is
+    /// the container overlay, wiped on every pod restart: rows get reseeded
+    /// but blob bytes don't, leaving dangling blobHash rows that 404 the
+    /// projected EPR apps (2026-06-09 regression class).
+    #[arg(long, env = "STORAGE_DIR")]
     storage_dir: Option<PathBuf>,
 
     /// HTTP API port for shard storage
