@@ -84,9 +84,7 @@ describe('AcquisitionService', () => {
 
       const result = await service.download('epr:test-content-2');
 
-      expect(fetchSpy).toHaveBeenCalledWith(
-        'http://localhost:8888/db/content/test-content-2',
-      );
+      expect(fetchSpy).toHaveBeenCalledWith('http://localhost:8888/db/content/test-content-2');
       expect(result).toBe('browser');
 
       fetchSpy.mockRestore();
@@ -98,9 +96,7 @@ describe('AcquisitionService', () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
 
       await service.download('epr:some-doc');
-      expect(fetchSpy).toHaveBeenCalledWith(
-        'http://localhost:8888/db/content/some-doc',
-      );
+      expect(fetchSpy).toHaveBeenCalledWith('http://localhost:8888/db/content/some-doc');
 
       fetchSpy.mockRestore();
     });
@@ -115,6 +111,78 @@ describe('AcquisitionService', () => {
       await expect(service.download('epr:missing')).rejects.toThrow('404');
 
       fetchSpy.mockRestore();
+    });
+  });
+
+  describe('pinAsPeer()', () => {
+    it('POSTs an item pin with provide:true to /api/v1/pins (epr: prefix stripped)', async () => {
+      storageMock.connectionMode = 'direct';
+
+      const resultPromise = service.pinAsPeer('epr:strawberry-guide');
+
+      const req = httpMock.expectOne('http://localhost:8888/api/v1/pins');
+      expect(req.request.method).toBe('POST');
+      // pin-as-peer is a provide pin: same own-node pins API, provide flag set so
+      // the provide reconciler authors a replicates-commons commitment for it.
+      expect(req.request.body).toEqual({
+        headRef: 'strawberry-guide',
+        kind: 'item',
+        provide: true,
+      });
+      req.flush({});
+
+      await expect(resultPromise).resolves.toBeUndefined();
+    });
+
+    it('rejects when called on a browser (non-peer) node', async () => {
+      storageMock.connectionMode = 'doorway';
+      await expect(service.pinAsPeer('epr:strawberry-guide')).rejects.toThrow('peer');
+      // No HTTP call must have been made.
+      httpMock.expectNone('http://localhost:8888/api/v1/pins');
+    });
+  });
+
+  describe('pullStatus$()', () => {
+    it('polls GET /api/v1/pins/{eprId}/pull and maps the wire shape', async () => {
+      const id = 'strawberry-guide';
+      const emissions: Array<unknown> = [];
+      const sub = service.pullStatus$('epr:strawberry-guide').subscribe(v => emissions.push(v));
+
+      // timer(0, …) leads on the next macrotask; let it fire before asserting.
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // First poll fires immediately (timer(0, …) leads).
+      const req = httpMock.expectOne(`http://localhost:8888/api/v1/pins/${id}/pull`);
+      expect(req.request.method).toBe('GET');
+      req.flush({
+        eprId: id,
+        total: 3,
+        fetched: 1,
+        pending: 2,
+        failed: 0,
+        caughtUp: false,
+      });
+
+      expect(emissions).toEqual([{ total: 3, fetched: 1, pending: 2, failed: 0, caughtUp: false }]);
+      sub.unsubscribe();
+    });
+
+    it('null-guards: emits a waiting state (caughtUp null, never complete) when the endpoint errors', async () => {
+      const emissions: Array<unknown> = [];
+      const sub = service.pullStatus$('epr:strawberry-guide').subscribe(v => emissions.push(v));
+
+      // timer(0, …) leads on the next macrotask; let it fire before asserting.
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const req = httpMock.expectOne('http://localhost:8888/api/v1/pins/strawberry-guide/pull');
+      req.flush('boom', { status: 503, statusText: 'Service Unavailable' });
+
+      // On error the stream must NOT die and must NOT claim caughtUp — it emits a
+      // null-guarded waiting state (caughtUp:null) so the UI keeps polling.
+      expect(emissions).toEqual([
+        { total: null, fetched: 0, pending: 0, failed: 0, caughtUp: null },
+      ]);
+      sub.unsubscribe();
     });
   });
 });
