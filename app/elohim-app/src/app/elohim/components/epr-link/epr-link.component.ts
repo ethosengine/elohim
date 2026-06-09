@@ -154,10 +154,29 @@ export class EprLinkComponent implements OnInit, OnDestroy {
     // a property, not an attribute).
     litEl.contextMenuItems = this.fullActionList;
 
+    // Rung 4 (provide): pin-as-peer is gated to peer-capable nodes serving
+    // commons-reach content. Resolve reach async, then re-set the property with
+    // the action appended. Browser/non-commons leaves the base list untouched.
+    void this.maybeOfferPinAsPeer(litEl);
+
     // Translate the Lit 'navigate' event into Angular Router navigation.
     host.addEventListener('navigate', this.navigateListener);
     // Handle context-menu selections the element re-emits.
     host.addEventListener('epr-menu-select', this.eprMenuSelectListener);
+  }
+
+  /**
+   * Append the rung-4 "Pin as peer" action when (a) the node is peer-capable and
+   * (b) the EPR resolves to commons reach. Only commons content is serveable to
+   * arbitrary peers; private/dwelling reach has no provide path. Browser nodes
+   * have no peer surface, so the action never appears there — the own-node
+   * GET /api/v1/pins/{eprId}/pull route is unreachable in doorway mode anyway.
+   */
+  private async maybeOfferPinAsPeer(litEl: ElohimEprLink): Promise<void> {
+    if (this.acquisition.capability() !== 'peer') return;
+    const resolved = await firstValueFrom(this.eprResolver.resolve(this.epr));
+    if (resolved?.content?.reach !== 'commons') return;
+    litEl.contextMenuItems = [...this.fullActionList, { id: 'pin-as-peer', label: 'Pin as peer' }];
   }
 
   ngOnDestroy(): void {
@@ -193,6 +212,13 @@ export class EprLinkComponent implements OnInit, OnDestroy {
         // browser path warms the SW cache lane.
         void this.acquisition.download(epr).catch(() => {
           console.warn('[EprLink] download failed for', epr);
+        });
+        break;
+      case 'pin-as-peer':
+        // Rung 4 (provide): pin AND offer to serve to peers. Peer-only — the
+        // service rejects on a browser node; the action isn't offered there.
+        void this.acquisition.pinAsPeer(epr).catch(() => {
+          console.warn('[EprLink] pin-as-peer failed for', epr);
         });
         break;
       case 'network':

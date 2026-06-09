@@ -48,12 +48,20 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
   let resolverSpy: { resolve: ReturnType<typeof vi.fn> };
   let routerNavSpy: ReturnType<typeof vi.spyOn>;
   let eprNavSpy: { navigate: ReturnType<typeof vi.fn> };
-  let acquisitionSpy: { download: ReturnType<typeof vi.fn> };
+  let acquisitionSpy: {
+    download: ReturnType<typeof vi.fn>;
+    capability: ReturnType<typeof vi.fn>;
+    pinAsPeer: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     resolverSpy = { resolve: vi.fn().mockReturnValue(of(mockResolved)) };
     eprNavSpy = { navigate: vi.fn() };
-    acquisitionSpy = { download: vi.fn().mockResolvedValue('browser') };
+    acquisitionSpy = {
+      download: vi.fn().mockResolvedValue('browser'),
+      capability: vi.fn().mockReturnValue('browser'),
+      pinAsPeer: vi.fn().mockResolvedValue(undefined),
+    };
 
     await TestBed.configureTestingModule({
       imports: [EprLinkComponent, RouterModule.forRoot([])],
@@ -66,9 +74,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
 
     fixture = TestBed.createComponent(EprLinkComponent);
     component = fixture.componentInstance;
-    routerNavSpy = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true as any);
+    routerNavSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true as any);
   });
 
   it('should create', () => {
@@ -91,7 +97,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     fixture.detectChanges();
 
     const lit = (fixture.nativeElement as HTMLElement).querySelector(
-      'elohim-epr-link',
+      'elohim-epr-link'
     ) as HTMLElement & { resolver?: unknown };
     expect(typeof lit.resolver).toBe('function');
   });
@@ -102,7 +108,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
 
     const host = fixture.nativeElement as HTMLElement;
     host.dispatchEvent(
-      new CustomEvent('navigate', { detail: { epr: 'epr:manifesto' }, bubbles: true }),
+      new CustomEvent('navigate', { detail: { epr: 'epr:manifesto' }, bubbles: true })
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -113,7 +119,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
 
   it('should navigate via EprNavService when route is null (cross-bundle)', async () => {
     resolverSpy.resolve.mockReturnValue(
-      of({ ...mockResolved, route: null, href: '/epr/manifesto' }),
+      of({ ...mockResolved, route: null, href: '/epr/manifesto' })
     );
 
     component.epr = 'epr:manifesto';
@@ -121,7 +127,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
 
     const host = fixture.nativeElement as HTMLElement;
     host.dispatchEvent(
-      new CustomEvent('navigate', { detail: { epr: 'epr:manifesto' }, bubbles: true }),
+      new CustomEvent('navigate', { detail: { epr: 'epr:manifesto' }, bubbles: true })
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -141,7 +147,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     fixture.detectChanges();
 
     const lit = (fixture.nativeElement as HTMLElement).querySelector(
-      'elohim-epr-link',
+      'elohim-epr-link'
     ) as HTMLElement & { contextMenuItems?: { id: string }[] };
     expect(Array.isArray(lit.contextMenuItems)).toBe(true);
     const ids = lit.contextMenuItems!.map(i => i.id);
@@ -161,7 +167,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
       new CustomEvent('epr-menu-select', {
         detail: { id: 'network', epr: 'epr:manifesto' },
         bubbles: true,
-      }),
+      })
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -184,12 +190,10 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
       new CustomEvent('epr-menu-select', {
         detail: { id: 'flag', epr: 'epr:manifesto' },
         bubbles: true,
-      }),
+      })
     );
 
-    expect(emitted).toEqual([
-      { entityType: 'epr', entityId: 'epr:manifesto', action: 'flag' },
-    ]);
+    expect(emitted).toEqual([{ entityType: 'epr', entityId: 'epr:manifesto', action: 'flag' }]);
   });
 
   it('should map "feedback" to the open-feedback governance action', () => {
@@ -204,7 +208,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
       new CustomEvent('epr-menu-select', {
         detail: { id: 'feedback', epr: 'epr:manifesto' },
         bubbles: true,
-      }),
+      })
     );
 
     expect(emitted[0].action).toBe('open-feedback');
@@ -218,10 +222,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     const removeSpy = vi.spyOn(host, 'removeEventListener');
     component.ngOnDestroy();
 
-    expect(removeSpy).toHaveBeenCalledWith(
-      'epr-menu-select',
-      expect.any(Function),
-    );
+    expect(removeSpy).toHaveBeenCalledWith('epr-menu-select', expect.any(Function));
   });
 
   it('should include "open-in" and "download" in the context menu action list', () => {
@@ -229,7 +230,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     fixture.detectChanges();
 
     const lit = (fixture.nativeElement as HTMLElement).querySelector(
-      'elohim-epr-link',
+      'elohim-epr-link'
     ) as HTMLElement & { contextMenuItems?: { id: string }[] };
     const ids = lit.contextMenuItems!.map(i => i.id);
     expect(ids).toContain('open-in');
@@ -247,7 +248,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
       new CustomEvent('epr-menu-select', {
         detail: { id: 'download', epr: 'epr:test-1' },
         bubbles: true,
-      }),
+      })
     );
     // Allow the microtask queue to drain so the void-promise handler runs.
     await Promise.resolve();
@@ -264,12 +265,82 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
       new CustomEvent('epr-menu-select', {
         detail: { id: 'open-in', epr: 'epr:manifesto' },
         bubbles: true,
-      }),
+      })
     );
     await Promise.resolve();
     await Promise.resolve();
 
     expect(resolverSpy.resolve).toHaveBeenCalledWith('epr:manifesto');
     expect(routerNavSpy).toHaveBeenCalledWith(['/epr', 'manifesto']);
+  });
+
+  it('does NOT offer "pin-as-peer" on a browser node', () => {
+    acquisitionSpy.capability.mockReturnValue('browser');
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+
+    const lit = (fixture.nativeElement as HTMLElement).querySelector(
+      'elohim-epr-link'
+    ) as HTMLElement & { contextMenuItems?: { id: string }[] };
+    const ids = lit.contextMenuItems!.map(i => i.id);
+    expect(ids).not.toContain('pin-as-peer');
+  });
+
+  it('offers "pin-as-peer" on a peer node for commons-reach content', async () => {
+    acquisitionSpy.capability.mockReturnValue('peer');
+    resolverSpy.resolve.mockReturnValue(
+      of({ ...mockResolved, content: { ...mockResolved.content, reach: 'commons' } })
+    );
+
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+    // pin-as-peer gating resolves reach asynchronously; let the resolver settle.
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
+
+    const lit = (fixture.nativeElement as HTMLElement).querySelector(
+      'elohim-epr-link'
+    ) as HTMLElement & { contextMenuItems?: { id: string }[] };
+    const ids = lit.contextMenuItems!.map(i => i.id);
+    expect(ids).toContain('pin-as-peer');
+  });
+
+  it('does NOT offer "pin-as-peer" on a peer node for non-commons content', async () => {
+    acquisitionSpy.capability.mockReturnValue('peer');
+    // mockResolved.content.reach is 'public' (non-commons) by default.
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
+
+    const lit = (fixture.nativeElement as HTMLElement).querySelector(
+      'elohim-epr-link'
+    ) as HTMLElement & { contextMenuItems?: { id: string }[] };
+    const ids = lit.contextMenuItems!.map(i => i.id);
+    expect(ids).not.toContain('pin-as-peer');
+  });
+
+  it('routes a "pin-as-peer" selection to AcquisitionService.pinAsPeer', async () => {
+    acquisitionSpy.capability.mockReturnValue('peer');
+    resolverSpy.resolve.mockReturnValue(
+      of({ ...mockResolved, content: { ...mockResolved.content, reach: 'commons' } })
+    );
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.dispatchEvent(
+      new CustomEvent('epr-menu-select', {
+        detail: { id: 'pin-as-peer', epr: 'epr:strawberry-guide' },
+        bubbles: true,
+      })
+    );
+    await Promise.resolve();
+
+    expect(acquisitionSpy.pinAsPeer).toHaveBeenCalledWith('epr:strawberry-guide');
   });
 });
