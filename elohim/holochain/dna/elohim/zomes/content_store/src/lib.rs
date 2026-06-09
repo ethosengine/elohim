@@ -12195,6 +12195,10 @@ pub fn create_rea_economic_event(
         image: None,
         lamad_event_type: input.lamad_event_type,
         metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
+        // None = unspecified (old-chain compatible). Origination on this path is
+        // deliberately deferred — server-derive from lamad_event_type is the open
+        // column-vs-metadata_json decision (cluster-3 substrate_signal migration plan).
+        substrate_signal: None,
         created_at: timestamp,
     };
 
