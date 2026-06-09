@@ -1147,6 +1147,9 @@ pub struct EconomicEvent {
     pub image: Option<String>,
     pub lamad_event_type: Option<String>, // LamadEventType for domain-specific tracking
     pub metadata_json: String,            // Additional metadata as JSON
+    /// Which protocol substrate dimension this event consumed (attention/compute/storage/…).
+    /// Validated against SUBSTRATE_SIGNALS; None = unspecified (old-chain compatible).
+    pub substrate_signal: Option<String>,
     pub created_at: String,
 }
 
@@ -4433,6 +4436,14 @@ fn validate_economic_event(event: &EconomicEvent) -> ExternResult<ValidateCallba
         }
     }
 
+    if let Some(sig) = event.substrate_signal.as_deref() {
+        if !SUBSTRATE_SIGNALS.contains(&sig) {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "EconomicEvent.substrate_signal '{sig}' is not a recognized substrate signal"
+            )));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -4469,6 +4480,7 @@ mod economic_event_validation_tests {
             image: None,
             lamad_event_type: None,
             metadata_json: metadata_json.into(),
+            substrate_signal: None,
             created_at: "2026-05-28T12:00:00Z".into(),
         }
     }
@@ -4531,6 +4543,30 @@ mod economic_event_validation_tests {
     #[test]
     fn republish_epr_non_object_metadata_rejected() {
         let event = ev("republish-epr", "not even json");
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn accepts_absent_substrate_signal() {
+        let mut event = ev("work", "{}");
+        event.substrate_signal = None;
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn accepts_whitelisted_substrate_signal() {
+        let mut event = ev("work", "{}");
+        event.substrate_signal = Some("attention".into());
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn rejects_unknown_substrate_signal() {
+        let mut event = ev("work", "{}");
+        event.substrate_signal = Some("garbage".into());
         let result = validate_economic_event(&event).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
@@ -4696,6 +4732,7 @@ mod post_commit_signal_dispatch_tests {
             image: None,
             lamad_event_type: None,
             metadata_json: r#"{"action":"republish-epr","bounded_by":"comm-cid"}"#.into(),
+            substrate_signal: None,
             created_at: "2026-05-28T12:00:00Z".into(),
         }
     }
