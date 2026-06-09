@@ -6,31 +6,31 @@ pub mod bootstrap_steward;
 
 // Commitment coordinator — REA compute delegation primitive (Z.D deploy flow).
 pub mod commitments;
-pub use commitments::{CommitmentOutput, CreateCommitmentInput};
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
     DnaProperties,
+};
+pub use commitments::{
+    CommitmentOutput, CommitmentStateLink, CommitmentStateLinkOutput, CreateCommitmentInput,
+    CreateCommitmentStateLinkInput,
 };
 
 // Re-export all wire types from qahal-types crate.
 // Integrity entry types (Challenge, Proposal, etc.) stay in mishpat_integrity
 // and are converted to wire types at construction sites below.
 pub use qahal_types::{
+    ChallengeOutcomeOutput,
     // Challenge
     ChallengeOutput,
     CreateChallengeInput,
+    // ChallengeOutcome (Phase 11)
+    CreateChallengeOutcomeInput,
     // Discussion
     CreateDiscussionInput,
     // GateDecisionAttestation
     CreateGateDecisionAttestationInput,
     // GateDecisionChallenge (Phase 11)
     CreateGateDecisionChallengeInput,
-    GateDecisionChallengeOutput,
-    QueryGateChallengesInput,
-    // ChallengeOutcome (Phase 11)
-    CreateChallengeOutcomeInput,
-    ChallengeOutcomeOutput,
-    QueryChallengeOutcomesInput,
     // GovernanceReaction
     CreateGovernanceReactionInput,
     // GovernanceState
@@ -51,6 +51,7 @@ pub use qahal_types::{
     CredentialVerification,
     DiscussionOutput,
     GateDecisionAttestationOutput,
+    GateDecisionChallengeOutput,
     GetGovernanceStateInput,
     GovernanceReactionOutput,
     GovernanceStateOutput,
@@ -59,8 +60,10 @@ pub use qahal_types::{
     PrecedentOutput,
     ProposalOutput,
     ProposalVoteOutput,
+    QueryChallengeOutcomesInput,
     QueryChallengesInput,
     QueryDiscussionsInput,
+    QueryGateChallengesInput,
     QueryGateDecisionsInput,
     QueryGovernanceReactionsInput,
     QueryGovernanceStatesInput,
@@ -279,7 +282,10 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ProposalOutpu
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let proposal_id = input.id.clone().unwrap_or_else(|| format!("prop-{}", timestamp));
+    let proposal_id = input
+        .id
+        .clone()
+        .unwrap_or_else(|| format!("prop-{}", timestamp));
 
     let proposal_wire = qahal_types::Proposal {
         id: proposal_id.clone(),
@@ -304,11 +310,19 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ProposalOutpu
 
     let closes_at = serde_json::from_str::<serde_json::Value>(&input.voting_config_json)
         .ok()
-        .and_then(|v| v.get("closes_at").and_then(|c| c.as_str()).map(String::from))
+        .and_then(|v| {
+            v.get("closes_at")
+                .and_then(|c| c.as_str())
+                .map(String::from)
+        })
         .unwrap_or_else(|| timestamp.clone());
     let ballot_format = serde_json::from_str::<serde_json::Value>(&input.voting_config_json)
         .ok()
-        .and_then(|v| v.get("ballot_format").and_then(|b| b.as_str()).map(String::from))
+        .and_then(|v| {
+            v.get("ballot_format")
+                .and_then(|b| b.as_str())
+                .map(String::from)
+        })
         .unwrap_or_else(|| "consent".to_string());
 
     let _ = call_elohim_propose_governance_action(ConsolidatedProposeGovernanceActionInput {
@@ -464,8 +478,11 @@ pub struct GetCommitmentOutput {
 /// one. `None` when the entry is not yet on this conductor's DHT view.
 #[hdk_extern]
 pub fn get_commitment(cid: String) -> ExternResult<Option<GetCommitmentOutput>> {
-    let entry_hash = EntryHash::try_from(cid.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest(format!("invalid commitment cid: {cid}"))))?;
+    let entry_hash = EntryHash::try_from(cid.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "invalid commitment cid: {cid}"
+        )))
+    })?;
 
     let Some(record) = get(entry_hash.clone(), GetOptions::default())? else {
         return Ok(None);
@@ -1103,7 +1120,10 @@ pub fn create_proposal_vote(input: CreateProposalVoteInput) -> ExternResult<Prop
         attestation_kind: "attestation:proposal-vote".to_string(),
         subject_cid: input.proposal_id.clone(),
         subject_kind: "governance-action".to_string(),
-        title: format!("Vote on proposal {} by {}", input.proposal_id, input.voter_id),
+        title: format!(
+            "Vote on proposal {} by {}",
+            input.proposal_id, input.voter_id
+        ),
         description: Some(format!("Position: {}", input.position)),
         reach: "community".to_string(),
         metadata: serde_json::json!({
@@ -1400,7 +1420,10 @@ pub fn create_gate_decision_attestation(
         subject_cid: input.elohim_id.clone(),
         subject_kind: "agent".to_string(),
         title: format!("Gate decision: {} by {}", input.gate_name, input.elohim_id),
-        description: Some(format!("Phase: {} — decision: {}", input.phase, input.decision)),
+        description: Some(format!(
+            "Phase: {} — decision: {}",
+            input.phase, input.decision
+        )),
         reach: "community".to_string(),
         metadata: serde_json::json!({
             "decision_id": input.decision_id,
@@ -1476,9 +1499,7 @@ pub fn create_gate_decision_challenge(
 ///
 /// Indexes by outcome_id, challenge_cid (one outcome per challenge), and verdict.
 #[hdk_extern]
-pub fn create_challenge_outcome(
-    input: CreateChallengeOutcomeInput,
-) -> ExternResult<ActionHash> {
+pub fn create_challenge_outcome(input: CreateChallengeOutcomeInput) -> ExternResult<ActionHash> {
     let entry = mishpat_integrity::ChallengeOutcome {
         outcome_id: input.outcome_id.clone(),
         challenge_cid: input.challenge_cid.clone(),
@@ -1542,11 +1563,8 @@ pub fn get_outcome_for_challenge(
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Invalid outcome hash".to_string()
-            ))
-        })?;
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid outcome hash".to_string())))?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
@@ -1587,11 +1605,8 @@ pub fn get_outcomes_by_verdict(
 
     let mut results = Vec::new();
     for link in links.iter().take(limit) {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Invalid outcome hash".to_string()
-            ))
-        })?;
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid outcome hash".to_string())))?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {

@@ -8,7 +8,7 @@
 //! `services::bounds_validator::validate` in elohim-storage.
 
 use hdk::prelude::*;
-use mishpat_integrity::Commitment;
+use mishpat_integrity::{Commitment, LinkTypes};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateCommitmentInput {
@@ -44,6 +44,139 @@ pub fn create_commitment(input: CreateCommitmentInput) -> ExternResult<Commitmen
         action_hash,
         entry_hash,
     })
+}
+
+// =============================================================================
+// CommitmentByState link author (Slice-2b T11)
+// =============================================================================
+//
+// Records a Commitment's lifecycle transition (proposed → active → …) as an
+// immutable `CommitmentByState` link on the Mishpat DHT. The SQL `state` column
+// in elohim-storage becomes a write-through cache: `graduate_to_active` writes
+// the cache; this link is the truth. Peers verify lifecycle by reading the link
+// off the commitment anchor — no need to replay every EconomicEvent.
+
+/// Input for `create_commitment_state_link`. `commitment_cid` is the base64
+/// `EntryHash` of the Commitment (the same value elohim-storage stores as
+/// `mishpat_commitments.cid` and `get_commitment` takes). `event_hash` is the
+/// base64 `ActionHash` of the EconomicEvent that justifies the transition.
+/// `signed_at` is the deterministic, caller-supplied signing time (Category-A —
+/// never `sys_time()` in-zome).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CreateCommitmentStateLinkInput {
+    pub commitment_cid: String,
+    pub state: String,
+    pub event_hash: String,
+    pub signed_at: String,
+}
+
+/// Output of `create_commitment_state_link` — the new link's `ActionHash`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CommitmentStateLinkOutput {
+    pub link_action_hash: ActionHash,
+}
+
+/// Author a `CommitmentByState` link recording a commitment's state transition.
+///
+/// - **base** = the Commitment's `EntryHash` (resolved from `commitment_cid`) —
+///   so the link is readable off the commitment anchor by any peer.
+/// - **target** = the graduating event's `ActionHash` (resolved from
+///   `event_hash`) — the proof a verifier can replay.
+/// - **tag** = `"<state>|<signed_at>"` — the new lifecycle state + signing time;
+///   the integrity zome enforces both segments are non-empty.
+///
+/// The link is immutable (links never update). Called by the elohim-storage
+/// graduation projection right after `graduate_to_active` flips the SQL cache.
+#[hdk_extern]
+pub fn create_commitment_state_link(
+    input: CreateCommitmentStateLinkInput,
+) -> ExternResult<CommitmentStateLinkOutput> {
+    if input.state.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "create_commitment_state_link: state must be non-empty".to_string()
+        )));
+    }
+    if input.signed_at.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "create_commitment_state_link: signed_at must be non-empty".to_string()
+        )));
+    }
+
+    // The commitment anchor: base64 EntryHash → EntryHash (the link base).
+    let base = EntryHash::try_from(input.commitment_cid.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "create_commitment_state_link: invalid commitment_cid (expected base64 EntryHash): {}",
+            input.commitment_cid
+        )))
+    })?;
+
+    // The transition proof: base64 ActionHash → ActionHash (the link target).
+    let target = ActionHash::try_from(input.event_hash.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "create_commitment_state_link: invalid event_hash (expected base64 ActionHash): {}",
+            input.event_hash
+        )))
+    })?;
+
+    // Tag carries the new state + signing time: "<state>|<signed_at>".
+    let tag_str = format!("{}|{}", input.state, input.signed_at);
+    let link_action_hash = create_link(
+        base,
+        target,
+        LinkTypes::CommitmentByState,
+        LinkTag::new(tag_str.as_bytes().to_vec()),
+    )?;
+
+    Ok(CommitmentStateLinkOutput { link_action_hash })
+}
+
+/// A `CommitmentByState` link projected to a wire shape. `state`/`signed_at`
+/// are parsed from the LinkTag (`"<state>|<signed_at>"`); `event_hash` is the
+/// link target (the graduating event's ActionHash) as base64.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CommitmentStateLink {
+    pub state: String,
+    pub signed_at: String,
+    pub event_hash: String,
+}
+
+/// Read all `CommitmentByState` links off a commitment anchor (base64
+/// `EntryHash`). Returns the lifecycle transitions notarized on the DHT —
+/// the peer-observable lifecycle without replaying every EconomicEvent.
+///
+/// Used by the Slice-2b T11 sweettest to verify cross-conductor replication,
+/// and available to any storage observer that wants to project lifecycle from
+/// DHT-truth rather than the SQL write-through cache.
+#[hdk_extern]
+pub fn get_commitment_state_links(
+    commitment_cid: String,
+) -> ExternResult<Vec<CommitmentStateLink>> {
+    let base = EntryHash::try_from(commitment_cid.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "get_commitment_state_links: invalid commitment_cid (expected base64 EntryHash): {commitment_cid}"
+        )))
+    })?;
+
+    let query = LinkQuery::try_new(base, LinkTypes::CommitmentByState)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut out = Vec::with_capacity(links.len());
+    for link in links {
+        let raw = String::from_utf8(link.tag.0.clone()).unwrap_or_default();
+        let mut parts = raw.splitn(2, '|');
+        let state = parts.next().unwrap_or("").to_string();
+        let signed_at = parts.next().unwrap_or("").to_string();
+        // Target is the graduating event's ActionHash; render as base64.
+        let event_hash = ActionHash::try_from(link.target.clone())
+            .map(|h| h.to_string())
+            .unwrap_or_default();
+        out.push(CommitmentStateLink {
+            state,
+            signed_at,
+            event_hash,
+        });
+    }
+    Ok(out)
 }
 
 /// Validate the commitment payload against the action-specific schema.
@@ -793,5 +926,28 @@ mod tests {
             signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    // =========================================================================
+    // CommitmentByState link author input (Slice-2b T11)
+    // =========================================================================
+
+    /// The state-link author input must survive a serde round-trip — the wire
+    /// contract with the elohim-storage `call_create_commitment_state_link`
+    /// caller. A dropped field would fail the zome call at runtime.
+    #[test]
+    fn create_commitment_state_link_input_serde_roundtrip() {
+        let original = CreateCommitmentStateLinkInput {
+            commitment_cid: "uhCEk-commitment-1".to_string(),
+            state: "active".to_string(),
+            event_hash: "uhCkk-graduating-event".to_string(),
+            signed_at: "2026-06-11T10:00:00Z".to_string(),
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let decoded: CreateCommitmentStateLinkInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.commitment_cid, original.commitment_cid);
+        assert_eq!(decoded.state, original.state);
+        assert_eq!(decoded.event_hash, original.event_hash);
+        assert_eq!(decoded.signed_at, original.signed_at);
     }
 }

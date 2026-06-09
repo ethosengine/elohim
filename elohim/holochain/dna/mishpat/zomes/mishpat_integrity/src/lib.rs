@@ -380,6 +380,18 @@ pub enum LinkTypes {
     IdToOutcome,        // Anchor(outcome_id) -> ChallengeOutcome
     ChallengeToOutcome, // Anchor(challenge_cid) -> ChallengeOutcome
     VerdictToOutcomes,  // Anchor(verdict) -> ChallengeOutcome
+
+    // =========================================================================
+    // Commitment lifecycle — CommitmentByState (Slice-2b T11)
+    // =========================================================================
+    // Records a Commitment's lifecycle transition (proposed → active → …) as an
+    // immutable DHT link so peers can verify lifecycle WITHOUT replaying every
+    // EconomicEvent. The base is the Commitment's EntryHash (the live anchor);
+    // the target is the ActionHash of the event that justifies the transition;
+    // the LinkTag carries `state|signed_at` (the new state + the deterministic,
+    // caller-supplied signing time). The SQL `state` column becomes a write-
+    // through cache: `graduate_to_active` writes the cache, this link is truth.
+    CommitmentByState, // EntryHash(Commitment) -> ActionHash(event); tag = state|signed_at
 }
 
 // =============================================================================
@@ -410,10 +422,60 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreRecord(store_record) => match store_record {
             OpRecord::CreateEntry { app_entry, .. } => validate_create_entry(&app_entry),
             OpRecord::UpdateEntry { app_entry, .. } => validate_update_entry(&app_entry),
+            OpRecord::CreateLink { link_type, tag, .. } => validate_create_link(&link_type, &tag),
             _ => Ok(ValidateCallbackResult::Valid),
         },
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => validate_create_link(&link_type, &tag),
         _ => Ok(ValidateCallbackResult::Valid),
     }
+}
+
+/// Validate link creation. Defense-in-depth, deterministic, and HDI-safe
+/// (no `get_links` — integrity validators may only call `must_get_*`).
+///
+/// `CommitmentByState` (Slice-2b T11): the LinkTag carries `state|signed_at`.
+/// The DHT records the lifecycle transition; the coordinator already validated
+/// the base/target hashes resolve, so integrity confirms only that the tag is
+/// well-formed (`<state>|<signed_at>`, both non-empty) — a direct-source-chain
+/// bypass that authored an empty/malformed tag is rejected here.
+fn validate_create_link(
+    link_type: &LinkTypes,
+    tag: &LinkTag,
+) -> ExternResult<ValidateCallbackResult> {
+    match link_type {
+        LinkTypes::CommitmentByState => {
+            let raw = String::from_utf8(tag.0.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "CommitmentByState tag must be UTF-8".to_string()
+                ))
+            })?;
+            match validate_commitment_by_state_tag(&raw) {
+                Ok(()) => Ok(ValidateCallbackResult::Valid),
+                Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
+            }
+        }
+        // All other link types pass structural validation (coordinator-gated).
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+/// Pure, deterministic check for a `CommitmentByState` LinkTag string.
+/// The tag wire shape is `<state>|<signed_at>` — both segments non-empty.
+/// Extracted as a free function so it is unit-testable natively (no WASM).
+fn validate_commitment_by_state_tag(raw: &str) -> Result<(), String> {
+    let mut parts = raw.splitn(2, '|');
+    let state = parts.next().unwrap_or("");
+    let signed_at = parts.next().unwrap_or("");
+    if state.is_empty() {
+        return Err("CommitmentByState tag state segment must be non-empty".into());
+    }
+    if signed_at.is_empty() {
+        return Err(
+            "CommitmentByState tag must carry '<state>|<signed_at>' with a non-empty signed_at"
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
@@ -864,5 +926,38 @@ mod tests {
         };
         let result = validate_commitment_entry(&event).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // CommitmentByState link tag tests (Slice-2b T11)
+    // =========================================================================
+
+    #[test]
+    fn commitment_by_state_well_formed_tag_passes() {
+        assert!(validate_commitment_by_state_tag("active|2026-06-11T10:00:00Z").is_ok());
+    }
+
+    #[test]
+    fn commitment_by_state_empty_state_rejected() {
+        // Leading '|' → empty state segment.
+        assert!(validate_commitment_by_state_tag("|2026-06-11T10:00:00Z").is_err());
+    }
+
+    #[test]
+    fn commitment_by_state_missing_signed_at_rejected() {
+        // No delimiter → no signed_at segment.
+        assert!(validate_commitment_by_state_tag("active").is_err());
+    }
+
+    #[test]
+    fn commitment_by_state_empty_signed_at_rejected() {
+        // Trailing '|' → empty signed_at segment.
+        assert!(validate_commitment_by_state_tag("active|").is_err());
+    }
+
+    #[test]
+    fn commitment_by_state_signed_at_with_delimiter_preserved() {
+        // splitn(2) keeps any later '|' inside the signed_at segment — still valid.
+        assert!(validate_commitment_by_state_tag("active|2026-06-11T10:00:00Z|extra").is_ok());
     }
 }
