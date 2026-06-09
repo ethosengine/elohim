@@ -261,79 +261,15 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey) {
     // index.html: SSR-mode dists (elohim-app, Angular 19) emit
     // index.csr.html only; materialize to index.html since storage's
     // /apps lookup is literal-path. Pure SPAs (app/lamad) pass through.
+    // Bash body lives in scripts/ci/stage-spa-blob.sh (extracted 2026-06-10:
+    // the inline heredoc pushed the CPS method past the JVM 64KB
+    // MethodTooLargeException limit — builds #1519/#1520 died at Jenkinsfile
+    // compile, zero stages ran). Keep helpers heredoc-free.
     def doPatch = (adminKey != null && adminKey.trim() != '') ? '1' : '0'
     for (bundle in bundles) {
-        def distDir = bundle.distDir
-        def slug = bundle.slug
-        echo "stageSpaBlobs: distDir='${distDir}' slug='${slug}'"
+        echo "stageSpaBlobs: distDir='${bundle.distDir}' slug='${bundle.slug}'"
         withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}"]) {
-            sh """#!/bin/bash
-                set -euo pipefail
-                cd '${distDir}'
-
-                # Angular 19 SSR mode emits index.csr.html (Client-Side Rendered
-                # fallback) instead of index.html. For static SPA delivery
-                # through the protocol's /apps/{slug}/index.html route we need
-                # a literal index.html (storage's /apps handler is literal-path,
-                # doesn't fall back to index.csr.html). Pure SPAs (app/lamad)
-                # pass through unchanged.
-                if [ ! -f index.html ] && [ -f index.csr.html ]; then
-                    cp index.csr.html index.html
-                    echo "  [${slug}] materialized index.html from index.csr.html (Angular SSR-mode dist)"
-                fi
-
-                zip -r spa-bundle.zip .
-                SPA_HASH="sha256-\$(sha256sum spa-bundle.zip | awk '{print \$1}')"
-                SPA_SIZE="\$(du -h spa-bundle.zip | cut -f1)"
-                echo "[${slug}] blob hash: \${SPA_HASH}"
-                echo "[${slug}] blob size: \${SPA_SIZE}"
-
-                # 1. Upload ZIP as blob via doorway's seed-blob route.
-                #
-                # Why /admin/seed/blob and not /blob/{hash}: doorway's
-                # forward_blob_to_storage (storage_proxy.rs) is a read-through
-                # cache that hardcodes client.get() — PUT requests get silently
-                # downgraded to GET, storage returns 404 on the not-yet-uploaded
-                # hash, the build fails with curl exit 22.
-                #
-                # /admin/seed/blob is the seeder's write-through path: doorway
-                # validates the X-Blob-Hash header, caches locally, then
-                # server-side forwards PUT /blob/{hash} to elohim-storage.
-                # (Preserves dev fix f853fb665 across the B21 multi-bundle rewrite.)
-                curl -fSs -X PUT \\
-                    -H 'Content-Type: application/zip' \\
-                    -H "X-Blob-Hash: \${SPA_HASH}" \\
-                    --data-binary @spa-bundle.zip \\
-                    "${doorwayEprUrl}/admin/seed/blob"
-                echo "  ✓ [${slug}] blob uploaded (via /admin/seed/blob)"
-
-                # 2. Link blob to ${slug} content row (PATCH+verify) — only when admin key present
-                if [ "\${DO_PATCH}" = "1" ]; then
-                    curl -fSs -X PATCH \\
-                        -H 'Content-Type: application/json' \\
-                        -H "X-API-Key: \${STORAGE_API_KEY_ADMIN}" \\
-                        -d "{\\"blobHash\\":\\"\${SPA_HASH}\\"}" \\
-                        "${doorwayEprUrl}/db/content/${slug}" \\
-                        >/dev/null
-                    echo "  ✓ patched ${slug}"
-
-                    ACTUAL=\$(curl -fSs "${doorwayEprUrl}/db/content/${slug}" \\
-                        | python3 -c "import sys, json; print(json.load(sys.stdin).get('blobHash',''))")
-                    if [ "\${ACTUAL}" != "\${SPA_HASH}" ]; then
-                        echo "ERROR: ${slug} blobHash drifted after PATCH" >&2
-                        echo "  expected: \${SPA_HASH}" >&2
-                        echo "  actual:   \${ACTUAL}" >&2
-                        exit 1
-                    fi
-                    echo "  ✓ verified ${slug} blobHash = \${SPA_HASH}"
-                else
-                    echo "  ⊘ WARN: skipping PATCH+verify for ${slug} — no admin credential available"
-                    echo "    content row retains seed-time blobHash"
-                    echo "    blob bytes uploaded and content-addressable via PUT /blob/\${SPA_HASH}"
-                fi
-
-                rm -f spa-bundle.zip
-            """
+            sh "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}'"
         }
     }
 }
@@ -347,23 +283,10 @@ def verifyEprMounts(String doorwayUrl, List<String> mounts) {
     // routed mounts themselves, not /apps. Retries span the EPR router's 30s
     // self-heal refresh window. Caller wraps in catchError->UNSTABLE: drift is
     // surfaced without aborting the orchestrator dependency chain.
+    // Bash body lives in scripts/ci/verify-epr-mount.sh (extracted 2026-06-10,
+    // CPS 64KB limit — see stageSpaBlobs note). Keep helpers heredoc-free.
     for (mount in mounts) {
-        sh """#!/bin/bash
-            set -euo pipefail
-            url="${doorwayUrl}${mount}"
-            for attempt in 1 2 3 4; do
-                code=\$(curl -sS -o /tmp/epr-probe-body -w '%{http_code}' --max-time 20 "\${url}" || echo 000)
-                if [ "\${code}" = "200" ]; then
-                    echo "  ✓ \${url} serves (200)"
-                    exit 0
-                fi
-                echo "  … attempt \${attempt}/4: \${url} -> \${code} (router may still be refreshing)"
-                sleep 20
-            done
-            echo "ERROR: EPR mount \${url} does not serve after blob staging" >&2
-            head -c 300 /tmp/epr-probe-body >&2 || true
-            exit 1
-        """
+        sh "bash '${env.WORKSPACE}/scripts/ci/verify-epr-mount.sh' '${doorwayUrl}${mount}'"
     }
 }
 

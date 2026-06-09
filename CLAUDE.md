@@ -186,7 +186,7 @@ View schemas in `elohim/sdk/schemas/v1/views/` define the JSON wire format for H
 The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM builds, which breaks native Rust builds. Use `RUSTFLAGS=""` for doorway/doorway-service and steward/node; keep the custom backend flag for elohim/elohim-storage.
 
 ### Jenkinsfile Size Limit
-Root `Jenkinsfile` (elohim-app pipeline) is ~1325 lines, near the 64KB JVM CPS method size limit. Helper methods live in `// STAGE HELPER METHODS`; never add inline logic to stages.
+Root `Jenkinsfile` (elohim-app pipeline) sits near the 64KB JVM CPS method size limit — **breached 2026-06-10 at 1596 lines** (`MethodTooLargeException` at Jenkinsfile compile; builds #1519/#1520 died before ANY stage ran, so the red looks total and stageless). Line count is only a proxy: large inline `sh """…"""` heredocs in helpers are what inflate the single CPS dispatch method (top-level helpers inline into it — `// STAGE HELPER METHODS` placement alone does NOT save bytecode). Rule: helpers stay heredoc-free — bash bodies live in `scripts/ci/*.sh`, called as `sh "bash '${env.WORKSPACE}/scripts/ci/<name>.sh' args…"` (secrets via `withEnv`, never argv).
 
 ### Jenkins params.MODE Null on First Build
 MultiBranch pipeline params are null until the Jenkinsfile runs once. Always use `(params.MODE ?: 'auto')`.
