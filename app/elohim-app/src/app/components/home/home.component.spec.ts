@@ -1,4 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
@@ -56,6 +57,12 @@ describe('HomeComponent', () => {
         { provide: DomInteractionService, useValue: mockDomInteractionService },
         provideRouter([]),
         provideHttpClient(),
+        // Capture (don't fire) HTTP from rendered children — the home tree mounts
+        // <elohim-epr-link> elements that resolve EPRs via StorageClientService.getContent.
+        // With a real backend these hit localhost:8090 and, under parallel load, leak a
+        // status-0 rejection that vitest reports as an unhandled error (exit 1 → CI FAILURE).
+        // The testing backend captures them; unflushed requests are dropped on teardown.
+        provideHttpClientTesting(),
       ],
     }).compileComponents();
 
