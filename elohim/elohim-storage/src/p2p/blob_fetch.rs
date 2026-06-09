@@ -246,6 +246,7 @@ pub async fn finalize_fetch_success(
             verified_at: None,
             scope_collab_cid: None,
             bounded_by: None,
+            substrate_signal: None,
         };
         diesel::insert_into(economic_events::table)
             .values(&new_event)

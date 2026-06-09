@@ -779,6 +779,7 @@ impl ResourceService {
                     metadata_json: None,
                     at_location: None,
                     scope_collab_cid: None,
+                    substrate_signal: None,
                 },
             )?;
             event.id.clone()

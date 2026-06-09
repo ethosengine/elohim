@@ -421,6 +421,7 @@ pub struct NewEconomicEvent<'a> {
     pub verified_at: Option<&'a str>,
     pub scope_collab_cid: Option<&'a str>,
     pub bounded_by: Option<&'a str>,
+    pub substrate_signal: Option<&'a str>,
 }
 
 // ============================================================================

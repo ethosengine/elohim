@@ -310,6 +310,8 @@ pub struct EconomicEventEntry {
     pub metadata_json: Option<String>,
     #[serde(default)]
     pub created_at: Option<String>,
+    #[serde(default)]
+    pub substrate_signal: Option<String>,
 }
 
 // ============================================================================
@@ -488,6 +490,7 @@ pub fn handle_rea_signal(
                 metadata_json: event.metadata_json,
                 at_location: event.at_location,
                 scope_collab_cid: None,
+                substrate_signal: event.substrate_signal,
             };
             economic_events::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
 

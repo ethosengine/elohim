@@ -92,6 +92,7 @@ fn seed_economic_event(
             verified_at: None,
             scope_collab_cid: None,
             bounded_by: None,
+            substrate_signal: None,
         })
         .execute(&mut conn)
         .expect("seed economic_event");

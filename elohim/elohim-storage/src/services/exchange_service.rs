@@ -462,6 +462,7 @@ impl ExchangeService {
                 metadata_json: Some(request_json),
                 at_location: None,
                 scope_collab_cid: None,
+                substrate_signal: None,
             };
             record_event(conn, ctx, req_event_input)?;
 
@@ -494,6 +495,7 @@ impl ExchangeService {
                 metadata_json: Some(intent_json),
                 at_location: None,
                 scope_collab_cid: None,
+                substrate_signal: None,
             };
             record_event(conn, ctx, intent_event_input)?;
 
@@ -530,6 +532,7 @@ impl ExchangeService {
                 metadata_json: Some(created_event_meta.to_string()),
                 at_location: None,
                 scope_collab_cid: None,
+                substrate_signal: None,
             };
             let created_event = record_event(conn, ctx, creation_event_input)?;
 
@@ -616,6 +619,7 @@ impl ExchangeService {
             metadata_json: Some(updated_json),
             at_location: None,
             scope_collab_cid: None,
+            substrate_signal: None,
         };
         record_event(conn, ctx, update_event_input)?;
 
@@ -773,6 +777,7 @@ impl ExchangeService {
                 metadata_json: Some(offer_json),
                 at_location: None,
                 scope_collab_cid: None,
+                substrate_signal: None,
             };
             record_event(conn, ctx, offer_event_input)?;
 
@@ -805,6 +810,7 @@ impl ExchangeService {
                 metadata_json: Some(intent_json),
                 at_location: None,
                 scope_collab_cid: None,
+                substrate_signal: None,
             };
             record_event(conn, ctx, intent_event_input)?;
 
@@ -841,6 +847,7 @@ impl ExchangeService {
                 metadata_json: Some(created_event_meta.to_string()),
                 at_location: None,
                 scope_collab_cid: None,
+                substrate_signal: None,
             };
             let created_event = record_event(conn, ctx, creation_event_input)?;
 
@@ -919,6 +926,7 @@ impl ExchangeService {
             metadata_json: Some(updated_json),
             at_location: None,
             scope_collab_cid: None,
+            substrate_signal: None,
         };
         record_event(conn, ctx, update_event_input)?;
 

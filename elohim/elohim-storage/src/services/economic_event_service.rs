@@ -295,6 +295,7 @@ impl EconomicEventService {
             metadata_json: Some(metadata_json),
             at_location: None,
             scope_collab_cid: None,
+            substrate_signal: None,
         };
 
         let event = record_event(conn, ctx, input)?;
@@ -626,6 +627,7 @@ pub fn route_economic_event_under_collab(
             // Settlements are always scoped to the Collab-Qahal they came from;
             // the scope is recorded in extensions.elohim.scopeCollabCid in metadata_json.
             scope_collab_cid: None,
+            substrate_signal: None,
         });
     }
 

@@ -68,6 +68,12 @@ pub struct CreateEconomicEventInput {
     /// and emits Settlement events before persisting the primary.
     #[serde(default)]
     pub scope_collab_cid: Option<String>,
+    /// DHT-signal tag projected from the DNA integrity field (compute-class only).
+    ///
+    /// Write-through projection from the notarized DHT entry. NULL for events
+    /// that carry no substrate signal.
+    #[serde(default)]
+    pub substrate_signal: Option<String>,
 }
 
 /// Query parameters for listing economic events - camelCase for URL params
@@ -338,6 +344,7 @@ pub fn record_event(
         verified_at: None,
         scope_collab_cid: input.scope_collab_cid.as_deref(),
         bounded_by: None,
+        substrate_signal: input.substrate_signal.as_deref(),
     };
 
     diesel::insert_into(economic_events::table)
@@ -385,6 +392,7 @@ pub fn record_content_view(
             metadata_json: None,
             at_location: None,
             scope_collab_cid: None,
+            substrate_signal: None,
         },
     )
 }
@@ -431,6 +439,7 @@ pub fn record_mastery_advancement(
             metadata_json: Some(metadata.to_string()),
             at_location: None,
             scope_collab_cid: None,
+            substrate_signal: None,
         },
     )
 }
@@ -471,6 +480,7 @@ pub fn record_citation(
             metadata_json: None,
             at_location: None,
             scope_collab_cid: None,
+            substrate_signal: None,
         },
     )
 }
@@ -511,6 +521,7 @@ pub fn record_path_completion(
             metadata_json: None,
             at_location: None,
             scope_collab_cid: None,
+            substrate_signal: None,
         },
     )
 }
@@ -552,6 +563,7 @@ pub fn record_affinity_transfer(
             metadata_json: None,
             at_location: None,
             scope_collab_cid: None,
+            substrate_signal: None,
         },
     )
 }
@@ -670,6 +682,7 @@ pub fn upsert_with_anchor(
             verified_at: None,
             scope_collab_cid: input.scope_collab_cid.as_deref(),
             bounded_by: None,
+            substrate_signal: input.substrate_signal.as_deref(),
         };
 
         diesel::insert_into(economic_events::table)
@@ -752,4 +765,100 @@ pub fn aggregate_for_content(
         total_effort_quantity,
         by_action: by_action.into_iter().collect(),
     })
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use diesel::prelude::*;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn test_conn() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory SQLite");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    fn test_ctx() -> AppContext {
+        AppContext::new("test-app")
+    }
+
+    /// Build a minimal valid CreateEconomicEventInput for "use" action.
+    fn minimal_input() -> CreateEconomicEventInput {
+        CreateEconomicEventInput {
+            id: None,
+            action: "use".to_string(),
+            provider: "provider-test".to_string(),
+            receiver: "receiver-test".to_string(),
+            resource_conforms_to: None,
+            resource_inventoried_as: None,
+            resource_classified_as: vec![],
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: None,
+            has_duration: None,
+            input_of: None,
+            output_of: None,
+            lamad_event_type: None,
+            content_id: None,
+            contributor_presence_id: None,
+            path_id: None,
+            triggered_by: None,
+            note: None,
+            metadata_json: None,
+            at_location: None,
+            scope_collab_cid: None,
+            substrate_signal: None,
+        }
+    }
+
+    #[test]
+    fn substrate_signal_persists_through_record_event() {
+        let mut conn = test_conn();
+        let ctx = test_ctx();
+
+        let input = CreateEconomicEventInput {
+            substrate_signal: Some("attention".to_string()),
+            ..minimal_input()
+        };
+
+        let row = record_event(&mut conn, &ctx, input).expect("record_event must succeed");
+
+        let got: Option<String> = economic_events::table
+            .find(&row.id)
+            .select(economic_events::substrate_signal)
+            .first(&mut conn)
+            .expect("select substrate_signal");
+
+        assert_eq!(got.as_deref(), Some("attention"));
+    }
+
+    #[test]
+    fn absent_substrate_signal_persists_as_null() {
+        let mut conn = test_conn();
+        let ctx = test_ctx();
+
+        let input = CreateEconomicEventInput {
+            substrate_signal: None,
+            ..minimal_input()
+        };
+
+        let row = record_event(&mut conn, &ctx, input).expect("record_event must succeed");
+
+        let got: Option<String> = economic_events::table
+            .find(&row.id)
+            .select(economic_events::substrate_signal)
+            .first(&mut conn)
+            .expect("select substrate_signal");
+
+        assert_eq!(got, None);
+    }
 }

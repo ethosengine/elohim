@@ -158,6 +158,7 @@ impl From<CreateEconomicEventInputView> for CreateEconomicEventInput {
             metadata_json: serialize_json_opt(&v.metadata),
             at_location: v.at_location,
             scope_collab_cid: v.scope_collab_cid,
+            substrate_signal: None,
         }
     }
 }
