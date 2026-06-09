@@ -38,6 +38,9 @@ function storageUrl(): string {
   return process.env['E2E_STORAGE_URL'] ?? 'http://localhost:8090';
 }
 
+/** Own-node pins API path (runtime arg; the cucumber-expression patterns escape the slashes). */
+const PINS_PATH = '/api/v1/pins';
+
 interface RawResponse {
   status: number;
   body: string;
@@ -82,7 +85,7 @@ const pinResponseStore = new WeakMap<E2EWorld, RawResponse>();
 When(
   'I POST a pin for {string} to \\/api\\/v1\\/pins',
   async function (this: E2EWorld, headRef: string) {
-    const resp = await storagePostRaw('/api/v1/pins', { headRef });
+    const resp = await storagePostRaw(PINS_PATH, { headRef });
     pinResponseStore.set(this, resp);
   }
 );
@@ -100,7 +103,7 @@ Then('the pin response status is {int}', function (this: E2EWorld, expectedStatu
 Then(
   'GET \\/api\\/v1\\/pins lists one active pin for {string}',
   async function (this: E2EWorld, headRef: string) {
-    const { status, body } = await storageGetJson('/api/v1/pins');
+    const { status, body } = await storageGetJson(PINS_PATH);
     assert.equal(status, 200, `GET /api/v1/pins returned ${status}`);
 
     const payload = body as Record<string, unknown>;
@@ -126,7 +129,7 @@ Then(
 When(
   'I POST a pin with kind {string} for {string} to \\/api\\/v1\\/pins',
   async function (this: E2EWorld, kind: string, headRef: string) {
-    const resp = await storagePostRaw('/api/v1/pins', { headRef, kind });
+    const resp = await storagePostRaw(PINS_PATH, { headRef, kind });
     pinResponseStore.set(this, resp);
   }
 );
@@ -139,6 +142,61 @@ Then('the pin response body mentions {string}', function (this: E2EWorld, fragme
     `Expected response body to mention "${fragment}"; got: ${resp.body.slice(0, 300)}`
   );
 });
+
+// ---------------------------------------------------------------------------
+// Provide pins (slice 2b — rung 4) — runnable own-node steps
+//
+// The provide pin (provide:true) is the same own-node /api/v1/pins API; the
+// provide flag tells the reconciler to author a replicates-commons commitment.
+// GET /api/v1/pins/{eprId}/pull returns the per-EPR rollup the
+// PinProgressComponent renders. Both legs run on a single household node.
+// ---------------------------------------------------------------------------
+
+When(
+  'I POST a provide pin for {string} to \\/api\\/v1\\/pins',
+  async function (this: E2EWorld, headRef: string) {
+    const id = headRef.replace(/^epr:/, '');
+    const resp = await storagePostRaw(PINS_PATH, {
+      headRef: id,
+      kind: 'item',
+      provide: true,
+    });
+    pinResponseStore.set(this, resp);
+  }
+);
+
+When(
+  'I POST a provide pin with a forced browser context for {string}',
+  async function (this: E2EWorld, headRef: string) {
+    const id = headRef.replace(/^epr:/, '');
+    // The provide flag is honored only on a peer-capable node; a browser-context
+    // provide must be refused 400. The own-node API enforces this server-side.
+    const resp = await storagePostRaw(PINS_PATH, {
+      headRef: id,
+      kind: 'item',
+      provide: true,
+      context: 'browser',
+    });
+    pinResponseStore.set(this, resp);
+  }
+);
+
+Then(
+  'GET \\/api\\/v1\\/pins\\/{word}\\/pull reports a pull rollup',
+  async function (this: E2EWorld, eprId: string) {
+    const { status, body } = await storageGetJson(`/api/v1/pins/${eprId}/pull`);
+    assert.equal(status, 200, `GET pull rollup returned ${status}`);
+    const rollup = body as Record<string, unknown>;
+    // The rollup is grouped by head_ref; the shape must carry the counters the
+    // PinProgressComponent renders (fetched/pending/failed) and a caughtUp flag.
+    for (const field of ['fetched', 'pending', 'failed', 'caughtUp']) {
+      assert.ok(
+        field in rollup,
+        `pull rollup missing "${field}"; got ${JSON.stringify(rollup).slice(0, 200)}`
+      );
+    }
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Scenario 3 — two-node byte-arrival (@wip @requires:household-nodes)
@@ -171,5 +229,17 @@ Then(
 );
 
 Then("the content row exists in peer B's local projection", function () {
+  return 'pending';
+});
+
+// Provide-serve cross-node leg (@wip @requires:household-nodes). The binding
+// regression is the Rust e2e replicates_commons test, not this cucumber stub.
+When('peer A pins {string} as a peer', function (_headRef: string) {
+  // Pending: requires a live two-node household stack. The provide-serve
+  // regression lives in the Rust integration test (replicates_commons e2e).
+  return 'pending';
+});
+
+Then('peer B fetched the bytes from peer A', function () {
   return 'pending';
 });
