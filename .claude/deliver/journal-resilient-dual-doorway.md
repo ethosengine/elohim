@@ -58,3 +58,29 @@ delivered (the 05-30 leftover, still live); `doorway-degrades-through-pool`,
 - Fix D (self): stageSpaBlobs verify-after-upload in root Jenkinsfile.
 
 Deploy + fresh-trigger render are operator-gated (commit-only; sprint-branch not orchestrator-indexed).
+
+## iter-1 — fixes landed (2026-06-09 ~22:00-23:30Z)
+
+Operator consent received mid-iteration: "the things you need consent for go ahead, it's all
+still in dev anyway.. go ahead and try and reconcile this" — unlocking the manifest changes and
+commissioning the P1 reconciliation stream.
+
+| Fix | What | Where | Gates | Commit |
+|---|---|---|---|---|
+| A | doorway EPR router boot+refresh pool fallback (`fetch_projections_with_fallback`, FallbackOutcome ladder: PrimaryNonEmpty/PeerServed→WARN/AllEmpty→INFO/AllUnreachable→keep-last-good) | doorway main.rs + projection/epr_router.rs (+7 wiremock tests) | lib 565/565, clippy+fmt clean | **swept into `e061c0172`** by a concurrent-session index race (content verified intact in HEAD; history not rewritten; memory updated with the subagent-pathspec lesson) |
+| B | apps-resolver heals missing app ZIPs via shared T17 race-fetch helper `get_blob_or_heal` (also pure-refactors /blob onto it); WARN names healed hash + source peer | elohim-storage http.rs (+5 tests) | lib 1481/1481, clippy+fmt clean | `d0e3c207f` |
+| C | felt-resilience entry-point nav: My Cluster + Peer Network action links on /shefa Overview (+2 tests). Finding: pillar sidenav links already existed (spec gap #1 partially stale — flagged, spec line 76-77 correction deferred to cite tooling) | shefa-home component | 72/72, lint clean | `59e3a7ca2` |
+| D | CI seatbelt `verifyEprMounts` probes EPR-routed `/` + `/lamad` on both doorways post-staging (the /apps path lies — doorway cache); UNSTABLE convention | root Jenkinsfile | brace-balanced, helper outside CPS method | `52f4f4ea8` |
+| E | persistence: `STORAGE_DIR=/data` on all 10 storage deployments (7 humans + 3 edgenode templates incl. prod-for-consistency) + clap env binding | manifests + storage main.rs | YAML valid ×10; cargo check clean | `7cf40e440` + `2592721b8` |
+| F | a2o canonical scenarios: doorway-pool-degrade.feature + app-blob-heal-on-read.feature (@wip pending fixture steps) | genesis/a2o/features | n/a | `59a719c6d` |
+| G | **P1 projection reconciliation stream** (gate-approved design: peers = discovery only, own conductor = truth via get_rea_commitment, GapTracker rails, ViewKind::ProjectionInventory on view-federation, v1 = rea_commitments) | elohim-storage (in flight — rust-architect dispatched) | pending | pending |
+
+**Live-state note:** alpha.elohim.host / + /lamad healed during iter-0 diagnosis (manual /blob
+demand-fetch) and were re-verified 200. apex remains 302→/threshold until Fix A deploys (its
+router will then fill from matthew through the pool while G converges adam's projection).
+
+**Verification plan post-merge (operator pushes dev):** orchestrator cascade → edge deploy →
+(1) seatbelt D probes mounts in-pipeline; (2) curl matrix re-run (4 URLs × 200); (3) Loki:
+expect doorway-B WARN "degraded primary" then router count=3; (4) after G deploys: adam
+`/db/rea_commitments?action=project-epr&doorwayId=apex-elohim-host` non-empty from its OWN sql;
+(5) screenshot pass for the tier-3 verdict (two consecutive delivered, one fresh-trigger).
