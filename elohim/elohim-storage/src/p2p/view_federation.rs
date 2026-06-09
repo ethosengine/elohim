@@ -34,9 +34,21 @@ use libp2p::request_response;
 use std::io;
 
 use crate::views::{
-    Freshness, FreshnessState, JsonVal, ViewFederationRequest, ViewFederationResponse, ViewKind,
-    ViewSlice,
+    Freshness, FreshnessState, JsonVal, ProjectionInventoryEntry, ProjectionInventoryPayload,
+    ViewFederationRequest, ViewFederationResponse, ViewKind, ViewSlice,
 };
+
+/// v1 cap on entries returned in a single `ProjectionInventory` slice. At
+/// ~80 bytes/entry MessagePack, 2000 entries ≈ 160 KiB, comfortably under
+/// [`MAX_PAYLOAD`] (256 KiB) with room for the slice envelope + signature.
+/// The `total` field reports the true row count when truncated.
+pub const PROJECTION_INVENTORY_CAP: i64 = 2000;
+
+/// The only projection table the v1 reconciliation stream serves an inventory
+/// for. The `ViewKind::ProjectionInventory { table }` discriminator is the seam
+/// for `agreements` / `economic_events` later; an unknown table yields an empty
+/// inventory (honest: "I hold nothing for a table I don't know").
+pub const PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS: &str = "rea_commitments";
 
 /// Protocol identifier for federated view-slice fetch.
 pub const VIEW_FEDERATION_PROTOCOL_ID: &str = "/elohim/view-federation/1.0.0";
@@ -213,6 +225,11 @@ pub struct SliceContext<'a> {
 /// When `agent_cid` does not match, payload is `serde_json::Value::Null`
 /// (Offline freshness) regardless of pool.
 ///
+/// `ProjectionInventory` is the exception to agent-scoping: the inventory is
+/// "what THIS peer's projection holds for `table`", independent of `agent_cid`.
+/// It always reports `Live` when a pool is available (local SQL is present
+/// truth), and an empty inventory when `pool` is `None` (test contexts).
+///
 /// The `ViewSlice` is signed with `keypair` using
 /// [`ViewSlice::canonical_bytes_for_signing`]. The signature is base64-encoded
 /// (standard alphabet, with padding) in `slice.signature`.
@@ -225,6 +242,30 @@ pub async fn build_response_slice(
     view_kind: ViewKind,
     ctx: SliceContext<'_>,
 ) -> Result<ViewFederationResponse, libp2p::identity::SigningError> {
+    // ProjectionInventory: not agent-scoped. Build from local SQL directly.
+    if let ViewKind::ProjectionInventory { table } = &view_kind {
+        let (payload, state) = build_inventory_payload(ctx.pool, table);
+        let mut slice = ViewSlice {
+            peer_id: ctx.local_peer_id,
+            view_kind: view_kind.clone(),
+            freshness: Freshness {
+                state,
+                stale_since_ms: None,
+            },
+            payload: JsonVal(payload),
+            signature: String::new(),
+        };
+        let canonical = slice.canonical_bytes_for_signing();
+        let sig_bytes = ctx.keypair.sign(&canonical)?;
+        slice.signature = base64::engine::general_purpose::STANDARD.encode(&sig_bytes);
+        return Ok(ViewFederationResponse {
+            view_kind,
+            agent_cid: ctx.agent_cid,
+            request_id: ctx.request_id,
+            slice,
+        });
+    }
+
     let owns_agent = ctx.agent_cid == ctx.local_agent_cid;
     let payload = if owns_agent {
         match ctx.pool {
@@ -234,6 +275,8 @@ pub async fn build_response_slice(
                     crate::services::peer_topology_view::build_local_slice(p, ctx.connected_peers)
                         .await
                 }
+                // Handled above by the early-return.
+                ViewKind::ProjectionInventory { .. } => unreachable!(),
             },
             None => serde_json::json!({}),
         }
@@ -264,6 +307,74 @@ pub async fn build_response_slice(
         request_id: ctx.request_id,
         slice,
     })
+}
+
+/// Build the `(payload_json, freshness)` for a `ProjectionInventory` request.
+///
+/// Reads the local projection for `table` (v1: `rea_commitments` only) capped
+/// at [`PROJECTION_INVENTORY_CAP`], newest first. `Live` when the pool is
+/// present (local SQL is present truth); `Offline` with an empty inventory when
+/// `pool` is `None` (test/conductor-less contexts) or the table is unknown.
+fn build_inventory_payload(
+    pool: Option<&crate::db::DbPool>,
+    table: &str,
+) -> (serde_json::Value, FreshnessState) {
+    let empty = || {
+        (
+            serde_json::to_value(ProjectionInventoryPayload {
+                table: table.to_string(),
+                total: 0,
+                entries: Vec::new(),
+            })
+            .unwrap_or(serde_json::Value::Null),
+            FreshnessState::Offline,
+        )
+    };
+
+    // v1: only rea_commitments. The discriminator is the seam for other tables.
+    if table != PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS {
+        return empty();
+    }
+    let Some(p) = pool else {
+        return empty();
+    };
+    let Ok(mut conn) = p.get() else {
+        return empty();
+    };
+    let app_ctx = crate::db::AppContext::default_lamad();
+    match crate::db::rea_commitments::inventory_for_reconcile(
+        &mut conn,
+        &app_ctx,
+        PROJECTION_INVENTORY_CAP,
+    ) {
+        Ok((rows, total)) => {
+            let entries = rows
+                .into_iter()
+                .map(|(id, dht_anchor_hash)| ProjectionInventoryEntry {
+                    id,
+                    dht_anchor_hash,
+                })
+                .collect();
+            let payload = ProjectionInventoryPayload {
+                table: table.to_string(),
+                total,
+                entries,
+            };
+            (
+                serde_json::to_value(payload).unwrap_or(serde_json::Value::Null),
+                FreshnessState::Live,
+            )
+        }
+        Err(e) => {
+            tracing::warn!(
+                target: "elohim_storage::view_federation",
+                table = %table,
+                error = %e,
+                "ProjectionInventory: local inventory query failed; returning empty"
+            );
+            empty()
+        }
+    }
 }
 
 #[cfg(test)]

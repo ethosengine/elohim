@@ -154,12 +154,57 @@ pub struct Freshness {
 }
 
 /// Which kind of view a federation slice represents.
+///
+/// `ProjectionInventory` (P1 reconciliation stream) is NOT a per-device view
+/// like the others — it carries a `table` discriminator naming which projection
+/// table the requester wants the responder's `(id, dhtAnchorHash)` inventory
+/// for. v1 supports only `"rea_commitments"`; the discriminator is the seam for
+/// `agreements` / `economic_events` later. The inventory itself rides in the
+/// `ViewSlice.payload` as a [`ProjectionInventoryPayload`].
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 #[serde(rename_all = "snake_case")]
 pub enum ViewKind {
     Cluster,
     PeerTopology,
+    /// Projection-inventory discovery for the reconciliation stream. `table`
+    /// names the projection (v1: `"rea_commitments"` only).
+    ProjectionInventory {
+        table: String,
+    },
+}
+
+/// One discovered projection row in a [`ProjectionInventoryPayload`]: the
+/// logical id and the DHT anchor hash the responder's projection holds for it.
+/// The reconciler diffs these against its own projection: missing id OR a
+/// different `dhtAnchorHash` ⇒ a convergence gap to heal from its OWN conductor.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectionInventoryEntry {
+    pub id: String,
+    /// May be empty when the responder's projection row carries no anchor yet
+    /// (un-anchored bulk-seed row). An empty anchor still counts as "present"
+    /// for discovery — the reconciler heals it from its own conductor.
+    pub dht_anchor_hash: String,
+}
+
+/// Response payload (carried in `ViewSlice.payload`) for a `ProjectionInventory`
+/// federation request. `entries` is capped at the most-recent-N rows; `total`
+/// reports the full row count so the requester can tell the inventory was
+/// truncated (v1 cap documented in `p2p::projection_reconcile`).
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectionInventoryPayload {
+    /// The projection table this inventory is for (echoes the request's `table`).
+    pub table: String,
+    /// Total rows in the responder's projection for `table` (may exceed
+    /// `entries.len()` when truncated by the cap).
+    #[ts(type = "number")]
+    pub total: usize,
+    /// Most-recent-N `(id, dhtAnchorHash)` pairs, newest first.
+    pub entries: Vec<ProjectionInventoryEntry>,
 }
 
 /// Per-device slice returned over the view-federation/1.0.0 libp2p protocol;

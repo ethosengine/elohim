@@ -149,6 +149,38 @@ pub async fn call_update_content(
     hc.call_zome(ZOME_NAME, "update_content", payload).await
 }
 
+/// Read a notarized REA Commitment back from THIS conductor's DHT view by its
+/// logical `id`, via the `content_store::get_rea_commitment` coordinator
+/// (lamad role). `Ok(None)` when the entry is not on this conductor's DHT view.
+///
+/// This is the read half the P1 projection reconciler uses: peers supply
+/// discovery (which ids exist), but the row content comes EXCLUSIVELY from this
+/// — the own-conductor DHT notary view. Peer bytes are never written into the
+/// projection. The returned `ReaCommitmentOutput` carries the same wire shape
+/// the post-commit `ReaCommitmentCommitted` signal carries (`action_hash` +
+/// `commitment`), so both feed the shared `project_commitment_from_wire`
+/// mapping.
+pub async fn get_rea_commitment(
+    hc: &Arc<HcClient>,
+    id: &str,
+) -> Result<Option<shefa_types::ReaCommitmentOutput>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&id.to_string()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode get_rea_commitment id: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "get_rea_commitment", payload)
+        .await?;
+    let out: Option<shefa_types::ReaCommitmentOutput> =
+        rmp_serde::from_slice(&bytes).map_err(|e| {
+            StorageError::Serialization(format!(
+                "conductor_writes: decode ReaCommitmentOutput: {e}"
+            ))
+        })?;
+    Ok(out)
+}
+
 /// Coordinator zome name (the mishpat zome, hosted in the mishpat role cell —
 /// role selection happens at HcClient construction). Hosts the Mishpat commitment
 /// coordinator functions (`create_commitment`, `get_commitment`); `call_zome`

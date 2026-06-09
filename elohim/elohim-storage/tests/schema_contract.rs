@@ -17,6 +17,7 @@
 #![allow(clippy::await_holding_lock)]
 
 use elohim_storage::p2p::acquisition::PullStatusInfo;
+use elohim_storage::p2p::projection_reconcile::ProjectionReconcileStatus;
 use elohim_storage::p2p::replication::ReplicationStatus;
 use elohim_storage::p2p::DrainStatusInfo;
 use elohim_storage::P2PStatusInfo;
@@ -210,6 +211,16 @@ fn p2p_status_view_matches_schema() {
             failed: 0,
             caught_up: false,
         }),
+        projection_reconcile: Some(ProjectionReconcileStatus {
+            pending: 1,
+            completed: 4,
+            failed: 0,
+            caught_up: false,
+            peers_asked: 2,
+            divergent_anchor: 1,
+            healed_total: 9,
+            sweeps: 3,
+        }),
         sync_paused: false,
         dedup_unique_len: 42,
         dedup_total_seen: 55,
@@ -234,6 +245,7 @@ fn p2p_status_view_with_null_drain() {
         replication: ReplicationStatus::default(),
         drain: None,
         pull: None,
+        projection_reconcile: None,
         sync_paused: true,
         dedup_unique_len: 0,
         dedup_total_seen: 0,

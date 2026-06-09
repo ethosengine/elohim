@@ -48,6 +48,7 @@ pub mod inventory_gossip;
 pub mod kad_store;
 pub mod observation_gossip;
 pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
+pub mod projection_reconcile; // P1 reconciliation stream — REA commitments converge from own conductor
 pub mod reach_authorization;
 pub mod reconcile_rails;
 pub mod recovery_invitation;
@@ -509,6 +510,12 @@ pub struct P2PNode {
     gap_queue: ReplicationGapQueue,
     /// Acquisition stream state (spec §4) — sibling of replication_state.
     acquisition: acquisition::AcquisitionState,
+    /// P1 projection-reconcile stream status, surfaced on `/p2p/status`. The
+    /// actual sweep runs in main.rs composition scope (it needs the lamad
+    /// HcClient author seam); the node holds a clone of the shared status only
+    /// so `refresh_status` can publish it. `None` when the reconcile task was
+    /// not spawned (missing HcClient / pool / disabled).
+    projection_reconcile: Option<projection_reconcile::ProjectionReconcileState>,
     /// Provide-loop reconciler (Slice 2b): caught-up commons pins → notarized
     /// replicates-commons Commitments. Logical-key dedup survives restart; the
     /// in-memory latch is a per-process optimisation only.
@@ -717,6 +724,10 @@ pub struct P2PStatusInfo {
     /// Acquisition pull-queue rollup — None when state cannot be computed.
     /// Consumers treat None as "keep waiting", NEVER as caught up (spec §4.3).
     pub pull: Option<acquisition::PullStatusInfo>,
+    /// P1 projection-reconcile stream status (REA commitments converge from own
+    /// conductor; peers as discovery). None when the reconcile task is not
+    /// running (missing lamad HcClient / pool / disabled).
+    pub projection_reconcile: Option<projection_reconcile::ProjectionReconcileStatus>,
     /// True when sync/replication is paused for backpressure (bulk write in progress).
     pub sync_paused: bool,
     /// D.7 dedup LRU: number of unique CIDs currently in the dedup window.
@@ -1134,6 +1145,7 @@ impl P2PHandle {
             replication: crate::p2p::replication::ReplicationStatus::default(),
             drain: None,
             pull: None,
+            projection_reconcile: None,
             sync_paused: false,
             dedup_unique_len: 0,
             dedup_total_seen: 0,
@@ -1227,6 +1239,12 @@ impl P2PHandle {
                 "set_last_gossiped_inventory: RwLock poisoned; inventory record dropped"
             );
         }
+    }
+
+    /// This node's agent public key (CID). Used by the projection-reconcile
+    /// stream to populate the `agent_cid` field of outbound federation requests.
+    pub fn agent_pubkey(&self) -> &str {
+        &self.agent_pubkey
     }
 
     /// List connected peers with identify protocol info.
@@ -1661,6 +1679,7 @@ impl P2PNode {
             replication: replication::ReplicationStatus::default(),
             drain: None,
             pull: None,
+            projection_reconcile: None,
             sync_paused: false,
             dedup_unique_len: 0,
             dedup_total_seen: 0,
@@ -1721,6 +1740,7 @@ impl P2PNode {
             )),
             gap_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             acquisition: acquisition::AcquisitionState::new(),
+            projection_reconcile: None,
             provide_reconciler: crate::services::provide_reconcile::ProvideReconciler::new(),
             pending_acquisition_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
@@ -1771,6 +1791,18 @@ impl P2PNode {
             pool.clone(),
         ));
         self.db_pool = Some(pool);
+        self
+    }
+
+    /// Attach the shared P1 projection-reconcile status so `refresh_status`
+    /// surfaces it on `/p2p/status`. The same `ProjectionReconcileState` clone
+    /// is driven by the reconcile task in main.rs (which holds the lamad
+    /// HcClient). Surfacing-only on the node side — the node never sweeps.
+    pub fn with_projection_reconcile_state(
+        mut self,
+        state: projection_reconcile::ProjectionReconcileState,
+    ) -> Self {
+        self.projection_reconcile = Some(state);
         self
     }
 
@@ -6908,6 +6940,10 @@ impl P2PNode {
 
         let (dedup_unique_len, dedup_total_seen) = self.dedup.stats();
         let pull = Some(self.acquisition.rollup().await);
+        let projection_reconcile = match &self.projection_reconcile {
+            Some(s) => Some(s.status().await),
+            None => None,
+        };
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
             listen_addresses,
@@ -6921,6 +6957,7 @@ impl P2PNode {
             replication,
             drain,
             pull,
+            projection_reconcile,
             sync_paused: self.sync_paused.load(Ordering::Acquire),
             dedup_unique_len,
             dedup_total_seen,

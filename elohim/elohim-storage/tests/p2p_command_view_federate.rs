@@ -48,6 +48,7 @@ fn test_status() -> P2PStatusInfo {
         replication: ReplicationStatus::default(),
         drain: None,
         pull: None,
+        projection_reconcile: None,
         sync_paused: false,
         dedup_unique_len: 0,
         dedup_total_seen: 0,

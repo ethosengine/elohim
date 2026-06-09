@@ -2,5 +2,12 @@
 
 /**
  * Which kind of view a federation slice represents.
+ *
+ * `ProjectionInventory` (P1 reconciliation stream) is NOT a per-device view
+ * like the others — it carries a `table` discriminator naming which projection
+ * table the requester wants the responder's `(id, dhtAnchorHash)` inventory
+ * for. v1 supports only `"rea_commitments"`; the discriminator is the seam for
+ * `agreements` / `economic_events` later. The inventory itself rides in the
+ * `ViewSlice.payload` as a [`ProjectionInventoryPayload`].
  */
-export type ViewKind = "cluster" | "peer_topology";
+export type ViewKind = "cluster" | "peer_topology" | { "projection_inventory": { table: string, } };

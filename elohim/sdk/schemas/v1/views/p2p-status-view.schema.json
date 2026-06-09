@@ -100,6 +100,37 @@
         { "type": "null" }
       ],
       "description": "Acquisition pull-queue rollup. null when state cannot be computed — treat as 'keep waiting', NEVER as caught up (spec §4.3)."
+    },
+    "projectionReconcile": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "P1 projection-reconcile stream status (REA commitments converge from own conductor; peers as discovery). null when the reconcile task is not running.",
+          "required": [
+            "pending",
+            "completed",
+            "failed",
+            "caughtUp",
+            "peersAsked",
+            "divergentAnchor",
+            "healedTotal",
+            "sweeps"
+          ],
+          "properties": {
+            "pending": { "type": "integer" },
+            "completed": { "type": "integer" },
+            "failed": { "type": "integer" },
+            "caughtUp": { "type": "boolean" },
+            "peersAsked": { "type": "integer" },
+            "divergentAnchor": { "type": "integer" },
+            "healedTotal": { "type": "integer" },
+            "sweeps": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        { "type": "null" }
+      ],
+      "description": "P1 projection-reconcile stream status. null when the reconcile task is not running (missing lamad HcClient / pool / disabled)."
     }
   },
   "additionalProperties": false

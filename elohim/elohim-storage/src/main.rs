@@ -1006,6 +1006,13 @@ async fn async_main(
     let progress_hub = Arc::new(ProgressHub::new(ProgressHubConfig::default()));
     info!("Progress hub initialized for WebSocket streaming");
 
+    // P1 projection-reconcile stream status. Created here so the node can hold
+    // a surfacing-only clone (`/p2p/status`) while the reconcile task (spawned
+    // after node construction, where the lamad HcClient is in scope) drives it.
+    #[cfg(feature = "p2p")]
+    let projection_reconcile_state =
+        elohim_storage::p2p::projection_reconcile::ProjectionReconcileState::new();
+
     // Initialize P2P node if enabled.
     // Gated on `transport_backend == Libp2p` so the iroh path can take over
     // the P2P slot when selected (the two stacks are mutually exclusive at
@@ -1112,6 +1119,11 @@ async fn async_main(
                 info!("  P2P EPR resolution: DB pool + policy enforcement wired");
             }
         }
+
+        // Surface the P1 projection-reconcile status on /p2p/status. The sweep
+        // itself runs in a task spawned after this block (it needs the lamad
+        // HcClient author seam); the node only publishes the shared snapshot.
+        p2p_node = p2p_node.with_projection_reconcile_state(projection_reconcile_state.clone());
 
         info!("P2P networking enabled");
         info!("  Peer ID: {}", p2p_node.peer_id());
@@ -2188,6 +2200,78 @@ async fn async_main(
         }
     } else {
         info!("Reconcile controller disabled: --imagodei-app-id is empty");
+    }
+
+    // P1 projection-reconcile stream — REA commitments converge from THIS node's
+    // OWN conductor, with peers used as discovery only. Cures the edge-triggered
+    // projection gap (a missed ReaProjectionSignal left adam divergent for 10
+    // days; reseeds collapse to 409 on the originator so the signal never
+    // re-fires). See `.claude/deliver/journal-resilient-dual-doorway.md` rc #2
+    // and `p2p::projection_reconcile`.
+    //
+    // Lives here (not in P2PNode) for the same reason as the provide-loop: the
+    // lamad HcClient author/read seam (`registry.lamad`) is only in this
+    // composition scope. Requires the libp2p P2P handle + lamad HcClient + db
+    // pool; absent any, the task is not spawned (the node still surfaces a null
+    // projectionReconcile on /p2p/status).
+    //
+    // Cadence: boot sweep after a 30s settle (peers + conductor up), then every
+    // PROJECTION_RECONCILE_SECS (default 300; 0 disables). Read once here, never
+    // on the hot path.
+    #[cfg(feature = "p2p")]
+    {
+        let reconcile_secs: u64 = std::env::var("PROJECTION_RECONCILE_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(300);
+        let p2p_handle = p2p_node.as_ref().map(|n| n.handle());
+        let lamad_hc = hc_registry_for_http.as_ref().and_then(|r| r.lamad.clone());
+        match (reconcile_secs, p2p_handle, lamad_hc, db_pool.clone()) {
+            (0, _, _, _) => {
+                info!("projection-reconcile: disabled (PROJECTION_RECONCILE_SECS=0)");
+            }
+            (secs, Some(handle), Some(hc), Some(pool)) => {
+                let state = projection_reconcile_state.clone();
+                let mut reconcile_shutdown = shutdown_tx.subscribe();
+                tokio::spawn(async move {
+                    use tokio::time::{interval, Duration, MissedTickBehavior};
+                    // Boot settle: let peers connect + conductor finish init
+                    // before the first sweep (other boot tasks behave likewise).
+                    tokio::select! {
+                        _ = tokio::time::sleep(Duration::from_secs(30)) => {}
+                        _ = reconcile_shutdown.recv() => {
+                            tracing::debug!("projection-reconcile: shutdown during boot settle");
+                            return;
+                        }
+                    }
+                    let mut ticker = interval(Duration::from_secs(secs));
+                    ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                    loop {
+                        tokio::select! {
+                            _ = ticker.tick() => {
+                                elohim_storage::p2p::projection_reconcile::run_sweep(
+                                    &handle, &hc, &pool, &state,
+                                )
+                                .await;
+                            }
+                            _ = reconcile_shutdown.recv() => {
+                                tracing::debug!("projection-reconcile: shutdown signal received, exiting");
+                                break;
+                            }
+                        }
+                    }
+                });
+                info!(
+                    interval_secs = secs,
+                    "projection-reconcile stream started (boot sweep +30s, then periodic, shutdown-aware)"
+                );
+            }
+            _ => {
+                info!(
+                    "projection-reconcile: disabled (requires libp2p P2P handle + lamad HcClient + db pool)"
+                );
+            }
+        }
     }
 
     // T21: Tending TTL sweep task — 5-minute interval, shutdown-aware.

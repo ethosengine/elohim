@@ -345,6 +345,73 @@ pub fn first_or_none(v: Vec<String>) -> Option<String> {
     v.into_iter().find(|s| !s.is_empty())
 }
 
+/// The Commitment fields the storage projection consumes, in the shape both
+/// the post-commit signal (`CommitmentEntry`, `_json` fields `Option<String>`)
+/// and the conductor read (`shefa_types::Commitment`, `_json` fields `String`)
+/// can produce. Borrowed so neither caller has to clone its source entry.
+///
+/// Factored out (P1 reconciliation stream) so the wire→`CreateReaCommitmentInput`
+/// mapping has exactly ONE home: the signal handler and the projection
+/// reconciler both go through [`project_commitment_from_wire`]. A second
+/// bespoke mapping would be a coherence violation — the same discipline the
+/// reconcile rails enforce for the gap state machine.
+pub struct CommitmentWireFields<'a> {
+    pub id: &'a str,
+    pub action: &'a str,
+    pub provider: &'a str,
+    pub receiver: &'a str,
+    pub resource_conforms_to: Option<&'a str>,
+    /// Raw JSON-encoded `Vec<String>` (or None / empty). The builder parses +
+    /// takes first, matching the storage column's single-value shape.
+    pub resource_classified_as_json: Option<&'a str>,
+    pub resource_quantity_value: Option<f64>,
+    pub resource_quantity_unit: Option<&'a str>,
+    pub effort_quantity_value: Option<f64>,
+    pub effort_quantity_unit: Option<&'a str>,
+    pub has_beginning: Option<&'a str>,
+    pub has_end: Option<&'a str>,
+    pub due: Option<&'a str>,
+    pub clause_of: Option<&'a str>,
+    /// Raw JSON-encoded scope list (or None / empty).
+    pub in_scope_of_json: Option<&'a str>,
+    pub note: Option<&'a str>,
+    pub metadata_json: Option<&'a str>,
+}
+
+/// Build the storage-side `CreateReaCommitmentInput` from the canonical
+/// Commitment wire fields. THE single mapping site for both the post-commit
+/// signal path ([`handle_rea_signal`]) and the projection reconciler
+/// (`p2p::projection_reconcile`).
+///
+/// `supersedes` is always `None`: a projection of an already-committed entry
+/// never re-runs supersession — that happened on the originating create.
+/// `medium_of_exchange_id` is `None`: not carried on the DHT Commitment entry.
+pub fn project_commitment_from_wire(fields: &CommitmentWireFields<'_>) -> CreateReaCommitmentInput {
+    let classified = first_or_none(parse_json_strings(fields.resource_classified_as_json));
+    let in_scope_of = first_or_none(parse_json_strings(fields.in_scope_of_json));
+    CreateReaCommitmentInput {
+        id: Some(fields.id.to_string()),
+        action: fields.action.to_string(),
+        provider: fields.provider.to_string(),
+        receiver: fields.receiver.to_string(),
+        resource_conforms_to: fields.resource_conforms_to.map(str::to_string),
+        resource_classified_as: classified,
+        resource_quantity_value: fields.resource_quantity_value.map(|v| v as f32),
+        resource_quantity_unit: fields.resource_quantity_unit.map(str::to_string),
+        effort_quantity_value: fields.effort_quantity_value.map(|v| v as f32),
+        effort_quantity_unit: fields.effort_quantity_unit.map(str::to_string),
+        has_beginning: fields.has_beginning.map(str::to_string),
+        has_end: fields.has_end.map(str::to_string),
+        due: fields.due.map(str::to_string),
+        clause_of: fields.clause_of.map(str::to_string),
+        in_scope_of,
+        medium_of_exchange_id: None,
+        note: fields.note.map(str::to_string),
+        metadata_json: fields.metadata_json.map(str::to_string),
+        supersedes: None,
+    }
+}
+
 // ============================================================================
 // Signal Handler
 // ============================================================================
@@ -384,34 +451,26 @@ pub fn handle_rea_signal(
             ..
         } => {
             info!(id = %commitment.id, hash = %action_hash, "Projecting Commitment from DHT");
-            let classified = first_or_none(parse_json_strings(
-                commitment.resource_classified_as_json.as_deref(),
-            ));
-            let in_scope_of =
-                first_or_none(parse_json_strings(commitment.in_scope_of_json.as_deref()));
-            let input = CreateReaCommitmentInput {
-                id: Some(commitment.id),
-                action: commitment.action,
-                provider: commitment.provider,
-                receiver: commitment.receiver,
-                resource_conforms_to: commitment.resource_conforms_to,
-                resource_classified_as: classified,
-                resource_quantity_value: commitment.resource_quantity_value.map(|v| v as f32),
-                resource_quantity_unit: commitment.resource_quantity_unit,
-                effort_quantity_value: commitment.effort_quantity_value.map(|v| v as f32),
-                effort_quantity_unit: commitment.effort_quantity_unit,
-                has_beginning: commitment.has_beginning,
-                has_end: commitment.has_end,
-                due: commitment.due,
-                clause_of: commitment.clause_of,
-                in_scope_of,
-                medium_of_exchange_id: None,
-                note: commitment.note,
-                metadata_json: commitment.metadata_json,
-                // Projection of an already-committed entry — supersession (if any)
-                // already happened on the originating create; never re-run it here.
-                supersedes: None,
-            };
+            // Single mapping site shared with the P1 projection reconciler.
+            let input = project_commitment_from_wire(&CommitmentWireFields {
+                id: &commitment.id,
+                action: &commitment.action,
+                provider: &commitment.provider,
+                receiver: &commitment.receiver,
+                resource_conforms_to: commitment.resource_conforms_to.as_deref(),
+                resource_classified_as_json: commitment.resource_classified_as_json.as_deref(),
+                resource_quantity_value: commitment.resource_quantity_value,
+                resource_quantity_unit: commitment.resource_quantity_unit.as_deref(),
+                effort_quantity_value: commitment.effort_quantity_value,
+                effort_quantity_unit: commitment.effort_quantity_unit.as_deref(),
+                has_beginning: commitment.has_beginning.as_deref(),
+                has_end: commitment.has_end.as_deref(),
+                due: commitment.due.as_deref(),
+                clause_of: commitment.clause_of.as_deref(),
+                in_scope_of_json: commitment.in_scope_of_json.as_deref(),
+                note: commitment.note.as_deref(),
+                metadata_json: commitment.metadata_json.as_deref(),
+            });
             rea_commitments::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
         }
         ReaProjectionSignal::ReaEconomicEventCommitted {

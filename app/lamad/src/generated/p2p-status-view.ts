@@ -71,6 +71,19 @@ export interface P2PStatusView {
     failed: number;
     caughtUp: boolean;
   } | null;
+  /**
+   * P1 projection-reconcile stream status. null when the reconcile task is not running (missing lamad HcClient / pool / disabled).
+   */
+  projectionReconcile?: {
+    pending: number;
+    completed: number;
+    failed: number;
+    caughtUp: boolean;
+    peersAsked: number;
+    divergentAnchor: number;
+    healedTotal: number;
+    sweeps: number;
+  } | null;
 }
 /**
  * Identity-driven content replication progress

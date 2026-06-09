@@ -187,6 +187,42 @@ pub fn list_commitments(
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
+/// Projection-inventory rows for the P1 reconciliation stream: the
+/// `(id, dht_anchor_hash)` pairs this peer's projection holds for `table`,
+/// newest first, capped at `cap`. Returns `(entries, total_row_count)`.
+///
+/// Discovery-only: peers exchange this so a reconciler can find ids it is
+/// missing (or holds with a stale anchor). The actual row content is NEVER
+/// read from a peer — it comes from the reconciler's OWN conductor. A NULL
+/// anchor projects as an empty string (an un-anchored bulk-seed row still
+/// counts as "present" for discovery; the reconciler heals the anchor from
+/// its own conductor).
+pub fn inventory_for_reconcile(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    cap: i64,
+) -> Result<(Vec<(String, String)>, usize), StorageError> {
+    let total: i64 = rea_commitments::table
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("inventory count failed: {e}")))?;
+
+    let rows: Vec<(String, Option<String>)> = rea_commitments::table
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        .order(rea_commitments::created_at.desc())
+        .limit(cap)
+        .select((rea_commitments::id, rea_commitments::dht_anchor_hash))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("inventory load failed: {e}")))?;
+
+    let entries = rows
+        .into_iter()
+        .map(|(id, anchor)| (id, anchor.unwrap_or_default()))
+        .collect();
+    Ok((entries, total.try_into().unwrap_or(usize::MAX)))
+}
+
 /// Get commitments for an agent (as provider or receiver)
 pub fn get_commitments_for_agent(
     conn: &mut SqliteConnection,
