@@ -4570,6 +4570,14 @@ mod economic_event_validation_tests {
         let result = validate_economic_event(&event).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
+
+    #[test]
+    fn rejects_empty_string_substrate_signal() {
+        let mut event = ev("work", "{}");
+        event.substrate_signal = Some("".into());
+        let result = validate_economic_event(&event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
 }
 
 /// Validate entry update operations
