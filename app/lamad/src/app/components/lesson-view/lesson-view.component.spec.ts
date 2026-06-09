@@ -137,7 +137,11 @@ describe('LessonViewComponent', () => {
     it('should initialize with default values', () => {
       expect(component.explorationMode).toBe('path');
       expect(component.showInlineQuiz).toBe(false);
-      expect(component.explorationPanelOpen).toBe(false);
+      // Desktop-open contract: at ≥1024px (jsdom default innerWidth = 1024) the
+      // exploration panel starts OPEN — at that width it renders as an in-flow
+      // rail whose mobile toggle is display:none, so a closed default would
+      // leave the learner no affordance to ever open it.
+      expect(component.explorationPanelOpen).toBe(true);
       expect(component.hasRegisteredRenderer).toBe(false);
     });
 

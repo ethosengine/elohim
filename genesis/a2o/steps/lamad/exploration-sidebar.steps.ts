@@ -229,9 +229,15 @@ Given(
 
 /**
  * Find a seeded path whose step renders the given content id, returning the
- * pathId + stepIndex to deep-link to. Returns null when none exists. Queried via
- * the doorway's path listing where available; null today for the doctrinal nodes
- * (the captured seed gap above).
+ * pathId + stepIndex to deep-link to. Returns null when none exists.
+ *
+ * Paths are ContentNodes (`contentType: 'path'`) — there is no `/db/paths`
+ * listing route on the current wire (the doorway's /db registry mirrors
+ * storage's manifest, which doesn't declare one). The canonical body shape is
+ * `sections[].items[]` with `ref: "epr:{id}"` (role: "step"); the lesson-view
+ * URL's stepIndex is the 0-based GLOBAL item index across sections
+ * (path-navigator.component.ts: "Global concept index across all sections").
+ * A legacy `steps[].resourceId` shape is tolerated for older seeds.
  */
 async function locatePathStepFor(
   world: E2EWorld,
@@ -243,15 +249,48 @@ async function locatePathStepFor(
   } catch {
     return null;
   }
-  const resp = await fetch(`${doorwayUrl}/db/paths`).catch(() => null);
+  const resp = await fetch(`${doorwayUrl}/db/content?contentType=path&limit=100`).catch(() => null);
   if (!resp?.ok) return null;
-  const paths = (await resp.json().catch(() => null)) as
-    | { id: string; steps?: { resourceId?: string }[] }[]
-    | null;
-  if (!Array.isArray(paths)) return null;
-  for (const path of paths) {
-    const idx = (path.steps ?? []).findIndex(s => s.resourceId === contentId);
-    if (idx >= 0) return { pathId: path.id, stepIndex: idx };
+  const list = (await resp.json().catch(() => null)) as { items?: PathContentRow[] } | null;
+  for (const row of list?.items ?? []) {
+    const body = parseBody(row.contentBody ?? row.content);
+    if (!body) continue;
+    // Canonical shape: sections[].items[].ref ("epr:{id}" or bare id), flat-indexed.
+    let flat = 0;
+    for (const section of body.sections ?? []) {
+      for (const item of section.items ?? []) {
+        const ref = (item.ref ?? '').replace(/^epr:/, '');
+        if (ref === contentId) return { pathId: row.id, stepIndex: flat };
+        flat++;
+      }
+    }
+    // Legacy shape: top-level steps[].resourceId.
+    const idx = (body.steps ?? []).findIndex(s => s.resourceId === contentId);
+    if (idx >= 0) return { pathId: row.id, stepIndex: idx };
+  }
+  return null;
+}
+
+interface PathContentRow {
+  id: string;
+  contentBody?: unknown;
+  content?: unknown;
+}
+
+interface PathBody {
+  sections?: { items?: { ref?: string }[] }[];
+  steps?: { resourceId?: string }[];
+}
+
+/** Path content bodies arrive as parsed JSON or a JSON string depending on the route. */
+function parseBody(raw: unknown): PathBody | null {
+  if (raw && typeof raw === 'object') return raw as PathBody;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as PathBody;
+    } catch {
+      return null;
+    }
   }
   return null;
 }
@@ -343,9 +382,11 @@ Then(
     if (!page) {
       return PENDING;
     }
+    // The lesson-view sidebar is collapsible and starts CLOSED — perform the
+    // learner's "Explore" tap first (no-op on the pinned standalone viewer).
     assert.ok(
-      await page.isSidebarVisible(),
-      'Expected the shared exploration sidebar to be visible in the path-step lesson view'
+      await page.ensureSidebarOpen(),
+      'Expected the shared exploration sidebar to open (Explore toggle) in the path-step lesson view'
     );
     const authored = await page.getAuthoredConceptTexts();
     assert.ok(authored.length >= 1, 'Expected at least one authored related-concept card');

@@ -45,6 +45,20 @@ this is a latent inconsistency, not a defect — but any future catalog/MCP tool
 reading it will under-count the doctrinal corpus. Regenerate the catalog (or
 confirm it's dead and retire it).
 
+## 3. Path-phase step relationships rejected: `relationship_type 'step'` not in storage vocabulary
+
+The seeder's path phase (`--paths-only`) emits step relationship rows with
+`relationshipType: 'step'`; storage's validator rejects the whole bulk batch:
+`HTTP 400 — relationship_type 'step' is not valid. Valid types: ["RELATES_TO",
+"CONTAINS", ...16 kinds]`. Same relationship-*kind* vocabulary-drift family the
+graph-seam spec §2 deliberately sidestepped (manifest 11 / DHT 6 / storage 16).
+Path STEP membership still works (it lives in the path ContentNode's body
+`sections[].items[]`), so this only drops the redundant step-edge projection —
+but the bulk-batch all-or-nothing rejection means any OTHER relationships in the
+same batch are lost with it. Fix: either map `step` → `CONTAINS` at the seeder,
+or admit `step` to storage's vocabulary as part of the tracked kind-drift
+reconciliation.
+
 ## Status
 
 `documented` — not actioned. Captured during the graph-seam delivery shift so the

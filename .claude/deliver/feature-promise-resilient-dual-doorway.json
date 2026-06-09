@@ -1,0 +1,136 @@
+{
+  "name": "resilient-dual-doorway-delivery",
+  "handle": "resiliency-epic + doorway-federation: two doorways routing p2p-hosted landing + lamad-epr apps, resilience visible on UI",
+  "title": "Both doorways (alpha.elohim.host facilitating/projection + elohim.host apex) deliver the p2p-hosted elohim-protocol landing and lamad EPR apps through the federated substrate, degrade gracefully when a backend peer is missing rows/bytes, and the resilience posture is visible to a human on the UI",
+  "extends": [
+    ".claude/deliver/feature-promise-doorway-federation.json",
+    ".claude/deliver/feature-promise-landing-page.json"
+  ],
+  "promise": {
+    "vision_quotes": [
+      {
+        "text": "Substrate = attested. N independent replicas held by people with skin in the game; the durability contract is notarized and auditable (you can verify your data is held, not trust a promise); a reciprocity-imbalance signal fires the moment a holder lapses. Verifiable durability beats claimed durability.",
+        "source": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md:39-42"
+      },
+      {
+        "text": "For a human staring at their screen ... the substrate's claim has to show up somewhere they can see it. Not in a settings panel six clicks deep. Not as an opt-in advanced view. At the top level of the storage / compute surface, glanceable in a second.",
+        "source": "genesis/docs/content/elohim-protocol/resilience/README.md Part V 'The Top-Level Surface — A Bar That Tells the Truth'"
+      },
+      {
+        "text": "Project a single Matthew-stewarded landing-page EPR (elohim-host-landing ContentNode) through two federated doorways — alpha.elohim.host (doorway-A) and elohim.host (doorway-B / apex) ... so visiting either surface renders the elohim-app browser bundle from a single content-addressed blob.",
+        "source": "genesis/docs/superpowers/plans/2026-05-23-landing-page-epr-dual-doorway.md:12"
+      },
+      {
+        "text": "Cross-doorway content delivery is the visible proof that the substrate, not any gateway, holds the content.",
+        "source": ".claude/deliver/feature-promise-doorway-federation.json manifesto_anchors"
+      }
+    ],
+    "plan_deliverables": [
+      {
+        "id": "alpha-serves-landing-and-lamad",
+        "text": "GET https://alpha.elohim.host/ renders the elohim-protocol landing (200, html); GET https://alpha.elohim.host/lamad renders the Lamad LMS (200, html).",
+        "source": "2026-05-23-landing-page-epr-dual-doorway.md acceptance criteria 1; 2026-05-30 sprint-result measure",
+        "user_visible": true
+      },
+      {
+        "id": "apex-serves-landing-and-lamad",
+        "text": "GET https://elohim.host/ and /lamad render the same surfaces through doorway-B from the same content-addressed substrate.",
+        "source": "2026-05-23-landing-page-epr-dual-doorway.md acceptance criteria 2; 2026-05-30 sprint-result 'Remaining step for apex'",
+        "user_visible": true
+      },
+      {
+        "id": "doorway-degrades-through-pool",
+        "text": "A doorway whose primary storage backend lacks projection rows populates its EPR router from the configured storage pool (the federated fallback the /db route registry already uses) instead of silently serving an empty router; degraded state logs at visible level.",
+        "source": "alpha-b.yaml:143-146 ('the pool is only consulted ... when the primary can't satisfy a request'); 2026-05-31 sprint R9/R10 leftover; iter-0 Loki evidence (refresh count=0 vs proxy 3 rows from matthew)",
+        "user_visible": true
+      },
+      {
+        "id": "blob-heal-on-demand-for-apps",
+        "text": "The storage apps-resolver heals a locally-missing app ZIP blob via the same T17 peer race-fetch the /blob route uses (peer_blob_inventory -> race_fetch -> finalize_fetch_success incl. serve-blob REA event), instead of 404 'App ZIP blob not found'.",
+        "source": "elohim/elohim-storage/src/http.rs:4741 (gap) vs :2093-2160 (existing heal); felt-resilience spec 'demand-driven replication'; iter-0 evidence: manual /blob fetch healed alpha / and /lamad",
+        "user_visible": true
+      },
+      {
+        "id": "resilience-visible-on-ui",
+        "text": "The resilience posture is reachable by a human on the deployed surfaces: nav links to /shefa/cluster and /shefa/peers exist (today URL-only), and the steward-count/protection state for content (already live in ResilienceService + EprRelationshipCard + content-viewer Network tab + /api/v1/resilience/{id}) is discoverable, not buried.",
+        "source": "2026-05-29-durability-topology-felt-resilience.md 'Three gaps' #1 connective tissue; resilience/README.md Part V roadmap items 3",
+        "user_visible": true
+      }
+    ],
+    "manifesto_anchors": [
+      {
+        "deliverable_id": "doorway-degrades-through-pool",
+        "why": "Resilience is not a feature, it is the substrate posture: a federation pair that goes dark when one peer misses rows has re-created web2's single-origin failure. The doorway consulting its pool IS mutual aid expressed at the gateway layer."
+      },
+      {
+        "deliverable_id": "blob-heal-on-demand-for-apps",
+        "why": "Verifiable durability beats claimed durability — the substrate already heals blobs on the /blob path and books a serve-blob REA event; the apps path 404ing instead is the substrate failing to keep its own promise on the surface a human actually visits."
+      },
+      {
+        "deliverable_id": "resilience-visible-on-ui",
+        "why": "The epic's Part V: the claim has to show up somewhere the human can see it. alpha was serving 404s for days with protectionStatus 'at-risk' sitting unread in an API nobody surfaces."
+      }
+    ]
+  },
+  "verification": {
+    "scenarios_existing": [
+      "genesis/a2o/features/protocol/landing-page-dogfood.feature (@e2e @protocol @landing-dogfood)",
+      "genesis/a2o/features/resilience/observable-distribution.feature (@e2e @resilience @resilience-p1 @local)",
+      "genesis/a2o/features/federation/cross-doorway-content.feature (@e2e @federation @requires:shem)",
+      "genesis/a2o/features/browser/doorway-dashboard-health.feature"
+    ],
+    "scenarios_missing": [
+      {
+        "intent": "A doorway whose primary storage returns zero projection rows for its DOORWAY_ID populates its EPR router from a pool peer and serves / + /lamad; the degraded-primary state is observable.",
+        "proposed_location": "genesis/a2o/features/federation/doorway-pool-degrade.feature"
+      },
+      {
+        "intent": "An app whose ZIP blob is locally missing on the serving peer heals on first request via peer race-fetch and serves 200; a serve-blob REA event is booked for the source peer.",
+        "proposed_location": "genesis/a2o/features/resilience/app-blob-heal-on-read.feature"
+      }
+    ],
+    "screenshot_targets": [
+      {
+        "scenario": "Landing serves on both doorways",
+        "url": "https://alpha.elohim.host/ and https://elohim.host/",
+        "what_should_be_visible": "elohim-app landing shell rendered (header/nav/hero structure), no error overlay, no infinite spinner"
+      },
+      {
+        "scenario": "Lamad serves on both doorways",
+        "url": "https://alpha.elohim.host/lamad and https://elohim.host/lamad",
+        "what_should_be_visible": "Lamad LMS shell rendered (sidebar/content grid structure)"
+      },
+      {
+        "scenario": "Resilience posture reachable",
+        "url": "https://alpha.elohim.host/shefa/cluster (via nav, not URL-only)",
+        "what_should_be_visible": "cluster device tiles with free/used/stewarded figures; nav affordance that led here"
+      }
+    ]
+  },
+  "scope": {
+    "unbounded_default": true,
+    "consent_required_paths": [
+      "**/*.production.*",
+      ".github/workflows/**",
+      "elohim/holochain/dna/**/integrity/**",
+      "genesis/orchestrator/manifests/**"
+    ],
+    "notes": "Manifests are consent-required this run because redeploys restart live alpha edge nodes (operator territory per sprint-branch memory). Code + Jenkinsfile helper changes are in scope; push/merge is integrator-owned (commit-only convention)."
+  },
+  "budget": {
+    "soft_iterations": 8,
+    "notes": "Deploy-gated verification: fresh-trigger renders require operator merge to dev."
+  },
+  "search_trail": [
+    {"location": "genesis/docs/superpowers/plans/2026-05-23-landing-page-epr-dual-doorway.md", "status": "hit", "note": "the dual-doorway implementation plan; acceptance criteria adopted"},
+    {"location": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md", "status": "hit", "note": "felt-resilience grounding; 3 gaps incl. connective-tissue UI"},
+    {"location": "genesis/docs/content/elohim-protocol/resilience/README.md", "status": "hit", "note": "the epic; Part V stewardship surface promise quoted verbatim"},
+    {"location": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md", "status": "hit-not-read", "note": "adjacent synthesis plan"},
+    {"location": ".claude/shifts/2026-05-30T03-15-landing-pages-both-doorways.sprint-result.md", "status": "hit", "note": "alpha delivered 2/4; apex blocked on adam-side projection rows — exact leftover confirmed live today"},
+    {"location": ".claude/shifts/2026-05-31T03-16-doorway-routing-projection-shakeout.sprint-result.md", "status": "hit", "note": "routing-shadow fix; R9/R21/apex-empty-router leftovers"},
+    {"location": "genesis/a2o/features/{protocol,federation,resilience,doorway,browser}/", "status": "hit", "note": "scenarios bound in verification"},
+    {"location": ".claude/deliver/feature-promise-doorway-federation.json + manifest.json", "status": "hit", "note": "prior promise extended; observable-distribution already active.alpha"},
+    {"location": "memory: project_epr_router_empties_on_poisoned_scope, project_resilience_snapshot_humans_junction, feedback_household_nodes_is_the_stable_floor, project_sprint_branch_not_orchestrator_indexed", "status": "hit"},
+    {"location": "live surfaces (curl) + Loki (doorway-alpha-b)", "status": "hit", "note": "iter-0 render + root-cause evidence"}
+  ]
+}

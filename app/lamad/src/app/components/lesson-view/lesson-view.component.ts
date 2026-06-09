@@ -421,8 +421,14 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
   rendererHost!: ViewContainerRef;
 
-  /** Whether exploration panel is open (mobile) */
-  explorationPanelOpen = false;
+  /**
+   * Whether the exploration panel is open. Desktop (≥1024px — the sidebar's
+   * CSS breakpoint) starts OPEN: at that width the panel renders as an in-flow
+   * rail, its mobile toggle is display:none, and a closed panel would leave the
+   * learner no affordance to ever open it. Mobile starts closed (off-canvas,
+   * opened via the Explore toggle).
+   */
+  explorationPanelOpen = typeof window !== 'undefined' && window.innerWidth >= 1024;
 
   /** Whether we have a registered renderer for this content */
   hasRegisteredRenderer = false;

@@ -49,6 +49,20 @@ export class EprContentPage extends BasePage {
   }
 
   /**
+   * Ensure the sidebar is open — the learner's "Explore" tap. In the
+   * path-step lesson view the sidebar is collapsible and starts CLOSED
+   * (off-canvas, present in DOM but not visible); on the standalone
+   * /epr/{id} viewer it is pinned and this is a no-op.
+   */
+  async ensureSidebarOpen(timeoutMs = 15_000): Promise<boolean> {
+    if (await this.isSidebarVisible(2_000)) return true;
+    const toggle = this.testId(EXPLORATION.PANEL_TOGGLE).first();
+    if ((await toggle.count()) === 0) return this.isSidebarVisible(timeoutMs);
+    await toggle.click();
+    return this.isSidebarVisible(timeoutMs);
+  }
+
+  /**
    * Texts of the AUTHORED related-concept cards (explicit relatedNodeIds edges).
    * Scoped to within the sidebar so it never picks up unrelated cards.
    */

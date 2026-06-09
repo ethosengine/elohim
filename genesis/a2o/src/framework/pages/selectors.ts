@@ -455,8 +455,11 @@ export const MARKDOWN = {
   BACK_TO_TOP: 'markdown-back-to-top',
   // The rendered markdown body. No data-testid (a content container, not an
   // interactive element); locate via this class. Render-verifies "the markdown
-  // content body is rendered".
-  CONTENT: '.markdown-content', // CSS selector — used via locate(), not testId()
+  // content body is rendered". TWO render paths exist: the lesson-view's
+  // markdown renderer emits .markdown-content; the standalone /epr/{id}
+  // content-viewer renders the body into .content-body (verified live —
+  // unification of the two markdown paths is a tracked content-viewer concern).
+  CONTENT: '.markdown-content, .content-viewer .content-body, .content-body', // CSS selector — used via locate(), not testId()
 } as const;
 
 // Shared exploration sidebar (lamad: exploration-sidebar.component.ts +
@@ -467,6 +470,7 @@ export const MARKDOWN = {
 // an inference-source attribute that is NOT "explicit".
 export const EXPLORATION = {
   SIDEBAR: 'exploration-sidebar', // root <aside> — render-verifies the sidebar mounted
+  PANEL_TOGGLE: 'exploration-panel-toggle', // collapsible-mode "Explore" toggle (lesson-view starts closed)
   EXPLORE_GRAPH: 'exploration-explore-graph', // "Explore in Full Graph" button
   RELATED_CONCEPT_CARD: 'related-concept-card', // authored neighbor (explicit edge)
   DISCOVERED_CONCEPT_CARD: 'discovered-concept-card', // computed neighbor (tag edge)
