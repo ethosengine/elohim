@@ -3,21 +3,23 @@ id: "backlog-ci-alpha-cluster-degraded-substrate"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Alpha cluster degraded (10/13 peers crashlooping) + shem down → cross-job UNSTABLE deploy/upload/E2E (one infra condition, many fingerprints)"
+title: "Alpha cluster degraded (10/13 peers crashlooping) + shem down → cross-job UNSTABLE/red deploy/upload/E2E-health-gate (one infra condition, many fingerprints)"
 slug: "ci-alpha-cluster-degraded-substrate"
 written: "2026-06-06"
 author: "ci-failure-triage"
 status: "backlog"
 priority: "high"
 ci_status: blocked
-fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4]
+fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af]
 jobs: [elohim, elohim-edge, elohim-genesis]
 relatedNodeIds: []
 tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1100/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1504/
+  - https://jenkins.ethosengine.com/job/elohim/job/dev/1518/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1042/
+  - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1051/
   - genesis/manifests/cluster-state.yaml
   - genesis/a2o/features/resilience/household-reciprocity.feature
   - genesis/a2o/steps/resilience.steps.ts
@@ -45,19 +47,49 @@ condition, not seven independent code bugs. The genesis E2E assertion cluster:
               (data-testid="content-viewer"); URL is "https://alpha.elohim.host/"           (genesis 1100)
 ```
 
-plus two deploy/upload facets on the sibling jobs:
+plus three deploy/upload/E2E facets on the sibling jobs:
 
 ```
 7bbfcf8928b9  elohim — stage:Upload SPA Blob          (elohim 1500–1504, build result UNSTABLE)
 5af3f81c7dd4  elohim-edge — deploy.alpha-doorway.elohim-doorway-alpha-b  (elohim-edge 1038–1042, UNSTABLE)
+79748fd505af  elohim — stage:E2E Testing - Alpha Validation             (elohim 1518, red build)
 ```
+
+The newest facet — **`79748fd505af` (elohim #1518)** — is the E2E
+**post-deploy health gate** failing, the cleanest single signature of the whole
+condition. Everything UPSTREAM of E2E on that build was green: **Unit Test
+PASSED (4597 tests)**, SonarQube / Upload SPA Blob / Build Image / Push /
+Deploy-to-Alpha all completed. The ONLY failing stage is `E2E Testing - Alpha
+Validation`, and within it the `runE2ETests('alpha', …)` "verify environment is
+up" gate (`Jenkinsfile:1456` → helper at `Jenkinsfile:140–146`):
+
+```
+timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://alpha.elohim.host \
+    | grep -q "200|302|301"; do sleep 5; done'
+→ exit 124   (alpha.elohim.host never returned 200/30x within the 60s window, post-deploy)
+```
+
+Exit 124 = the `timeout` killing the `until`-loop — i.e. the alpha edge never
+came up within 60s of the deploy completing. No Cypress test even ran. This is
+the **deploy-succeeds-but-app-never-serves** shape of the same degraded
+substrate: the App pipeline reports green through Deploy (the rollout *applied*),
+then the availability gate catches that the pods never reached Ready. Distinct
+in mechanism from #1500–1504's `Upload SPA Blob` (a PUT/PATCH against degraded
+backends) but the **same root condition** (degraded alpha). The sibling
+**elohim-edge #1051** UNSTABLE is the matching evidence one layer down — a
+doorway-alpha StatefulSet *rollout timeout* — the deploy-side mirror of the same
+unavailability. And **orchestrator #1197 FAILURE is pure cascade** of #1518:
+its own post stages were skipped because the App child failed; it is NOT the
+`a90e18c0cf94`/`ddd8ed2cbdc7` shapes (those are unrelated concerns).
 
 Occurrence evidence: genesis builds **1091–1100 are ALL UNSTABLE** (no green
 genesis run in the window; 1090 ABORTED, 1101 FAILURE = the separate TS2739
 concern, see `ci-genesis-projectionspec-ts2739.md`). elohim 1495–1504 are ALL
-UNSTABLE; elohim-edge 1035–1042 are ALL UNSTABLE. The whole edge/genesis
-surface has been UNSTABLE-not-green for the entire recent window — the
-signature of an environment-down condition, not a code regression.
+UNSTABLE; elohim 1518 carries the condition forward into the E2E gate; elohim-edge
+1035–1042 are ALL UNSTABLE and 1051 UNSTABLE again on the doorway-alpha rollout
+timeout. The whole edge/genesis surface has been UNSTABLE-not-green for the
+entire recent window — the signature of an environment-down condition, not a
+code regression.
 
 ## Verdict
 
@@ -120,7 +152,22 @@ Each fingerprint traces to the same degraded backends:
    cluster. (Distinct from the doorway *image quality-gate* fixture concern at
    edge #1043, which is the separate `ci-doorway-dockerfile-fixture-context`
    entry — that one is host-green-≠-CI-green build-context, this one is
-   live-deploy-against-degraded-pods.)
+   live-deploy-against-degraded-pods.) Re-surfaced at **edge #1051** as a
+   doorway-alpha StatefulSet rollout timeout — the deploy-layer mirror of the
+   App-job E2E gate below.
+
+6. **`E2E Testing - Alpha Validation` (elohim #1518)** — the App pipeline's
+   post-deploy availability gate. After Deploy-to-Alpha *applies* the rollout,
+   `runE2ETests('alpha', 'https://alpha.elohim.host', …)` runs a 60s health
+   probe (`Jenkinsfile:140–146`) before any Cypress test. With the alpha edge
+   degraded, the deployed pods never reach Ready, the probe loops on a
+   non-200/30x (or connection-refused) response, and `timeout` fires → **exit
+   124**, failing the build red. The deploy "succeeded" (k8s accepted the
+   manifest) but the app never *served* — the classic
+   availability-≠-deploy-success boundary. The fix is the substrate, not the
+   gate: a 60s window is reasonable for a healthy alpha; the gate is doing its
+   job by going red instead of running Cypress against a dead backend (which
+   would mask the real signal — cf. museum trap "host-green ≠ CI-green").
 
 ## The tagging seam (the one bounded, in-tree improvement)
 
@@ -183,10 +230,20 @@ stabilizes OR the tags hold the scenarios out of the degraded run.
 
 - No tree change in this triage run (correctly — substrate is operator-owned and
   the tagging/seeding fix is an operator `/shift`, not a sentinel edit).
-- Ledger: all 7 fingerprints set `status: blocked` (blocker: degraded
+- Ledger: all 8 fingerprints set `status: blocked` (blocker: degraded
   alpha-cluster-6peer + down shem; operator-owned). No `triaged_at_build` stamp
   (nothing landed). Recurrence is expected every run until the substrate flips —
   that's the intended LOUD signal, not a re-fire bug.
+- **2026-06-09 extension** — added `79748fd505af` (elohim #1518, E2E health-gate
+  exit-124 on `alpha.elohim.host` post-deploy). Same root condition, new facet:
+  the App-job *post-deploy availability gate* (deploy applied, app never served).
+  Sibling evidence edge #1051 (doorway-alpha rollout timeout) cited; orchestrator
+  #1197 confirmed pure cascade (skipped post stages), not an independent concern.
+  No `@requires:` tag exists for an App-pipeline E2E *health gate* (it's a
+  Jenkinsfile shell probe, not an a2o scenario) — so the substrate-return path
+  (unblock #1) is the only mover for this facet; it cannot be HELD-skipped by the
+  a2o tagging fix (unblock #2). It disappears on a green streak the moment alpha
+  serves 200/30x within 60s post-deploy.
 - **Ceiling note for the operator** (sentinel cannot trigger builds; anonymous
   MCP): confirmation requires either a substrate flip + re-run, or the
   tag+seed `/shift` above. Until then, these UNSTABLE results are the
