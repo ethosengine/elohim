@@ -578,4 +578,77 @@ mod tests {
         );
         assert_eq!(d_edges[0].depth, 2, "D is at depth 2");
     }
+
+    /// `max_computed` is a hard cap on Pass 2 output. The SQL LIMIT is inflated
+    /// by the exclude-set size and then re-truncated with `.take(max_computed)` —
+    /// this locks the subtle two-stage bound: 3 tag neighbors, cap 2, exactly 2
+    /// tag edges survive (and they are the highest-overlap ones).
+    #[test]
+    fn max_computed_caps_tag_edges() {
+        let (pool, ctx, _tmp) = test_pool_ctx();
+
+        {
+            let mut conn = pool.get().expect("conn");
+            // Root shares tags with three unlinked neighbors at distinct overlap
+            // strengths: N2 shares 3 tags, N1 shares 2, N0 shares 1.
+            insert_content_with_tags(&mut conn, &ctx, "X", &["grace", "sin", "hope"]);
+            insert_content_with_tags(&mut conn, &ctx, "N2", &["grace", "sin", "hope"]);
+            insert_content_with_tags(&mut conn, &ctx, "N1", &["grace", "sin"]);
+            insert_content_with_tags(&mut conn, &ctx, "N0", &["grace"]);
+        }
+
+        let resolver = NativeGraphResolver::new(pool);
+        let q = GraphQuery {
+            include_computed: true,
+            min_shared_tags: 1,
+            max_computed: 2,
+            ..GraphQuery::new("X")
+        };
+        let n = resolver.resolve_neighborhood(&ctx, &q).unwrap();
+
+        let tag_edges: Vec<_> = n
+            .edges
+            .iter()
+            .filter(|e| e.inference_source == "tag")
+            .collect();
+        assert_eq!(tag_edges.len(), 2, "tag edges truncated to max_computed");
+        let targets: std::collections::BTreeSet<_> =
+            tag_edges.iter().map(|e| e.target_id.as_str()).collect();
+        assert!(
+            targets.contains("N2") && targets.contains("N1"),
+            "the cap keeps the highest-overlap neighbors (got {targets:?})"
+        );
+    }
+
+    /// `max_depth: 1` is a strict bound: a transitively-reachable node at
+    /// depth 2 must NOT be emitted. (Depth-2 emission is covered by
+    /// `explicit_bfs_reaches_depth_two`; this is the complementary negative.)
+    #[test]
+    fn max_depth_one_excludes_depth_two_nodes() {
+        let (pool, ctx, _tmp) = test_pool_ctx();
+
+        // A -> B -> C, all explicit.
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_relationship(&mut conn, &ctx, "A", "B", "RELATES_TO", "explicit");
+            insert_relationship(&mut conn, &ctx, "B", "C", "RELATES_TO", "explicit");
+        }
+
+        let resolver = NativeGraphResolver::new(pool);
+        let q = GraphQuery {
+            include_computed: false,
+            max_depth: 1,
+            ..GraphQuery::new("A")
+        };
+        let n = resolver.resolve_neighborhood(&ctx, &q).unwrap();
+
+        assert!(
+            n.edges.iter().any(|e| e.target_id == "B" && e.depth == 1),
+            "B (depth 1) is within the bound"
+        );
+        assert!(
+            !n.edges.iter().any(|e| e.target_id == "C"),
+            "C (depth 2) must be excluded at max_depth 1"
+        );
+    }
 }
