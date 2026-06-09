@@ -187,11 +187,7 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
     };
 
     let alice_output: ReaCommitmentOutput = ca
-        .call(
-            &cell_a.zome(ZOME),
-            "create_rea_commitment",
-            input,
-        )
+        .call(&cell_a.zome(ZOME), "create_rea_commitment", input)
         .await;
 
     assert_eq!(alice_output.commitment.id, commitment_id);

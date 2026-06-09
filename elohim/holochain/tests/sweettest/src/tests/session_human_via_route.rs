@@ -106,8 +106,7 @@ struct Manifest {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn session_events_and_onboarding_manifest_round_trip() -> Result<()> {
-    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] =
-        two_agent_conductors().await?;
+    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] = two_agent_conductors().await?;
     let network = network_seed(DNA);
 
     let dna_a = load_dna(DNA, &network, Some(agent_a.clone())).await?;
@@ -300,7 +299,8 @@ async fn session_events_and_onboarding_manifest_round_trip() -> Result<()> {
         )
         .await;
 
-    let path_event = path_event_b.expect("path-started EconomicEvent should be visible from Agent B");
+    let path_event =
+        path_event_b.expect("path-started EconomicEvent should be visible from Agent B");
     assert_eq!(
         path_event.lamad_event_type.as_deref(),
         Some("path-started"),

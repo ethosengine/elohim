@@ -237,7 +237,11 @@ async fn revoke_attestation_issues_superseding_content_entry() -> Result<()> {
     };
 
     let original: AttestationOutput = conductor
-        .call(&cell.zome("content_store"), "issue_attestation", issue_input)
+        .call(
+            &cell.zome("content_store"),
+            "issue_attestation",
+            issue_input,
+        )
         .await;
 
     assert!(!original.cid.is_empty(), "original cid must be set");
@@ -249,7 +253,11 @@ async fn revoke_attestation_issues_superseding_content_entry() -> Result<()> {
     };
 
     let revocation: AttestationOutput = conductor
-        .call(&cell.zome("content_store"), "revoke_attestation", revoke_input)
+        .call(
+            &cell.zome("content_store"),
+            "revoke_attestation",
+            revoke_input,
+        )
         .await;
 
     // The revocation is a NEW attestation entry of the same kind.
@@ -304,7 +312,11 @@ async fn propose_governance_action_renewal_request_creates_parent_content() -> R
     };
 
     let output: GovernanceActionOutput = conductor
-        .call(&cell.zome("content_store"), "propose_governance_action", input)
+        .call(
+            &cell.zome("content_store"),
+            "propose_governance_action",
+            input,
+        )
         .await;
 
     assert_eq!(output.governance_kind, "governance-action:renewal-request");
@@ -348,7 +360,11 @@ async fn vote_on_governance_action_creates_child_attestation_with_parent_link() 
     };
 
     let parent: GovernanceActionOutput = conductor
-        .call(&cell.zome("content_store"), "propose_governance_action", propose_input)
+        .call(
+            &cell.zome("content_store"),
+            "propose_governance_action",
+            propose_input,
+        )
         .await;
 
     assert!(!parent.cid.is_empty(), "parent cid must be set");
@@ -362,7 +378,11 @@ async fn vote_on_governance_action_creates_child_attestation_with_parent_link() 
     };
 
     let vote: AttestationOutput = conductor
-        .call(&cell.zome("content_store"), "vote_on_governance_action", vote_input)
+        .call(
+            &cell.zome("content_store"),
+            "vote_on_governance_action",
+            vote_input,
+        )
         .await;
 
     // The child attestation kind must match the governance-action → attestation mapping.
@@ -410,7 +430,11 @@ async fn get_attestations_for_subject_returns_issued_attestations() -> Result<()
     };
 
     let issued: AttestationOutput = conductor
-        .call(&cell.zome("content_store"), "issue_attestation", issue_input)
+        .call(
+            &cell.zome("content_store"),
+            "issue_attestation",
+            issue_input,
+        )
         .await;
     assert!(!issued.cid.is_empty(), "issued cid must be set");
 
@@ -464,7 +488,11 @@ async fn get_governance_action_with_children_returns_parent_and_votes() -> Resul
     };
 
     let parent: GovernanceActionOutput = conductor
-        .call(&cell.zome("content_store"), "propose_governance_action", propose_input)
+        .call(
+            &cell.zome("content_store"),
+            "propose_governance_action",
+            propose_input,
+        )
         .await;
     assert!(!parent.cid.is_empty(), "parent cid must be set");
 
@@ -477,7 +505,11 @@ async fn get_governance_action_with_children_returns_parent_and_votes() -> Resul
     };
 
     let vote: AttestationOutput = conductor
-        .call(&cell.zome("content_store"), "vote_on_governance_action", vote_input)
+        .call(
+            &cell.zome("content_store"),
+            "vote_on_governance_action",
+            vote_input,
+        )
         .await;
     assert!(!vote.cid.is_empty(), "vote cid must be set");
 

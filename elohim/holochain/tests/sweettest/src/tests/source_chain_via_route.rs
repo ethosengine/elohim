@@ -183,22 +183,47 @@ fn source_chain_entry_view_fields_are_camel_case() {
     let obj = json_value.as_object().expect("must be an object");
 
     // Assert camelCase keys present.
-    assert!(obj.contains_key("actionHash"), "expected 'actionHash', got keys: {:?}", obj.keys().collect::<Vec<_>>());
+    assert!(
+        obj.contains_key("actionHash"),
+        "expected 'actionHash', got keys: {:?}",
+        obj.keys().collect::<Vec<_>>()
+    );
     assert!(obj.contains_key("entryHash"), "expected 'entryHash'");
     assert!(obj.contains_key("authorAgent"), "expected 'authorAgent'");
     assert!(obj.contains_key("entryType"), "expected 'entryType'");
     assert!(obj.contains_key("contentJson"), "expected 'contentJson'");
-    assert!(obj.contains_key("prevActionHash"), "expected 'prevActionHash'");
+    assert!(
+        obj.contains_key("prevActionHash"),
+        "expected 'prevActionHash'"
+    );
     assert!(obj.contains_key("sequence"), "expected 'sequence'");
     assert!(obj.contains_key("timestamp"), "expected 'timestamp'");
 
     // Assert no snake_case leakage.
-    assert!(!obj.contains_key("action_hash"), "snake_case leaked: 'action_hash'");
-    assert!(!obj.contains_key("entry_hash"), "snake_case leaked: 'entry_hash'");
-    assert!(!obj.contains_key("author_agent"), "snake_case leaked: 'author_agent'");
-    assert!(!obj.contains_key("entry_type"), "snake_case leaked: 'entry_type'");
-    assert!(!obj.contains_key("content_json"), "snake_case leaked: 'content_json'");
-    assert!(!obj.contains_key("prev_action_hash"), "snake_case leaked: 'prev_action_hash'");
+    assert!(
+        !obj.contains_key("action_hash"),
+        "snake_case leaked: 'action_hash'"
+    );
+    assert!(
+        !obj.contains_key("entry_hash"),
+        "snake_case leaked: 'entry_hash'"
+    );
+    assert!(
+        !obj.contains_key("author_agent"),
+        "snake_case leaked: 'author_agent'"
+    );
+    assert!(
+        !obj.contains_key("entry_type"),
+        "snake_case leaked: 'entry_type'"
+    );
+    assert!(
+        !obj.contains_key("content_json"),
+        "snake_case leaked: 'content_json'"
+    );
+    assert!(
+        !obj.contains_key("prev_action_hash"),
+        "snake_case leaked: 'prev_action_hash'"
+    );
 }
 
 /// EntryLinkView serializes in camelCase with no snake_case leakage.
@@ -227,12 +252,30 @@ fn entry_link_view_fields_are_camel_case() {
     assert!(obj.contains_key("deletedAt"), "expected 'deletedAt'");
     assert!(obj.contains_key("deleted"), "expected 'deleted'");
 
-    assert!(!obj.contains_key("link_hash"), "snake_case leaked: 'link_hash'");
-    assert!(!obj.contains_key("base_hash"), "snake_case leaked: 'base_hash'");
-    assert!(!obj.contains_key("target_hash"), "snake_case leaked: 'target_hash'");
-    assert!(!obj.contains_key("link_type"), "snake_case leaked: 'link_type'");
-    assert!(!obj.contains_key("author_agent"), "snake_case leaked: 'author_agent'");
-    assert!(!obj.contains_key("deleted_at"), "snake_case leaked: 'deleted_at'");
+    assert!(
+        !obj.contains_key("link_hash"),
+        "snake_case leaked: 'link_hash'"
+    );
+    assert!(
+        !obj.contains_key("base_hash"),
+        "snake_case leaked: 'base_hash'"
+    );
+    assert!(
+        !obj.contains_key("target_hash"),
+        "snake_case leaked: 'target_hash'"
+    );
+    assert!(
+        !obj.contains_key("link_type"),
+        "snake_case leaked: 'link_type'"
+    );
+    assert!(
+        !obj.contains_key("author_agent"),
+        "snake_case leaked: 'author_agent'"
+    );
+    assert!(
+        !obj.contains_key("deleted_at"),
+        "snake_case leaked: 'deleted_at'"
+    );
 }
 
 /// Source-chain entries must appear in ascending sequence order (chain ordering
@@ -249,9 +292,17 @@ fn source_chain_entries_are_ordered_by_sequence() {
             action_hash: format!("uhCkk{:04}", seq),
             entry_hash: String::new(),
             author_agent: "uhCAkABC".to_string(),
-            entry_type: if seq == 0 { "Dna".to_string() } else { "Create:App(0)".to_string() },
+            entry_type: if seq == 0 {
+                "Dna".to_string()
+            } else {
+                "Create:App(0)".to_string()
+            },
             content_json: None,
-            prev_action_hash: if seq == 0 { None } else { Some(format!("uhCkk{:04}", seq - 1)) },
+            prev_action_hash: if seq == 0 {
+                None
+            } else {
+                Some(format!("uhCkk{:04}", seq - 1))
+            },
             sequence: seq,
             timestamp: format!("{}", 1_748_000_000_000_000_u64 + seq as u64 * 1_000),
         })
@@ -269,7 +320,10 @@ fn source_chain_entries_are_ordered_by_sequence() {
     // Verify genesis entries appear in the right positions.
     assert_eq!(records[0].entry_type, "Dna", "first entry must be Dna");
     assert!(records[0].prev_action_hash.is_none(), "genesis has no prev");
-    assert!(records[1].prev_action_hash.is_some(), "second entry has prev");
+    assert!(
+        records[1].prev_action_hash.is_some(),
+        "second entry has prev"
+    );
 }
 
 /// LocalSourceChainService retirement guard.

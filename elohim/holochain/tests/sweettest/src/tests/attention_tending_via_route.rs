@@ -132,7 +132,9 @@ fn zome_input_serializes_without_signer_pubkey() {
 
     // Confirm all required fields are present and round-trip cleanly.
     assert_eq!(
-        json_value.get("filter_subject_json").and_then(|v| v.as_str()),
+        json_value
+            .get("filter_subject_json")
+            .and_then(|v| v.as_str()),
         Some(r#"{"contentId":"abc123"}"#)
     );
     assert_eq!(
@@ -146,7 +148,10 @@ fn zome_input_serializes_without_signer_pubkey() {
     // reason is Option<String> — None serializes as null in JSON (not absent).
     // This confirms the field exists but is null, as the zome expects.
     assert!(
-        json_value.get("reason").map(|v| v.is_null()).unwrap_or(false),
+        json_value
+            .get("reason")
+            .map(|v| v.is_null())
+            .unwrap_or(false),
         "reason: None must serialize as null (present but null)"
     );
 }
@@ -251,12 +256,7 @@ fn ack_view_serializes_camel_case() {
 /// classification, this test flags the schema gap.
 #[test]
 fn classification_enum_values_are_exhaustive() {
-    let allowed = &[
-        "values-forward",
-        "fatigue",
-        "scope-mismatch",
-        "safety",
-    ];
+    let allowed = &["values-forward", "fatigue", "scope-mismatch", "safety"];
 
     // Every value must serialize as a valid intent.
     for cls in allowed {

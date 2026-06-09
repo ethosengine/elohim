@@ -69,7 +69,11 @@ fn far_future_micros() -> i64 {
 
 /// Settle the DHT across both conductors so cross-agent reads see committed
 /// entries + links. Mirrors the qahal_collab_t0_test two-conductor pattern.
-async fn settle(c0: &SweetConductor, c1: &SweetConductor, cells: [&holochain::sweettest::SweetCell; 2]) -> Result<()> {
+async fn settle(
+    c0: &SweetConductor,
+    c1: &SweetConductor,
+    cells: [&holochain::sweettest::SweetCell; 2],
+) -> Result<()> {
     tokio::time::timeout(std::time::Duration::from_secs(30), async {
         while !SweetConductor::exchange_peer_info([c0, c1]).await {
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;

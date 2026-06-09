@@ -66,8 +66,7 @@ struct Manifest {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn pillar_projection_manifest_with_mechanism_ladder_round_trips() -> Result<()> {
-    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] =
-        two_agent_conductors().await?;
+    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] = two_agent_conductors().await?;
     let network = network_seed(DNA);
 
     let dna_a = load_dna(DNA, &network, Some(agent_a.clone())).await?;
@@ -160,8 +159,7 @@ async fn pillar_projection_manifest_with_mechanism_ladder_round_trips() -> Resul
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn pillar_projection_manifest_without_ladder_validates() -> Result<()> {
-    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] =
-        two_agent_conductors().await?;
+    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] = two_agent_conductors().await?;
     let network = network_seed(DNA);
 
     let dna_a = load_dna(DNA, &network, Some(agent_a.clone())).await?;
@@ -252,11 +250,16 @@ fn mechanism_selection_four_rule_ladder_matches_retired_client_constants() {
     ]
     .into_iter()
     .collect();
-    let feedback_content_types = ["discussion", "proposal-draft", "request-for-comment", "reflection"];
+    let feedback_content_types = [
+        "discussion",
+        "proposal-draft",
+        "request-for-comment",
+        "reflection",
+    ];
 
     struct Case<'a> {
         name: &'a str,
-        govstate: Option<&'a str>,     // voting_state field
+        govstate: Option<&'a str>,        // voting_state field
         active_proposal: Option<&'a str>, // votingMechanism of active proposal
         content_type: &'a str,
         expect_level: i32,
@@ -265,19 +268,89 @@ fn mechanism_selection_four_rule_ladder_matches_retired_client_constants() {
 
     let cases = vec![
         // Rule 1: settled govstate → level 0
-        Case { name: "constitutional → level 0", govstate: Some("constitutional"), active_proposal: None, content_type: "concept", expect_level: 0, expect_render_target: "angular" },
-        Case { name: "settled → level 0", govstate: Some("settled"), active_proposal: None, content_type: "discussion", expect_level: 0, expect_render_target: "angular" },
+        Case {
+            name: "constitutional → level 0",
+            govstate: Some("constitutional"),
+            active_proposal: None,
+            content_type: "concept",
+            expect_level: 0,
+            expect_render_target: "angular",
+        },
+        Case {
+            name: "settled → level 0",
+            govstate: Some("settled"),
+            active_proposal: None,
+            content_type: "discussion",
+            expect_level: 0,
+            expect_render_target: "angular",
+        },
         // Rule 2: active proposal → level from map (psephos)
-        Case { name: "approval proposal → level 3", govstate: Some("open"), active_proposal: Some("approval"), content_type: "concept", expect_level: 3, expect_render_target: "psephos" },
-        Case { name: "ranked-choice proposal → level 4", govstate: Some("open"), active_proposal: Some("ranked-choice"), content_type: "discussion", expect_level: 4, expect_render_target: "psephos" },
-        Case { name: "consent proposal → level 6", govstate: None, active_proposal: Some("consent"), content_type: "reflection", expect_level: 6, expect_render_target: "psephos" },
+        Case {
+            name: "approval proposal → level 3",
+            govstate: Some("open"),
+            active_proposal: Some("approval"),
+            content_type: "concept",
+            expect_level: 3,
+            expect_render_target: "psephos",
+        },
+        Case {
+            name: "ranked-choice proposal → level 4",
+            govstate: Some("open"),
+            active_proposal: Some("ranked-choice"),
+            content_type: "discussion",
+            expect_level: 4,
+            expect_render_target: "psephos",
+        },
+        Case {
+            name: "consent proposal → level 6",
+            govstate: None,
+            active_proposal: Some("consent"),
+            content_type: "reflection",
+            expect_level: 6,
+            expect_render_target: "psephos",
+        },
         // Rule 3: feedback-inviting contentType → level 2
-        Case { name: "discussion, no proposal → level 2", govstate: None, active_proposal: None, content_type: "discussion", expect_level: 2, expect_render_target: "angular" },
-        Case { name: "proposal-draft → level 2", govstate: None, active_proposal: None, content_type: "proposal-draft", expect_level: 2, expect_render_target: "angular" },
-        Case { name: "reflection → level 2", govstate: None, active_proposal: None, content_type: "reflection", expect_level: 2, expect_render_target: "angular" },
+        Case {
+            name: "discussion, no proposal → level 2",
+            govstate: None,
+            active_proposal: None,
+            content_type: "discussion",
+            expect_level: 2,
+            expect_render_target: "angular",
+        },
+        Case {
+            name: "proposal-draft → level 2",
+            govstate: None,
+            active_proposal: None,
+            content_type: "proposal-draft",
+            expect_level: 2,
+            expect_render_target: "angular",
+        },
+        Case {
+            name: "reflection → level 2",
+            govstate: None,
+            active_proposal: None,
+            content_type: "reflection",
+            expect_level: 2,
+            expect_render_target: "angular",
+        },
         // Rule 4: default → level 1
-        Case { name: "concept, no context → level 1", govstate: None, active_proposal: None, content_type: "concept", expect_level: 1, expect_render_target: "angular" },
-        Case { name: "lesson, no context → level 1", govstate: None, active_proposal: None, content_type: "lesson", expect_level: 1, expect_render_target: "angular" },
+        Case {
+            name: "concept, no context → level 1",
+            govstate: None,
+            active_proposal: None,
+            content_type: "concept",
+            expect_level: 1,
+            expect_render_target: "angular",
+        },
+        Case {
+            name: "lesson, no context → level 1",
+            govstate: None,
+            active_proposal: None,
+            content_type: "lesson",
+            expect_level: 1,
+            expect_render_target: "angular",
+        },
     ];
 
     for case in &cases {

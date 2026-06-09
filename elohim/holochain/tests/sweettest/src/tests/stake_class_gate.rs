@@ -114,7 +114,11 @@ struct ReaEconomicEventOutput {
 // Helper
 // ---------------------------------------------------------------------------
 
-fn make_event(id: &str, action: &str, observation_refs: Option<Vec<String>>) -> CreateReaEconomicEventInput {
+fn make_event(
+    id: &str,
+    action: &str,
+    observation_refs: Option<Vec<String>>,
+) -> CreateReaEconomicEventInput {
     CreateReaEconomicEventInput {
         id: id.to_string(),
         action: action.to_string(),

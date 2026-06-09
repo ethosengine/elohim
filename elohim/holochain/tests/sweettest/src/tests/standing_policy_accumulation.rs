@@ -95,8 +95,7 @@ struct FeedbackSignal {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn standing_policy_manifest_with_thresholds_round_trips() -> Result<()> {
-    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] =
-        two_agent_conductors().await?;
+    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] = two_agent_conductors().await?;
     let network = network_seed(DNA);
 
     let dna_a = load_dna(DNA, &network, Some(agent_a.clone())).await?;
@@ -180,8 +179,7 @@ async fn standing_policy_manifest_with_thresholds_round_trips() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
 async fn feedback_signals_replicate_for_accumulation() -> Result<()> {
-    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] =
-        two_agent_conductors().await?;
+    let [(mut conductor_a, agent_a), (mut conductor_b, agent_b)] = two_agent_conductors().await?;
     let network = network_seed(DNA);
 
     let dna_a = load_dna(DNA, &network, Some(agent_a.clone())).await?;
@@ -307,15 +305,45 @@ fn accumulation_threshold_defaults_match_retired_client_constants() {
 
     let cases = vec![
         // Below all thresholds → pending
-        ThresholdCheck { total: 5, consensus: 0.5, expect_ready: false, expect_controversy: false, expect_settled: false },
+        ThresholdCheck {
+            total: 5,
+            consensus: 0.5,
+            expect_ready: false,
+            expect_controversy: false,
+            expect_settled: false,
+        },
         // Exactly at readyForSensemaking threshold
-        ThresholdCheck { total: 20, consensus: 0.65, expect_ready: true, expect_controversy: false, expect_settled: false },
+        ThresholdCheck {
+            total: 20,
+            consensus: 0.65,
+            expect_ready: true,
+            expect_controversy: false,
+            expect_settled: false,
+        },
         // At controversyDetected (low consensus)
-        ThresholdCheck { total: 12, consensus: 0.25, expect_ready: false, expect_controversy: true, expect_settled: false },
+        ThresholdCheck {
+            total: 12,
+            consensus: 0.25,
+            expect_ready: false,
+            expect_controversy: true,
+            expect_settled: false,
+        },
         // At settled threshold
-        ThresholdCheck { total: 30, consensus: 0.90, expect_ready: false, expect_controversy: false, expect_settled: true },
+        ThresholdCheck {
+            total: 30,
+            consensus: 0.90,
+            expect_ready: false,
+            expect_controversy: false,
+            expect_settled: true,
+        },
         // High signal count, high consensus, NOT ready (consensus >= 0.7 blocks ready)
-        ThresholdCheck { total: 25, consensus: 0.80, expect_ready: false, expect_controversy: false, expect_settled: false },
+        ThresholdCheck {
+            total: 25,
+            consensus: 0.80,
+            expect_ready: false,
+            expect_controversy: false,
+            expect_settled: false,
+        },
     ];
 
     for (i, case) in cases.iter().enumerate() {

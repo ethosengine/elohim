@@ -544,8 +544,7 @@ async fn m4_t4_commit_key_rotation_blocked_by_cross_dna_identity_freeze() -> Res
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -688,8 +687,7 @@ async fn m4_t4_commit_key_rotation_blocked_by_cross_dna_key_revocation() -> Resu
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -829,8 +827,7 @@ async fn m4_t5_submit_revocation_vote_reads_cross_dna_content() -> Result<()> {
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -918,15 +915,14 @@ async fn m4_t5_submit_revocation_vote_reads_cross_dna_content() -> Result<()> {
         attestation: "Recognized Matthew, this is legitimate.".to_string(),
     };
 
-    let vote_result: holochain::conductor::api::error::ConductorApiResult<
-        RevocationVoteOutput,
-    > = conductor
-        .call_fallible(
-            &imagodei_cell.zome("imagodei"),
-            "submit_revocation_vote",
-            vote_input,
-        )
-        .await;
+    let vote_result: holochain::conductor::api::error::ConductorApiResult<RevocationVoteOutput> =
+        conductor
+            .call_fallible(
+                &imagodei_cell.zome("imagodei"),
+                "submit_revocation_vote",
+                vote_input,
+            )
+            .await;
 
     if let Err(err) = vote_result {
         let message = format!("{err:?}");
@@ -1165,8 +1161,7 @@ async fn m4_t13_create_recovery_request_lands_governance_action_on_elohim_dna() 
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -1320,11 +1315,17 @@ async fn m4_t13_create_recovery_request_lands_governance_action_on_elohim_dna() 
         "recovery-request effective_at must be null until quorum is reached"
     );
     assert!(
-        metadata.get("trigger_type").and_then(|v| v.as_str()).is_some(),
+        metadata
+            .get("trigger_type")
+            .and_then(|v| v.as_str())
+            .is_some(),
         "trigger_type must be surfaced at top level for projector classification"
     );
     assert!(
-        metadata.get("session_pubkey").and_then(|v| v.as_str()).is_some(),
+        metadata
+            .get("session_pubkey")
+            .and_then(|v| v.as_str())
+            .is_some(),
         "session_pubkey (new_agent_pubkey) must be surfaced at top level"
     );
 
@@ -1349,8 +1350,7 @@ async fn m4_t13_create_self_revocation_lands_governance_action_on_elohim_dna() -
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -1361,7 +1361,11 @@ async fn m4_t13_create_self_revocation_lands_governance_action_on_elohim_dna() -
     ];
 
     let app = conductor
-        .setup_app_for_agent("recovery-m4-t13-revocation", agent.clone(), &dnas_with_roles)
+        .setup_app_for_agent(
+            "recovery-m4-t13-revocation",
+            agent.clone(),
+            &dnas_with_roles,
+        )
         .await?;
     let cells = app.cells();
     let imagodei_cell = cells
@@ -1496,7 +1500,9 @@ async fn m4_t13_create_self_revocation_lands_governance_action_on_elohim_dna() -
         "self-revocation is immediately effective on the initial CREATE"
     );
     assert!(
-        metadata["effective_at"].as_str().is_some_and(|s| !s.is_empty()),
+        metadata["effective_at"]
+            .as_str()
+            .is_some_and(|s| !s.is_empty()),
         "self-revocation effective_at must be a non-empty string on the initial CREATE"
     );
     assert_eq!(
@@ -1576,8 +1582,7 @@ async fn m4_t14_create_revocation_request_lands_pending() -> Result<()> {
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -1758,8 +1763,7 @@ async fn m4_t14_submit_revocation_vote_lands_attestation() -> Result<()> {
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -1920,8 +1924,7 @@ async fn m4_t14_identity_freeze_lands_effective() -> Result<()> {
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -2057,8 +2060,7 @@ async fn m4_t14_specialist_revocation_lands_effective() -> Result<()> {
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -2276,7 +2278,14 @@ async fn m4_t18_envelope_wire_shape() -> Result<()> {
     );
 
     // --- S1.3: required top-level fields present ---
-    for field in &["subjectCid", "issuer", "issuedAt", "signature", "metadata", "relayChain"] {
+    for field in &[
+        "subjectCid",
+        "issuer",
+        "issuedAt",
+        "signature",
+        "metadata",
+        "relayChain",
+    ] {
         assert!(
             !wire[field].is_null(),
             "required envelope field '{}' must be present in wire JSON",
@@ -2302,9 +2311,9 @@ async fn m4_t18_envelope_wire_shape() -> Result<()> {
     );
 
     // --- S1.5: relayChain is present-but-empty (T18 wire contract) ---
-    let relay_chain = wire["relayChain"].as_array().expect(
-        "relayChain must be a JSON array on T18 wire (present-but-empty)"
-    );
+    let relay_chain = wire["relayChain"]
+        .as_array()
+        .expect("relayChain must be a JSON array on T18 wire (present-but-empty)");
     assert!(
         relay_chain.is_empty(),
         "relayChain must be empty in T18 (relay elohims not yet running)"
@@ -2375,8 +2384,7 @@ async fn m4_t18_dna_emits_key_revocation_envelope_on_self_revocation() -> Result
 
     let (mut conductor, agent) = single_agent_conductor().await?;
 
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let lamad_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
 
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
@@ -2494,7 +2502,7 @@ async fn m4_t18_dna_emits_key_revocation_envelope_on_self_revocation() -> Result
 
     let envelope = key_revocation_signal.expect(
         "T18: DnaSignal::KeyRevocation must be emitted alongside KeyRevocationEffective \
-         on create_self_revocation"
+         on create_self_revocation",
     );
 
     // --- Signal shape assertions ---

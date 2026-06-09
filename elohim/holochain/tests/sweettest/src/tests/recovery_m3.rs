@@ -195,8 +195,7 @@ async fn intimate_witness_reads_cross_dna_recovery_request() -> Result<()> {
 
     // Load both DNAs and install them under explicit role names matching
     // the imagodei coordinator's `CallTargetCell::OtherRole("elohim")` target.
-    let imagodei_dna =
-        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let imagodei_dna = load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
     let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
     let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
     let elohim_dna_hash = elohim_dna.dna_hash().clone();
@@ -246,7 +245,10 @@ async fn intimate_witness_reads_cross_dna_recovery_request() -> Result<()> {
             propose_input,
         )
         .await;
-    assert!(!governance_output.cid.is_empty(), "governance CID must be set");
+    assert!(
+        !governance_output.cid.is_empty(),
+        "governance CID must be set"
+    );
 
     // Step 2: invoke submit_intimate_witness on imagodei with the elohim CID.
     let witness_input = SubmitIntimateWitnessInputMirror {

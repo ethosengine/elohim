@@ -82,8 +82,8 @@ fn wire_type_serializes_to_camelcase() {
         computed_at: "2026-05-28T12:00:00Z".to_string(),
     };
 
-    let json_value = serde_json::to_value(&view)
-        .expect("ContentEngagementStatsView must serialize to JSON");
+    let json_value =
+        serde_json::to_value(&view).expect("ContentEngagementStatsView must serialize to JSON");
 
     // All fields must appear under camelCase keys — snake_case must never
     // cross the Rust boundary (CLAUDE.md rule: snake_case stays in Rust).
@@ -121,9 +121,7 @@ fn wire_type_serializes_to_camelcase() {
         Some(10)
     );
     assert_eq!(
-        json_value
-            .get("completionRate")
-            .and_then(|v| v.as_f64()),
+        json_value.get("completionRate").and_then(|v| v.as_f64()),
         Some(0.4)
     );
 }
@@ -144,8 +142,7 @@ fn zero_views_completion_rate_is_zero() {
         computed_at: "2026-05-28T10:00:00Z".to_string(),
     };
 
-    let json_value =
-        serde_json::to_value(&zero_view).expect("zero-view stats must serialize");
+    let json_value = serde_json::to_value(&zero_view).expect("zero-view stats must serialize");
 
     let rate = json_value
         .get("completionRate")

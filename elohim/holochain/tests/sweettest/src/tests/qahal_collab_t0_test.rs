@@ -125,7 +125,10 @@ async fn create_collective_atomic_founder_membership() -> Result<()> {
             collective_hash.clone(),
         )
         .await;
-    assert!(collective_record.is_some(), "Collective record must exist after create_collective");
+    assert!(
+        collective_record.is_some(),
+        "Collective record must exist after create_collective"
+    );
 
     // Read back: exactly one Membership record (the founder Steward Membership).
     let memberships: Vec<holochain_types::prelude::Record> = conductor
@@ -218,7 +221,11 @@ async fn create_collab_agreement_requires_pending_attestations() -> Result<()> {
 
     // After creation, status must be PendingAttestations.
     let status: String = conductor
-        .call(&cell.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .call(
+            &cell.zome(ZOME),
+            "get_collab_status",
+            agreement_hash.clone(),
+        )
         .await;
     assert_eq!(
         status, "PendingAttestations",
@@ -238,7 +245,11 @@ async fn create_collab_agreement_requires_pending_attestations() -> Result<()> {
         .await;
 
     let status: String = conductor
-        .call(&cell.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .call(
+            &cell.zome(ZOME),
+            "get_collab_status",
+            agreement_hash.clone(),
+        )
         .await;
     assert_eq!(
         status, "PendingAttestations",
@@ -258,7 +269,11 @@ async fn create_collab_agreement_requires_pending_attestations() -> Result<()> {
         .await;
 
     let status: String = conductor
-        .call(&cell.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .call(
+            &cell.zome(ZOME),
+            "get_collab_status",
+            agreement_hash.clone(),
+        )
         .await;
     assert_eq!(
         status, "Instantiated",
@@ -606,7 +621,11 @@ async fn two_conductor_t0_collab_end_to_end() -> Result<()> {
 
     // Status on conductor A must be PendingAttestations immediately after creation.
     let status_before: String = ca
-        .call(&cell_a.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .call(
+            &cell_a.zome(ZOME),
+            "get_collab_status",
+            agreement_hash.clone(),
+        )
         .await;
     assert_eq!(
         status_before, "PendingAttestations",
@@ -658,7 +677,11 @@ async fn two_conductor_t0_collab_end_to_end() -> Result<()> {
     // Both conductors must now see the Collab-Qahal as Instantiated.
     // -------------------------------------------------------------------------
     let status_a: String = ca
-        .call(&cell_a.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .call(
+            &cell_a.zome(ZOME),
+            "get_collab_status",
+            agreement_hash.clone(),
+        )
         .await;
     assert_eq!(
         status_a, "Instantiated",
@@ -666,7 +689,11 @@ async fn two_conductor_t0_collab_end_to_end() -> Result<()> {
     );
 
     let status_b: String = cb
-        .call(&cell_b.zome(ZOME), "get_collab_status", agreement_hash.clone())
+        .call(
+            &cell_b.zome(ZOME),
+            "get_collab_status",
+            agreement_hash.clone(),
+        )
         .await;
     assert_eq!(
         status_b, "Instantiated",

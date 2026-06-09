@@ -122,8 +122,7 @@ struct ReaEconomicEventOutput {
 async fn level_2_participation_records_weighted_economic_event() -> Result<()> {
     let [(mut ca, a1), (mut cb, a2)] = two_agent_conductors().await?;
 
-    let mishpat_dna =
-        load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
+    let mishpat_dna = load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
     let elohim_dna = load_dna(ELOHIM_DNA, &network_seed(ELOHIM_DNA), Some(a1.clone())).await?;
 
     // Capture DNA hashes before the DnaFiles are moved into setup_app_for_agent.
@@ -141,11 +140,7 @@ async fn level_2_participation_records_weighted_economic_event() -> Result<()> {
         )
         .await?;
     let app_b = cb
-        .setup_app_for_agent(
-            "test-app-bob",
-            a2.clone(),
-            &[mishpat_dna, elohim_dna],
-        )
+        .setup_app_for_agent("test-app-bob", a2.clone(), &[mishpat_dna, elohim_dna])
         .await?;
 
     let mishpat_cell_a = app_a
@@ -184,7 +179,10 @@ async fn level_2_participation_records_weighted_economic_event() -> Result<()> {
         )
         .await;
 
-    assert!(!event_action_hash.get_raw_32().is_empty(), "should return a valid ActionHash");
+    assert!(
+        !event_action_hash.get_raw_32().is_empty(),
+        "should return a valid ActionHash"
+    );
 
     // --- Exchange peer info then await DHT consistency. ---
     tokio::time::timeout(std::time::Duration::from_secs(30), async {
@@ -263,8 +261,7 @@ async fn level_2_participation_records_weighted_economic_event() -> Result<()> {
 async fn invalid_participation_type_is_rejected() -> Result<()> {
     let [(mut ca, a1), (mut _cb, _a2)] = two_agent_conductors().await?;
 
-    let mishpat_dna =
-        load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
+    let mishpat_dna = load_dna(MISHPAT_DNA, &network_seed(MISHPAT_DNA), Some(a1.clone())).await?;
     let elohim_dna = load_dna(ELOHIM_DNA, &network_seed(ELOHIM_DNA), Some(a1.clone())).await?;
 
     // Capture the mishpat DNA hash before the DnaFiles move into setup; select
