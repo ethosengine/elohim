@@ -256,6 +256,39 @@ fn is_content_address(identifier: &str) -> bool {
     identifier.starts_with("sha256-") && identifier.len() > 10
 }
 
+/// Outcome of [`HttpServer::get_blob_or_heal`]: the shared local-read +
+/// T17 peer-heal sequence behind both `GET /blob/{hash}` and the `/apps/`
+/// resolver. Callers map each variant onto their own HTTP semantics — the
+/// `/blob` route distinguishes 503 (finalize failed) from 404 (no heal), and
+/// preserves its existing metrics/headers; the apps resolver continues into ZIP
+/// extraction on `Bytes` and keeps its existing 404 body otherwise.
+#[derive(Debug)]
+enum BlobHealOutcome {
+    /// Bytes available — either a local hit (`healed_from = None`) or fetched
+    /// from a peer and durably finalized (`healed_from = Some(peer_id)`).
+    Bytes {
+        bytes: Vec<u8>,
+        healed_from: Option<String>,
+    },
+    /// Local miss and no peer served verified bytes (no candidates, race miss,
+    /// or no p2p/db wired) → caller returns 404.
+    NotFound,
+    /// Bytes were fetched from a peer but local finalize failed → caller
+    /// returns 503 to preserve downstream retry semantics. The variant carries
+    /// the precise failure leg so the `/blob` route keeps its distinct bodies.
+    FinalizeFailed(FinalizeFailure),
+}
+
+/// The two finalize failure legs the `/blob` route distinguishes, each with its
+/// own 503 body (preserved verbatim from the pre-refactor handler).
+#[derive(Debug)]
+enum FinalizeFailure {
+    /// Connection pool exhausted; could not acquire a connection to finalize.
+    PoolExhausted,
+    /// Filesystem persist or the wrapping SQL transaction failed.
+    Persist,
+}
+
 /// Extract the `elohim_session` cookie value from a request's `Cookie` header.
 ///
 /// The header is a `; `-separated list of `name=value` pairs. Returns the
@@ -2089,171 +2122,45 @@ impl HttpServer {
         let manifest = match manifest {
             Some(m) => m,
             None => {
-                // Try direct blob lookup (for non-sharded blobs)
-                match self.blob_store.get(hash).await {
-                    Ok(data) => {
+                // Try direct blob lookup (for non-sharded blobs), healing from
+                // peers on a local miss (T17). The shared `get_blob_or_heal`
+                // helper encapsulates the local-read + race-fetch + finalize
+                // sequence; this arm maps its outcome back to the exact same
+                // responses (metrics counters, headers, distinct 503 bodies)
+                // the inline implementation produced before the extraction.
+                match self.get_blob_or_heal(hash).await {
+                    BlobHealOutcome::Bytes { bytes, healed_from } => {
                         self.blob_libp2p_served_count
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (direct)");
+                        if healed_from.is_some() {
+                            debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (race-fetch)");
+                        } else {
+                            debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (direct)");
+                        }
                         return Ok(Self::with_cors_headers(Response::builder())
                             .status(StatusCode::OK)
                             .header(header::CONTENT_TYPE, "application/octet-stream")
-                            .header(header::CONTENT_LENGTH, data.len())
+                            .header(header::CONTENT_LENGTH, bytes.len())
                             .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-                            .body(Full::new(Bytes::from(data)))
+                            .body(Full::new(Bytes::from(bytes)))
                             .unwrap());
                     }
-                    Err(_) => {
-                        // Local miss — attempt peer fallback before returning 404.
-                        // T17: race-fetch helper. Requires P2P feature + db pool.
-                        #[cfg(feature = "p2p")]
-                        if let (Some(ref handle), Some(ref pool)) =
-                            (&self.p2p_handle, &self.db_pool)
-                        {
-                            let fresh_after = (chrono::Utc::now()
-                                - chrono::Duration::seconds(
-                                    // default to 600s if not set
-                                    600,
-                                ))
-                            .format("%Y-%m-%dT%H:%M:%SZ")
-                            .to_string();
-                            let candidates = pool
-                                .get()
-                                .ok()
-                                .and_then(|mut conn| {
-                                    crate::db::peer_blob_inventory::lookup_hosts(
-                                        &mut conn,
-                                        hash,
-                                        &fresh_after,
-                                    )
-                                    .ok()
-                                })
-                                .map(|rows| rows.into_iter().map(|r| r.peer_id).collect::<Vec<_>>())
-                                .unwrap_or_default();
-
-                            if !candidates.is_empty() {
-                                let cmd_tx = handle.command_sender();
-                                let parallelism = self.fetch_blob_parallelism;
-                                let per_peer_timeout =
-                                    std::time::Duration::from_secs(self.fetch_blob_timeout_seconds);
-                                // Snapshot the connected-peer set via ListPeers command;
-                                // use a sync closure for race_fetch that checks membership.
-                                let connected_set: std::collections::HashSet<String> = handle
-                                    .list_peers()
-                                    .await
-                                    .into_iter()
-                                    .map(|p| p.peer_id)
-                                    .collect();
-                                let is_connected = move |peer: &str| connected_set.contains(peer);
-                                let outcome = crate::p2p::blob_fetch::race_fetch(
-                                    hash,
-                                    candidates,
-                                    &cmd_tx,
-                                    is_connected,
-                                    parallelism,
-                                    per_peer_timeout,
-                                )
-                                .await;
-
-                                match outcome {
-                                    crate::p2p::blob_fetch::FetchOutcome::Hit {
-                                        bytes,
-                                        source_peer,
-                                    } => {
-                                        // T20: persist + SQL collapse into a single async
-                                        // `finalize_fetch_success` call.
-                                        //
-                                        // Ordering inside finalize: filesystem persist FIRST,
-                                        // then `record_fetch_success`, then `serve-blob` REA
-                                        // event (the latter two atomic via a single
-                                        // `conn.transaction`). The 503 below covers all three
-                                        // failure legs: pool exhaustion (cannot acquire conn),
-                                        // filesystem write failure (no SQL written), or SQL
-                                        // failure inside the wrapping transaction (rolled back
-                                        // by Diesel; orphan blob on disk reconciled by the T18
-                                        // parity sweep). Either way the blob is not yet
-                                        // durably accounted for through this gateway, and 503
-                                        // (not 404) preserves retry semantics on the
-                                        // downstream cache.
-                                        let bytes_len = bytes.len();
-                                        let blob_store = self.blob_store.clone();
-
-                                        let mut conn = match pool.get() {
-                                            Ok(c) => c,
-                                            Err(e) => {
-                                                error!(
-                                                    hash = %hash,
-                                                    error = %e,
-                                                    "T20: pool exhausted, cannot finalize fetch"
-                                                );
-                                                return Ok(Self::with_cors_headers(
-                                                    Response::builder(),
-                                                )
-                                                .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                .body(Full::new(Bytes::from(
-                                                    "Storage unavailable; retry",
-                                                )))
-                                                .unwrap());
-                                            }
-                                        };
-                                        if let Err(e) =
-                                            crate::p2p::blob_fetch::finalize_fetch_success(
-                                                &mut conn,
-                                                hash,
-                                                &source_peer,
-                                                &bytes,
-                                                &self.self_cid,
-                                                &blob_store,
-                                            )
-                                            .await
-                                        {
-                                            error!(
-                                                hash = %hash,
-                                                source_peer = %source_peer,
-                                                error = %e,
-                                                "T20: finalize_fetch_success failed; returning 503"
-                                            );
-                                            return Ok(Self::with_cors_headers(
-                                                Response::builder(),
-                                            )
-                                            .status(StatusCode::SERVICE_UNAVAILABLE)
-                                            .body(Full::new(Bytes::from(
-                                                "Blob fetched from peer but local persist failed; retry",
-                                            )))
-                                            .unwrap());
-                                        }
-
-                                        info!(
-                                            hash = %hash,
-                                            source_peer = %source_peer,
-                                            size = bytes_len,
-                                            "T20: race-fetch hit — blob persisted and recorded"
-                                        );
-                                        self.blob_libp2p_served_count
-                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                        debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (race-fetch)");
-                                        return Ok(Self::with_cors_headers(Response::builder())
-                                            .status(StatusCode::OK)
-                                            .header(
-                                                header::CONTENT_TYPE,
-                                                "application/octet-stream",
-                                            )
-                                            .header(header::CONTENT_LENGTH, bytes_len)
-                                            .header(
-                                                header::CACHE_CONTROL,
-                                                "public, max-age=31536000, immutable",
-                                            )
-                                            .body(Full::new(Bytes::from(bytes)))
-                                            .unwrap());
-                                    }
-                                    crate::p2p::blob_fetch::FetchOutcome::Miss
-                                    | crate::p2p::blob_fetch::FetchOutcome::NoCandidates => {
-                                        debug!(hash = %hash, "T17: race-fetch miss — returning 404");
-                                    }
-                                }
-                            }
-                        }
-
+                    BlobHealOutcome::FinalizeFailed(FinalizeFailure::PoolExhausted) => {
+                        return Ok(Self::with_cors_headers(Response::builder())
+                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                            .body(Full::new(Bytes::from("Storage unavailable; retry")))
+                            .unwrap());
+                    }
+                    BlobHealOutcome::FinalizeFailed(FinalizeFailure::Persist) => {
+                        return Ok(Self::with_cors_headers(Response::builder())
+                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                            .body(Full::new(Bytes::from(
+                                "Blob fetched from peer but local persist failed; retry",
+                            )))
+                            .unwrap());
+                    }
+                    BlobHealOutcome::NotFound => {
+                        debug!(hash = %hash, "T17: race-fetch miss — returning 404");
                         return Ok(Self::with_cors_headers(Response::builder())
                             .status(StatusCode::NOT_FOUND)
                             .body(Full::new(Bytes::from("Blob not found")))
@@ -2292,6 +2199,164 @@ impl HttpServer {
             .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
             .body(Full::new(Bytes::from(data)))
             .unwrap())
+    }
+
+    /// Read a blob locally, healing from peers on a local miss (T17).
+    ///
+    /// This is the shared core extracted from `GET /blob/{hash}`'s
+    /// direct-blob-lookup arm: on a local hit it returns the bytes; on any
+    /// local-read error (a miss) it consults `peer_blob_inventory`, races a
+    /// fetch across connected hosting peers (`crate::p2p::blob_fetch::race_fetch`),
+    /// and on a verified hit persists + records via `finalize_fetch_success`
+    /// (which also books the `serve-blob` REA event).
+    ///
+    /// `hash` MUST already be in canonical `sha256-{hex}` form (the form the
+    /// `/blob` route normalizes to, and the form `peer_blob_inventory` and
+    /// `verify_blob_hash` expect). The `#[cfg(feature = "p2p")]` gating keeps
+    /// non-p2p builds at exactly the prior behaviour: a local miss yields
+    /// `NotFound` with no peer attempt.
+    ///
+    /// The returned `BlobHealOutcome` carries the heal/503/404 distinction so
+    /// each caller maps it onto its own response shape (the `/blob` route keeps
+    /// its distinct 503 bodies and metrics; the apps resolver continues into
+    /// ZIP extraction on `Bytes`). The helper is infallible — every local-read
+    /// or heal failure resolves to a `BlobHealOutcome` variant — so callers map
+    /// it directly rather than propagating a `StorageError`.
+    async fn get_blob_or_heal(&self, hash: &str) -> BlobHealOutcome {
+        // Local hit — no heal needed.
+        //
+        // Any local-read error (NotFound, a corrupt-chunk HashMismatch, or an
+        // IO error) is treated as a miss and falls through to the peer-heal
+        // attempt below. This matches the pre-extraction `/blob` handler's
+        // `Err(_)` catch-all exactly (preserving its observable behavior) and
+        // is the more resilient choice for the apps resolver: a locally corrupt
+        // ZIP blob re-heals from a peer rather than 404ing.
+        match self.blob_store.get(hash).await {
+            Ok(data) => {
+                return BlobHealOutcome::Bytes {
+                    bytes: data,
+                    healed_from: None,
+                };
+            }
+            Err(_) => {
+                // Local miss — fall through to the peer-heal attempt below.
+            }
+        }
+
+        // Local miss — attempt peer fallback. T17: race-fetch helper.
+        // Requires P2P feature + db pool; otherwise we degrade to NotFound,
+        // exactly as the pre-refactor handler did.
+        #[cfg(feature = "p2p")]
+        if let (Some(ref handle), Some(ref pool)) = (&self.p2p_handle, &self.db_pool) {
+            let fresh_after = (chrono::Utc::now()
+                - chrono::Duration::seconds(
+                    // default to 600s if not set
+                    600,
+                ))
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string();
+            let candidates = pool
+                .get()
+                .ok()
+                .and_then(|mut conn| {
+                    crate::db::peer_blob_inventory::lookup_hosts(&mut conn, hash, &fresh_after).ok()
+                })
+                .map(|rows| rows.into_iter().map(|r| r.peer_id).collect::<Vec<_>>())
+                .unwrap_or_default();
+
+            if !candidates.is_empty() {
+                let cmd_tx = handle.command_sender();
+                let parallelism = self.fetch_blob_parallelism;
+                let per_peer_timeout =
+                    std::time::Duration::from_secs(self.fetch_blob_timeout_seconds);
+                // Snapshot the connected-peer set via ListPeers command;
+                // use a sync closure for race_fetch that checks membership.
+                let connected_set: std::collections::HashSet<String> = handle
+                    .list_peers()
+                    .await
+                    .into_iter()
+                    .map(|p| p.peer_id)
+                    .collect();
+                let is_connected = move |peer: &str| connected_set.contains(peer);
+                let outcome = crate::p2p::blob_fetch::race_fetch(
+                    hash,
+                    candidates,
+                    &cmd_tx,
+                    is_connected,
+                    parallelism,
+                    per_peer_timeout,
+                )
+                .await;
+
+                match outcome {
+                    crate::p2p::blob_fetch::FetchOutcome::Hit { bytes, source_peer } => {
+                        // T20: persist + SQL collapse into a single async
+                        // `finalize_fetch_success` call.
+                        //
+                        // Ordering inside finalize: filesystem persist FIRST,
+                        // then `record_fetch_success`, then `serve-blob` REA
+                        // event (the latter two atomic via a single
+                        // `conn.transaction`). The FinalizeFailed legs below
+                        // cover all three failure cases: pool exhaustion
+                        // (cannot acquire conn), filesystem write failure (no
+                        // SQL written), or SQL failure inside the wrapping
+                        // transaction (rolled back by Diesel; orphan blob on
+                        // disk reconciled by the T18 parity sweep). Either way
+                        // the blob is not yet durably accounted for through
+                        // this gateway, and callers return 503 (not 404) to
+                        // preserve retry semantics on the downstream cache.
+                        let mut conn = match pool.get() {
+                            Ok(c) => c,
+                            Err(e) => {
+                                error!(
+                                    hash = %hash,
+                                    error = %e,
+                                    "T20: pool exhausted, cannot finalize fetch"
+                                );
+                                return BlobHealOutcome::FinalizeFailed(
+                                    FinalizeFailure::PoolExhausted,
+                                );
+                            }
+                        };
+                        if let Err(e) = crate::p2p::blob_fetch::finalize_fetch_success(
+                            &mut conn,
+                            hash,
+                            &source_peer,
+                            &bytes,
+                            &self.self_cid,
+                            &self.blob_store,
+                        )
+                        .await
+                        {
+                            error!(
+                                hash = %hash,
+                                source_peer = %source_peer,
+                                error = %e,
+                                "T20: finalize_fetch_success failed; returning 503"
+                            );
+                            return BlobHealOutcome::FinalizeFailed(FinalizeFailure::Persist);
+                        }
+
+                        info!(
+                            hash = %hash,
+                            source_peer = %source_peer,
+                            size = bytes.len(),
+                            "T20: race-fetch hit — blob persisted and recorded"
+                        );
+                        return BlobHealOutcome::Bytes {
+                            bytes,
+                            healed_from: Some(source_peer),
+                        };
+                    }
+                    crate::p2p::blob_fetch::FetchOutcome::Miss
+                    | crate::p2p::blob_fetch::FetchOutcome::NoCandidates => {
+                        debug!(hash = %hash, "T17: race-fetch miss — no peer served verified bytes");
+                    }
+                }
+            }
+        }
+
+        BlobHealOutcome::NotFound
     }
 
     /// GET /manifest/{hash} - Get shard manifest
@@ -4736,10 +4801,39 @@ impl HttpServer {
 
         debug!(identifier = %identifier, blob_hash = %blob_hash, "Found blob hash");
 
-        // Fetch ZIP from blob store
-        let zip_data = match self.blob_store.get(&blob_hash).await {
-            Ok(data) => data,
-            Err(StorageError::NotFound(_)) => {
+        // Fetch the ZIP from the blob store, healing from peers on a local miss
+        // (T17). This shares the same race-fetch + finalize machinery as
+        // `GET /blob/{hash}`: an alpha-class regression where the db/content row
+        // points at a hash whose bytes never landed locally now self-heals on
+        // the first page visit instead of 404ing for days (resilient-dual-doorway
+        // journal iter-0 Fix B; the manual `GET /blob/<hash>` heal that fixed the
+        // live site exercised this exact path). On heal failure the existing 404
+        // body is preserved unchanged.
+        //
+        // `get_blob_or_heal` consults `peer_blob_inventory` keyed by the
+        // canonical `sha256-{hex}` form, so normalize first (falling back to the
+        // stored value if it doesn't parse — `BlobStore::get`'s `blob_path`
+        // tolerates either form, matching the prior direct `blob_store.get`).
+        let heal_hash = match crate::blob_store::BlobStore::parse_content_address(&blob_hash) {
+            Ok(h) => format!("sha256-{}", h),
+            Err(_) => blob_hash.clone(),
+        };
+        let zip_data = match self.get_blob_or_heal(&heal_hash).await {
+            BlobHealOutcome::Bytes { bytes, healed_from } => {
+                if let Some(ref peer) = healed_from {
+                    warn!(
+                        identifier = %identifier,
+                        blob_hash = %heal_hash,
+                        source_peer = %peer,
+                        "app blob healed on-read from peer (T17 race-fetch)"
+                    );
+                }
+                bytes
+            }
+            // NotFound (no peer served) and FinalizeFailed (bytes fetched but
+            // could not be durably persisted/recorded) both leave us without a
+            // durably-available app blob — keep the existing 404 body unchanged.
+            BlobHealOutcome::NotFound | BlobHealOutcome::FinalizeFailed(_) => {
                 return Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -4749,7 +4843,6 @@ impl HttpServer {
                     ))))
                     .unwrap());
             }
-            Err(e) => return Err(e),
         };
 
         debug!(identifier = %identifier, zip_size = zip_data.len(), "Fetched ZIP blob");
@@ -11721,6 +11814,148 @@ mod blob_backend_wiring_tests {
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(v["blobs"]["iroh_served"].as_u64(), Some(7));
         assert_eq!(v["blobs"]["libp2p_served"].as_u64(), Some(13));
+    }
+}
+
+// =============================================================================
+// Apps-resolver blob-heal tests — resilient-dual-doorway Fix B
+//
+// The apps resolver (`handle_app_request`) shares the `GET /blob/{hash}` T17
+// heal-on-miss path via `get_blob_or_heal`. These tests pin the behaviour that
+// is verifiable WITHOUT a live p2p mesh: the non-p2p path (a local miss still
+// 404s with the identical body), the local-hit path (a present blob still
+// serves), and the pure helper decision logic. The heal-success leg requires a
+// running swarm and a hosting peer, so it is exercised by the soak/a2o layer,
+// not here.
+//
+// Plain `#[cfg(test)]` so the module compiles under the default feature set
+// (which includes `p2p`); the `get_blob_or_heal` helper degrades to `NotFound`
+// when no `p2p_handle`/`db_pool` is wired, which is exactly what these tests
+// drive.
+// =============================================================================
+#[cfg(test)]
+mod apps_resolver_heal_tests {
+    use super::*;
+    use http_body_util::BodyExt;
+    use std::io::Write;
+
+    async fn test_server() -> HttpServer {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        // No p2p_handle and no db_pool wired → `get_blob_or_heal` cannot heal
+        // and must degrade to `NotFound`, the pre-Fix-B 404 behaviour.
+        HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
+    }
+
+    /// Build a minimal valid single-file ZIP (`index.html`) in memory.
+    fn tiny_zip() -> Vec<u8> {
+        let mut buf = Vec::new();
+        {
+            let cursor = std::io::Cursor::new(&mut buf);
+            let mut zip = zip::ZipWriter::new(cursor);
+            let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zip.start_file("index.html", opts).unwrap();
+            zip.write_all(b"<!doctype html><title>ok</title>").unwrap();
+            zip.finish().unwrap();
+        }
+        buf
+    }
+
+    async fn body_string(resp: Response<Full<Bytes>>) -> (StatusCode, String) {
+        let status = resp.status();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        (status, String::from_utf8_lossy(&bytes).to_string())
+    }
+
+    /// Fix B core: a missing app ZIP, with NO peer-heal possible (no p2p handle
+    /// / no db pool), still returns 404 with the exact pre-refactor body. The
+    /// identifier is a content address, so it bypasses slug resolution and goes
+    /// straight to the `get_blob_or_heal` arm.
+    #[tokio::test]
+    async fn apps_resolver_missing_blob_404s_with_identical_body_no_p2p() {
+        let server = test_server().await;
+        // 64-hex sha256 content address → is_content_address() true → is_cid
+        // path, cached_blob_hash = Some(identifier).
+        let cid = format!("sha256-{}", "a".repeat(64));
+        let resp = server
+            .handle_app_request(&format!("/apps/{cid}/index.html"), "")
+            .await
+            .unwrap();
+        let (status, body) = body_string(resp).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        // Body byte-identical to the pre-Fix-B handler.
+        assert_eq!(
+            body,
+            format!(r#"{{"error": "App ZIP blob not found: {cid}"}}"#)
+        );
+    }
+
+    /// The heal path's local-hit arm preserves normal serving: a blob present in
+    /// the local store is extracted and served (200) without any heal attempt.
+    #[tokio::test]
+    async fn apps_resolver_serves_local_hit() {
+        let server = test_server().await;
+        let zip = tiny_zip();
+        let stored = server.blob_store.store(&zip).await.unwrap();
+        // `store` returns the canonical `sha256-{hex}` hash; the resolver accepts
+        // a content-address identifier in that form.
+        let cid = stored.hash.clone();
+        assert!(cid.starts_with("sha256-"), "store yields sha256- form");
+
+        let resp = server
+            .handle_app_request(&format!("/apps/{cid}/index.html"), "")
+            .await
+            .unwrap();
+        let (status, body) = body_string(resp).await;
+        assert_eq!(status, StatusCode::OK, "local-hit must serve, body={body}");
+        assert!(body.contains("<title>ok</title>"));
+    }
+
+    /// The `GET /blob/{hash}` refactor is observably unchanged on a local miss
+    /// with no peer-heal possible: still 404 with the "Blob not found" body.
+    #[tokio::test]
+    async fn blob_route_missing_blob_404s_with_identical_body_no_p2p() {
+        let server = test_server().await;
+        let hash = format!("sha256-{}", "b".repeat(64));
+        let resp = server.handle_get_blob(&hash, None).await.unwrap();
+        let (status, body) = body_string(resp).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body, "Blob not found");
+    }
+
+    /// Pure decision logic: a local hit resolves to `Bytes { healed_from: None }`
+    /// (no heal attempted).
+    #[tokio::test]
+    async fn get_blob_or_heal_local_hit_returns_bytes_no_heal() {
+        let server = test_server().await;
+        let payload = b"hello quilt".to_vec();
+        let stored = server.blob_store.store(&payload).await.unwrap();
+        match server.get_blob_or_heal(&stored.hash).await {
+            BlobHealOutcome::Bytes { bytes, healed_from } => {
+                assert_eq!(bytes, payload);
+                assert!(
+                    healed_from.is_none(),
+                    "local hit must not record a heal source"
+                );
+            }
+            other => panic!("expected Bytes on local hit, got {other:?}"),
+        }
+    }
+
+    /// Pure decision logic: a local miss with no p2p/db wired resolves to
+    /// `NotFound` (degraded path), never a panic or an error.
+    #[tokio::test]
+    async fn get_blob_or_heal_miss_no_p2p_returns_not_found() {
+        let server = test_server().await;
+        let hash = format!("sha256-{}", "c".repeat(64));
+        match server.get_blob_or_heal(&hash).await {
+            BlobHealOutcome::NotFound => {}
+            other => panic!("expected NotFound on miss with no p2p, got {other:?}"),
+        }
     }
 }
 
