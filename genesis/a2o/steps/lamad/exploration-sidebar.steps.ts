@@ -203,10 +203,11 @@ When('the learner opens the EPR address for {string}', async function (this: E2E
  * named markdown node, exercising the SAME shared sidebar in its path-coupled
  * layout.
  *
- * @wip seed gap (see the feature comment): the witness corpus deliberately leaves
- * the doctrinal nodes NOT path-attached, so this lookup finds no path stepping
- * the named id today. Authored for post-deploy once a path step renders a
- * doctrinal markdown node.
+ * The scenario targets "manifesto" — the markdown node a seeded path already
+ * steps through (love-map-matthew-jessica step resourceId) — so the runtime
+ * lookup resolves. The doctrinal trio stays deliberately un-path-attached
+ * (slice plan C1 Step 3); the lookup scans steps[].resourceId only, not
+ * chapter conceptIds.
  */
 Given(
   'the learner is on a path step rendering {string}',

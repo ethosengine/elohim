@@ -37,24 +37,24 @@ Feature: Shared exploration sidebar surfaces authored and discovered neighbors
     And it shows at least one discovered concept card
     And the discovered card's inference source is not "explicit"
 
-  @browser-only @wip
+  @browser-only
   Scenario: The same sidebar appears inside the path-step lesson view
     # The path-coupled lesson-view renders the SAME app-exploration-sidebar (the
-    # whole point of the shared component): a learner who reaches "confession" as a
-    # path step gets the identical authored + discovered neighborhood.
+    # whole point of the shared component): a learner who reaches the MANIFESTO as
+    # a path step gets the identical authored + discovered neighborhood.
     #
-    # @wip — SEED GAP (captured for C2, not a fake pass): the witness corpus
-    # deliberately leaves confession/theology/constitution NOT path-attached
-    # (slice plan Task C1 Step 3: "Do NOT add any of these ids to paths/*.json").
-    # So no seeded path steps through "confession" today, and the path-step step
-    # below resolves its pathId/stepIndex from a runtime lookup that will find
-    # none. Un-@wip once a path step renders a doctrinal markdown node (either
-    # attach confession to a path step, OR retarget this scenario at the markdown
-    # node a seeded path already steps through). The shared-sidebar contract it
-    # guards — lesson-view renders the identical authored+discovered neighborhood
-    # — is real and proven at the component layer (lesson-view spec); this is the
-    # end-to-end witness waiting on a path-attached markdown step.
-    Given the learner is on a path step rendering "confession"
+    # Retargeted from "confession" to "manifesto" (resolving the captured C2 seed
+    # gap the @wip documented): the doctrinal trio stays deliberately
+    # un-path-attached (slice plan C1 Step 3), but "manifesto" is the markdown
+    # node a seeded path ALREADY steps through (love-map-matthew-jessica step 2,
+    # resourceId: "manifesto") — exactly the "retarget at the node a seeded path
+    # already steps through" branch the gap note named. Manifesto's authored
+    # cards are its cites-mesh relatedNodeIds (constitution/confession/theology);
+    # its discovered card comes from the resolver's tag pass (external ≥1-shared-
+    # tag neighbors exist beyond the explicit-precedence-excluded trio). This is
+    # the operator-named delivery surface: graph-native discovery of the
+    # theology/confessional beside the Elohim Protocol manifesto lesson.
+    Given the learner is on a path step rendering "manifesto"
     Then the exploration sidebar is visible with authored and discovered neighbors
 
   @browser-only

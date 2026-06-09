@@ -277,7 +277,8 @@ export const VIEWER = {
   BACK_HOME: 'viewer-back-home',
   ERROR_BACK: 'viewer-error-back',
   EDIT_LINK: 'viewer-edit-link',
-  EXPLORE_GRAPH: 'viewer-explore-graph',
+  // 'viewer-explore-graph' retired — the explore affordance moved into the shared
+  // exploration sidebar; use EXPLORATION.EXPLORE_GRAPH ('exploration-explore-graph').
   RETURN_TO_PATH: 'viewer-return-to-path',
   TAB_CONTENT: 'viewer-tab-content',
   TAB_GOVERNANCE: 'viewer-tab-governance',
@@ -308,12 +309,9 @@ export const FEEDBACK_GATE = {
   ARTIFACT_SUBMIT: 'artifact-submit',
 } as const;
 
-// Lesson view (elohim-app: lesson-view.component.ts)
-export const LESSON = {
-  TOGGLE_PANEL: 'lesson-toggle-panel',
-  PANEL_CLOSE: 'lesson-panel-close',
-  EXPLORE_GRAPH: 'lesson-explore-graph',
-} as const;
+// Lesson view: the inline exploration panel (lesson-toggle-panel/lesson-panel-close/
+// lesson-explore-graph) was extracted into the shared <app-exploration-sidebar>;
+// those testids no longer exist in any template — use the EXPLORATION group.
 
 // Search (elohim-app: search.component.ts)
 export const SEARCH = {
