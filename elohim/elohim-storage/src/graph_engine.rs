@@ -114,6 +114,7 @@ pub struct GraphQuery<'a> {
     /// Edge types to traverse.
     /// - `Some(list)`: traverse only these types (caller override).
     /// - `None`: use the resolver's default whitelist (RELATES_TO ∪ graph.json content↔content vocabulary).
+    ///
     /// NOTE: `None` does NOT mean "traverse all stored edge types".
     pub relationship_types: Option<&'a [String]>,
     pub include_computed: bool,
