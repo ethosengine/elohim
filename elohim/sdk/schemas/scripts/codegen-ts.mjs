@@ -377,7 +377,7 @@ async function generateFromDir(subdir, refMap) {
       let ts = await compile(schema, schema.title || name, {
         bannerComment: `/* eslint-disable @typescript-eslint/consistent-indexed-object-style */\n/* Generated from protocol schema: ${subdir}/${file} -- DO NOT EDIT */`,
         additionalProperties: false,
-        style: { singleQuote: true, trailingComma: 'all' },
+        style: { singleQuote: true, trailingComma: 'es5' },
       });
 
       // Post-process: replace {} empty object type with Record<string, unknown>
@@ -386,6 +386,17 @@ async function generateFromDir(subdir, refMap) {
       ts = ts.replace(/\| \{\}/g, '| Record<string, unknown>');
       ts = ts.replace(/: \{\}\[\]/g, ': Record<string, unknown>[]');
       ts = ts.replace(/: \{\};/g, ': Record<string, unknown>;');
+
+      // Deterministic union wrap (prevents the documented Prettier oscillation):
+      // collapse a vertical string-literal `export type X = | 'a' | 'b';` alias to
+      // single-line when it fits the 100-char printWidth, and leave wider ones
+      // vertical — exactly Prettier's width-aware decision, applied IN-SCRIPT.
+      // json-schema-to-typescript always emits unions vertical (width-blind); the
+      // downstream Prettier pass then collapses the short ones. Doing it here makes
+      // the emitted bytes identical whether or not that Prettier pass runs, so a
+      // regen on a Prettier-less agent can no longer flip a near-boundary union
+      // vertical<->single-line. See feedback_codegen_prettier_oscillation.
+      ts = collapseUnionAliases(ts);
 
       const outFile = `${name}.ts`;
       await writeFile(join(outDir, outFile), ts);
@@ -454,6 +465,36 @@ function formatTsConst(name, values) {
   // Fall back to multi-line for long arrays
   const items = values.map((v) => `  '${v}',`).join('\n');
   return `export const ${name} = [\n${items}\n] as const;`;
+}
+
+/**
+ * Collapse vertical `export type X =\n  | 'a'\n  | 'b';` union aliases to a single
+ * line when the single-line form fits printWidth, leaving wider ones vertical.
+ * This mirrors Prettier's width-aware wrap exactly, but applies it deterministically
+ * in-script so the emitted file is byte-identical regardless of whether the
+ * downstream Prettier pass runs — eliminating the agent-dependent union oscillation
+ * (feedback_codegen_prettier_oscillation). Only top-level string-literal union
+ * aliases are touched; any union the regex does not match stays as Prettier leaves it.
+ */
+function collapseUnionAliases(ts, printWidth = 100) {
+  return ts.replace(
+    /^export type (\w+) =\n((?:[ \t]*\| .+(?:\r?\n|$))+)/gm,
+    (block, name, body) => {
+      const members = body
+        .replace(/\s+$/, '')
+        .split('\n')
+        .map((line) => line.trim().replace(/^\|\s*/, '').replace(/;\s*$/, ''))
+        .filter((m) => m.length > 0);
+      // ONLY collapse pure string-literal unions. Object-type or type-ref unions
+      // (e.g. `| { tag: 'x'; ... }`) have multi-line members this single-line
+      // regex cannot safely flatten — leave them exactly as emitted.
+      if (!members.every((m) => /^'[^']*'$/.test(m))) return block;
+      const singleLine = `export type ${name} = ${members.join(' | ')};`;
+      return singleLine.length <= printWidth
+        ? singleLine + (block.endsWith('\n') ? '\n' : '')
+        : block;
+    },
+  );
 }
 
 async function main() {
