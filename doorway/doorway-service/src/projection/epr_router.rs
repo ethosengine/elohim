@@ -36,6 +36,113 @@ pub async fn fetch_projections_from_storage(
     Ok(projections)
 }
 
+/// What the pool fallback fetch decided, and why — so callers can log at the
+/// right level (Fix A: the degraded-primary state was invisible at DEBUG for
+/// days; observability is part of the fix).
+///
+/// See `.claude/deliver/journal-resilient-dual-doorway.md` iter-0 root cause #2.
+#[derive(Debug)]
+pub enum FallbackOutcome {
+    /// The primary (first) URL returned a non-empty projection set. Normal path.
+    PrimaryNonEmpty {
+        url: String,
+        projections: Vec<EprProjectionView>,
+    },
+    /// The primary was empty or unreachable, but a pool peer supplied rows.
+    /// Caller MUST log this at WARN naming both URLs — this is the degraded
+    /// state that hid for days.
+    PeerServed {
+        primary_url: String,
+        /// `None` when the primary errored; `Some(0)` when it returned empty.
+        primary_empty: bool,
+        serving_url: String,
+        projections: Vec<EprProjectionView>,
+    },
+    /// Primary AND every pool peer returned an EMPTY (but successful) fetch.
+    /// This is a genuine empty state — replace the router, log at INFO.
+    AllEmpty { urls_tried: Vec<String> },
+    /// Primary AND every pool peer ERRORED (none returned a usable response).
+    /// Caller MUST preserve the last-good table (never clear on transient
+    /// unavailability).
+    AllUnreachable {
+        urls_tried: Vec<String>,
+        last_error: String,
+    },
+}
+
+/// Consult an ordered pool of storage base URLs for active project-epr
+/// projections, falling back through the pool when the primary is empty or
+/// unreachable.
+///
+/// Selection (Fix A):
+/// 1. Try `base_urls[0]` (the primary). If it returns a non-empty set, use it.
+/// 2. Otherwise (error OR empty), try each remaining URL in order until one
+///    returns a NON-EMPTY set. Use the first such result.
+/// 3. If primary and all peers return empty (successfully), that is a genuine
+///    empty state (`AllEmpty`).
+/// 4. If every URL errored, that is total unreachability (`AllUnreachable`) —
+///    the caller preserves the last-good table.
+///
+/// The outcome variant carries enough to log at the right level and to decide
+/// whether to call `replace_all`.
+pub async fn fetch_projections_with_fallback(
+    base_urls: &[String],
+    doorway_id: &str,
+    http: &reqwest::Client,
+) -> FallbackOutcome {
+    let mut urls_tried: Vec<String> = Vec::new();
+    let mut primary_url: Option<String> = None;
+    let mut primary_empty = false;
+    let mut any_success = false;
+    let mut last_error: Option<String> = None;
+
+    for (idx, base_url) in base_urls.iter().enumerate() {
+        urls_tried.push(base_url.clone());
+        match fetch_projections_from_storage(base_url, doorway_id, http).await {
+            Ok(projections) if !projections.is_empty() => {
+                if idx == 0 {
+                    return FallbackOutcome::PrimaryNonEmpty {
+                        url: base_url.clone(),
+                        projections,
+                    };
+                }
+                // A pool peer supplied rows the primary couldn't. Degraded.
+                let primary = primary_url.unwrap_or_else(|| base_urls[0].clone());
+                return FallbackOutcome::PeerServed {
+                    primary_url: primary,
+                    primary_empty,
+                    serving_url: base_url.clone(),
+                    projections,
+                };
+            }
+            Ok(_empty) => {
+                any_success = true;
+                if idx == 0 {
+                    primary_url = Some(base_url.clone());
+                    primary_empty = true;
+                }
+            }
+            Err(e) => {
+                last_error = Some(e.to_string());
+                if idx == 0 {
+                    // Primary errored; record it so PeerServed can name it.
+                    primary_url = Some(base_url.clone());
+                    primary_empty = false;
+                }
+            }
+        }
+    }
+
+    if any_success {
+        FallbackOutcome::AllEmpty { urls_tried }
+    } else {
+        FallbackOutcome::AllUnreachable {
+            urls_tried,
+            last_error: last_error.unwrap_or_else(|| "no storage URLs configured".to_string()),
+        }
+    }
+}
+
 /// In-memory routing table for this doorway's projected EPRs.
 ///
 /// Populated at boot via storage HTTP API (`GET /db/rea_commitments?
@@ -503,5 +610,177 @@ mod tests {
         let g0 = router.generation();
         router.replace_all(vec![make_projection("a", "/a")]);
         assert!(router.generation() > g0);
+    }
+
+    // ── Fix A: storage-pool fallback for boot + refresh ──────────────────────
+    // journal: .claude/deliver/journal-resilient-dual-doorway.md iter-0 RC #2.
+    mod pool_fallback {
+        use super::super::{fetch_projections_with_fallback, FallbackOutcome};
+        use super::make_projection;
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+        /// Mount the project-epr query on a mock server, returning the given
+        /// projection set as JSON (an empty Vec models the "0 rows" primary).
+        async fn mock_project_epr(server: &MockServer, projections: &[&str]) {
+            let body: Vec<_> = projections
+                .iter()
+                .map(|epr| make_projection(epr, &format!("/{epr}")))
+                .collect();
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/db/rea_commitments"))
+                .and(matchers::query_param("action", "project-epr"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&body))
+                .mount(server)
+                .await;
+        }
+
+        #[tokio::test]
+        async fn primary_non_empty_short_circuits_the_pool() {
+            let primary = MockServer::start().await;
+            mock_project_epr(&primary, &["landing", "lamad"]).await;
+            // A second peer that, if consulted, would also answer — but must NOT
+            // be reached because the primary already satisfied the fetch.
+            let peer = MockServer::start().await;
+            mock_project_epr(&peer, &["landing"]).await;
+
+            let http = reqwest::Client::new();
+            let urls = vec![primary.uri(), peer.uri()];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+
+            match outcome {
+                FallbackOutcome::PrimaryNonEmpty { url, projections } => {
+                    assert_eq!(url, primary.uri());
+                    assert_eq!(projections.len(), 2);
+                }
+                other => panic!("expected PrimaryNonEmpty, got {other:?}"),
+            }
+            // The peer must not have been hit (primary short-circuit).
+            assert!(
+                peer.received_requests().await.unwrap().is_empty(),
+                "pool peer must not be consulted when primary is non-empty"
+            );
+        }
+
+        #[tokio::test]
+        async fn empty_primary_falls_back_to_a_peer_with_rows() {
+            // This is the apex bug: primary (adam) returns 0 rows, peer (matthew)
+            // has the 3 rows.
+            let primary = MockServer::start().await;
+            mock_project_epr(&primary, &[]).await; // 0 rows
+            let peer = MockServer::start().await;
+            mock_project_epr(&peer, &["landing", "lamad", "portal"]).await;
+
+            let http = reqwest::Client::new();
+            let urls = vec![primary.uri(), peer.uri()];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+
+            match outcome {
+                FallbackOutcome::PeerServed {
+                    primary_url,
+                    primary_empty,
+                    serving_url,
+                    projections,
+                } => {
+                    assert_eq!(primary_url, primary.uri());
+                    assert!(primary_empty, "primary returned an empty (not errored) set");
+                    assert_eq!(serving_url, peer.uri());
+                    assert_eq!(projections.len(), 3);
+                }
+                other => panic!("expected PeerServed, got {other:?}"),
+            }
+        }
+
+        #[tokio::test]
+        async fn unreachable_primary_falls_back_to_a_peer_with_rows() {
+            // Primary URL points at a dead port → fetch errors; peer answers.
+            let peer = MockServer::start().await;
+            mock_project_epr(&peer, &["landing"]).await;
+
+            let http = reqwest::Client::new();
+            let urls = vec!["http://127.0.0.1:1/never".to_string(), peer.uri()];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+
+            match outcome {
+                FallbackOutcome::PeerServed {
+                    primary_url,
+                    primary_empty,
+                    serving_url,
+                    projections,
+                } => {
+                    assert_eq!(primary_url, "http://127.0.0.1:1/never");
+                    assert!(!primary_empty, "primary errored, it was not empty");
+                    assert_eq!(serving_url, peer.uri());
+                    assert_eq!(projections.len(), 1);
+                }
+                other => panic!("expected PeerServed, got {other:?}"),
+            }
+        }
+
+        #[tokio::test]
+        async fn all_empty_is_a_genuine_empty_state() {
+            let primary = MockServer::start().await;
+            mock_project_epr(&primary, &[]).await;
+            let peer = MockServer::start().await;
+            mock_project_epr(&peer, &[]).await;
+
+            let http = reqwest::Client::new();
+            let urls = vec![primary.uri(), peer.uri()];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+
+            match outcome {
+                FallbackOutcome::AllEmpty { urls_tried } => {
+                    assert_eq!(urls_tried.len(), 2);
+                }
+                other => panic!("expected AllEmpty, got {other:?}"),
+            }
+        }
+
+        #[tokio::test]
+        async fn all_unreachable_preserves_last_good() {
+            let http = reqwest::Client::new();
+            let urls = vec![
+                "http://127.0.0.1:1/never".to_string(),
+                "http://127.0.0.1:2/never".to_string(),
+            ];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+
+            match outcome {
+                FallbackOutcome::AllUnreachable {
+                    urls_tried,
+                    last_error,
+                } => {
+                    assert_eq!(urls_tried.len(), 2);
+                    assert!(!last_error.is_empty());
+                }
+                other => panic!("expected AllUnreachable, got {other:?}"),
+            }
+        }
+
+        #[tokio::test]
+        async fn single_primary_empty_is_genuine_empty_not_peer_served() {
+            // Pool of one: an empty primary with no peers is a genuine empty
+            // state (not a degraded fallback).
+            let primary = MockServer::start().await;
+            mock_project_epr(&primary, &[]).await;
+
+            let http = reqwest::Client::new();
+            let urls = vec![primary.uri()];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+
+            match outcome {
+                FallbackOutcome::AllEmpty { urls_tried } => {
+                    assert_eq!(urls_tried, vec![primary.uri()]);
+                }
+                other => panic!("expected AllEmpty for single empty primary, got {other:?}"),
+            }
+        }
+
+        #[tokio::test]
+        async fn empty_url_pool_is_unreachable_not_panic() {
+            let http = reqwest::Client::new();
+            let urls: Vec<String> = vec![];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+            assert!(matches!(outcome, FallbackOutcome::AllUnreachable { .. }));
+        }
     }
 }

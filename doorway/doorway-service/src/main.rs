@@ -16,8 +16,8 @@ use doorway::{
     nats::NatsClient,
     orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorState},
     projection::{
-        spawn_engine_task, spawn_subscriber, EngineConfig, ProjectionEngine, ProjectionSignal,
-        SubscriberConfig,
+        spawn_engine_task, spawn_subscriber, EngineConfig, EprRouter, FallbackOutcome,
+        ProjectionEngine, ProjectionSignal, SubscriberConfig,
     },
     server,
     services::{
@@ -587,33 +587,27 @@ async fn main() -> anyhow::Result<()> {
             }
         };
 
-        if let Some(ref storage_url) = state.args.storage_url {
-            match doorway::projection::fetch_projections_from_storage(
-                storage_url,
-                doorway_id,
-                &epr_http,
-            )
-            .await
-            {
-                Ok(projections) => {
-                    info!(
-                        count = projections.len(),
-                        doorway_id = %doorway_id,
-                        "Loaded EPR projections at boot"
-                    );
-                    state.epr_router.replace_all(projections);
-                }
-                Err(e) => {
-                    warn!(
-                        error = %e,
-                        doorway_id = %doorway_id,
-                        "Could not load EPR projections at boot; router starts empty \
-                         (SSE events will populate it when storage is reachable)"
-                    );
-                }
-            }
+        // Fix A: consult the storage POOL, not just the singular primary.
+        // doorway-B's STORAGE_URL = adam (which returns 0 rows for
+        // doorwayId=apex-elohim-host); the pool (STORAGE_URLS) includes
+        // matthew, who holds the rows. Try primary first; fall through the pool
+        // on empty/unreachable so apex is routable while the primary heals.
+        // journal: .claude/deliver/journal-resilient-dual-doorway.md iter-0 RC #2.
+        let epr_pool_urls = epr_storage_pool(&state.args);
+        if epr_pool_urls.is_empty() {
+            info!("STORAGE_URL/STORAGE_URLS not configured — EPR router starts empty");
         } else {
-            info!("STORAGE_URL not configured — EPR router starts empty");
+            apply_epr_fallback_outcome(
+                doorway::projection::fetch_projections_with_fallback(
+                    &epr_pool_urls,
+                    doorway_id,
+                    &epr_http,
+                )
+                .await,
+                doorway_id,
+                &state.epr_router,
+                "boot",
+            );
         }
     }
 
@@ -627,15 +621,16 @@ async fn main() -> anyhow::Result<()> {
     // router self-populates once storage recovers — no kubectl restart needed.
     // On failure it logs at debug and preserves the last-good table (never
     // clears the router on transient storage unavailability).
-    if let Some(ref storage_url) = state.args.storage_url {
+    let refresh_pool_urls = epr_storage_pool(&state.args);
+    if !refresh_pool_urls.is_empty() {
         let refresh_secs = std::env::var("DOORWAY_EPR_REFRESH_SECS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(30);
-        let refresh_storage_url = storage_url.clone();
         let refresh_epr_router = Arc::clone(&state.epr_router);
         let refresh_node_id = state.args.node_id.to_string();
         let refresh_doorway_id = state.args.doorway_id.clone().unwrap_or(refresh_node_id);
+        let refresh_pool_size = refresh_pool_urls.len();
         tokio::spawn(async move {
             let http = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(10))
@@ -646,33 +641,25 @@ async fn main() -> anyhow::Result<()> {
             interval.tick().await;
             loop {
                 interval.tick().await;
-                match doorway::projection::fetch_projections_from_storage(
-                    &refresh_storage_url,
+                // Fix A: same pool fallback as boot — primary first, peers on
+                // empty/unreachable, never silently clear a non-empty table.
+                let outcome = doorway::projection::fetch_projections_with_fallback(
+                    &refresh_pool_urls,
                     &refresh_doorway_id,
                     &http,
                 )
-                .await
-                {
-                    Ok(projections) => {
-                        let count = projections.len();
-                        refresh_epr_router.replace_all(projections);
-                        tracing::debug!(
-                            count,
-                            doorway_id = %refresh_doorway_id,
-                            "EPR router periodic refresh: replaced projections"
-                        );
-                    }
-                    Err(e) => {
-                        tracing::debug!(
-                            error = %e,
-                            "EPR router periodic refresh: storage unreachable; keeping last-good"
-                        );
-                    }
-                }
+                .await;
+                apply_epr_fallback_outcome(
+                    outcome,
+                    &refresh_doorway_id,
+                    &refresh_epr_router,
+                    "periodic refresh",
+                );
             }
         });
         info!(
             interval_secs = refresh_secs,
+            pool_size = refresh_pool_size,
             "EPR router periodic self-heal refresh task started"
         );
     }
@@ -1023,6 +1010,105 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Build the ordered storage pool for EPR-projection fetches: the singular
+/// primary (`STORAGE_URL`) first, then each distinct `STORAGE_URLS` peer.
+///
+/// Mirrors the steward-peer registration ordering (see the `peer_urls`
+/// construction earlier in `main`) so the EPR router consults the same pool
+/// that the route registry already trusts — primary first, peers as reach
+/// fallback. journal: `.claude/deliver/journal-resilient-dual-doorway.md` RC #2.
+fn epr_storage_pool(args: &Args) -> Vec<String> {
+    let mut pool: Vec<String> = Vec::new();
+    if let Some(ref primary) = args.storage_url {
+        let trimmed = primary.trim().to_string();
+        if !trimmed.is_empty() {
+            pool.push(trimmed);
+        }
+    }
+    for url in &args.storage_urls {
+        let trimmed = url.trim().to_string();
+        if !trimmed.is_empty() && !pool.contains(&trimmed) {
+            pool.push(trimmed);
+        }
+    }
+    pool
+}
+
+/// Apply a pool-fallback fetch outcome to the EPR router, logging at the level
+/// each case warrants (Fix A: the degraded-primary state was invisible at DEBUG
+/// for days — the WARN here is part of the fix). `phase` is "boot" or
+/// "periodic refresh" for log context.
+///
+/// - `PrimaryNonEmpty` / `PeerServed` → `replace_all` with the fetched rows.
+///   `PeerServed` logs WARN naming the degraded primary and the serving peer.
+/// - `AllEmpty` → `replace_all` with empty (genuine empty state), log INFO.
+/// - `AllUnreachable` → preserve the last-good table, log WARN.
+fn apply_epr_fallback_outcome(
+    outcome: FallbackOutcome,
+    doorway_id: &str,
+    router: &EprRouter,
+    phase: &str,
+) {
+    match outcome {
+        FallbackOutcome::PrimaryNonEmpty { url, projections } => {
+            let count = projections.len();
+            router.replace_all(projections);
+            info!(
+                phase,
+                count,
+                doorway_id = %doorway_id,
+                serving_url = %url,
+                "EPR router: loaded projections from primary storage"
+            );
+        }
+        FallbackOutcome::PeerServed {
+            primary_url,
+            primary_empty,
+            serving_url,
+            projections,
+        } => {
+            let count = projections.len();
+            router.replace_all(projections);
+            warn!(
+                phase,
+                count,
+                doorway_id = %doorway_id,
+                primary_url = %primary_url,
+                primary_state = if primary_empty { "empty" } else { "unreachable" },
+                serving_url = %serving_url,
+                "EPR router DEGRADED: primary storage gave no projections; a pool peer \
+                 supplied them. Router is serving via the fallback peer — heal the primary."
+            );
+        }
+        FallbackOutcome::AllEmpty { urls_tried } => {
+            // Genuine empty state — every pool member returned 0 rows. Replace
+            // (an honest empty router) and log at INFO.
+            router.replace_all(Vec::new());
+            info!(
+                phase,
+                doorway_id = %doorway_id,
+                urls_tried = ?urls_tried,
+                "EPR router: every storage pool member returned 0 projections — \
+                 genuine empty state, router cleared"
+            );
+        }
+        FallbackOutcome::AllUnreachable {
+            urls_tried,
+            last_error,
+        } => {
+            // Total fetch failure — preserve the last-good table (never clear on
+            // transient unavailability).
+            warn!(
+                phase,
+                doorway_id = %doorway_id,
+                urls_tried = ?urls_tried,
+                last_error = %last_error,
+                "EPR router: entire storage pool unreachable; keeping last-good table"
+            );
+        }
+    }
 }
 
 /// Derive admin WebSocket URL from app URL by replacing the port.
