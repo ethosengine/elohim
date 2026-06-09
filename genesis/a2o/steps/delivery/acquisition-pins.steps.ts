@@ -83,7 +83,7 @@ const pinResponseStore = new WeakMap<E2EWorld, RawResponse>();
 // ---------------------------------------------------------------------------
 
 When(
-  'I POST a pin for {string} to \\/api\\/v1\\/pins',
+  String.raw`I POST a pin for {string} to \/api\/v1\/pins`,
   async function (this: E2EWorld, headRef: string) {
     const resp = await storagePostRaw(PINS_PATH, { headRef });
     pinResponseStore.set(this, resp);
@@ -101,13 +101,13 @@ Then('the pin response status is {int}', function (this: E2EWorld, expectedStatu
 });
 
 Then(
-  'GET \\/api\\/v1\\/pins lists one active pin for {string}',
+  String.raw`GET \/api\/v1\/pins lists one active pin for {string}`,
   async function (this: E2EWorld, headRef: string) {
     const { status, body } = await storageGetJson(PINS_PATH);
     assert.equal(status, 200, `GET /api/v1/pins returned ${status}`);
 
     const payload = body as Record<string, unknown>;
-    const pins = payload['pins'] as Array<Record<string, unknown>>;
+    const pins = payload['pins'] as Record<string, unknown>[];
     assert.ok(
       Array.isArray(pins),
       `"pins" must be an array; got ${JSON.stringify(payload).slice(0, 200)}`
@@ -127,7 +127,7 @@ Then(
 // ---------------------------------------------------------------------------
 
 When(
-  'I POST a pin with kind {string} for {string} to \\/api\\/v1\\/pins',
+  String.raw`I POST a pin with kind {string} for {string} to \/api\/v1\/pins`,
   async function (this: E2EWorld, kind: string, headRef: string) {
     const resp = await storagePostRaw(PINS_PATH, { headRef, kind });
     pinResponseStore.set(this, resp);
@@ -153,7 +153,7 @@ Then('the pin response body mentions {string}', function (this: E2EWorld, fragme
 // ---------------------------------------------------------------------------
 
 When(
-  'I POST a provide pin for {string} to \\/api\\/v1\\/pins',
+  String.raw`I POST a provide pin for {string} to \/api\/v1\/pins`,
   async function (this: E2EWorld, headRef: string) {
     const id = headRef.replace(/^epr:/, '');
     const resp = await storagePostRaw(PINS_PATH, {
@@ -182,7 +182,7 @@ When(
 );
 
 Then(
-  'GET \\/api\\/v1\\/pins\\/{word}\\/pull reports a pull rollup',
+  String.raw`GET \/api\/v1\/pins\/{word}\/pull reports a pull rollup`,
   async function (this: E2EWorld, eprId: string) {
     const { status, body } = await storageGetJson(`/api/v1/pins/${eprId}/pull`);
     assert.equal(status, 200, `GET pull rollup returned ${status}`);
