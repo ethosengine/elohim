@@ -128,6 +128,7 @@ feed is what surfaces at SessionStart:
 | `context-ratchet.py` | The directional gate — context-coverage may improve but not regress | When checking whether a cycle held stasis |
 | `memkit-retention.py` | Retention/aging measure for the memory tail (comet-tail tier) | Read via the budget headline; informs what's due to graduate or forget |
 | `mempalace-currency.py` | The MemPalace staleness tripwire — measures palace currency on the same measured+enforced footing as the other drift stores; tells you when a re-mine (see MemPalace tools) is due | Read via the budget headline; the only agent who can act on it is you |
+| `focus-baseline.py` | The per-subject focus-baseline reader (reader twin of `scope-reconcile`) — reads the testable surface `placement-audit --focus` projects from `cluster-state.yaml`, standalone | When you need the focus baseline without the full scoreboard pass |
 | `delivery-status-distribution.py` | The delivery-axis floor-signal distribution (the orthogonal status axis, `feedback_story_delivery_status_axis`); writes `delivery-status-distribution.json` | Every cycle; surfaces floor signals the cartographer reads |
 
 The hooks at `.claude/hooks/`:
@@ -137,6 +138,7 @@ The hooks at `.claude/hooks/`:
 - `memory-coherence-signal.py` — PostToolUse Edit/Write, bumps a memory entry's counter when edited code matches its `cites:` glob (the same-pass memory↔code accumulator)
 - `placement-drift-signal.py` — PostToolUse Edit/Write, accumulates placement drift → `placement-drift.json` (feeds the budget headline)
 - `map-drift-signal.py` — PostToolUse Edit/Write, bumps `map-currency-drift.json` when an architecture seed changes while MAP.md is untouched (feeds the MAP-currency mandate above)
+- `managed-surface-context.py` — PreToolUse, injects the cite-tooling discipline when you edit a registered managed surface (`.claude/agents/*.md` IS one); `cite-seal-signal.py` — PostToolUse, the seal counterpart. These two fire on your own catalog/CLAUDE.md edits: scope lives in `_lib/managed_surfaces.py` ONLY, and a hand-written slug/fingerprint corrupts the controller — go through the cite tooling (`seal`/`describe`/`propagate`/`refresh`), never hand-edit the envelope ([[feedback_managed_surface_edit_discipline]]).
 
 The skills you dispatch from:
 - `/memory-kit` — the toolkit's user-facing entry point
@@ -170,7 +172,7 @@ disagreement is a measurement question before it is a rebuild action.
 
 **Storage** (`project_memory_in_repo_two_tier.md`): Primary memory lives at `.claude/memory/` (git-tracked, team-shareable, PVC-recoverable). The `.claude-config/projects/.../memory/` slot is a symlink. Project knowledge belongs in repo; personal observations stay in the symlinked slot. → Claude-native auto-memory protocol: https://code.claude.com/docs/en/memory (the two-system model: CLAUDE.md instructions + auto-memory accumulator).
 
-**Signal-driven ceremonies** (`project_signal_driven_audit_ceremonies.md`): Audits are triggered by accumulated signal, not by fixed cadence. The drift-signal hook tracks edits → when `drift_score ≥ threshold`, the ceremony is worth running. CLAUDE.md is treated as gospel until signal accumulates. → CLAUDE.md authoring best practices: https://claude.com/blog/using-claude-md-files (specific + concise instructions; team-shared at repo root; iterate when Claude does something wrong).
+**Signal-driven ceremonies** (`project_signal_driven_audit_ceremonies.md`): Audits are triggered by accumulated signal, not by fixed cadence. The drift-signal hook tracks edits → when `drift_score ≥ threshold`, the ceremony is worth running. CLAUDE.md is treated as gospel until signal accumulates. Your whole budget/compaction mandate is one instance of the operator's deterministic flag→agent→canon→stasis automation arch (a deterministic ledger flag → background Opus dispatch → cite-sealed backlog with status → suppress-on-re-encounter so a blocked item never re-fires → ceremony-pattern sweep); the deprecation-sentinel is its reference implementation ([[feedback_deterministic_flag_agent_canon_stasis_pattern]]). → CLAUDE.md authoring best practices: https://claude.com/blog/using-claude-md-files (specific + concise instructions; team-shared at repo root; iterate when Claude does something wrong).
 
 **Memory↔code coherence is a reconciliation controller** (`project_memory_cites_edge.md`): memory entries
 declare `cites:` to the code/spec/scenario they depend on; `memory-coherence-audit.py` is not a lint pass —
@@ -300,7 +302,7 @@ When multiple agents work the same repo concurrently, untracked files from one a
 
 You don't:
 - Author timeline entries — chronicle (historian), roadmap/backlog (cartographer)
-- Surface archive patterns (historian's domain — now operational via mempalace)
+- Surface archive patterns (historian's domain)
 - Write into `genesis/data/stories/` (storyteller)
 - Edit MEMORY.md entries directly to "fix" them (operator decisions; you can suggest and may apply tiny corrections — typo, dup-merge — per LIFECYCLE.md)
 - Edit CLAUDE.md files without the operator's explicit go-ahead (gospel, treat with care)
