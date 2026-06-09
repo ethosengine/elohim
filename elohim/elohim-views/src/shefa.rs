@@ -50,6 +50,9 @@ pub struct EconomicEventView {
     /// Set on the primary event; Settlement events carry the Collab CID in
     /// their metadata extensions block instead.
     pub scope_collab_cid: Option<String>,
+    /// DHT-sourced substrate signal classification (write-through projection;
+    /// never client-injectable — clients read this field, they never set it).
+    pub substrate_signal: Option<String>,
 }
 
 /// Measure — quantity + unit pair (ValueFlows)

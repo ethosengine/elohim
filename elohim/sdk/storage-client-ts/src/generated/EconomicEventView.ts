@@ -19,4 +19,9 @@ atLocation: string | null,
  * Set on the primary event; Settlement events carry the Collab CID in
  * their metadata extensions block instead.
  */
-scopeCollabCid: string | null, };
+scopeCollabCid: string | null, 
+/**
+ * DHT-sourced substrate signal classification (write-through projection;
+ * never client-injectable — clients read this field, they never set it).
+ */
+substrateSignal: string | null, };

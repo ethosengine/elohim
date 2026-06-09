@@ -99,6 +99,7 @@ impl From<EconomicEvent> for EconomicEventView {
             created_at: e.created_at,
             at_location: e.at_location,
             scope_collab_cid: e.scope_collab_cid,
+            substrate_signal: e.substrate_signal,
         }
     }
 }

@@ -38,7 +38,8 @@
     "metadata": { "type": "object", "description": "Domain-specific metadata (parsed object)" },
     "dhtAnchorHash": { "type": "string", "description": "DHT entry hash linking this projection to the notarized record" },
     "createdAt": { "type": "string", "description": "ISO 8601 creation timestamp" },
-    "atLocation": { "type": "string", "description": "Place ID for spatial grounding" }
+    "atLocation": { "type": "string", "description": "Place ID for spatial grounding" },
+    "substrateSignal": { "type": ["string", "null"], "description": "DHT-sourced substrate signal classification for this event (write-through projection; never client-injectable)" }
   },
   "additionalProperties": false
 }

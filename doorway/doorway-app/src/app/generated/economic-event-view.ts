@@ -77,4 +77,8 @@ export interface EconomicEventView {
    * Place ID for spatial grounding
    */
   atLocation?: string;
+  /**
+   * DHT-sourced substrate signal classification for this event (write-through projection; never client-injectable)
+   */
+  substrateSignal?: string | null;
 }

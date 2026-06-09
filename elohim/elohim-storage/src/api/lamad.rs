@@ -220,6 +220,7 @@ async fn handle_emit_event(
                     metadata: None,
                     created_at: String::new(),
                     dht_anchor_hash: None,
+                    substrate_signal: None,
                 };
                 return Ok(crate::services::response::json_response(
                     hyper::StatusCode::CREATED,
