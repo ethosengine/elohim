@@ -1,6 +1,15 @@
+---
+id: elohim-protocol-manifesto
+cites:
+  - constitution | The law that operationalizes this vision: the constitution-as-system-prompt, layer precedence (more-immutable wins), and the Matthew 6:21 gate that binds even the lawgiver. | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md
+  - confession | The theology beneath this vision said plainly — what the protocol is FOR (the upstream soil it tends), what it holds, and the honest edges it cannot resolve. | sha256:68d7d48b66a1af34 | path: genesis/docs/content/elohim-protocol/confession.md
+  - theology | The same theology forged as a disputation: each commitment pressed by its strongest objection across thirteen Articles, several answered 'this stands.' | sha256:021aedd2c45998ea | path: genesis/docs/content/elohim-protocol/theology.md
+---
 # **Elohim Protocol - Digital Infrastructure for Human Flourishing: A Manifesto for Love-Centered Technology**
 
 Learn more at [https://elohim.host](https://elohim.host) a vision-setting project of Ethosengine. 
+
+> **On this document and its companions.** This manifesto is the **vision** — the crisis it answers and the love-centered alternative it proposes. Three companion documents complete the corpus: [`./constitution.md`](./constitution.md) is the **law** that operationalizes this vision, the constitution-as-system-prompt with its layer precedence and the universal gate that binds even the lawgiver; [`./confession.md`](./confession.md) states the **theology beneath the vision plainly** — what the protocol holds, with what it cannot resolve gathered honestly at the end; [`./theology.md`](./theology.md) is the same theology **argued out as a disputation**, each commitment pressed by its strongest objection article by article.
 
 ## **Executive Summary**
 
