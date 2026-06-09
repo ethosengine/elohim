@@ -5,15 +5,20 @@ contentType: "backlog-item"
 contentFormat: "markdown"
 title: "Genesis stewardship-allocation E2E fails — seeder idempotency read truncates at limit=10000, affinity stewards never seeded (allocations matthew-only)"
 slug: "ci-genesis-stewardship-allocation-seed-truncation"
-written: "2026-06-07"
+written: "2026-06-08"
 author: "ci-failure-triage"
 status: "wip"
-priority: "high"
+priority: "medium"
+# seeder idempotency-truncation CAUSE is landed (ec5937287 + fbe3c6d70 pagination);
+# the residual stewardship-scenario red is the provenance/under-seed gap, re-pointed
+# to backlog-seed-provenance-anchor-gap. Held at `wip` (not active.*) because the
+# scenario is not GREEN and `active.*` is /deliver's tier-3 verdict to mint, not triage/cartographer.
 ci_status: in-progress
 fingerprints: [0c4425ee19d3, afc361e61c2d, 401e1c60291d]
 jobs: [elohim-genesis]
-relatedNodeIds: []
-tags: [ci, elohim-genesis, seeder, stewardship, allocations, idempotency, pagination, e2e, persistent-pvc]
+relatedNodeIds:
+  - "backlog-seed-provenance-anchor-gap"
+tags: [ci, elohim-genesis, seeder, stewardship, allocations, idempotency, pagination, e2e, persistent-pvc, resolved-cause-residual-provenance]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1104/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1102/
@@ -111,12 +116,25 @@ shadow at #1104.
 
 ## Current decision
 
-**Fixed in the seeder (committed on shift branch), `status: triaged` /
-`triaged_at_build: 1104`. Awaiting CI disappearance confirmation** (genesis green-streak
-≥3 with no recurrence of the three fingerprints). `decompose_on_confirm` is NOT set —
-the lesson (a `limit=N` existence-read silently truncating an idempotency diff on a
-persistent-PVC store) is reusable seeder-hardening guidance worth graduating, so the
-harvester reports the backlog entry for graduate-then-decompose rather than auto-deleting.
+**SEEDER CAUSE RESOLVED — `ec5937287` (seeder allocation idempotency truncation) + `fbe3c6d70`
+(`listAllocations` pagination, persona drift Susan→Jessica).** The `limit=10000` existence-read
+truncation described below is fixed; "Allocation ratios sum to ~1.0" is **GREEN on #1106**. Status
+bumped to `active.alpha` — the originally-diagnosed mechanism (truncated idempotency diff) no longer
+holds.
+
+**RESIDUAL (re-pointed):** the stewardship-*affinity*-scenario reds ("multiple stewards", "reflects
+human affinities", "faith content stewarded by pastoral affinity") that persisted on #1106 are **NOT**
+this seeder truncation. Per the completed root-cause investigation, they are the **provenance/under-seed
+gap** — the bulk ~1865 affinity items sit behind `require_provenance` un-stamped because the alpha stack
+is peer-starved (the drain never stamps `p2p_published_at`). The exact-count match (5 value-scanner /
+4 public-observer scan windows == the provenance-passing category-None tag-only counts) proves the stack
+returned only the few provenance-passing rows, not that allocations are missing. The residual now lives
+in the master capture **`seed-provenance-anchor-gap.md`** (see `relatedNodeIds`). This entry is retained
+(not deleted) to preserve the fingerprint trail (`0c4425ee19d3` / `afc361e61c2d` / `401e1c60291d`); its
+*cause* is closed, its *residual symptom* is re-pointed.
+
+The lesson (a `limit=N` existence-read silently truncating an idempotency diff on a persistent-PVC
+store) remains reusable seeder-hardening guidance worth graduating to the museum.
 
 A second, related defect this run did NOT change (documented, not yet acted): the
 persistent allocations table carries stale partial allocations from old runs and is
