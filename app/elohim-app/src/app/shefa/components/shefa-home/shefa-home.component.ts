@@ -7,11 +7,7 @@ import { RouterModule } from '@angular/router';
 import { EconomicEvent, REAAction } from '@app/elohim/models';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
-import {
-  ECONOMIC_EVENT_FACTORY,
-  type IEconomicEventFactory,
-  type AppreciationDisplay,
-} from '../../interfaces';
+import { ECONOMIC_EVENT_FACTORY, type AppreciationDisplay } from '../../interfaces';
 
 const RECOGNITION_POINTS_UNIT = 'recognition-points';
 
@@ -176,6 +172,12 @@ const RECOGNITION_POINTS_UNIT = 'recognition-points';
       <div class="dashboard-actions" *ngIf="!loading()">
         <button class="action-btn primary" (click)="refreshData()">🔄 Refresh Data</button>
         <button class="action-btn" (click)="testConnection()">🔌 Test Connection</button>
+        <a class="action-btn" routerLink="/shefa/cluster" data-testid="shefa-home-cluster">
+          🕸️ My Cluster
+        </a>
+        <a class="action-btn" routerLink="/shefa/peers" data-testid="shefa-home-peers">
+          🌐 Peer Network
+        </a>
         <a [attr.href]="lamadHref" class="action-btn">📚 Explore Lamad</a>
       </div>
 

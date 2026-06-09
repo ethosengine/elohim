@@ -632,5 +632,33 @@ describe('ShefaHomeComponent', () => {
 
       expect(refreshSpy).toHaveBeenCalled();
     });
+
+    // felt-resilience gap 1: the cluster + peer-topology surfaces must be
+    // reachable from the Shefa entry point, not URL-only.
+    it('should render a discoverable link to My Cluster (/shefa/cluster)', async () => {
+      fixture.detectChanges();
+      await waitForLoadData();
+      fixture.detectChanges();
+
+      const clusterLink: HTMLAnchorElement = fixture.nativeElement.querySelector(
+        'a[data-testid="shefa-home-cluster"]'
+      );
+      expect(clusterLink).toBeTruthy();
+      expect(clusterLink.getAttribute('href')).toBe('/shefa/cluster');
+      expect(clusterLink.textContent).toContain('My Cluster');
+    });
+
+    it('should render a discoverable link to Peer Network (/shefa/peers)', async () => {
+      fixture.detectChanges();
+      await waitForLoadData();
+      fixture.detectChanges();
+
+      const peersLink: HTMLAnchorElement = fixture.nativeElement.querySelector(
+        'a[data-testid="shefa-home-peers"]'
+      );
+      expect(peersLink).toBeTruthy();
+      expect(peersLink.getAttribute('href')).toBe('/shefa/peers');
+      expect(peersLink.textContent).toContain('Peer Network');
+    });
   });
 });
