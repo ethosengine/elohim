@@ -47,6 +47,9 @@ const INTERFACE_FILES = [
   { src: 'inputs/create-economic-event-input.ts', dest: 'create-economic-event-input.ts' },
   { src: 'inputs/create-attestation-input.ts', dest: 'create-attestation-input.ts' },
   { src: 'views/content-view.ts', dest: 'content-view.ts' },
+  // Native content-graph seam §4.6 — graph wire shape (rootId/related/totalNodes,
+  // inferenceSource-discriminated edges) from GET /db/relationships/graph/{id}.
+  { src: 'views/content-graph.ts', dest: 'content-graph-view.ts' },
   { src: 'views/economic-event-view.ts', dest: 'economic-event-view.ts' },
   { src: 'views/p2p-status-view.ts', dest: 'p2p-status-view.ts' },
   { src: 'views/drain-status-view.ts', dest: 'drain-status-view.ts' },

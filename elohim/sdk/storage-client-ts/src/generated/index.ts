@@ -297,3 +297,10 @@ export * from "./DeviceSummary";
 export * from "./Freshness";
 export * from "./HubComputeAggregateView";
 export * from "./HubKind";
+
+// Native content-graph seam (spec: native-content-graph-seam-design §4.6) —
+// the contracted graph wire shape served by GET /db/relationships/graph/{id}.
+// `inferenceSource` discriminates authored ("explicit") from computed
+// discovery ("tag"/...) edges; `depth` marks transitive reach.
+export * from "./ContentGraphView";
+export * from "./ContentGraphNodeView";
