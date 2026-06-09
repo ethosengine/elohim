@@ -16,7 +16,9 @@ import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, RouterModule } from '@angular/router';
 
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
+
+import type { PullStatusInfo } from '../../services/acquisition.service';
 
 import { type ContextMenuAction } from '@app/qahal';
 
@@ -52,6 +54,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     download: ReturnType<typeof vi.fn>;
     capability: ReturnType<typeof vi.fn>;
     pinAsPeer: ReturnType<typeof vi.fn>;
+    pullStatus$: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
@@ -61,6 +64,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
       download: vi.fn().mockResolvedValue('browser'),
       capability: vi.fn().mockReturnValue('browser'),
       pinAsPeer: vi.fn().mockResolvedValue(undefined),
+      pullStatus$: vi.fn().mockReturnValue(of()),
     };
 
     await TestBed.configureTestingModule({
@@ -342,5 +346,138 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     await Promise.resolve();
 
     expect(acquisitionSpy.pinAsPeer).toHaveBeenCalledWith('epr:strawberry-guide');
+  });
+
+  // ── Rung-4 visible-delivery wiring: <app-pin-progress> in the host ──────────
+
+  /** Drive a peer pin-as-peer selection and return the status Subject feeding it. */
+  async function selectPinAsPeer(epr = 'epr:strawberry-guide'): Promise<Subject<PullStatusInfo>> {
+    const status$ = new Subject<PullStatusInfo>();
+    acquisitionSpy.capability.mockReturnValue('peer');
+    acquisitionSpy.pullStatus$.mockReturnValue(status$);
+    resolverSpy.resolve.mockReturnValue(
+      of({ ...mockResolved, content: { ...mockResolved.content, reach: 'commons' } })
+    );
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.dispatchEvent(
+      new CustomEvent('epr-menu-select', { detail: { id: 'pin-as-peer', epr }, bubbles: true })
+    );
+    // pinAsPeer resolves, then subscribePull subscribes (two microtask hops).
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
+    return status$;
+  }
+
+  it('subscribes to pullStatus$ and renders <app-pin-progress> on a pin-as-peer selection', async () => {
+    const status$ = await selectPinAsPeer();
+    expect(acquisitionSpy.pullStatus$).toHaveBeenCalledWith('epr:strawberry-guide');
+    expect(status$.observed).toBe(true);
+
+    status$.next({ total: 4, fetched: 1, pending: 3, failed: 0, caughtUp: false });
+    fixture.detectChanges();
+
+    const bar = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="epr-link-pin-progress"]'
+    );
+    expect(bar).toBeTruthy();
+    const frac = bar?.querySelector('[data-testid="pin-progress-fraction"]');
+    expect(frac?.textContent).toContain('1');
+    expect(frac?.textContent).toContain('4');
+  });
+
+  it('does not render the progress bar before a pin-as-peer selection', () => {
+    component.epr = 'epr:manifesto';
+    fixture.detectChanges();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="epr-link-pin-progress"]')
+    ).toBeFalsy();
+  });
+
+  it('stops polling on caughtUp===true but KEEPS the element (serving badge)', async () => {
+    const status$ = await selectPinAsPeer();
+    expect(status$.observed).toBe(true);
+
+    status$.next({ total: 2, fetched: 2, pending: 0, failed: 0, caughtUp: true });
+    fixture.detectChanges();
+
+    // Polling stopped: the host unsubscribed.
+    expect(status$.observed).toBe(false);
+    // Element still rendered, showing the caught-up badge (null≠done preserved —
+    // total was computable, so caughtUp surfaces).
+    const bar = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="epr-link-pin-progress"]'
+    );
+    expect(bar).toBeTruthy();
+    expect(bar?.querySelector('[data-testid="pin-progress-caught-up"]')).toBeTruthy();
+  });
+
+  it('does NOT stop polling when caughtUp is true but total is null (null≠done)', async () => {
+    const status$ = await selectPinAsPeer();
+    status$.next({ total: null, fetched: 0, pending: 0, failed: 0, caughtUp: true });
+    fixture.detectChanges();
+
+    // null total = not computable: keep polling, never surface "serving".
+    expect(status$.observed).toBe(true);
+    const bar = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="epr-link-pin-progress"]'
+    );
+    expect(bar?.querySelector('[data-testid="pin-progress-caught-up"]')).toBeFalsy();
+    expect(bar?.querySelector('[data-testid="pin-progress-waiting"]')).toBeTruthy();
+  });
+
+  it('clears the bar and unsubscribes on cancel (no leaked subscription)', async () => {
+    const status$ = await selectPinAsPeer();
+    status$.next({ total: 4, fetched: 1, pending: 3, failed: 0, caughtUp: false });
+    fixture.detectChanges();
+
+    const cancelBtn = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="pin-progress-cancel"]'
+    ) as HTMLButtonElement;
+    expect(cancelBtn).toBeTruthy();
+    cancelBtn.click();
+    fixture.detectChanges();
+
+    // Unsubscribed (no leaked poll) AND the bar is gone.
+    expect(status$.observed).toBe(false);
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="epr-link-pin-progress"]')
+    ).toBeFalsy();
+  });
+
+  it('re-issues pinAsPeer and re-subscribes on retry', async () => {
+    const status$ = await selectPinAsPeer();
+    status$.next({ total: 3, fetched: 1, pending: 1, failed: 1, caughtUp: false });
+    fixture.detectChanges();
+
+    const retryBtn = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="pin-progress-retry"]'
+    ) as HTMLButtonElement;
+    expect(retryBtn).toBeTruthy();
+
+    acquisitionSpy.pinAsPeer.mockClear();
+    acquisitionSpy.pullStatus$.mockClear();
+    const status2$ = new Subject<PullStatusInfo>();
+    acquisitionSpy.pullStatus$.mockReturnValue(status2$);
+
+    retryBtn.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
+
+    expect(acquisitionSpy.pinAsPeer).toHaveBeenCalledWith('epr:strawberry-guide');
+    expect(status2$.observed).toBe(true);
+  });
+
+  it('unsubscribes the poll on ngOnDestroy (no leaked interval)', async () => {
+    const status$ = await selectPinAsPeer();
+    expect(status$.observed).toBe(true);
+    component.ngOnDestroy();
+    expect(status$.observed).toBe(false);
   });
 });

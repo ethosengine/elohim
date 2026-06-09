@@ -28,18 +28,20 @@ import {
   OnInit,
   Output,
   inject,
+  signal,
 } from '@angular/core';
 import { type NavigationExtras, Router } from '@angular/router';
 
-import { firstValueFrom } from 'rxjs';
+import { type Subscription, firstValueFrom } from 'rxjs';
 
 import 'elohim-core/register';
 
 import { type ContextMenuAction } from '@app/qahal';
 
-import { AcquisitionService } from '../../services/acquisition.service';
+import { AcquisitionService, type PullStatusInfo } from '../../services/acquisition.service';
 import { EprNavService } from '../../services/epr-nav.service';
 import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
+import { PinProgressComponent } from '../pin-progress/pin-progress.component';
 
 import type { ContextMenuItem, ElohimEprLink, EprLinkDisplay } from 'elohim-core';
 
@@ -48,10 +50,22 @@ export type { EprLinkDisplay } from 'elohim-core';
 @Component({
   selector: 'app-epr-link',
   standalone: true,
-  imports: [],
+  imports: [PinProgressComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <elohim-epr-link [attr.epr]="epr" [attr.display]="display"></elohim-epr-link>
+    @if (activePeerPin() !== null) {
+      <app-pin-progress
+        data-testid="epr-link-pin-progress"
+        [total]="peerPinStatus()?.total ?? null"
+        [fetched]="peerPinStatus()?.fetched ?? 0"
+        [pending]="peerPinStatus()?.pending ?? 0"
+        [failed]="peerPinStatus()?.failed ?? 0"
+        [caughtUp]="peerPinStatus()?.caughtUp ?? null"
+        (cancel)="cancelPeerPin()"
+        (retry)="retryPeerPin()"
+      ></app-pin-progress>
+    }
   `,
   styles: [
     `
@@ -94,6 +108,18 @@ export class EprLinkComponent implements OnInit, OnDestroy {
   private readonly eprNav = inject(EprNavService);
   private readonly acquisition = inject(AcquisitionService);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  /**
+   * Rung-4 provide UI state. `activePeerPin` holds the epr id of the in-flight
+   * pin (null = no progress bar). `peerPinStatus` holds the latest poll rollup
+   * the <app-pin-progress> element binds. Both are host-owned — the stateless
+   * element renders what it's fed and never fetches (blank-slate discipline).
+   */
+  protected readonly activePeerPin = signal<string | null>(null);
+  protected readonly peerPinStatus = signal<PullStatusInfo | null>(null);
+
+  /** The pull-status poll subscription. Disposed on caught-up, cancel, destroy. */
+  private pullSub: Subscription | null = null;
 
   /**
    * The full Epic E action set the menu offers. Built-in conveniences
@@ -183,6 +209,67 @@ export class EprLinkComponent implements OnInit, OnDestroy {
     const host = this.elRef.nativeElement;
     host.removeEventListener('navigate', this.navigateListener);
     host.removeEventListener('epr-menu-select', this.eprMenuSelectListener);
+    this.stopPolling();
+  }
+
+  /**
+   * Rung-4 provide loop (host-owned lifecycle). POST the provide pin, then
+   * subscribe the pull-status poll and feed each emission to the stateless
+   * <app-pin-progress>. Peer-only — pinAsPeer() rejects on a browser node, but
+   * the action isn't offered there, so this path is unreachable in doorway mode.
+   */
+  private startPeerPin(epr: string): void {
+    this.activePeerPin.set(epr);
+    this.peerPinStatus.set(null);
+    // Attach .then/.catch synchronously (no await) so the handled-rejection job
+    // is registered before any zone drain-end uncaught check — the native-await
+    // phantom-unhandled caveat (MEMORY: zone.js native-await phantom uncaught).
+    this.acquisition
+      .pinAsPeer(epr)
+      .then(() => this.subscribePull(epr))
+      .catch(() => {
+        console.warn('[EprLink] pin-as-peer failed for', epr);
+        this.clearPeerPin();
+      });
+  }
+
+  /** Subscribe the poll stream; stop polling once the backend asserts caught-up. */
+  private subscribePull(epr: string): void {
+    this.stopPolling();
+    this.pullSub = this.acquisition.pullStatus$(epr).subscribe(status => {
+      this.peerPinStatus.set(status);
+      // null≠done: only a computable total + caughtUp:true ends the poll. The
+      // element keeps showing the "✓ serving" badge; we just stop fetching.
+      if (status.total !== null && status.caughtUp === true) {
+        this.stopPolling();
+      }
+    });
+  }
+
+  /** Cancel: stop polling and clear the bar. No own-node un-pin route exists in
+   *  the service yet, so cancel is a UI-local disposition (no DELETE). */
+  protected cancelPeerPin(): void {
+    this.clearPeerPin();
+  }
+
+  /** Retry: re-issue the provide pin and re-subscribe the poll for the same epr. */
+  protected retryPeerPin(): void {
+    const epr = this.activePeerPin();
+    if (epr === null) return;
+    this.startPeerPin(epr);
+  }
+
+  /** Tear down the poll subscription without clearing the rendered state. */
+  private stopPolling(): void {
+    this.pullSub?.unsubscribe();
+    this.pullSub = null;
+  }
+
+  /** Stop polling AND remove the progress bar (cancel / pin failure). */
+  private clearPeerPin(): void {
+    this.stopPolling();
+    this.activePeerPin.set(null);
+    this.peerPinStatus.set(null);
   }
 
   /**
@@ -217,9 +304,7 @@ export class EprLinkComponent implements OnInit, OnDestroy {
       case 'pin-as-peer':
         // Rung 4 (provide): pin AND offer to serve to peers. Peer-only — the
         // service rejects on a browser node; the action isn't offered there.
-        void this.acquisition.pinAsPeer(epr).catch(() => {
-          console.warn('[EprLink] pin-as-peer failed for', epr);
-        });
+        this.startPeerPin(epr);
         break;
       case 'network':
         // Resolve to the resource route, then land directly on the Network /
