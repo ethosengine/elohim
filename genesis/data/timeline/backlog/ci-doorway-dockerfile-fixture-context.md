@@ -16,6 +16,8 @@ relatedNodeIds: []
 tags: [ci, elohim-edge, doorway, dockerfile, build-context, museum-trap-3, host-green-not-ci-green]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1043/
+  - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1051/
+  - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1052/
   - doorway/doorway-service/Dockerfile
   - doorway/doorway-service/src/projection/epr_router.rs
   - doorway/doorway-service/src/server/http.rs
@@ -104,3 +106,40 @@ opened as a finding.
   verified against the `include_str!` normalization above.
 - Commit-only (integrator pushes; a `[build:edge]`-tagged integrator push will
   rebuild the doorway image and confirm by green streak).
+
+## Re-triage 2026-06-09 — false recurrence (museum trap #1), fix confirmed good
+
+The harvester reopened `ef52f70f4178` (last_build advanced 1043 → 1052,
+exceeding the stamped `triaged_at_build: 1043`). Re-triage finding: **the fix
+took; the "recurrence" is an ABORTED-build artifact** (museum trap #1 —
+NOT_BUILT/ABORTED/superseded read as a failure).
+
+Evidence:
+
+- The COPY fix landed in `82adedd21` on **2026-06-06**. The Dockerfile `check`
+  stage now carries `COPY elohim/sdk/fixtures /elohim/sdk/fixtures` (line 88),
+  with the explanatory comment block above it.
+- Build **#1051** (UNSTABLE, 2026-06-08, *after* the fix) ran the
+  fixture-consuming tests to completion in the doorway `check` stage:
+  `#33 [check 7/7] RUN RUSTFLAGS="" cargo test --lib --bins` →
+  `test result: ok. 558 passed; 0 failed`. The fixtures parse; the COPY works.
+  #1051's UNSTABLE is an *unrelated* stage — `Edge deploy partial failure: 1/2
+  peers did not reach Ready — elohim-doorway-alpha-b` (the
+  alpha-cluster-degraded-substrate concern, separately canonicalized). No
+  fixture `No such file (os error 2)` anywhere in #1051.
+- Build **#1052** (ABORTED, 2026-06-09) carries `InterruptedBuildAction` /
+  `BuildTriggerCancelledCause` ("Calling Pipeline was cancelled"). Its
+  "Quality Gate: Doorway" went UNSTABLE only via
+  `script returned exit code 143` (SIGTERM) — `Quality Gate: Doorway - issues
+  found (non-blocking): Calling Pipeline was cancelled`. The Docker `check`
+  build was mid-`cargo test --lib --bins` when the orchestrator's
+  `abortPrevious` killed it. The fixture error signature does **not** appear.
+  The coarse fingerprint line ("red build, stage:Quality Gate: Doorway")
+  re-matched the cancellation banner — a false recurrence, not the real
+  failure.
+
+Action: re-stamped `triaged_at_build: 1052` (advance the recurrence reference
+past the aborted build so the next abort doesn't re-trip it), `status:
+triaged`, `decompose_on_confirm: true` retained. The fix awaits a genuine
+green streak; #1051's 558-passing doorway check is the substantive
+confirmation that the gate is repaired.
