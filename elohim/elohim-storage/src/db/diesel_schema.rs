@@ -200,6 +200,9 @@ diesel::table! {
         // Mishpat::Commitment (compute-class action `delegates-compute`).
         // Used by DieselRateHistory for sliding-window rate queries.
         bounded_by -> Nullable<Text>,
+        // DHT-signal tag for this event (migration 2026-06-10-010000).
+        // Nullable; write-through projection of the DNA integrity field.
+        substrate_signal -> Nullable<Text>,
     }
 }
 

@@ -380,6 +380,12 @@ pub struct EconomicEvent {
     /// Used by `DieselRateHistory` for sliding-window rate queries.
     /// Migration: 2026-05-28-050000_economic_events_add_bounded_by.
     pub bounded_by: Option<String>,
+    /// DHT-signal tag projected from the DNA integrity field (compute-class only).
+    ///
+    /// Write-through projection; populated by the signal writer (Task 5).
+    /// NULL for events that carry no substrate signal.
+    /// Migration: 2026-06-10-010000_add_economic_event_substrate_signal.
+    pub substrate_signal: Option<String>,
 }
 
 /// New economic event for INSERT
