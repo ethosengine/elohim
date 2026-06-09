@@ -7,7 +7,7 @@ domain: D8
 sprint: slice-1
 cites:
   - lens-complete-epr-resolution-four-leg-coupling-design | the parent design; this plan implements Slice 1 (demote claims-302 + focal epr-composite render + Open-in-pillar lens) | sha256:79f821217c1c8e11 | path: genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md
-  - epr-acquisition-pull-queue-design | owns the typed-relation ClusterClosure (HELD here, composed in Slice 3) + the value-leg provide-content substrate (HELD, Slice 2) — do not fork | sha256:fc4a0cdd9828a377 | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
+  - epr-acquisition-pull-queue-design | owns the typed-relation ClusterClosure (HELD here, composed in Slice 3) + the value-leg provide-content substrate (HELD, Slice 2) — do not fork | sha256:fc4a0cdd9828a377 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
   - epr-slice0-raw-node-surface-plan | the prior slice (raw-node surface); this builds on its EprSubview dispatch + the shell /epr routing | sha256:a09175be8e1817bb | path: genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md
 ---
 

@@ -6,7 +6,7 @@ class: protocol-canonical
 domain: D5
 sprint: acquisition-family-slice-1
 cites:
-  - epr-acquisition-pull-queue-design | the spec this plan implements — Slice 1 of its §13 slicing (reconcile rails §4.1, acquisition stream §4.2-4.4, DevicePin §1.1, rungs 2-3 §8); gate record in its §3/§12 covers every entity here | sha256:fc4a0cdd9828a377 | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
+  - epr-acquisition-pull-queue-design | the spec this plan implements — Slice 1 of its §13 slicing (reconcile rails §4.1, acquisition stream §4.2-4.4, DevicePin §1.1, rungs 2-3 §8); gate record in its §3/§12 covers every entity here | sha256:fc4a0cdd9828a377 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
   - .claude/memory-kit/gap-items/specs__2026-06-07-epr-acquisition-pull-queue-design.json
   - genesis/plans/2026-04-06-identity-driven-replication-plan.md
   - genesis/plans/2026-03-22-epr-body-plane-plan.md

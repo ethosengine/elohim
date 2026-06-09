@@ -12,7 +12,7 @@ informed-by:
 cites:
   - genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-delivery-master.md
   - genesis/docs/content/elohim-protocol/architecture/2026-03-26-app-manifest-sdk-boundary-design.md
-  - mutual-storage-replication-dwelling-hub-design | pledge-tier mechanism + donut clamp that the §4 amendment's negotiation gate extends — closes its floor-via-declaration gap one layer up | sha256:5596799dbb456bc2 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
+  - mutual-storage-replication-dwelling-hub-design | pledge-tier mechanism + donut clamp that the §4 amendment's negotiation gate extends — closes its floor-via-declaration gap one layer up | sha256:5596799dbb456bc2 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
   - app-manifest-staged-intents-design | manifest-substrate precedent the quiltPolicies extension follows (shape-vs-vocabulary boundary; substrate-landed/feature-held); its ceremony-id typo trap motivates validator-enforced referential integrity | sha256:98e0a6576d9a197a | path: genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md
 informs:
   - All future quilt-stewardship sprint specs (the 8-wave roadmap)
