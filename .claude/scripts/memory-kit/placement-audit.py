@@ -763,43 +763,44 @@ def map_currency_line():
             f"   ({'walk current ✅' if n == 0 else '⚠ MAP.md may be stale vs seeds → refresh the walk'})")
 
 
-def memkit_line():
-    """memory-kit PROCESS-ARTIFACT tier currency (comet retention — bounded, trajectory-preserving)."""
+def _gate_subprocess(gate: str, script: str, flag: str, timeout: int = 15) -> str:
+    """Run a headline gate's backing script with INSTRUMENT LIVENESS: a gate that
+    crashes must surface as `⚠ gate-error`, never silently vanish. (Incident
+    2026-06-09: scope-reconcile crashed on a malformed gap-item for days and the
+    `scope:` line simply disappeared from SessionStart — a dead instrument read
+    as 'nothing to report'. A vanished gate line is itself a finding.)
+
+    Contract: rc==0 + stdout → the line; rc==0 + empty stdout → "" (legitimate
+    silence, gate chose to say nothing); rc!=0 → ⚠ gate-error with the first
+    stderr line; exception/timeout → ⚠ gate-error with the exception class."""
     import subprocess
     try:
         out = subprocess.run(
-            [sys.executable, str(Path(__file__).parent / "memkit-retention.py"), "--status"],
-            capture_output=True, text=True, timeout=10)
+            [sys.executable, str(Path(__file__).parent / script), flag],
+            capture_output=True, text=True, timeout=timeout)
+        if out.returncode != 0:
+            err = (out.stderr or "").strip().splitlines()
+            tail = err[-1][:90] if err else f"exit {out.returncode}"
+            return f"  {gate}: ⚠ gate-error ({script}: {tail})"
         s = out.stdout.strip()
         return "  " + s if s else ""
-    except Exception:
-        return ""
+    except Exception as e:  # noqa: BLE001 — the headline must never die, but must SAY the gate did
+        return f"  {gate}: ⚠ gate-error ({type(e).__name__})"
+
+
+def memkit_line():
+    """memory-kit PROCESS-ARTIFACT tier currency (comet retention — bounded, trajectory-preserving)."""
+    return _gate_subprocess("memkit", "memkit-retention.py", "--status", timeout=10)
 
 
 def mempalace_line():
     """MemPalace semantic-index staleness — the 7th store's tripwire (index vs the cleaned surface)."""
-    import subprocess
-    try:
-        out = subprocess.run(
-            [sys.executable, str(Path(__file__).parent / "mempalace-currency.py"), "--status"],
-            capture_output=True, text=True, timeout=15)
-        s = out.stdout.strip()
-        return "  " + s if s else ""
-    except Exception:
-        return ""
+    return _gate_subprocess("mempalace", "mempalace-currency.py", "--status")
 
 
 def cleanup_line():
     """drift-elevation gate — has enough churned since the last cleanup to warrant the memory-stasis-loop?"""
-    import subprocess
-    try:
-        out = subprocess.run(
-            [sys.executable, str(Path(__file__).parent / "cleanup-pressure.py"), "--status"],
-            capture_output=True, text=True, timeout=15)
-        s = out.stdout.strip()
-        return "  " + s if s else ""
-    except Exception:
-        return ""
+    return _gate_subprocess("cleanup", "cleanup-pressure.py", "--status")
 
 
 def scope_line():
@@ -807,15 +808,7 @@ def scope_line():
     onto the plate (a capability returned) / needing to be HELD (a capability was lost)? The symmetric inverse
     of how the CI layer auto-reconciles: this surfaces the held<->live move so stories + architecture follow
     the substrate without anyone remembering to run it."""
-    import subprocess
-    try:
-        out = subprocess.run(
-            [sys.executable, str(Path(__file__).parent / "scope-reconcile.py"), "--report"],
-            capture_output=True, text=True, timeout=15)
-        s = out.stdout.strip()
-        return "  " + s if s else ""
-    except Exception:
-        return ""
+    return _gate_subprocess("scope", "scope-reconcile.py", "--report")
 
 
 def headline_mode():
@@ -848,7 +841,10 @@ def headline_mode():
           f"   ({'clear ✅' if due == 0 else '⚠ decompose-self → zero residue'})")
     # LEGIBILITY/PATH + PRIORITIZATION/ROADMAP currency: is the MAP walk current vs the
     # architecture seeds, and when was the roadmap synthesis last refreshed?
-    print(map_currency_line())
+    try:
+        print(map_currency_line())
+    except Exception as e:  # noqa: BLE001 — instrument liveness: say the gate died
+        print(f"  path: ⚠ gate-error ({type(e).__name__})")
     # PROCESS-ARTIFACT tier: is the memory-kit report dir comet-shaped + within budget?
     ml = memkit_line()
     if ml:

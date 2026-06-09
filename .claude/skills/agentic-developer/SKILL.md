@@ -20,6 +20,47 @@ closes with done or a clean bail.
    You (Opus) orchestrate and attempt every iteration.
 3. **Judgment governs loop length.** Bail when stuck with an explicit
    question. Budget is the safety net, not the primary exit.
+
+   **Research-before-bail (the gate in front of every bail).** A question the
+   corpus can answer is not bail-worthy — an unattended shift that bails on
+   an answerable question wastes the whole night. Before any bail, exhaust
+   what's here, in order: (a) the governing spec/plan sections for the
+   Objective; (b) the trajectory — shift journals, HANDOFF.md, sprint
+   results, recent git log on the touched paths (what was the prior session
+   *doing* and *deciding*?); (c) prior-art recall
+   (`spec-coherence-index.py --query`, MemPalace when scoped); (d) the
+   backlog/findings ledgers (is this already a captured, owned concern?).
+   If a best-evidenced reading exists, **forge ahead on it** and record an
+   *interpretive decision* in the journal under `Decisions taken on standing
+   evidence` — named alternatives, the evidence that picked the winner, and
+   what would falsify it — so morning review is one cheap read. **Forge-ahead
+   applies only to ACTIONS fully revertible by `git revert` within the
+   shift's path scope** — anything touching data, migrations, deploys, or
+   non-repo state bails regardless of evidence strength (a journaled
+   decision is auditable; it does not un-wipe anything). An evidence TIE
+   counts as corpus-dry: take the more reversible reading and journal the
+   tie. One research pass per question per shift — re-encountering it cites
+   the prior pass. This gate stands in front of EVERY bail shape —
+   question-, blocker-, or stall-shaped; a blocker bail must additionally
+   show the palette-conformant workarounds attempted. Bail remains correct
+   ONLY when (1) the question is judge/ceiling-classed (measures, fixtures,
+   env flips, spend, vision) — valid only if the consult shows the corpus
+   does NOT already settle it (an answered "vision" question is an
+   interpretive decision, not a bail); (2) the ACTION required is
+   irreversible as above; or (3) the corpus genuinely ran dry. The bail
+   stanza must list which of (a)–(d) were consulted and what each said —
+   "stuck" without that trail is a dump.
+
+   **Unattended kickoff (loop-fired arcs).** When a build-authorized
+   /delivery-stasis loop fires this discipline overnight: the loop's
+   verified lease substitutes for "yes, kick off"; the shift runs on the
+   **durable palette only** (gaps → wishlist, never self-written
+   settings.local.json additions); mode is self-detected from orchestrator
+   state without user confirmation; a readiness failure returns control to
+   the loop (next target or maintenance) instead of waiting for morning;
+   budget comes from the loop (night window minus maintenance reserve), not
+   the supervised defaults. Destructive-parameter rebuilds (RESET_STORAGE
+   etc.), env flips, and spend stay ceiling regardless of inherited rails.
 4. **Done is stable.** Two consecutive passing measurements, at least one
    from a **fresh trigger** — a new Jenkins build dispatched by the
    orchestrator from a `git push` you made this shift, *not* a poll or

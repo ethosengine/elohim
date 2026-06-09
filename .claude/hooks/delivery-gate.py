@@ -66,13 +66,29 @@ def main():
     ci_open = jsonl_count(".claude/data/ci-findings.jsonl", lambda e: e.get("status") == "open")
     dep_open = jsonl_count(".claude/data/deprecations.jsonl", lambda e: e.get("status") != "fixed")
 
-    # Worst pass-ratio among jobs with a meaningful window.
-    worst_job, worst_ratio = None, None
-    for job, window in (jread(".claude/data/ci-cursor.json", {}).get("recent", {}) or {}).items():
-        if len(window) >= 4:
-            ratio = window.count("SUCCESS") / len(window)
-            if worst_ratio is None or ratio < worst_ratio:
-                worst_job, worst_ratio = job, ratio
+    # FAILURE-CLASS-AWARE floor (mirrors delivery-scoreboard.py's verdict ladder):
+    # floor pressure = a degraded window WITH open (live code) findings attributed.
+    # Red whose findings are all blocked/triaged is the ceiling/wait track and must
+    # not steer dispatch. (A bare worst-pass_ratio read "0%" at substrate-gated
+    # jobs all day on 2026-06-09 and pointed the conveyor wrong.)
+    open_by_job = {}
+    path = os.path.join(PROJECT, ".claude/data/ci-findings.jsonl")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for raw in fh:
+                try:
+                    e = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if e.get("status") == "open":
+                    j = e.get("job") or "?"
+                    open_by_job[j] = open_by_job.get(j, 0) + 1
+    except OSError:
+        pass
+    code_red = sorted(
+        job for job, window in (jread(".claude/data/ci-cursor.json", {}).get("recent", {}) or {}).items()
+        if len(window) >= 4 and open_by_job.get(job)
+        and any(r in ("FAILURE", "ABORTED", "UNSTABLE") for r in window[-3:]))
 
     pressures = []
     if claimed:
@@ -81,8 +97,9 @@ def main():
         pressures.append((ci_open, f"{ci_open} open CI findings (→ ci-failure-triage / shift rails)"))
     if dep_open:
         pressures.append((dep_open, f"{dep_open} live dep/sec findings (→ /deprecation-stasis)"))
-    if worst_ratio is not None and worst_ratio < 0.5:
-        pressures.append((10, f"{worst_job} pass_ratio {worst_ratio:.0%} (floor pressure)"))
+    if code_red:
+        pressures.append((10, f"code-red CI floor: {', '.join(code_red)} (degraded window + open findings;"
+                              f" env-gated red excluded)"))
 
     if not pressures:
         return  # stasis — say nothing

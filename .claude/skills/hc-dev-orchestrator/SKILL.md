@@ -37,52 +37,57 @@ This skill manages the local development stack for the Elohim Protocol. The fram
 ## Quick Start Commands
 
 ```bash
-cd /projects/elohim/elohim-app
+cd /projects/elohim/app/elohim-app    # NOTE: app/elohim-app (post-reorg path)
 
 # Start full stack (conductor + storage + doorway)
-npm run hc:start
+pnpm run hc:start
 
 # Start with content seeding
-npm run hc:start:seed
+pnpm run hc:start:seed
 
 # Start + Angular dev server
-npm run dev
+pnpm run dev
 
 # Check status
-npm run hc:status
+pnpm run hc:status
 
 # Stop all services
-npm run hc:stop
+pnpm run hc:stop
 ```
+
+`hc-start.sh` is the MAINTAINED entry (its HC_DIR math is post-reorg-correct);
+`storage-start.sh` standalone still computes a pre-reorg `HC_DIR=../holochain`
+and will not find binaries — start storage via `hc-start.sh` or manually (see
+the bring-up ladder below).
 
 ## Command Reference
 
 | Command | Description |
 |---------|-------------|
-| `npm run hc:start` | Start full stack (conductor + storage + doorway) |
-| `npm run hc:start:seed` | Full stack + seed sample content |
-| `npm run hc:start:conductor` | Conductor only (debug mode, rare) |
-| `npm run hc:stop` | Stop all services |
-| `npm run hc:reset` | Stop + clear all data + restart |
-| `npm run hc:status` | Show all service status |
-| `npm run hc:build` | Build all DNAs |
-| `npm run hc:build:all` | Rebuild everything (DNAs + binaries) |
-| `npm run hc:seed` | Seed content to local stack |
-| `npm run dev` | Start full stack + Angular dev server |
+| `pnpm run hc:start` | Start full stack (conductor + storage + doorway) |
+| `pnpm run hc:start:seed` | Full stack + seed sample content |
+| `pnpm run hc:start:conductor` | Conductor only (debug mode, rare) |
+| `pnpm run hc:stop` | Stop all services |
+| `pnpm run hc:reset` | Stop + clear all data + restart |
+| `pnpm run hc:status` | Show all service status |
+| `pnpm run hc:build` | Build all DNAs |
+| `pnpm run hc:build:all` | Rebuild everything (DNAs + binaries) |
+| `pnpm run hc:seed` | Seed content to local stack |
+| `pnpm run dev` | Start full stack + Angular dev server |
 
 ### Component-Specific Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run storage:start` | Start storage service |
-| `npm run storage:start:foreground` | Start storage (logs visible) |
-| `npm run storage:stop` | Stop storage service |
-| `npm run storage:build` | Build storage binary |
-| `npm run storage:stats` | Show content database stats |
-| `npm run doorway:start` | Start doorway |
-| `npm run doorway:stop` | Stop doorway |
-| `npm run doorway:build` | Build doorway binary |
-| `npm run doorway:logs` | Show doorway status |
+| `pnpm run storage:start` | Start storage service |
+| `pnpm run storage:start:foreground` | Start storage (logs visible) |
+| `pnpm run storage:stop` | Stop storage service |
+| `pnpm run storage:build` | Build storage binary |
+| `pnpm run storage:stats` | Show content database stats |
+| `pnpm run doorway:start` | Start doorway |
+| `pnpm run doorway:stop` | Stop doorway |
+| `pnpm run doorway:build` | Build doorway binary |
+| `pnpm run doorway:logs` | Show doorway status |
 
 ## Environment Variables
 
@@ -97,7 +102,7 @@ npm run hc:stop
 
 ```bash
 # Full status
-npm run hc:status
+pnpm run hc:status
 
 # Individual checks
 curl http://localhost:8888/status        # Doorway (full status)
@@ -128,11 +133,11 @@ curl "http://localhost:8888/db/content?limit=10"
 # Get content by ID
 curl http://localhost:8888/db/content/manifesto
 
-# List learning paths
-curl http://localhost:8888/db/paths
+# List learning paths — there is NO /db/paths route; paths are ContentNodes
+curl "http://localhost:8888/db/content?contentType=path&limit=100"
 
-# Get path with steps
-curl http://localhost:8888/db/paths/elohim-protocol
+# Get a path (steps live in the body: sections[].items[].ref = "epr:{id}")
+curl http://localhost:8888/db/content/elohim-protocol
 
 # Database stats
 curl http://localhost:8888/db/stats
@@ -156,8 +161,8 @@ curl -I http://localhost:8888/blob/sha256-abc123
 ## Seeding Content
 
 ```bash
-# Quick seed (from elohim-app)
-npm run hc:seed
+# Quick seed (from app/elohim-app)
+pnpm run hc:seed
 
 # Or with options (from seeder directory)
 cd genesis/seeder
@@ -166,10 +171,10 @@ STORAGE_URL=http://localhost:8090 \
 npx tsx src/seed.ts --limit 50
 
 # Dry run (validate without writing)
-npm run seed:dry-run
+pnpm run seed:dry-run
 
 # Validate schema only
-npm run seed:validate
+pnpm run seed:validate
 ```
 
 ## Troubleshooting
@@ -180,29 +185,29 @@ npm run seed:validate
 fuser 8888/tcp 8090/tcp 4445/tcp
 
 # Kill stuck processes
-npm run hc:stop
+pnpm run hc:stop
 fuser -k 8888/tcp 8090/tcp
 
 # Fresh start
-npm run hc:reset
-npm run hc:start
+pnpm run hc:reset
+pnpm run hc:start
 ```
 
 ### Content Database 503 Errors
 If you see `503 Service Unavailable` on `/db/*` endpoints:
 ```bash
 # Ensure storage has ENABLE_CONTENT_DB=true
-npm run storage:start:foreground
+pnpm run storage:start:foreground
 # Look for: "SQLite content database enabled"
 ```
 
 ### Conductor Not Responding
 ```bash
 # Check ports file
-cat ../holochain/local-dev/.hc_ports
+cat ../../elohim/holochain/local-dev/.hc_ports
 
 # Test conductor
-ADMIN_PORT=$(cat ../holochain/local-dev/.hc_ports | grep admin_port | grep -o '[0-9]*')
+ADMIN_PORT=$(cat ../../elohim/holochain/local-dev/.hc_ports | grep admin_port | grep -o '[0-9]*')
 hc sandbox call --running $ADMIN_PORT list-apps
 ```
 
@@ -213,20 +218,80 @@ curl http://localhost:8888/status | jq '.storage'
 # Should show: "configured": true, "healthy": true
 
 # Restart doorway with storage
-npm run doorway:stop
-npm run doorway:start
+pnpm run doorway:stop
+pnpm run doorway:start
 ```
+
+## Verified bring-up ladder (render-proof grade, verified 2026-06-09)
+
+The full path from cold tree to a screenshot-able stack — each rung names the
+trap it clears. This is the /deliver station's bring-up asset: reuse it, don't
+rediscover it.
+
+1. **Binaries.** `hc-start.sh` expects `elohim/elohim-storage/target/release/elohim-storage`
+   and `doorway/doorway-service/target/release/doorway`. Native release builds on
+   the /projects volume hit the fingerprint-ENOENT quirk — build with a /tmp
+   target and symlink the binary to the expected path:
+   ```bash
+   cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' \
+     CARGO_TARGET_DIR=/tmp/cargo-target-elohim-storage cargo build --release
+   mkdir -p target/release && ln -sf /tmp/cargo-target-elohim-storage/release/elohim-storage target/release/
+   ```
+2. **Stale-process trap.** `hc-start.sh` skips storage when ANYTHING answers
+   `:8090/health` — including a days-old binary from a previous session. Before
+   trusting "already running": `ls -l /proc/$(fuser 8090/tcp 2>/dev/null | tr -d ' ')/exe`
+   and check its mtime/path. Old binary on the port = old wire shapes
+   (snake_case graph responses were the 2026-06-09 tell). Kill and relaunch:
+   ```bash
+   fuser -k 8090/tcp; ADMIN_PORT=$(grep admin_port elohim/holochain/local-dev/.hc_ports | grep -o '[0-9]*' | head -1)
+   cd elohim/elohim-storage && HOLOCHAIN_ADMIN_URL="ws://localhost:$ADMIN_PORT" HTTP_PORT=8090 \
+     ENABLE_IMPORT_API=true ENABLE_CONTENT_DB=true nohup ./target/release/elohim-storage > /tmp/storage.log 2>&1 &
+   ```
+3. **Seed.** Full: `pnpm run hc:seed` (from app/elohim-app). Scoped:
+   `npx tsx src/seed.ts --content-only --ids=a,b,c` / `--paths-only` (from
+   genesis/seeder, with DOORWAY_URL/STORAGE_URL). Two seeder facts: bulk create
+   is **skip-on-exists** (stale rows keep their old content/type — DELETE the
+   row or update SQL directly, then re-seed), and the paths phase's step
+   relationships are rejected (`relationship_type 'step'` not in storage's
+   vocabulary — known, backlogged; path-step membership still works via the
+   path body).
+4. **Provenance gate (the documented anchor gap).** Bulk-seeded rows have
+   `dht_anchor_hash` NULL → `GET /db/content/{id}` 404s while the graph/tag
+   routes still work. Dev recovery — backfill the live DB (Che data dir is
+   `$XDG_DATA_HOME/elohim-storage/content.db`, i.e. `/nix/xdg/data/...`):
+   ```sql
+   UPDATE content SET dht_anchor_hash='uhCkk-local-dev-backfill' WHERE dht_anchor_hash IS NULL;
+   ```
+5. **Wire facts for verification probes.** There is NO `/db/paths` route —
+   paths are ContentNodes (`/db/content?contentType=path`), body shape
+   `sections[].items[].ref` (`epr:{id}`), step index = 0-based global item
+   index. Graph route: `/db/relationships/graph/{id}?computed=true&depth=N`.
+6. **Render topology (two bundles, two dev servers).** The shell
+   (`app/elohim-app`, :4200) routes `/epr/{id}` (it lazy-loads the lamad
+   content-viewer) but NOT `/lamad/*`; the lamad bundle serves those:
+   ```bash
+   cd app/lamad && pnpm exec ng serve --port 4300 --serve-path /lamad --proxy-config ../elohim-app/proxy.conf.mjs
+   ```
+   Shell `pnpm start` runs a `prestart` that needs `wasm-pack`; when absent and
+   `elohim/elohim-cache-core/pkg/` already exists, bypass:
+   `pnpm exec ng serve --proxy-config proxy.conf.mjs --disable-host-check`.
+   Screenshots: `cd genesis/a2o && pnpm look <url> --wait-testid <id> --out <slug>`.
+7. **Known local noise.** The shell dev server's SSR pass logs
+   `ReferenceError: document is not defined` per request (500 → CSR fallback);
+   pages render fine client-side, but a2o After-hooks asserting zero console
+   errors trip on it locally — absent on alpha (static serve).
 
 ## Key File Locations
 
 | File | Purpose |
 |------|---------|
-| `app/elohim-app/scripts/hc-start.sh` | Main startup script |
-| `app/elohim-app/scripts/storage-start.sh` | Storage service startup |
+| `app/elohim-app/scripts/hc-start.sh` | Main startup script (the MAINTAINED path math) |
+| `app/elohim-app/scripts/storage-start.sh` | Storage startup — STALE pre-reorg HC_DIR; prefer hc-start.sh |
 | `app/elohim-app/scripts/hc-build.sh` | Multi-DNA build |
-| `holochain/local-dev/.hc_ports` | Dynamic port configuration |
-| `holochain/target/release/elohim-storage` | Storage binary |
-| `doorway/target/release/doorway` | Doorway binary |
+| `elohim/holochain/local-dev/.hc_ports` | Dynamic port configuration |
+| `elohim/elohim-storage/target/release/elohim-storage` | Storage binary (symlink from /tmp build — rung 1) |
+| `doorway/doorway-service/target/release/doorway` | Doorway binary (hc-start's expected path) |
+| `$XDG_DATA_HOME/elohim-storage/content.db` | Live SQLite (Che: /nix/xdg/data/elohim-storage/) |
 
 ## Multi-DNA Architecture
 
@@ -243,21 +308,21 @@ The Elohim hApp provides identity and provenance:
 ### Full Development Session
 ```bash
 # Start everything + Angular
-npm run dev
+pnpm run dev
 
 # Or step by step
-npm run hc:start
+pnpm run hc:start
 npm start
 ```
 
 ### Content Development
 ```bash
 # Start stack
-npm run hc:start
+pnpm run hc:start
 
 # Edit content in genesis/data/lamad/
 # Then seed
-npm run hc:seed
+pnpm run hc:seed
 
 # Verify
 curl http://localhost:8888/db/stats
@@ -266,13 +331,13 @@ curl http://localhost:8888/db/stats
 ### Debugging Storage
 ```bash
 # Start conductor only
-npm run hc:start:conductor
+pnpm run hc:start:conductor
 
 # Start storage in foreground (see all logs)
-npm run storage:start:foreground
+pnpm run storage:start:foreground
 
 # In another terminal, start doorway
-npm run doorway:start
+pnpm run doorway:start
 ```
 
 ### Connect to Remote Environment

@@ -18,6 +18,14 @@ findings-sentinel pattern's instantiation B owner (spec:
 (fix | block)**, and you leave the deterministic layers able to answer every
 re-encounter without another dispatch.
 
+**Dispatcher-supplied evidence is admissible.** When your dispatch prompt
+carries an already-completed ci-investigator/observer analysis (quoted log
+lines, stage verdicts, root-cause chain), canonicalize FROM it rather than
+re-deriving — verify it minimally (does the quoted signature match the
+fingerprint's `line`? do build ids line up?) and spend your budget on the
+canon + fix, not on repeating the analysis. Re-derive only when the handed
+evidence contradicts the ledger or the museum's trap list.
+
 ## The two stores you reconcile
 
 1. **Ledger** (`.claude/data/ci-findings.jsonl`) — one line per LIVE finding:

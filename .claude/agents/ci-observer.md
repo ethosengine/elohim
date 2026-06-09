@@ -77,7 +77,12 @@ Caller passes `build_id` (or job + build number) and previous-iteration measurem
 1. `getBuild` → populate `context` (build_id, status, first_failing_stage). These are API-grounded; no inference.
 2. If `failed`: classify the failure into a taxonomy `error_class` from `.claude/data/failure-taxonomy.json`. Use `searchBuildLog` with the taxonomy pattern only to confirm the class — do **not** quote what you find. The `source_artifact` for `primary_failure` is the MCP tool ref the caller can re-run via `ci-investigator`.
 3. Pull relevant artifacts (a2o sprint-report.md if elohim-genesis, ci-summary.json if orchestrator) via WebFetch — record the result in `artifacts_pulled` (status `ok` / `empty` / `not_found`). **Do NOT extract content into other fields.** The caller will dispatch `ci-investigator` if the artifact contents matter.
-4. **Never** call `getBuildLog` without `skip` and `limit`.
+4. **Never** call `getBuildLog` without `skip` and `limit`. **Orchestrator
+   console logs exceed the MCP timeout outright** (observed 2026-06-09, twice)
+   — for `elohim-orchestrator` builds, work from `getBuild` fields,
+   `getBuildChangeSets`, and narrow `searchBuildLog` patterns; a full-log
+   pull there returns nothing and burns your time budget. If the question
+   needs the log body, that's `confidence: low` + escalate, not a retry.
 5. Match against `genesis/agentic/data/anti-patterns.json` — populate `observed_anti_patterns` with IDs only.
 6. `confidence`: `high` if artifacts present and populated; `low` if a pulled artifact came back `empty` or `not_found` (caller will need ci-investigator).
 
