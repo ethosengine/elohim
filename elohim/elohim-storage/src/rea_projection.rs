@@ -36,6 +36,48 @@ use crate::db::rea_commitments::{self, CreateReaCommitmentInput};
 use crate::db::DbPool;
 use crate::error::StorageError;
 
+/// A graduation that needs a `CommitmentByState` link authored (the SQL cache is
+/// already flipped; this carries the DHT-truth write to the subscriber that holds
+/// the HcClient). Decouples the sync projection from the async link author.
+///
+/// The SQL `state` flip is the functional path; the link is the durability +
+/// peer-observability upgrade. `signed_at` is the transition's signing time
+/// (the graduating event's projection time — the storage path supplies it, never
+/// `sys_time()` in-zome).
+#[derive(Debug, Clone)]
+pub struct PendingStateLink {
+    pub commitment_cid: String,
+    pub state: String,
+    pub event_hash: String,
+    pub signed_at: String,
+}
+
+/// Set once by the signal subscriber at startup; the projection path pushes
+/// graduations onto it for the subscriber's async drain task (which holds the
+/// HcClient and calls `conductor_writes::call_create_commitment_state_link`).
+static STATE_LINK_TX: std::sync::OnceLock<tokio::sync::mpsc::UnboundedSender<PendingStateLink>> =
+    std::sync::OnceLock::new();
+
+/// Install the channel the subscriber drains. Idempotent: a second call is a
+/// no-op (`OnceLock`). Called from main.rs after the HcClient is available.
+pub fn install_state_link_sink(tx: tokio::sync::mpsc::UnboundedSender<PendingStateLink>) {
+    let _ = STATE_LINK_TX.set(tx);
+}
+
+/// Record a pending state-link transition. No-op when no sink is installed
+/// (e.g. unit tests / conductor-less mode) — the SQL cache flip already stands;
+/// the link is the durable upgrade the subscriber path performs once wired.
+fn record_pending_state_link(commitment_cid: &str, state: &str, event_hash: &str, signed_at: &str) {
+    if let Some(tx) = STATE_LINK_TX.get() {
+        let _ = tx.send(PendingStateLink {
+            commitment_cid: commitment_cid.to_string(),
+            state: state.to_string(),
+            event_hash: event_hash.to_string(),
+            signed_at: signed_at.to_string(),
+        });
+    }
+}
+
 // ============================================================================
 // Signal Types — mirror DNA-side ProjectionSignal exactly
 //
@@ -453,14 +495,32 @@ pub fn handle_rea_signal(
             // graduates its Mishpat commitment proposed → active (spec §6.5). No-op
             // if the commitment isn't yet projected or isn't 'proposed'.
             if let Some(ref bounded) = bounded_by_cid {
-                if let Err(e) =
-                    crate::db::mishpat_commitments::graduate_to_active(&mut conn, bounded)
-                {
-                    debug!(
-                        error = %e,
-                        cid = %bounded,
-                        "graduation projection: graduate_to_active failed"
-                    );
+                match crate::db::mishpat_commitments::graduate_to_active(&mut conn, bounded) {
+                    Ok(rows) if rows > 0 => {
+                        // SQL cache flipped (an actual proposed→active transition) →
+                        // record the lifecycle TRUTH as a CommitmentByState link. The
+                        // link author is async and needs the conductor; hand the
+                        // transition to the signal subscriber (which holds the
+                        // HcClient) to drain. The action_hash of THIS graduating event
+                        // is the proof the link's target carries; signed_at is the
+                        // projection time (Category-A — supplied here, never sys_time
+                        // in-zome).
+                        let signed_at = Utc::now().to_rfc3339();
+                        info!(
+                            cid = %bounded,
+                            event_hash = %action_hash,
+                            "graduation projection: proposed→active (CommitmentByState link author queued)"
+                        );
+                        record_pending_state_link(bounded, "active", &action_hash, &signed_at);
+                    }
+                    Ok(_) => { /* not 'proposed' — no transition, no link */ }
+                    Err(e) => {
+                        debug!(
+                            error = %e,
+                            cid = %bounded,
+                            "graduation projection: graduate_to_active failed"
+                        );
+                    }
                 }
             }
         }
@@ -777,5 +837,41 @@ mod tests {
             result.is_err(),
             "internally-tagged wire shape must NOT decode (would mean storage drifted away from DNA again)"
         );
+    }
+
+    /// The sink decoupling (T11): once a subscriber installs the channel, a
+    /// recorded graduation arrives on it with the right fields — without any
+    /// conductor in the loop. This is the seam the graduation block uses on a
+    /// real proposed→active flip; the subscriber's drain task authors the link.
+    #[tokio::test]
+    async fn install_sink_receives_pending_state_link() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        install_state_link_sink(tx);
+
+        // Direct recorder call (the graduation block calls this on a real flip).
+        record_pending_state_link(
+            "anchor:commit-1",
+            "active",
+            "uhCkk-event-1",
+            "2026-06-11T10:00:00Z",
+        );
+
+        let got = rx.recv().await.expect("pending link must arrive");
+        assert_eq!(got.commitment_cid, "anchor:commit-1");
+        assert_eq!(got.state, "active");
+        assert_eq!(got.event_hash, "uhCkk-event-1");
+        assert_eq!(got.signed_at, "2026-06-11T10:00:00Z");
+    }
+
+    /// No-op without a sink: `record_pending_state_link` must never panic when
+    /// no subscriber has installed a channel (unit-test / conductor-less mode).
+    /// The SQL cache flip stands alone; the link is the durable upgrade. This
+    /// also documents that the `OnceLock` means `install_sink_receives_pending_state_link`
+    /// is the ONLY test that may install a sink (a second install is a no-op).
+    #[test]
+    fn record_without_sink_is_noop() {
+        // If install_sink_receives_pending_state_link already ran and set the
+        // OnceLock, this still must not panic (the send is best-effort).
+        record_pending_state_link("anchor:x", "active", "uhCkk-y", "2026-06-11T00:00:00Z");
     }
 }

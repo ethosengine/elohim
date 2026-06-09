@@ -249,6 +249,46 @@ pub async fn call_create_commitment(
         .await
 }
 
+/// Input for `create_commitment_state_link` — records a Commitment's lifecycle
+/// transition as a notarized `CommitmentByState` link in the Mishpat DNA.
+///
+/// The link is the source of truth for lifecycle; the SQL `state` column is a
+/// write-through cache (`graduate_to_active` writes the cache, this writes the
+/// truth). `event_hash` is the graduating EconomicEvent's action_hash — the
+/// link's tag carries `<state>|<signed_at>` so a verifier can replay the proof.
+/// Mirrors `mishpat::commitments::CreateCommitmentStateLinkInput` field-for-field.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CreateCommitmentStateLinkInput {
+    /// Base64 `entry_hash` of the Commitment being transitioned (the live anchor;
+    /// the same value the projection stores as `mishpat_commitments.cid`).
+    pub commitment_cid: String,
+    /// New lifecycle state, e.g. "active".
+    pub state: String,
+    /// Base64 `action_hash` of the event that justifies the transition.
+    pub event_hash: String,
+    /// ISO-8601 signing time (Category-A determinism — never sys_time in-zome).
+    pub signed_at: String,
+}
+
+/// Author a `CommitmentByState` link recording a commitment's state transition.
+///
+/// Called from the graduation projection right after `graduate_to_active` flips
+/// the SQL cache, so the DHT link and the cache agree. Returns raw bytes
+/// (`CommitmentStateLinkOutput { link_action_hash }`); the caller rarely needs
+/// the result — the link is fire-and-confirm.
+pub async fn call_create_commitment_state_link(
+    hc: &Arc<HcClient>,
+    input: CreateCommitmentStateLinkInput,
+) -> Result<Vec<u8>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode CreateCommitmentStateLinkInput: {e}"
+        ))
+    })?;
+    hc.call_zome(MISHPAT_ZOME, "create_commitment_state_link", payload)
+        .await
+}
+
 /// Read a notarized Mishpat commitment back by its base64 `cid` (entry_hash)
 /// via the `mishpat::get_commitment` coordinator. `Ok(None)` when the entry is
 /// not on this conductor's DHT view. This is the conductor-backed read path for
@@ -315,5 +355,25 @@ mod tests {
             decoded.resource_classified_as,
             original.resource_classified_as
         );
+    }
+
+    /// The state-link author input must survive a MessagePack named-fields
+    /// round-trip — the wire contract with the Mishpat coordinator's
+    /// create_commitment_state_link extern. A dropped field would 500 at runtime.
+    #[test]
+    fn create_commitment_state_link_input_serde_roundtrip() {
+        let original = super::CreateCommitmentStateLinkInput {
+            commitment_cid: "anchor:commitment-1".to_string(),
+            state: "active".to_string(),
+            event_hash: "uhCkk-graduating-event".to_string(),
+            signed_at: "2026-06-11T10:00:00Z".to_string(),
+        };
+        let bytes = rmp_serde::to_vec_named(&original).expect("encode");
+        let decoded: super::CreateCommitmentStateLinkInput =
+            rmp_serde::from_slice(&bytes).expect("decode");
+        assert_eq!(decoded.commitment_cid, original.commitment_cid);
+        assert_eq!(decoded.state, original.state);
+        assert_eq!(decoded.event_hash, original.event_hash);
+        assert_eq!(decoded.signed_at, original.signed_at);
     }
 }

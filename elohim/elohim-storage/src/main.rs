@@ -676,6 +676,53 @@ async fn async_main(
                     // but the bounded SQL-projection poll would time out at 1s — visible to
                     // the operator as "REA commitment X written via conductor but projection
                     // did not land". Same shape that affected /lamad on alpha pre-fix.
+                    // Slice-2b T11 — CommitmentByState link author drain.
+                    //
+                    // The graduation projection (`handle_rea_signal`, sync) flips the
+                    // SQL `state` cache proposed→active on a provide event; the DHT
+                    // TRUTH is a `CommitmentByState` link, authored async via the
+                    // mishpat coordinator. `handle_rea_signal` has no HcClient, so it
+                    // pushes the transition onto an mpsc sink; THIS task (which holds
+                    // `hc`) drains it and authors the link. Wired here, beside the REA
+                    // subscriber, because this is the composition where the HcClient is
+                    // available. Without it the SQL cache flip stands alone (honest,
+                    // but the lifecycle is not yet DHT-observable).
+                    {
+                        let hc_link = hc.clone();
+                        let (link_tx, mut link_rx) = tokio::sync::mpsc::unbounded_channel::<
+                            elohim_storage::rea_projection::PendingStateLink,
+                        >();
+                        elohim_storage::rea_projection::install_state_link_sink(link_tx);
+                        tokio::spawn(async move {
+                            while let Some(pending) = link_rx.recv().await {
+                                let input = elohim_storage::services::conductor_writes::CreateCommitmentStateLinkInput {
+                                    commitment_cid: pending.commitment_cid.clone(),
+                                    state: pending.state.clone(),
+                                    event_hash: pending.event_hash.clone(),
+                                    signed_at: pending.signed_at.clone(),
+                                };
+                                if let Err(e) = elohim_storage::services::conductor_writes::call_create_commitment_state_link(
+                                    &hc_link, input,
+                                )
+                                .await
+                                {
+                                    // Best-effort: the SQL cache flip already stands.
+                                    warn!(
+                                        error = %e,
+                                        cid = %pending.commitment_cid,
+                                        state = %pending.state,
+                                        "CommitmentByState link author failed (SQL state cache flip stands)"
+                                    );
+                                }
+                            }
+                        });
+                        info!(
+                            "CommitmentByState link-author drain registered (graduation \
+                             proposed→active authors a notarized lifecycle link; SQL state \
+                             is a write-through cache)"
+                        );
+                    }
+
                     if let Some(subscriber_pool) = db_pool.clone() {
                         let hc_sub = hc.clone();
                         let ctx_sub = elohim_storage::db::AppContext::default_lamad();
