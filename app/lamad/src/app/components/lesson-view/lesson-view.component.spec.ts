@@ -338,14 +338,6 @@ describe('LessonViewComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should toggle exploration panel state', () => {
-      expect(component.explorationPanelOpen).toBe(false);
-      component.toggleExplorationPanel();
-      expect(component.explorationPanelOpen).toBe(true);
-      component.toggleExplorationPanel();
-      expect(component.explorationPanelOpen).toBe(false);
-    });
-
     it('should render the shared exploration sidebar in path mode', () => {
       const compiled = fixture.nativeElement as HTMLElement;
       const sidebar = compiled.querySelector('app-exploration-sidebar');
@@ -435,16 +427,6 @@ describe('LessonViewComponent', () => {
         });
 
         component.onRelatedConceptClick('related-1');
-      }));
-
-    it('should emit exploreContent when graph node clicked', () =>
-      new Promise<void>(done => {
-        component.exploreContent.subscribe(nodeId => {
-          expect(nodeId).toBe('node-123');
-          done();
-        });
-
-        component.onGraphNodeClick('node-123');
       }));
 
     it('should emit exploreInGraph when explore button clicked', () =>

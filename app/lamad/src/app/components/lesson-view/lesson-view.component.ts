@@ -457,24 +457,10 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   }
 
   /**
-   * Toggle exploration panel visibility (mobile).
-   */
-  toggleExplorationPanel(): void {
-    this.explorationPanelOpen = !this.explorationPanelOpen;
-  }
-
-  /**
    * Handle click on related concept.
    */
   onRelatedConceptClick(conceptId: string): void {
     this.exploreContent.emit(conceptId);
-  }
-
-  /**
-   * Handle click on graph node.
-   */
-  onGraphNodeClick(nodeId: string): void {
-    this.exploreContent.emit(nodeId);
   }
 
   /**
