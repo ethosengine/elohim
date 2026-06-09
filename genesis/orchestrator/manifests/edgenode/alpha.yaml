@@ -240,6 +240,15 @@ spec:
           image: harbor.ethosengine.com/ethosengine/elohim-storage:STORAGE_TAG_PLACEHOLDER
           imagePullPolicy: Always
           env:
+            # Persist blobs + content.db on the storage-data PVC (mounted at
+            # /data). Without this the binary defaults to the container
+            # overlay (dirs::data_local_dir) and every pod restart wipes
+            # blob bytes while reseeds rebuild rows — the dangling-row 404
+            # class (2026-06-09 /deliver iter-0). Inert until the binary
+            # with the STORAGE_DIR env binding deploys; converges via
+            # reseed + stageSpaBlobs + heal-on-read afterward.
+            - name: STORAGE_DIR
+              value: "/data"
             - name: RUST_LOG
               value: "info,elohim_storage=debug"
             - name: HOLOCHAIN_ADMIN_URL
