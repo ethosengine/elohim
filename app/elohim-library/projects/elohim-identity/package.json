@@ -2,6 +2,17 @@
   "name": "@elohim/identity",
   "version": "0.1.0",
   "description": "Elohim identity SDK — session management, identity guards, profile and attestation models for the @elohim/identity surface",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/public-api.ts",
+      "default": "./src/public-api.ts"
+    },
+    "./core": {
+      "types": "./src/core.ts",
+      "default": "./src/core.ts"
+    }
+  },
   "sideEffects": false,
   "peerDependencies": {
     "@angular/common": "^19.2.0",
