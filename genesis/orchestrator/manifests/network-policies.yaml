@@ -52,11 +52,22 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # Allow Jenkins runners (CI/CD operator surface) to reach storage + doorway.
-    # Jenkins is shared infra, not an environment — the cross-env policy's intent
-    # is to isolate envs from each other, not block trusted operator namespaces.
-    # Restricted to storage HTTP (8090) and doorway HTTP (8080); conductor
-    # admin/app ports (4444/4445) remain blocked.
+    # Allow Jenkins runners (CI/CD operator surface) to reach storage + doorway
+    # + conductor WS. Jenkins is shared infra, not an environment — the cross-env
+    # policy's intent is to isolate envs from each other, not block trusted
+    # operator namespaces.
+    # Conductor bridge pod ports (8444 admin / 8445 app — Service maps
+    # 4444→8444, 4445→8445; NetworkPolicy matches the post-DNAT POD port) were
+    # opened 2026-06-10: the genesis pipeline's seed stages (conductor
+    # identities, agent peer bindings, household formation) exist solely to
+    # perform admin-WS seeding, so jenkins is already a trusted admin surface
+    # by design; blocking the ports just made those stages permanently
+    # UNSTABLE (conductor-readiness.json 0/3 in every retained build).
+    # SCOPED BOOTSTRAP DEBT: network-position auth on conductor admin is a
+    # bypass of the delegates-compute grant pattern. Retirement condition
+    # (re-close 8444/8445 once seeding goes through a commitment-gated
+    # doorway deputy) is tracked in genesis/data/timeline/backlog/
+    # security-ci-substrate-authorization-grant-coherence.md.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -66,6 +77,10 @@ spec:
           port: 8090
         - protocol: TCP
           port: 8080
+        - protocol: TCP
+          port: 8444
+        - protocol: TCP
+          port: 8445
 
 ---
 # ============================================================================
