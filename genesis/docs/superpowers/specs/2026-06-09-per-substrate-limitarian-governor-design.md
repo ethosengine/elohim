@@ -603,6 +603,15 @@ fn continuous_governor_restores_toward_target_under_rich_get_richer_inflow() {
 ```
 Three corrections vs the raw synthesis test: **run the clamped model** (k_max set), assert **monotone descent toward
 `C_target`** (not just boundedness/settling), and assert **`C* ≈ C_target`** (restoration, not "settled somewhere").
+
+> **ERRATUM (2026-06-10, v1 implementation):** assertion (a) `top < 1.0e9` is unsatisfiable as
+> written — under `c_inflow=0.20 > k_max=0.05` every balance nets ≥15%/tick (this section's OWN
+> §4.2 correction: above saturation the rate is linear and absolute balances diverge; closure
+> lives in the scale-invariant C-series, not absolute boundedness). The landed test
+> (`continuous_governor_restores_toward_target_under_rich_get_richer_inflow`,
+> elohim-storage concentration_service) asserts top-SHARE convergence + (b)/(c)/(d) verbatim in
+> the saturated run, and absolute boundedness in a second `c_inflow=0` (rate-closable) run.
+> Trail: backlog `limitarian-governor-v1-followons` item 7.
 A DB-backed follow-on folds the real `apply_decay` over a multi-agent fixture, asserting `token_decay_events` rows
 grow while the layer's `concentration_snapshot.gini` decreases tick-over-tick toward the target.
 

@@ -1,3 +1,8 @@
+---
+status: landed
+landed: 2026-06-10
+verify_evidence: "elohim-holochain dev #1321 SUCCESS (sweettests incl. mishpat wall validator); elohim dev #1523/#1524 build+unit stages green (deploy-side red = degraded-alpha substrate family, excluded); local: storage lib 1497/0, mishpat native 34/0, both wasm-checks"
+---
 # Per-Substrate Limitarian Governor v1 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
