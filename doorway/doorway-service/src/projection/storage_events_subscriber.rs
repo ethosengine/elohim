@@ -80,9 +80,14 @@ pub fn spawn_subscriber_task(
 
         let mut backoff = Duration::from_secs(1);
         let max_backoff = Duration::from_secs(60);
+        // A stream must survive this long before the backoff resets — a
+        // storage/LB that answers 200 and closes immediately must escalate,
+        // not hot-loop (clean close used to reconnect with zero delay).
+        let stable_stream = Duration::from_secs(10);
 
         loop {
-            match run_subscriber(
+            let stream_start = std::time::Instant::now();
+            let result = run_subscriber(
                 &url,
                 &storage_url,
                 &doorway_id,
@@ -90,14 +95,19 @@ pub fn spawn_subscriber_task(
                 &epr_router,
                 &http,
             )
-            .await
-            {
+            .await;
+
+            if stream_start.elapsed() >= stable_stream {
+                backoff = Duration::from_secs(1);
+            }
+
+            match result {
                 Ok(()) => {
                     info!(
                         url = %url,
-                        "storage_events_subscriber: stream ended cleanly; reconnecting"
+                        backoff_secs = %backoff.as_secs(),
+                        "storage_events_subscriber: stream ended cleanly; reconnecting after backoff"
                     );
-                    backoff = Duration::from_secs(1);
                 }
                 Err(e) => {
                     warn!(
@@ -106,10 +116,11 @@ pub fn spawn_subscriber_task(
                         backoff_secs = %backoff.as_secs(),
                         "storage_events_subscriber: stream error; backing off before retry"
                     );
-                    sleep(backoff).await;
-                    backoff = (backoff * 2).min(max_backoff);
                 }
             }
+
+            sleep(backoff).await;
+            backoff = (backoff * 2).min(max_backoff);
         }
     })
 }

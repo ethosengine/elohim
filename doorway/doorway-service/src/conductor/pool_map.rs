@@ -187,6 +187,7 @@ mod tests {
             request_timeout_ms: 5000,
             max_queue_size: 100,
             auth_token: None,
+            token_minter: None,
         };
         // Pool creation requires async + running conductor
         // Integration tests should verify full flow

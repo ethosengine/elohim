@@ -13,7 +13,7 @@ use std::time::Duration;
 use tokio::sync::{mpsc, oneshot, Semaphore};
 use tracing::{debug, error, info};
 
-use super::conductor::ConductorConnection;
+use super::conductor::{ConductorConnection, TokenMinter};
 use crate::types::{DoorwayError, Result};
 
 /// Request sent to the worker pool
@@ -39,6 +39,10 @@ pub struct PoolConfig {
     /// `Some(token)` for app-interface pools (zome calls), minted via the
     /// admin client's `issue_app_auth_token`.
     pub auth_token: Option<Vec<u8>>,
+    /// Re-mints the app auth token when the connection loop detects unstable
+    /// sessions (the stale-token signature after a conductor restart).
+    /// `None` for admin-interface pools.
+    pub token_minter: Option<TokenMinter>,
 }
 
 impl Default for PoolConfig {
@@ -49,6 +53,7 @@ impl Default for PoolConfig {
             request_timeout_ms: 30000,
             max_queue_size: 1000,
             auth_token: None,
+            token_minter: None,
         }
     }
 }
@@ -116,12 +121,14 @@ impl WorkerPool {
             let timeout_ms = config.request_timeout_ms;
             let connected_workers = Arc::clone(&connected_workers);
             let auth_token = config.auth_token.clone();
+            let token_minter = config.token_minter.clone();
 
             tokio::spawn(async move {
                 worker_task(
                     i,
                     conductor_url,
                     auth_token,
+                    token_minter,
                     request_rx,
                     timeout_ms,
                     connected_workers,
@@ -238,38 +245,25 @@ impl WorkerPool {
     }
 }
 
-/// Maximum consecutive connection failures before logging at error level
-const MAX_RETRIES_BEFORE_UNHEALTHY: u32 = 5;
+/// How often an idle worker re-checks connectivity to keep the
+/// connected-workers gauge (which drives pool health/routing) fresh.
+const CONNECTIVITY_RECHECK: Duration = Duration::from_secs(1);
 
-/// Base delay for exponential backoff on connection retry
-const BASE_RETRY_DELAY: Duration = Duration::from_millis(500);
+/// How long a disconnected worker waits before re-checking the connection.
+const DISCONNECTED_POLL: Duration = Duration::from_millis(250);
 
-/// Maximum delay between connection retries
-const MAX_RETRY_DELAY: Duration = Duration::from_secs(30);
-
-/// Compute exponential backoff with jitter for connection retries.
-/// Uses full-jitter strategy: sleep = random(0, min(cap, base * 2^attempt))
-fn backoff_with_jitter(attempt: u32) -> Duration {
-    let exp_ms = BASE_RETRY_DELAY.as_millis() as u64 * 2u64.saturating_pow(attempt);
-    let capped_ms = exp_ms.min(MAX_RETRY_DELAY.as_millis() as u64);
-    // Simple jitter: use attempt + time-based seed for variance without pulling in rand
-    let jitter_seed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos() as u64;
-    let jitter_ms = if capped_ms > 0 {
-        jitter_seed % capped_ms
-    } else {
-        0
-    };
-    Duration::from_millis(jitter_ms)
-}
-
-/// Worker task that processes requests from the pool
+/// Worker task that processes requests from the pool.
+///
+/// Creates its [`ConductorConnection`] exactly ONCE: the connection's internal
+/// loop owns all reconnection (stability-gated exponential backoff, token
+/// re-mint, shutdown-on-drop). Recreating the handle on failure — what this
+/// function used to do — leaked the previous detached connection loop, and the
+/// accumulated leaked loops were the 2026-06-10 conductor reconnect storm.
 async fn worker_task(
     worker_id: usize,
     conductor_url: String,
     auth_token: Option<Vec<u8>>,
+    token_minter: Option<TokenMinter>,
     request_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<PoolRequest>>>,
     timeout_ms: u64,
     connected_workers: Arc<AtomicUsize>,
@@ -285,96 +279,77 @@ async fn worker_task(
         }
     );
 
-    let mut consecutive_failures: u32 = 0;
+    let conductor =
+        ConductorConnection::spawn_with_auth_minter(&conductor_url, auth_token, token_minter);
+
+    let mut counted_connected = false;
 
     loop {
-        // Connect to conductor with exponential backoff on failure.
-        // Pass the auth token if configured (app-interface pools); admin-interface
-        // pools have `auth_token: None` and skip the authenticate handshake.
-        let conductor = match ConductorConnection::connect_with_auth(
-            &conductor_url,
-            auth_token.clone(),
-        )
-        .await
-        {
-            Ok(c) => {
-                // Reset failure counter on successful connect
-                consecutive_failures = 0;
-                // Increment connected counter
-                connected_workers.fetch_add(1, Ordering::Relaxed);
+        // Reconcile the connected-workers gauge with the connection's actual
+        // state, and avoid draining requests into a dead connection.
+        if !conductor.is_connected().await {
+            if counted_connected {
+                counted_connected = false;
+                connected_workers.fetch_sub(1, Ordering::Relaxed);
                 info!(
-                    "Worker {} connected to conductor ({} workers now connected)",
+                    "Worker {} disconnected ({} workers now connected)",
                     worker_id,
                     connected_workers.load(Ordering::Relaxed)
                 );
-                c
             }
-            Err(e) => {
-                consecutive_failures += 1;
-                let delay = backoff_with_jitter(consecutive_failures);
+            tokio::time::sleep(DISCONNECTED_POLL).await;
+            continue;
+        }
+        if !counted_connected {
+            counted_connected = true;
+            connected_workers.fetch_add(1, Ordering::Relaxed);
+            info!(
+                "Worker {} connected to conductor ({} workers now connected)",
+                worker_id,
+                connected_workers.load(Ordering::Relaxed)
+            );
+        }
 
-                if consecutive_failures >= MAX_RETRIES_BEFORE_UNHEALTHY {
-                    error!(
-                        "Worker {} failed to connect (attempt {}): {} — conductor may be unhealthy. Retrying in {:?}",
-                        worker_id, consecutive_failures, e, delay
-                    );
-                } else {
-                    info!(
-                        "Worker {} failed to connect (attempt {}): {}, retrying in {:?}",
-                        worker_id, consecutive_failures, e, delay
-                    );
+        // Get next request; time out periodically to refresh the gauge.
+        let request = {
+            let mut rx = request_rx.lock().await;
+            match tokio::time::timeout(CONNECTIVITY_RECHECK, rx.recv()).await {
+                Err(_) => continue,
+                Ok(Some(r)) => r,
+                Ok(None) => {
+                    // Channel closed — pool dropped; shut down. Dropping the
+                    // conductor handle stops its connection loop too.
+                    if counted_connected {
+                        connected_workers.fetch_sub(1, Ordering::Relaxed);
+                    }
+                    info!("Worker {} shutting down (channel closed)", worker_id);
+                    return;
                 }
-
-                tokio::time::sleep(delay).await;
-                continue;
             }
         };
 
-        // Process requests
-        loop {
-            // Get next request
-            let request = {
-                let mut rx = request_rx.lock().await;
-                match rx.recv().await {
-                    Some(r) => r,
-                    None => {
-                        // Channel closed, decrement and shutdown
-                        connected_workers.fetch_sub(1, Ordering::Relaxed);
-                        info!("Worker {} shutting down (channel closed)", worker_id);
-                        return;
-                    }
-                }
-            };
+        debug!(
+            "Worker {} processing request ({} bytes)",
+            worker_id,
+            request.payload.len()
+        );
 
-            debug!(
-                "Worker {} processing request ({} bytes)",
-                worker_id,
-                request.payload.len()
-            );
+        // Send to conductor. On failure we do NOT recreate the connection —
+        // the internal loop reconnects with backoff; we just report the error.
+        let result = conductor.request(request.payload, timeout_ms).await;
 
-            // Send to conductor
-            let result = conductor.request(request.payload, timeout_ms).await;
-
-            match &result {
-                Ok(data) => debug!("Worker {} got response ({} bytes)", worker_id, data.len()),
-                Err(e) => {
-                    error!("Worker {} request failed: {}", worker_id, e);
-                    // Connection likely lost, decrement and reconnect
-                    connected_workers.fetch_sub(1, Ordering::Relaxed);
-                    info!(
-                        "Worker {} disconnected ({} workers now connected)",
-                        worker_id,
-                        connected_workers.load(Ordering::Relaxed)
-                    );
-                    // Send error response and break to reconnect
-                    let _ = request.response_tx.send(result);
-                    break;
-                }
+        match &result {
+            Ok(data) => debug!("Worker {} got response ({} bytes)", worker_id, data.len()),
+            Err(e) => {
+                error!(
+                    "Worker {} request failed: {} (connection loop will reconnect with backoff)",
+                    worker_id, e
+                );
             }
-
-            // Send response back
-            let _ = request.response_tx.send(result);
         }
+
+        // Send response back
+        let _ = request.response_tx.send(result);
     }
 }
 
@@ -403,30 +378,9 @@ mod tests {
             request_timeout_ms: 5000,
             max_queue_size: 100,
             auth_token: Some(token.clone()),
+            token_minter: None,
         };
         assert_eq!(config.auth_token.as_deref(), Some(token.as_slice()));
-    }
-
-    #[test]
-    fn test_backoff_with_jitter_bounded() {
-        // Verify backoff never exceeds MAX_RETRY_DELAY
-        for attempt in 0..20 {
-            let delay = backoff_with_jitter(attempt);
-            assert!(
-                delay <= MAX_RETRY_DELAY,
-                "Backoff delay {:?} exceeded max {:?} at attempt {}",
-                delay,
-                MAX_RETRY_DELAY,
-                attempt
-            );
-        }
-    }
-
-    #[test]
-    fn test_backoff_at_zero_attempt() {
-        // At attempt 0, max possible is BASE_RETRY_DELAY (500ms)
-        let delay = backoff_with_jitter(0);
-        assert!(delay <= BASE_RETRY_DELAY);
     }
 
     #[test]

@@ -194,6 +194,9 @@ pub struct SubscriberConfig {
     pub storage_url: Option<String>,
     /// Projection store for cache stream warm-up on reconnect
     pub projection_store: Option<Arc<super::store::ProjectionStore>>,
+    /// Called on every reconnect attempt — feeds peer-health observability
+    /// so reconnect storms are visible to operators (/status).
+    pub on_reconnect: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl std::fmt::Debug for SubscriberConfig {
@@ -214,6 +217,7 @@ impl std::fmt::Debug for SubscriberConfig {
                     .as_ref()
                     .map(|_| "ProjectionStore(...)"),
             )
+            .field("on_reconnect", &self.on_reconnect.as_ref().map(|_| "Fn"))
             .finish()
     }
 }
@@ -230,6 +234,7 @@ impl Default for SubscriberConfig {
             ping_interval: Duration::from_secs(5), // Must be < conductor idle timeout (~10s)
             storage_url: None,
             projection_store: None,
+            on_reconnect: None,
         }
     }
 }
@@ -261,6 +266,7 @@ impl SubscriberConfig {
             ping_interval: Duration::from_secs(30),
             storage_url: None,
             projection_store: None,
+            on_reconnect: None,
         }
     }
 }
@@ -276,6 +282,12 @@ pub struct ContentServerRegistration {
     pub online: bool,
 }
 
+/// Ceiling for the escalated reconnect wait.
+const MAX_RECONNECT_WAIT: Duration = Duration::from_secs(60);
+
+/// A conductor session must hold this long before the reconnect ladder resets.
+const STABLE_HOLD_THRESHOLD: Duration = Duration::from_secs(10);
+
 /// Signal Subscriber - receives signals from Holochain conductor
 pub struct SignalSubscriber {
     config: SubscriberConfig,
@@ -285,6 +297,9 @@ pub struct SignalSubscriber {
     blob_registry_tx: broadcast::Sender<ContentServerRegistration>,
     /// Shutdown signal
     shutdown_tx: broadcast::Sender<()>,
+    /// Single-flight guard for the cache warm-up stream — a flapping
+    /// conductor must not fan out one full cache pull per reconnect.
+    warm_stream_active: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl SignalSubscriber {
@@ -299,6 +314,7 @@ impl SignalSubscriber {
             signal_tx,
             blob_registry_tx,
             shutdown_tx,
+            warm_stream_active: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 
@@ -353,10 +369,7 @@ impl SignalSubscriber {
             )
             .await
             {
-                Ok(c) => {
-                    reconnect_attempts = 0;
-                    c
-                }
+                Ok(c) => c,
                 Err(e) => {
                     error!("Conductor connection failed: {}", e);
                     reconnect_attempts += 1;
@@ -369,8 +382,13 @@ impl SignalSubscriber {
                         );
                         break;
                     }
-                    self.wait_reconnect(&mut shutdown_rx, reconnect_attempts)
-                        .await;
+                    if self
+                        .wait_reconnect(&mut shutdown_rx, reconnect_attempts)
+                        .await
+                    {
+                        info!("Signal subscriber shutting down");
+                        break;
+                    }
                     continue;
                 }
             };
@@ -406,35 +424,75 @@ impl SignalSubscriber {
             if let (Some(ref storage_url), Some(ref store)) =
                 (&self.config.storage_url, &self.config.projection_store)
             {
-                let store = Arc::clone(store);
-                let url = storage_url.clone();
-                tokio::spawn(async move {
-                    super::warm_stream::stream_from_peer(store, &url).await;
-                });
-                info!("Cache stream warm-up triggered after connect");
+                // Single-flight: a flapping conductor used to spawn one full
+                // cache stream per reconnect with no cancellation — up to
+                // dozens of concurrent full-cache pulls against storage.
+                let already_running = self
+                    .warm_stream_active
+                    .swap(true, std::sync::atomic::Ordering::SeqCst);
+                if already_running {
+                    debug!("Cache stream warm-up already in flight; not spawning another");
+                } else {
+                    let store = Arc::clone(store);
+                    let url = storage_url.clone();
+                    let active = Arc::clone(&self.warm_stream_active);
+                    tokio::spawn(async move {
+                        super::warm_stream::stream_from_peer(store, &url).await;
+                        active.store(false, std::sync::atomic::Ordering::SeqCst);
+                    });
+                    info!("Cache stream warm-up triggered after connect");
+                }
             }
 
             // Hold connection with health checks until disconnect or shutdown
+            let hold_start = std::time::Instant::now();
             hold_connection(&client, Duration::from_secs(30), self.shutdown_receiver()).await;
 
+            // Stability-gated backoff: a session that died quickly escalates
+            // (accept-then-drop is the auth-reject/crash-loop signature); only
+            // a session that held for a while resets the ladder.
+            if hold_start.elapsed() >= STABLE_HOLD_THRESHOLD {
+                reconnect_attempts = 0;
+            } else {
+                reconnect_attempts = reconnect_attempts.saturating_add(1);
+            }
+
             // Wait before reconnecting
-            self.wait_reconnect(&mut shutdown_rx, reconnect_attempts)
-                .await;
+            if self
+                .wait_reconnect(&mut shutdown_rx, reconnect_attempts)
+                .await
+            {
+                info!("Signal subscriber shutting down");
+                break;
+            }
         }
 
         info!("Signal subscriber stopped");
     }
 
-    /// Wait for reconnect delay or shutdown
-    async fn wait_reconnect(&self, shutdown_rx: &mut broadcast::Receiver<()>, attempts: u32) {
-        info!(
-            "Reconnecting in {:?} (attempt {})",
-            self.config.reconnect_delay, attempts
-        );
+    /// Wait for the (exponentially escalated) reconnect delay or shutdown.
+    ///
+    /// Returns `true` when shutdown was received — the caller must stop its
+    /// loop instead of reconnecting (the signal used to be swallowed here).
+    async fn wait_reconnect(
+        &self,
+        shutdown_rx: &mut broadcast::Receiver<()>,
+        attempts: u32,
+    ) -> bool {
+        let delay = self
+            .config
+            .reconnect_delay
+            .saturating_mul(2u32.saturating_pow(attempts.min(8)))
+            .min(MAX_RECONNECT_WAIT);
+        if let Some(ref on_reconnect) = self.config.on_reconnect {
+            on_reconnect();
+        }
+        info!("Reconnecting in {:?} (attempt {})", delay, attempts);
         tokio::select! {
-            _ = sleep(self.config.reconnect_delay) => {}
+            _ = sleep(delay) => false,
             _ = shutdown_rx.recv() => {
                 info!("Shutdown received during reconnect wait");
+                true
             }
         }
     }

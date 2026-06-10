@@ -20,10 +20,10 @@ use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, info, warn};
 
 use crate::types::Result;
-use crate::worker::ConductorConnection;
+use crate::worker::{ConductorConnection, TokenMinter};
 
 /// Configuration for the import client
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ImportClientConfig {
     /// Conductor app interface URL (NOT admin interface)
     pub app_url: String,
@@ -31,6 +31,23 @@ pub struct ImportClientConfig {
     pub timeout_ms: u64,
     /// Whether to auto-reconnect on failure
     pub auto_reconnect: bool,
+    /// App auth token for the Holochain 0.6 app interface — without it the
+    /// conductor drops every connection before the first import request.
+    pub auth_token: Option<Vec<u8>>,
+    /// Re-mints the token after unstable sessions (conductor restart).
+    pub token_minter: Option<TokenMinter>,
+}
+
+impl std::fmt::Debug for ImportClientConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ImportClientConfig")
+            .field("app_url", &self.app_url)
+            .field("timeout_ms", &self.timeout_ms)
+            .field("auto_reconnect", &self.auto_reconnect)
+            .field("auth_token", &self.auth_token.as_ref().map(|_| "<token>"))
+            .field("token_minter", &self.token_minter.as_ref().map(|_| "Fn"))
+            .finish()
+    }
 }
 
 impl Default for ImportClientConfig {
@@ -39,6 +56,8 @@ impl Default for ImportClientConfig {
             app_url: "ws://localhost:4445".to_string(),
             timeout_ms: 60_000, // 60s for import operations (longer than default)
             auto_reconnect: true,
+            auth_token: None,
+            token_minter: None,
         }
     }
 }
@@ -104,7 +123,12 @@ impl ImportClient {
         // Create new connection
         info!("ImportClient connecting to {}", self.config.app_url);
 
-        let conn = ConductorConnection::connect(&self.config.app_url).await?;
+        let conn = ConductorConnection::connect_with_auth_minter(
+            &self.config.app_url,
+            self.config.auth_token.clone(),
+            self.config.token_minter.clone(),
+        )
+        .await?;
         let conn = Arc::new(conn);
 
         // Store the connection

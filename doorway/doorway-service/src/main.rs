@@ -155,6 +155,11 @@ async fn main() -> anyhow::Result<()> {
         request_timeout_ms: args.request_timeout_ms,
         max_queue_size: 1000,
         auth_token: app_auth_token.clone(),
+        token_minter: Some(make_token_minter(
+            args.admin_url().to_string(),
+            args.installed_app_id.clone(),
+            args.dev_mode,
+        )),
     })
     .await
     {
@@ -188,6 +193,7 @@ async fn main() -> anyhow::Result<()> {
         request_timeout_ms: args.request_timeout_ms,
         max_queue_size: 1000,
         auth_token: None,
+        token_minter: None,
     })
     .await
     {
@@ -257,7 +263,18 @@ async fn main() -> anyhow::Result<()> {
     // Create single-connection ImportClient for import operations
     // Uses ONE connection to app interface to avoid overwhelming conductor during batch imports
     let import_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
-    let import_client = services::ImportClient::with_defaults(import_app_url.clone());
+    let import_client = services::ImportClient::new(services::ImportClientConfig {
+        app_url: import_app_url.clone(),
+        // Reuse the app pool's token (same conductor + app); the minter heals
+        // a stale token after a conductor restart.
+        auth_token: app_auth_token.clone(),
+        token_minter: Some(make_token_minter(
+            args.admin_url().to_string(),
+            args.installed_app_id.clone(),
+            args.dev_mode,
+        )),
+        ..Default::default()
+    });
     state.import_client = Some(Arc::new(import_client));
     info!(
         "ImportClient created (single connection to app interface: {})",
@@ -327,6 +344,11 @@ async fn main() -> anyhow::Result<()> {
                 request_timeout_ms: args.request_timeout_ms,
                 max_queue_size: 500,
                 auth_token: pool_auth_token,
+                token_minter: Some(make_token_minter(
+                    admin_url_for_pool.clone(),
+                    args.installed_app_id.clone(),
+                    args.dev_mode,
+                )),
             })
             .await
             {
@@ -745,6 +767,14 @@ async fn main() -> anyhow::Result<()> {
                     installed_app_id: args.installed_app_id.clone(),
                     storage_url: peer_urls.get(i).cloned(),
                     projection_store: state.projection.as_ref().map(Arc::clone),
+                    on_reconnect: Some({
+                        // Make reconnect churn visible to operators (/status):
+                        // each subscriber reconnect attempt marks the peer
+                        // Degraded and bumps reconnect_attempts.
+                        let peer_health = Arc::clone(&peer_health);
+                        let conductor_id = conductor_id.clone();
+                        Arc::new(move || peer_health.record_reconnect(&conductor_id))
+                    }),
                     ..SubscriberConfig::default()
                 };
 
@@ -772,10 +802,9 @@ async fn main() -> anyhow::Result<()> {
                                 }
                             }
                             Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                                // Note: record_reconnect() is available but not wired here
-                                // because there is no reconnect loop yet. When subscriber
-                                // reconnection is implemented, it should call
-                                // peer_health.record_reconnect() on each attempt.
+                                // Reconnect attempts are recorded via the
+                                // subscriber's on_reconnect hook (see
+                                // SubscriberConfig above).
                                 peer_health_clone.update_health(
                                     &conductor_id_clone,
                                     elohim_compute::ServiceHealth::Offline,
@@ -1115,6 +1144,26 @@ fn apply_epr_fallback_outcome(
 /// Delegates to the library implementation so there is a single source of truth.
 fn derive_admin_url_from_app(app_url: &str) -> String {
     doorway::derive_admin_url_from_app(app_url)
+}
+
+/// Build a [`doorway::worker::TokenMinter`] that re-mints an app auth token
+/// from the given admin interface. Handed to worker pools so a connection
+/// stuck in unstable sessions (the stale-token signature after a conductor
+/// restart) heals itself instead of staying broken until the doorway restarts.
+fn make_token_minter(
+    admin_url: String,
+    installed_app_id: String,
+    dev_mode: bool,
+) -> doorway::worker::TokenMinter {
+    std::sync::Arc::new(
+        move || -> futures::future::BoxFuture<'static, Option<Vec<u8>>> {
+            let admin_url = admin_url.clone();
+            let installed_app_id = installed_app_id.clone();
+            Box::pin(
+                async move { mint_app_auth_token(&admin_url, &installed_app_id, dev_mode).await },
+            )
+        },
+    )
 }
 
 /// Mint an app authentication token by connecting to a conductor's admin interface
