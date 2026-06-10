@@ -243,6 +243,9 @@ mod tests {
             .expect("get_config_for_layer failed")
             .expect("config row must exist");
         assert_eq!(config.ratified_by.as_deref(), Some("uhCEk-ga-cid"));
-        assert_eq!(config.dht_anchor_hash.as_deref(), Some("uhCEk-commitment-cid"));
+        assert_eq!(
+            config.dht_anchor_hash.as_deref(),
+            Some("uhCEk-commitment-cid")
+        );
     }
 }

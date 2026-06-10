@@ -279,10 +279,13 @@ impl ContentService {
         // The DNA target field is `blob_cid`. View carries `blob_hash`.
         let new_blob_cid = view.blob_hash.clone();
 
-        let output_bytes = if existing.content.dht_anchor_hash.is_none() {
-            // Lazy-migration bootstrap: publish the full entry, applying patch
-            // on top of the existing SQL row's data. Fields not patched fall
-            // through to the existing row's values.
+        // Built unconditionally: the NULL-anchor branch publishes it, and the
+        // stale-anchor heal below re-publishes it when the conductor has lost
+        // the entry the anchor points at (post-DHT-reset class, 2026-06-10).
+        // Lazy-migration bootstrap: publish the full entry, applying patch
+        // on top of the existing SQL row's data. Fields not patched fall
+        // through to the existing row's values.
+        let bootstrap = {
             let bootstrap = lamad_types::CreateContentInput {
                 id: existing.content.id.clone(),
                 content_type: existing.content.content_type.clone(),
@@ -324,6 +327,10 @@ impl ContentService {
                 content_size_bytes: existing.content.content_size_bytes.map(|n| n as u64),
                 content_hash: existing.content.blob_hash.clone(),
             };
+            bootstrap
+        };
+
+        let output_bytes = if existing.content.dht_anchor_hash.is_none() {
             conductor_writes::call_create_content(hc, &bootstrap).await?
         } else {
             // Standard update: only patched fields cross the wire.
@@ -341,7 +348,27 @@ impl ContentService {
                 description: view.description.clone(),
                 metadata_json: merged_metadata_json.clone(),
             };
-            conductor_writes::call_update_content(hc, &patch).await?
+            match conductor_writes::call_update_content(hc, &patch).await {
+                Ok(bytes) => bytes,
+                // STALE-ANCHOR HEAL (2026-06-10): the SQL row carries a
+                // dht_anchor_hash but the conductor has no entry behind it —
+                // the anchor predates a conductor/DHT reset (RESET_STORAGE
+                // wiped DHT state while the SQL projection persisted). The
+                // zome's update_content errors "no Content entry found for
+                // id"; re-publish the full entry from the SQL row + patch
+                // (identical to the NULL-anchor bootstrap); the resulting
+                // ContentCommitted projection overwrites the stale anchor.
+                // Without this, every post-reset PATCH 503s forever and the
+                // EPR-routed mounts (the landing a human visits) stay 404.
+                Err(e) if e.to_string().contains("no Content entry found") => {
+                    tracing::warn!(
+                        id = %id,
+                        "update_via_conductor: stale dht_anchor_hash (no DHT entry behind it) — healing via create_content re-publish"
+                    );
+                    conductor_writes::call_create_content(hc, &bootstrap).await?
+                }
+                Err(e) => return Err(e),
+            }
         };
 
         // Eagerly project the SQL row from the zome output (Gap-F fix).
