@@ -3599,7 +3599,7 @@ pub struct NewMishpatCommitment {
 /// Source of truth: NONE (rebuildable by replay; deliberately NOT DHT-anchored —
 /// spec §4.4 A/C seam invariant). NO per-agent identity by construction
 /// (firewall test enforces).
-#[derive(Debug, Clone, Queryable, Serialize)]
+#[derive(Debug, Clone, PartialEq, Queryable, Serialize)]
 #[diesel(table_name = concentration_snapshots)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct ConcentrationSnapshot {
