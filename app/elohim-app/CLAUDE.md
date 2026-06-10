@@ -223,7 +223,7 @@ pnpm start
 |---------|---------|--------------|
 | `isolated` (default) | `pnpm run hc:start` | Full local stack on an island DHT — local conductor, storage, doorway; no external peers. |
 | `live-data` | `pnpm start:alpha` | Local UI against deployed alpha data via the dev proxy (`proxy.conf.alpha.mjs`); HTTP contexts only — no local conductor in the data path. Read-mostly polish loops. |
-| `join-alpha` | `NETWORK_PROFILE=join-alpha pnpm run hc:start` | Local conductor joins the alpha DHT via the deployed doorway's bootstrap+signal. Requires DNA-hash parity with the deployed bundles (fetch script lands in arc plan Task 2.2) — mismatched hashes = partitioned DHT. Override endpoints with `CONDUCTOR_BOOTSTRAP_URL` / `CONDUCTOR_SIGNAL_URL`. |
+| `join-alpha` | `NETWORK_PROFILE=join-alpha pnpm run hc:start` | Local conductor joins the alpha DHT via the deployed doorway's bootstrap+signal. DNA-hash parity is automatic: `scripts/fetch-deployed-dna.sh` fetches the DEPLOYED bundle (Harbor via oras, Jenkins artifact fallback) and the stack installs that instead of the local build. `FORCE_LOCAL_HAPP=1` keeps the local bundle (partition risk if hashes differ). Override endpoints with `CONDUCTOR_BOOTSTRAP_URL` / `CONDUCTOR_SIGNAL_URL`; pin the fetch with `DEPLOYED_HAPP_TAG` / `DEPLOYED_HAPP_BRANCH`. |
 
 <!-- ci-marker(2026-05-24, retrigger after nexus PVC recovery): App pipeline rebuild after stageSpaBlob URL + 413 fixes.
      The orchestrator's graph-walker change-patterns for the App pipeline don't

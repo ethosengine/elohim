@@ -18,12 +18,18 @@
 #   NETWORK_PROFILE  Conductor network profile (default: isolated)
 #                      isolated   - island DHT, no external peers (today's behavior)
 #                      join-alpha - join the alpha DHT via the deployed doorway's
-#                                   bootstrap + signal servers (requires DNA-hash
-#                                   parity with the deployed bundles)
+#                                   bootstrap + signal servers; auto-fetches the
+#                                   DEPLOYED bundle (scripts/fetch-deployed-dna.sh)
+#                                   so DNA hashes match what alpha runs
 #   CONDUCTOR_BOOTSTRAP_URL  Bootstrap URL, join-alpha only
 #                            (default: https://doorway-alpha.elohim.host/bootstrap)
 #   CONDUCTOR_SIGNAL_URL     WebRTC signal URL, join-alpha only
 #                            (default: wss://doorway-alpha.elohim.host/signal)
+#   FORCE_LOCAL_HAPP         join-alpha only: =1 installs the locally-built hApp
+#                            instead of the fetched deployed bundle (PARTITION
+#                            risk if DNA hashes differ — warning printed)
+#   DEPLOYED_HAPP_TAG/DEPLOYED_HAPP_BRANCH  Pin the deployed-bundle fetch
+#                            (defaults: dev-latest / dev — see fetch-deployed-dna.sh)
 #
 # COMPONENTS:
 #   1. Holochain Conductor - Cryptographic provenance & agent identity
@@ -249,17 +255,36 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
         echo "   Bootstrap: $CONDUCTOR_BOOTSTRAP_URL"
         echo "   Signal:    $CONDUCTOR_SIGNAL_URL"
         echo ""
-        echo "   ⚠️  DNA-HASH PARITY REQUIRED: this stack installs the locally"
-        echo "      built hApp ($HAPP_PATH)."
-        echo "      If its DNA hashes differ from the deployed alpha bundles,"
-        echo "      this peer lands on a PARTITIONED DHT (same network endpoints,"
-        echo "      different DHTs — peers will never see each other's data)."
-        echo "      Deployed-bundle fetch (scripts/fetch-deployed-dna.sh) lands"
-        echo "      in arc plan Task 2.2; until then verify hashes manually."
-        echo ""
+        # DNA-hash parity: install the DEPLOYED bundle (what alpha actually
+        # runs), not the locally-built one — mismatched DNA hashes land this
+        # peer on a PARTITIONED DHT (same network endpoints, different DHTs —
+        # peers never see each other's data). FORCE_LOCAL_HAPP=1 opts out.
+        JOIN_HAPP_PATH="$LOCAL_DEV_DIR/deployed-bundles/elohim.happ"
+        if [ "${FORCE_LOCAL_HAPP:-0}" = "1" ]; then
+            JOIN_HAPP_PATH="$HAPP_PATH"
+            echo "   ⚠️  FORCE_LOCAL_HAPP=1: installing the LOCALLY BUILT hApp"
+            echo "      ($HAPP_PATH)."
+            echo "      If its DNA hashes differ from the deployed alpha bundles,"
+            echo "      this peer lands on a PARTITIONED DHT (same network"
+            echo "      endpoints, different DHTs — peers will never see each"
+            echo "      other's data). Verify hashes with:"
+            echo "      scripts/fetch-deployed-dna.sh (prints the deployed hashes)"
+            echo ""
+        elif "$SCRIPT_DIR/fetch-deployed-dna.sh"; then
+            echo "   ✅ Installing the DEPLOYED bundle (DNA-hash parity with alpha):"
+            echo "      $JOIN_HAPP_PATH"
+            echo ""
+        else
+            echo ""
+            echo "   ❌ join-alpha refused: could not fetch the deployed bundle,"
+            echo "      and installing the locally-built hApp risks a PARTITIONED"
+            echo "      DHT. Either fix connectivity and re-run, or accept the"
+            echo "      risk explicitly with FORCE_LOCAL_HAPP=1."
+            exit 1
+        fi
         cat > "$HC_WRAPPER" << EOF
 #!/bin/bash
-exec hc sandbox generate --app-id elohim --in-process-lair -r=4445 "$HAPP_PATH" network --bootstrap "$CONDUCTOR_BOOTSTRAP_URL" webrtc "$CONDUCTOR_SIGNAL_URL"
+exec hc sandbox generate --app-id elohim --in-process-lair -r=4445 "$JOIN_HAPP_PATH" network --bootstrap "$CONDUCTOR_BOOTSTRAP_URL" webrtc "$CONDUCTOR_SIGNAL_URL"
 EOF
     else
         cat > "$HC_WRAPPER" << EOF
