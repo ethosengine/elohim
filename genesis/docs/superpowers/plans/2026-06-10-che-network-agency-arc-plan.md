@@ -41,6 +41,23 @@ the live source.
 projection/signals, `ConductorCommitmentFetcher`. A checked box elsewhere is a claim — Phase 4
 re-verifies the pieces it depends on before consuming them.
 
+**In-flight simplification discipline (operator directive, 2026-06-10):** every task on this plan
+carries a standing sub-obligation — *leave the touched surface simpler than found*. When a task
+opens a file, name the accreted complexity in it (duplicated logic, dead flags, parallel
+implementations, stale indirection); **simplify in-scope when bounded** (same files, no behavior
+change beyond the task's own), otherwise **capture to backlog with file:line** — never absorb a
+refactor that widens the task, never leave a discovery unrecorded. Known accretions on this
+plan's surfaces (from the 2026-06-10 surveys), routed to the phases that touch them:
+
+| Accretion | Routed to |
+|---|---|
+| a2o `doorway-client.ts` hand-rolled auth types ×3 consumers | Phase 1 (deleted by design) |
+| `local-stack.ts` re-implements start/health/seed | Task 2.3 (deleted by design) |
+| DNA build logic in 4 places (`hc-start.sh:137-163`, devfile, justfile, `hc-build.sh`) | Task 2.1 names ONE canonical path in CLAUDE.md; consolidation beyond docs → backlog if unbounded |
+| Two seeders invoked differently (`seed.ts` vs `seed-sqlite.ts`) | Task 2.3 (one path + one documented exception) |
+| `.hc_ports` file-based discovery coupling (silent staleness, `hc-start.sh:103-106` / `storage-start.sh:101`) | Task 2.1 in-scope if bounded (validate-or-regenerate), else backlog |
+| devfile `start-doorway` hardcoded conductor URL (dead path) | Task 2.3 (deprecation comment) |
+
 ---
 
 ## Phase 0 — Stage A enablement (operator + verification; small)
@@ -74,6 +91,20 @@ inferred. **Files:** `.claude/settings.local.json` (operator applies).
       content only; no bulk seeding; no destructive flows; alpha state is operator-owned;
       writes happen under an explicit permission grant (Task 0.1), never inferred.
 - [ ] Commit Phase 0 (docs + any look fix).
+
+### Task 0.4: Operator-viewable eyes (added in-flight, operator directive 2026-06-10)
+
+The operator can't `Read` shot.png the way the agent does; the eyes must be symmetric. Serve
+`genesis/a2o/reports/` on port 4201 — the devfile's already-public `ui-playground` Che endpoint
+(zero devfile change needed). The doorway/ContentNode publishing path (`publish-results.ts`)
+remains the Stage-C-aligned evolution for *reports*; screenshots ride the static route today.
+
+- [x] `genesis/a2o/scripts/serve-reports.ts` — zero-dep static server (dir index, png/json mime,
+      traversal guard) + `pnpm reports:serve` (verified 2026-06-10: index 200, shot.png 200
+      image/png, `../` → 403)
+- [x] Document operator view in `genesis/a2o/CLAUDE.md` Tools (Che `ui-playground` endpoint)
+- [ ] Follow-up decision (with Stage C): publish look captures as ContentNodes with blob-backed
+      screenshots so results are doorway-presentable beyond the workspace lifetime
 
 ---
 

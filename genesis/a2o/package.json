@@ -30,6 +30,7 @@
     "test:unit": "tsx --test 'src/**/__tests__/*.test.ts' 'scripts/__tests__/*.test.ts'",
     "a2o:setup": "playwright install chromium",
     "look": "tsx scripts/look.ts",
+    "reports:serve": "tsx scripts/serve-reports.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
