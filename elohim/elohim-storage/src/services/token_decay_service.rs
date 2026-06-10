@@ -184,14 +184,27 @@ impl TokenDecayService {
             Some(ref row) => row.balance,
         };
 
-        // Step 3 — obligation level (label kept for audit continuity) + continuous rate
-        let level = evaluate_position(balance, &config);
+        // Step 3 — obligation level (AUDIT LABEL ONLY, spec §3) + continuous rate
+        let g = crate::services::limit_gradient_registry::LimitGradientRegistry::core_default(
+            "attention", governance_layer);
+        let c = crate::services::concentration_service::ConcentrationService::effective_c(
+                conn, &ctx.h_app_id, "attention", governance_layer)?
+            .unwrap_or(g.c_target); // no snapshot yet → C at target → base-rate-only (fail-coherent)
+        let snapshot_mu = crate::db::concentration_snapshots::latest_snapshot(
+                conn, &ctx.h_app_id, "attention", governance_layer)?
+            .map(|s| s.mu)
+            .unwrap_or(config.median_estimate); // pre-snapshot fallback: the legacy estimate
+        let b_hat = if snapshot_mu > 0.0 { balance / snapshot_mu } else { 1.0 };
+        // T2-REVIEW FIX (dual-source divergence): the sufficientarian gate reads the
+        // SAME source as the Step-5 clamp — config.dignity_floor (the governed row),
+        // never the GradientConfig default.
+        let rate = if balance < config.dignity_floor {
+            0.0 // sufficientarian floor_factor: decay OFF below the floor (spec §3)
+        } else {
+            calculate_decay_rate_continuous(b_hat, c, &g)
+        };
+        let level = evaluate_position(balance, b_hat, c, config.dignity_floor, g.c_target);
         let label = obligation_level_label(&level).to_string();
-        let g = GradientConfig::default(); // Task 6 will swap to the registry read
-        let mu_estimate = config.median_estimate; // Task 6 swaps to the snapshot's mu
-        let b_hat = if mu_estimate > 0.0 { balance / mu_estimate } else { 1.0 };
-        let c = 0.0_f32; // placeholder until Task 6 wires the snapshot; rate = base_rate·b̂^γ clamped
-        let rate = if balance < g.dignity_floor { 0.0 } else { calculate_decay_rate_continuous(b_hat, c, &g) };
 
         // Step 4 — raw decay
         let decay_amount = balance * rate;

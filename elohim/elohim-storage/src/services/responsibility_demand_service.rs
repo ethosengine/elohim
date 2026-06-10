@@ -16,8 +16,10 @@ use diesel::SqliteConnection;
 
 use crate::db::context::AppContext;
 use crate::db::models::ResponsibilityDemandConfig;
-use crate::db::{responsibility_demand_configs, token_balances};
+use crate::db::{concentration_snapshots, responsibility_demand_configs, token_balances};
 use crate::error::StorageError;
+use crate::services::concentration_service::ConcentrationService;
+use crate::services::limit_gradient_registry::LimitGradientRegistry;
 
 // ============================================================================
 // Obligation Level
@@ -65,12 +67,13 @@ pub enum ObligationLevel {
 pub struct ResponsibilityDemandService;
 
 impl ResponsibilityDemandService {
-    /// Evaluate the obligation level for an agent in a governance layer.
+    /// Evaluate the obligation level (audit label) for an agent in a governance layer.
     ///
     /// 1. Fetches the demand curve config for the layer.
     /// 2. If no config or enforcement is inactive, returns `Normal`.
     /// 3. Fetches the agent's current balance (defaults to 0.0 if absent).
-    /// 4. Delegates to the pure `evaluate_position` function.
+    /// 4. Reads the snapshot C and relational μ; computes b̂.
+    /// 5. Delegates to the pure `evaluate_position` function.
     pub fn evaluate(
         conn: &mut SqliteConnection,
         ctx: &AppContext,
@@ -90,7 +93,17 @@ impl ResponsibilityDemandService {
             .map(|b| b.balance)
             .unwrap_or(0.0_f32);
 
-        Ok(evaluate_position(balance, &config))
+        let g = LimitGradientRegistry::core_default("attention", governance_layer);
+        let c = ConcentrationService::effective_c(
+                conn, &ctx.h_app_id, "attention", governance_layer)?
+            .unwrap_or(g.c_target);
+        let snapshot_mu = concentration_snapshots::latest_snapshot(
+                conn, &ctx.h_app_id, "attention", governance_layer)?
+            .map(|s| s.mu)
+            .unwrap_or(config.median_estimate);
+        let b_hat = if snapshot_mu > 0.0 { balance / snapshot_mu } else { 1.0 };
+
+        Ok(evaluate_position(balance, b_hat, c, config.dignity_floor, g.c_target))
     }
 
     /// Gate check before a token transfer.
@@ -125,40 +138,36 @@ impl ResponsibilityDemandService {
 // Pure Curve Function
 // ============================================================================
 
-/// Pure function — the responsibility demand curve itself.
+/// AUDIT LABEL ONLY (spec §3) — derived from the snapshot C and the agent's
+/// relational position; no longer a rate driver. Bands: Supported below the
+/// dignity floor; then C-relative bands at the gradient's target.
 ///
-/// Maps a token balance to an obligation level using the thresholds in
-/// `config`. No I/O; fully testable without a database.
+/// Boundary semantics:
+/// - `balance < dignity_floor` → Supported
+/// - `c <= c_target` → Normal (concentration at or below target, regardless of b̂)
+/// - `c > c_target && b̂ < 2.0` → Elevated
+/// - `c > c_target && b̂ < 5.0` → High
+/// - `c > c_target && b̂ >= 5.0` → Extreme
 ///
-/// Boundary semantics (inclusive lower, exclusive upper):
-/// - `[0, dignity_floor)` → Supported
-/// - `[dignity_floor, median)` → Normal
-/// - `[median, median × soft_ceiling_multiplier)` → Elevated
-/// - `[median × soft_ceiling_multiplier, median × hard_ceiling_multiplier)` → High
-/// - `[median × hard_ceiling_multiplier, ∞)` → Extreme
-pub fn evaluate_position(balance: f32, config: &ResponsibilityDemandConfig) -> ObligationLevel {
-    let median = config.median_estimate;
-    let soft_ceiling = median * config.soft_ceiling_multiplier;
-    let hard_ceiling = median * config.hard_ceiling_multiplier;
-
-    if balance < config.dignity_floor {
+/// `dignity_floor` must come from the governed config row (never a GradientConfig
+/// default); `c_target` from the gradient registry.
+pub fn evaluate_position(
+    balance: f32,
+    b_hat: f32,
+    c: f32,
+    dignity_floor: f32,
+    c_target: f32,
+) -> ObligationLevel {
+    if balance < dignity_floor {
         ObligationLevel::Supported
-    } else if balance < median {
+    } else if c <= c_target {
         ObligationLevel::Normal
-    } else if balance < soft_ceiling {
-        ObligationLevel::Elevated {
-            visibility_required: true,
-        }
-    } else if balance < hard_ceiling {
-        ObligationLevel::High {
-            stewardship_required: true,
-            justification_required: true,
-        }
+    } else if b_hat < 2.0 {
+        ObligationLevel::Elevated { visibility_required: true }
+    } else if b_hat < 5.0 {
+        ObligationLevel::High { stewardship_required: true, justification_required: true }
     } else {
-        ObligationLevel::Extreme {
-            elohim_review_required: true,
-            constitutional_justification: true,
-        }
+        ObligationLevel::Extreme { elohim_review_required: true, constitutional_justification: true }
     }
 }
 
@@ -170,99 +179,65 @@ pub fn evaluate_position(balance: f32, config: &ResponsibilityDemandConfig) -> O
 mod tests {
     use super::*;
 
-    /// Build a `ResponsibilityDemandConfig` with known values for curve tests.
-    ///
-    /// dignity_floor = 100, median = 1000, soft_ceiling_mult = 10 (→ 10 000),
-    /// hard_ceiling_mult = 20 (→ 20 000).
-    fn test_config() -> ResponsibilityDemandConfig {
-        ResponsibilityDemandConfig {
-            id: "test-config".to_string(),
-            h_app_id: "test-app".to_string(),
-            governance_layer: "global".to_string(),
-            dignity_floor: 100.0,
-            median_estimate: 1000.0,
-            soft_ceiling_multiplier: 10.0,
-            hard_ceiling_multiplier: 20.0,
-            social_contract_health: 1.0,
-            enforcement_active: 1,
-            ratified_by: None,
-            ratified_at: None,
-            dht_anchor_hash: None,
-            created_at: "2026-04-01T00:00:00Z".to_string(),
-            updated_at: "2026-04-01T00:00:00Z".to_string(),
-        }
-    }
+    // Shared test constants: dignity_floor=100, c_target=0.15 (gradient default).
+    const DIGNITY_FLOOR: f32 = 100.0;
+    const C_TARGET: f32 = 0.15;
 
     #[test]
-    fn test_below_dignity_floor() {
-        let config = test_config();
-        let level = evaluate_position(50.0, &config);
+    fn evaluate_supported_below_floor() {
+        // Any balance strictly below the dignity floor → Supported,
+        // regardless of concentration or relational position.
+        let level = evaluate_position(50.0, 0.05, 0.5, DIGNITY_FLOOR, C_TARGET);
         assert_eq!(level, ObligationLevel::Supported);
     }
 
     #[test]
-    fn test_normal_range() {
-        let config = test_config();
-        let level = evaluate_position(500.0, &config);
-        assert_eq!(level, ObligationLevel::Normal);
+    fn evaluate_normal_at_or_below_target() {
+        // When C <= C_target the system is not over-concentrated — Normal regardless
+        // of b̂ (high-balance agent in a well-distributed layer).
+        let level_at_target = evaluate_position(5000.0, 5.0, C_TARGET, DIGNITY_FLOOR, C_TARGET);
+        assert_eq!(level_at_target, ObligationLevel::Normal);
+
+        let level_below_target = evaluate_position(500.0, 0.5, 0.05, DIGNITY_FLOOR, C_TARGET);
+        assert_eq!(level_below_target, ObligationLevel::Normal);
     }
 
     #[test]
-    fn test_elevated_range() {
-        let config = test_config();
-        // 5000 is between median (1000) and soft ceiling (10 000)
-        let level = evaluate_position(5000.0, &config);
-        assert_eq!(
-            level,
-            ObligationLevel::Elevated {
-                visibility_required: true
-            }
-        );
+    fn evaluate_bands_by_relational_position() {
+        // With C above target (concentrated system), band is driven by b̂.
+        let c_high = C_TARGET + 0.2; // C > c_target: shape engaged
+
+        // b̂ < 2.0 → Elevated
+        let elevated = evaluate_position(200.0, 1.5, c_high, DIGNITY_FLOOR, C_TARGET);
+        assert_eq!(elevated, ObligationLevel::Elevated { visibility_required: true });
+
+        // b̂ in [2.0, 5.0) → High
+        let high = evaluate_position(200.0, 3.0, c_high, DIGNITY_FLOOR, C_TARGET);
+        assert_eq!(high, ObligationLevel::High {
+            stewardship_required: true,
+            justification_required: true,
+        });
+
+        // b̂ >= 5.0 → Extreme
+        let extreme = evaluate_position(200.0, 6.0, c_high, DIGNITY_FLOOR, C_TARGET);
+        assert_eq!(extreme, ObligationLevel::Extreme {
+            elohim_review_required: true,
+            constitutional_justification: true,
+        });
     }
 
     #[test]
-    fn test_high_range() {
-        let config = test_config();
-        // 15 000 is between soft ceiling (10 000) and hard ceiling (20 000)
-        let level = evaluate_position(15000.0, &config);
-        assert_eq!(
-            level,
-            ObligationLevel::High {
-                stewardship_required: true,
-                justification_required: true,
-            }
-        );
-    }
-
-    #[test]
-    fn test_extreme_range() {
-        let config = test_config();
-        // 25 000 is at or above hard ceiling (20 000)
-        let level = evaluate_position(25000.0, &config);
-        assert_eq!(
-            level,
-            ObligationLevel::Extreme {
-                elohim_review_required: true,
-                constitutional_justification: true,
-            }
-        );
-    }
-
-    #[test]
-    fn test_at_boundaries() {
-        let config = test_config();
-
-        // Exactly at dignity_floor (100) → Normal (inclusive lower bound)
-        let at_floor = evaluate_position(100.0, &config);
+    fn evaluate_floor_boundary_inclusive() {
+        // Exactly at dignity_floor → NOT Supported (balance is not strictly below floor)
+        // With c <= c_target this lands Normal.
+        let at_floor = evaluate_position(DIGNITY_FLOOR, 1.0, 0.05, DIGNITY_FLOOR, C_TARGET);
         assert_eq!(at_floor, ObligationLevel::Normal);
+    }
 
-        // Exactly at median (1000) → Elevated (inclusive lower bound of elevated range)
-        let at_median = evaluate_position(1000.0, &config);
-        assert_eq!(
-            at_median,
-            ObligationLevel::Elevated {
-                visibility_required: true
-            }
-        );
+    #[test]
+    fn evaluate_floor_trumps_concentration() {
+        // Even with extreme concentration and high b̂, below-floor → Supported.
+        let level = evaluate_position(50.0, 10.0, 0.99, DIGNITY_FLOOR, C_TARGET);
+        assert_eq!(level, ObligationLevel::Supported);
     }
 }
