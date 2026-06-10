@@ -13,7 +13,8 @@
 #
 # ENVIRONMENT VARIABLES:
 #   STORAGE_PORT     Storage HTTP port (default: 8090)
-#   STORAGE_DIR      Storage data directory (default: /tmp/elohim-storage)
+#   STORAGE_DIR      Storage data directory, passed through to the
+#                    elohim-storage binary (binary default: ~/.local/share/elohim-storage)
 #   SEED_LIMIT       Number of items to seed with --seed (default: 200)
 #   NETWORK_PROFILE  Conductor network profile (default: isolated)
 #                      isolated   - island DHT, no external peers (today's behavior)
@@ -350,13 +351,16 @@ echo "│ Step 2: elohim-storage (Content DB + Blobs)                   │"
 echo "└──────────────────────────────────────────────────────────────┘"
 
 # elohim-storage now lives at elohim/elohim-storage (peer-level), not under elohim/holochain.
-STORAGE_DIR="$HC_DIR/../elohim-storage"
-STORAGE_BIN="$STORAGE_DIR/target/release/elohim-storage"
+# NOTE: this is the CRATE directory, deliberately NOT named STORAGE_DIR — the
+# elohim-storage binary reads STORAGE_DIR from the environment as its DATA
+# directory (src/main.rs), so a user-set STORAGE_DIR must pass through untouched.
+STORAGE_CRATE_DIR="$HC_DIR/../elohim-storage"
+STORAGE_BIN="$STORAGE_CRATE_DIR/target/release/elohim-storage"
 
 # Build if needed
 if [ ! -f "$STORAGE_BIN" ] || [ "$FORCE_BUILD" = true ]; then
     echo "   🔨 Building elohim-storage..."
-    cd "$STORAGE_DIR"
+    cd "$STORAGE_CRATE_DIR"
     RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
     echo "   ✅ Build complete"
 fi
