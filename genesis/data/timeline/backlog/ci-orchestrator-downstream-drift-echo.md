@@ -10,14 +10,15 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "low"
 ci_status: blocked
-fingerprints: [4508f1172d15, b169c3b9034c, ddd8ed2cbdc7]
+fingerprints: [4508f1172d15, b169c3b9034c, ddd8ed2cbdc7, a90e18c0cf94]
 jobs: [elohim-orchestrator]
 relatedNodeIds: []
-tags: [ci, elohim-orchestrator, reconcile-build-graph, post-flight-health-check, downstream-echo, museum-trap-1, not-a-root-cause]
+tags: [ci, elohim-orchestrator, reconcile-build-graph, post-flight-health-check, post-actual-build-graph, downstream-echo, museum-trap-1, not-a-root-cause]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1167/
   - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1168/
   - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1192/
+  - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1199/
   - genesis/orchestrator/README.md
   - genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md
 ---
@@ -127,10 +128,63 @@ healthy (200, conductor-connected). Blocker: alpha-edge/staging availability
 (operator). It clears when those endpoints come back; the harvester confirms by
 green streak.
 
+## 2026-06-10 — `a90e18c0cf94` "stage:Post Actual Build Graph" folded in (skip-echo, the breadcrumb confirmed)
+
+Fingerprint `a90e18c0cf94` ("red build, stage:Post Actual Build Graph", seen 5,
+builds 1171–1199) is the **same Level-N-child-FAILURE echo** the breadcrumb
+above already anticipated — confirmed, not a new shape. The dispatch hypothesis
+("its own failure shape on some builds, a skip-echo on others") resolves to:
+**it is ALWAYS a skip-echo; `Post Actual Build Graph` never fails on its own.**
+
+Mechanism (verified by reading + #1199 log):
+
+- `Post Actual Build Graph` is an OBSERVATIONAL post-dispatch stage,
+  `catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE')`-wrapped
+  (`genesis/orchestrator/Jenkinsfile:1896`, with the explicit fail-regime
+  comment at 1887-1895). It therefore **cannot turn the build FAILURE** — the
+  worst it can do to its own exceptions is UNSTABLE. So a FAILURE'd orchestrator
+  was never this stage failing.
+- When the orchestrator goes **FAILURE** (not UNSTABLE), a build-LEVEL stage
+  (`Level N: <pipeline>`) `error`'d out on a hard child FAILURE BEFORE the
+  observational stages ran. Declarative-pipeline then marks every later stage
+  `skipped due to earlier failure(s)` — including `Post Actual Build Graph` and
+  `Reconcile Build Graph`. The harvester's coarse line-match attributes the
+  build's FAILURE to the first such named stage it positions on, yielding the
+  misleading "stage:Post Actual Build Graph" line for what is really a
+  child-FAILURE-then-skip.
+
+Evidence (#1199, FAILURE):
+- `Build elohim-app » dev #1520 completed: FAILURE` → orchestrator echoes
+  `❌ elohim: FAILURE` (the Level-0 child hard-failed).
+- `Stage "Post Actual Build Graph" skipped due to earlier failure(s)` and
+  `Stage "Reconcile Build Graph" skipped due to earlier failure(s)`.
+- `[baseline:post] currentBuild.result=FAILURE — NOT advancing __global__`,
+  then `Finished: FAILURE`.
+- #1171 (first occurrence) is the same shape: result FAILURE, description
+  `auto: elohim, elohim-storybook, elohim-genesis` (a child failed).
+
+So `a90e18c0cf94` points at the **child build** (here elohim-app #1520 — the
+elohim-app failure is owned by other concerns, e.g. the lamad-shell-routing /
+steward-portal-handoff regressions), exactly as the breadcrumb said an
+orchestrator Level-N FAILURE does. There is nothing to fix in the orchestrator
+for this fingerprint; it clears when the elohim-app child goes green.
+
+Ledger: `a90e18c0cf94` → `status: blocked` (blocker: the upstream elohim-app
+child FAILURE). No `triaged_at_build` (nothing landed in the orchestrator).
+Recurrence tracks the child and is expected until it clears.
+
+Contrast with the SIBLING orchestrator concern opened the same day,
+`ci-orchestrator-graph-only-pipeline-dispatch-leak.md` (`97d7fb9c085c`,
+"stage:elohim-doorway-app"): that one is a **real orchestrator code bug**
+(JSONNull defeats the jenkinsPath dispatch filter), NOT an echo. Two
+orchestrator fingerprints, two different verdicts — this one is the echo; that
+one is the bug. Keep them distinct.
+
 ## Fix trail
 
 - No change (intentional — orchestrator is reporting correctly; the fix surface
-  is the four upstream concerns).
+  is the four upstream concerns, plus, for `a90e18c0cf94`, the elohim-app child
+  build owned by its own concern).
 - This entry exists so the next sentinel run does not re-investigate the
   orchestrator as a novel concern: it is, and will remain, an echo until the
   children are green.
