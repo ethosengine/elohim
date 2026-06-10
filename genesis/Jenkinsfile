@@ -112,6 +112,20 @@ def getHumanStorageUrls(String ignored) {
 }
 
 /**
+ * Comma-separated name=host:port pairs for substrate-verify.sh — derived from
+ * getHumanStorageUrls() so topology.json (when present) and the
+ * alpha-concentration fallback stay the single source of truth. Short name =
+ * first segment after the human- prefix (human-matthew-manager → matthew),
+ * matching the seeder's storageUrlForHuman() convention in peer-id.ts.
+ */
+def peerStorageUrlsCsv() {
+    return getHumanStorageUrls('').collect { h ->
+        def shortName = (h.humanId ?: '').replaceFirst(/^human-/, '').split('-')[0]
+        "${shortName}=${h.storageUrl}"
+    }.join(',')
+}
+
+/**
  * Build comma-separated CONDUCTOR_URLS for non-suspended humans whose
  * agencyPhase is node, doorway, or device. Each URL points at the conductor's
  * app WebSocket port; the seeder derives admin port (= app port - 1) per the
@@ -647,7 +661,7 @@ def probeConductorReadiness(String urlsString, String stageLabel) {
             echo "[probe] ✅ ${host}:${adminPort} reachable"
         } else {
             unreadyDetails.add([url: appUrl, host: host, adminPort: adminPort, reason: 'tcp-timeout-or-refused'])
-            echo "[probe] ❌ ${host}:${adminPort} unreachable (admin WS not accepting TCP)"
+            echo "[probe] ❌ ${host}:${adminPort} unreachable (admin WS not accepting TCP) — if ALL peers fail, the jenkins→elohim-alpha NetworkPolicy must admit pod ports 8444/8445 (genesis/orchestrator/manifests/network-policies.yaml is operator-applied; see backlog ci-genesis-conductor-adminws-unreachable)"
         }
     }
 
@@ -928,126 +942,43 @@ def seedProjectionsStage() {
         }
 
         if (deployment && namespace) {
-            sh """#!/bin/bash
-                set -uo pipefail
-                echo "═══════════════════════════════════════════════════════════"
-                echo "RESTART DOORWAY POD — refresh EprRouter post-seed"
-                echo "═══════════════════════════════════════════════════════════"
-                echo "Namespace: ${namespace}"
-                echo "Target:    pods matching '${deployment}'"
-                echo ""
-
-                # Try canonical k8s recommended label first, then a common
-                # alternative, then a grep-by-name fallback. Each branch is
-                # gated on the prior branch failing (-z stdout check).
-                PODS=\$(kubectl get pods -n ${namespace} -l app.kubernetes.io/name=${deployment} -o name 2>/dev/null || true)
-                if [ -z "\$PODS" ]; then
-                    PODS=\$(kubectl get pods -n ${namespace} -l app=${deployment} -o name 2>/dev/null || true)
-                fi
-                if [ -z "\$PODS" ]; then
-                    PODS=\$(kubectl get pods -n ${namespace} -o name 2>/dev/null | grep -F "${deployment}" || true)
-                fi
-
-                if [ -n "\$PODS" ]; then
-                    echo "Deleting pods:"
-                    echo "\$PODS" | sed 's/^/  /'
-                    echo ""
-                    echo "\$PODS" | xargs -r kubectl delete -n ${namespace} --wait=false
-                    echo ""
-                    echo "✓ doorway pods deleted; Deployment controller will recreate"
-                    echo "  New pod's boot will fetch project-epr commitments from storage"
-                    echo "  → EprRouter populated → / and /lamad serve 200"
-                    echo ""
-
-                    # ── Rollout-wait at the PUBLIC boundary ────────────────────────
-                    # The e2e bench tests THROUGH the public ingress, so readiness is
-                    # defined there — not at pod or internal-DNS level. Without this
-                    # wait, E2E Verification starts while the Deployment controller is
-                    # still recreating the deleted pods and the ENTIRE API run 503s at
-                    # the ingress (genesis #1078: 57/79 failed, every one an nginx
-                    # 503-HTML, run finished in 36s). Two consecutive 200s required —
-                    # a single 200 can be a draining old pod.
-                    #
-                    # A bare 200 is NOT enough: a freshly-recreated doorway pod binds its
-                    # HTTP listener and answers 200 on /health BEFORE its admin-WS
-                    # handshake with the conductor pool completes (the james/conductor-2
-                    # race — E2E starts on the bare 200 and provisioning 503s because the
-                    # conductor is not yet serving). The /health body already carries the
-                    # right signal: "connected":true,...}. So a 200 only
-                    # counts toward the stable streak when the body ALSO reports the
-                    # conductor connected. This mirrors the jq-based Seed-preflight gate
-                    # (.conductor.connected) but stays jq-free for this sh context.
-                    #
-                    # Degrade gracefully: an older doorway image whose /health body omits
-                    # the conductor object must not deadlock the wait. After several
-                    # consecutive 200s with NO "conductor" object present at all, warn and
-                    # fall back to the old 200-only behavior.
-                    echo "⏳ waiting for doorway rollout to serve 200 (conductor-connected) at ${doorwayHost}/health ..."
-                    OK_COUNT=0
-                    CONDUCTOR_FIELD_MISSING=0
-                    DEGRADE_TO_HTTP_ONLY=0
-                    for i in \$(seq 1 72); do
-                        BODY=\$(curl -s --max-time 5 -w '\\n%{http_code}' "${doorwayHost}/health" || printf '\\n000')
-                        CODE=\$(printf '%s' "\$BODY" | tail -n1)
-                        if [ "\$CODE" = "200" ]; then
-                            # A 200 with the conductor reported connected is fully ready.
-                            if printf '%s' "\$BODY" | grep -q '"connected":true'; then
-                                OK_COUNT=\$((OK_COUNT+1))
-                                CONDUCTOR_FIELD_MISSING=0
-                            elif printf '%s' "\$BODY" | grep -q '"conductor"'; then
-                                # Conductor object present but not yet connected — the
-                                # listener is up but the admin-WS handshake is still
-                                # pending. Reset the streak; this is the race we guard.
-                                echo "  ↻ doorway 200 but conductor not yet connected — waiting (\$((i*5))s)"
-                                OK_COUNT=0
-                                CONDUCTOR_FIELD_MISSING=0
-                            else
-                                # No conductor object at all in the body. Tolerate an older
-                                # image: count consecutive field-absent 200s and degrade
-                                # after 3 so we never deadlock on a body shape we can't read.
-                                CONDUCTOR_FIELD_MISSING=\$((CONDUCTOR_FIELD_MISSING+1))
-                                if [ "\$CONDUCTOR_FIELD_MISSING" -ge 3 ] && [ "\$DEGRADE_TO_HTTP_ONLY" = "0" ]; then
-                                    echo "  ⚠️  conductor readiness field absent from /health body — proceeding on HTTP-200 only (degrade)"
-                                    DEGRADE_TO_HTTP_ONLY=1
-                                fi
-                                if [ "\$DEGRADE_TO_HTTP_ONLY" = "1" ]; then
-                                    OK_COUNT=\$((OK_COUNT+1))
-                                else
-                                    OK_COUNT=0
-                                fi
-                            fi
-                            if [ "\$OK_COUNT" -ge 2 ]; then
-                                if [ "\$DEGRADE_TO_HTTP_ONLY" = "1" ]; then
-                                    echo "✅ doorway serving 200 at public /health (stable ×2 after ~\$((i*5))s, conductor field absent — HTTP-only degrade)"
-                                else
-                                    echo "✅ doorway serving 200 + conductor-connected at public /health (stable ×2 after ~\$((i*5))s)"
-                                fi
-                                break
-                            fi
-                        else
-                            OK_COUNT=0
-                        fi
-                        sleep 5
-                    done
-                    if [ "\$OK_COUNT" -lt 2 ]; then
-                        echo "❌ doorway did not reach a stable 200 (conductor-connected) at the public boundary within 6min."
-                        echo "   Failing THIS stage loudly (one true cause) instead of letting the"
-                        echo "   e2e bench drown in dozens of misleading ingress-503 failures."
-                        exit 1
-                    fi
-                else
-                    echo "WARNING: no doorway pods matched any selector in ${namespace}"
-                    echo "  Tried: -l app.kubernetes.io/name=${deployment}"
-                    echo "         -l app=${deployment}"
-                    echo "         pod name grep '${deployment}'"
-                    kubectl get pods -n ${namespace} 2>&1 | head -20 || true
-                    exit 1
-                fi
-            """
+            // Bash body lives in genesis/scripts/ci/restart-doorway-epr.sh
+            // (extracted 2026-06-10: CPS method-size hard limit — the pod-delete
+            // + public-boundary rollout-wait heredoc was ~6KB of this method).
+            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/restart-doorway-epr.sh' '${namespace}' '${deployment}' '${doorwayHost}'"
         } else {
             echo "Skipping doorway pod restart — unrecognized doorwayHost: ${doorwayHost}"
         }
     }
+}
+
+/**
+ * One substrate-validation step: run a substrate-verify.sh subcommand
+ * (UNSTABLE on assertion failure) and archive its JSON report. Top-level
+ * def = its own CPS method (64KB pipeline-block relief).
+ */
+def substrateVerifyStage(String sub) {
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/substrate-verify.sh' '${sub}'"
+    }
+    archiveArtifacts(artifacts: "substrate-verify-${sub}.json", allowEmptyArchive: true, fingerprint: true)
+}
+
+/**
+ * Upload Blob-Backed Content body: stage the content blob + the
+ * build-unique propagation probe blob via doorway, then export the hashes
+ * for the custody/propagation/delivery stages downstream.
+ */
+def uploadBlobContentStage() {
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/substrate-verify.sh' upload"
+        env.CONTENT_BLOB_HASH = sh(script: 'cat /tmp/substrate-verify/content_blob_hash', returnStdout: true).trim()
+        env.CONTENT_BLOB_SIZE_BYTES = sh(script: 'cat /tmp/substrate-verify/content_blob_size', returnStdout: true).trim()
+        env.PROBE_BLOB_HASH = sh(script: 'cat /tmp/substrate-verify/probe_blob_hash', returnStdout: true).trim()
+        env.SUBSTRATE_BUILD_START_ISO = sh(script: 'cat /tmp/substrate-verify/build_start_iso', returnStdout: true).trim()
+        echo "Exported: CONTENT_BLOB_HASH=${env.CONTENT_BLOB_HASH} (${env.CONTENT_BLOB_SIZE_BYTES} bytes), PROBE_BLOB_HASH=${env.PROBE_BLOB_HASH}"
+    }
+    archiveArtifacts(artifacts: 'substrate-verify-upload.json', allowEmptyArchive: true, fingerprint: true)
 }
 
 pipeline {
@@ -1130,7 +1061,7 @@ spec:
 
     options {
         skipDefaultCheckout(true)
-        timeout(time: 60, unit: 'MINUTES')  // M1 topology seeds + E2E (~25-35 min); 60 absorbs pod-flap archival waits
+        timeout(time: 60, unit: 'MINUTES')  // topology seeds + substrate-validation suite + E2E (~25-35 min); 60 absorbs pod-flap archival waits
         buildDiscarder(logRotator(numToKeepStr: '20'))
         overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
     }
@@ -1764,6 +1695,11 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             'seed-conductor-identities.ts',
                             env.SEED_RESULTS_CONDUCTOR_IDENTITIES_FILE ?: 'seed-results-conductor-identities.json',
                         )
+                        // Gates Verify Resilience Signals: peer-status projections
+                        // only fill once conductor seeding actually runs. 'false'
+                        // while the jenkins→conductor netpol apply is pending
+                        // (backlog ci-genesis-conductor-adminws-unreachable).
+                        env.CONDUCTOR_SEEDING_READY = res.skipped ? 'false' : 'true'
                         if (res.skipped) return
                         def c = res.seedReport?.counts ?: [:]
                         if (res.exitCode == 2) {
@@ -1815,8 +1751,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                     script {
                         // Ceremony driver (rung 3): collective + affirmations + stewardship
                         // grant run BEFORE the blob upload; the custody layer inside the
-                        // script self-skips when M1_BLOB_HASH is absent, and the
-                        // Seed Custody Commitments stage remains the M1 anti-drift flag.
+                        // script self-skips when CONTENT_BLOB_HASH is absent, and the
+                        // Seed Custody Commitments stage remains the custody anti-drift flag.
                         // The script probes the storage projection to REUSE the existing
                         // collective cid, so re-runs converge (no new collective per run).
                         // STORAGE_URL exported here (not in runProbedSeeder) so the
@@ -1840,7 +1776,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
-        stage('Upload M1 Blob-Backed Content') {
+        stage('Verify Peer Mesh') {
+            // Substrate-validation suite (formerly the "M1" stages — every
+            // assertion lives in genesis/scripts/ci/substrate-verify.sh).
+            // The mesh is the precondition for everything downstream:
+            // per-pod libp2p peer counts, source↔target adjacency (the
+            // cross-pod fetch races CONNECTED peers), binary-version parity
+            // (partial-rollout = DHT-partition risk class).
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.SEED_DATA }
@@ -1848,43 +1790,32 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
-                        def manifestoPath = 'genesis/docs/content/elohim-protocol/manifesto.md'
-                        def internalDoorwayUrl = env.INTERNAL_DOORWAY_URL
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                            sh """#!/bin/bash
-                                set -euo pipefail
-                                if [ ! -f "${manifestoPath}" ]; then
-                                  echo "ERROR: ${manifestoPath} missing"; exit 1
-                                fi
-                                BLOB_SIZE=\$(wc -c < "${manifestoPath}")
-                                BLOB_HASH=sha256-\$(sha256sum "${manifestoPath}" | awk '{print \$1}')
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "UPLOAD M1 BLOB-BACKED CONTENT"
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "File:   ${manifestoPath}"
-                                echo "Size:   \$BLOB_SIZE bytes"
-                                echo "Hash:   \$BLOB_HASH"
-                                echo "Target: http://${internalDoorwayUrl}/admin/seed/blob"
-                                echo ""
-                                STATUS=\$(curl -s -o /tmp/upload.out -w '%{http_code}' \\
-                                  -X PUT "http://${internalDoorwayUrl}/admin/seed/blob" \\
-                                  -H "X-Blob-Hash: \$BLOB_HASH" \\
-                                  -H 'Content-Type: application/octet-stream' \\
-                                  --data-binary @"${manifestoPath}")
-                                if [ "\$STATUS" != "200" ] && [ "\$STATUS" != "201" ] && [ "\$STATUS" != "409" ]; then
-                                  echo "Upload failed: HTTP \$STATUS"
-                                  cat /tmp/upload.out
-                                  exit 1
-                                fi
-                                echo "Upload status: \$STATUS"
-                                echo "\$BLOB_HASH" > /tmp/m1_blob_hash
-                                echo "\$BLOB_SIZE" > /tmp/m1_blob_size
-                            """
-                            env.M1_BLOB_HASH = sh(script: 'cat /tmp/m1_blob_hash', returnStdout: true).trim()
-                            env.M1_BLOB_SIZE_BYTES = sh(script: 'cat /tmp/m1_blob_size', returnStdout: true).trim()
-                            echo "Exported: M1_BLOB_HASH=${env.M1_BLOB_HASH}, M1_BLOB_SIZE_BYTES=${env.M1_BLOB_SIZE_BYTES}"
-                        }
+                        // Downstream coupling: propagation/delivery/projection/
+                        // resilience subcommands also read PEER_STORAGE_URLS —
+                        // safe because they share this stage's when{} gates
+                        // (PIPELINE_SKIPPED + SEED_DATA); revisit if those ever
+                        // diverge.
+                        env.PEER_STORAGE_URLS = peerStorageUrlsCsv()
+                        substrateVerifyStage('mesh')
                     }
+                }
+            }
+        }
+
+        stage('Upload Blob-Backed Content') {
+            // Stages the manifesto blob AND a build-unique propagation probe
+            // blob onto the genesis peer via doorway /admin/seed/blob. The
+            // probe blob's hash never existed before this build, so Verify
+            // Substrate Propagation can only pass via live cross-pod
+            // replication (genesis #1100/#1110 "passed" on a fossil replica
+            // of the previous manifesto hash — never again).
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script { uploadBlobContentStage() }
                 }
             }
         }
@@ -1893,27 +1824,27 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.SEED_DATA }
-                expression { env.M1_BLOB_HASH != null && env.M1_BLOB_HASH != '' }
+                expression { env.CONTENT_BLOB_HASH != null && env.CONTENT_BLOB_HASH != '' }
             }}
             steps {
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
-                        def blobHash = env.M1_BLOB_HASH
-                        def blobSize = env.M1_BLOB_SIZE_BYTES ?: '0'
+                        def blobHash = env.CONTENT_BLOB_HASH
+                        def blobSize = env.CONTENT_BLOB_SIZE_BYTES ?: '0'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
                                 sh """#!/bin/bash
                                     set -euo pipefail
                                     echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED CUSTODY COMMITMENTS (M1 default pair set — seeder prints the actual pairs)"
+                                    echo "SEED CUSTODY COMMITMENTS (default custody pair set — seeder prints the actual pairs)"
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "Doorway: ${doorwayHost}"
                                     echo "Blob:    ${blobHash} (${blobSize} bytes)"
                                     echo ""
                                     DOORWAY_URL="${doorwayHost}" \\
-                                    M1_BLOB_HASH="${blobHash}" \\
-                                    M1_BLOB_SIZE_BYTES="${blobSize}" \\
+                                    CONTENT_BLOB_HASH="${blobHash}" \\
+                                    CONTENT_BLOB_SIZE_BYTES="${blobSize}" \\
                                       npx tsx src/seed-commitments.ts
                                 """
                             }
@@ -1992,40 +1923,41 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
-        stage('Trigger M1 Cross-Pod Fetch') {
+        stage('Verify Substrate Propagation') {
+            // Formerly "Trigger M1 Cross-Pod Fetch". Proves the p2p data
+            // plane moved bytes THIS build: custody manifest present on the
+            // source (matthew), build-unique probe blob served by the target
+            // (jessica, non-genesis on-prem device — never ingests during
+            // seeding), polled because heal-on-read + the 120s custody-sweep
+            // tick need real time, and bytes persisted on disk
+            // (inventory-parity filesystem delta). GET, never HEAD
+            // (memory feedback_head_vs_get_blob_asymmetry).
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.SEED_DATA }
-                expression { env.M1_BLOB_HASH != null && env.M1_BLOB_HASH != '' }
+                expression { env.CONTENT_BLOB_HASH != null && env.CONTENT_BLOB_HASH != '' }
             }}
             steps {
                 container('builder') {
-                    script {
-                        def blobHash = env.M1_BLOB_HASH
-                        // Cross-pod fetch target: jessica (non-genesis on-prem device).
-                        // The test validates substrate cross-pod blob propagation —
-                        // jessica must not have ingested the blob directly during
-                        // seeding (genesis-peer-only path), so a successful fetch
-                        // here proves the substrate replicated it across pods.
-                        def fetchPeerUrl = 'http://elohim-jessica-alpha.elohim-alpha.svc.cluster.local:8090'
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                            sh """#!/bin/bash
-                                set -euo pipefail
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "M1 CROSS-POD FETCH — jessica fetches blob ${blobHash} from matthew"
-                                echo "═══════════════════════════════════════════════════════════"
-                                # GET (not HEAD per memory feedback_head_vs_get_blob_asymmetry)
-                                STATUS=\$(curl -s -o /dev/null -w '%{http_code}' \\
-                                  "${fetchPeerUrl}/blob/${blobHash}")
-                                echo "Fetch status: \$STATUS"
-                                if [ "\$STATUS" != "200" ]; then
-                                  echo "Fetch failed — substrate did not propagate the blob"
-                                  exit 1
-                                fi
-                                echo "Fetch successful — serve-blob EconomicEvent should be emitted"
-                            """
-                        }
-                    }
+                    script { substrateVerifyStage('propagation') }
+                }
+            }
+        }
+
+        stage('Verify Delivery Events') {
+            // serve-blob REA EconomicEvents are written in the SAME
+            // transaction as a successful peer blob fetch (blob_fetch's
+            // atomic pair) — zero events for this build means either no
+            // transfer happened (see propagation) or the delivery-event
+            // leg regressed.
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+                expression { env.PROBE_BLOB_HASH != null && env.PROBE_BLOB_HASH != '' }
+            }}
+            steps {
+                container('builder') {
+                    script { substrateVerifyStage('delivery') }
                 }
             }
         }
@@ -2062,6 +1994,58 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             fi
                         """
                     }
+                }
+            }
+        }
+
+        stage('Verify Projection Sync') {
+            // Projector cursor lag per pod + replication/pull/
+            // projection-reconcile stream caught-up flags from /p2p/status.
+            // null streams are "not computable" — warned, never treated as
+            // caught up (spec §4.3 in P2PStatusInfo docs).
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script { substrateVerifyStage('projection') }
+                }
+            }
+        }
+
+        stage('Verify Federation Layer') {
+            // Doorway federation membership + the p2p bootstrap surface.
+            // Cross-doorway breadth is shem-dependent and reported, not
+            // asserted (a2o @requires:shem vocabulary).
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script { substrateVerifyStage('federation') }
+                }
+            }
+        }
+
+        stage('Verify Resilience Signals') {
+            // peer-statuses + network posture are written ONLY by
+            // conductor-originated PeerStatusRecorded signals — before
+            // conductor seeding runs they are empty BY DESIGN, so this stage
+            // gates on CONDUCTOR_SEEDING_READY (set by Seed Conductor
+            // Identities) instead of false-failing while the jenkins→
+            // conductor netpol apply is pending (backlog
+            // ci-genesis-conductor-adminws-unreachable). This is the canary
+            // that lights up once the operator applies network-policies.yaml.
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+                expression { env.CONDUCTOR_SEEDING_READY == 'true' }
+            }}
+            steps {
+                container('builder') {
+                    script { substrateVerifyStage('resilience') }
                 }
             }
         }
