@@ -165,6 +165,17 @@ const INTERFACE_FILES = [
   // Sprint 3: per-peer and hub storage capacity projections (Category C operational)
   { src: 'views/peer-capacity-view.ts', dest: 'peer-capacity-view.ts' },
   { src: 'views/hub-capacity-view.ts', dest: 'hub-capacity-view.ts' },
+  // Auth wire-contract completion (plan 2026-06-10 Task 1) — doorway /auth/*
+  // response shapes (Category C operational session state, HTTP wire only).
+  // Rust wire authority: doorway/doorway-service/src/routes/auth_routes.rs,
+  // validated by doorway/doorway-service/tests/schema_contract.rs. The nested
+  // AuthorityRef + HumanProfileResponse objects are $ref'd and inline into
+  // me-response.ts / auth-response.ts respectively (dashboard-steward pattern).
+  { src: 'views/auth-response.ts', dest: 'auth-response.ts' },
+  { src: 'views/me-response.ts', dest: 'me-response.ts' },
+  { src: 'views/exchange-session-response.ts', dest: 'exchange-session-response.ts' },
+  { src: 'views/session-token-response.ts', dest: 'session-token-response.ts' },
+  { src: 'views/account-response.ts', dest: 'account-response.ts' },
 ];
 
 /**

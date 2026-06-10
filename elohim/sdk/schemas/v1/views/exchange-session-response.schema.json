@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:exchange-session-response",
+  "title": "ExchangeSessionResponse",
+  "description": "Source of truth: doorway operational session state (Operational, Category C). GET /auth/exchange-session exchanges a single-use transfer token for a full JWT session; reconstructed per request, never persisted as substrate truth. Rust wire authority: doorway/doorway-service/src/routes/auth_routes.rs ExchangeSessionResponse (validated by that crate's tests/schema_contract.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["token", "humanId", "agentPubKey", "identifier", "expiresAt"],
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "Doorway-issued JWT bearer token"
+    },
+    "humanId": {
+      "type": "string",
+      "description": "Holochain human ID for the authenticated session"
+    },
+    "agentPubKey": {
+      "type": "string",
+      "description": "Holochain agent public key for the authenticated session"
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Login identifier (e.g. email) of the authenticated human"
+    },
+    "expiresAt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp (seconds) when the JWT expires (the `exp` claim)"
+    },
+    "doorwayId": {
+      "type": "string",
+      "description": "Doorway that issued this token (for federation). Absent when not configured (serde skip_serializing_if)"
+    },
+    "doorwayUrl": {
+      "type": "string",
+      "description": "Doorway URL for cross-doorway validation. Absent when not configured (serde skip_serializing_if)"
+    },
+    "portalHostUrl": {
+      "type": "string",
+      "description": "First reachable portal host URL for this human, when the human is a steward and at least one registered host responds to a health probe. Absent when not a steward or no host is reachable (serde skip_serializing_if)"
+    }
+  }
+}

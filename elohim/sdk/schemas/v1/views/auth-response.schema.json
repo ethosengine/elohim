@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:auth-response",
+  "title": "AuthResponse",
+  "description": "Source of truth: doorway operational session state (Operational, Category C). Consolidated response of POST /auth/register, POST /auth/login, and POST /auth/refresh — a JWT session minted from the doorway's user store; reconstructed per request, never persisted as substrate truth. Rust wire authority: doorway/doorway-service/src/routes/auth_routes.rs AuthResponse (validated by that crate's tests/schema_contract.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["token", "humanId", "agentPubKey", "identifier", "expiresAt"],
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "Doorway-issued JWT bearer token"
+    },
+    "humanId": {
+      "type": "string",
+      "description": "Holochain human ID for the authenticated session"
+    },
+    "agentPubKey": {
+      "type": "string",
+      "description": "Holochain agent public key for the authenticated session"
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Login identifier (e.g. email) of the authenticated human"
+    },
+    "expiresAt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp (seconds) when the JWT expires (the `exp` claim)"
+    },
+    "doorwayId": {
+      "type": "string",
+      "description": "Doorway that issued this token (for federation). Absent when not configured (serde skip_serializing_if)"
+    },
+    "doorwayUrl": {
+      "type": "string",
+      "description": "Doorway URL for cross-doorway validation. Absent when not configured (serde skip_serializing_if)"
+    },
+    "installedAppId": {
+      "type": "string",
+      "description": "Holochain installed app ID for this user (multi-conductor routing). Absent when not applicable (serde skip_serializing_if)"
+    },
+    "profile": {
+      "$ref": "human-profile-response.schema.json",
+      "description": "Human profile (returned on registration). Absent otherwise (serde skip_serializing_if)"
+    },
+    "isSteward": {
+      "type": "boolean",
+      "description": "True when the human's stewardship is substrate-confirmed. ABSENT when false (serde skip_serializing_if = Not::not), so presence implies true"
+    },
+    "portalHostUrl": {
+      "type": "string",
+      "description": "First reachable portal host URL for this human, when isSteward is true and at least one registered host responds to a health probe. Absent when not a steward or no host is reachable (serde skip_serializing_if)"
+    }
+  }
+}

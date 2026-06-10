@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:session-token-response",
+  "title": "SessionTokenResponse",
+  "description": "Source of truth: doorway in-memory session-transfer store (Operational, Category C). Short-lived (60 s TTL) single-use token minted by GET /auth/session-token for cross-app session handoff; never persisted. Rust wire authority: doorway/doorway-service/src/routes/auth_routes.rs SessionTokenResponse (validated by that crate's tests/schema_contract.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sessionToken", "expiresAt"],
+  "properties": {
+    "sessionToken": {
+      "type": "string",
+      "description": "Short-lived single-use transfer token (60 s TTL)"
+    },
+    "expiresAt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp (seconds) when the transfer token expires"
+    }
+  }
+}

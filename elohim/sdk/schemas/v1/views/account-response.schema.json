@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:account-response",
+  "title": "AccountResponse",
+  "description": "Source of truth: doorway operational account record (Operational, Category C) — the doorway user store (UserDoc) joined with per-account usage counters (storage, projection queries, bandwidth) and hosting/stewardship state; reconstructed per request, never persisted as a new entity. Distinct from epr:schema:view:account-view (the DHT-derived account-management snapshot). Rust wire authority: doorway/doorway-service/src/routes/auth_routes.rs AccountResponse (validated by that crate's tests/schema_contract.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "humanId",
+    "identifier",
+    "permissionLevel",
+    "storageBytes",
+    "storageLimit",
+    "storagePercent",
+    "projectionQueries",
+    "dailyQueryLimit",
+    "queriesPercent",
+    "bandwidthBytes",
+    "dailyBandwidthLimit",
+    "bandwidthPercent",
+    "isSteward",
+    "keyExported"
+  ],
+  "properties": {
+    "humanId": {
+      "type": "string",
+      "description": "Holochain human ID for the account"
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Login identifier (e.g. email) of the account"
+    },
+    "permissionLevel": {
+      "type": "string",
+      "description": "Doorway permission level — Display form of doorway's PermissionLevel enum: 'PUBLIC' | 'AUTHENTICATED' | 'ADMIN'"
+    },
+    "storageBytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Bytes of hosted storage currently used by the account"
+    },
+    "storageLimit": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Hosted storage quota in bytes"
+    },
+    "storagePercent": {
+      "type": "number",
+      "description": "storageBytes as a percentage of storageLimit"
+    },
+    "projectionQueries": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Projection queries used today"
+    },
+    "dailyQueryLimit": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Daily projection-query quota"
+    },
+    "queriesPercent": {
+      "type": "number",
+      "description": "projectionQueries as a percentage of dailyQueryLimit"
+    },
+    "bandwidthBytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Bandwidth bytes used today"
+    },
+    "dailyBandwidthLimit": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Daily bandwidth quota in bytes"
+    },
+    "bandwidthPercent": {
+      "type": "number",
+      "description": "bandwidthBytes as a percentage of dailyBandwidthLimit"
+    },
+    "conductorId": {
+      "type": "string",
+      "description": "Conductor hosting this account's cell, when hosted. Absent otherwise (serde skip_serializing_if)"
+    },
+    "isSteward": {
+      "type": "boolean",
+      "description": "True when the account's stewardship is substrate-confirmed. Always present (no skip on this struct)"
+    },
+    "stewardshipAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when stewardship was confirmed. Absent when not a steward (serde skip_serializing_if)"
+    },
+    "keyExported": {
+      "type": "boolean",
+      "description": "Whether the custodial key bundle has been exported by the human"
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when the account was created. Absent when unknown (serde skip_serializing_if)"
+    },
+    "lastLoginAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp of the last login. Absent when never logged in (serde skip_serializing_if)"
+    }
+  }
+}

@@ -1,0 +1,500 @@
+//! Schema contract tests — validates that the doorway /auth/* response
+//! structs' Rust serialization matches the JSON Schema source of truth in
+//! elohim/sdk/schemas/v1/views/.
+//!
+//! Mirrors the harness in elohim/elohim-storage/tests/schema_contract.rs
+//! (per-crate harness, shared schemas directory). These tests catch drift
+//! between the auth wire shapes (auth_routes.rs serialize structs —
+//! Category C operational session state, HTTP wire only) and the schema
+//! contract. If a field is renamed, added, or removed in Rust without
+//! updating the schema (or vice versa), these tests fail.
+//!
+//! The harness inlines `$ref` before compiling because the jsonschema
+//! crate doesn't resolve file-based references automatically.
+
+use doorway::routes::auth_routes::{
+    AccountResponse, AuthResponse, AuthorityRef, ExchangeSessionResponse, HumanProfileResponse,
+    MeResponse, SessionTokenResponse,
+};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+
+/// Resolve the shared protocol schema directory relative to this crate.
+fn schema_dir() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir.join("../../elohim/sdk/schemas/v1")
+}
+
+/// Load schemas from the subdirectories the auth views can reference into a
+/// ref map keyed by every relative-path form plus `$id` (same key forms as
+/// the elohim-storage harness).
+fn load_ref_map() -> HashMap<String, Value> {
+    let base = schema_dir();
+    let mut refs = HashMap::new();
+
+    for subdir in &["enums", "views", "objects"] {
+        let dir = base.join(subdir);
+        if let Ok(entries) = fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        if let Ok(schema) = serde_json::from_str::<Value>(&content) {
+                            let filename = path.file_name().unwrap().to_str().unwrap().to_string();
+                            // Same-dir ref: "authority-ref.schema.json"
+                            refs.insert(filename.clone(), schema.clone());
+                            // Same-dir ref with leading ./
+                            refs.insert(format!("./{}", filename), schema.clone());
+                            // Cross-dir ref: "../enums/reach.schema.json"
+                            refs.insert(format!("../{}/{}", subdir, filename), schema.clone());
+                            // From repo-relative form: "views/authority-ref.schema.json"
+                            refs.insert(format!("{}/{}", subdir, filename), schema.clone());
+                            // URI-style $id ref: "epr:schema:view:authority-ref"
+                            if let Some(Value::String(id)) = schema.get("$id") {
+                                refs.insert(id.clone(), schema);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    refs
+}
+
+/// Recursively inline `$ref` in a schema value using the ref map.
+fn inline_refs(schema: &Value, refs: &HashMap<String, Value>) -> Value {
+    match schema {
+        Value::Object(map) => {
+            // If this object has a $ref, replace with the referenced schema
+            if let Some(Value::String(ref_path)) = map.get("$ref") {
+                if !ref_path.starts_with('#') {
+                    // Split file portion from JSON Pointer fragment
+                    let (file_part, fragment) = match ref_path.split_once('#') {
+                        Some((file, frag)) => (file, Some(frag)),
+                        None => (ref_path.as_str(), None),
+                    };
+                    if let Some(referenced) = refs.get(file_part) {
+                        let mut inlined = referenced.clone();
+                        if let Value::Object(ref mut obj) = inlined {
+                            obj.remove("$id");
+                            obj.remove("$schema");
+                        }
+                        if let Some(frag) = fragment {
+                            let pointer = if frag.starts_with('/') {
+                                frag.to_string()
+                            } else {
+                                format!("/{frag}")
+                            };
+                            if let Some(sub) = inlined.pointer(&pointer) {
+                                return inline_refs(&sub.clone(), refs);
+                            }
+                        }
+                        return inline_refs(&inlined, refs);
+                    }
+                }
+            }
+
+            let mut result = serde_json::Map::new();
+            for (key, value) in map {
+                result.insert(key.clone(), inline_refs(value, refs));
+            }
+            Value::Object(result)
+        }
+        Value::Array(arr) => Value::Array(arr.iter().map(|v| inline_refs(v, refs)).collect()),
+        other => other.clone(),
+    }
+}
+
+/// Load a schema, inline all $ref, and return the resolved value.
+fn load_schema(relative: &str) -> Value {
+    let path = schema_dir().join(relative);
+    let content = fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("Failed to read schema {}: {}", path.display(), e));
+    let raw: Value = serde_json::from_str(&content)
+        .unwrap_or_else(|e| panic!("Failed to parse schema {}: {}", path.display(), e));
+
+    let refs = load_ref_map();
+    inline_refs(&raw, &refs)
+}
+
+/// Validate a serialized Rust struct against a schema.
+fn validate_against_schema(schema_path_str: &str, instance: &Value) {
+    let schema = load_schema(schema_path_str);
+    let validator = jsonschema::validator_for(&schema)
+        .unwrap_or_else(|e| panic!("Failed to compile schema {}: {}", schema_path_str, e));
+    let errors: Vec<String> = validator
+        .iter_errors(instance)
+        .map(|e| format!("  - {} (at {})", e, e.instance_path))
+        .collect();
+    if !errors.is_empty() {
+        panic!(
+            "Schema validation failed for {}:\n{}\n\nInstance:\n{}",
+            schema_path_str,
+            errors.join("\n"),
+            serde_json::to_string_pretty(instance).unwrap()
+        );
+    }
+}
+
+/// Convention: every view schema must declare source of truth in description.
+fn assert_source_of_truth_declared(schema_value: &Value, schema_name: &str) {
+    let desc = schema_value["description"]
+        .as_str()
+        .unwrap_or_else(|| panic!("Schema {} missing description", schema_name));
+    assert!(
+        desc.contains("Source of truth:"),
+        "Schema {} description must contain 'Source of truth:' — got: {}",
+        schema_name,
+        desc
+    );
+}
+
+fn sample_profile() -> HumanProfileResponse {
+    HumanProfileResponse {
+        id: "human-matthew".to_string(),
+        display_name: "Matthew".to_string(),
+        bio: Some("Learning steward".to_string()),
+        affinities: vec!["systems".to_string(), "gardening".to_string()],
+        profile_reach: "public".to_string(),
+        location: Some("us-central".to_string()),
+        created_at: "2026-06-10T00:00:00Z".to_string(),
+        updated_at: "2026-06-10T00:00:00Z".to_string(),
+    }
+}
+
+// ── AuthResponse (POST /auth/register | /auth/login | /auth/refresh) ────
+
+#[test]
+fn auth_response_full_matches_schema() {
+    let response = AuthResponse {
+        token: "eyJhbGciOiJIUzI1NiJ9.payload.sig".to_string(),
+        human_id: "human-matthew".to_string(),
+        agent_pub_key: "uhCAkABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890123456789012".to_string(),
+        identifier: "matthew@example.com".to_string(),
+        expires_at: 1_780_000_000,
+        doorway_id: Some("alpha".to_string()),
+        doorway_url: Some("https://doorway-alpha.elohim.host".to_string()),
+        installed_app_id: Some("elohim-human-matthew".to_string()),
+        profile: Some(sample_profile()),
+        is_steward: true,
+        portal_host_url: Some("https://portal.matthew.example".to_string()),
+    };
+
+    let json = serde_json::to_value(&response).unwrap();
+    validate_against_schema("views/auth-response.schema.json", &json);
+}
+
+#[test]
+fn auth_response_minimal_matches_schema() {
+    // Login path without federation config, profile, or stewardship: every
+    // skip_serializing_if field must be ABSENT (not null) on the wire.
+    let response = AuthResponse {
+        token: "eyJhbGciOiJIUzI1NiJ9.payload.sig".to_string(),
+        human_id: "human-visitor".to_string(),
+        agent_pub_key: "uhCAkVISITOR0123456789012345678901234567890123456789012".to_string(),
+        identifier: "visitor@example.com".to_string(),
+        expires_at: 1_780_000_000,
+        doorway_id: None,
+        doorway_url: None,
+        installed_app_id: None,
+        profile: None,
+        is_steward: false,
+        portal_host_url: None,
+    };
+
+    let json = serde_json::to_value(&response).unwrap();
+    let obj = json.as_object().unwrap();
+    for absent in [
+        "doorwayId",
+        "doorwayUrl",
+        "installedAppId",
+        "profile",
+        "isSteward",
+        "portalHostUrl",
+    ] {
+        assert!(
+            !obj.contains_key(absent),
+            "{} must be absent when None/false (serde skip_serializing_if)",
+            absent
+        );
+    }
+    validate_against_schema("views/auth-response.schema.json", &json);
+}
+
+#[test]
+fn auth_response_rejects_additional_properties() {
+    let mut instance = serde_json::json!({
+        "token": "jwt",
+        "humanId": "human-x",
+        "agentPubKey": "uhCAkX",
+        "identifier": "x@example.com",
+        "expiresAt": 1780000000u64
+    });
+    instance["snake_case_leak"] = serde_json::json!("should-not-be-here");
+
+    let schema = load_schema("views/auth-response.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors: Vec<_> = validator.iter_errors(&instance).collect();
+    assert!(
+        !errors.is_empty(),
+        "Schema must reject additionalProperties on AuthResponse"
+    );
+}
+
+// ── HumanProfileResponse (nested in AuthResponse) ───────────────────────
+
+#[test]
+fn human_profile_response_matches_schema() {
+    let json = serde_json::to_value(sample_profile()).unwrap();
+    validate_against_schema("views/human-profile-response.schema.json", &json);
+}
+
+#[test]
+fn human_profile_response_minimal_matches_schema() {
+    let profile = HumanProfileResponse {
+        id: "human-minimal".to_string(),
+        display_name: "Minimal".to_string(),
+        bio: None,
+        affinities: vec![],
+        profile_reach: "private".to_string(),
+        location: None,
+        created_at: "2026-06-10T00:00:00Z".to_string(),
+        updated_at: "2026-06-10T00:00:00Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&profile).unwrap();
+    let obj = json.as_object().unwrap();
+    assert!(!obj.contains_key("bio"), "bio must be absent when None");
+    assert!(
+        !obj.contains_key("location"),
+        "location must be absent when None"
+    );
+    validate_against_schema("views/human-profile-response.schema.json", &json);
+}
+
+// ── MeResponse (GET /auth/me) ───────────────────────────────────────────
+
+#[test]
+fn me_response_full_matches_schema() {
+    let response = MeResponse {
+        human_id: "human-matthew".to_string(),
+        agent_pub_key: "uhCAkABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890123456789012".to_string(),
+        identifier: "matthew@example.com".to_string(),
+        permission_level: "ADMIN".to_string(),
+        doorway_id: Some("alpha".to_string()),
+        doorway_url: Some("https://doorway-alpha.elohim.host".to_string()),
+        authenticated: true,
+        trust_mode: "doorway-host".to_string(),
+        authority: AuthorityRef {
+            label: "doorway-alpha.elohim.host".to_string(),
+            id: Some("alpha".to_string()),
+        },
+        conductor_endpoint: Some("ws://conductor-0.headless:8445".to_string()),
+    };
+
+    let json = serde_json::to_value(&response).unwrap();
+    validate_against_schema("views/me-response.schema.json", &json);
+}
+
+#[test]
+fn me_response_minimal_matches_schema() {
+    // MVP shape: no federation config, doorway-host mode, no conductor endpoint.
+    let response = MeResponse {
+        human_id: "human-visitor".to_string(),
+        agent_pub_key: "uhCAkVISITOR0123456789012345678901234567890123456789012".to_string(),
+        identifier: "visitor@example.com".to_string(),
+        permission_level: "AUTHENTICATED".to_string(),
+        doorway_id: None,
+        doorway_url: None,
+        authenticated: true,
+        trust_mode: "doorway-host".to_string(),
+        authority: AuthorityRef {
+            label: "localhost:8888".to_string(),
+            id: None,
+        },
+        conductor_endpoint: None,
+    };
+
+    let json = serde_json::to_value(&response).unwrap();
+    let obj = json.as_object().unwrap();
+    for absent in ["doorwayId", "doorwayUrl", "conductorEndpoint"] {
+        assert!(
+            !obj.contains_key(absent),
+            "{} must be absent when None (serde skip_serializing_if)",
+            absent
+        );
+    }
+    assert!(
+        !json["authority"].as_object().unwrap().contains_key("id"),
+        "authority.id must be absent when None (serde skip_serializing_if)"
+    );
+    validate_against_schema("views/me-response.schema.json", &json);
+}
+
+// ── AuthorityRef (nested in MeResponse) ─────────────────────────────────
+
+#[test]
+fn authority_ref_matches_schema() {
+    let authority = AuthorityRef {
+        label: "alpha.elohim.host".to_string(),
+        id: Some("alpha".to_string()),
+    };
+    let json = serde_json::to_value(&authority).unwrap();
+    validate_against_schema("views/authority-ref.schema.json", &json);
+}
+
+// ── SessionTokenResponse (GET /auth/session-token) ──────────────────────
+
+#[test]
+fn session_token_response_matches_schema() {
+    let response = SessionTokenResponse {
+        session_token: "f3a9c2e1d4b5a6978085a4b3c2d1e0f9".to_string(),
+        expires_at: 1_780_000_060,
+    };
+
+    let json = serde_json::to_value(&response).unwrap();
+    validate_against_schema("views/session-token-response.schema.json", &json);
+}
+
+// ── ExchangeSessionResponse (GET /auth/exchange-session) ────────────────
+
+#[test]
+fn exchange_session_response_full_matches_schema() {
+    let response = ExchangeSessionResponse {
+        token: "eyJhbGciOiJIUzI1NiJ9.payload.sig".to_string(),
+        human_id: "human-matthew".to_string(),
+        agent_pub_key: "uhCAkABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890123456789012".to_string(),
+        identifier: "matthew@example.com".to_string(),
+        expires_at: 1_780_000_000,
+        doorway_id: Some("alpha".to_string()),
+        doorway_url: Some("https://doorway-alpha.elohim.host".to_string()),
+        portal_host_url: Some("https://portal.matthew.example".to_string()),
+    };
+
+    let json = serde_json::to_value(&response).unwrap();
+    validate_against_schema("views/exchange-session-response.schema.json", &json);
+}
+
+#[test]
+fn exchange_session_response_minimal_matches_schema() {
+    let response = ExchangeSessionResponse {
+        token: "eyJhbGciOiJIUzI1NiJ9.payload.sig".to_string(),
+        human_id: "human-visitor".to_string(),
+        agent_pub_key: "uhCAkVISITOR0123456789012345678901234567890123456789012".to_string(),
+        identifier: "visitor@example.com".to_string(),
+        expires_at: 1_780_000_000,
+        doorway_id: None,
+        doorway_url: None,
+        portal_host_url: None,
+    };
+
+    let json = serde_json::to_value(&response).unwrap();
+    let obj = json.as_object().unwrap();
+    for absent in ["doorwayId", "doorwayUrl", "portalHostUrl"] {
+        assert!(
+            !obj.contains_key(absent),
+            "{} must be absent when None (serde skip_serializing_if)",
+            absent
+        );
+    }
+    validate_against_schema("views/exchange-session-response.schema.json", &json);
+}
+
+// ── AccountResponse (GET /auth/account) ─────────────────────────────────
+
+#[test]
+fn account_response_full_matches_schema() {
+    let response = AccountResponse {
+        human_id: "human-matthew".to_string(),
+        identifier: "matthew@example.com".to_string(),
+        permission_level: "AUTHENTICATED".to_string(),
+        storage_bytes: 52_428_800,
+        storage_limit: 1_073_741_824,
+        storage_percent: 4.88,
+        projection_queries: 142,
+        daily_query_limit: 10_000,
+        queries_percent: 1.42,
+        bandwidth_bytes: 10_485_760,
+        daily_bandwidth_limit: 5_368_709_120,
+        bandwidth_percent: 0.2,
+        conductor_id: Some("conductor-0".to_string()),
+        is_steward: true,
+        stewardship_at: Some("2026-05-01T12:00:00Z".to_string()),
+        key_exported: true,
+        created_at: Some("2026-01-15T08:30:00Z".to_string()),
+        last_login_at: Some("2026-06-10T07:45:00Z".to_string()),
+    };
+
+    let json = serde_json::to_value(&response).unwrap();
+    validate_against_schema("views/account-response.schema.json", &json);
+}
+
+#[test]
+fn account_response_minimal_matches_schema() {
+    // Fresh hosted account: no conductor assignment, no stewardship, no
+    // recorded timestamps. is_steward has NO skip attribute — it must be
+    // PRESENT even when false.
+    let response = AccountResponse {
+        human_id: "human-fresh".to_string(),
+        identifier: "fresh@example.com".to_string(),
+        permission_level: "AUTHENTICATED".to_string(),
+        storage_bytes: 0,
+        storage_limit: 1_073_741_824,
+        storage_percent: 0.0,
+        projection_queries: 0,
+        daily_query_limit: 10_000,
+        queries_percent: 0.0,
+        bandwidth_bytes: 0,
+        daily_bandwidth_limit: 5_368_709_120,
+        bandwidth_percent: 0.0,
+        conductor_id: None,
+        is_steward: false,
+        stewardship_at: None,
+        key_exported: false,
+        created_at: None,
+        last_login_at: None,
+    };
+
+    let json = serde_json::to_value(&response).unwrap();
+    let obj = json.as_object().unwrap();
+    for absent in ["conductorId", "stewardshipAt", "createdAt", "lastLoginAt"] {
+        assert!(
+            !obj.contains_key(absent),
+            "{} must be absent when None (serde skip_serializing_if)",
+            absent
+        );
+    }
+    assert!(
+        obj.contains_key("isSteward"),
+        "isSteward must be present even when false (no skip attribute on AccountResponse)"
+    );
+    validate_against_schema("views/account-response.schema.json", &json);
+}
+
+// ── Convention enforcement ──────────────────────────────────────────────
+
+#[test]
+fn auth_view_schemas_declare_source_of_truth() {
+    let view_schemas = [
+        "views/auth-response.schema.json",
+        "views/me-response.schema.json",
+        "views/exchange-session-response.schema.json",
+        "views/session-token-response.schema.json",
+        "views/account-response.schema.json",
+        "views/authority-ref.schema.json",
+        "views/human-profile-response.schema.json",
+    ];
+
+    for schema_name in &view_schemas {
+        let path = schema_dir().join(schema_name);
+        let content = fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", schema_name, e));
+        let schema_value: Value = serde_json::from_str(&content)
+            .unwrap_or_else(|e| panic!("Failed to parse {}: {}", schema_name, e));
+        assert_source_of_truth_declared(&schema_value, schema_name);
+    }
+}

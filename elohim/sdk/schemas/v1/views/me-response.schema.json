@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:me-response",
+  "title": "MeResponse",
+  "description": "Source of truth: doorway operational session state (Operational, Category C). GET /auth/me — current-session info decoded from the bearer JWT plus the issuing doorway's identity; reconstructed per request, never persisted. The unauthenticated path returns 401 with no MeResponse body. Rust wire authority: doorway/doorway-service/src/routes/auth_routes.rs MeResponse (validated by that crate's tests/schema_contract.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "humanId",
+    "agentPubKey",
+    "identifier",
+    "permissionLevel",
+    "authenticated",
+    "trustMode",
+    "authority"
+  ],
+  "properties": {
+    "humanId": {
+      "type": "string",
+      "description": "Holochain human ID for the authenticated session"
+    },
+    "agentPubKey": {
+      "type": "string",
+      "description": "Holochain agent public key for the authenticated session"
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Login identifier (e.g. email) of the authenticated human"
+    },
+    "permissionLevel": {
+      "type": "string",
+      "description": "Doorway permission level from the JWT claims — Display form of doorway's PermissionLevel enum: 'PUBLIC' | 'AUTHENTICATED' | 'ADMIN'"
+    },
+    "doorwayId": {
+      "type": "string",
+      "description": "Doorway that issued this token (for federation). Absent when not configured (serde skip_serializing_if)"
+    },
+    "doorwayUrl": {
+      "type": "string",
+      "description": "Doorway URL for cross-doorway validation. Absent when not configured (serde skip_serializing_if)"
+    },
+    "authenticated": {
+      "type": "boolean",
+      "description": "Whether the caller has a valid session. Always true on the 200 path; the unauthenticated path returns 401 (no MeResponse body)"
+    },
+    "trustMode": {
+      "type": "string",
+      "description": "Auth mode for the current session: 'doorway-host' (doorway runs the conductor) or 'peer-conductor' (conductor on a peer-managed instance). MVP: always 'doorway-host'"
+    },
+    "authority": {
+      "$ref": "authority-ref.schema.json",
+      "description": "Human-readable authority reference surfaced by the portal trust-indicator. Derived from the issuing doorway's URL + id for doorway-host mode"
+    },
+    "conductorEndpoint": {
+      "type": "string",
+      "description": "Conductor's reachable URL or peer-id descriptor when trustMode is 'peer-conductor'. Absent in MVP (Mode B substrate deferred; serde skip_serializing_if)"
+    }
+  }
+}

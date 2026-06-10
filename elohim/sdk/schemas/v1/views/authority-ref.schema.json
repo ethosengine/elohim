@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:authority-ref",
+  "title": "AuthorityRef",
+  "description": "Source of truth: doorway operational session state (Operational, Category C). Human-readable authority reference surfaced by the portal trust-indicator chrome — for doorway-host mode the label is the doorway hostname and id is the doorway_id slug; for peer-conductor mode they describe the peer's conductor location. Rust wire authority: doorway/doorway-service/src/routes/auth_routes.rs AuthorityRef (validated by that crate's tests/schema_contract.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["label"],
+  "properties": {
+    "label": {
+      "type": "string",
+      "description": "Human-readable label rendered by the trust-indicator chip"
+    },
+    "id": {
+      "type": "string",
+      "description": "Optional stable identifier (doorway_id slug or conductor peer_id). Absent when unknown (serde skip_serializing_if)"
+    }
+  }
+}

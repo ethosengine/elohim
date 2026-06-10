@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:human-profile-response",
+  "title": "HumanProfileResponse",
+  "description": "Source of truth: imagodei zome Human entry projected through the doorway auth surface (Operational, Category C wire fragment of a Category A entry). Returned inside AuthResponse on registration. Rust wire authority: doorway/doorway-service/src/routes/auth_routes.rs HumanProfileResponse (validated by that crate's tests/schema_contract.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "displayName", "affinities", "profileReach", "createdAt", "updatedAt"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Human entry identifier"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Display name chosen at registration"
+    },
+    "bio": {
+      "type": "string",
+      "description": "Optional bio/description. Absent when not provided (serde skip_serializing_if)"
+    },
+    "affinities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "User interests/affinities"
+    },
+    "profileReach": {
+      "type": "string",
+      "description": "Profile visibility (public, connections, private)"
+    },
+    "location": {
+      "type": "string",
+      "description": "Optional location. Absent when not provided (serde skip_serializing_if)"
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when the profile was created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp when the profile was last updated"
+    }
+  }
+}
