@@ -15,11 +15,16 @@ jobs: [elohim-genesis]
 relatedNodeIds: []
 tags: [ci, genesis, e2e, auth, doorway, portal-handoff, recovery-m5, auth-portal-convergence]
 cites:
+  - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1108/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1105/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1104/
+  - https://jenkins.ethosengine.com/job/elohim/job/dev/1522/
   - genesis/a2o/features/auth/steward-login-portal-handoff.feature
   - genesis/a2o/steps/ui/steward-login-portal-handoff.steps.ts
+  - genesis/a2o/steps/ui/account-m5.steps.ts
+  - genesis/data/timeline/backlog/steward-grant-fixture-surface.md
   - doorway/doorway-service/src/routes/auth_routes.rs
+  - doorway/doorway-service/src/routes/admin_dev.rs
   - doorway/doorway-service/src/server/http.rs
   - elohim/elohim-storage/src/services/session_exchange.rs
   - app/elohim-app/src/app/imagodei/services/providers/oauth-auth.provider.ts
@@ -153,29 +158,59 @@ infra/measure-class). No museum citation.
 
 ## Current decision
 
-`ci_status: in-progress` — BOTH fingerprints now have a landed (unpushed) fix.
-Neither was a product regression; both were never-satisfiable test assertions
-revealed when `DEV_MODE` let the scenarios progress past the fixture-grant gate
-at #1104.
+`ci_status: in-progress` — BOTH fingerprints have a landed fix that is now
+**merged to `dev` AND deployed to alpha** (no longer unpushed). Neither was a
+product regression; both were never-satisfiable test assertions revealed when
+`DEV_MODE` let the scenarios progress past the fixture-grant gate at #1104.
 
 - **F1** (`ce5f4e6a4d1f`): operator chose option (a) — a `DEV_MODE`-gated
   portal-health override. Landed `0ce5c23e0` (doorway `routes/admin_dev.rs` +
   `probe_first_portal_host` decision split + the two a2o step rewrites).
 - **F2** (`a9a433e7b31c`): assertion corrected to the no-portal-hand-off
-  invariant (origin-agnostic). Landed (a2o step-only change).
+  invariant (origin-agnostic). Landed `f242caad9` (a2o step-only change).
 
-Both clear on the NEXT genesis build once the unpushed commits are pushed
-(F1 needs the doorway binary; F2 is test-only so it clears as soon as the suite
-re-runs against any deploy carrying the step change). Confirm by disappearance
-(green-streak ≥3, no recurrence of either fingerprint).
+**Deploy/confirmation status (reconciled 2026-06-09):** all three fix commits
+landed on `dev` 2026-06-07 ~19:00–23:58Z. Genesis **#1108** (2026-06-08 21:00Z)
+still ran against an alpha whose doorway binary PREDATED `0ce5c23e0` — the
+rewired a2o step (`account-m5.steps.ts:223` "portal host responds to /healthz
+with 200") shows `✔` because the step now POSTs the dev override, but the OLD
+binary had no override endpoint so the POST was a no-op and `portalHostUrl`
+stayed `undefined` (F1 still red at #1108; this is consistent with the fix, not
+a refutation of it). The binary fix only reached alpha via the
+**elohim#1522 redeploy (2026-06-09 12:04Z)** — AFTER #1108 last tested. Since
+then NO genesis build has re-run these E2E scenarios against the redeployed
+alpha: **#1109 ABORTED** (museum trap #1 — lossy 0-failure measure, no signal)
+and **#1110 ran 0 a2o scenarios** (`Findings: 0 (scenarios: 0)` for both the
+api and browser cucumber profiles — the E2E executor produced no scenario
+output; also no signal, NOT a green confirmation). So the failures' *absence*
+since #1108 is not yet a confirmed disappearance — it is the museum-trap-#1 "no
+signal" gap.
+
+Ledger stamped `status: triaged` + `triaged_at_build` (F1=1108, F2=1106 — each
+fingerprint's own `last_build` at triage, the sweep's recurrence reference). The
+harvester's disappearance-sweep is now armed: it confirms by a genesis
+green-streak ≥3 with no recurrence of either fingerprint once a real E2E run
+lands against the #1522-deployed alpha. NOT stamped `decompose_on_confirm` —
+the F1/F2 lesson (`DEV_MODE` reveals a pre-existing never-satisfiable test
+fiction; the fixture-grant gate is the upstream cause — see
+`steward-grant-fixture-surface.md`) is a recurring-class insight worth
+graduating, so this graduates-then-decomposes rather than auto-deleting.
 
 ## Fix trail
 
-- F1: `0ce5c23e0` (DEV_MODE portal-health override — doorway + a2o steps).
-- F2: a2o step assertion fix in `steward-login-portal-handoff.steps.ts`
-  (origin-equality → no-hand-off invariant); `tsc`/`eslint` clean. Verified live
-  that `/threshold/login` is served on BOTH origins (the fact that breaks the old
-  assertion). Final proof = next CI run (cannot run live a2o E2E locally).
-- Recurrence reference for the sweep: `last_build` at triage = 1105; the
-  disproven "rides storage fix" hypothesis was settled by #1106 (F2 still red
-  with the router populated).
+- F1: `0ce5c23e0` (DEV_MODE portal-health override — doorway `admin_dev.rs` +
+  `auth_routes.rs` `portal_probe_decision` split + `account-m5.steps.ts` and
+  `steward-login-portal-handoff.steps.ts` rewrites). Verified in-tree: under
+  `dev_mode` + a doorway-local health override, `portal_probe_decision` returns
+  `Return` (short-circuits the live HEAD to the non-resolving `.example` host)
+  so `/auth/login` carries `portalHostUrl`; with `dev_mode` off, byte-for-byte
+  unchanged. On `dev` and on the working HEAD.
+- F2: `f242caad9` — a2o step assertion fix in
+  `steward-login-portal-handoff.steps.ts` (origin-equality → no-hand-off
+  invariant); `tsc`/`eslint` clean. Verified live that `/threshold/login` is
+  served on BOTH origins (the fact that breaks the old assertion). On `dev`.
+- Recurrence reference for the sweep: `triaged_at_build` = 1108 (F1) / 1106
+  (F2). The disproven "rides storage fix" hypothesis was settled by #1106 (F2
+  still red with the router populated).
+- Final proof = the next genesis build that actually runs the auth E2E suite
+  against the #1522-deployed alpha (cannot run live a2o E2E locally).

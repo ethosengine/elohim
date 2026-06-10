@@ -15,14 +15,17 @@ jobs: [elohim-genesis]
 relatedNodeIds: []
 tags: [ci, genesis, e2e, lamad, doorway, routing, spa-fallback, epr-dispatch]
 cites:
+  - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1108/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1105/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1104/
+  - https://jenkins.ethosengine.com/job/elohim/job/dev/1522/
   - genesis/a2o/features/deployment/staging-validation.feature
   - genesis/a2o/features/lamad/deep-link-delivery.feature
   - genesis/a2o/steps/ui/navigation.steps.ts
   - genesis/a2o/steps/lamad/deep-link-delivery.steps.ts
   - app/elohim-app/src/index.html
   - app/elohim-app/src/app/app.routes.ts
+  - elohim/elohim-storage/src/db/rea_commitments.rs
   - doorway/doorway-service/src/server/http.rs
   - genesis/data/timeline/backlog/epr-routing-complementary-captures.md
 ---
@@ -160,12 +163,33 @@ F3 needs NO app change — `app/elohim-app/src/index.html:5` already titles
 
 ## Current decision
 
-`ci_status: in-progress` → fix landed locally (commit-only; integrator pushes).
-On deploy of the fixed storage binary, alpha's EprRouter repopulates by healing
-the array-wrapped rows on read; F3 + F4 both clear. **Immediate-recovery option
-for the operator** (without waiting on a full edge rebuild): reseed the
-`project-epr` commitments on alpha (writes bare-string `in_scope_of` back via
-`upsert_with_anchor`), which the CURRENT deployed binary can already parse.
+`ci_status: in-progress` → fix `f38be2635` landed, now **merged to `dev` AND
+deployed to alpha** (commit-only; integrator pushed). On deploy of the fixed
+storage binary, alpha's EprRouter repopulates by healing the array-wrapped rows
+on read; F3 + F4 both clear. **Immediate-recovery option for the operator**
+(without waiting on a full edge rebuild): reseed the `project-epr` commitments
+on alpha (writes bare-string `in_scope_of` back via `upsert_with_anchor`), which
+the CURRENT deployed binary can already parse.
+
+**Deploy/confirmation status (reconciled 2026-06-09):** `f38be2635` landed on
+`dev` 2026-06-07 19:02Z. The fixed storage binary reached alpha via the
+**elohim#1522 redeploy (2026-06-09 12:04Z)**. Since #1108, NO genesis build has
+re-run these E2E scenarios against the redeployed alpha to confirm: **#1109
+ABORTED** (museum trap #1 — lossy 0-failure measure, no signal) and **#1110 ran
+0 a2o scenarios** (`Findings: 0 (scenarios: 0)` for both cucumber profiles — no
+signal, NOT a green confirmation). The failures' absence since #1105 is the
+museum-trap-#1 "no signal" gap, not yet a confirmed disappearance.
+
+Ledger stamped `status: triaged` + `triaged_at_build: 1105` for both
+fingerprints (each's own `last_build` at triage — the sweep's recurrence
+reference). The harvester's disappearance-sweep is now armed: it confirms by a
+genesis green-streak ≥3 with no recurrence of `606fa2a22a53` / `a969e96c4361`
+once a real E2E run lands against the #1522-deployed alpha. NOT stamped
+`decompose_on_confirm` — the EprRouter-empties-on-one-poisoned-scope-row lesson
+is already gospel-tier memory (`project_epr_router_empties_on_poisoned_scope`)
+and museum-worthy (a fail-closed `collect()` over a stale-binary-poisoned row
+emptying the whole router), so this graduates-then-decomposes rather than
+auto-deleting.
 
 Sweep confirms by disappearance (genesis green-streak ≥3, no recurrence of
-`606fa2a22a53` / `a969e96c4361`). Recurrence reference: `last_build` at triage = 1105.
+`606fa2a22a53` / `a969e96c4361`). Recurrence reference: `triaged_at_build` = 1105.
