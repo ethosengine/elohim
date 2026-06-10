@@ -167,7 +167,6 @@ export class PlaywrightDevice extends Device {
 
   private context?: PWBrowserContext;
   private _page?: PWPage;
-  private authResponse?: AuthResponse;
 
   /** Captured console messages (all levels). */
   consoleLogs: CapturedConsoleLog[] = [];
@@ -189,20 +188,21 @@ export class PlaywrightDevice extends Device {
     this.client = new DoorwayClient(doorwayUrl);
   }
 
+  // Session bookkeeping lives in the client's session store — read-only views.
   get isAuthenticated(): boolean {
-    return !!this.authResponse;
+    return this.client.session !== null;
   }
 
   get token(): string | undefined {
-    return this.authResponse?.token;
+    return this.client.session?.token;
   }
 
   get agentPubKey(): string | undefined {
-    return this.authResponse?.agentPubKey;
+    return this.client.session?.agentPubKey;
   }
 
   get humanId(): string | undefined {
-    return this.authResponse?.humanId;
+    return this.client.session?.humanId;
   }
 
   get page(): PWPage {
@@ -287,8 +287,6 @@ export class PlaywrightDevice extends Device {
   /** Register via API, then inject the auth token as a cookie/localStorage. */
   async register(req: RegisterRequest): Promise<AuthResponse> {
     const res = await this.client.register(req);
-    this.authResponse = res;
-    this.client.setToken(res.token);
     await this.injectAuth(res);
     return res;
   }
@@ -296,8 +294,6 @@ export class PlaywrightDevice extends Device {
   /** Login via API, then inject the auth token into the browser. */
   async login(req: LoginRequest): Promise<AuthResponse> {
     const res = await this.client.login(req);
-    this.authResponse = res;
-    this.client.setToken(res.token);
     await this.injectAuth(res);
     return res;
   }

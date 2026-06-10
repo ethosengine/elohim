@@ -1,64 +1,62 @@
 /**
  * Typed HTTP client for the Doorway API.
  *
- * Types derived from:
- *   - doorway/src/routes/auth_routes.rs (RegisterRequest, AuthResponse)
+ * The auth surface (register/login/logout/me/session handoff) delegates to the
+ * consolidated DoorwaySessionClient from @elohim/identity — the single home
+ * for doorway auth wire types (source of truth:
+ * doorway/doorway-service/src/routes/auth_routes.rs).
+ *
+ * Non-auth types below are derived from:
+ *   - doorway/src/routes/auth_routes.rs (AccountResponse)
  *   - doorway/src/routes/health.rs (HealthResponse)
  */
 
+import * as identityNamespace from '@elohim/identity/lib/doorway-session-client.js';
 import { request } from 'undici';
 
+import type {
+  AuthResponse,
+  DoorwaySessionClient as SessionClient,
+  ExchangeSessionResponse,
+  LoginRequest,
+  MeResponse,
+  RegisterRequest,
+  SessionTokenResponse,
+  StoredSession,
+  SuccessResponse,
+} from '@elohim/identity/lib/doorway-session-client.js';
+
 // ---------------------------------------------------------------------------
-// Request / Response types (mirrors Rust structs, camelCase on the wire)
+// @elohim/identity interop
+//
+// The identity library is consumed as framework-free TS source via the
+// tsconfig path alias (the same source-alias pattern elohim-app uses). Its
+// package.json carries no "type": "module", so Node treats the file as CJS:
+// the tsx ESM loader exposes the exports on `default`, while cucumber's CJS
+// require hook (requireModule: tsx) exposes them directly.
+// `default ?? namespace` lands on the exports in both pipelines.
 // ---------------------------------------------------------------------------
 
-export interface RegisterRequest {
-  identifier: string;
-  password: string;
-  displayName: string;
-  identifierType?: string;
-  bio?: string;
-  affinities?: string[];
-  profileReach?: string;
-  adminBootstrapKey?: string;
-}
+type IdentityModule = typeof identityNamespace;
+const identity: IdentityModule =
+  (identityNamespace as IdentityModule & { default?: IdentityModule }).default ?? identityNamespace;
 
-export interface LoginRequest {
-  identifier: string;
-  password: string;
-}
+const { DoorwaySessionClient, InMemorySessionTokenStore, DoorwaySessionError } = identity;
 
-export interface AuthResponse {
-  token: string;
-  humanId: string;
-  agentPubKey: string;
-  identifier: string;
-  expiresAt: number;
-  doorwayId?: string;
-  doorwayUrl?: string;
-  installedAppId?: string;
-  profile?: HumanProfileResponse;
-}
-
-export interface HumanProfileResponse {
-  id: string;
-  displayName: string;
-  bio?: string;
-  affinities: string[];
-  profileReach: string;
-  location?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface MeResponse {
-  humanId: string;
-  agentPubKey: string;
-  identifier: string;
-  permissionLevel: string;
-  doorwayId?: string;
-  doorwayUrl?: string;
-}
+// Re-export the consolidated auth wire types — the identity package owns the
+// definitions; a2o consumers keep importing them from this module.
+export { DoorwaySessionError };
+export type {
+  AuthResponse,
+  ExchangeSessionResponse,
+  HumanProfileResponse,
+  LoginRequest,
+  MeResponse,
+  RegisterRequest,
+  SessionTokenResponse,
+  StoredSession,
+  SuccessResponse,
+} from '@elohim/identity/lib/doorway-session-client.js';
 
 export interface ConductorHealth {
   connected: boolean;
@@ -149,48 +147,34 @@ export interface PathWithDetailsView extends PathIndexEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Session Transfer types (mirrors Rust session handoff endpoints)
-// ---------------------------------------------------------------------------
-
-export interface SessionTokenResponse {
-  sessionToken: string;
-  expiresAt: number;
-}
-
-export interface SessionExchangeResponse {
-  token: string;
-  humanId: string;
-  agentPubKey: string;
-  identifier: string;
-  expiresAt: number;
-}
-
-// ---------------------------------------------------------------------------
-// Account types (mirrors doorway admin AccountResponse)
+// Account types (mirrors auth_routes.rs AccountResponse — flat camelCase;
+// optional fields are serde skip_serializing_if = Option::is_none)
 // ---------------------------------------------------------------------------
 
 export interface AccountResponse {
-  identifier: string;
   humanId: string;
-  agentPubKey: string;
+  identifier: string;
   permissionLevel: string;
-  isActive: boolean;
+  // Storage
+  storageBytes: number;
+  storageLimit: number;
+  storagePercent: number;
+  // Queries
+  projectionQueries: number;
+  dailyQueryLimit: number;
+  queriesPercent: number;
+  // Bandwidth
+  bandwidthBytes: number;
+  dailyBandwidthLimit: number;
+  bandwidthPercent: number;
+  // Hosting / stewardship
+  conductorId?: string;
   isSteward: boolean;
-  doorwayId?: string;
-  doorwayName?: string;
-  doorwayRegion?: string;
-  memberSince?: string;
-  lastLogin?: string;
-  usage?: {
-    storageBytes: number;
-    projectionQueries: number;
-    bandwidthBytes: number;
-  };
-  quota?: {
-    storageLimit: number;
-    dailyQueryLimit: number;
-    dailyBandwidthLimit: number;
-  };
+  stewardshipAt?: string;
+  keyExported: boolean;
+  // Timestamps
+  createdAt?: string;
+  lastLoginAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -392,10 +376,25 @@ export interface ObservationReport {
 // ---------------------------------------------------------------------------
 
 export class DoorwayClient {
+  /**
+   * Single token home: auth flows (via the composed session client) and raw
+   * setToken() both write here; every request reads its bearer from here.
+   */
+  private readonly tokenStore = new InMemorySessionTokenStore();
+  private readonly sessionClient: SessionClient;
+
   constructor(
     private readonly baseUrl: string,
-    private token?: string
-  ) {}
+    token?: string
+  ) {
+    this.sessionClient = new DoorwaySessionClient({
+      baseUrl,
+      tokenStore: this.tokenStore,
+      // Thread the active observation session through auth requests too.
+      fetchImpl: async (input, init) => fetch(input, this.withObservation(init)),
+    });
+    if (token) this.setToken(token);
+  }
 
   /** Active observation session ID, if any. */
   observationId: string | null = null;
@@ -404,12 +403,27 @@ export class DoorwayClient {
     return this.baseUrl;
   }
 
+  /** Stored session identity (null when unauthenticated). */
+  get session(): StoredSession | null {
+    return this.tokenStore.get();
+  }
+
   setToken(token: string): void {
-    this.token = token;
+    // Re-setting the bearer that is already stored keeps the full session
+    // identity (device flows call setToken right after login). A NEW bare
+    // token (steps injecting arbitrary JWTs) synthesizes a minimal session.
+    if (this.tokenStore.get()?.token === token) return;
+    this.tokenStore.set({
+      token,
+      humanId: '',
+      agentPubKey: '',
+      identifier: '',
+      expiresAt: Number.MAX_SAFE_INTEGER,
+    });
   }
 
   clearToken(): void {
-    this.token = undefined;
+    this.tokenStore.clear();
   }
 
   // -- Health ---------------------------------------------------------------
@@ -427,22 +441,22 @@ export class DoorwayClient {
     }
   }
 
-  // -- Auth -----------------------------------------------------------------
+  // -- Auth (delegated to @elohim/identity DoorwaySessionClient) -------------
 
   async register(req: RegisterRequest): Promise<AuthResponse> {
-    return this.post<AuthResponse>('/auth/register', req);
+    return this.sessionClient.register(req);
   }
 
   async login(req: LoginRequest): Promise<AuthResponse> {
-    return this.post<AuthResponse>('/auth/login', req);
+    return this.sessionClient.login(req);
   }
 
-  async logout(): Promise<{ success: boolean; message: string }> {
-    return this.post<{ success: boolean; message: string }>('/auth/logout', {});
+  async logout(): Promise<SuccessResponse> {
+    return this.sessionClient.logout();
   }
 
   async me(): Promise<MeResponse> {
-    return this.get<MeResponse>('/auth/me');
+    return this.sessionClient.me();
   }
 
   // -- Stewardship Allocations -----------------------------------------------
@@ -522,16 +536,14 @@ export class DoorwayClient {
     return envelope.items;
   }
 
-  // -- Session Handoff ------------------------------------------------------
+  // -- Session Handoff (delegated to @elohim/identity) ------------------------
 
   async sessionToken(): Promise<SessionTokenResponse> {
-    return this.get<SessionTokenResponse>('/auth/session-token');
+    return this.sessionClient.requestSessionToken();
   }
 
-  async exchangeSession(sessionToken: string): Promise<SessionExchangeResponse> {
-    return this.get<SessionExchangeResponse>(
-      `/auth/exchange-session?session_token=${encodeURIComponent(sessionToken)}`
-    );
+  async exchangeSession(sessionToken: string): Promise<ExchangeSessionResponse> {
+    return this.sessionClient.exchangeSessionToken(sessionToken);
   }
 
   // -- Account (doorway-app) ------------------------------------------------
@@ -686,9 +698,22 @@ export class DoorwayClient {
 
   private headers(): Record<string, string> {
     const h: Record<string, string> = {};
-    if (this.token) h['authorization'] = `Bearer ${this.token}`;
+    const token = this.tokenStore.get()?.token;
+    if (token) h['authorization'] = `Bearer ${token}`;
     if (this.observationId) h['x-observation-id'] = this.observationId;
     return h;
+  }
+
+  /** Add the observation header to a session-client request when active. */
+  private withObservation(init?: RequestInit): RequestInit | undefined {
+    if (!this.observationId) return init;
+    return {
+      ...init,
+      headers: {
+        ...((init?.headers ?? {}) as Record<string, string>),
+        'x-observation-id': this.observationId,
+      },
+    };
   }
 
   // -- Observations ---------------------------------------------------------

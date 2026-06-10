@@ -1,5 +1,8 @@
 /**
  * BrowserDevice — simulates a browser interacting with a doorway via HTTP.
+ *
+ * Session bookkeeping lives in the client's session store (the composed
+ * @elohim/identity DoorwaySessionClient) — the device exposes read-only views.
  */
 
 import {
@@ -15,50 +18,37 @@ export class BrowserDevice extends Device {
   readonly label: string;
   readonly client: DoorwayClient;
 
-  private authResponse?: AuthResponse;
-
-  constructor(
-    label: string,
-    private readonly doorwayUrl: string
-  ) {
+  constructor(label: string, doorwayUrl: string) {
     super();
     this.label = label;
     this.client = new DoorwayClient(doorwayUrl);
   }
 
   get isAuthenticated(): boolean {
-    return !!this.authResponse;
+    return this.client.session !== null;
   }
 
   get token(): string | undefined {
-    return this.authResponse?.token;
+    return this.client.session?.token;
   }
 
   get agentPubKey(): string | undefined {
-    return this.authResponse?.agentPubKey;
+    return this.client.session?.agentPubKey;
   }
 
   get humanId(): string | undefined {
-    return this.authResponse?.humanId;
+    return this.client.session?.humanId;
   }
 
   async register(req: RegisterRequest): Promise<AuthResponse> {
-    const res = await this.client.register(req);
-    this.authResponse = res;
-    this.client.setToken(res.token);
-    return res;
+    return this.client.register(req);
   }
 
   async login(req: LoginRequest): Promise<AuthResponse> {
-    const res = await this.client.login(req);
-    this.authResponse = res;
-    this.client.setToken(res.token);
-    return res;
+    return this.client.login(req);
   }
 
   async logout(): Promise<void> {
     await this.client.logout();
-    this.authResponse = undefined;
-    this.client.clearToken();
   }
 }

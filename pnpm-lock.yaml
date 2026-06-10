@@ -1092,6 +1092,9 @@ importers:
       '@cucumber/cucumber':
         specifier: ^11.2.0
         version: 11.3.0
+      '@elohim/identity':
+        specifier: workspace:*
+        version: link:../../app/elohim-library/projects/elohim-identity
       ajv:
         specifier: ^8.17.1
         version: 8.18.0

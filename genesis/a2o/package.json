@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@cucumber/cucumber": "^11.2.0",
+    "@elohim/identity": "workspace:*",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "playwright": "1.59.1",
