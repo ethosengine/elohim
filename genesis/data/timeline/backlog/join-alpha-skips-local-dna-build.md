@@ -16,3 +16,12 @@ snippets duplicated across dna/Jenkinsfile (~:903) and edge Jenkinsfile
 DNA pipeline's version-metadata `sed` into happ.yaml (dna/Jenkinsfile:638)
 doesn't survive `hc app unpack`, so bundle provenance isn't recoverable from
 the artifact (the fetcher's `.src` sidecar partially fills the gap).
+
+RESOLVED 2026-06-10 (papercut sweep commit ce3d7f801, reviewed ✅): Step-1 build
+skipped under join-alpha && !FORCE_LOCAL_HAPP. Residual INFO from review: the
+`--build`/-b flag (and `hc:build:all`) is now silently ignored in join-alpha
+mode — semantics arguably correct (artifact never installs; FORCE_LOCAL_HAPP=1
+restores build+install) but the help text doesn't say so and the skip echo
+doesn't acknowledge an ignored --build. One-line echo + help amendment when
+hc-start is next touched. Sibling accretions (oras dedupe, happ.yaml sed
+provenance) remain open above.
