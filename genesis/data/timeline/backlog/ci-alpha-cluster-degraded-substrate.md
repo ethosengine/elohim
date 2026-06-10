@@ -10,12 +10,13 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "high"
 ci_status: blocked
-fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede]
+fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede, 9f60eb44561d]
 jobs: [elohim, elohim-edge, elohim-genesis]
 relatedNodeIds: []
 tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1100/
+  - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1111/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1504/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1518/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1522/
@@ -289,3 +290,39 @@ stabilizes OR the tags hold the scenarios out of the degraded run.
   as a finding only if NOT followed by `successfully rolled out` within the same
   stage. Both are harvester-side (classifier) changes, not sentinel work —
   noted here so the lesson isn't lost; not opened as a separate concern.
+- **2026-06-10 extension** — added `9f60eb44561d` (genesis #1111, the terminal
+  `❌ GENESIS PIPELINE FAILED` banner). #1111's actual failing stage is **`Verify
+  Target Health`**: `timeout 120s bash -c 'until curl -sf -o /dev/null
+  https://alpha.elohim.host; do … sleep 5; done'` looped "Waiting for target
+  site…" ×22 and the `timeout` killed it → **exit code 124** (`ERROR: script
+  returned exit code 124`, build log line 1680). Every downstream stage (Seed
+  Database … E2E Verification) then reported "skipped due to earlier failure(s)",
+  ending in the banner. Same exit-124-on-`alpha.elohim.host` shape as facet #6
+  (elohim #1518) — the **genesis-side pre-seed availability gate** mirror of the
+  App-job's post-deploy gate. The substrate-return path (unblock #1) is the only
+  mover; like the App E2E gate it's a Jenkinsfile shell probe, not an a2o
+  scenario, so the tagging fix (unblock #2) cannot HELD-skip it. Set
+  `status: blocked` (no `triaged_at_build` — operator-owned substrate); it
+  disappears on a green streak the moment alpha serves within the 120s window.
+- **Re-home, not a recurrence (fingerprint-coarseness, recorded per dispatcher).**
+  `9f60eb44561d` is the **generic terminal banner**, the coarsest signature in
+  the genesis ledger — it matches *any* genesis pipeline FAILURE. It was
+  originally pinned to `ci-genesis-projectionspec-ts2739` at #1101 (the lone
+  genesis FAILURE in that window) and stamped `triaged_at_build: 1101`. The
+  harvester reopened it at #1111 (seen→2) reading the banner's reappearance as a
+  recurrence of the TS2739 fix — but the TS2739 fix (`39c3c8b6b`) is genuinely IN
+  #1111: **`Validate Constants` passed** ("✅ Constants validation passed"; the
+  `routeClaims`/`redirectTemplates` fields now appear as *passing* unit-test
+  assertions, build log lines 1265/1279–1284), and the TS2739-specific
+  fingerprint `0a93d2d79477` did NOT recur (stays `triaged` at #1101). So #1111's
+  red is a *different root cause wearing the same coarse banner* — re-homed here
+  (the degraded-alpha concern that owns the `Verify Target Health` exit-124),
+  with the stale `triaged_at_build: 1101` stamp dropped (it's an open infra
+  blocker, not a fix awaiting disappearance). The TS2739 entry keeps only its
+  specific fingerprint `0a93d2d79477`. Classifier lesson (harvester-side, not
+  sentinel): a terminal "PIPELINE FAILED" *banner* line is a poor fingerprint —
+  it carries no stage/cause identity, so it re-pins to whatever concern last held
+  it and masks the true (changed) root cause. Prefer fingerprinting the
+  **failing-stage cause line** (here: the `Verify Target Health` exit-124 / the
+  TS2739 `error TS2739` line) over the catch-all banner. Noted with the two
+  classifier improvements above; not opened as a separate concern.

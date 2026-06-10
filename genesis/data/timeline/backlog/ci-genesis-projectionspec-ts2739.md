@@ -10,7 +10,7 @@ author: "ci-failure-triage"
 status: "wip"
 priority: "high"
 ci_status: in-progress
-fingerprints: [0a93d2d79477, 9f60eb44561d]
+fingerprints: [0a93d2d79477]
 jobs: [elohim-genesis]
 relatedNodeIds: []
 tags: [ci, elohim-genesis, typescript, ts2739, validate-constants, seeder, already-fixed]
@@ -39,11 +39,24 @@ src/__tests__/integration/projections-substrate.test.ts(127,13): error TS2739:
 
 Build result FAILURE (this is the ONE genesis FAILURE in the window — 1091–1100
 are all UNSTABLE; the type-check gate `exit 1`s, the catchError-wrapped E2E
-stages never run). Fingerprint `9f60eb44561d` ("❌ GENESIS PIPELINE FAILED") is
-this same build's terminal banner — **same concern, not a second one**.
+stages never run). At #1101 the terminal banner `9f60eb44561d` ("❌ GENESIS
+PIPELINE FAILED") rode this same build, so it was initially grouped here.
 
-Occurrence evidence: `0a93d2d79477` seen 1 (first=last=1101); `9f60eb44561d`
-seen 1 (first=last=1101).
+**2026-06-10 — banner re-homed; this concern is confirmed FIXED.** The generic
+banner fingerprint `9f60eb44561d` was **removed from this entry** and re-homed to
+`ci-alpha-cluster-degraded-substrate`: at genesis #1111 the banner reappeared but
+the failing stage was `Verify Target Health` (exit 124 on `alpha.elohim.host`),
+NOT this TS2739 — the banner is a catch-all that re-pins to any genesis FAILURE
+and masked the changed root cause (see that entry's 2026-06-10 extension). This
+concern's OWN fingerprint `0a93d2d79477` (`error TS2739`) did NOT recur at #1111:
+**`Validate Constants` PASSED** at #1111 ("✅ Constants validation passed"; the
+`routeClaims`/`redirectTemplates` fields now appear as passing unit-test
+assertions). The fix (`39c3c8b6b`) is genuinely in — confirmed by a real
+`Validate Constants`-clean run. Awaiting only the harvester's
+disappearance-confirmation on `0a93d2d79477`.
+
+Occurrence evidence: `0a93d2d79477` seen 1 (first=last=1101, type-check clean at
+#1111 — concern fixed).
 
 ## Verdict
 
