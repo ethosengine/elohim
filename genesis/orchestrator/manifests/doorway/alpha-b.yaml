@@ -112,6 +112,17 @@ spec:
                     operator: In
                     values:
                       - remote
+      # Tolerate the WAN/remote-zone taint: shem is tainted
+      # remote-wan=true:NoSchedule by the operator to keep cluster infra +
+      # dev tooling off the ISP-latency node. doorway-B is shem-pinned by the
+      # affinity above, so it must opt in to the remote zone or every rollout
+      # sits Pending while the old pod keeps serving (observed 2026-06-10:
+      # the storm-fix rollout stalled exactly this way). Pairs with the same
+      # toleration on node-type=remote humans (adam, edgenode template).
+      tolerations:
+        - key: remote-wan
+          operator: Exists
+          effect: NoSchedule
       containers:
         # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
         - name: doorway
