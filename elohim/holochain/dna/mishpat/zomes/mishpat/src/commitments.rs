@@ -193,6 +193,7 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
         "replicates-dwelling" => validate_replicates_dwelling(&payload),
         "replicates-commons" => validate_replicates_commons(&payload),
         "revokes-commitment" => validate_revokes_commitment(&payload),
+        "ratifies-limit-gradient" => validate_ratifies_limit_gradient(&payload),
         other => Err(format!(
             "commitments::validate_commitment_payload unhandled action: {other}"
         )),
@@ -323,6 +324,106 @@ fn validate_revokes_commitment(payload: &serde_json::Value) -> Result<(), String
         .unwrap_or("");
     if signed.is_empty() {
         return Err("revokes-commitment signed_at must be present".into());
+    }
+    Ok(())
+}
+
+// =============================================================================
+// DNA walls for the limitarian gradient (spec §5.2 — reject-at-write; a config
+// that exists is, by construction, in-wall). Widths are TBD-operator (spec
+// §Decision 2); the SHAPE (that a wall exists, that α cannot blind the tail,
+// that loosening is witnessed) is decided. Mirror: storage
+// limit_gradient_registry.rs — keep in lockstep.
+// =============================================================================
+const ALPHA_WALL: (f64, f64) = (1.0, 2.0);
+const C_TARGET_WALL: (f64, f64) = (0.05, 0.30);
+const K_MAX_WALL: (f64, f64) = (0.01, 0.10);
+const BASE_RATE_WALL: (f64, f64) = (0.0005, 0.005);
+const GAMMA_WALL: (f64, f64) = (0.5, 2.0);
+
+fn wall_check(
+    payload: &serde_json::Value,
+    path: &[&str],
+    wall: (f64, f64),
+    name: &str,
+) -> Result<(), String> {
+    let mut v = payload;
+    for key in path {
+        v = v
+            .get(key)
+            .ok_or_else(|| format!("ratifies-limit-gradient missing field: {}", path.join(".")))?;
+    }
+    let x = v
+        .as_f64()
+        .ok_or_else(|| format!("{name} must be a number"))?;
+    if x < wall.0 || x > wall.1 {
+        return Err(format!(
+            "{name}={x} outside DNA wall [{}, {}] — out-of-wall values cannot be ratified (reject-at-write)",
+            wall.0, wall.1
+        ));
+    }
+    Ok(())
+}
+
+fn validate_ratifies_limit_gradient(payload: &serde_json::Value) -> Result<(), String> {
+    for field in [
+        "substrate_signal",
+        "governance_layer",
+        "measure",
+        "shape",
+        "base_rate",
+        "k_max",
+        "dignity_floor",
+        "valid_from",
+        "valid_until",
+        "ratified_by_governance_action_cid",
+    ] {
+        if payload.get(field).is_none() {
+            return Err(format!(
+                "ratifies-limit-gradient missing required field: {field}"
+            ));
+        }
+    }
+    wall_check(payload, &["measure", "alpha"], ALPHA_WALL, "measure.alpha")?;
+    wall_check(
+        payload,
+        &["shape", "C_target"],
+        C_TARGET_WALL,
+        "shape.C_target",
+    )?;
+    wall_check(payload, &["shape", "gamma"], GAMMA_WALL, "shape.gamma")?;
+    wall_check(payload, &["base_rate"], BASE_RATE_WALL, "base_rate")?;
+    wall_check(payload, &["k_max"], K_MAX_WALL, "k_max")?;
+
+    let floor = payload
+        .get("dignity_floor")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(-1.0);
+    if floor < 0.0 {
+        return Err("dignity_floor must be >= 0".into());
+    }
+
+    // Loosening witness (spec §5.4 v1-minimal): any param looser than the core
+    // default requires loosening_acknowledged=true. Core defaults inline (the
+    // WASM cannot read the storage registry; lockstep with GradientConfig::default):
+    //   c_target default = 0.15, k_max default = 0.05, dignity_floor default = 100.0
+    let loosens = payload["shape"]["C_target"]
+        .as_f64()
+        .map(|v| v > 0.15)
+        .unwrap_or(false)
+        || payload["k_max"].as_f64().map(|v| v < 0.05).unwrap_or(false)
+        || floor == 0.0;
+    if loosens {
+        let acked = payload
+            .get("loosening_acknowledged")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if !acked {
+            return Err(
+                "loosening override requires loosening_acknowledged=true (witnessed loosening, spec §5.4)"
+                    .into(),
+            );
+        }
     }
     Ok(())
 }
@@ -926,6 +1027,45 @@ mod tests {
             signed_at: "2026-06-10T00:00:00Z".to_string(),
         };
         assert!(validate_commitment_payload(&input).is_err());
+    }
+
+    // =========================================================================
+    // ratifies-limit-gradient tests (spec §5.2 DNA walls + §5.4 loosening)
+    // =========================================================================
+
+    fn lg_payload(c_target: f64, k_max: f64, acked: bool) -> serde_json::Value {
+        serde_json::json!({
+            "substrate_signal": "attention", "governance_layer": "community",
+            "measure": {"alpha": 2.0, "q": 0.01, "w_e": 0.6, "w_s": 0.4},
+            "shape": {"C_target": c_target, "k_s": 0.5, "gamma": 1.0},
+            "base_rate": 0.001, "k_max": k_max, "dignity_floor": 50.0,
+            "valid_from": "2026-06-10T00:00:00Z", "valid_until": "2026-09-10T00:00:00Z",
+            "loosening_acknowledged": acked,
+            "ratified_by_governance_action_cid": "uhCEk-test"
+        })
+    }
+
+    #[test]
+    fn in_wall_config_validates() {
+        assert!(validate_ratifies_limit_gradient(&lg_payload(0.15, 0.05, false)).is_ok());
+    }
+
+    #[test]
+    fn out_of_wall_c_target_rejected_at_write() {
+        let err = validate_ratifies_limit_gradient(&lg_payload(0.9, 0.05, true)).unwrap_err();
+        assert!(err.contains("DNA wall"), "must name the wall: {err}");
+    }
+
+    #[test]
+    fn confiscatory_k_max_rejected() {
+        assert!(validate_ratifies_limit_gradient(&lg_payload(0.15, 1.0, true)).is_err());
+    }
+
+    #[test]
+    fn loosening_requires_acknowledgement() {
+        let err = validate_ratifies_limit_gradient(&lg_payload(0.25, 0.05, false)).unwrap_err();
+        assert!(err.contains("loosening_acknowledged"), "{err}");
+        assert!(validate_ratifies_limit_gradient(&lg_payload(0.25, 0.05, true)).is_ok());
     }
 
     // =========================================================================
