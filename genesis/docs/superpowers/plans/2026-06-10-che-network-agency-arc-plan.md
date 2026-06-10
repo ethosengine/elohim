@@ -67,30 +67,30 @@ plan's surfaces (from the 2026-06-10 surveys), routed to the phases that touch t
 The 2026-06-10 classifier denial is the rail working; the grant must be explicit settings, not
 inferred. **Files:** `.claude/settings.local.json` (operator applies).
 
-- [ ] Operator adds a permission rule allowing a2o fixture-auth flows against alpha (the
+- [x] Operator adds a permission rule allowing a2o fixture-auth flows against alpha (the
       `pnpm look * --as *` / `pnpm test:browser` command family from `genesis/a2o`). Use the
       `update-config` skill interactively; scope to the command shapes, not blanket Bash.
-- [ ] Record the grant + its intent in the journal/session notes (authorized-by line).
+- [x] Record the grant + its intent in the journal/session notes (authorized-by line).
 
 ### Task 0.2: Verify `look --as Matthew` end-to-end (closes the L3 open item)
 
 **Files:** none expected (verification; fix `look.ts` only if a defect surfaces).
 
-- [ ] Run: `cd genesis/a2o && pnpm look "https://doorway-alpha.elohim.host/lamad" --as Matthew --wait-testid <known-dashboard-testid> --out stage-a-verify`
-- [ ] `Read` the screenshot; confirm an authenticated surface (not the login page);
+- [x] Run: `cd genesis/a2o && pnpm look "https://doorway-alpha.elohim.host/lamad" --as Matthew --wait-testid <known-dashboard-testid> --out stage-a-verify`
+- [x] `Read` the screenshot; confirm an authenticated surface (not the login page);
       `capture.json` shows `"as":"Matthew","ok":true`. If login fails, debug `device.login`
       against `auth_routes.rs` before any code change.
-- [ ] Check the box on the arc spec's Stage-A item + the L3 spec's Hygiene-#4 item; re-run
+- [x] Check the box on the arc spec's Stage-A item + the L3 spec's Hygiene-#4 item; re-run
       `decompose.py` on both specs (claims now carry today's evidence).
 
 ### Task 0.3: Write-etiquette doc (the authorized-write rail)
 
 **Files:** `genesis/a2o/CLAUDE.md` (gospel — cite-tooling discipline applies).
 
-- [ ] Add a short "Authorized writes on shared alpha" subsection under Tools: test-persona
+- [x] Add a short "Authorized writes on shared alpha" subsection under Tools: test-persona
       content only; no bulk seeding; no destructive flows; alpha state is operator-owned;
       writes happen under an explicit permission grant (Task 0.1), never inferred.
-- [ ] Commit Phase 0 (docs + any look fix).
+- [x] Commit Phase 0 (docs + any look fix).
 
 ### Task 0.4: Operator-viewable eyes (added in-flight, operator directive 2026-06-10)
 
@@ -137,7 +137,7 @@ captured to backlog — bigger blast radius, own plan.
       from `@elohim/identity`); non-auth methods unchanged.
 - [ ] `pnpm test:unit` in a2o green; one `@browser` cucumber scenario with `@auth` passes
       locally (Stage-A grant from Phase 0 required for the alpha-target run).
-- [ ] `look --as` re-verified through the migrated path (same command as Task 0.2). Commit.
+- [x] `look --as` re-verified through the migrated path (same command as Task 0.2). Commit.
 
 ### Task 1.3: Capture the complementary follow-ups (backlog, NOT this plan)
 
@@ -303,6 +303,16 @@ only. No new table, no new entry type, storage rows remain projections keyed by 
   join-alpha-skips-local-dna-build, elohim-identity-type-module-esm-interop, angular-auth-onto-doorway-session-client,
   doorway-auth-view-schema-contract.
 - Grant-gated (operator): Phase 0 Tasks 0.1-0.3; Task 1.2's alpha-target `@browser` + `look --as` re-verify.
+
+**Phase 0 completion (2026-06-10):** grant applied via the permissions dialog (operator's first use —
+prompt-grants for the look-as-Matthew family); `look --as Matthew` verified against live alpha
+(`ok:true, as:Matthew`, via the MIGRATED DoorwaySessionClient path — typed-error login would have
+thrown), closing the arc Stage-A verification AND the 1.2 deferred re-verify box. Findings:
+`/dashboard` is not a deployed route (L1-plan example URL was fictional; rendered Page Not Found);
+the manifesto `/db/content/manifesto` 403 REPRODUCES authenticated-as-admin-fixture (strengthens
+`backlog/alpha-manifesto-content-403.md` — not an anon-only reach gate); the Welcome surface renders
+identically logged-in vs anonymous (no session chrome — observation only). L3's Hygiene-#4
+(auth through the localhost:4200 proxy) remains genuinely OPEN — this verification was direct-to-alpha.
 
 ## Self-Review
 

@@ -78,3 +78,13 @@ Feature files describe **what a human goes through** — learner experiences, ti
 - **Render & see (`look`)**: `pnpm look <url> [--as <FixtureHuman>] [--doorway <id|url>] [--wait-testid <id>] [--out <slug>] [--viewport WxH]` — renders a surface headless in Che, writes `reports/look/<latest|slug>/{shot.png,capture.json}`, and prints both paths. The fast "glance at the app" loop for agentic iteration; reuses `PlaywrightDevice` capture (console/pageerror/failed-requests). `--as` logs in as a fixture human first. First run needs `pnpm a2o:setup` (installs Chromium to the XDG cache once).
 - **Operator view (`reports:serve`)**: `pnpm reports:serve` — serves `reports/` (look captures, screenshots, cucumber reports) on port 4201 = the Che `ui-playground` public endpoint. The operator opens that endpoint route in their browser and sees the SAME artifacts the agent reads — symmetric vision. Zero-dep static server (`scripts/serve-reports.ts`); port 4201 is a shared dev slot (mutually exclusive with a second dev server there).
 - **Slash commands**: `/gap-analysis` (sprint planning), `/generate-scenarios` (bulk from gap report), `/close-loop` (per-commit verification)
+
+## Authorized writes on shared alpha
+
+Alpha is shared deployed state owned by real peers; agent writes happen only under an explicit
+operator permission grant (settings/permissions dialog — never inferred from conversation).
+Within a grant: test-persona content only (fixture humans), no bulk seeding, no destructive
+flows; alpha state remains operator-owned (repo manifests are the cleanup surface). Authenticated
+flows (`look --as <FixtureHuman>`, `test:browser` against alpha) are deliberate acts — the
+default loop stays read-mostly. Granted 2026-06-10: the `look --as` / `test:browser` command
+family (arc plan Task 0.1).

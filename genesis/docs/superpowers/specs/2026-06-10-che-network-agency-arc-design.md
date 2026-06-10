@@ -56,9 +56,9 @@ authz and reach through the HTTP API. Agent key stays in the doorway pool — no
   from a question). Acts mint *as Matthew* — impersonation-shaped provenance; acceptable for dev
   on alpha, never the destination pattern. Alpha also has `registrationOpen: true` — an agent may
   instead register its own account for honest-attribution writes without Matthew's reach.
-- [ ] Operator grants a scoped permission rule for fixture-auth flows against alpha
-- [ ] Verify `look --as Matthew` end-to-end (closes the L3 open item; proves the write context)
-- [ ] Document the authorized-write etiquette in `genesis/a2o/CLAUDE.md` (what dev writes on
+- [x] Operator grants a scoped permission rule for fixture-auth flows against alpha
+- [x] Verify `look --as Matthew` end-to-end (closes the L3 open item; proves the write context)
+- [x] Document the authorized-write etiquette in `genesis/a2o/CLAUDE.md` (what dev writes on
       shared alpha are acceptable: test-persona content, never bulk seeding/destructive flows)
 
 ## Stage B — Sovereign-peer agency (spike-ready; the workspace becomes a real peer)
