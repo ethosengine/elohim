@@ -62,6 +62,18 @@ export interface P2PStatusView {
    */
   dedupTotalSeen: number;
   /**
+   * T23 custody reconcile: total reconcile passes run since startup. CI asserts a custody reconcile pass ran without log scraping.
+   */
+  reconcilePassesTotal: number;
+  /**
+   * T23 custody reconcile: total fetch kicks fired across all passes. Non-zero confirms the reconciler emitted fetch requests for gaps.
+   */
+  kicksFiredTotal: number;
+  /**
+   * T23 custody reconcile: total placement gaps emitted across all passes.
+   */
+  placementGapsEmittedTotal: number;
+  /**
    * Acquisition pull-queue rollup. null when state cannot be computed — treat as 'keep waiting', NEVER as caught up (spec §4.3).
    */
   pull?: {

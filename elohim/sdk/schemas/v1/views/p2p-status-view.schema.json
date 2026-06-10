@@ -17,7 +17,10 @@
     "replication",
     "syncPaused",
     "dedupUniqueLen",
-    "dedupTotalSeen"
+    "dedupTotalSeen",
+    "reconcilePassesTotal",
+    "kicksFiredTotal",
+    "placementGapsEmittedTotal"
   ],
   "properties": {
     "peerId": {
@@ -81,6 +84,18 @@
     "dedupTotalSeen": {
       "type": "integer",
       "description": "D.7 dedup LRU: cumulative insert calls (new + duplicate). Ratio (dedupTotalSeen - dedupUniqueLen) / dedupTotalSeen approximates duplication rate."
+    },
+    "reconcilePassesTotal": {
+      "type": "integer",
+      "description": "T23 custody reconcile: total reconcile passes run since startup. CI asserts a custody reconcile pass ran without log scraping."
+    },
+    "kicksFiredTotal": {
+      "type": "integer",
+      "description": "T23 custody reconcile: total fetch kicks fired across all passes. Non-zero confirms the reconciler emitted fetch requests for gaps."
+    },
+    "placementGapsEmittedTotal": {
+      "type": "integer",
+      "description": "T23 custody reconcile: total placement gaps emitted across all passes."
     },
     "pull": {
       "oneOf": [

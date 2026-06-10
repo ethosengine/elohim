@@ -200,6 +200,11 @@ pub struct HttpServer {
     fetch_blob_timeout_seconds: u64,
     /// T17: max parallel peer attempts per race-fetch batch. From `Config::fetch_blob_parallelism`.
     fetch_blob_parallelism: usize,
+    /// T17: freshness window (seconds) for `peer_blob_inventory` rows consulted
+    /// during a GET-time heal. From `Config::inventory_freshness_seconds`.
+    /// Replaces a previously hardcoded 600s window so the same operator knob
+    /// that governs the reconciler's staleness threshold also governs heal.
+    inventory_freshness_seconds: u64,
     /// Iroh-side blob backend (BLAKE3-keyed). Wired at startup via
     /// [`HttpServer::with_iroh_blob_store`] when the iroh node is
     /// active. None means iroh is disabled or not yet wired — every
@@ -381,6 +386,7 @@ impl HttpServer {
             self_cid: String::new(),
             fetch_blob_timeout_seconds: 5,
             fetch_blob_parallelism: 3,
+            inventory_freshness_seconds: 600,
             #[cfg(feature = "p2p-iroh")]
             iroh_blob_store: None,
             #[cfg(feature = "p2p-iroh")]
@@ -600,6 +606,7 @@ impl HttpServer {
         self.self_cid = config.self_cid.clone().unwrap_or_default();
         self.fetch_blob_timeout_seconds = config.fetch_blob_timeout_seconds;
         self.fetch_blob_parallelism = config.fetch_blob_parallelism;
+        self.inventory_freshness_seconds = config.inventory_freshness_seconds;
         self
     }
 
@@ -2248,14 +2255,20 @@ impl HttpServer {
         // exactly as the pre-refactor handler did.
         #[cfg(feature = "p2p")]
         if let (Some(ref handle), Some(ref pool)) = (&self.p2p_handle, &self.db_pool) {
+            // Short hash prefix for log correlation across legs without
+            // dumping the full 64-char hex on every line.
+            let hash_prefix: String = hash.chars().take(20).collect();
+
+            // Inventory-first: consult the peer_blob_inventory projection for
+            // peers known to host this blob within the configured freshness
+            // window. Driven by `Config::inventory_freshness_seconds` (was a
+            // hardcoded 600s) so the same operator knob governs heal and the
+            // reconciler's staleness threshold.
             let fresh_after = (chrono::Utc::now()
-                - chrono::Duration::seconds(
-                    // default to 600s if not set
-                    600,
-                ))
+                - chrono::Duration::seconds(self.inventory_freshness_seconds as i64))
             .format("%Y-%m-%dT%H:%M:%SZ")
             .to_string();
-            let candidates = pool
+            let inventory_candidates = pool
                 .get()
                 .ok()
                 .and_then(|mut conn| {
@@ -2264,19 +2277,54 @@ impl HttpServer {
                 .map(|rows| rows.into_iter().map(|r| r.peer_id).collect::<Vec<_>>())
                 .unwrap_or_default();
 
+            // Snapshot the connected-peer set via ListPeers command once;
+            // used both as the race_fetch membership filter and (on empty
+            // inventory) as the connected-fallback candidate set.
+            let connected_peers: Vec<String> = handle
+                .list_peers()
+                .await
+                .into_iter()
+                .map(|p| p.peer_id)
+                .collect();
+
+            // Connected-fallback: when gossipsub inventory publish has failed
+            // (alpha after pod restarts: `InsufficientPeers`, no fresh row for
+            // a peer that is nonetheless connected and advertising the blob),
+            // the inventory candidate set comes up empty even though a direct
+            // fetch would succeed. Rather than 404 on an empty set, race the
+            // currently-connected peers directly. Inventory hits stay strictly
+            // preferred; this fallback fires ONLY when inventory is empty.
+            // Bounded to 8 peers so a large mesh can't fan out unboundedly;
+            // the per-peer timeout still bounds total time for a genuine miss.
+            const CONNECTED_FALLBACK_CAP: usize = 8;
+            let (candidates, candidate_source) = if !inventory_candidates.is_empty() {
+                (inventory_candidates, "inventory")
+            } else if !connected_peers.is_empty() {
+                let mut capped = connected_peers.clone();
+                capped.truncate(CONNECTED_FALLBACK_CAP);
+                (capped, "connected-fallback")
+            } else {
+                // Distinct label: a structured `source=connected-fallback` next
+                // to "no connected peers" reads as the fallback having fired.
+                (Vec::new(), "no-peers")
+            };
+
             if !candidates.is_empty() {
                 let cmd_tx = handle.command_sender();
                 let parallelism = self.fetch_blob_parallelism;
                 let per_peer_timeout =
                     std::time::Duration::from_secs(self.fetch_blob_timeout_seconds);
-                // Snapshot the connected-peer set via ListPeers command;
-                // use a sync closure for race_fetch that checks membership.
-                let connected_set: std::collections::HashSet<String> = handle
-                    .list_peers()
-                    .await
-                    .into_iter()
-                    .map(|p| p.peer_id)
-                    .collect();
+                let candidate_count = candidates.len();
+                info!(
+                    hash_prefix = %hash_prefix,
+                    candidate_count,
+                    source = candidate_source,
+                    "blob heal: racing peers for local miss"
+                );
+                // race_fetch filters candidates to those connected at call
+                // time; the closure checks membership in the snapshot above.
+                let connected_set: std::collections::HashSet<String> =
+                    connected_peers.into_iter().collect();
                 let is_connected = move |peer: &str| connected_set.contains(peer);
                 let outcome = crate::p2p::blob_fetch::race_fetch(
                     hash,
@@ -2338,21 +2386,45 @@ impl HttpServer {
                         }
 
                         info!(
-                            hash = %hash,
+                            hash_prefix = %hash_prefix,
                             source_peer = %source_peer,
                             size = bytes.len(),
-                            "T20: race-fetch hit — blob persisted and recorded"
+                            candidate_count,
+                            source = candidate_source,
+                            "blob heal: race-fetch HIT — blob persisted and recorded"
                         );
                         return BlobHealOutcome::Bytes {
                             bytes,
                             healed_from: Some(source_peer),
                         };
                     }
-                    crate::p2p::blob_fetch::FetchOutcome::Miss
-                    | crate::p2p::blob_fetch::FetchOutcome::NoCandidates => {
-                        debug!(hash = %hash, "T17: race-fetch miss — no peer served verified bytes");
+                    crate::p2p::blob_fetch::FetchOutcome::Miss => {
+                        info!(
+                            hash_prefix = %hash_prefix,
+                            candidate_count,
+                            source = candidate_source,
+                            "blob heal: race-fetch ALL-MISSES — no peer served verified bytes; returning 404"
+                        );
+                    }
+                    crate::p2p::blob_fetch::FetchOutcome::NoCandidates => {
+                        // candidate_count > 0 here, but none were connected at
+                        // race time (the inventory rows pointed at peers that
+                        // have since disconnected). Distinct from the empty-set
+                        // leg below so a 404 names the failing reason precisely.
+                        info!(
+                            hash_prefix = %hash_prefix,
+                            candidate_count,
+                            source = candidate_source,
+                            "blob heal: race-fetch NO-CANDIDATES — candidates known but none connected; returning 404"
+                        );
                     }
                 }
+            } else {
+                info!(
+                    hash_prefix = %hash_prefix,
+                    source = candidate_source,
+                    "blob heal: NO-CANDIDATES — empty inventory and no connected peers; returning 404"
+                );
             }
         }
 

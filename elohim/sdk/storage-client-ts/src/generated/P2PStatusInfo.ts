@@ -60,4 +60,18 @@ dedupUniqueLen: number,
  * D.7 dedup LRU: cumulative insert calls (new + duplicate).
  * Ratio `(dedup_total_seen - dedup_unique_len) / dedup_total_seen` approximates duplication rate.
  */
-dedupTotalSeen: number, };
+dedupTotalSeen: number, 
+/**
+ * T23 custody reconcile: total reconcile passes run since startup.
+ * Lets CI assert "a custody reconcile pass ran" without log scraping.
+ */
+reconcilePassesTotal: number, 
+/**
+ * T23 custody reconcile: total fetch kicks fired across all passes.
+ * A non-zero value confirms the reconciler emitted fetch requests for gaps.
+ */
+kicksFiredTotal: number, 
+/**
+ * T23 custody reconcile: total placement gaps emitted across all passes.
+ */
+placementGapsEmittedTotal: number, };

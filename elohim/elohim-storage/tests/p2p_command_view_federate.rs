@@ -52,6 +52,9 @@ fn test_status() -> P2PStatusInfo {
         sync_paused: false,
         dedup_unique_len: 0,
         dedup_total_seen: 0,
+        reconcile_passes_total: 0,
+        kicks_fired_total: 0,
+        placement_gaps_emitted_total: 0,
     }
 }
 

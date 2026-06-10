@@ -224,6 +224,9 @@ fn p2p_status_view_matches_schema() {
         sync_paused: false,
         dedup_unique_len: 42,
         dedup_total_seen: 55,
+        reconcile_passes_total: 7,
+        kicks_fired_total: 3,
+        placement_gaps_emitted_total: 12,
     };
 
     let json = serde_json::to_value(&status).unwrap();
@@ -249,6 +252,9 @@ fn p2p_status_view_with_null_drain() {
         sync_paused: true,
         dedup_unique_len: 0,
         dedup_total_seen: 0,
+        reconcile_passes_total: 0,
+        kicks_fired_total: 0,
+        placement_gaps_emitted_total: 0,
     };
 
     let json = serde_json::to_value(&status).unwrap();

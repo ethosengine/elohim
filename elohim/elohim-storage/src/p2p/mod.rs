@@ -737,6 +737,17 @@ pub struct P2PStatusInfo {
     /// Ratio `(dedup_total_seen - dedup_unique_len) / dedup_total_seen` approximates duplication rate.
     #[ts(type = "number")]
     pub dedup_total_seen: usize,
+    /// T23 custody reconcile: total reconcile passes run since startup.
+    /// Lets CI assert "a custody reconcile pass ran" without log scraping.
+    #[ts(type = "number")]
+    pub reconcile_passes_total: u64,
+    /// T23 custody reconcile: total fetch kicks fired across all passes.
+    /// A non-zero value confirms the reconciler emitted fetch requests for gaps.
+    #[ts(type = "number")]
+    pub kicks_fired_total: u64,
+    /// T23 custody reconcile: total placement gaps emitted across all passes.
+    #[ts(type = "number")]
+    pub placement_gaps_emitted_total: u64,
 }
 
 /// Per-peer detail from libp2p Swarm state.
@@ -1149,6 +1160,9 @@ impl P2PHandle {
             sync_paused: false,
             dedup_unique_len: 0,
             dedup_total_seen: 0,
+            reconcile_passes_total: 0,
+            kicks_fired_total: 0,
+            placement_gaps_emitted_total: 0,
         };
         let (status_tx, status_rx) = watch::channel(initial_status);
         // Keep sender alive so the receiver never sees "sender dropped"
@@ -1683,6 +1697,9 @@ impl P2PNode {
             sync_paused: false,
             dedup_unique_len: 0,
             dedup_total_seen: 0,
+            reconcile_passes_total: 0,
+            kicks_fired_total: 0,
+            placement_gaps_emitted_total: 0,
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -5626,7 +5643,13 @@ impl P2PNode {
                                                 &when,
                                             ) {
                                                 Ok(()) => {
-                                                    debug!(
+                                                    // INFO (was DEBUG): on alpha, gossipsub
+                                                    // inventory publish fails after pod
+                                                    // restarts, so the presence/absence of
+                                                    // this line is the primary signal for
+                                                    // diagnosing a heal 404 — it tells us
+                                                    // whether a peer's inventory ever landed.
+                                                    info!(
                                                         target: "elohim_storage::inventory",
                                                         from = %propagation_source,
                                                         peer_id = %snapshot.peer_id,
@@ -6944,6 +6967,7 @@ impl P2PNode {
             Some(s) => Some(s.status().await),
             None => None,
         };
+        let recon = self.reconciliation_metrics();
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
             listen_addresses,
@@ -6961,6 +6985,9 @@ impl P2PNode {
             sync_paused: self.sync_paused.load(Ordering::Acquire),
             dedup_unique_len,
             dedup_total_seen,
+            reconcile_passes_total: recon.reconcile_passes_total,
+            kicks_fired_total: recon.kicks_fired_total,
+            placement_gaps_emitted_total: recon.placement_gaps_emitted_total,
         };
         let _ = self.status_tx.send(status);
     }
