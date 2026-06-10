@@ -42,6 +42,12 @@ export function isSpaRoutingNoise(log: CapturedConsoleLog): boolean {
  */
 export function isExpectedNetworkFailure(req: CapturedFailedRequest): boolean {
   if (req.failure === 'net::ERR_ABORTED') return true;
-  const externalHosts = ['youtube.com', 'ytimg.com', 'shields.io', 'googleapis.com'];
+  const externalHosts = [
+    'youtube.com',
+    'ytimg.com',
+    'shields.io',
+    'googleapis.com',
+    'buymeacoffee.com',
+  ];
   return externalHosts.some(host => req.url.includes(host));
 }

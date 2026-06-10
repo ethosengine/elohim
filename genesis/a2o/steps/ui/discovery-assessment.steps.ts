@@ -11,6 +11,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { ASSESSMENT, SOPHIA, LIKERT, DISCOVERY } from '../../src/framework/pages/selectors.js';
+import { isExpectedNetworkFailure } from '../../src/framework/utils/console-filters.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 function getDevice(world: E2EWorld): PlaywrightDevice {
@@ -308,9 +309,16 @@ Then('no failed network requests should be captured', function (this: E2EWorld) 
   if (!device) return 'pending';
 
   const errors = device.getErrors();
+  // Filter out expected third-party externalities (YouTube embeds, CDN badges,
+  // donation widgets) and SPA-navigation aborts — these fail in CI's sandboxed
+  // egress regardless of whether the app itself is healthy. Same allowlist the
+  // auth After-hook uses (steps/ui/auth.steps.ts), so a genuine app/backend
+  // asset failure (e.g. a 404 on an alpha-served wasm/font) is the clean signal
+  // instead of being buried under third-party noise.
+  const unexpected = errors.network.filter(req => !isExpectedNetworkFailure(req));
   assert.equal(
-    errors.network.length,
+    unexpected.length,
     0,
-    `Failed network requests: ${errors.network.map(e => e.url).join('; ')}`
+    `Failed network requests: ${unexpected.map(e => e.url).join('; ')}`
   );
 });
