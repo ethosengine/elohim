@@ -255,20 +255,27 @@ async function locatePathStepFor(
   for (const row of list?.items ?? []) {
     const body = parseBody(row.contentBody ?? row.content);
     if (!body) continue;
-    // Canonical shape: sections[].items[].ref ("epr:{id}" or bare id), flat-indexed.
-    let flat = 0;
-    for (const section of body.sections ?? []) {
-      for (const item of section.items ?? []) {
-        const ref = (item.ref ?? '').replace(/^epr:/, '');
-        if (ref === contentId) return { pathId: row.id, stepIndex: flat };
-        flat++;
-      }
-    }
-    // Legacy shape: top-level steps[].resourceId.
-    const idx = (body.steps ?? []).findIndex(s => s.resourceId === contentId);
-    if (idx >= 0) return { pathId: row.id, stepIndex: idx };
+    const stepIndex = stepIndexIn(body, contentId);
+    if (stepIndex >= 0) return { pathId: row.id, stepIndex };
   }
   return null;
+}
+
+/**
+ * Step index of `contentId` within one path body, or -1 when absent.
+ * Canonical shape first: sections[].items[].ref ("epr:{id}" or bare id),
+ * flat-indexed globally across sections. Falls back to the legacy
+ * top-level steps[].resourceId shape for older seeds.
+ */
+function stepIndexIn(body: PathBody, contentId: string): number {
+  let flat = 0;
+  for (const section of body.sections ?? []) {
+    for (const item of section.items ?? []) {
+      if ((item.ref ?? '').replace(/^epr:/, '') === contentId) return flat;
+      flat++;
+    }
+  }
+  return (body.steps ?? []).findIndex(s => s.resourceId === contentId);
 }
 
 interface PathContentRow {
