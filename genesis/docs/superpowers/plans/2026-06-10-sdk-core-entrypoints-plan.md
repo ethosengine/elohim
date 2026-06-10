@@ -1,7 +1,7 @@
 ---
 title: SDK Framework-Free Core Entrypoints — type:module + /core subpath exports (pre-Phase-4 gate)
 id: sdk-core-entrypoints-plan
-status: Draft
+status: landed
 class: process-meta
 process_subdomain: schema-sdk
 sprint: unranked — born 2026-06-10; gates arc Phase 4 (rea-runtime CommitmentService). Packaging-only — operational concern, no storage schema, no DHT entities.
@@ -43,31 +43,31 @@ workarounds this plan retires.
 
 **Files:** `genesis/docs/architecture/elohim-sdk.md` (managed surface — cite tooling applies).
 
-- [ ] Add a compact section "Node-consumable core entrypoints": each library that hosts
+- [x] Add a compact section "Node-consumable core entrypoints": each library that hosts
       framework-free modules declares `"type": "module"` and an `exports` map with `./core`
       (framework-free only — no Angular imports transitively) beside the Angular root entry;
       consumers outside Angular import ONLY `@elohim/<lib>/core`. State the rule for new
       libraries: born with the pattern when any non-Angular consumer is foreseeable.
-- [ ] Note the two empirical failure modes (from arc 1.2) the pattern prevents, one line each.
-- [ ] `cite-gen.py --seal` clean on the edited doc. Commit.
+- [x] Note the two empirical failure modes (from arc 1.2) the pattern prevents, one line each.
+- [x] `cite-gen.py --seal` clean on the edited doc. Commit.
 
 ## Task 2: Implement in `@elohim/identity` (the proven consumer set)
 
 **Files:** `app/elohim-library/projects/elohim-identity/package.json`, new `src/core.ts`,
 `ng-package`/tsconfig surfaces ONLY if the Angular build requires.
 
-- [ ] Add `"type": "module"` + `exports` map: root → existing public-api path (verify what the
+- [x] Add `"type": "module"` + `exports` map: root → existing public-api path (verify what the
       Angular consumers resolve today — elohim-app consumes via tsconfig path alias
       `app/elohim-app/tsconfig.json:25-26`; confirm the alias bypasses `exports` and therefore
       cannot break), `./core` → `src/core.ts` (or built equivalent — match how a2o resolves the
       source via its alias; keep BOTH the alias path and the exports map coherent).
-- [ ] `src/core.ts` exports ONLY framework-free modules: `doorway-session-client` (+ its types),
+- [x] `src/core.ts` exports ONLY framework-free modules: `doorway-session-client` (+ its types),
       any models with zero Angular imports (verify transitively — a grep for `@angular` in the
       import closure of core.ts must be empty; add that as a unit test so the boundary is
       enforced, not aspirational).
-- [ ] Identity suite still green: `cd app/elohim-library && pnpm exec vitest run --config
+- [x] Identity suite still green: `cd app/elohim-library && pnpm exec vitest run --config
       vite.config.ts projects/elohim-identity` (67 tests).
-- [ ] Angular consumer unaffected: run the elohim-app test subset that imports `@elohim/identity`
+- [x] Angular consumer unaffected: run the elohim-app test subset that imports `@elohim/identity`
       (locate via grep; run those spec files under the app's vitest) — green. If the app consumes
       source via alias only, additionally `pnpm run lint` on the importing files for module-res
       sanity. Commit.
@@ -76,10 +76,10 @@ workarounds this plan retires.
 
 **Files:** `genesis/a2o/src/framework/api/doorway-client.ts`, `genesis/a2o/tsconfig.json`.
 
-- [ ] Replace the `namespace.default ?? namespace` interop and deep-module import with a plain
+- [x] Replace the `namespace.default ?? namespace` interop and deep-module import with a plain
       named import from `@elohim/identity/core`; update the a2o tsconfig alias to match;
       delete the interop comment block.
-- [ ] Re-verify all three pipelines (the 1.2 evidence set): `pnpm typecheck` (0),
+- [x] Re-verify all three pipelines (the 1.2 evidence set): `pnpm typecheck` (0),
       `pnpm test:unit` (107), `pnpm exec cucumber-js --dry-run --tags '@e2e'` (exit 0,
       514 scenarios). Commit.
 
@@ -88,19 +88,33 @@ workarounds this plan retires.
 **Files:** `app/elohim-library/projects/elohim-rea-runtime/package.json` (+ a stub core.ts only
 if it already has framework-free modules), checklist additions to the canon section.
 
-- [ ] `@elohim/rea-runtime`: add `"type": "module"` + `./core` export now (empty-or-minimal core
+- [x] `@elohim/rea-runtime`: add `"type": "module"` + `./core` export now (empty-or-minimal core
       is fine — Phase 4's CommitmentService lands INTO it); verify its existing tests/build.
-- [ ] Audit `@elohim/service`, `@elohim/storage-client`, `elohim-core` (Lit): which already have
+- [x] Audit `@elohim/service`, `@elohim/storage-client`, `elohim-core` (Lit): which already have
       honest module metadata (storage-client is plain tsc — likely fine), which would break
       consumers if flipped. Output = a one-line verdict per library appended to the canon
       section's checklist — flip ONLY where a consumer exists today; document the rest.
-- [ ] Full gate: a2o suites + identity suite + `pnpm run lint` on touched packages. Commit.
+- [x] Full gate: a2o suites + identity suite + `pnpm run lint` on touched packages. Commit.
 
 ## Out of scope
 
 The auth wire-contract work and Angular auth migration — operational, no storage concern — (sibling plan
 `2026-06-10-auth-wire-contract-completion-plan.md`); any ng-packagr dist/build redesign; the
 SDK scaffolding CLI (its spec's trigger — next domain manifest split — has not fired).
+
+
+## Execution log (2026-06-10, subagent-driven, two-stage reviews — plan LANDED)
+
+- **T1** canon §4.1: e68883a94 (controller-reviewed).
+- **T2** identity /core: b3edef551 — 70 tests incl. boundary walker w/ positive control; 254 elohim-app
+  consumer tests green; ng build green. Review ✅/APPROVED (2 Minors → T4 caveats).
+- **T3** a2o shim collapse: 8378b693f — alias removed entirely (exports map single-homed); caught+fixed
+  latent T2 gap (.js-suffixed re-exports required under Node16). Review ✅/APPROVED (deviation justified).
+- **T4** rea-runtime pre-pave + audit + canon close: 44c06a3d7 + fb6c112b8 — 69 tests; honest audit
+  (storage-client NOT flipped: CJS emit; elohim-core already honest). Review ✅/✅.
+- **Carried forward:** LOW latent — rea-runtime `protocol-event-types.ts:16` extensionless type import
+  trips TS2835 on first node16 /core consumer (arc Phase 4); one-line fix then. Silent root-config test
+  gap filed: backlog/rea-runtime-specs-silent-skip-root-config.md.
 
 ## Self-Review
 
