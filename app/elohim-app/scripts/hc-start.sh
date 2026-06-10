@@ -175,7 +175,14 @@ echo ""
 # ──────────────────────────────────────────────────────────────────────────────
 # Step 1: Build hApp if needed
 # ──────────────────────────────────────────────────────────────────────────────
-if [ ! -f "$HAPP_PATH" ] || [ "$FORCE_BUILD" = true ]; then
+if [ "$NETWORK_PROFILE" = "join-alpha" ] && [ "${FORCE_LOCAL_HAPP:-0}" != "1" ]; then
+    # join-alpha installs the FETCHED deployed bundle (DNA-hash parity with
+    # alpha), so the locally-built hApp would never be installed — skip the
+    # multi-minute WASM build. FORCE_LOCAL_HAPP=1 restores local build+install.
+    echo "⏭️  Skipping local DNA build: NETWORK_PROFILE=join-alpha installs the"
+    echo "   fetched deployed bundle (set FORCE_LOCAL_HAPP=1 to build + install local)"
+    echo ""
+elif [ ! -f "$HAPP_PATH" ] || [ "$FORCE_BUILD" = true ]; then
     echo "┌──────────────────────────────────────────────────────────────┐"
     echo "│ Building Holochain DNAs                                       │"
     echo "└──────────────────────────────────────────────────────────────┘"
