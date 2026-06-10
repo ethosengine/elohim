@@ -131,6 +131,29 @@ in two planes:
 scenario (API/browser through alpha) and one peer-native scenario (sweettest tier or the Che
 peer directly). Any verdict delta between the planes is a truth-layer bug, surfaced by design.
 
+## Client connection matrix (agency-phase gotchas — DO NOT step on these)
+
+How a client UI connects is inherently more complex than a simple server-client webapp (operator
+directive, 2026-06-10: be explicit so agency work never tramples a client configuration). The
+strategy layer lives in `app/elohim-library/projects/elohim-service/src/connection/` (factory
+detection: `__TAURI__` global → tauri; else doorway/direct by config):
+
+| Client context | Strategy | Control plane | Data/blob | Gotchas the arc must respect |
+|---|---|---|---|---|
+| Browser, Che/local dev | `DoorwayConnectionStrategy` + same-origin (`window.location.origin`, Che strips CORS) | Holochain Admin/App **WebSockets** proxied via doorway :8888 | `/blob/{hash}` via dev proxy | WS upgrade through Che traefik needs the devfile endpoint `secure: true`; **browser holds zome-call signing keypairs** (`generateSigningKeyPair`/`setSigningCredentials`) — clients are not HTTP-only |
+| Browser, production | `DoorwayConnectionStrategy` direct `https://doorway…` | same (wss) | doorway `/blob` | `trustMode` (`doorway-host` \| `peer-conductor`) is **discovered from `/auth/me`, never config** — pinning it reintroduces the two-parallel-auth-systems trap |
+| Browser, L3 `live-data` profile | same-origin → dev proxy → **deployed alpha** | HTTP verified; **WS/`/p2p` through this proxy UNVERIFIED** | alpha `/blob` | the live-data proxy covers the HTTP contexts only — don't assume websocket parity until proven |
+| Tauri desktop | `TauriConnectionStrategy` (session mgmt) / `DirectConnectionStrategy` | direct ws to **embedded conductor**; bootstrap/signal arrive via doorway **`/auth/native-handoff`** (fed by doorway `BOOTSTRAP_URL`/`SIGNAL_URL` env, `config.rs:26-31`) | **elohim-storage sidecar `:8090` direct — doorway NOT in the path** | Stage B touches conductor network config; it must NOT repurpose the native-handoff channel — that is the Tauri client's bootstrap path |
+| Node (a2o, seeder, agent tooling) | `DirectConnectionStrategy` (Node) or plain HTTP | HTTP/ws to doorway or storage | direct | global fetch (Node 22 = undici); no localStorage exists — session storage must be injectable |
+
+**Arc rails derived from the matrix:** Stage A's `DoorwaySessionClient` stays transport-dumb —
+`baseUrl`/`fetchImpl`/`tokenStore` injected, NO strategy detection, NO trustMode logic, NO
+localStorage assumption (Tauri/Node differ). Stage B changes the *conductor's* network config
+only, never the client strategy layer, and leaves `/auth/native-handoff` semantics untouched.
+Stage C's `CommitmentService` must work against both doorway-proxied and sidecar-direct (`:8090`)
+base URLs. Any auth change must remember browser clients sign zome calls with client-held keys —
+the session token is not the only credential in play.
+
 ## Developer-surface coherence (startup scripts speak the stages)
 
 Survey (2026-06-10): `hc-start.sh` is canonical, but full-stack startup logic exists in three
