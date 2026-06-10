@@ -268,6 +268,11 @@ commands:
         #   echo "$GH_TOKEN" | gh auth login --with-token
         #   gh auth status
         # fi
+  # DEPRECATED: use app/elohim-app/scripts/hc-start.sh (pnpm run hc:start) — the
+  # canonical stack starter. This command's hardcoded ws://localhost:4444 conductor
+  # URL is dead (hc-start discovers the dynamic admin port via the
+  # elohim/holochain/local-dev/.hc_ports file it writes), and the workingDir
+  # predates the move to doorway/doorway-service.
   - id: start-doorway
     exec:
       component: tools
