@@ -37,6 +37,13 @@ const GENERATED_OUTPUT_DIRS = [
   // app/lamad/src/app/generated/ with `import '../../generated/content-view'`,
   // which resolves to app/lamad/src/generated/ — distribute schema types there.
   resolve(REPO_ROOT, 'app/lamad/src/generated'),
+  // Auth wire-contract completion (plan 2026-06-10 Task 1): @elohim/identity's
+  // framework-free DoorwaySessionClient re-exports the generated /auth/*
+  // response shapes (auth-response.ts, me-response.ts, ...) instead of
+  // hand-matching them. Identity's /core entry must stay framework-free and
+  // cannot depend on @elohim/service or @elohim/storage-client, so it gets its
+  // own generated/ copy — same identical-files pattern as every other consumer.
+  resolve(REPO_ROOT, 'app/elohim-library/projects/elohim-identity/src/generated'),
 ];
 
 const ENUM_OUTPUT_PATHS = GENERATED_OUTPUT_DIRS.map((d) => join(d, 'schema-enums.ts'));

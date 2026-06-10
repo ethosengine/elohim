@@ -50,7 +50,7 @@ This runs `scripts/codegen-ts.mjs` which:
 
 1. **Generates interfaces** from `inputs/` and `views/` schemas via `json-schema-to-typescript`
 2. **Generates enum constants** from `enums/` schemas with `_dna` metadata → `CORE_*`, `ALL_*`, backward-compat alias, `Type` alias
-3. **Distributes** identical files to five locations (see `GENERATED_OUTPUT_DIRS` in `codegen-ts.mjs`):
+3. **Distributes** identical files to six locations (see `GENERATED_OUTPUT_DIRS` in `codegen-ts.mjs`):
 
 | Location | Consumer |
 |----------|----------|
@@ -59,6 +59,7 @@ This runs `scripts/codegen-ts.mjs` which:
 | `app/elohim-library/projects/elohim-service/src/generated/` | Shared library |
 | `doorway/doorway-app/src/app/generated/` | Doorway operator dashboard (added Phase 2 L5 for `DoorwayDashboardView` consumers) |
 | `app/lamad/src/generated/` | Lamad SPA bundle (added 2026-05-25 in the pillar-EPR decomposition) |
+| `app/elohim-library/projects/elohim-identity/src/generated/` | `@elohim/identity` framework-free core (added 2026-06-10 auth wire-contract completion — `DoorwaySessionClient` re-exports the `/auth/*` response shapes; identity's `/core` cannot depend on other packages, so it gets its own copy) |
 
 Plus a pre-distribution barrel at `elohim/sdk/schemas/generated-ts/index.ts` that re-exports every generated input/view/enum module — read-canon for any consumer that wants the full surface in one import.
 

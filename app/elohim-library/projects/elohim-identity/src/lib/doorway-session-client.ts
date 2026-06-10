@@ -24,6 +24,10 @@
  * both provide `globalThis.fetch`; tests inject a mock `fetchImpl` and the
  * default token store is in-memory, so no localStorage is required.
  */
+import type { AuthResponse } from '../generated/auth-response.js';
+import type { ExchangeSessionResponse } from '../generated/exchange-session-response.js';
+import type { MeResponse } from '../generated/me-response.js';
+import type { SessionTokenResponse } from '../generated/session-token-response.js';
 
 // =============================================================================
 // Request types (mirror auth_routes.rs deserialize structs)
@@ -63,93 +67,27 @@ export interface LoginRequest {
 }
 
 // =============================================================================
-// Response types (mirror auth_routes.rs serialize structs, field-for-field)
+// Response types — re-exported from the schema-generated wire shapes.
+//
+// The JSON Schemas in elohim/sdk/schemas/v1/views/ ({auth,me,exchange-session,
+// session-token,account}-response.schema.json) are the contract; the Rust
+// structs in auth_routes.rs are validated against them by
+// doorway/doorway-service/tests/schema_contract.rs, and `pnpm run
+// schema:codegen:ts` distributes the generated interfaces to ../generated/.
+// Hand-matching the shapes here is therefore no longer possible to drift:
+// these are the SAME types the schema declares.
 // =============================================================================
 
-/** Human profile (auth_routes.rs `HumanProfileResponse`, returned on registration). */
-export interface HumanProfileResponse {
-  id: string;
-  displayName: string;
-  bio?: string;
-  affinities: string[];
-  profileReach: string;
-  location?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/**
- * Consolidated auth response (auth_routes.rs:164 `AuthResponse`).
- * `expiresAt` is a unix timestamp in SECONDS (the JWT `exp` claim).
- * `isSteward` is omitted from the wire when false (serde skip_serializing_if).
- */
-export interface AuthResponse {
-  token: string;
-  humanId: string;
-  agentPubKey: string;
-  identifier: string;
-  expiresAt: number;
-  /** Doorway that issued this token (for federation). */
-  doorwayId?: string;
-  /** Doorway URL for cross-doorway validation. */
-  doorwayUrl?: string;
-  /** Holochain installed app ID for this user (multi-conductor routing). */
-  installedAppId?: string;
-  /** Human profile (returned on registration). */
-  profile?: HumanProfileResponse;
-  /** Present (true) only when stewardship is substrate-confirmed. */
-  isSteward?: boolean;
-  /** First reachable portal host URL when `isSteward` is true. */
-  portalHostUrl?: string;
-}
-
-/** Human-readable authority reference (auth_routes.rs `AuthorityRef`). */
-export interface AuthorityRef {
-  label: string;
-  id?: string;
-}
-
-/** GET /auth/me response (auth_routes.rs `MeResponse`). */
-export interface MeResponse {
-  humanId: string;
-  agentPubKey: string;
-  identifier: string;
-  permissionLevel: string;
-  doorwayId?: string;
-  doorwayUrl?: string;
-  /** Always true on the 200 path; the unauthenticated path returns 401. */
-  authenticated: boolean;
-  /** 'doorway-host' | 'peer-conductor' (MVP: always 'doorway-host'). */
-  trustMode: string;
-  authority: AuthorityRef;
-  conductorEndpoint?: string;
-}
+export type { AuthResponse, HumanProfileResponse } from '../generated/auth-response.js';
+export type { AuthorityRef, MeResponse } from '../generated/me-response.js';
+export type { SessionTokenResponse } from '../generated/session-token-response.js';
+export type { ExchangeSessionResponse } from '../generated/exchange-session-response.js';
+export type { AccountResponse } from '../generated/account-response.js';
 
 /** POST /auth/logout response (auth_routes.rs `SuccessResponse`). */
 export interface SuccessResponse {
   success: boolean;
   message: string;
-}
-
-/** GET /auth/session-token response (auth_routes.rs:78 `SessionTokenResponse`). */
-export interface SessionTokenResponse {
-  /** Short-lived single-use transfer token (60 s TTL). */
-  sessionToken: string;
-  /** Unix timestamp (seconds) when the transfer token expires. */
-  expiresAt: number;
-}
-
-/** GET /auth/exchange-session response (auth_routes.rs:88 `ExchangeSessionResponse`). */
-export interface ExchangeSessionResponse {
-  token: string;
-  humanId: string;
-  agentPubKey: string;
-  identifier: string;
-  expiresAt: number;
-  doorwayId?: string;
-  doorwayUrl?: string;
-  /** First reachable portal host URL for stewards (omitted otherwise). */
-  portalHostUrl?: string;
 }
 
 // =============================================================================

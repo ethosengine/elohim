@@ -1,0 +1,193 @@
+/* eslint-disable @typescript-eslint/consistent-indexed-object-style */
+/* Generated from protocol schema: views/distribution-details.schema.json -- DO NOT EDIT */
+
+/**
+ * Hardware/deployment archetype carried on the AgentPeerBinding.
+ */
+export type DeviceArchetype = 'node' | 'desktop' | 'mobile' | 'steward';
+
+/**
+ * Lazy-fetched per-CID developer-grade distribution view. Strict superset of DistributionSummary: includes per-replica peer rows, projector identities, placement gaps, and recent projection events. Source of truth: composed from rea_commitments + economic_events + peer_identity_bindings + libp2p swarm state (Operational, Category C). Reconstructed per request; not persisted.
+ */
+export interface DistributionDetails {
+  summary: DistributionSummary;
+  /**
+   * Per-replica detail (peer id, archetype, freshness, hop hint, etc).
+   */
+  replicaPeers: ReplicaPeer[];
+  /**
+   * Per-doorway projection ack rows.
+   */
+  projectorIdentities: ProjectorIdentity[];
+  /**
+   * Concrete placement gaps for this content; empty if fully placed.
+   */
+  placementGaps: PlacementGapRow[];
+  /**
+   * Recent rea projection-event records relevant to this CID. Open-shape during bring-up.
+   */
+  recentProjectionEvents: Record<string, unknown>[];
+  /**
+   * CustodianCommitment CID references (rea_commitments rows) backing this distribution snapshot.
+   */
+  commitmentReferences?: string[];
+  /**
+   * Active replicates-* commitments whose recipient + scope_filter cover this content.
+   */
+  replicationCommitments: {
+    commitmentCid: string;
+    tier: 'dwelling' | 'collective' | 'commons';
+    providerCid: string;
+    recipientCid: string;
+    providerRole?: 'steward_mutual' | 'collective_steward';
+  }[];
+  faultDomainDiversity: {
+    distinctHouseholdCount: number;
+    distinctCollectiveCount: number;
+    distinctRegionCount: number;
+    singleFaultDomainRisk: boolean;
+    faultModesEvaluated: ('household' | 'collective' | 'region')[];
+  };
+}
+/**
+ * Inline summary — same shape returned on every CID-bearing response.
+ */
+export interface DistributionSummary {
+  /**
+   * Number of replicas currently observed for this CID.
+   */
+  replicaCount: number;
+  /**
+   * Target replica count derived from the CID's reach + policy.
+   */
+  replicaTarget: number;
+  /**
+   * Health bucket: healthy = at/above target, at_risk = below target, critical = below floor, over_replicated = more replicas than commitments justify; release shards to reclaim budget.
+   */
+  replicaHealth: 'healthy' | 'at_risk' | 'critical' | 'over_replicated';
+  /**
+   * Number of doorways currently projecting this CID.
+   */
+  projectorCount: number;
+  /**
+   * Reach band the content is authored at — drives target replica count.
+   */
+  reachClass:
+    | 'private'
+    | 'intimate'
+    | 'household'
+    | 'neighborhood'
+    | 'collective'
+    | 'community'
+    | 'district'
+    | 'public';
+  diversityHint: DiversityHint;
+  /**
+   * Where the bytes for this fetch came from.
+   */
+  thisFetchSource: 'projected_via_doorway' | 'peer_direct' | 'local_pantry';
+  /**
+   * Seconds since the last custodian probe verified the replica.
+   */
+  lastVerifiedSeconds: number;
+  /**
+   * Viewer's role for this CID, when known.
+   */
+  myRole?: 'sole_replica' | 'replica' | 'replica_and_projector' | 'not_hosting';
+  /**
+   * Net diff: positive = viewer hosts more than is hosted for them.
+   */
+  reciprocityHint?: number;
+  /**
+   * Federation-level projection coverage. local = 1-2 projectors in same cluster; regional = 3+ projectors but ≤1 fault domain; global = projectors spanning ≥2 fault domains. Computed from projectorCount + projector geography when available.
+   */
+  projectionTier: 'local' | 'regional' | 'global';
+}
+/**
+ * Peer-diversity hint for the replica set.
+ */
+export interface DiversityHint {
+  /**
+   * Which diversity dimension the hint addresses.
+   */
+  kind: 'region_metro' | 'household_archetypes' | 'collective_member_count' | 'none';
+  /**
+   * Hint payload. Array of region/archetype strings, an integer count, or null/absent when kind=none. Serde tag/content adjacent tagging omits this key for unit variants.
+   */
+  value?: string[] | number | null;
+}
+/**
+ * Per-peer replica row for a CID's distribution-details view. Source of truth: peer_identity_bindings (Category A from imagodei DHT, projected via signal stream) joined with libp2p swarm liveness (Operational, Category C). Reconstructed per request; not persisted.
+ */
+export interface ReplicaPeer {
+  /**
+   * libp2p PeerId of the replica.
+   */
+  peerId: string;
+  deviceArchetype: DeviceArchetype;
+  /**
+   * Seconds since this peer was last observed online.
+   */
+  lastSeenSeconds: number;
+  /**
+   * Approximate libp2p Kad hop distance from the requester.
+   */
+  hopHint?: number;
+  /**
+   * Household this peer belongs to, when known.
+   */
+  householdId?: string;
+  /**
+   * Coarse region tier (e.g. 'us-central') for diversity reasoning.
+   */
+  regionTier?: string;
+  /**
+   * Count of distinct RS-encoded shards this peer holds for the content. 1 if whole-blob; up to N+M for rs-N-M encoding.
+   */
+  shardsHeld?: number;
+  shardsByEncoding?: {
+    /**
+     * rs-N-M or 'whole-blob'.
+     */
+    encoding?: string;
+    minShardsForRecovery?: number;
+  };
+}
+/**
+ * Per-doorway projector row for a CID's distribution-details view. Source of truth: doorway projection registry observed via libp2p (Operational, Category C). Reconstructed per request; not persisted.
+ */
+export interface ProjectorIdentity {
+  /**
+   * Public hostname of the projecting doorway (e.g. 'matthew.elohim.host').
+   */
+  doorwayHostname: string;
+  /**
+   * Seconds since the projector last acknowledged this CID.
+   */
+  lastAckSeconds: number;
+  /**
+   * Coarse region tier of the doorway, when known.
+   */
+  regionTier?: string;
+}
+/**
+ * Source of truth: peer_blob_inventory (gossip-synced operational truth) + peer-identity bindings (DHT Category-A) + declared reach class on EPR head (DHT Category-A). Hub-abstract: kind enum stays substrate-agnostic; classification of which hub kind (dwelling/collective/computed) is the gap happens at the projection layer in ResilienceHubView. Operational Category C — no DHT entry.
+ */
+export interface PlacementGapRow {
+  /**
+   * Which diversity/redundancy axis fell short. hub_diversity is hub-kind-agnostic; concrete hub kinds (dwelling/collective/computed) appear in ResilienceHubView per C2.
+   */
+  kind: 'hub_diversity' | 'replica_count' | 'reach_class';
+  contentId: string;
+  /**
+   * Concrete delta: target vs observed
+   */
+  shortfall: {
+    target: number;
+    observed: number;
+  };
+  /**
+   * Optional hint about what action would close the gap
+   */
+  remediation?: string | null;
+}
