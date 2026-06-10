@@ -11,7 +11,11 @@
 /// α=1 → Theil-T (log-weighted, standard economics measure).
 /// α=2 → Herfindahl-like (squared, amplifies large shares).
 /// Returns 0.0 on empty input or zero-mean distributions.
+/// Inputs must be non-negative (x_i >= 0): a negative value with non-integer α
+/// produces silent NaN via powf. α must be non-zero (α=0 divides by zero → ±Inf);
+/// the governed path clamps α to [1,2] before reaching here.
 pub fn ge_alpha(xs: &[f32], alpha: f32) -> f32 {
+    debug_assert!(xs.iter().all(|&x| x >= 0.0), "ge_alpha requires non-negative inputs");
     let n = xs.len();
     if n == 0 {
         return 0.0;
@@ -137,7 +141,7 @@ mod tests {
     fn squash_is_bounded_monotone_and_fixed() {
         assert_eq!(squash(0.0), 0.0);
         assert!(squash(1.0) - 0.5 < 1e-6);
-        assert!(squash(1e7) < 1.0); // f32 loses +1 precision at 1e8+; 1e7 still strictly < 1
+        assert!(squash(1e7) < 1.0); // 1e7 is safely below the f32 +1-precision wall (ULP=2 from 2^24 ≈ 1.68e7).
         assert!(squash(2.0) > squash(1.0));
     }
 
