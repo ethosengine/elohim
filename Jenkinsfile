@@ -290,6 +290,111 @@ def verifyEprMounts(String doorwayUrl, List<String> mounts) {
     }
 }
 
+// The three helpers below carry the Upload-SPA-Blob stage's script-block body.
+// Extracted 2026-06-10 (second cut of the CPS 64KB breach): the block grew
+// 9,034 → 9,898 source bytes when the seatbelt call-sites landed, and THAT
+// delta — not the helper heredocs — is what pushed WorkflowScript.___cps___7636
+// over the JVM method limit (#1519/#1520/#1521 all died at Jenkinsfile
+// compile). Split small on purpose: each top-level def is its own CPS method;
+// one big helper would just relocate the breach.
+
+def resolveDoorwayEprUrls() {
+    // A doorway-EPR URL is a DNS-facilitated address routed and projected by
+    // a doorway to a specific EPR's hosting contract (here: the
+    // elohim-host-landing EPR + lamad-spa). It is NOT "the doorway URL" —
+    // that name belongs to the doorway-service surface itself. A single
+    // doorway projects/hosts many EPRs; each has its own DNS-facilitated URL
+    // via the doorway's stewardship contract.
+    //
+    // We hit the doorway-EPR URL (not the storage tier directly) because
+    // storage is peer-native and not reachable from outside the cluster. The
+    // doorway proxies /blob/{hash} (PUT) and /db/content/{id} (PATCH)
+    // through to storage. The previous default (a headless-service pod FQDN)
+    // only resolved inside the elohim-alpha namespace; build pods in the
+    // jenkins namespace got curl exit 6 — see App #1457.
+    //
+    // Alpha cluster has TWO storage backends — matthew (alpha.elohim.host) +
+    // adam (elohim.host) — and each must carry the SPA blob bytes + blobHash
+    // itself: the blob does not auto-replicate P2P and the blobHash PATCH is
+    // a per-storage write. Seeding one left apex /apps/* at 404.
+    // STORAGE_URL env still overrides for ad-hoc or in-cluster targeting.
+    def branch = env.BRANCH_NAME ?: 'dev'
+    def defaults
+    if (branch == 'main') {
+        defaults = ['https://elohim.host']
+    } else if (branch == 'staging' || branch.startsWith('staging-')) {
+        defaults = ['https://staging.elohim.host']
+    } else {
+        defaults = ['https://alpha.elohim.host', 'https://elohim.host']
+    }
+    return env.STORAGE_URL ? [env.STORAGE_URL] : defaults
+}
+
+def resolveStorageAdminKey() {
+    // Auth for PATCH /db/content/{id}: try `storage-api-key-admin`
+    // (k8s-provisioned) then fall back to `doorway-admin-bootstrap-key`
+    // (genesis/Jenkinsfile seed stages). App pipeline credential scope is
+    // sometimes folder-disjoint; the fallback keeps both visibility paths
+    // working without operator coordination.
+    def adminKey = ''
+    def credUsed = ''
+    try {
+        withCredentials([string(credentialsId: 'storage-api-key-admin', variable: 'ADMIN_KEY')]) {
+            adminKey = env.ADMIN_KEY
+            credUsed = 'storage-api-key-admin'
+        }
+    } catch (e1) {
+        try {
+            withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+                adminKey = env.ADMIN_KEY
+                credUsed = 'doorway-admin-bootstrap-key'
+            }
+        } catch (e2) {
+            adminKey = ''
+            credUsed = ''
+        }
+    }
+    if (credUsed) {
+        echo "stageSpaBlobs auth: using credential '${credUsed}'"
+    } else {
+        // RC2 hardening (2026-05-28): fail loud instead of silently degrading
+        // to PUT-only. Without the admin credential the blobHash PATCH cannot
+        // run, db/content/lamad-spa keeps no blobHash, /apps/lamad-spa/ 404s,
+        // /lamad goes dark while the build reports green — exactly the drift
+        // spa-blob-deploy-drift documented.
+        error("stageSpaBlobs auth: neither 'storage-api-key-admin' nor 'doorway-admin-bootstrap-key' is visible at this job's credential scope. The blobHash PATCH (db/content/{slug}) cannot run without it, which leaves lamad-spa blobless and /lamad 404ing. Provision one of these credentials at the App job/folder scope, then re-run. (To intentionally ship a no-content deploy, remove this guard deliberately.)")
+    }
+    return adminKey
+}
+
+def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey) {
+    // Two pillar-EPR bundles, two content rows (Task B21). Deploy-seed is
+    // post-build and transient-prone (doorway 503 during cluster churn); the
+    // orchestrator runs this pipeline wait-for-result at Level 0, so a
+    // FAILURE here would abort the whole dependency graph. catchError ->
+    // UNSTABLE keeps the chain alive (the orchestrator treats UNSTABLE as
+    // success). The credential-missing guard stays a hard error upstream.
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        for (int i = 0; i < doorwayEprUrls.size(); i++) {
+            stageSpaBlobs(doorwayEprUrls[i], [
+                [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
+                [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
+            ], adminKey)
+        }
+    }
+    // End-to-end serving seatbelt: probe the EPR-routed mounts a human
+    // actually visits (verifyEprMounts). Skipped on STORAGE_URL override
+    // runs — a raw storage backend has no EPR router to probe. UNSTABLE per
+    // the same dependency-chain rationale as the staging loop.
+    if (!env.STORAGE_URL) {
+        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+            for (int i = 0; i < doorwayEprUrls.size(); i++) {
+                verifyEprMounts(doorwayEprUrls[i], ['/', '/lamad'])
+            }
+        }
+    }
+}
+
 // ============================================================================
 // END HELPER METHODS
 // ============================================================================
@@ -945,141 +1050,15 @@ VEOF
             steps {
                 container('builder') {
                     script {
-                        // Resolve the doorway-EPR URL for the target environment.
-                        //
-                        // A doorway-EPR URL is a DNS-facilitated address routed and
-                        // projected by a doorway to a specific EPR's hosting contract
-                        // (here: the elohim-host-landing EPR + lamad-spa). It is NOT
-                        // "the doorway URL" — that name belongs to the doorway-service
-                        // surface itself (doorway auth, federation, uptime, bootstrap).
-                        // A single doorway projects/hosts many EPRs; each has its own
-                        // DNS-facilitated URL via the doorway's stewardship contract.
-                        //
-                        // We hit the doorway-EPR URL (not the storage tier directly)
-                        // because storage is peer-native and not reachable from outside
-                        // the cluster. The doorway proxies /blob/{hash} (PUT) and
-                        // /db/content/{id} (PATCH) through to storage. This matches
-                        // how the pipeline behaves in production (Jenkins has no k8s
-                        // access to pod FQDNs there) and works regardless of which
-                        // namespace the build pod runs in.
-                        //
-                        // The previous default (http://elohim-matthew-alpha-0.elohim-
-                        // matthew-alpha-headless:8090) was a headless-service pod
-                        // FQDN that only resolved from inside the elohim-alpha
-                        // namespace; build pods in the jenkins namespace got curl
-                        // exit 6 (Couldn't resolve host). See App #1457 for the
-                        // diagnosis.
-                        //
-                        // Env mapping mirrors the Environment Architecture comment
-                        // at the top of this file. STORAGE_URL env still overrides
-                        // for ad-hoc or in-cluster targeting — kept named that way
-                        // for backward compatibility with existing deploy scripts.
-                        def branch = env.BRANCH_NAME ?: 'dev'
-                        def defaultDoorwayEprUrls
-                        if (branch == 'main') {
-                            defaultDoorwayEprUrls = ['https://elohim.host']
-                        } else if (branch == 'staging' || branch.startsWith('staging-')) {
-                            defaultDoorwayEprUrls = ['https://staging.elohim.host']
-                        } else {
-                            // Alpha cluster has TWO storage backends — matthew
-                            // (alpha.elohim.host) + adam (elohim.host) — and each must
-                            // carry the SPA blob bytes + blobHash itself: the blob does
-                            // not auto-replicate P2P and the blobHash PATCH is a
-                            // per-storage write. Seeding one left apex /apps/* at 404
-                            // (empty blobHash). Matches the Environment Architecture
-                            // intent (projected by doorway-A + doorway-B).
-                            defaultDoorwayEprUrls = ['https://alpha.elohim.host', 'https://elohim.host']
-                        }
-                        // STORAGE_URL override stays single-target (ad-hoc/in-cluster).
-                        def doorwayEprUrls = env.STORAGE_URL ? [env.STORAGE_URL] : defaultDoorwayEprUrls
+                        // Body lives in three top-level helpers (resolveDoorwayEprUrls /
+                        // resolveStorageAdminKey / stageAndVerifyAllBundles) — this block
+                        // grew 9,034 → 9,898 bytes with the seatbelt call-sites and broke
+                        // the CPS 64KB method limit (___cps___7636, #1519–#1521). Keep it
+                        // thin; rationale comments moved with their logic.
+                        def doorwayEprUrls = resolveDoorwayEprUrls()
                         echo "stageSpaBlobs doorwayEprUrls: ${doorwayEprUrls}"
-                        // Auth for PATCH /db/content/{id} (the new route).
-                        // Try `storage-api-key-admin` (k8s-provisioned for
-                        // this work) then fall back to
-                        // `doorway-admin-bootstrap-key` (used by
-                        // genesis/Jenkinsfile seed stages). App pipeline
-                        // credential scope is sometimes folder-disjoint;
-                        // fallback keeps both visibility paths working
-                        // without operator coordination.
-                        //
-                        // When neither credential is present, the stage
-                        // continues: stageSpaBlobs still uploads the blobs
-                        // via unauthenticated PUT, but skips the PATCH+
-                        // verify step. Content rows keep their seed-time
-                        // blobHash. This is the deploy-degraded path —
-                        // operator action is documented in
-                        // genesis/docs/handoffs/2026-05-23-followup-2-k8s-handoff-summary.md
-                        // and the spa-blob-deploy-drift plan, but no
-                        // longer blocks the App pipeline.
-                        def adminKey = ''
-                        def credUsed = ''
-                        try {
-                            withCredentials([string(credentialsId: 'storage-api-key-admin', variable: 'ADMIN_KEY')]) {
-                                adminKey = env.ADMIN_KEY
-                                credUsed = 'storage-api-key-admin'
-                            }
-                        } catch (e1) {
-                            try {
-                                withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
-                                    adminKey = env.ADMIN_KEY
-                                    credUsed = 'doorway-admin-bootstrap-key'
-                                }
-                            } catch (e2) {
-                                adminKey = ''
-                                credUsed = ''
-                            }
-                        }
-                        if (credUsed) {
-                            echo "stageSpaBlobs auth: using credential '${credUsed}'"
-                        } else {
-                            // RC2 hardening (2026-05-28): fail loud instead of
-                            // silently degrading to PUT-only. Without the admin
-                            // credential, stageSpaBlobs can upload blob bytes but
-                            // CANNOT PATCH the blobHash onto the content rows —
-                            // so db/content/lamad-spa keeps no blobHash and
-                            // /apps/lamad-spa/ 404s, leaving /lamad dark while the
-                            // build reports green. That silent drift is exactly
-                            // what spa-blob-deploy-drift documented. A blocked
-                            // deploy with an actionable message beats a green deploy
-                            // that doesn't serve.
-                            error("stageSpaBlobs auth: neither 'storage-api-key-admin' nor 'doorway-admin-bootstrap-key' is visible at this job's credential scope. The blobHash PATCH (db/content/{slug}) cannot run without it, which leaves lamad-spa blobless and /lamad 404ing. Provision one of these credentials at the App job/folder scope, then re-run. (To intentionally ship a no-content deploy, remove this guard deliberately.)")
-                        }
-                        // Two pillar-EPR bundles, two content rows (Task B21).
-                        // Order matters only insofar as elohim-app must build
-                        // before lamad (lamad's tsconfig aliases reference
-                        // elohim-app codegen) — that ordering is enforced by
-                        // the upstream Build stages, not this call.
-                        // Deploy-seed (blob upload + content PATCH) is post-build and
-                        // transient-prone (doorway 503 during cluster churn). The
-                        // orchestrator runs this pipeline wait-for-result at Level 0; a
-                        // FAILURE here aborts the whole dependency graph and blocks
-                        // unrelated downstream pipelines (edge deploy). catchError->UNSTABLE
-                        // keeps the chain alive — the orchestrator treats UNSTABLE as
-                        // success (genesis/orchestrator/Jenkinsfile success-check) and
-                        // continues dispatch. The credential-missing guard above stays a
-                        // hard error (real misconfig, not a transient flake). Mirrors the
-                        // SonarQube + orchestrator post-build catchError precedent.
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                        for (int i = 0; i < doorwayEprUrls.size(); i++) {
-                            stageSpaBlobs(doorwayEprUrls[i], [
-                                [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
-                                [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
-                            ], adminKey)
-                        }
-                        }
-                        // End-to-end serving seatbelt: probe the EPR-routed
-                        // mounts a human actually visits (see verifyEprMounts
-                        // helper). Skipped on STORAGE_URL override runs —
-                        // a raw storage backend has no EPR router to probe.
-                        // UNSTABLE (not FAILURE) per the same orchestrator
-                        // dependency-chain rationale as the staging loop above.
-                        if (!env.STORAGE_URL) {
-                            catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                                for (int i = 0; i < doorwayEprUrls.size(); i++) {
-                                    verifyEprMounts(doorwayEprUrls[i], ['/', '/lamad'])
-                                }
-                            }
-                        }
+                        def adminKey = resolveStorageAdminKey()
+                        stageAndVerifyAllBundles(doorwayEprUrls, adminKey)
                     }
                 }
             }
