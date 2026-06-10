@@ -83,6 +83,24 @@ The children's states, already canonicalized:
 The orchestrator carries **no independent defect**. There is nothing to fix in
 the orchestrator Jenkinsfile or graph-walker.
 
+**Breadcrumb — orchestrator FAILURE (not UNSTABLE) at a build-LEVEL stage is a
+different shape (also an echo, also not a root cause):** the fingerprints above
+are all *post-dispatch* UNSTABLE echoes. A separate one-shot was
+`c9624ee1d1fe` (elohim-orchestrator **#1200**, `stage:Level 0: elohim`,
+build result **FAILURE**). Unlike the post-dispatch stages, the build-graph
+*Level N* stages run children and `error` out on a child FAILURE (not
+catchError-UNSTABLE) — so a Level-0 FAILURE means a Level-0 child *hard-failed*,
+not the degraded-substrate UNSTABLE echo. Here the child was `elohim-app` #1521
+(FAILURE) throwing `MethodTooLargeException: WorkflowScript.___cps___7636` — the
+CPS Jenkinsfile-method-size breach (museum: Jenkinsfile 64KB CPS limit). That
+breach was fixed in-tree (`ec581d5ea` "CPS breach cut 2 — the killer was the
+Upload-SPA-Blob script block"; `b3755bf9` was an incomplete cut 1) and
+**parse-verified by elohim #1522 running every stage end-to-end**. So
+`c9624ee1d1fe` was triaged `decompose_on_confirm` (transient, resolved, no
+lasting lesson — closes by orchestrator green streak), NOT folded into this
+persistent-echo concern. Recorded here only as the breadcrumb that an
+orchestrator *Level-N FAILURE* points you at the child build, not at this doc.
+
 ## Current decision
 
 **BLOCKED-as-echo — resolves automatically when the upstream concerns resolve.**

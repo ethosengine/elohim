@@ -10,7 +10,7 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "high"
 ci_status: blocked
-fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af]
+fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede]
 jobs: [elohim, elohim-edge, elohim-genesis]
 relatedNodeIds: []
 tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env]
@@ -18,6 +18,7 @@ cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1100/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1504/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1518/
+  - https://jenkins.ethosengine.com/job/elohim/job/dev/1522/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1042/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1051/
   - genesis/manifests/cluster-state.yaml
@@ -53,7 +54,24 @@ plus three deploy/upload/E2E facets on the sibling jobs:
 7bbfcf8928b9  elohim — stage:Upload SPA Blob          (elohim 1500–1504, build result UNSTABLE)
 5af3f81c7dd4  elohim-edge — deploy.alpha-doorway.elohim-doorway-alpha-b  (elohim-edge 1038–1042, UNSTABLE)
 79748fd505af  elohim — stage:E2E Testing - Alpha Validation             (elohim 1518, red build)
+ab55feadd29c  elohim — "+ kubectl rollout restart deployment/elohim-site-alpha …"  (elohim 1522, UNSTABLE)
+8a0ee37aaa17  elohim — "+ kubectl rollout status deployment/elohim-site-alpha …"   (elohim 1522, UNSTABLE)
+39f396758ede  elohim — "Waiting for … elohim-site-alpha rollout … 1 old replicas pending"  (elohim 1522, UNSTABLE)
 ```
+
+The three **`*-site-alpha`** fingerprints (elohim #1522) are the same root
+condition surfacing on the App job's **Deploy-to-Alpha** stage — but they are a
+**harvester false-positive on echo/progress lines from a stage that SUCCEEDED**.
+In #1522's log the site-alpha rollout actually *finished*:
+`deployment "elohim-site-alpha" successfully rolled out` (line 6578); the
+captured lines are the `sh`-trace command echoes (`+ kubectl rollout restart` /
+`+ kubectl rollout status`) and the transient mid-rollout progress line
+(`1 old replicas are pending termination` — the NORMAL rolling-update message),
+not a failure. The build's actual UNSTABLE was set in the **Upload SPA Blob**
+catchError (`Setting overall build result to UNSTABLE`, line 6093, exit code 1)
+— i.e. facet #4 (`7bbfcf8928b9`) again, the PUT/PATCH against degraded alpha
+backends. So all three are the degraded-alpha condition, attached here, with the
+fingerprinting weakness noted below (Fix trail, 2026-06-10).
 
 The newest facet — **`79748fd505af` (elohim #1518)** — is the E2E
 **post-deploy health gate** failing, the cleanest single signature of the whole
@@ -248,3 +266,26 @@ stabilizes OR the tags hold the scenarios out of the degraded run.
   MCP): confirmation requires either a substrate flip + re-run, or the
   tag+seed `/shift` above. Until then, these UNSTABLE results are the
   cluster-state telling the truth.
+- **2026-06-10 extension** — added `ab55feadd29c` / `8a0ee37aaa17` /
+  `39f396758ede` (elohim #1522, the `elohim-site-alpha` kubectl rollout watch).
+  #1522 is the RECOVERY build after the CPS `MethodTooLargeException` breach was
+  cut (fix `ec581d5ea` "CPS breach cut 2 — the killer was the Upload-SPA-Blob
+  script block"; the earlier `b3755bf9` heredoc-extraction was cut 1 and #1521
+  still threw MethodTooLarge at it). With the Jenkinsfile parsing again, #1522
+  ran end-to-end and finished **UNSTABLE on Upload SPA Blob** (line 6093) —
+  same degraded-alpha condition as facet #4. All three new fingerprints set
+  `status: blocked` (no `triaged_at_build` — nothing landed; operator-owned
+  substrate). They disappear on a green streak the moment alpha serves cleanly.
+- **Fingerprinting weakness (recorded here per dispatcher, no new doc):** the
+  harvester captured **`sh`-trace command-echo lines** (prefixed `+ `, e.g.
+  `+ kubectl rollout restart …`, `+ kubectl rollout status …`) and a
+  **transient mid-rollout progress line** (`1 old replicas are pending
+  termination` — the normal rolling-update wait message) as distinct "finding
+  lines," even though that stage SUCCEEDED (`successfully rolled out`, line
+  6578). The stage's real failure signal was elsewhere (Upload SPA Blob exit 1).
+  Two cheap classifier improvements would suppress this whole false-positive
+  family: (1) drop lines matching `^\+ ` (shell xtrace echoes are commands, not
+  outcomes); (2) treat a `kubectl rollout status` "Waiting for …" progress line
+  as a finding only if NOT followed by `successfully rolled out` within the same
+  stage. Both are harvester-side (classifier) changes, not sentinel work —
+  noted here so the lesson isn't lost; not opened as a separate concern.
