@@ -172,6 +172,11 @@ pub mod acquisition_pins;
 // Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §6.5.
 pub mod mishpat_commitments;
 
+// Limitarian-governor concentration snapshots (Category C operational aggregate — spec §11 land 3a)
+// Source of truth: NONE — rebuildable by replay; no dht_anchor_hash by design (spec §4.4).
+// k>=5 firewall enforced by concentration_service (writer side).
+pub mod concentration_snapshots;
+
 use std::path::Path;
 use std::time::Duration;
 

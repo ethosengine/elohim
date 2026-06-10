@@ -14,8 +14,9 @@ use ts_rs::TS;
 
 use super::diesel_schema::{
     access_grants, acquisition_pins, agreements, appeals, apps, challenges,
-    collective_participations, collectives, comments, content, content_attestations,
-    content_mastery, content_tags, contributor_dashboards, contributor_presences,
+    collective_participations, collectives, comments, concentration_snapshots, content,
+    content_attestations, content_mastery, content_tags, contributor_dashboards,
+    contributor_presences,
     custodian_metrics, custodian_shares, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
@@ -3588,4 +3589,57 @@ pub struct NewMishpatCommitment {
     pub revoked_at: Option<String>,
     pub state: String,
     pub dht_anchor_hash: Option<String>,
+}
+
+// ============================================================================
+// concentration_snapshots
+// ============================================================================
+
+/// Per-layer concentration snapshot — Classification C (operational aggregate).
+/// Source of truth: NONE (rebuildable by replay; deliberately NOT DHT-anchored —
+/// spec §4.4 A/C seam invariant). NO per-agent identity by construction
+/// (firewall test enforces).
+#[derive(Debug, Clone, Queryable, Serialize)]
+#[diesel(table_name = concentration_snapshots)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ConcentrationSnapshot {
+    pub id: String,
+    pub h_app_id: String,
+    pub substrate_signal: String,
+    pub governance_layer: String,
+    pub n: i32,
+    pub mu: f32,
+    pub ge: f32,
+    pub ge_squashed: f32,
+    pub top_share: f32,
+    pub gini: f32,
+    pub c_composite: f32,
+    pub alpha: f32,
+    /// Top-quantile parameter (renamed from `q` — Diesel reserves `q` as a macro identifier).
+    pub top_q: f32,
+    pub computed_at: String,
+}
+
+/// Insertable row for `concentration_snapshots`.
+///
+/// `computed_at` is omitted — the DB DEFAULT `(datetime('now'))` fills it
+/// automatically on INSERT, keeping the writer from needing to supply a
+/// timestamp and ensuring the DB clock is authoritative.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = concentration_snapshots)]
+pub struct NewConcentrationSnapshot {
+    pub id: String,
+    pub h_app_id: String,
+    pub substrate_signal: String,
+    pub governance_layer: String,
+    pub n: i32,
+    pub mu: f32,
+    pub ge: f32,
+    pub ge_squashed: f32,
+    pub top_share: f32,
+    pub gini: f32,
+    pub c_composite: f32,
+    pub alpha: f32,
+    /// Top-quantile parameter (renamed from `q` — Diesel reserves `q` as a macro identifier).
+    pub top_q: f32,
 }

@@ -1772,6 +1772,28 @@ diesel::table! {
     }
 }
 
+// Migration: 2026-06-10-020000_concentration_snapshot
+// Source of truth: NONE (Category C operational aggregate — see migration header;
+// deliberately no dht_anchor_hash, spec §4.4).
+diesel::table! {
+    concentration_snapshots (id) {
+        id -> Text,
+        h_app_id -> Text,
+        substrate_signal -> Text,
+        governance_layer -> Text,
+        n -> Integer,
+        mu -> Float,
+        ge -> Float,
+        ge_squashed -> Float,
+        top_share -> Float,
+        gini -> Float,
+        c_composite -> Float,
+        alpha -> Float,
+        top_q -> Float,
+        computed_at -> Text,
+    }
+}
+
 // DevicePin — airplane-mode-durable local want (Category B, agent-scoped). No dht_anchor_hash.
 // Source of truth: local SQLite. Notarized shadow is a provide-content Commitment (Slice 2).
 // Migration: 2026-06-07-000000_acquisition_pins
@@ -1803,6 +1825,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     challenge_outcomes,
     challenges,
     comments,
+    concentration_snapshots,
     collective_participations,
     collectives,
     content,
