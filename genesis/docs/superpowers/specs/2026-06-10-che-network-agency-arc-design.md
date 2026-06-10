@@ -9,6 +9,8 @@ cites:
   - doorway-access-tier-patterns | the canonical agency-state catalog this arc maps onto — Stage A = its Tier-2 hosted user; its Tier-3 recovery proxy is the sibling story Stage C must NOT be confused with | sha256:f862d55525b442c3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
   - che-live-peer-dev-loop-design | the eyes this arc adds hands to — L3 of the browser-feedback series; its read-mostly rail is what Stages A-C graduate beyond | sha256:f976477c2f2baba0 | path: genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md
+  - genesis/docs/architecture/elohim-sdk.md
+  - genesis/docs/architecture/rea-compute-commitment-primitive.md
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md
 derived_from:
@@ -111,7 +113,73 @@ C teaches the protocol's authority model (bounded reciprocity). Each stage's rai
 stage's vocabulary. The arc ends where the gospel memory points: reciprocal REA compute
 agreements exercised end-to-end by the first non-human agent on the network.
 
+## Dual-plane verification discipline (what the perspectives are FOR)
+
+Stage A *is* the doorway perspective, developed by inhabiting it (every act crosses the web2
+projection: sessions, reach-gating, projection caches). Stage B *is* the peer-native perspective
+(the network as something you ARE: gossip, source chain, validation). Stage C is the seam where
+both must converge on ONE authority model — a grant is a single DHT entry, but enforcement holds
+in two planes:
+
+- **Doorway plane**: the bounds-gate checks the commitment (scope, TTL, revocation) before
+  accepting a delegate's HTTP write — the projection enforcing substrate truth.
+- **Peer plane**: validation on the delegate's `EconomicEvent` verifies the same commitment by
+  link traversal — peers enforcing it with zero doorway present (the D8 "doorway is optional"
+  rail made executable).
+
+**Discipline: every Stage-C gap-item lands with PAIRED verification** — one doorway-plane a2o
+scenario (API/browser through alpha) and one peer-native scenario (sweettest tier or the Che
+peer directly). Any verdict delta between the planes is a truth-layer bug, surfaced by design.
+
+## Developer-surface coherence (startup scripts speak the stages)
+
+Survey (2026-06-10): `hc-start.sh` is canonical, but full-stack startup logic exists in three
+places (`hc-start.sh` / a2o `local-stack.ts` / devfile `start-doorway`), DNA build in four, two
+seeders are invoked differently (`seed.ts` vs `seed-sqlite.ts`), and the local conductor
+(`hc-start.sh:196`, `hc sandbox generate`) has **no bootstrap/signal hook** — today's dev
+conductor is always an isolated island. The stages give these scripts their missing vocabulary —
+**named network profiles** instead of accreted flags:
+
+| Profile | Meaning | Today |
+|---|---|---|
+| `isolated` | full local stack, island DHT (current `hc:start`) | exists (default) |
+| `live-data` | local UI × alpha data via dev proxy (L3 `start:alpha`) | exists |
+| `join-alpha` | local conductor joins the alpha DHT as a Stage-B peer | missing — the gap |
+
+- [ ] Thread `CONDUCTOR_BOOTSTRAP_URL` / `CONDUCTOR_SIGNAL_URL` (or a generated conductor-config)
+      through `hc-start.sh` so `join-alpha` is a profile, not a fork; document the three profiles
+      in one place the agent reads (`app/elohim-app/CLAUDE.md` Starting Development)
+- [ ] `join-alpha` sources the **deployed** `.dna` bundles (parity rail) — add a fetch path for
+      CI-built artifacts; local builds remain `isolated`-profile-only
+- [ ] De-duplicate one seam: a2o `local-stack.ts` consumes `hc-start.sh`'s surface (single
+      health-check + seeder path) instead of re-implementing it
+
+## SDK complement (the arc as the SDK's first consumer)
+
+The SDK canon (`elohim-sdk.md` §3–4) already names the homes this work fills; the arc's stages
+are the forcing functions, and the agent's tooling becomes the SDK's **first consumer** instead
+of a fourth hand-rolled duplicate:
+
+- **Stage A → `@elohim/identity` `DoorwaySessionClient`.** Auth/session logic is hand-rolled
+  today in at least three places (`app` `auth.service.ts`, a2o `doorway-client.ts` +
+  `browser-device.ts`, doorway-app `auth-state.service.ts`) around one wire shape. Stage A's
+  authorized write path lands as the consolidated client (login / register / logout / me /
+  exchange / restore + one `AuthResponse` model); a2o and `look --as` migrate onto it first.
+- **Stage C → `@elohim/rea-runtime` `CommitmentService`.** Canon §3.5 explicitly scopes Z.D
+  `delegates-compute` here. Wire types and `/api/v1/commitments` routes exist; the gap is the
+  service layer: create/accept/query/revoke + a `delegates-compute` builder + state-machine
+  guards, all keyed on **CID = `entry_hash`**. The arc's grant-mint-exercise-revoke loop is the
+  service's first real exercise.
+- **Stage B** contributes the startup profile + artifact sourcing only — a peer-conductor client
+  surface in `@elohim/service` is deferred to peer-topology work (out of arc).
+
+- [ ] `DoorwaySessionClient` in `@elohim/identity`; a2o framework + `look --as` consume it
+      (delete the duplicated auth walking in `doorway-client.ts`/`browser-device.ts`)
+- [ ] `CommitmentService` in `@elohim/rea-runtime` with the `delegates-compute` builder and
+      transition guards; Stage C's grant loop runs through it end-to-end
+
 ## Out of scope
 
 Steward key-bundle handoff into Che (custody canon); the recovery web-session implementation
-(Pattern Recovery ships it); multi-agent fleets under one grant; any new DHT entry type.
+(Pattern Recovery ships it); multi-agent fleets under one grant; any new DHT entry type; a
+peer-conductor/topology client in `@elohim/service` (deferred with Stage B's hosting work).
