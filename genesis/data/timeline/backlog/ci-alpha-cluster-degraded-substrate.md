@@ -10,18 +10,20 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "high"
 ci_status: blocked
-fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede, 9f60eb44561d]
+fingerprints: [44518e179748, 597cbd37725a, 41b22c5d7ad1, 97f6d69af262, 6b6e5de4e4ef, 7bbfcf8928b9, 5af3f81c7dd4, 79748fd505af, ab55feadd29c, 8a0ee37aaa17, 39f396758ede, 9f60eb44561d, 43ba8b15ffeb, 63dd3437bede, 2e09854ec226, 1eda1f5d27e0, b4303a6d852e, 2d1b82ad175f, 1714722d9dab, 63ecdda7a81e, e9b60b28964c, 5d74b506f389]
 jobs: [elohim, elohim-edge, elohim-genesis]
 relatedNodeIds: []
-tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env]
+tags: [ci, infra, alpha-cluster-6peer, shem, substrate-degraded, reduced-scope, host-green-not-ci-green, museum-trap-1, requires-env, per-peer-rollout]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1100/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1111/
+  - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1113/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1504/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1518/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1522/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1042/
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1051/
+  - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1053/
   - genesis/manifests/cluster-state.yaml
   - genesis/a2o/features/resilience/household-reciprocity.feature
   - genesis/a2o/steps/resilience.steps.ts
@@ -326,3 +328,70 @@ stabilizes OR the tags hold the scenarios out of the degraded run.
   **failing-stage cause line** (here: the `Verify Target Health` exit-124 / the
   TS2739 `error TS2739` line) over the catch-all banner. Noted with the two
   classifier improvements above; not opened as a separate concern.
+- **2026-06-10 extension — the per-peer EDGE rollout facet (8 fingerprints,
+  elohim-edge #1053).** The edge pipeline deploys each alpha conductor as its
+  own parallel `deploy-elohim-<peer>-alpha` branch; the harvester fingerprinted
+  each branch's failure line as a distinct TEST_FAILURE, yielding eight
+  fingerprints for ONE condition:
+  ```
+  43ba8b15ffeb  elohim-edge.deploy.alpha.elohim-pete-alpha       (edge 1053)
+  63dd3437bede  elohim-edge.deploy.alpha.elohim-terrance-alpha   (edge 1053)
+  2e09854ec226  elohim-edge.deploy.alpha.elohim-frank-alpha      (edge 1053)
+  1eda1f5d27e0  elohim-edge.deploy.alpha.elohim-gertrude-alpha   (edge 1053)
+  b4303a6d852e  elohim-edge.deploy.alpha.elohim-susan-alpha      (edge 1053)
+  2d1b82ad175f  elohim-edge.deploy.alpha.elohim-caleb-alpha      (edge 1053)
+  1714722d9dab  elohim-edge.deploy.alpha.elohim-daniel-alpha     (edge 1053)
+  63ecdda7a81e  elohim-edge.deploy.alpha.elohim-emma-alpha       (edge 1053)
+  ```
+  These eight peers are precisely the **household peers that are offline while
+  the bootstrap pair (adam+matthew) serves** — the declared
+  `alpha-cluster-6peer: degraded` topology (`project_alpha_topology_bootstrap_pair`:
+  the household/non-bootstrap conductors are the ones crashlooping; #1053's build
+  result is UNSTABLE, `hApp:NO | Push:Skip`). The per-peer deploy/health-verify
+  of each crashlooping household conductor cannot complete → the branch fails →
+  UNSTABLE. This is the **deploy-layer, per-conductor** mirror of facets #5/#6
+  (the single-`doorway-B` deploy and the App/genesis availability gates): same
+  degraded substrate, now fanned out one fingerprint per household peer because
+  the edge pipeline parallelizes the rollout. **The doorway/bootstrap node DID
+  take this build's image** — the landing heal it carried is verified working
+  (dispatcher-confirmed; the bootstrap pair serves, only the household peers are
+  down) — which is exactly why the build is the LOUD-but-tolerant UNSTABLE, not a
+  total red: the serving path landed, the degraded household-peer rollout is the
+  honest red. All eight set `status: blocked` (no `triaged_at_build` — nothing
+  landed; operator-owned substrate). They disappear on a green streak the moment
+  the household peers rejoin a stable ≥6-peer cluster. Classifier note
+  (harvester-side, not sentinel): a parallel-rollout stage that fans one
+  condition across N peers will mint N fingerprints — these collapse to one
+  concern; the per-peer multiplicity is fingerprint granularity, not N bugs.
+- **2026-06-10 extension — the genesis browser-E2E facet (2 fingerprints,
+  elohim-genesis #1113).** Two genesis E2E assertion failures, both rooted in the
+  same degraded alpha backend not serving its assets:
+  ```
+  e9b60b28964c  AssertionError: Failed network requests: …alpha.elohim.host/wasm/
+                elohim-cache-core/…; …/version.json; doorway-alpha…/epr/…/nav-context;
+                …/db/content/manifesto; …/health; …fonts/logo…  (genesis 1113)
+  5d74b506f389  AssertionError: feedback dialog backdrop element not found   (genesis 1113)
+  ```
+  - `e9b60b28964c` (`discovery-assessment.steps.ts:306`, "no failed network
+    requests should be captured") — the captured failures are **dominated by
+    `alpha.elohim.host` / `doorway-alpha.elohim.host` resources** (cache-core
+    wasm, `version.json`, the EPR `nav-context`, `/db/content/manifesto`,
+    `/health`, fonts, logo) — the live degraded backend not serving. (A few
+    third-party externalities — `youtube.com/embed`, `buymeacoffee`, `shields.io`
+    badge — also appear in the same list; they are unrelated external flakiness
+    riding the same coarse assertion, NOT the root cause. If the alpha backend
+    served, the assertion would still need those third-party hosts to be
+    reachable — a secondary brittleness worth a `@browser-only` allowlist someday,
+    but not this concern's mover.)
+  - `5d74b506f389` (`feedback-gate.steps.ts:171`) — a `@browser-only` UI scenario
+    whose feedback dialog never renders because the alpha backend it loads from is
+    degraded — the same shape as facet #2 (`cross-pillar resource viewer …
+    doesn't render`). Genesis #1113 also carries the `Verify Target Health`
+    exit-124 (the `9f60eb44561d` gate facet) — confirming the alpha backend is
+    down for this whole build, which is *why* these browser scenarios fail.
+  Both set `status: blocked` (no `triaged_at_build` — operator-owned substrate).
+  Like the other browser-E2E facets, the durable bounded fix is the
+  `@requires:alpha-cluster-6peer` tagging `/shift` (so they HELD-skip cleanly
+  instead of running against down pods) — named in "The tagging seam" above, an
+  operator-scoped story Objective, not a sentinel edit. They disappear on a green
+  streak the moment alpha serves its assets.

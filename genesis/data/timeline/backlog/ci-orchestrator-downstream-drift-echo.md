@@ -10,15 +10,17 @@ author: "ci-failure-triage"
 status: "backlog"
 priority: "low"
 ci_status: blocked
-fingerprints: [4508f1172d15, b169c3b9034c, ddd8ed2cbdc7, a90e18c0cf94]
+fingerprints: [4508f1172d15, b169c3b9034c, ddd8ed2cbdc7, a90e18c0cf94, c9624ee1d1fe]
 jobs: [elohim-orchestrator]
 relatedNodeIds: []
-tags: [ci, elohim-orchestrator, reconcile-build-graph, post-flight-health-check, post-actual-build-graph, downstream-echo, museum-trap-1, not-a-root-cause]
+tags: [ci, elohim-orchestrator, reconcile-build-graph, post-flight-health-check, post-actual-build-graph, level-n-child-failure, downstream-echo, museum-trap-1, not-a-root-cause, coarse-fingerprint]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1167/
   - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1168/
   - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1192/
   - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1199/
+  - https://jenkins.ethosengine.com/job/elohim-orchestrator/job/dev/1205/
+  - https://jenkins.ethosengine.com/job/elohim/job/dev/1525/
   - genesis/orchestrator/README.md
   - genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md
 ---
@@ -180,11 +182,72 @@ Contrast with the SIBLING orchestrator concern opened the same day,
 orchestrator fingerprints, two different verdicts — this one is the echo; that
 one is the bug. Keep them distinct.
 
+## 2026-06-10 — `c9624ee1d1fe` "stage:Level 0: elohim" RECURRED at #1205 — folded in (the breadcrumb was right; `decompose_on_confirm` was wrong)
+
+`c9624ee1d1fe` ("red build, stage:Level 0: elohim", orchestrator **FAILURE**)
+was originally recorded ONLY as the breadcrumb above (the #1200 instance: its
+Level-0 child was elohim-app #1521 throwing `MethodTooLargeException` — the CPS
+breach, since fixed by `ec581d5ea`). It was stamped `triaged_at_build: 1202` +
+`decompose_on_confirm: true` (transient, resolved, no lasting lesson). **The
+harvester reopened it at #1205 (seen→4, last_build 1205)** — and the dispatcher
+asked whether the JSONNull `jenkinsPath` fix (`bcbae389a`) failed.
+
+**It did not. The JSONNull bug is a DIFFERENT fingerprint.** The JSONNull
+dispatch-leak is `97d7fb9c085c` / "stage:elohim-doorway-app"
+(`ci-orchestrator-graph-only-pipeline-dispatch-leak.md`), and that fix landed
+and is unrelated here. `c9624ee1d1fe`'s `line` is "stage:Level 0: elohim" — a
+**Level-0 child hard-FAILURE skip-echo**, the exact shape this concern's
+breadcrumb (and the `a90e18c0cf94` section) already names. Verified against
+#1205 (FAILURE):
+
+- `Build elohim-app » dev #1525 completed: FAILURE` (orch log line 550) →
+  `❌ elohim: FAILURE` (line 552) → the Level-0 stage `error`'d.
+- Every later observational stage shows `skipped due to earlier failure(s)`
+  (Post Actual Build Graph, Reconcile Build Graph, Verify Deployment,
+  Post-flight Health Check, the four Advisory stages) → `Finished: FAILURE`
+  (line 698). The harvester's coarse match positions on the first named
+  Level-0 stage → the "stage:Level 0: elohim" line.
+- **No `MethodTooLargeException` anywhere in #1525** — the CPS breach is
+  genuinely gone; this recurrence is NOT the #1200 CPS shape coming back.
+
+**Why elohim-app #1525 hard-failed: the degraded-alpha substrate** (verified in
+the #1525 log) — NOT an orchestrator bug, NOT a CPS breach:
+- Upload SPA Blob → `exit code 22` → UNSTABLE (line 5732), the degraded-alpha
+  PUT/PATCH facet;
+- `EPR mount https://alpha.elohim.host/ does not serve after blob staging`
+  → 404, `App ZIP blob not found` (line 5742);
+- the post-deploy E2E health gate → `exit code 124` → **FAILURE** (line 6752) —
+  the alpha edge never served 200/30x post-deploy.
+These are exactly facets #4/#6 of `ci-alpha-cluster-degraded-substrate.md`
+(Upload-SPA-Blob + the E2E availability gate). So #1205's Level-0 echo points
+at the elohim-app child, whose hard FAILURE is owned by the degraded-substrate
+concern.
+
+**The coarseness lesson (why `decompose_on_confirm` was wrong, corrected here).**
+"stage:Level 0: elohim" is a **coarse fingerprint** — it carries no child/cause
+identity, so it re-pins to *whatever* child hard-fails at Level 0: #1200 it was
+the CPS breach; #1205 it is the degraded-alpha child. Marking it
+`decompose_on_confirm` treated it as a one-shot tied to the CPS fix — but a
+coarse Level-N-echo fingerprint is **persistent**, not transient: it recurs
+every time any Level-0 child hard-FAILs (just as `a90e18c0cf94` recurs for
+Post-Actual-Build-Graph). It belongs here, folded into this echo concern, as a
+documented persistent echo — `status: blocked` (blocker: whichever Level-0
+child hard-failed; currently the degraded-alpha elohim-app), `triaged_at_build`
+and `decompose_on_confirm` **cleared** (it is not a fix awaiting disappearance;
+it is an echo that disappears when the children go green). This mirrors exactly
+how `9f60eb44561d` (the generic "PIPELINE FAILED" banner) was re-homed off its
+stale `triaged_at_build: 1101` stamp in the alpha-cluster concern — same
+coarse-banner-re-pins-to-the-last-holder mechanism. Classifier lesson
+(harvester-side, not sentinel; already in the alpha-cluster concern's Fix
+trail): prefer fingerprinting the **failing-stage CAUSE line** (the child name +
+its hard-fail signature) over a generic "Level N: <pipeline>" stage banner.
+
 ## Fix trail
 
 - No change (intentional — orchestrator is reporting correctly; the fix surface
-  is the four upstream concerns, plus, for `a90e18c0cf94`, the elohim-app child
-  build owned by its own concern).
+  is the four upstream concerns, plus, for `a90e18c0cf94` and now
+  `c9624ee1d1fe`, the elohim-app child build owned by its own concern —
+  currently `ci-alpha-cluster-degraded-substrate.md`).
 - This entry exists so the next sentinel run does not re-investigate the
   orchestrator as a novel concern: it is, and will remain, an echo until the
   children are green.
