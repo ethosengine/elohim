@@ -9,7 +9,7 @@ written: "2026-06-10"
 author: "ci-failure-triage"
 status: "backlog"
 priority: "medium"
-ci_status: blocked
+ci_status: triaged
 fingerprints: [97d7fb9c085c]
 jobs: [elohim-orchestrator]
 relatedNodeIds: []
@@ -155,3 +155,11 @@ doorway-app-touching pushes and is expected until one path resolves.
   the other graph-only pipeline (`pipeline-registry.test.mjs:35`); it will
   re-trip this exact UNSTABLE the first time a push touches its sources. The
   durable fix (a) closes both; the operator point-fix (b) does not.
+
+- 2026-06-10: UNBLOCKED and LANDED — the jenkinsfile-method-size hook's helper-region
+  aggregate check (the blocker) was redesigned to per-def measurement (the CPS unit is the
+  single method, never the region: the orchestrator's ~46KB region of small defs compiles
+  fine). Fix applied at getPipelineMetadata's registry branch: jenkinsPath normalized to
+  real-nonblank-String-or-absent (JSONNull removed), mirroring pipeline-registry.mjs.
+  Verdict: next doorway-app-touching wave should dispatch without the soft-skip UNSTABLE;
+  harvester confirms by disappearance.

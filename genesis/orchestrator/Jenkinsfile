@@ -65,7 +65,18 @@ import groovy.transform.Field
 def getPipelineMetadata(String name) {
     if (env.PIPELINE_REGISTRY_JSON) {
         def registry = readJSON(text: env.PIPELINE_REGISTRY_JSON)
-        return registry[name] ?: [:]
+        def meta = registry[name] ?: [:]
+        // readJSON deserializes an absent/null jenkinsPath as net.sf.json.JSONNull —
+        // a non-null OBJECT, hence Groovy-TRUTHY — so `!meta.jenkinsPath` dispatch
+        // filters let graph-only pipelines (elohim-doorway-app, by design no
+        // jenkinsPath) through to dispatch, which soft-skips "No item named …"
+        // → permanent UNSTABLE on every doorway-app-touching push. Normalize to
+        // real-nonblank-String-or-absent, mirroring pipeline-registry.mjs's guard.
+        def jp = meta.jenkinsPath
+        if (!(jp instanceof CharSequence) || !jp.toString().trim()) {
+            meta.remove('jenkinsPath')
+        }
+        return meta
     }
     // Pre-build-graph fallback: parse manifests directly.
     def manifestPath = sh(

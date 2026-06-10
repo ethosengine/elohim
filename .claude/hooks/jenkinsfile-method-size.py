@@ -35,29 +35,33 @@ TOTAL_WARN = 55000
 TOTAL_HARD = 65000
 
 # Per-script-block thresholds — the actual CPS method size proxy.
-# Each `script { ... }` body in a Jenkinsfile compiles to one CPS method.
-# Calibration from real builds (2026-05-09):
-#   • elohim/holochain/Jenkinsfile @ 10656 source bytes — compiles (#1210)
-#   • genesis/orchestrator/Jenkinsfile @ 13724 source bytes — FAILED #923
-#     with WorkflowScript.___cps___74 too large
-# So the danger zone for a single script body starts somewhere between
-# 11KB and 13KB source. We set HARD at 11000 (above largest known-good)
-# and WARN at 9000 (give margin to refactor before push).
-SCRIPT_WARN = 9000
-SCRIPT_HARD = 11000
+# Each `script { ... }` body compiles to one CPS method, but BYTECODE DENSITY
+# VARIES PER FILE (interpolation/expression density), so thresholds are
+# PER-FILE empirical brackets, keyed by path suffix. Evidence:
+#   • root Jenkinsfile deploy block: 9,034B compiled (#1518) / 9,898B broke
+#     (#1519-#1521, ___cps___7636 — the 2026-06-10 breach, mis-attributed to
+#     helper heredocs in cut 1; cut 2's block-split fixed it)
+#   • genesis/orchestrator: 9,524B + 10,656B compile / 13,724B broke (#923)
+#   • elohim/holochain: 10,656B compiles (#1210)
+# Unknown files get the looser bracket (false HARD-blocks are worse than
+# warns where density is unmeasured).
+SCRIPT_THRESHOLDS = {
+    # path-suffix match → (WARN, HARD)
+    "/projects/elohim/Jenkinsfile": (8500, 9500),   # root app pipeline (dense blocks)
+}
+SCRIPT_DEFAULT = (10000, 11000)
 
-# Helper-region thresholds (everything ABOVE `pipeline {`) — comment-stripped
-# bytes IN THIS HOOK'S OWN METRIC (helper_region_size: full preamble, groovy
-# // lines stripped, heredoc contents kept). THE 2026-06-10 BLIND SPOT: this
-# hook's own remediation advice sent logic into top-level `def` helpers,
-# which are ALSO CPS-compiled and capped — and which no check measured.
-# Builds #1519/#1520 died at Jenkinsfile compile (MethodTooLargeException,
-# zero stages ran) from heredoc growth in helpers while every measured
-# region passed. Empirical bracket in this metric (verified by running this
-# hook against both SHAs): 11,747B parsed (000e144f7) / 12,564B broke
-# (31a429bf5). Bash bodies belong in scripts/ci/*.sh, not heredocs.
-HELPER_WARN = 10500
-HELPER_HARD = 12000
+# Per-DEF thresholds (largest single top-level `def` body above `pipeline {`,
+# comment-stripped). 2026-06-10 lesson, both directions: (a) helpers are
+# CPS-compiled too — the hook's old advice sent code into an unmeasured
+# region; (b) the AGGREGATE region size is NOT the unit (the orchestrator's
+# helper region totals ~46KB across many small defs and compiles fine —
+# an aggregate check false-blocked a real 3-line bugfix there). The unit is
+# the single def. Largest known-good def: 6,564B (root stageSpaBlobs heredoc
+# era). No def has been observed breaking; HARD sits conservatively above
+# all known-good.
+DEF_WARN = 6000
+DEF_HARD = 8000
 
 
 def find_pipeline_block(text: str) -> tuple[int, int] | None:
@@ -108,13 +112,39 @@ def script_block_sizes(text: str, start: int, end: int) -> list[dict]:
     return sizes
 
 
-def helper_region_size(text: str, pipeline_start: int) -> int:
-    """Comment-stripped byte size of everything ABOVE `pipeline {` — the
-    top-level helper region. Groovy `//` lines cost no bytecode and are
-    stripped; heredoc contents (GString constants) DO cost and are kept."""
-    region = text[:pipeline_start]
-    stripped = re.sub(r"^\s*//.*$", "", region, flags=re.MULTILINE)
-    return len(stripped.encode("utf-8"))
+def largest_def_body(text: str, pipeline_start: int) -> dict | None:
+    """Largest single top-level `def name(...) { ... }` body above
+    `pipeline {`, comment-stripped (groovy // lines cost no bytecode and are
+    stripped; heredoc contents are GString constants that DO cost and are
+    kept). Each def is its own CPS method — the per-method 64KB cap applies
+    to the def, never to the region aggregate."""
+    pre = text[:pipeline_start]
+    best = None
+    for dm in re.finditer(r"^def\s+(\w+)\s*\(", pre, re.MULTILINE):
+        op = pre.find("{", dm.end())
+        if op < 0:
+            continue
+        depth = 0
+        for i in range(op, len(pre)):
+            if pre[i] == "{":
+                depth += 1
+            elif pre[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    body = re.sub(r"^\s*//.*$", "", pre[op:i + 1], flags=re.MULTILINE)
+                    size = len(body.encode("utf-8"))
+                    line = pre[:dm.start()].count("\n") + 1
+                    if best is None or size > best["size"]:
+                        best = {"size": size, "name": dm.group(1), "line": line}
+                    break
+    return best
+
+
+def script_thresholds(file_path: str) -> tuple[int, int]:
+    for suffix, pair in SCRIPT_THRESHOLDS.items():
+        if file_path.endswith(suffix) or suffix.endswith(file_path):
+            return pair
+    return SCRIPT_DEFAULT
 
 
 def main() -> int:
@@ -142,20 +172,22 @@ def main() -> int:
     total_size = end - start + 1
     scripts = script_block_sizes(text, start, end)
     largest_script = scripts[0] if scripts else None
-    helper_size = helper_region_size(text, start)
+    largest_def = largest_def_body(text, start)
+    s_warn, s_hard = script_thresholds(file_path)
 
-    # Decide verdict — failure on any of the three thresholds.
+    # Decide verdict — failure on any of the three checks.
     # Per-script is the dominant in-pipeline signal (each is its own CPS
-    # method); total catches maps of inline closures; helper-region catches
-    # the top-level def bodies the first two structurally cannot see.
+    # method, per-file calibrated); total catches maps of inline closures;
+    # per-def catches the top-level helper bodies the first two structurally
+    # cannot see (the unit is the single def — NEVER the region aggregate).
     total_fail = total_size >= TOTAL_HARD
     total_warn = total_size >= TOTAL_WARN
-    script_fail = largest_script is not None and largest_script["size"] >= SCRIPT_HARD
-    script_warn = largest_script is not None and largest_script["size"] >= SCRIPT_WARN
-    helper_fail = helper_size >= HELPER_HARD
-    helper_warn = helper_size >= HELPER_WARN
+    script_fail = largest_script is not None and largest_script["size"] >= s_hard
+    script_warn = largest_script is not None and largest_script["size"] >= s_warn
+    def_fail = largest_def is not None and largest_def["size"] >= DEF_HARD
+    def_warn = largest_def is not None and largest_def["size"] >= DEF_WARN
 
-    if total_fail or script_fail or helper_fail:
+    if total_fail or script_fail or def_fail:
         msg = [f"\n❌ {file_path}: Jenkinsfile method-size HARD limit exceeded"]
         if total_fail:
             msg.append(
@@ -166,28 +198,30 @@ def main() -> int:
             ls = largest_script
             msg.append(
                 f"   • largest script {{}} body: {ls['size']} bytes "
-                f"at line {ls['line']} (HARD {SCRIPT_HARD})"
+                f"at line {ls['line']} (HARD {s_hard} for this file; the root "
+                f"deploy block broke at 9,898B — builds #1519-#1521)"
             )
-        if helper_fail:
+        if def_fail:
+            ld = largest_def
             msg.append(
-                f"   • helper region above pipeline {{}}: {helper_size} "
-                f"comment-stripped bytes (HARD {HELPER_HARD}; empirical: "
-                f"10,519B broke builds #1519/#1520 at COMPILE time)"
+                f"   • largest top-level def `{ld['name']}` body: {ld['size']} "
+                f"comment-stripped bytes at line {ld['line']} (HARD {DEF_HARD})"
             )
         msg.append(
-            "   Each `script { }` body AND the top-level helper region "
-            "compile to CPS methods capped at 64KB JVM bytecode."
+            "   Each `script { }` body AND each top-level `def` compile to "
+            "their own CPS method capped at 64KB JVM bytecode."
         )
         msg.append(
-            "   Refactor: bash bodies move to scripts/ci/*.sh called via "
-            "one-line `sh \"bash '${env.WORKSPACE}/scripts/ci/<name>.sh' …\"` "
-            "(secrets via withEnv, never argv) — moving heredocs into "
-            "top-level helpers only relocates the breach."
+            "   Refactor: split the oversized method — bash bodies move to "
+            "scripts/ci/*.sh called via one-line "
+            "`sh \"bash '${env.WORKSPACE}/scripts/ci/<name>.sh' …\"` (secrets "
+            "via withEnv, never argv); dense groovy splits into several small "
+            "defs (each is its own CPS method — that's the relief valve)."
         )
         print("\n".join(msg), file=sys.stderr)
         return 2
 
-    if total_warn or script_warn or helper_warn:
+    if total_warn or script_warn or def_warn:
         msg = [f"\n⚠️  {file_path}: Jenkinsfile method-size WARN"]
         if total_warn:
             msg.append(
@@ -198,17 +232,18 @@ def main() -> int:
             ls = largest_script
             msg.append(
                 f"   • largest script {{}} body: {ls['size']} bytes "
-                f"at line {ls['line']} (WARN {SCRIPT_WARN}, HARD {SCRIPT_HARD})"
+                f"at line {ls['line']} (WARN {s_warn}, HARD {s_hard} for this file)"
             )
-        if helper_warn:
+        if def_warn:
+            ld = largest_def
             msg.append(
-                f"   • helper region above pipeline {{}}: {helper_size} "
-                f"comment-stripped bytes (WARN {HELPER_WARN}, HARD "
-                f"{HELPER_HARD}) — move bash heredocs to scripts/ci/*.sh"
+                f"   • largest top-level def `{ld['name']}`: {ld['size']} "
+                f"comment-stripped bytes at line {ld['line']} "
+                f"(WARN {DEF_WARN}, HARD {DEF_HARD})"
             )
         msg.append(
-            "   Extract bash bodies to scripts/ci/*.sh — heredocs in "
-            "top-level helpers count toward the CPS cap too."
+            "   Split early: small script blocks + small defs; bash bodies "
+            "to scripts/ci/*.sh."
         )
         print("\n".join(msg), file=sys.stderr)
         return 0
