@@ -36,6 +36,8 @@ export interface LookResult {
   console: { type: string; text: string }[];
   pageErrors: string[];
   failedRequests: { url: string; failure?: string }[];
+  /** HTTP responses with status >= 400 — the URLs behind bare console 404s. */
+  httpErrors: { url: string; status: number }[];
   shotPath: string;
   capturePath: string;
 }
@@ -123,8 +125,18 @@ export async function runLook(opts: LookOptions): Promise<LookResult> {
   );
 
   let result: LookResult;
+  const httpErrors: { url: string; status: number }[] = [];
   try {
     await device.init();
+    // PlaywrightDevice's failedRequests only carries network-level failures
+    // (requestfailed); HTTP error RESPONSES (4xx/5xx) never surface there, so
+    // capture.json showed "404" console noise with no URL. Record them here —
+    // additive field, framework device untouched (other consumers unaffected).
+    device.page.on('response', (...args: unknown[]) => {
+      const resp = args[0] as { url(): string; status(): number };
+      const status = resp.status();
+      if (status >= 400) httpErrors.push({ url: resp.url(), status });
+    });
     // Override the device's default 1280x720 viewport.
     await (
       device.page as unknown as {
@@ -171,6 +183,7 @@ export async function runLook(opts: LookOptions): Promise<LookResult> {
       console: device.consoleLogs.map(c => ({ type: c.level, text: c.text })),
       pageErrors: device.pageErrors.map(p => p.message),
       failedRequests: device.failedRequests.map(r => ({ url: r.url, failure: r.failure })),
+      httpErrors,
       shotPath,
       capturePath,
     };

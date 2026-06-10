@@ -2,12 +2,13 @@
    return promises that the test runner itself consumes; awaiting them is wrong. */
 import { strict as assert } from 'node:assert';
 import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { parseArgs, runLook } from '../look.js';
+import { parseArgs, runLook, type LookResult } from '../look.js';
 
 describe('parseArgs', () => {
   it('parses a bare url', () => {
@@ -69,10 +70,50 @@ describe('runLook (file:// hermetic render)', () => {
     assert.equal(result.title, 'Look Smoke');
     assert.equal(result.as, null);
     assert.deepEqual(result.pageErrors, []);
+    // No HTTP traffic at all → the additive httpErrors field is present and empty.
+    // (A file:// miss surfaces as requestfailed, never as an HTTP 4xx response.)
+    assert.deepEqual(result.httpErrors, []);
     // Files exist and are non-empty.
     assert.ok((await stat(result.shotPath)).size > 0, 'shot.png written');
-    const capture = JSON.parse(await readFile(result.capturePath, 'utf8'));
+    const capture = JSON.parse(await readFile(result.capturePath, 'utf8')) as LookResult;
     assert.equal(capture.ok, true);
     assert.equal(capture.title, 'Look Smoke');
+    assert.deepEqual(capture.httpErrors, []);
+  });
+});
+
+describe('runLook (localhost hermetic 404 capture)', () => {
+  it('records {url, status} for HTTP responses >= 400 in httpErrors', async () => {
+    // Hermetic localhost server: the page itself is a 200, its subresource 404s.
+    const server = createServer((req, res) => {
+      if (req.url === '/page.html') {
+        res.writeHead(200, { 'content-type': 'text/html' });
+        res.end('<!doctype html><title>404 Probe</title><img src="/missing.png">');
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as { port: number };
+
+    try {
+      const result = await runLook({
+        url: `http://127.0.0.1:${port}/page.html`,
+        out: 'unit-404',
+      });
+
+      assert.deepEqual(result.httpErrors, [
+        { url: `http://127.0.0.1:${port}/missing.png`, status: 404 },
+      ]);
+      // Additive contract: a 4xx subresource is recorded, not promoted to failure.
+      assert.equal(result.ok, true);
+      const capture = JSON.parse(await readFile(result.capturePath, 'utf8')) as LookResult;
+      assert.deepEqual(capture.httpErrors, result.httpErrors);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close(err => (err ? reject(err) : resolve()))
+      );
+    }
   });
 });
