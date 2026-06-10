@@ -71,6 +71,9 @@ done
 
 mkdir -p "$DEST_DIR"
 
+# Trap: clean up temp files on interrupt or exit
+trap 'rm -rf "$DEST_DIR"/.dl.* "$DEST_DIR"/.pull.* 2>/dev/null || true' EXIT
+
 # ----------------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------------
@@ -110,7 +113,7 @@ fetch_via_harbor() {
     curl -sI --max-time 5 "https://$HARBOR_HOST/v2/" >/dev/null 2>&1 || return 1
 
     if [ -n "$HARBOR_USER" ] && [ -n "$HARBOR_PASS" ]; then
-        oras login "$HARBOR_HOST" -u "$HARBOR_USER" -p "$HARBOR_PASS" >/dev/null 2>&1 || true
+        printf '%s' "$HARBOR_PASS" | oras login "$HARBOR_HOST" -u "$HARBOR_USER" --password-stdin >/dev/null 2>&1 || echo "⚠️  Harbor login failed — continuing with anonymous pull" >&2
     fi
 
     # Idempotence: compare the manifest digest with the cached copy's provenance.
@@ -152,16 +155,22 @@ fetch_via_harbor() {
 fetch_via_jenkins() {
     # Idempotence: Last-Modified + Content-Length from a HEAD request stand in
     # for a digest (Jenkins serves no ETag here).
-    local head_out last_modified content_length remote_id
-    head_out=$(curl -fsI --max-time 15 "$JENKINS_ARTIFACT_URL" 2>/dev/null) || {
+    local head_out last_modified content_length remote_id curl_exit
+    head_out=$(curl -fsI --max-time 15 "$JENKINS_ARTIFACT_URL" 2>/dev/null)
+    curl_exit=$?
+    if [ $curl_exit -ne 0 ]; then
         if [ -f "$DEST" ]; then
-            echo "   ⚠️  Jenkins unreachable — keeping existing cached bundle: $DEST"
+            if [ $curl_exit -eq 22 ]; then
+                echo "   ⚠️  Jenkins returned an HTTP error (artifact missing?) — keeping existing cached bundle: $DEST"
+            else
+                echo "   ⚠️  Jenkins unreachable — keeping existing cached bundle: $DEST"
+            fi
             echo "      ($(cat "$META" 2>/dev/null || echo 'provenance unknown'))"
             print_dna_hashes "cache (remote unreachable)"
             return 0
         fi
         return 1
-    }
+    fi
     last_modified=$(printf '%s' "$head_out" | tr -d '\r' | sed -n 's/^[Ll]ast-[Mm]odified: //p')
     content_length=$(printf '%s' "$head_out" | tr -d '\r' | sed -n 's/^[Cc]ontent-[Ll]ength: //p')
     remote_id="jenkins $DEPLOYED_HAPP_BRANCH lastSuccessfulBuild $last_modified $content_length"
