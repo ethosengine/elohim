@@ -63,6 +63,7 @@ pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;
 pub mod manifest_registry;
+pub mod measure;
 pub mod mastery_depth;
 pub mod mutuality_audit_service;
 pub mod peer_capacity_service;
