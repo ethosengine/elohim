@@ -139,9 +139,13 @@ fn dna_default_ratios() -> EffectiveRatios {
 }
 
 fn compute_manifest_cid(path: &str) -> String {
-    // Substrate-correct CID would hash the manifest bytes via the EPR cid module.
-    // For Sprint 3 we use a path-derived fingerprint; follow-up sprint upgrades.
-    format!("manifest-fingerprint:{path}")
+    // Substrate-correct CID: hash the manifest bytes via the EPR cid module
+    // (spec per-substrate-limitarian-governor-design §6.2 — the governed EPR
+    // must be content-addressed-in-fact, not fingerprinted-by-path).
+    match std::fs::read(path) {
+        Ok(bytes) => elohim_epr::cid::compute_cid(&bytes).to_string(),
+        Err(_) => format!("manifest-missing:{path}"),
+    }
 }
 
 #[cfg(test)]

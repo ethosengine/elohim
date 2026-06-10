@@ -63,6 +63,7 @@ pub mod imagodei_lookup; // Phase 4 T5 — display name resolver
 pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;
+pub mod limit_gradient_registry;
 pub mod manifest_registry;
 pub mod mastery_depth;
 pub mod measure;
