@@ -46,7 +46,14 @@
       "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/forget-decision-metadata.schema.json" },
       "uniqueness_anchor": "attestation:forget-decision:{subject_cid}:{request_cid}",
       "revocable_by": ["issuer", "governance"]
+    },
+    "attestation:limit-gradient-approval": {
+      "description": "Approval vote on a ratify-limit-gradient governance action. Vote-child of governance-action:ratify-limit-gradient.",
+      "subject_kinds": ["governance-action"],
+      "uniqueness_anchor": "attestation:limit-gradient-approval:{parent_governance_action_cid}:{issuer_cid}",
+      "revocable_by": ["issuer"]
     }
+  
   },
   "observation_kinds": [],
   "governance-actions": {
@@ -64,6 +71,12 @@
       "description": "Election of a governance role. New capability (previously not modeled).",
       "child_attestation_kind": "attestation:proposal-vote",
       "default_ballot_format": "ranked-choice"
+    },
+    "governance-action:ratify-limit-gradient": {
+      "description": "Ratify a per-substrate limitarian gradient (LimitGradientConfig) for a governance layer — the community supplying the limit a lower layer cannot set for itself. Spec: per-substrate-limitarian-governor-design §5.",
+      "child_attestation_kind": "attestation:limit-gradient-approval",
+      "default_ballot_format": "approve-reject"
     }
+  
   }
 }
