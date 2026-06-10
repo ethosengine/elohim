@@ -176,11 +176,16 @@ The pattern retires two empirically-proven failure modes (arc Task 1.2, commit `
 
 | Library | `./core` status |
 | --- | --- |
-| `@elohim/identity` | Pattern landing (plan Task 2). |
-| `@elohim/rea-runtime` | Pre-pave (plan Task 4). |
-| `@elohim/service` | Audit pending (plan Task 4). |
-| `@elohim/storage-client` | Audit pending (plan Task 4). |
-| `elohim-core` | Audit pending (plan Task 4). |
+| `@elohim/identity` | **Landed** (commits `b3edef551`, `8378b693f`): `type:module` + `./core` → `src/core.ts` with an enforced boundary spec. Discovery: the relative re-exports inside `core.ts` MUST carry explicit `.js` suffixes — Node16 ESM resolution in a `type:module` package rejects extensionless specifiers (surfaced as TS2307/TS2835 in a2o's typecheck). |
+| `@elohim/rea-runtime` | **Pre-paved** (plan Task 4): `type:module` + `./core` → `src/core.ts` exporting the four framework-free modules (`rea-action-types`, `protocol-event-types`, `lamad-event-intent.types`, `signal-emit-types`), boundary spec enforced. Excluded: the five Angular services + `shefa-di-tokens` (`@angular/core`), and `resource-explorer.model` (rxjs). `CommitmentService` (arc Phase 4) lands INTO this entry. |
+| `@elohim/service` | **Audited — no flip.** No non-Angular consumer today (a2o imports nothing from it; elohim-app consumes source via tsconfig alias; the CLI is in-package ts-node). Its dist-CJS `main`/`types` metadata is honest for its tsc build; `type:module` would risk the ts-node CLI for zero gain. When an external Node consumer arrives, `src/index.ts` (the Node-leaning barrel that already excludes browser-breaking parsers) is the natural `/core` precursor. |
+| `@elohim/storage-client` | **Audited — no flip.** dist is CJS (tsc `"module": "commonjs"`), so the absent `type` field is honest and `type:module` would break every consumer today. No `/core` needed: the entire package is framework-free (zero `@angular/*`), so the root entry — with its already-honest subpath exports map — IS the Node door. |
+| `elohim-core` | **Audited — already honest.** Ships `type:module` + a complete ESM exports map (Lit elements; zero `@angular/*` by construction). Nothing to flip; no `/core` subpath needed — the root entry is already framework-free. |
+
+Two dist-packaging caveats (identity review, 2026-06-10):
+
+1. ng-packagr copies the `./core` condition **verbatim** (`./src/core.ts`) into the dist `package.json` but does not ship `src/` — fine for today's source-alias consumers, but MUST be revisited before any npm/dist publishing of these libraries.
+2. ng-packagr emits benign `"conflicting export condition"` warnings for `"."` on every build (it overrides the source-form `types`/`default` conditions with its generated FESM entries). Accepted trade-off — do not chase.
 
 Plan: `genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md`.
 
