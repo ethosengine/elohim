@@ -1,18 +1,22 @@
-//! Token decay service — obligation-proportional balance decay with dignity floor.
+//! Token decay service — continuous limitarian balance decay with dignity floor.
 //!
 //! Tokens behave like memories: stories that aren't retold fade. The decay rate
-//! scales with an agent's obligation level — the more concentrated their position,
-//! the faster unsteward-ed tokens erode. The dignity floor is always protected.
+//! follows a continuous limitarian curve (spec §3): shape rises with wealth
+//! concentration C above the governed extinction setpoint C_target; rank rises
+//! with the agent's relational position b̂ = b_i/μ. The dignity floor always
+//! silences decay — no agent decays below the sufficientarian gate.
 //!
-//! ## Decay Rates by Obligation Level
+//! ## Rate Function (continuous — replaces the 5-rung step)
 //!
-//! | Level     | Rate per period | Notes |
-//! |-----------|----------------|-------|
-//! | Supported | 0.0%           | Protected — community is supporting this agent |
-//! | Normal    | 0.1%           | Ordinary participant; gentle pressure to remain active |
-//! | Elevated  | 0.5%           | Increased visibility obligations; faster fade if dormant |
-//! | High      | 2.0%           | Active stewardship expected; significant decay if idle |
-//! | Extreme   | 5.0%           | Constitutional review; fastest decay to prevent lock-in |
+//! ```text
+//!   shape(C)  = 1 + k_s · relu(C − C_target)
+//!   rank(b̂)   = b̂^γ
+//!   rate      = clamp(base_rate · shape · rank, 0, k_max)
+//! ```
+//!
+//! apply_decay Steps 4-6 (decay_amount, dignity-floor clamp, audit row) are
+//! reused verbatim (spec §3 honest costing). The ObligationLevel label string
+//! is kept for audit continuity.
 
 use diesel::SqliteConnection;
 use serde::Serialize;
@@ -47,21 +51,49 @@ pub struct DecayResult {
 }
 
 // ============================================================================
-// Pure Function
+// Pure Functions
 // ============================================================================
 
-/// Pure decay rate lookup — no I/O, fully unit-testable.
-///
-/// Returns the fraction of balance to remove per decay period for the given
-/// obligation level. `Supported` always returns 0.0 (no decay while protected).
-pub fn calculate_decay_rate(level: &ObligationLevel) -> f32 {
-    match level {
-        ObligationLevel::Supported => 0.0,
-        ObligationLevel::Normal => 0.001,
-        ObligationLevel::Elevated { .. } => 0.005,
-        ObligationLevel::High { .. } => 0.02,
-        ObligationLevel::Extreme { .. } => 0.05,
+/// The ratifiable gradient parameters (spec §3/§5.1 payload shape; every
+/// numeric default is in-wall and marked TBD-operator at the wall layer).
+#[derive(Debug, Clone, Copy)]
+pub struct GradientConfig {
+    pub base_rate: f32,     // default 0.001 — the old Normal rung becomes the curve floor
+    pub dignity_floor: f32, // sufficientarian gate; decay OFF below
+    pub gamma: f32,         // rank exponent; friction exponent = 1+gamma
+    pub k_max: f32,         // per-tick confiscation ceiling (top-side dignity)
+    pub c_target: f32,      // governed extinction setpoint (NOT zero — spec §4.4)
+    pub k_s: f32,           // shape gain
+    pub alpha: f32,         // GE order, wall [1,2]
+    pub q: f32,             // top-share quantile
+    pub w_e: f32,           // composite weight: shape term
+    pub w_s: f32,           // composite weight: tail term
+}
+
+impl Default for GradientConfig {
+    fn default() -> Self {
+        // In-wall, value-laden core defaults (spec §5.1 payload defaults).
+        Self { base_rate: 0.001, dignity_floor: 100.0, gamma: 1.0, k_max: 0.05,
+               c_target: 0.15, k_s: 0.5, alpha: 1.0, q: 0.01, w_e: 0.6, w_s: 0.4 }
     }
+}
+
+/// Continuous limitarian rate (spec §3, signature per the §11 done-when test —
+/// arc decision #3: the composite C drives the shape term; S_q is folded into
+/// C via w_s, not a separate factor).
+///
+///   shape(C)   = 1 + k_s · relu(C − C_target)
+///   rank(b̂)    = b̂^γ          (b̂ = b_i/μ — the agent's RELATIONAL position)
+///   rate       = clamp(base_rate · shape · rank, 0, k_max)
+///
+/// The sufficientarian floor_factor is applied by the CALLER (decay is skipped
+/// entirely below dignity_floor); downstream of the rate, apply_decay Steps 4-6
+/// (decay_amount, the .max(dignity_floor) clamp, the audit row) are REUSED
+/// VERBATIM (spec §3 honest costing).
+pub fn calculate_decay_rate_continuous(b_hat: f32, c: f32, g: &GradientConfig) -> f32 {
+    let shape = 1.0 + g.k_s * (c - g.c_target).max(0.0);
+    let rank = b_hat.max(0.0).powf(g.gamma);
+    (g.base_rate * shape * rank).clamp(0.0, g.k_max)
 }
 
 /// Human-readable label for an obligation level (used in audit records).
@@ -152,10 +184,14 @@ impl TokenDecayService {
             Some(ref row) => row.balance,
         };
 
-        // Step 3 — obligation level
+        // Step 3 — obligation level (label kept for audit continuity) + continuous rate
         let level = evaluate_position(balance, &config);
-        let rate = calculate_decay_rate(&level);
         let label = obligation_level_label(&level).to_string();
+        let g = GradientConfig::default(); // Task 6 will swap to the registry read
+        let mu_estimate = config.median_estimate; // Task 6 swaps to the snapshot's mu
+        let b_hat = if mu_estimate > 0.0 { balance / mu_estimate } else { 1.0 };
+        let c = 0.0_f32; // placeholder until Task 6 wires the snapshot; rate = base_rate·b̂^γ clamped
+        let rate = if balance < g.dignity_floor { 0.0 } else { calculate_decay_rate_continuous(b_hat, c, &g) };
 
         // Step 4 — raw decay
         let decay_amount = balance * rate;
@@ -215,52 +251,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_decay_rate_supported_zero() {
-        let rate = calculate_decay_rate(&ObligationLevel::Supported);
-        assert_eq!(rate, 0.0, "Supported must have zero decay");
+    fn continuous_rate_at_target_equals_base_rate_for_mean_agent() {
+        let g = GradientConfig::default();
+        let r = calculate_decay_rate_continuous(1.0, g.c_target, &g);
+        assert!((r - g.base_rate).abs() < 1e-6, "rate at (b̂=1, C=C_target) must be base_rate, got {r}");
     }
 
     #[test]
-    fn test_decay_rate_normal() {
-        let rate = calculate_decay_rate(&ObligationLevel::Normal);
-        assert!(
-            (rate - 0.001).abs() < f32::EPSILON,
-            "Normal decay rate must be 0.001, got {rate}"
-        );
+    fn continuous_rate_monotone_in_concentration() {
+        let g = GradientConfig::default();
+        let r_low = calculate_decay_rate_continuous(2.0, g.c_target, &g);
+        let r_mid = calculate_decay_rate_continuous(2.0, g.c_target + 0.2, &g);
+        let r_high = calculate_decay_rate_continuous(2.0, g.c_target + 0.5, &g);
+        assert!(r_low < r_mid && r_mid < r_high, "rate must rise with C: {r_low} {r_mid} {r_high}");
     }
 
     #[test]
-    fn test_decay_rate_elevated() {
-        let rate = calculate_decay_rate(&ObligationLevel::Elevated {
-            visibility_required: true,
-        });
-        assert!(
-            (rate - 0.005).abs() < f32::EPSILON,
-            "Elevated decay rate must be 0.005, got {rate}"
-        );
+    fn continuous_rate_monotone_in_relational_position() {
+        let g = GradientConfig::default();
+        let c = g.c_target + 0.3;
+        let r1 = calculate_decay_rate_continuous(1.0, c, &g);
+        let r4 = calculate_decay_rate_continuous(4.0, c, &g);
+        assert!(r4 > r1, "rate must rise with b̂ (super-linear friction): {r1} vs {r4}");
     }
 
     #[test]
-    fn test_decay_rate_high() {
-        let rate = calculate_decay_rate(&ObligationLevel::High {
-            stewardship_required: true,
-            justification_required: true,
-        });
-        assert!(
-            (rate - 0.02).abs() < f32::EPSILON,
-            "High decay rate must be 0.02, got {rate}"
-        );
+    fn continuous_rate_clamped_at_k_max() {
+        let g = GradientConfig::default();
+        let r = calculate_decay_rate_continuous(1_000.0, 0.99, &g);
+        assert!((r - g.k_max).abs() < 1e-6, "rate must clamp at k_max, got {r}");
     }
 
     #[test]
-    fn test_decay_rate_extreme() {
-        let rate = calculate_decay_rate(&ObligationLevel::Extreme {
-            elohim_review_required: true,
-            constitutional_justification: true,
-        });
-        assert!(
-            (rate - 0.05).abs() < f32::EPSILON,
-            "Extreme decay rate must be 0.05, got {rate}"
-        );
+    fn continuous_rate_never_negative_below_target() {
+        let g = GradientConfig::default();
+        let r = calculate_decay_rate_continuous(0.5, 0.0, &g);
+        assert!(r >= 0.0 && r <= g.base_rate, "below-target rate bounded by base_rate·b̂^γ, got {r}");
     }
 }
