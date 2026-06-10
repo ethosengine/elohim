@@ -32,3 +32,10 @@ export * from './lib/session-human.service';
 // Attestation primitives — LANDED
 // ============================================================================
 export * from './lib/attestations.model';
+
+// ============================================================================
+// Doorway session client — LANDED (arc plan 2026-06-10 Phase 1 Task 1.1)
+// Framework-free auth surface client; consolidates hand-rolled auth walking
+// (elohim-app AuthService / a2o DoorwayClient / a2o BrowserDevice).
+// ============================================================================
+export * from './lib/doorway-session-client';
