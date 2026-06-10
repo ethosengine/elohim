@@ -2,6 +2,17 @@
   "name": "@elohim/rea-runtime",
   "version": "0.1.0",
   "description": "Elohim REA runtime — Economic Event services, Commitment action types, signal-bearing primitives per rea-compute-commitment-primitive.md",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/public-api.ts",
+      "default": "./src/public-api.ts"
+    },
+    "./core": {
+      "types": "./src/core.ts",
+      "default": "./src/core.ts"
+    }
+  },
   "sideEffects": false,
   "peerDependencies": {
     "@angular/common": "^19.2.0",
