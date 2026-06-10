@@ -50,7 +50,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket } from '@holochain/client';
-import { deterministicPeerId, type Archetype } from './peer-id.js';
+import { deterministicPeerId, resolvePeerId, type Archetype } from './peer-id.js';
 
 // Canonical artifact filename from build-artifacts.json — single source of
 // truth across Groovy + TypeScript + JS. See seed-conductor-identities.ts
@@ -300,7 +300,16 @@ async function seedBindingsForHuman(
       const validFromMicros = Date.now() * 1000;
 
       for (const archetype of plans) {
-        const peerId = deterministicPeerId(human.id, archetype);
+        // Join-coherence contract with seed-commitments (peer-id.ts header):
+        // the 'desktop' archetype IS the human's live alpha pod (custody
+        // pairs key on 'desktop'), so its binding must carry the pod's REAL
+        // libp2p peer id or cluster_view/reciprocity_view joins against
+        // custody commitments silently return empty. Other archetypes are
+        // declared-but-not-running devices — Stage-1 deterministic ids.
+        const peerId =
+          archetype === 'desktop'
+            ? await resolvePeerId(human.id, archetype)
+            : deterministicPeerId(human.id, archetype);
         const input: CreateAgentPeerBindingInput = {
           peer_id: peerId,
           agent_cid: human.id,

@@ -10,7 +10,7 @@
  *   ALPHA_BASE_URL=https://app.elohim.host \
  *   MATTHEW_USERNAME=matthew.dowell@alpha.elohim.host \
  *   MATTHEW_PASSWORD=TestAdmin2026! \
- *   M1_BLOB_HASH=sha256-... \
+ *   CONTENT_BLOB_HASH=sha256-... \
  *   npx tsx src/probe-topology-m1.ts
  */
 
@@ -22,7 +22,7 @@ const BASE = process.env.ALPHA_BASE_URL || 'https://alpha.elohim.host';
 const DOORWAY = process.env.ALPHA_DOORWAY_URL || 'https://doorway-alpha.elohim.host';
 const USER = process.env.MATTHEW_USERNAME || 'matthew.dowell@alpha.elohim.host';
 const PASS = process.env.MATTHEW_PASSWORD || 'TestAdmin2026!';
-const BLOB = process.env.M1_BLOB_HASH || '';
+const BLOB = process.env.CONTENT_BLOB_HASH || '';
 const OUT_DIR = resolve(process.cwd(), '.claude/shifts/m1-probe');
 
 mkdirSync(OUT_DIR, { recursive: true });
@@ -111,7 +111,7 @@ async function checkContentViewer(page: Page): Promise<void> {
     results.push({
       name: 'D1+D6: blob-backed content viewer',
       ok: false,
-      detail: 'M1_BLOB_HASH not set — skipped',
+      detail: 'CONTENT_BLOB_HASH not set — skipped',
     });
     return;
   }

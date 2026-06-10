@@ -31,7 +31,12 @@ import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DoorwayClient } from './doorway-client.js';
-import { deterministicPeerId, type Archetype } from './peer-id.js';
+import {
+  deterministicPeerId,
+  resolvePeerId,
+  type Archetype,
+  type ResolvePeerIdOptions,
+} from './peer-id.js';
 
 // =============================================================================
 // Suspended-persona guard
@@ -125,6 +130,31 @@ function normalizeBlobHash(input: string): string {
   return input.startsWith('sha256-') ? input : `sha256-${input}`;
 }
 
+/** Resolved provider/receiver peer-id pair for one custody commitment. */
+export interface CustodyPeerIds {
+  provider: string;
+  receiver: string;
+}
+
+/**
+ * Resolve the REAL libp2p peer ids for a custody pair from each human's live
+ * storage pod (Stage 2 — peer-id.ts). Role semantics are untouched: the
+ * pair's providerHumanId stays the provider, receiverHumanId the receiver;
+ * only the id VALUE changes from the Stage-1 deterministic fake to the pod's
+ * real peer id. This is what makes the row actionable: elohim-storage's
+ * custody sweep kicks a blob fetch iff commitment.provider == the node's
+ * REAL peer id, which a Stage-1 fake id can never equal.
+ */
+export async function resolveCustodyPeerIds(
+  pair: CustodyPair,
+  opts: ResolvePeerIdOptions = {}
+): Promise<CustodyPeerIds> {
+  return {
+    provider: await resolvePeerId(pair.providerHumanId, pair.providerArchetype, opts),
+    receiver: await resolvePeerId(pair.receiverHumanId, pair.receiverArchetype, opts),
+  };
+}
+
 /**
  * Build a CreateReaCommitmentInputView body for a single custody-blob pair.
  *
@@ -132,10 +162,19 @@ function normalizeBlobHash(input: string): string {
  * receiver_peer, blob_hash) tuple — re-runs produce identical ids and the
  * doorway POST handler returns 409 (idempotent). Distinct tuples produce
  * distinct ids so genuine shape drift surfaces as 400 (fail-fast).
+ *
+ * `peerIds` carries the resolved REAL peer ids (resolveCustodyPeerIds); when
+ * omitted the body falls back to Stage-1 deterministic ids — isolated
+ * shape-tests only. The live seed path always resolves first.
  */
-export function buildCustodyCommitmentBody(pair: CustodyPair): CommitmentBody {
-  const providerPeerId = deterministicPeerId(pair.providerHumanId, pair.providerArchetype);
-  const receiverPeerId = deterministicPeerId(pair.receiverHumanId, pair.receiverArchetype);
+export function buildCustodyCommitmentBody(
+  pair: CustodyPair,
+  peerIds?: CustodyPeerIds
+): CommitmentBody {
+  const providerPeerId =
+    peerIds?.provider ?? deterministicPeerId(pair.providerHumanId, pair.providerArchetype);
+  const receiverPeerId =
+    peerIds?.receiver ?? deterministicPeerId(pair.receiverHumanId, pair.receiverArchetype);
   const blob = normalizeBlobHash(pair.blobHash);
 
   const idDigest = createHash('sha256')
@@ -171,13 +210,13 @@ export function buildCustodyCommitmentBody(pair: CustodyPair): CommitmentBody {
  * set process.env before invoking — the function is only called from main or
  * from tests, never at module initialisation).
  */
-export function defaultM1Pairs(): CustodyPair[] {
-  const blobHash = process.env.M1_BLOB_HASH || '';
-  const blobSizeBytes = parseInt(process.env.M1_BLOB_SIZE_BYTES || '0', 10);
+export function defaultCustodyPairs(): CustodyPair[] {
+  const blobHash = process.env.CONTENT_BLOB_HASH || '';
+  const blobSizeBytes = parseInt(process.env.CONTENT_BLOB_SIZE_BYTES || '0', 10);
 
   if (!blobHash || blobSizeBytes <= 0) {
     console.error(
-      'ERROR: M1_BLOB_HASH and M1_BLOB_SIZE_BYTES must be set (or pass CUSTODY_PAIRS_JSON).',
+      'ERROR: CONTENT_BLOB_HASH and CONTENT_BLOB_SIZE_BYTES must be set (or pass CUSTODY_PAIRS_JSON).',
     );
     process.exit(1);
   }
@@ -264,7 +303,9 @@ export async function seedCustodyCommitments(
   let alreadyExists = 0;
 
   for (const pair of pairs) {
-    const body = buildCustodyCommitmentBody(pair);
+    // Real peer ids from the live storage pods — per-host cached, so the
+    // activate phase below recomputes the SAME content-addressed body.id.
+    const body = buildCustodyCommitmentBody(pair, await resolveCustodyPeerIds(pair));
     const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
 
     const response = await client.createCommitment(body);
@@ -319,7 +360,9 @@ export async function activateCustodyCommitments(
   let missing = 0;
 
   for (const pair of pairs) {
-    const body = buildCustodyCommitmentBody(pair);
+    // Same resolver as the seed phase — the per-host cache (peer-id.ts)
+    // guarantees an identical id even if a pod flapped between phases.
+    const body = buildCustodyCommitmentBody(pair, await resolveCustodyPeerIds(pair));
     const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
 
     const response = await client.patchCommitmentState(body.id, 'active', body.metadata);
@@ -361,7 +404,7 @@ if (isMain) {
   const pairsJsonPath = process.env.CUSTODY_PAIRS_JSON;
   const pairs: CustodyPair[] = pairsJsonPath
     ? (JSON.parse(readFileSync(pairsJsonPath, 'utf-8')) as CustodyPair[])
-    : defaultM1Pairs();
+    : defaultCustodyPairs();
 
   // The terrance-drift flag: never seed custody for suspended personas.
   assertPairsNotSuspended(pairs, loadSuspendedHumanPrefixes());

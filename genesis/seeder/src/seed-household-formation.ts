@@ -18,7 +18,7 @@
  *      PROVIDER's own conductor (lamad cell). Self-skips when M1 blob env unset.
  *
  * Env: CONDUCTOR_URLS (comma-separated app WS urls), INSTALLED_APP_ID prefix
- * (default 'elohim'), M1_BLOB_HASH + M1_BLOB_SIZE_BYTES (custody payload;
+ * (default 'elohim'), CONTENT_BLOB_HASH + CONTENT_BLOB_SIZE_BYTES (custody payload;
  * custody layer self-skips when absent), HOUSEHOLD_SALT (32 hex; deterministic
  * default), HOUSEHOLD_NONCE_PREFIX (default 'genesis').
  *
@@ -443,8 +443,8 @@ async function main(): Promise<void> {
   const appIdPrefix = process.env.INSTALLED_APP_ID ?? 'elohim';
   const salt = process.env.HOUSEHOLD_SALT ?? 'f00df00df00df00df00df00df00df00d';
   const noncePrefix = process.env.HOUSEHOLD_NONCE_PREFIX ?? 'genesis';
-  const blobHash = process.env.M1_BLOB_HASH ?? '';
-  const blobSizeBytes = parseInt(process.env.M1_BLOB_SIZE_BYTES ?? '0', 10);
+  const blobHash = process.env.CONTENT_BLOB_HASH ?? '';
+  const blobSizeBytes = parseInt(process.env.CONTENT_BLOB_SIZE_BYTES ?? '0', 10);
 
   const conductorUrls = conductorUrlsRaw
     .split(',')
@@ -626,7 +626,7 @@ async function main(): Promise<void> {
 
   const haveBlob = blobHash.length > 0 && blobSizeBytes > 0;
   if (!haveBlob) {
-    console.warn('[!] M1_BLOB_HASH / M1_BLOB_SIZE_BYTES unset — skipping custody mesh.');
+    console.warn('[!] CONTENT_BLOB_HASH / CONTENT_BLOB_SIZE_BYTES unset — skipping custody mesh.');
   } else {
     const affirmedMembers = HOUSEHOLD_MEMBERS.filter(m => affirmed.has(m.humanId));
     for (const provider of affirmedMembers) {
