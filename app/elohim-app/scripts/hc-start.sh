@@ -15,6 +15,15 @@
 #   STORAGE_PORT     Storage HTTP port (default: 8090)
 #   STORAGE_DIR      Storage data directory (default: /tmp/elohim-storage)
 #   SEED_LIMIT       Number of items to seed with --seed (default: 200)
+#   NETWORK_PROFILE  Conductor network profile (default: isolated)
+#                      isolated   - island DHT, no external peers (today's behavior)
+#                      join-alpha - join the alpha DHT via the deployed doorway's
+#                                   bootstrap + signal servers (requires DNA-hash
+#                                   parity with the deployed bundles)
+#   CONDUCTOR_BOOTSTRAP_URL  Bootstrap URL, join-alpha only
+#                            (default: https://doorway-alpha.elohim.host/bootstrap)
+#   CONDUCTOR_SIGNAL_URL     WebRTC signal URL, join-alpha only
+#                            (default: wss://doorway-alpha.elohim.host/signal)
 #
 # COMPONENTS:
 #   1. Holochain Conductor - Cryptographic provenance & agent identity
@@ -51,6 +60,7 @@ HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
 # Environment with defaults
 : "${STORAGE_PORT:=8090}"
 : "${SEED_LIMIT:=200}"
+: "${NETWORK_PROFILE:=isolated}"
 
 # Options
 RUN_SEED=false
@@ -96,12 +106,46 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ============================================================================
+# Network Profile
+# ============================================================================
+# isolated   (default) - island DHT; the generate command is byte-identical to
+#                        the historical behavior. No external peers.
+# join-alpha           - the local conductor joins the alpha DHT via the deployed
+#                        doorway's bootstrap + signal endpoints. Holochain appends
+#                        /{pubkey} to the signal URL client-side; path-based
+#                        routing on the main host handles this. (The deployed
+#                        edgenode reference uses the subdomain form
+#                        wss://signal.doorway-alpha.elohim.host as an alternative.)
+# NOTE: doorway's own BOOTSTRAP_URL/SIGNAL_URL env vars are a different concern
+# (Tauri native-handoff channel) — these CONDUCTOR_* vars are conductor-only.
+
+case "$NETWORK_PROFILE" in
+    isolated)
+        ;;
+    join-alpha)
+        : "${CONDUCTOR_BOOTSTRAP_URL:=https://doorway-alpha.elohim.host/bootstrap}"
+        : "${CONDUCTOR_SIGNAL_URL:=wss://doorway-alpha.elohim.host/signal}"
+        ;;
+    *)
+        echo "Unknown NETWORK_PROFILE: '$NETWORK_PROFILE' (expected: isolated | join-alpha)"
+        exit 1
+        ;;
+esac
+
+# ============================================================================
 # Functions
 # ============================================================================
 
 get_admin_port() {
+    local port
     if [ -f "$HC_PORTS_FILE" ]; then
-        grep "admin_port" "$HC_PORTS_FILE" | grep -o "[0-9]*" | head -1
+        port=$(grep "admin_port" "$HC_PORTS_FILE" | grep -o "[0-9]*" | head -1)
+        # Staleness guard: the ports file survives conductor crashes/restarts.
+        # Only trust the recorded port if something actually accepts a TCP
+        # connection there; otherwise return nothing so callers regenerate.
+        if [ -n "$port" ] && timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+            echo "$port"
+        fi
     fi
 }
 
@@ -179,6 +223,12 @@ CONDUCTOR_RUNNING=false
 if [ -n "$ADMIN_PORT" ] && hc sandbox call --running "$ADMIN_PORT" list-apps >/dev/null 2>&1; then
     echo "   ✅ Conductor already running on port $ADMIN_PORT"
     CONDUCTOR_RUNNING=true
+    if [ "$NETWORK_PROFILE" = "join-alpha" ]; then
+        echo "   ⚠️  NETWORK_PROFILE=join-alpha requested, but the network profile"
+        echo "      only applies at sandbox generate time. This conductor keeps"
+        echo "      whatever network config it was generated with."
+        echo "      To re-generate: npm run hc:stop, then re-run with the profile."
+    fi
 fi
 
 if [ "$CONDUCTOR_RUNNING" = false ]; then
@@ -191,10 +241,32 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
     SANDBOX_LOG="$LOCAL_DEV_DIR/.sandbox_log"
     HC_WRAPPER="$LOCAL_DEV_DIR/.hc_wrapper.sh"
 
-    cat > "$HC_WRAPPER" << EOF
+    if [ "$NETWORK_PROFILE" = "join-alpha" ]; then
+        echo ""
+        echo "   ╔══════════════════════════════════════════════════════════════╗"
+        echo "   ║  🌐 NETWORK_PROFILE=join-alpha — JOINING THE ALPHA DHT         ║"
+        echo "   ╚══════════════════════════════════════════════════════════════╝"
+        echo "   Bootstrap: $CONDUCTOR_BOOTSTRAP_URL"
+        echo "   Signal:    $CONDUCTOR_SIGNAL_URL"
+        echo ""
+        echo "   ⚠️  DNA-HASH PARITY REQUIRED: this stack installs the locally"
+        echo "      built hApp ($HAPP_PATH)."
+        echo "      If its DNA hashes differ from the deployed alpha bundles,"
+        echo "      this peer lands on a PARTITIONED DHT (same network endpoints,"
+        echo "      different DHTs — peers will never see each other's data)."
+        echo "      Deployed-bundle fetch (scripts/fetch-deployed-dna.sh) lands"
+        echo "      in arc plan Task 2.2; until then verify hashes manually."
+        echo ""
+        cat > "$HC_WRAPPER" << EOF
+#!/bin/bash
+exec hc sandbox generate --app-id elohim --in-process-lair -r=4445 "$HAPP_PATH" network --bootstrap "$CONDUCTOR_BOOTSTRAP_URL" webrtc "$CONDUCTOR_SIGNAL_URL"
+EOF
+    else
+        cat > "$HC_WRAPPER" << EOF
 #!/bin/bash
 exec hc sandbox generate --app-id elohim --in-process-lair -r=4445 "$HAPP_PATH"
 EOF
+    fi
     chmod +x "$HC_WRAPPER"
 
     rm -f "$SANDBOX_LOG"

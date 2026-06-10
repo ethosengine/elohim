@@ -217,6 +217,14 @@ pnpm run hc:start
 pnpm start
 ```
 
+### Developer network profiles
+
+| Profile | Command | What you get |
+|---------|---------|--------------|
+| `isolated` (default) | `pnpm run hc:start` | Full local stack on an island DHT — local conductor, storage, doorway; no external peers. |
+| `live-data` | `pnpm start:alpha` | Local UI against deployed alpha data via the dev proxy (`proxy.conf.alpha.mjs`); HTTP contexts only — no local conductor in the data path. Read-mostly polish loops. |
+| `join-alpha` | `NETWORK_PROFILE=join-alpha pnpm run hc:start` | Local conductor joins the alpha DHT via the deployed doorway's bootstrap+signal. Requires DNA-hash parity with the deployed bundles (fetch script lands in arc plan Task 2.2) — mismatched hashes = partitioned DHT. Override endpoints with `CONDUCTOR_BOOTSTRAP_URL` / `CONDUCTOR_SIGNAL_URL`. |
+
 <!-- ci-marker(2026-05-24, retrigger after nexus PVC recovery): App pipeline rebuild after stageSpaBlob URL + 413 fixes.
      The orchestrator's graph-walker change-patterns for the App pipeline don't
      yet include genesis/orchestrator/manifests/elohim-app/** — so ingress changes
