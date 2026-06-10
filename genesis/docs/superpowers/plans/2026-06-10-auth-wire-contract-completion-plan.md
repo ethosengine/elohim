@@ -51,17 +51,17 @@ sibling test lands in doorway: **investigate first**, the existing contract harn
 elohim-storage; doorway structs need an equivalent — follow the established pattern, do not
 invent a parallel mechanism); `elohim/sdk/schemas/scripts/codegen-ts.mjs` `INTERFACE_FILES`.
 
-- [ ] Write the five schemas per `views/CONVENTIONS.md` (10 rules), field-for-field with
+- [x] Write the five schemas per `views/CONVENTIONS.md` (10 rules), field-for-field with
       `doorway/doorway-service/src/routes/auth_routes.rs` (AuthResponse :164 incl. the
       absent-when-false `isSteward`; MeResponse :248-264 incl. `trustMode`/`authority`;
       ExchangeSessionResponse :88; SessionTokenResponse :78; AccountResponse :283-311 flat shape)
-- [ ] Contract tests pinning the Rust structs to the schemas (investigate-first note above;
+- [x] Contract tests pinning the Rust structs to the schemas (investigate-first note above;
       record the mechanism decision in one journal line before coding)
-- [ ] Add to `INTERFACE_FILES`; `pnpm run schema:codegen:ts`; pre-push freshness gate passes
+- [x] Add to `INTERFACE_FILES`; `pnpm run schema:codegen:ts`; pre-push freshness gate passes
       (codegen of operational wire shapes — storage untouched)
-- [ ] Reconcile `@elohim/identity`'s hand-matched types to the generated interfaces — ONE source:
+- [x] Reconcile `@elohim/identity`'s hand-matched types to the generated interfaces — ONE source:
       identity re-exports/extends the generated shapes (no second hand-written copy survives)
-- [ ] a2o + identity suites green (the consumers of those types). Commit (schema + tests + codegen
+- [x] a2o + identity suites green (the consumers of those types). Commit (schema + tests + codegen
       together).
 
 ## Task 2: elohim-app `auth.service.ts` onto `DoorwaySessionClient`
@@ -96,6 +96,18 @@ platform tokenStore adapter in the imagodei pillar.
       declarations remain anywhere outside generated dirs + the identity re-export
 - [ ] Update the two backlog entries (this plan's cites) to `resolved-by:` lines; re-run
       `decompose.py` on this plan; `placement-audit.py --ledger` reflects the drain. Commit.
+
+
+## Execution log (2026-06-10)
+
+- **T1 LANDED, review interrupted:** 09becf281 (7 schemas — 5 + $ref'd authority-ref/human-profile;
+  sibling doorway harness, 14/14 contract tests, clippy/fmt clean; codegen idempotent) + 3b3a89d4d
+  (identity types → generated re-exports; identity became the SIXTH codegen distribution location —
+  implementer correctly rejected the storage-client import premise as wrong-source + bad dependency
+  direction for /core; suites 70 + 108 green, a2o tsc clean). Independent two-lens review was
+  dispatched but **terminated by the account spend limit after 31 tool calls — re-review queued as
+  the first action when work resumes.** Boxes below are CLAIMS with implementer evidence only.
+- T2-T4 not started. T2 next (elohim-app auth.service migration).
 
 ## Out of scope
 
