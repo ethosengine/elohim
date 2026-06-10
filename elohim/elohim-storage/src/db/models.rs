@@ -3642,4 +3642,8 @@ pub struct NewConcentrationSnapshot {
     pub alpha: f32,
     /// Top-quantile parameter (renamed from `q` — Diesel reserves `q` as a macro identifier).
     pub top_q: f32,
+    /// Caller-supplied (single ISO-8601 format everywhere): keeps the id slug's
+    /// timestamp and this column consistent by construction, and lets a future
+    /// scheduler guarantee id uniqueness (T3-review flag).
+    pub computed_at: String,
 }

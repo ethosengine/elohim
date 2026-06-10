@@ -57,6 +57,7 @@ impl ConcentrationService {
             c_composite: composite_concentration(balances, g.alpha, g.q, g.w_e, g.w_s),
             alpha: g.alpha,
             top_q: g.q,
+            computed_at: computed_at.to_string(),
         };
         Ok(SnapshotOutcome::Written(insert_snapshot(conn, row)?))
     }
@@ -119,6 +120,7 @@ mod tests {
             substrate_signal: "attention".into(), governance_layer: "community".into(),
             n: 5, mu: 1.0, ge: 0.0, ge_squashed: 0.0, top_share: 0.2,
             gini: 0.0, c_composite: 0.08, alpha: 1.0, top_q: 0.01,
+            computed_at: "t".into(),
         };
         let json = serde_json::to_string(&serde_json::json!({
             "id": row.id, "hAppId": row.h_app_id, "substrateSignal": row.substrate_signal,

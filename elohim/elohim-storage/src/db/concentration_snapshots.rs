@@ -61,6 +61,7 @@ mod tests {
             c_composite: 0.22,
             alpha: 1.0,
             top_q: 0.01,
+            computed_at: "2026-06-10T03:00:00Z".into(),
         };
         insert_snapshot(&mut conn, row).expect("insert");
         let got = latest_snapshot(&mut conn, "shefa", "attention", "community")
