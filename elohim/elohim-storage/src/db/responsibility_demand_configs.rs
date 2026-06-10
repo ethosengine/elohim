@@ -130,10 +130,17 @@ pub fn apply_ratification(
     dignity_floor: f32,
     ratified_at: &str,
 ) -> QueryResult<usize> {
+    // FIRST-QUORUM-WINS (whole-arc review W1): tally recompute runs on EVERY
+    // vote, so post-quorum votes would otherwise re-stamp ratified_at and
+    // shift dht_anchor_hash to the latest vote's signal — vote-order-dependent
+    // projection state across peers. The IS NULL guard pins the stamp to the
+    // quorum-crossing vote; a superseding ratification is a NEW Commitment
+    // whose projector clears/replaces the row deliberately, never a re-stamp.
     diesel::update(
         responsibility_demand_configs::table
             .filter(responsibility_demand_configs::h_app_id.eq(h_app_id))
-            .filter(responsibility_demand_configs::governance_layer.eq(governance_layer)),
+            .filter(responsibility_demand_configs::governance_layer.eq(governance_layer))
+            .filter(responsibility_demand_configs::ratified_by.is_null()),
     )
     .set((
         responsibility_demand_configs::ratified_by.eq(ratified_by),
@@ -218,5 +225,24 @@ mod tests {
             Some("2026-06-10T04:00:00Z"),
             "ratified_at must be set"
         );
+
+        // FIRST-QUORUM-WINS (review W1): a post-quorum re-fire must be a no-op —
+        // the anchor stays pinned to the quorum-crossing vote's values.
+        let again = apply_ratification(
+            &mut conn,
+            "shefa",
+            "community",
+            "uhCEk-LATER-vote-cid",
+            "uhCEk-LATER-anchor",
+            10.0,
+            "2026-06-10T05:00:00Z",
+        )
+        .expect("second apply_ratification failed");
+        assert_eq!(again, 0, "post-quorum re-fire must update zero rows");
+        let config = get_config_for_layer(&mut conn, &ctx, "community")
+            .expect("get_config_for_layer failed")
+            .expect("config row must exist");
+        assert_eq!(config.ratified_by.as_deref(), Some("uhCEk-ga-cid"));
+        assert_eq!(config.dht_anchor_hash.as_deref(), Some("uhCEk-commitment-cid"));
     }
 }

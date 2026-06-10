@@ -407,12 +407,18 @@ fn validate_ratifies_limit_gradient(payload: &serde_json::Value) -> Result<(), S
     // default requires loosening_acknowledged=true. Core defaults inline (the
     // WASM cannot read the storage registry; lockstep with GradientConfig::default):
     //   c_target default = 0.15, k_max default = 0.05, dignity_floor default = 100.0
+    // Whole-arc review W2: the floor check covers the ENTIRE below-default
+    // range (a floor of 1.0 guts sufficientarian protection as surely as 0.0).
+    // NAMED GAP (TBD-operator, spec §Decision 2): k_s (shape gain) and S_target
+    // are not loosening-checked in v1 — a k_s=0 ratification would near-
+    // extinguish the shape term unwitnessed; wall them when the operator
+    // derives the wall widths.
     let loosens = payload["shape"]["C_target"]
         .as_f64()
         .map(|v| v > 0.15)
         .unwrap_or(false)
         || payload["k_max"].as_f64().map(|v| v < 0.05).unwrap_or(false)
-        || floor == 0.0;
+        || floor < 100.0;
     if loosens {
         let acked = payload
             .get("loosening_acknowledged")
@@ -1038,7 +1044,7 @@ mod tests {
             "substrate_signal": "attention", "governance_layer": "community",
             "measure": {"alpha": 2.0, "q": 0.01, "w_e": 0.6, "w_s": 0.4},
             "shape": {"C_target": c_target, "k_s": 0.5, "gamma": 1.0},
-            "base_rate": 0.001, "k_max": k_max, "dignity_floor": 50.0,
+            "base_rate": 0.001, "k_max": k_max, "dignity_floor": 100.0,
             "valid_from": "2026-06-10T00:00:00Z", "valid_until": "2026-09-10T00:00:00Z",
             "loosening_acknowledged": acked,
             "ratified_by_governance_action_cid": "uhCEk-test"
@@ -1059,6 +1065,18 @@ mod tests {
     #[test]
     fn confiscatory_k_max_rejected() {
         assert!(validate_ratifies_limit_gradient(&lg_payload(0.15, 1.0, true)).is_err());
+    }
+
+    #[test]
+    fn floor_below_default_is_loosening_and_requires_acknowledgement() {
+        // Review W2: ANY floor below the 100.0 core default guts sufficientarian
+        // protection and must be witnessed — not only the pathological zero.
+        let mut payload = lg_payload(0.15, 0.05, false);
+        payload["dignity_floor"] = serde_json::json!(50.0);
+        let err = validate_ratifies_limit_gradient(&payload).unwrap_err();
+        assert!(err.contains("loosening_acknowledged"), "{err}");
+        payload["loosening_acknowledged"] = serde_json::json!(true);
+        assert!(validate_ratifies_limit_gradient(&payload).is_ok());
     }
 
     #[test]
