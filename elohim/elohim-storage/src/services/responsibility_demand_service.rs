@@ -37,22 +37,22 @@ pub enum ObligationLevel {
     /// No obligations; the community is supporting this agent.
     Supported,
 
-    /// Between dignity floor and median — ordinary participant.
-    /// Standard participation obligations apply.
+    /// Above the dignity floor while the substrate is at or below its governed
+    /// concentration target (c <= c_target) — ordinary participant.
     Normal,
 
-    /// Between median and soft ceiling (median × soft_ceiling_multiplier).
+    /// Substrate over target (c > c_target), agent below 2× the mean (b̂ < 2).
     /// Elevated participation expected; stewardship visibility increases.
     Elevated { visibility_required: bool },
 
-    /// Between soft ceiling and hard ceiling (median × hard_ceiling_multiplier).
+    /// Substrate over target, agent at 2–5× the mean (b̂ in [2,5)).
     /// Active stewardship required; justification for concentration expected.
     High {
         stewardship_required: bool,
         justification_required: bool,
     },
 
-    /// At or above hard ceiling (median × hard_ceiling_multiplier).
+    /// Substrate over target, agent at or above 5× the mean (b̂ >= 5).
     /// Full constitutional review of position; elohim discernment triggered in Sprint 3.
     Extreme {
         elohim_review_required: bool,
@@ -93,14 +93,14 @@ impl ResponsibilityDemandService {
             .map(|b| b.balance)
             .unwrap_or(0.0_f32);
 
+        // v1: single-substrate governor — "attention" only (spec §11).
         let g = LimitGradientRegistry::core_default("attention", governance_layer);
-        let c = ConcentrationService::effective_c(
-                conn, &ctx.h_app_id, "attention", governance_layer)?
-            .unwrap_or(g.c_target);
-        let snapshot_mu = concentration_snapshots::latest_snapshot(
-                conn, &ctx.h_app_id, "attention", governance_layer)?
-            .map(|s| s.mu)
-            .unwrap_or(config.median_estimate);
+        // ONE snapshot read serves both C and μ (T5/T6-review: no double-fetch —
+        // this sits on the transfer hot path).
+        let snap = concentration_snapshots::latest_snapshot(
+            conn, &ctx.h_app_id, "attention", governance_layer)?;
+        let c = snap.as_ref().map(|s| s.c_composite).unwrap_or(g.c_target);
+        let snapshot_mu = snap.map(|s| s.mu).unwrap_or(config.median_estimate);
         let b_hat = if snapshot_mu > 0.0 { balance / snapshot_mu } else { 1.0 };
 
         Ok(evaluate_position(balance, b_hat, c, config.dignity_floor, g.c_target))

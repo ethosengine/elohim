@@ -54,6 +54,8 @@ mod tests {
             assert!(g.alpha >= ALPHA_WALL.0 && g.alpha <= ALPHA_WALL.1);
             assert!(g.c_target >= C_TARGET_WALL.0 && g.c_target <= C_TARGET_WALL.1);
             assert!(g.k_max >= K_MAX_WALL.0 && g.k_max <= K_MAX_WALL.1);
+            assert!(g.base_rate >= BASE_RATE_WALL.0 && g.base_rate <= BASE_RATE_WALL.1);
+            assert!(g.gamma >= GAMMA_WALL.0 && g.gamma <= GAMMA_WALL.1);
         }
     }
 

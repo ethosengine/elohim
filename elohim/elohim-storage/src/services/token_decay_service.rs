@@ -185,14 +185,17 @@ impl TokenDecayService {
         };
 
         // Step 3 — obligation level (AUDIT LABEL ONLY, spec §3) + continuous rate
+        // v1: single-substrate governor — "attention" is the only governed
+        // substrate (spec §11); multi-substrate routing arrives with
+        // substrate_signal-keyed distributions.
         let g = crate::services::limit_gradient_registry::LimitGradientRegistry::core_default(
             "attention", governance_layer);
-        let c = crate::services::concentration_service::ConcentrationService::effective_c(
-                conn, &ctx.h_app_id, "attention", governance_layer)?
+        // ONE snapshot read serves both C and μ (T5/T6-review: no double-fetch).
+        let snap = crate::db::concentration_snapshots::latest_snapshot(
+            conn, &ctx.h_app_id, "attention", governance_layer)?;
+        let c = snap.as_ref().map(|s| s.c_composite)
             .unwrap_or(g.c_target); // no snapshot yet → C at target → base-rate-only (fail-coherent)
-        let snapshot_mu = crate::db::concentration_snapshots::latest_snapshot(
-                conn, &ctx.h_app_id, "attention", governance_layer)?
-            .map(|s| s.mu)
+        let snapshot_mu = snap.map(|s| s.mu)
             .unwrap_or(config.median_estimate); // pre-snapshot fallback: the legacy estimate
         let b_hat = if snapshot_mu > 0.0 { balance / snapshot_mu } else { 1.0 };
         // T2-REVIEW FIX (dual-source divergence): the sufficientarian gate reads the
