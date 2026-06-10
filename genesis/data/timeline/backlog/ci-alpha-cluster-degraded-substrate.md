@@ -395,3 +395,15 @@ stabilizes OR the tags hold the scenarios out of the degraded run.
   instead of running against down pods) — named in "The tagging seam" above, an
   operator-scoped story Objective, not a sentinel edit. They disappear on a green
   streak the moment alpha serves its assets.
+
+- 2026-06-10 ~11:50Z (operator root-cause): the per-peer edge-deploy failures
+  (the 10 fps folded 2026-06-10, elohim-edge#1053 pete/terrance/frank/gertrude/
+  susan/caleb/daniel/emma…) are **OOM SIGKILLs on the human StatefulSets** —
+  CONSTRAINT_MEMCG, anon-rss ~1488MiB against the 512Mi/1536Mi archetype limits —
+  not offline peers. Operator raised the $recycledLaptopFloor archetype to
+  768Mi/3Gi across deployments.json (9 humans), per-human YAMLs, and all three
+  edgenode environment manifests (alpha/staging/prod), with restoration path
+  documented (profile RSS on stable shem, step down with evidence). Closure:
+  these fingerprints should disappear on the first edge wave after the manifest
+  bump lands; if a peer still fails post-bump, that residue is a NEW concern,
+  not this one.
