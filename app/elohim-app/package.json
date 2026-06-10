@@ -38,7 +38,7 @@
     "hc:status": "echo '=== Doorway ===' && curl -s http://localhost:8888/status 2>/dev/null | head -20 && echo && echo '=== Storage ===' && curl -s http://localhost:8090/db/stats 2>/dev/null || echo 'Services not running'",
     "hc:build": "./scripts/hc-build.sh",
     "hc:build:all": "./scripts/hc-start.sh --build",
-    "hc:seed": "ADMIN_PORT=$(cat ../../scripts/local-dev/.hc_ports 2>/dev/null | grep admin_port | grep -o '[0-9]*') && cd ../../genesis/seeder && DOORWAY_URL=http://localhost:8888 STORAGE_URL=http://localhost:8090 HOLOCHAIN_ADMIN_URL=ws://localhost:$ADMIN_PORT npx tsx src/seed.ts",
+    "hc:seed": "ADMIN_PORT=$(cat ../../elohim/holochain/local-dev/.hc_ports 2>/dev/null | grep admin_port | grep -o '[0-9]*') && cd ../../genesis/seeder && DOORWAY_URL=http://localhost:8888 STORAGE_URL=http://localhost:8090 HOLOCHAIN_ADMIN_URL=ws://localhost:$ADMIN_PORT npx tsx src/seed.ts",
     "doorway:start": "ADMIN_PORT=$(cat ../../scripts/local-dev/.hc_ports 2>/dev/null | grep admin_port | grep -o '[0-9]*' || echo 4444) && ../../doorway/doorway-service/target/release/doorway --dev-mode --listen 0.0.0.0:8888 --conductor-url ws://localhost:$ADMIN_PORT --storage-url http://localhost:8090",
     "doorway:stop": "fuser -k 8888/tcp 2>/dev/null && echo 'Stopped Doorway' || echo 'Doorway not running'",
     "doorway:build": "cd ../../doorway && RUSTFLAGS='' cargo build --release",
