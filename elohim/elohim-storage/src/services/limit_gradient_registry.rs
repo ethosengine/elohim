@@ -13,11 +13,11 @@ use crate::services::token_decay_service::GradientConfig;
 
 // DNA-wall mirror (native side). Keep in lockstep with mishpat wall constants
 // (Task 7) — the validator there is authoritative at write time.
-pub const ALPHA_WALL: (f32, f32) = (1.0, 2.0);        // cannot blind the tail (α=0 forbidden)
-pub const C_TARGET_WALL: (f32, f32) = (0.05, 0.30);   // TBD-operator
-pub const K_MAX_WALL: (f32, f32) = (0.01, 0.10);      // TBD-operator
+pub const ALPHA_WALL: (f32, f32) = (1.0, 2.0); // cannot blind the tail (α=0 forbidden)
+pub const C_TARGET_WALL: (f32, f32) = (0.05, 0.30); // TBD-operator
+pub const K_MAX_WALL: (f32, f32) = (0.01, 0.10); // TBD-operator
 pub const BASE_RATE_WALL: (f32, f32) = (0.0005, 0.005); // TBD-operator
-pub const GAMMA_WALL: (f32, f32) = (0.5, 2.0);        // TBD-operator
+pub const GAMMA_WALL: (f32, f32) = (0.5, 2.0); // TBD-operator
 
 pub struct LimitGradientRegistry;
 
@@ -61,15 +61,21 @@ mod tests {
 
     #[test]
     fn layer_defaulted_alpha() {
-        assert_eq!(LimitGradientRegistry::core_default("attention", "household").alpha, 1.0);
-        assert_eq!(LimitGradientRegistry::core_default("attention", "community").alpha, 2.0);
+        assert_eq!(
+            LimitGradientRegistry::core_default("attention", "household").alpha,
+            1.0
+        );
+        assert_eq!(
+            LimitGradientRegistry::core_default("attention", "community").alpha,
+            2.0
+        );
     }
 
     #[test]
     fn clamp_pulls_out_of_wall_values_in() {
         let mut wild = GradientConfig::default();
-        wild.alpha = 0.0;      // tail-blinding attempt
-        wild.k_max = 1.0;      // confiscate-everything attempt
+        wild.alpha = 0.0; // tail-blinding attempt
+        wild.k_max = 1.0; // confiscate-everything attempt
         let clamped = LimitGradientRegistry::clamp_to_walls(wild);
         assert_eq!(clamped.alpha, ALPHA_WALL.0);
         assert_eq!(clamped.k_max, K_MAX_WALL.1);

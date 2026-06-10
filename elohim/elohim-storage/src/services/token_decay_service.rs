@@ -58,23 +58,33 @@ pub struct DecayResult {
 /// numeric default is in-wall and marked TBD-operator at the wall layer).
 #[derive(Debug, Clone, Copy)]
 pub struct GradientConfig {
-    pub base_rate: f32,     // default 0.001 — the old Normal rung becomes the curve floor
+    pub base_rate: f32, // default 0.001 — the old Normal rung becomes the curve floor
     pub dignity_floor: f32, // sufficientarian gate; decay OFF below
-    pub gamma: f32,         // rank exponent; friction exponent = 1+gamma
-    pub k_max: f32,         // per-tick confiscation ceiling (top-side dignity)
-    pub c_target: f32,      // governed extinction setpoint (NOT zero — spec §4.4)
-    pub k_s: f32,           // shape gain
-    pub alpha: f32,         // GE order, wall [1,2]
-    pub q: f32,             // top-share quantile
-    pub w_e: f32,           // composite weight: shape term
-    pub w_s: f32,           // composite weight: tail term
+    pub gamma: f32,     // rank exponent; friction exponent = 1+gamma
+    pub k_max: f32,     // per-tick confiscation ceiling (top-side dignity)
+    pub c_target: f32,  // governed extinction setpoint (NOT zero — spec §4.4)
+    pub k_s: f32,       // shape gain
+    pub alpha: f32,     // GE order, wall [1,2]
+    pub q: f32,         // top-share quantile
+    pub w_e: f32,       // composite weight: shape term
+    pub w_s: f32,       // composite weight: tail term
 }
 
 impl Default for GradientConfig {
     fn default() -> Self {
         // In-wall, value-laden core defaults (spec §5.1 payload defaults).
-        Self { base_rate: 0.001, dignity_floor: 100.0, gamma: 1.0, k_max: 0.05,
-               c_target: 0.15, k_s: 0.5, alpha: 1.0, q: 0.01, w_e: 0.6, w_s: 0.4 }
+        Self {
+            base_rate: 0.001,
+            dignity_floor: 100.0,
+            gamma: 1.0,
+            k_max: 0.05,
+            c_target: 0.15,
+            k_s: 0.5,
+            alpha: 1.0,
+            q: 0.01,
+            w_e: 0.6,
+            w_s: 0.4,
+        }
     }
 }
 
@@ -189,15 +199,23 @@ impl TokenDecayService {
         // substrate (spec §11); multi-substrate routing arrives with
         // substrate_signal-keyed distributions.
         let g = crate::services::limit_gradient_registry::LimitGradientRegistry::core_default(
-            "attention", governance_layer);
+            "attention",
+            governance_layer,
+        );
         // ONE snapshot read serves both C and μ (T5/T6-review: no double-fetch).
         let snap = crate::db::concentration_snapshots::latest_snapshot(
-            conn, &ctx.h_app_id, "attention", governance_layer)?;
-        let c = snap.as_ref().map(|s| s.c_composite)
-            .unwrap_or(g.c_target); // no snapshot yet → C at target → base-rate-only (fail-coherent)
-        let snapshot_mu = snap.map(|s| s.mu)
-            .unwrap_or(config.median_estimate); // pre-snapshot fallback: the legacy estimate
-        let b_hat = if snapshot_mu > 0.0 { balance / snapshot_mu } else { 1.0 };
+            conn,
+            &ctx.h_app_id,
+            "attention",
+            governance_layer,
+        )?;
+        let c = snap.as_ref().map(|s| s.c_composite).unwrap_or(g.c_target); // no snapshot yet → C at target → base-rate-only (fail-coherent)
+        let snapshot_mu = snap.map(|s| s.mu).unwrap_or(config.median_estimate); // pre-snapshot fallback: the legacy estimate
+        let b_hat = if snapshot_mu > 0.0 {
+            balance / snapshot_mu
+        } else {
+            1.0
+        };
         // T2-REVIEW FIX (dual-source divergence): the sufficientarian gate reads the
         // SAME source as the Step-5 clamp — config.dignity_floor (the governed row),
         // never the GradientConfig default.
@@ -270,7 +288,10 @@ mod tests {
     fn continuous_rate_at_target_equals_base_rate_for_mean_agent() {
         let g = GradientConfig::default();
         let r = calculate_decay_rate_continuous(1.0, g.c_target, &g);
-        assert!((r - g.base_rate).abs() < 1e-6, "rate at (b̂=1, C=C_target) must be base_rate, got {r}");
+        assert!(
+            (r - g.base_rate).abs() < 1e-6,
+            "rate at (b̂=1, C=C_target) must be base_rate, got {r}"
+        );
     }
 
     #[test]
@@ -279,7 +300,10 @@ mod tests {
         let r_low = calculate_decay_rate_continuous(2.0, g.c_target, &g);
         let r_mid = calculate_decay_rate_continuous(2.0, g.c_target + 0.2, &g);
         let r_high = calculate_decay_rate_continuous(2.0, g.c_target + 0.5, &g);
-        assert!(r_low < r_mid && r_mid < r_high, "rate must rise with C: {r_low} {r_mid} {r_high}");
+        assert!(
+            r_low < r_mid && r_mid < r_high,
+            "rate must rise with C: {r_low} {r_mid} {r_high}"
+        );
     }
 
     #[test]
@@ -288,20 +312,29 @@ mod tests {
         let c = g.c_target + 0.3;
         let r1 = calculate_decay_rate_continuous(1.0, c, &g);
         let r4 = calculate_decay_rate_continuous(4.0, c, &g);
-        assert!(r4 > r1, "rate must rise with b̂ (super-linear friction): {r1} vs {r4}");
+        assert!(
+            r4 > r1,
+            "rate must rise with b̂ (super-linear friction): {r1} vs {r4}"
+        );
     }
 
     #[test]
     fn continuous_rate_clamped_at_k_max() {
         let g = GradientConfig::default();
         let r = calculate_decay_rate_continuous(1_000.0, 0.99, &g);
-        assert!((r - g.k_max).abs() < 1e-6, "rate must clamp at k_max, got {r}");
+        assert!(
+            (r - g.k_max).abs() < 1e-6,
+            "rate must clamp at k_max, got {r}"
+        );
     }
 
     #[test]
     fn continuous_rate_never_negative_below_target() {
         let g = GradientConfig::default();
         let r = calculate_decay_rate_continuous(0.5, 0.0, &g);
-        assert!(r >= 0.0 && r <= g.base_rate, "below-target rate bounded by base_rate·b̂^γ, got {r}");
+        assert!(
+            r >= 0.0 && r <= g.base_rate,
+            "below-target rate bounded by base_rate·b̂^γ, got {r}"
+        );
     }
 }

@@ -12,12 +12,8 @@ pub fn insert_snapshot(
     conn: &mut SqliteConnection,
     new: NewConcentrationSnapshot,
 ) -> QueryResult<ConcentrationSnapshot> {
-    diesel::insert_into(cs::table)
-        .values(&new)
-        .execute(conn)?;
-    cs::table
-        .filter(cs::id.eq(&new.id))
-        .first(conn)
+    diesel::insert_into(cs::table).values(&new).execute(conn)?;
+    cs::table.filter(cs::id.eq(&new.id)).first(conn)
 }
 
 /// Most recent snapshot for (h_app_id, substrate_signal, governance_layer) —

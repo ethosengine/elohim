@@ -15,7 +15,10 @@
 /// produces silent NaN via powf. α must be non-zero (α=0 divides by zero → ±Inf);
 /// the governed path clamps α to [1,2] before reaching here.
 pub fn ge_alpha(xs: &[f32], alpha: f32) -> f32 {
-    debug_assert!(xs.iter().all(|&x| x >= 0.0), "ge_alpha requires non-negative inputs");
+    debug_assert!(
+        xs.iter().all(|&x| x >= 0.0),
+        "ge_alpha requires non-negative inputs"
+    );
     let n = xs.len();
     if n == 0 {
         return 0.0;
@@ -31,7 +34,11 @@ pub fn ge_alpha(xs: &[f32], alpha: f32) -> f32 {
             .iter()
             .map(|&x| {
                 let r = x as f64 / mu;
-                if r > 0.0 { r * r.ln() } else { 0.0 }
+                if r > 0.0 {
+                    r * r.ln()
+                } else {
+                    0.0
+                }
             })
             .sum();
         (s / n as f64) as f32
@@ -45,7 +52,11 @@ pub fn ge_alpha(xs: &[f32], alpha: f32) -> f32 {
 /// scale-invariance-preserving (a function of already-scale-invariant GE,
 /// introducing NO N- or μ-dependence). Do NOT replace with GE/GE_max(N).
 pub fn squash(g: f32) -> f32 {
-    if g <= 0.0 { 0.0 } else { g / (1.0 + g) }
+    if g <= 0.0 {
+        0.0
+    } else {
+        g / (1.0 + g)
+    }
 }
 
 /// Share of the total held by the top ⌈q·N⌉ holders (q=0.01 default).
@@ -60,7 +71,9 @@ pub fn top_quantile_share(xs: &[f32], q: f32) -> f32 {
     }
     let mut sorted: Vec<f64> = xs.iter().map(|&x| x as f64).collect();
     sorted.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-    let k = ((q as f64 * xs.len() as f64).ceil() as usize).max(1).min(xs.len());
+    let k = ((q as f64 * xs.len() as f64).ceil() as usize)
+        .max(1)
+        .min(xs.len());
     let top: f64 = sorted[..k].iter().sum();
     (top / total) as f32
 }
@@ -103,12 +116,18 @@ mod tests {
         for alpha in [1.0_f32, 1.5, 2.0] {
             let a = ge_alpha(&d, alpha);
             let b = ge_alpha(&scaled, alpha);
-            assert!((a - b).abs() < 1e-4, "GE(α={alpha}) not scale-invariant: {a} vs {b}");
+            assert!(
+                (a - b).abs() < 1e-4,
+                "GE(α={alpha}) not scale-invariant: {a} vs {b}"
+            );
         }
         let c1 = composite_concentration(&d, 2.0, 0.01, 0.6, 0.4);
         let c2 = composite_concentration(&scaled, 2.0, 0.01, 0.6, 0.4);
         assert!((c1 - c2).abs() < 1e-4, "composite not scale-invariant");
-        assert!((gini(&d) - gini(&scaled)).abs() < 1e-4, "gini not scale-invariant");
+        assert!(
+            (gini(&d) - gini(&scaled)).abs() < 1e-4,
+            "gini not scale-invariant"
+        );
     }
 
     #[test]

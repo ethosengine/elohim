@@ -15,10 +15,8 @@ use serde::Serialize;
 use diesel::SqliteConnection;
 
 use crate::db::context::AppContext;
-use crate::db::models::ResponsibilityDemandConfig;
 use crate::db::{concentration_snapshots, responsibility_demand_configs, token_balances};
 use crate::error::StorageError;
-use crate::services::concentration_service::ConcentrationService;
 use crate::services::limit_gradient_registry::LimitGradientRegistry;
 
 // ============================================================================
@@ -98,12 +96,26 @@ impl ResponsibilityDemandService {
         // ONE snapshot read serves both C and μ (T5/T6-review: no double-fetch —
         // this sits on the transfer hot path).
         let snap = concentration_snapshots::latest_snapshot(
-            conn, &ctx.h_app_id, "attention", governance_layer)?;
+            conn,
+            &ctx.h_app_id,
+            "attention",
+            governance_layer,
+        )?;
         let c = snap.as_ref().map(|s| s.c_composite).unwrap_or(g.c_target);
         let snapshot_mu = snap.map(|s| s.mu).unwrap_or(config.median_estimate);
-        let b_hat = if snapshot_mu > 0.0 { balance / snapshot_mu } else { 1.0 };
+        let b_hat = if snapshot_mu > 0.0 {
+            balance / snapshot_mu
+        } else {
+            1.0
+        };
 
-        Ok(evaluate_position(balance, b_hat, c, config.dignity_floor, g.c_target))
+        Ok(evaluate_position(
+            balance,
+            b_hat,
+            c,
+            config.dignity_floor,
+            g.c_target,
+        ))
     }
 
     /// Gate check before a token transfer.
@@ -163,11 +175,19 @@ pub fn evaluate_position(
     } else if c <= c_target {
         ObligationLevel::Normal
     } else if b_hat < 2.0 {
-        ObligationLevel::Elevated { visibility_required: true }
+        ObligationLevel::Elevated {
+            visibility_required: true,
+        }
     } else if b_hat < 5.0 {
-        ObligationLevel::High { stewardship_required: true, justification_required: true }
+        ObligationLevel::High {
+            stewardship_required: true,
+            justification_required: true,
+        }
     } else {
-        ObligationLevel::Extreme { elohim_review_required: true, constitutional_justification: true }
+        ObligationLevel::Extreme {
+            elohim_review_required: true,
+            constitutional_justification: true,
+        }
     }
 }
 
@@ -209,21 +229,32 @@ mod tests {
 
         // b̂ < 2.0 → Elevated
         let elevated = evaluate_position(200.0, 1.5, c_high, DIGNITY_FLOOR, C_TARGET);
-        assert_eq!(elevated, ObligationLevel::Elevated { visibility_required: true });
+        assert_eq!(
+            elevated,
+            ObligationLevel::Elevated {
+                visibility_required: true
+            }
+        );
 
         // b̂ in [2.0, 5.0) → High
         let high = evaluate_position(200.0, 3.0, c_high, DIGNITY_FLOOR, C_TARGET);
-        assert_eq!(high, ObligationLevel::High {
-            stewardship_required: true,
-            justification_required: true,
-        });
+        assert_eq!(
+            high,
+            ObligationLevel::High {
+                stewardship_required: true,
+                justification_required: true,
+            }
+        );
 
         // b̂ >= 5.0 → Extreme
         let extreme = evaluate_position(200.0, 6.0, c_high, DIGNITY_FLOOR, C_TARGET);
-        assert_eq!(extreme, ObligationLevel::Extreme {
-            elohim_review_required: true,
-            constitutional_justification: true,
-        });
+        assert_eq!(
+            extreme,
+            ObligationLevel::Extreme {
+                elohim_review_required: true,
+                constitutional_justification: true,
+            }
+        );
     }
 
     #[test]

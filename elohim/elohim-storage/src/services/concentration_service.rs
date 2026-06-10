@@ -10,7 +10,9 @@ use diesel::sqlite::SqliteConnection;
 
 use crate::db::concentration_snapshots::{insert_snapshot, latest_snapshot};
 use crate::db::models::{ConcentrationSnapshot, NewConcentrationSnapshot};
-use crate::services::measure::{composite_concentration, ge_alpha, gini, squash, top_quantile_share};
+use crate::services::measure::{
+    composite_concentration, ge_alpha, gini, squash, top_quantile_share,
+};
 use crate::services::token_decay_service::GradientConfig;
 
 pub const K_MIN: usize = 5;
@@ -69,8 +71,10 @@ impl ConcentrationService {
         substrate_signal: &str,
         governance_layer: &str,
     ) -> Result<Option<f32>, diesel::result::Error> {
-        Ok(latest_snapshot(conn, h_app_id, substrate_signal, governance_layer)?
-            .map(|s| s.c_composite))
+        Ok(
+            latest_snapshot(conn, h_app_id, substrate_signal, governance_layer)?
+                .map(|s| s.c_composite),
+        )
     }
 }
 
@@ -84,13 +88,22 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
         let out = ConcentrationService::compute_snapshot(
-            &mut conn, "shefa", "attention", "household",
-            &[100.0, 200.0, 300.0, 400.0], &GradientConfig::default(),
+            &mut conn,
+            "shefa",
+            "attention",
+            "household",
+            &[100.0, 200.0, 300.0, 400.0],
+            &GradientConfig::default(),
             "2026-06-10T03:00:00Z",
-        ).expect("ok");
+        )
+        .expect("ok");
         assert_eq!(out, SnapshotOutcome::SuppressedBelowK { n: 4 });
-        assert!(ConcentrationService::effective_c(&mut conn, "shefa", "attention", "household")
-            .expect("q").is_none(), "no row may exist for a suppressed cohort");
+        assert!(
+            ConcentrationService::effective_c(&mut conn, "shefa", "attention", "household")
+                .expect("q")
+                .is_none(),
+            "no row may exist for a suppressed cohort"
+        );
     }
 
     #[test]
@@ -99,14 +112,27 @@ mod tests {
         let mut conn = pool.get().expect("conn");
         let balances = [100.0_f32, 100.0, 100.0, 100.0, 10_000.0];
         let out = ConcentrationService::compute_snapshot(
-            &mut conn, "shefa", "attention", "community", &balances,
-            &GradientConfig::default(), "2026-06-10T03:00:00Z",
-        ).expect("ok");
-        let snap = match out { SnapshotOutcome::Written(s) => s, _ => panic!("expected write") };
+            &mut conn,
+            "shefa",
+            "attention",
+            "community",
+            &balances,
+            &GradientConfig::default(),
+            "2026-06-10T03:00:00Z",
+        )
+        .expect("ok");
+        let snap = match out {
+            SnapshotOutcome::Written(s) => s,
+            _ => panic!("expected write"),
+        };
         assert_eq!(snap.n, 5);
-        assert!(snap.c_composite > 0.3, "skewed distribution must read concentrated");
+        assert!(
+            snap.c_composite > 0.3,
+            "skewed distribution must read concentrated"
+        );
         let c = ConcentrationService::effective_c(&mut conn, "shefa", "attention", "community")
-            .expect("q").expect("some");
+            .expect("q")
+            .expect("some");
         assert!((c - snap.c_composite).abs() < 1e-6);
     }
 
@@ -130,11 +156,22 @@ mod tests {
     #[test]
     fn continuous_governor_restores_toward_target_under_rich_get_richer_inflow() {
         use crate::services::measure::composite_concentration;
-        use crate::services::token_decay_service::{calculate_decay_rate_continuous, GradientConfig};
+        use crate::services::token_decay_service::{
+            calculate_decay_rate_continuous, GradientConfig,
+        };
 
-        let g = GradientConfig { base_rate: 0.001, dignity_floor: 100.0, gamma: 1.0,
-                                 k_max: 0.05, c_target: 0.15, k_s: 0.5, alpha: 1.0,
-                                 q: 0.01, w_e: 0.6, w_s: 0.4 };
+        let g = GradientConfig {
+            base_rate: 0.001,
+            dignity_floor: 100.0,
+            gamma: 1.0,
+            k_max: 0.05,
+            c_target: 0.15,
+            k_s: 0.5,
+            alpha: 1.0,
+            q: 0.01,
+            w_e: 0.6,
+            w_s: 0.4,
+        };
 
         // ---- MAIN RUN: c_inflow=0.20 (4× k_max — step-divergent regime) ----
         // f64 balances prevent numeric overflow; composite_concentration is
@@ -142,7 +179,7 @@ mod tests {
         let c_inflow = 0.20_f64;
         let initial_top_share: f64 = {
             let b = [100_000.0_f64, 100.0, 100.0, 100.0, 100.0];
-            b[0] / b.iter().sum::<f64>()   // ≈ 0.9960
+            b[0] / b.iter().sum::<f64>() // ≈ 0.9960
         };
         let mut balances = vec![100_000.0_f64, 100.0, 100.0, 100.0, 100.0];
         let mut series = vec![];
@@ -156,8 +193,11 @@ mod tests {
             for b in balances.iter_mut() {
                 let inflow = c_inflow * *b;
                 let b_hat = (*b / mu) as f32;
-                let rate = if *b < g.dignity_floor as f64 { 0.0 }
-                           else { calculate_decay_rate_continuous(b_hat, cc, &g) as f64 };
+                let rate = if *b < g.dignity_floor as f64 {
+                    0.0
+                } else {
+                    calculate_decay_rate_continuous(b_hat, cc, &g) as f64
+                };
                 *b = (*b + inflow - rate * *b).max(g.dignity_floor as f64);
             }
         }
@@ -168,24 +208,34 @@ mod tests {
         // (a) TOP SHARE DESCENDS: rich-get-richer inflow still equalizes the
         //     distribution — small agents grow 20%/tick, the top grows 15%
         //     (net of k_max), so relative shares converge even as absolutes diverge.
-        assert!(top_share_final < initial_top_share,
-            "top share must fall: {top_share_final:.4} not < initial {initial_top_share:.4}");
+        assert!(
+            top_share_final < initial_top_share,
+            "top share must fall: {top_share_final:.4} not < initial {initial_top_share:.4}"
+        );
 
         // (b) MONOTONE DESCENT toward target in the tail (restoring force).
         let tail = &series[series.len() / 2..];
-        assert!(tail.windows(2).all(|w| w[1] <= w[0] + 1e-4),
-            "C not non-increasing in the tail");
+        assert!(
+            tail.windows(2).all(|w| w[1] <= w[0] + 1e-4),
+            "C not non-increasing in the tail"
+        );
 
         // (c) RESTORES TO THE TARGET, not just somewhere.
-        assert!((series.last().unwrap() - g.c_target).abs() < 0.05,
-            "settled at {} away from C_target {}", series.last().unwrap(), g.c_target);
+        assert!(
+            (series.last().unwrap() - g.c_target).abs() < 0.05,
+            "settled at {} away from C_target {}",
+            series.last().unwrap(),
+            g.c_target
+        );
 
         // (d) SELF-EXTINGUISHING-WHEN-JUST: equal start stays equal, friction at base.
         let equal = vec![500.0_f32; 5];
         let cc_eq = composite_concentration(&equal, g.alpha, g.q, g.w_e, g.w_s);
         let r_eq = calculate_decay_rate_continuous(1.0, cc_eq, &g);
-        assert!(r_eq <= g.base_rate * 1.5,
-            "friction at equality must sit at base_rate, got {r_eq}");
+        assert!(
+            r_eq <= g.base_rate * 1.5,
+            "friction at equality must sit at base_rate, got {r_eq}"
+        );
 
         // ---- SECONDARY RUN: pure decay (c_inflow=0) — absolute-bound regime ----
         // With zero inflow the governor is the sole mover; absolute convergence
@@ -199,14 +249,19 @@ mod tests {
             let normed2: Vec<f32> = balances2.iter().map(|&b| b / mu2).collect();
             let cc2 = composite_concentration(&normed2, g.alpha, g.q, g.w_e, g.w_s);
             for b in balances2.iter_mut() {
-                let rate = if *b < g.dignity_floor { 0.0 }
-                           else { calculate_decay_rate_continuous(*b / mu2, cc2, &g) };
+                let rate = if *b < g.dignity_floor {
+                    0.0
+                } else {
+                    calculate_decay_rate_continuous(*b / mu2, cc2, &g)
+                };
                 *b = (*b - rate * *b).max(g.dignity_floor);
             }
         }
         let top2 = balances2.iter().cloned().fold(0.0_f32, f32::max);
-        assert!(top2.is_finite() && top2 < 1.0e9,
-            "decay-only regime must bound absolute balances toward floor: {top2}");
+        assert!(
+            top2.is_finite() && top2 < 1.0e9,
+            "decay-only regime must bound absolute balances toward floor: {top2}"
+        );
     }
 
     /// Firewall (spec §8.1, aggregator.rs:491 mold): exhaustive construction +
@@ -215,10 +270,19 @@ mod tests {
     #[test]
     fn snapshot_struct_has_no_peer_identity() {
         let row = NewConcentrationSnapshot {
-            id: "attention:community:t".into(), h_app_id: "shefa".into(),
-            substrate_signal: "attention".into(), governance_layer: "community".into(),
-            n: 5, mu: 1.0, ge: 0.0, ge_squashed: 0.0, top_share: 0.2,
-            gini: 0.0, c_composite: 0.08, alpha: 1.0, top_q: 0.01,
+            id: "attention:community:t".into(),
+            h_app_id: "shefa".into(),
+            substrate_signal: "attention".into(),
+            governance_layer: "community".into(),
+            n: 5,
+            mu: 1.0,
+            ge: 0.0,
+            ge_squashed: 0.0,
+            top_share: 0.2,
+            gini: 0.0,
+            c_composite: 0.08,
+            alpha: 1.0,
+            top_q: 0.01,
             computed_at: "t".into(),
         };
         let json = serde_json::to_string(&serde_json::json!({
@@ -226,9 +290,15 @@ mod tests {
             "governanceLayer": row.governance_layer, "n": row.n, "mu": row.mu,
             "ge": row.ge, "geSquashed": row.ge_squashed, "topShare": row.top_share,
             "gini": row.gini, "cComposite": row.c_composite, "alpha": row.alpha, "topQ": row.top_q,
-        })).expect("serialize");
-        for leak in ["agent_id", "agentId", "pubkey", "agentKey", "signer", "human_id", "humanId", "balance"] {
-            assert!(!json.contains(leak), "snapshot must not carry per-agent field '{leak}': {json}");
+        }))
+        .expect("serialize");
+        for leak in [
+            "agent_id", "agentId", "pubkey", "agentKey", "signer", "human_id", "humanId", "balance",
+        ] {
+            assert!(
+                !json.contains(leak),
+                "snapshot must not carry per-agent field '{leak}': {json}"
+            );
         }
     }
 
@@ -239,7 +309,9 @@ mod tests {
     #[test]
     fn no_in_wall_config_extinguishes_friction_under_concentration() {
         use crate::services::limit_gradient_registry::*;
-        use crate::services::token_decay_service::{calculate_decay_rate_continuous, GradientConfig};
+        use crate::services::token_decay_service::{
+            calculate_decay_rate_continuous, GradientConfig,
+        };
 
         let alphas = [ALPHA_WALL.0, 1.5, ALPHA_WALL.1];
         let c_targets = [C_TARGET_WALL.0, 0.15, C_TARGET_WALL.1];
@@ -247,16 +319,33 @@ mod tests {
         let base_rates = [BASE_RATE_WALL.0, 0.001, BASE_RATE_WALL.1];
         let gammas = [GAMMA_WALL.0, 1.0, GAMMA_WALL.1];
 
-        for &alpha in &alphas { for &c_target in &c_targets { for &k_max in &k_maxes {
-        for &base_rate in &base_rates { for &gamma in &gammas {
-            let g = GradientConfig { base_rate, dignity_floor: 100.0, gamma, k_max,
-                                     c_target, k_s: 0.5, alpha, q: 0.01, w_e: 0.6, w_s: 0.4 };
-            // A concentrated world (C far above every in-wall target), a top agent.
-            let rate = calculate_decay_rate_continuous(10.0, 0.9, &g);
-            assert!(rate > 0.0,
+        for &alpha in &alphas {
+            for &c_target in &c_targets {
+                for &k_max in &k_maxes {
+                    for &base_rate in &base_rates {
+                        for &gamma in &gammas {
+                            let g = GradientConfig {
+                                base_rate,
+                                dignity_floor: 100.0,
+                                gamma,
+                                k_max,
+                                c_target,
+                                k_s: 0.5,
+                                alpha,
+                                q: 0.01,
+                                w_e: 0.6,
+                                w_s: 0.4,
+                            };
+                            // A concentrated world (C far above every in-wall target), a top agent.
+                            let rate = calculate_decay_rate_continuous(10.0, 0.9, &g);
+                            assert!(rate > 0.0,
                 "in-wall config governed friction open: α={alpha} C_t={c_target} k_max={k_max} base={base_rate} γ={gamma}");
-            assert!(rate >= base_rate,
+                            assert!(rate >= base_rate,
                 "top-agent rate under high C must be at least base_rate (got {rate})");
-        }}}}}
+                        }
+                    }
+                }
+            }
+        }
     }
 }
