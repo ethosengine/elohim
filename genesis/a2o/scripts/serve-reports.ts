@@ -32,23 +32,25 @@ const MIME: Record<string, string> = {
 };
 
 function htmlIndex(urlPath: string, entries: { name: string; dir: boolean }[]): string {
-  const rows = entries
-    .sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name))
-    .map((e) => {
+  const sorted = [...entries];
+  sorted.sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name));
+  const rows = sorted
+    .map(e => {
       const href = `${urlPath.replace(/\/$/, '')}/${e.name}${e.dir ? '/' : ''}`;
       return `<li><a href="${href}">${e.name}${e.dir ? '/' : ''}</a></li>`;
     })
     .join('\n');
   return `<!doctype html><meta charset="utf-8"><title>a2o reports ${urlPath}</title>
 <style>body{font:14px/1.6 system-ui;margin:2rem;max-width:60rem}img{max-width:100%}</style>
-<h1>a2o reports — ${urlPath}</h1><ul>${urlPath !== '/' ? '<li><a href="../">../</a></li>' : ''}${rows}</ul>`;
+<h1>a2o reports — ${urlPath}</h1><ul>${urlPath === '/' ? '' : '<li><a href="../">../</a></li>'}${rows}</ul>`;
 }
 
 const server = createServer((req, res) => {
   void (async () => {
     const urlPath = decodeURIComponent((req.url ?? '/').split('?')[0]);
     const fsPath = normalize(join(ROOT, urlPath));
-    if (!fsPath.startsWith(ROOT + sep) && fsPath !== ROOT) {
+    const inRoot = fsPath.startsWith(ROOT + sep) || fsPath === ROOT;
+    if (!inRoot) {
       res.writeHead(403).end('forbidden');
       return;
     }
@@ -56,8 +58,11 @@ const server = createServer((req, res) => {
       const info = await stat(fsPath);
       if (info.isDirectory()) {
         const names = await readdir(fsPath, { withFileTypes: true });
-        const entries = names.map((d) => ({ name: d.name, dir: d.isDirectory() }));
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        const entries = names.map(d => ({ name: d.name, dir: d.isDirectory() }));
+        res.writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+        });
         res.end(htmlIndex(urlPath, entries));
         return;
       }
