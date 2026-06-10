@@ -1,12 +1,13 @@
 ---
-id: feedback-sccache-cache-corruption-recovery
 name: sccache-cache-corruption-recovery
-description: "When sccache produces null-byte output (clippy 'unclosed delimiter' errors at random source positions), the underlying S3 cache likely has corrupted entries. SCCACHE_RECACHE=1 only repaves COMPILATION entries — NOT probe-response entries. A poisoned probe blob requires direct S3 DELETE (the specific key) or full bucket wipe via Garage admin. Procedure verified on 2026-05-17."
-metadata:
+description: "sccache null-byte/'unclosed delimiter' rustc errors. ISOLATED 2026-06-09: NOT a poisoned key — sccache leaks an S3 `.sccache_check` 404-NoSuchKey error string into its RlibDepDecoder rustc-via-stdin probe. Trigger is an EMPTY bucket, so a full wipe CAUSES it. Fix: RUSTC_WRAPPER='' or restore the sentinel — key-deletion does not apply. (SCCACHE_RECACHE only repaves compilation entries; earlier 2026-05-17 recovery procedures retained below.)"
+metadata: 
   node_type: memory
+  id: feedback-sccache-cache-corruption-recovery
+  cites: 
+    - genesis/orchestrator/Jenkinsfile
   type: feedback
-cites:
-  - genesis/orchestrator/Jenkinsfile
+  originSessionId: a07b86ac-7fd6-475e-ad7f-c2939da2ce69
 ---
 
 When sccache surfaces cache corruption — symptoms include `error: unknown start of token: \u{0}` from rustc, clippy errors of the form `error: this file contains an unclosed delimiter` pointing at cached source positions, or build failures that disappear when `RUSTC_WRAPPER=""` is set — the corrupted cache entries need to be cleared. This memory captures only the verified recovery steps. The deeper question of *why* the cache became corrupted in the first place, or why some downstream invocation paths surface it differently, is **not isolated** as of this writing.
@@ -56,11 +57,15 @@ RUSTFLAGS="" RUSTC_WRAPPER="" cargo build ...
 
 This bypasses sccache entirely. The build pays full compile cost. Does NOT repair anything; just sidesteps the broken cache for this one invocation.
 
-## Unisolated: why downstream builds via cargo wrapper produce null bytes
+## ISOLATED (2026-06-09): null-byte = sccache leaking an S3 sentinel 404 into the rustc target-info probe
 
-After the bucket wipe on 2026-05-17, a focused re-verify (`cargo clean -p elohim-epr && cargo build -p elohim-epr` with `RUSTC_WRAPPER=sccache`) failed with `error: unknown start of token: \u{0}` even though the cold-cache full-workspace release build immediately prior had written 275 fresh entries with 0 read errors and 0 write errors.
+Isolated on the 2026-06-09 dev push with verbatim sccache stderr. sccache (0.15.0) initialises an `RlibDepDecoder` by compiling a minimal rlib, feeding source to `rustc -` over **stdin**. When the S3 backend 404s on its startup sentinel read (`GET sccache-elohim/.sccache_check → S3Error NoSuchKey`), sccache leaks the **S3Error debug text into that probe's stdin**, so rustc parses the error string as source → `error: this file contains an unclosed delimiter` / `error: unknown start of token: \u{0}` at `<anon>:N:M`, surfaced by cargo as `failed to run rustc to learn about target-specific information`.
 
-Root cause **NOT** isolated as of this writing. **Plausible candidates** that should be bisected in a follow-up session before any concrete claim is made:
+**The trigger is an EMPTY bucket — so Option B (full wipe) CAUSES this symptom** by removing `.sccache_check`. That resolves the 2026-05-17 puzzle ("after the wipe, cargo-wrapped `\u{0}`'d though 275 fresh entries wrote"): the compile path tolerates the missing sentinel (hence the writes), but cargo's target-info probe triggers `RlibDepDecoder` init, which does not — which is exactly the "direct `sccache rustc --print cfg` works, cargo-wrapped doesn't" asymmetry (a bare `--print` is `NotCompilation` and skips the decoder).
+
+**There is NO poisoned key to delete for this symptom** — it is the *absence* of `.sccache_check` plus sccache's error-into-stdin leak. Recover via `RUSTC_WRAPPER=""` (Option C, reliable), or heal the sentinel (let a healthy sccache recreate it, PUT a placeholder object back, or fix Garage so the read succeeds). Likely an upstream sccache bug — worth a version bump. The 2026-06-09 push shipped via Option C + a `/tmp` target-pool redirect (the `/projects`-RAID fingerprint quirk is a separate, orthogonal issue).
+
+### Historical (2026-05-17, pre-isolation): candidates considered before the mechanism was known
 
 - Stale `target/` `.rmeta` from before the wipe still being consumed by the per-crate build (`cargo clean -p X` only cleans X's artifacts, not its deps')
 - Cargo passing a response file (`@/tmp/rustc-XXXX`) whose contents are empty/null due to a transient disk/tmpfs issue

@@ -1,0 +1,12 @@
+---
+name: canteen-outreach-thread
+description: "Stephen Lewis (Canteen, NYC) hackathon outreach — Matthew engaged on substance, declined to commit; reply anchored in the Beer arc"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: ccd90cc8-bafe-4d92-b7b6-2f55b64f63eb
+---
+
+Stephen Lewis <stephen@syntrosignalmentor.com> (Canteen, thecanteenapp.com, Flatiron NYC) cold-emailed 2026-06-06/07 inviting Matthew to an invite-only creator-payments hackathon (2026-06-15 → 06-29, luma.com/5xcrazms, passphrase LEPTONx1313) and asked for perspective on his RFS post (thecanteenapp.com/analysis/2026/05/28/distribution-bootstrap-payments-founders.html — thesis: x402/sub-cent settlement drops the fee floor, so payment layers can attach permissionlessly to open-source creator infra; "attribution metadata becomes settlement logic").
+
+The first email sparked the arc that produced the Stafford Beer research docs (genesis/research/beer-designing-freedom-elohim-critique-2026-06-04.md and elohim-as-viable-system-2026-06-04.md). The arc's driving question was: how would we build a **bridge/attractor useful to those creator services** (Navidrome, Owncast, PeerTube, Immich…) — i.e., a creator-services bridge in the bridges/ pattern (sidecar reads their existing APIs/webhooks — Subsonic scrobbles, Owncast presence, Immich lineage — and translates them into EPR-REA economic events; settlement becomes a projection of the event record, not the record). Nothing landed in-tree yet (bridges/ holds only valueflows). On 2026-06-10 Matthew SENT the reply: not committing to the hackathon, engaging on the three points of contact (lineage royalties ↔ cascading attribution via CID provenance graphs; user-centric royalties ↔ agent-centric play-history custody; per-second billing ↔ bounded-reciprocity commitments), the legitimacy-over-fee-floor thesis, and the bridge-as-attractor offer — closing with an invitation to send builders (or Claude Code agents) to read github.com/ethosengine/elohim and star it. If Stephen or his network responds, the warm thread continues from there; the creator-services bridge (Subsonic/Owncast/Immich → EPR-REA events) remains undesigned in-tree and would go through p2p-design-gate when started. Stance: keep the relationship warm as a potential outreach channel into the payments/creator-infra builder network; the Beer critique doc §6 "For outreach" is the canonical phrasing source for this audience. See [[project-rea-compute-commitment-primitive]].

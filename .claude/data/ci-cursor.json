@@ -1,44 +1,52 @@
 {
  "jobs": {
-  "elohim": 1514,
-  "elohim-edge": 1051,
-  "elohim-genesis": 1110,
-  "elohim-holochain": 1314,
-  "elohim-orchestrator": 1192,
+  "elohim": 1526,
+  "elohim-edge": 1053,
+  "elohim-genesis": 1116,
+  "elohim-holochain": 1321,
+  "elohim-orchestrator": 1209,
   "elohim-sophia": 144,
   "elohim-steward": 1,
-  "elohim-storybook": 147
+  "elohim-storybook": 153
  },
  "green": {
-  "elohim-holochain": 1314,
+  "elohim-holochain": 1321,
   "elohim-sophia": 144,
-  "elohim-storybook": 147
+  "elohim-storybook": 153,
+  "elohim": 1526
  },
  "green_streak": {
-  "elohim": 0,
+  "elohim": 1,
   "elohim-edge": 0,
-  "elohim-storybook": 4,
+  "elohim-storybook": 5,
   "elohim-orchestrator": 0,
   "elohim-genesis": 0,
-  "elohim-holochain": 1
+  "elohim-holochain": 2
  },
  "recent": {
   "elohim": [
+   "UNSTABLE",
+   "UNSTABLE",
+   "ABORTED",
+   "ABORTED",
    "FAILURE",
    "UNSTABLE",
    "FAILURE",
    "FAILURE",
    "FAILURE",
+   "FAILURE",
    "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "ABORTED"
+   "FAILURE",
+   "FAILURE",
+   "FAILURE",
+   "SUCCESS"
   ],
   "elohim-edge": [
    "UNSTABLE",
    "UNSTABLE",
    "FAILURE",
+   "UNSTABLE",
+   "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
@@ -53,22 +61,28 @@
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
+   "SUCCESS",
+   "FAILURE",
+   "SUCCESS",
+   "SUCCESS",
+   "SUCCESS",
+   "SUCCESS",
    "SUCCESS"
   ],
   "elohim-orchestrator": [
-   "UNSTABLE",
    "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
    "NOT_BUILT",
+   "FAILURE",
+   "FAILURE",
+   "FAILURE",
    "UNSTABLE",
+   "FAILURE",
+   "FAILURE",
+   "FAILURE",
    "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
+   "ABORTED",
    "UNSTABLE",
    "UNSTABLE"
   ],
@@ -81,13 +95,26 @@
    "UNSTABLE",
    "UNSTABLE",
    "ABORTED",
-   "UNSTABLE"
+   "UNSTABLE",
+   "FAILURE",
+   "FAILURE",
+   "UNSTABLE",
+   "ABORTED",
+   "ABORTED",
+   "ABORTED"
   ],
   "elohim-holochain": [
    "ABORTED",
    "SUCCESS",
    "SUCCESS",
    "NOT_BUILT",
+   "SUCCESS",
+   "SUCCESS",
+   "SUCCESS",
+   "FAILURE",
+   "SUCCESS",
+   "NOT_BUILT",
+   "SUCCESS",
    "SUCCESS"
   ]
  }

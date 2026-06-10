@@ -2,9 +2,9 @@
   "schema_version": 1,
   "entries": {
     "project_local_stack_dht_anchor_gap": {
-      "hits": 10,
-      "last_changed": "elohim/elohim-storage/src/db/content_diesel.rs",
-      "last_signal_at": "2026-06-08T22:23:26Z"
+      "hits": 11,
+      "last_changed": "elohim/elohim-storage/src/db/rea_commitments.rs",
+      "last_signal_at": "2026-06-09T22:24:15Z"
     },
     "project_resilience_snapshot_humans_junction": {
       "hits": 3,
@@ -12,34 +12,34 @@
       "last_signal_at": "2026-06-06T21:39:34Z"
     },
     "project_sprint_branch_not_orchestrator_indexed": {
-      "hits": 2,
+      "hits": 5,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-07T15:50:23Z"
+      "last_signal_at": "2026-06-10T00:39:05Z"
     },
     "project_ci_playwright_image": {
-      "hits": 2,
+      "hits": 5,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-07T15:50:23Z"
+      "last_signal_at": "2026-06-10T00:39:05Z"
     },
     "feedback_pvc_threshold_and_recovery": {
-      "hits": 2,
+      "hits": 5,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-07T15:50:23Z"
+      "last_signal_at": "2026-06-10T00:39:05Z"
     },
     "feedback_cargo_target_dir_for_native_builds": {
-      "hits": 2,
+      "hits": 5,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-07T15:50:23Z"
+      "last_signal_at": "2026-06-10T00:39:05Z"
     },
     "feedback_multi_agent_pvc_pacing": {
-      "hits": 2,
+      "hits": 5,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-07T15:50:23Z"
+      "last_signal_at": "2026-06-10T00:39:05Z"
     },
     "feedback_sccache_cache_corruption_recovery": {
-      "hits": 2,
+      "hits": 5,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-06-07T15:50:23Z"
+      "last_signal_at": "2026-06-10T00:39:05Z"
     },
     "project_ci_storage_topology": {
       "hits": 2,
@@ -47,9 +47,9 @@
       "last_signal_at": "2026-06-07T15:50:16Z"
     },
     "feedback_diesel_migration_timestamp_collision": {
-      "hits": 2,
+      "hits": 3,
       "last_changed": "elohim/elohim-storage/src/db/mod.rs",
-      "last_signal_at": "2026-06-08T14:23:28Z"
+      "last_signal_at": "2026-06-10T01:10:08Z"
     },
     "project_sweettest_native_build_env": {
       "hits": 11,
@@ -57,9 +57,14 @@
       "last_signal_at": "2026-06-09T00:10:35Z"
     },
     "feedback_codegen_prettier_oscillation": {
-      "hits": 2,
+      "hits": 7,
       "last_changed": "elohim/sdk/schemas/scripts/codegen-ts.mjs",
-      "last_signal_at": "2026-06-08T23:19:59Z"
+      "last_signal_at": "2026-06-09T20:38:19Z"
+    },
+    "project_alpha_topology_bootstrap_pair": {
+      "hits": 1,
+      "last_changed": "genesis/orchestrator/data/deployments.json",
+      "last_signal_at": "2026-06-10T11:50:57Z"
     }
   }
 }
