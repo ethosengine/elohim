@@ -157,10 +157,10 @@ spec:
               value: "true"
           resources:
             requests:
-              memory: "512Mi"
+              memory: "768Mi"
               cpu: "250m"
             limits:
-              memory: "1536Mi"
+              memory: "3Gi"
               cpu: "1000m"
           volumeMounts:
             - name: holochain-data
