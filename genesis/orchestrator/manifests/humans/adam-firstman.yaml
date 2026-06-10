@@ -155,6 +155,14 @@ spec:
                     operator: In
                     values:
                       - remote
+      # Tolerate the WAN/remote-zone taint: shem is tainted remote-wan=true:NoSchedule
+      # by the operator to keep cluster infra + dev tooling off the ISP-latency node.
+      # Adam is node-type=remote (shem bootstrap anchor), so he must tolerate it to be
+      # schedulable there after a reinit. Pairs with the node-type affinity above.
+      tolerations:
+        - key: remote-wan
+          operator: Exists
+          effect: NoSchedule
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher

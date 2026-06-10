@@ -160,6 +160,17 @@ spec:
                   - key: node-type
                     operator: In
                     values: NODE_TYPE_VALUES_PLACEHOLDER
+      # Tolerate the WAN/remote-zone taint so node-type=remote humans can land on
+      # shem, which the operator taints remote-wan=true:NoSchedule to keep cluster
+      # infra + dev tooling off the ISP-latency node (a CoreDNS/che-gateway replica
+      # there added a WAN hop to everything). Inert for operations/edge/performance
+      # humans — their node affinity keeps them off shem, so this is never exercised;
+      # it's the "opt-in to the remote zone" half that pairs with the node-type
+      # affinity above.
+      tolerations:
+        - key: remote-wan
+          operator: Exists
+          effect: NoSchedule
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher
