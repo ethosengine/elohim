@@ -395,6 +395,7 @@ fn child_attestation_kind_for_governance_action(governance_kind: &str) -> Option
         "governance-action:proposal" => Some("attestation:proposal-vote"),
         "governance-action:challenge" => Some("attestation:statement-vote"),
         "governance-action:election" => Some("attestation:proposal-vote"),
+        "governance-action:ratify-limit-gradient" => Some("attestation:limit-gradient-approval"),
         _ => None,
     }
 }

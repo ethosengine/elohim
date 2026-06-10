@@ -10,10 +10,10 @@
 //! whose `content_type` starts with `attestation:` or `governance-action:`.
 
 use diesel::sqlite::SqliteConnection;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::db::models::{AttestationRow, GovernanceActionRow};
-use crate::db::{attestations, governance_actions};
+use crate::db::{attestations, governance_actions, responsibility_demand_configs};
 use crate::error::StorageError;
 use crate::services::tally_projector;
 use crate::signals::ElohimContentSignal;
@@ -49,6 +49,95 @@ pub fn handle_content_signal(
                 reject = tally.current_reject_count,
                 "governance tally recomputed after vote"
             );
+
+            // Dead-seam writeback (spec §5.3/§11 land 6): when a
+            // ratify-limit-gradient tally reaches quorum, stamp the
+            // responsibility_demand_configs row with the ratification metadata.
+            //
+            // Trigger shape (b): tally_projector::recompute returns the computed
+            // tally after every vote; we inspect governance_kind + computed_status
+            // here rather than building a new signal pipeline. The parent's
+            // parameters_json carries governance_layer + dignity_floor; a parse
+            // failure logs WARN and skips (fail-soft, mirrors CommitmentCommitted arm
+            // at signals.rs ~:652).
+            if tally.governance_kind == "governance-action:ratify-limit-gradient"
+                && tally.computed_status == "reached-quorum"
+            {
+                // Load the parent governance_action row to read parameters_json.
+                match governance_actions::get_by_id(conn, parent_cid) {
+                    Ok(Some(gov_row)) => {
+                        let params: serde_json::Value = gov_row
+                            .parameters_json
+                            .as_deref()
+                            .and_then(|s| serde_json::from_str(s).ok())
+                            .unwrap_or_default();
+
+                        let governance_layer = params["governance_layer"].as_str();
+                        let dignity_floor = params["dignity_floor"].as_f64().map(|f| f as f32);
+
+                        match (governance_layer, dignity_floor) {
+                            (Some(layer), Some(floor)) => {
+                                // h_app_id carried in subject_cid by convention for
+                                // ratify-limit-gradient: subject_cid is the h_app_id
+                                // (the governance action's subject is the app/collective).
+                                let h_app_id = tally.subject_cid.as_str();
+                                let ratified_at = &signal.created_at;
+                                let ratified_by = parent_cid.as_str();
+                                let dht_anchor_hash = signal.entry_hash.as_str();
+
+                                match responsibility_demand_configs::apply_ratification(
+                                    conn,
+                                    h_app_id,
+                                    layer,
+                                    ratified_by,
+                                    dht_anchor_hash,
+                                    floor,
+                                    ratified_at,
+                                ) {
+                                    Ok(affected) => {
+                                        debug!(
+                                            parent_cid = %parent_cid,
+                                            h_app_id = %h_app_id,
+                                            governance_layer = %layer,
+                                            dignity_floor = %floor,
+                                            affected,
+                                            "ratify-limit-gradient reached quorum — writeback stamped"
+                                        );
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            parent_cid = %parent_cid,
+                                            error = %e,
+                                            "apply_ratification failed — skipped"
+                                        );
+                                    }
+                                }
+                            }
+                            _ => {
+                                warn!(
+                                    parent_cid = %parent_cid,
+                                    params = ?params,
+                                    "ratify-limit-gradient reached quorum but parameters_json \
+                                     missing governance_layer or dignity_floor — writeback skipped"
+                                );
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        warn!(
+                            parent_cid = %parent_cid,
+                            "ratify-limit-gradient parent governance_action not found — writeback skipped"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(
+                            parent_cid = %parent_cid,
+                            error = %e,
+                            "ratify-limit-gradient: failed to load parent governance_action — writeback skipped"
+                        );
+                    }
+                }
+            }
         }
     } else if signal.content_type.starts_with("governance-action:") {
         let row = build_governance_action_row(signal)?;
@@ -205,6 +294,7 @@ fn resolve_manifest_ref(content_type: &str) -> String {
         || content_type.starts_with("attestation:gate-")
         || content_type.starts_with("attestation:proposal-")
         || content_type.starts_with("attestation:statement-")
+        || content_type.starts_with("attestation:limit-gradient-")
     {
         "mishpat".to_string()
     } else {
