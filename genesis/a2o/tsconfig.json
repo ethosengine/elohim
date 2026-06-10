@@ -10,8 +10,7 @@
     "declaration": true,
     "sourceMap": true,
     "paths": {
-      "@framework/*": ["./src/framework/*"],
-      "@elohim/identity/*": ["../../app/elohim-library/projects/elohim-identity/src/*"]
+      "@framework/*": ["./src/framework/*"]
     }
   },
   "include": ["src/**/*.ts", "steps/**/*.ts", "scripts/**/*.ts"],

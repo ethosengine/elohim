@@ -16,11 +16,11 @@
  */
 
 // Session identity primitives (models only — the service is Angular-coupled)
-export * from './lib/content-access.model';
-export * from './lib/session-human.model';
+export * from './lib/content-access.model.js';
+export * from './lib/session-human.model.js';
 
 // Attestation primitives
-export * from './lib/attestations.model';
+export * from './lib/attestations.model.js';
 
 // Doorway session client — framework-free auth surface client
-export * from './lib/doorway-session-client';
+export * from './lib/doorway-session-client.js';

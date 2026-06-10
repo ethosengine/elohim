@@ -11,12 +11,11 @@
  *   - doorway/src/routes/health.rs (HealthResponse)
  */
 
-import * as identityNamespace from '@elohim/identity/lib/doorway-session-client.js';
+import { DoorwaySessionClient, InMemorySessionTokenStore } from '@elohim/identity/core';
 import { request } from 'undici';
 
 import type {
   AuthResponse,
-  DoorwaySessionClient as SessionClient,
   ExchangeSessionResponse,
   LoginRequest,
   MeResponse,
@@ -24,28 +23,11 @@ import type {
   SessionTokenResponse,
   StoredSession,
   SuccessResponse,
-} from '@elohim/identity/lib/doorway-session-client.js';
-
-// ---------------------------------------------------------------------------
-// @elohim/identity interop
-//
-// The identity library is consumed as framework-free TS source via the
-// tsconfig path alias (the same source-alias pattern elohim-app uses). Its
-// package.json carries no "type": "module", so Node treats the file as CJS:
-// the tsx ESM loader exposes the exports on `default`, while cucumber's CJS
-// require hook (requireModule: tsx) exposes them directly.
-// `default ?? namespace` lands on the exports in both pipelines.
-// ---------------------------------------------------------------------------
-
-type IdentityModule = typeof identityNamespace;
-const identity: IdentityModule =
-  (identityNamespace as IdentityModule & { default?: IdentityModule }).default ?? identityNamespace;
-
-const { DoorwaySessionClient, InMemorySessionTokenStore, DoorwaySessionError } = identity;
+} from '@elohim/identity/core';
 
 // Re-export the consolidated auth wire types — the identity package owns the
 // definitions; a2o consumers keep importing them from this module.
-export { DoorwaySessionError };
+export { DoorwaySessionError } from '@elohim/identity/core';
 export type {
   AuthResponse,
   ExchangeSessionResponse,
@@ -56,7 +38,7 @@ export type {
   SessionTokenResponse,
   StoredSession,
   SuccessResponse,
-} from '@elohim/identity/lib/doorway-session-client.js';
+} from '@elohim/identity/core';
 
 export interface ConductorHealth {
   connected: boolean;
@@ -381,7 +363,7 @@ export class DoorwayClient {
    * setToken() both write here; every request reads its bearer from here.
    */
   private readonly tokenStore = new InMemorySessionTokenStore();
-  private readonly sessionClient: SessionClient;
+  private readonly sessionClient: DoorwaySessionClient;
 
   constructor(
     private readonly baseUrl: string,
