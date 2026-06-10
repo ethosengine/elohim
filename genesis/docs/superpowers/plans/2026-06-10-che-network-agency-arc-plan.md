@@ -120,19 +120,19 @@ captured to backlog — bigger blast radius, own plan.
 
 **Files:** `app/elohim-library/projects/elohim-identity/src/lib/doorway-session-client.ts` (+ test).
 
-- [ ] Failing tests first (node-fetch/undici-agnostic transport injected): `login`, `register`,
+- [x] Failing tests first (node-fetch/undici-agnostic transport injected): `login`, `register`,
       `logout`, `me`, `exchangeSessionToken`, `restoreSession`; one consolidated `AuthResponse`
       model (field-for-field match with `doorway/doorway-service/src/routes/auth_routes.rs` —
       camelCase wire, no transforms).
-- [ ] Implement; framework-free (no Angular DI in the core class — Angular wraps it later).
-- [ ] `pnpm --filter @elohim/identity test` green; lint clean. Commit.
+- [x] Implement; framework-free (no Angular DI in the core class — Angular wraps it later).
+- [x] `pnpm --filter @elohim/identity test` green; lint clean. Commit.
 
 ### Task 1.2: Migrate the a2o framework onto it
 
 **Files:** `genesis/a2o/src/framework/api/doorway-client.ts`,
 `genesis/a2o/src/framework/devices/browser-device.ts` (+ `playwright-device` login path).
 
-- [ ] `DoorwayClient` delegates its auth methods (login/register/logout/me/exchange) to
+- [x] `DoorwayClient` delegates its auth methods (login/register/logout/me/exchange) to
       `DoorwaySessionClient`; delete the duplicated request/response type definitions (import
       from `@elohim/identity`); non-auth methods unchanged.
 - [ ] `pnpm test:unit` in a2o green; one `@browser` cucumber scenario with `@auth` passes
@@ -141,9 +141,9 @@ captured to backlog — bigger blast radius, own plan.
 
 ### Task 1.3: Capture the complementary follow-ups (backlog, NOT this plan)
 
-- [ ] Backlog: migrate Angular `auth.service.ts` + doorway-app `auth-state.service.ts` onto
+- [x] Backlog: migrate Angular `auth.service.ts` + doorway-app `auth-state.service.ts` onto
       `DoorwaySessionClient` (`genesis/data/timeline/backlog/angular-auth-onto-doorway-session-client.md`)
-- [ ] Backlog: doorway auth wire shapes into the view-schema contract system (today hand-authored
+- [x] Backlog: doorway auth wire shapes into the view-schema contract system (today hand-authored
       in 3 places; drift risk) (`genesis/data/timeline/backlog/doorway-auth-view-schema-contract.md`)
       — source of truth: operational session state (Category C; doorway-local, reconstructable by
       re-auth); the schema describes the HTTP wire shape only, no new storage.
@@ -156,18 +156,18 @@ captured to backlog — bigger blast radius, own plan.
 
 **Files:** `app/elohim-app/scripts/hc-start.sh`, `app/elohim-app/CLAUDE.md`.
 
-- [ ] **Investigate first (one step, journaled):** how the pinned `hc sandbox generate`
+- [x] **Investigate first (one step, journaled):** how the pinned `hc sandbox generate`
       (hc-start.sh:196) accepts network config — CLI flags vs generated conductor-config
       (reference shape: `elohim/holochain/edgenode/conductor-config.yaml`). Record the answer in
       the plan journal before coding.
-- [ ] Add `NETWORK_PROFILE=isolated|join-alpha` (default `isolated` — today's behavior,
+- [x] Add `NETWORK_PROFILE=isolated|join-alpha` (default `isolated` — today's behavior,
       byte-identical when unset). `join-alpha` threads `CONDUCTOR_BOOTSTRAP_URL`
       (default `https://doorway-alpha.elohim.host/bootstrap`) + `CONDUCTOR_SIGNAL_URL` into the
       conductor network config.
-- [ ] Document the THREE profiles (`isolated` / `live-data` / `join-alpha`) in
+- [x] Document the THREE profiles (`isolated` / `live-data` / `join-alpha`) in
       `app/elohim-app/CLAUDE.md` Starting Development — one table, the agent's single orientation
       point. (`live-data` = L3's `start:alpha`, already landed.)
-- [ ] Verify: `NETWORK_PROFILE=isolated` run is unchanged (existing smoke path); `join-alpha`
+- [x] Verify: `NETWORK_PROFILE=isolated` run is unchanged (existing smoke path); `join-alpha`
       config renders the URLs (full join proof is Phase 3). Commit.
 
 ### Task 2.2: Deployed-DNA artifact sourcing (the parity rail)
@@ -175,13 +175,13 @@ captured to backlog — bigger blast radius, own plan.
 **Files:** `app/elohim-app/scripts/fetch-deployed-dna.sh` (new), wired into `hc-start.sh`
 `join-alpha` path.
 
-- [ ] **Investigate first:** where the DNA pipeline archives `.dna`/`.happ` artifacts
+- [x] **Investigate first:** where the DNA pipeline archives `.dna`/`.happ` artifacts
       (`elohim/holochain/dna/Jenkinsfile:602-641` builds them; find the archived-artifact URL —
       public Jenkins artifact paths per the pipeline-diagnostics skill). Journal the source of
       truth + how to pin the build that alpha actually runs.
-- [ ] Script: fetch the deployed bundle set to a cache dir; verify hashes (`hc dna hash` against
+- [x] Script: fetch the deployed bundle set to a cache dir; verify hashes (`hc dna hash` against
       the fetched files); refuse to proceed on `join-alpha` with locally-built bundles.
-- [ ] Verify: fetched-bundle hash list printed; `isolated` profile never touches the fetch path.
+- [x] Verify: fetched-bundle hash list printed; `isolated` profile never touches the fetch path.
       Commit.
 
 ### Task 2.3: De-duplicate one seam: `local-stack.ts` consumes `hc-start.sh`
@@ -284,6 +284,25 @@ only. No new table, no new entry type, storage rows remain projections keyed by 
       --ledger` reflects the drained items. Final commit.
 
 ---
+
+## Execution log (2026-06-10, subagent-driven, two-stage reviews)
+
+- **0.4** operator-viewable eyes: 388454d4f + lint-clean follow-up; serving verified (200/200/403).
+- **1.1** DoorwaySessionClient: a91dc88 + f205533ac; 67 tests; spec ✅ / quality APPROVED (reviewers re-ran suites).
+- **1.2** a2o migration: 0026de6b1; 107 unit / 514 dry-run scenarios; spec ✅ / quality APPROVED. Two LOW
+  behavioral notes for future step-authors: `exchangeSession()` now PERSISTS the exchanged session in the
+  shared store (old code was read-only); `logout()` clears the local session even when the server call fails.
+  ESM/CJS interop at the import site is load-bearing until `elohim-identity-type-module-esm-interop.md` lands.
+- **2.1** NETWORK_PROFILE: 0c61c5d00; isolated wrapper byte-identical (cmp); spec ✅ incl. `.hc_ports` guard
+  caller-trace; quality pass controller-direct. Investigation's clap order was WRONG — corrected empirically
+  (HAPP positional precedes the `network` subcommand).
+- **2.2** fetch-deployed-dna: bc66edd35 + ae65418d2 (hardening: password-stdin, temp trap, curl-exit
+  distinction); live-fetched the deployed bundle (Jenkins fallback; oras absent); 5 deployed DNA hashes printed;
+  spec ✅ / quality APPROVED.
+- Backlog captures (in-flight discipline): hc-start-storage-dir-dead-override, hc-seed-ports-file-path-drift,
+  join-alpha-skips-local-dna-build, elohim-identity-type-module-esm-interop, angular-auth-onto-doorway-session-client,
+  doorway-auth-view-schema-contract.
+- Grant-gated (operator): Phase 0 Tasks 0.1-0.3; Task 1.2's alpha-target `@browser` + `look --as` re-verify.
 
 ## Self-Review
 
