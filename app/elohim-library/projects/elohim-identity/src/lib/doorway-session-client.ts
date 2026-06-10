@@ -220,10 +220,11 @@ export class DoorwaySessionError extends Error {
 
 async function errorFromResponse(res: Response): Promise<DoorwaySessionError> {
   const text = await res.text();
-  let message = text || `HTTP ${res.status}`;
+  const trimmed = text.trim();
+  let message = trimmed || `HTTP ${res.status}`;
   let code: string | undefined;
   try {
-    const envelope = JSON.parse(text) as { error?: unknown; code?: unknown };
+    const envelope = JSON.parse(trimmed) as { error?: unknown; code?: unknown };
     if (typeof envelope?.error === 'string') {
       message = envelope.error;
       code = typeof envelope.code === 'string' ? envelope.code : undefined;
@@ -247,6 +248,13 @@ export interface DoorwaySessionClientOptions {
   tokenStore?: SessionTokenStore;
 }
 
+/**
+ * Doorway session client.
+ *
+ * Non-2xx responses throw `DoorwaySessionError`. Network-level failures from
+ * `fetchImpl` (DNS/TCP/abort) propagate as-is (typically `TypeError`) and are
+ * NOT wrapped. `logout()` clears the stored session even when the fetch fails.
+ */
 export class DoorwaySessionClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
@@ -319,6 +327,7 @@ export class DoorwaySessionClient {
       'GET',
       `/auth/exchange-session?session_token=${encodeURIComponent(sessionToken)}`
     );
+    // installedAppId intentionally absent — ExchangeSessionResponse (auth_routes.rs:88) does not carry it.
     this.tokenStore.set({
       token: res.token,
       humanId: res.humanId,

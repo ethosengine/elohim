@@ -198,6 +198,16 @@ describe('DoorwaySessionClient', () => {
       await expect(client.logout()).rejects.toBeInstanceOf(DoorwaySessionError);
       expect(client.restoreSession()).toBeNull();
     });
+
+    it('clears the stored session even when fetchImpl network fails', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, makeAuthResponse()));
+      await client.login({ identifier: 'a@b', password: 'pw' });
+
+      fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+      await expect(client.logout()).rejects.toThrow(TypeError);
+      expect(client.restoreSession()).toBeNull();
+    });
   });
 
   // ===========================================================================
@@ -452,6 +462,17 @@ describe('DoorwaySessionClient', () => {
       expect((err as DoorwaySessionError).message).toBe('Bad Gateway');
       expect((err as DoorwaySessionError).code).toBeUndefined();
     });
+
+    it('falls back to HTTP status when body is whitespace-only', async () => {
+      fetchMock.mockResolvedValueOnce(textResponse(502, '\n  '));
+
+      const err = await client.me().catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(DoorwaySessionError);
+      expect((err as DoorwaySessionError).status).toBe(502);
+      expect((err as DoorwaySessionError).message).toBe('HTTP 502');
+      expect((err as DoorwaySessionError).code).toBeUndefined();
+    });
   });
 
   // ===========================================================================
@@ -505,6 +526,41 @@ describe('DoorwaySessionClient', () => {
       await slashed.login({ identifier: 'a@b', password: 'pw' });
 
       expect(lastRequest().url).toBe(`${BASE_URL}/auth/login`);
+    });
+
+    it('preserves path segments in baseUrl', async () => {
+      const withPath = new DoorwaySessionClient({
+        baseUrl: 'http://localhost:8888/proxy',
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      });
+      const store = new InMemorySessionTokenStore();
+      store.set({
+        token: 'stored-token',
+        humanId: 'human-1',
+        agentPubKey: 'key-1',
+        identifier: 'user@example.com',
+        expiresAt: unixSeconds(3600),
+      });
+      const client2 = new DoorwaySessionClient({
+        baseUrl: 'http://localhost:8888/proxy',
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        tokenStore: store,
+      });
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(200, {
+          humanId: 'human-1',
+          agentPubKey: 'key-1',
+          identifier: 'user@example.com',
+          permissionLevel: 'member',
+          authenticated: true,
+          trustMode: 'doorway-host',
+          authority: { label: 'localhost' },
+        })
+      );
+
+      await client2.me();
+
+      expect(lastRequest().url).toBe('http://localhost:8888/proxy/auth/me');
     });
   });
 });
