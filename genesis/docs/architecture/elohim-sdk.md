@@ -161,6 +161,29 @@ Two cross-cutting rules:
 1. **One symbol, one home.** A symbol does not live in two libraries. If two libraries seem to need it, the library boundary is wrong; redraw it.
 2. **Check the symbol's primary dependencies, not its current directory.** Historically-misplaced symbols (the canonical case: `profile.service` living under `elohim/services/` but primarily depending on `@app/imagodei/models/profile.model` — cleanup sprint Wave 1 operator-input #1) are routed by their dependency graph, not by where they accidentally lived.
 
+### §4.1 — Node-Consumable Core Entrypoints
+
+The placement principle homes a symbol; this rule governs how non-Angular consumers reach it. **Any SDK library hosting framework-free modules declares `"type": "module"` in its `package.json` and an `exports` map with a `./core` subpath beside the Angular root entry.** The `./core` entry is framework-free ONLY — zero `@angular/*` anywhere in its transitive import closure. Non-Angular consumers (Node tooling, a2o, agents, future runtimes) import ONLY `@elohim/<lib>/core`; the root entry remains the Angular surface.
+
+The pattern retires two empirically-proven failure modes (arc Task 1.2, commit `0026de6b1`):
+
+1. Without `"type": "module"`, raw-TS source consumption under an ESM loader (tsx) breaks named imports.
+2. The same module under a CJS require chain (cucumber's `requireModule`) breaks default imports — forcing a `namespace.default ?? namespace` interop shim and deep-module imports that bypass `public-api.ts` (which drags in Angular deps unresolvable in Node).
+
+**Born-with rule.** A new library with any foreseeable non-Angular consumer is created with the pattern from day one. The named case: `@elohim/rea-runtime`'s `CommitmentService` (the che-network-agency arc's Phase 4) has the identical Node+browser consumer set and lands INTO a pre-paved `./core` entry.
+
+**Per-library status:**
+
+| Library | `./core` status |
+| --- | --- |
+| `@elohim/identity` | Pattern landing (plan Task 2). |
+| `@elohim/rea-runtime` | Pre-pave (plan Task 4). |
+| `@elohim/service` | Audit pending (plan Task 4). |
+| `@elohim/storage-client` | Audit pending (plan Task 4). |
+| `elohim-core` | Audit pending (plan Task 4). |
+
+Plan: `genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md`.
+
 ---
 
 ## §5 — Substrate-API Consumption Patterns
