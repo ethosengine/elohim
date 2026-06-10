@@ -7,7 +7,7 @@ domain: D9
 sprint: acquisition-family-slice-2a
 requires_env: [household-nodes]
 cites:
-  - epr-acquisition-pull-queue-design | the spec whose §6.4 split this plan implements — Slice 2a delivers the REA emit/graduation rails Slice 2b composes | sha256:96164edffcbaf94e | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
+  - epr-acquisition-pull-queue-design | the spec whose §6.4 split this plan implements — Slice 2a delivers the REA emit/graduation rails Slice 2b composes | sha256:96164edffcbaf94e | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
   - mutual-storage-replication-dwelling-hub-design | the REA compute-commitment instance-1 design whose floor-check gap + replicates-commons reservation this rail unblocks | sha256:1acbeeec8b7a3956 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
   - genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md
   - genesis/docs/architecture/rea-compute-commitment-primitive.md
