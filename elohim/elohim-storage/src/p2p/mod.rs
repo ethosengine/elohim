@@ -532,6 +532,12 @@ pub struct P2PNode {
     identify_cache: Arc<DashMap<String, CachedIdentifyInfo>>,
     /// Per-peer runtime metrics (direction, last-seen, RTT)
     peer_metrics: Arc<DashMap<String, PeerMetrics>>,
+    /// T24 persistent peering: bootstrap addr (canonical multiaddr string) →
+    /// PeerId learned from a successful outbound dial. Lets the bootstrap
+    /// retry arm redial INDIVIDUAL dropped links — the connected==0-only
+    /// retry left matthew↔jessica partitioned for pod lifetimes while each
+    /// held 10-11 unrelated connections (genesis #1119).
+    bootstrap_peer_ids: Arc<DashMap<String, PeerId>>,
     /// Backpressure flag: when true, sync/replication cycles are skipped.
     /// Set by bulk write operations (account import, content bulk) to prevent
     /// P2P sync from competing for memory during heavy writes.
@@ -1666,7 +1672,10 @@ impl P2PNode {
                 ElohimStorageBehaviour::new(key.clone(), config.clone(), relay_client, kad_db)
             })
             .map_err(|e| StorageError::P2PNetwork(format!("Behaviour error: {}", e)))?
-            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+            // 300s (was 60s): pod↔pod links idle between ~60s inventory cadences
+            // raced the 60s timeout (genesis #1119 partition class). Persistent
+            // peering redials dropped links; the longer timeout reduces flap.
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(300)))
             .build();
 
         // Initialize sync infrastructure (reuses same sled::Db handle)
@@ -1767,6 +1776,7 @@ impl P2PNode {
             delivery_peers: Arc::new(DashMap::new()),
             identify_cache: Arc::new(DashMap::new()),
             peer_metrics: Arc::new(DashMap::new()),
+            bootstrap_peer_ids: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
             identity_map,
             dedup: Arc::new(dedup::DedupLru::new()),
@@ -2385,40 +2395,49 @@ impl P2PNode {
                     drop(swarm);
                 }
                 _ = bootstrap_retry_interval.tick() => {
-                    let connected = swarm.connected_peers().count();
-                    if connected == 0 && !self.config.bootstrap_nodes.is_empty() {
-                        consecutive_empty_ticks = consecutive_empty_ticks.saturating_add(1);
-                        // Cap the retry frequency: after 10 ticks (~5 minutes of no peers),
-                        // slow down to every 5 minutes by skipping ticks.
-                        let should_retry = consecutive_empty_ticks <= 10
-                            || consecutive_empty_ticks.is_multiple_of(10);
-                        if should_retry {
-                            info!(
-                                attempt = consecutive_empty_ticks,
-                                bootstrap_count = self.config.bootstrap_nodes.len(),
-                                "Bootstrap retry: no connected peers, re-dialing bootstrap nodes"
-                            );
-                            for addr_str in &self.config.bootstrap_nodes {
-                                match addr_str.parse::<Multiaddr>() {
-                                    Ok(addr) => match swarm.dial(addr.clone()) {
-                                        Ok(_) => debug!(addr = %addr, "Re-dialed bootstrap"),
-                                        Err(e) => debug!(addr = %addr, error = %e, "Re-dial failed"),
-                                    },
-                                    Err(e) => warn!(
-                                        addr = %addr_str,
-                                        error = %e,
-                                        "Bootstrap retry: invalid multiaddr in config, skipping"
-                                    ),
+                    // T24 persistent peering: redial ANY configured bootstrap
+                    // link that is not currently connected — not only when
+                    // connected==0. The old gate left a dropped pod↔pod link
+                    // dead for the pod's lifetime as long as ANY other peer
+                    // (steward clients, other pods) stayed connected: genesis
+                    // #1119 found matthew↔jessica partitioned in BOTH
+                    // directions while each held 10-11 live connections.
+                    if !self.config.bootstrap_nodes.is_empty() {
+                        let connected_now: std::collections::HashSet<PeerId> =
+                            swarm.connected_peers().copied().collect();
+                        let needing = bootstrap_needing_redial(
+                            &self.config.bootstrap_nodes,
+                            &self.bootstrap_peer_ids,
+                            &connected_now,
+                        );
+                        if needing.is_empty() {
+                            if consecutive_empty_ticks > 0 {
+                                info!(
+                                    connected = connected_now.len(),
+                                    prior_attempts = consecutive_empty_ticks,
+                                    "Bootstrap links recovered"
+                                );
+                                consecutive_empty_ticks = 0;
+                            }
+                        } else {
+                            consecutive_empty_ticks = consecutive_empty_ticks.saturating_add(1);
+                            // Cap retry frequency: after 10 ticks (~5 min),
+                            // slow to every 10th tick (~5-min cadence).
+                            let should_retry = consecutive_empty_ticks <= 10
+                                || consecutive_empty_ticks.is_multiple_of(10);
+                            if should_retry {
+                                for addr in needing {
+                                    match swarm.dial(addr.clone()) {
+                                        Ok(_) => info!(
+                                            addr = %addr,
+                                            attempt = consecutive_empty_ticks,
+                                            "Persistent peering: re-dialing bootstrap link"
+                                        ),
+                                        Err(e) => debug!(addr = %addr, error = %e, "Persistent peering: re-dial failed"),
+                                    }
                                 }
                             }
                         }
-                    } else if connected > 0 && consecutive_empty_ticks > 0 {
-                        info!(
-                            connected = connected,
-                            prior_attempts = consecutive_empty_ticks,
-                            "Bootstrap recovered"
-                        );
-                        consecutive_empty_ticks = 0;
                     }
                     drop(swarm);
                 }
@@ -3552,6 +3571,20 @@ impl P2PNode {
                         last_seen_ms: now_unix_ms(),
                         rtt_samples: std::collections::VecDeque::with_capacity(8),
                     });
+                // T24: learn bootstrap-addr → PeerId from outbound dials so the
+                // persistent-peering retry knows WHICH configured link dropped.
+                if endpoint.is_dialer() {
+                    let dialed = endpoint.get_remote_address().to_string();
+                    let is_bootstrap = self.config.bootstrap_nodes.iter().any(|cfg| {
+                        cfg.parse::<Multiaddr>()
+                            .map(|a| a.to_string() == dialed)
+                            .unwrap_or(false)
+                    });
+                    if is_bootstrap {
+                        self.bootstrap_peer_ids.insert(dialed.clone(), peer_id);
+                        info!(addr = %dialed, peer = %peer_id, "Bootstrap link established (persistent peering tracks it)");
+                    }
+                }
                 {
                     let mut swarm = self.swarm.write().await;
                     // In K8s (mDNS disabled), add connected peers to Kademlia for DHT routing.
@@ -7034,6 +7067,92 @@ pub fn reach_gate_allows(
             }
         }
         _ => false,
+    }
+}
+
+/// T24 persistent peering: which configured bootstrap addrs lack a live
+/// connection? An addr needs redial when its PeerId was never learned (no
+/// successful outbound dial yet — covers inbound-only and never-connected
+/// links) or its learned PeerId is absent from the connected set. Invalid
+/// multiaddr strings are skipped (startup already warns on them).
+pub(crate) fn bootstrap_needing_redial(
+    configured: &[String],
+    learned: &DashMap<String, PeerId>,
+    connected: &std::collections::HashSet<PeerId>,
+) -> Vec<Multiaddr> {
+    configured
+        .iter()
+        .filter_map(|s| s.parse::<Multiaddr>().ok())
+        .filter(|addr| match learned.get(&addr.to_string()) {
+            Some(pid) => !connected.contains(pid.value()),
+            None => true,
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod bootstrap_peering_tests {
+    use super::bootstrap_needing_redial;
+    use dashmap::DashMap;
+    use libp2p::{Multiaddr, PeerId};
+    use std::collections::HashSet;
+
+    const ADDR_A: &str = "/dns4/elohim-jessica-alpha-0.svc/tcp/9876";
+    const ADDR_B: &str = "/dns4/elohim-pete-alpha-0.svc/tcp/9876";
+
+    fn canonical(addr: &str) -> String {
+        addr.parse::<Multiaddr>().unwrap().to_string()
+    }
+
+    #[test]
+    fn unlearned_addr_needs_redial() {
+        let learned = DashMap::new();
+        let connected = HashSet::new();
+        let needing = bootstrap_needing_redial(&[ADDR_A.to_string()], &learned, &connected);
+        assert_eq!(needing.len(), 1);
+        assert_eq!(needing[0].to_string(), canonical(ADDR_A));
+    }
+
+    #[test]
+    fn learned_and_connected_does_not_redial() {
+        let pid = PeerId::random();
+        let learned = DashMap::new();
+        learned.insert(canonical(ADDR_A), pid);
+        let connected: HashSet<PeerId> = [pid].into_iter().collect();
+        let needing = bootstrap_needing_redial(&[ADDR_A.to_string()], &learned, &connected);
+        assert!(needing.is_empty());
+    }
+
+    #[test]
+    fn learned_but_dropped_link_redials_only_that_addr() {
+        // The genesis #1119 shape: one configured link drops while the other
+        // stays connected — the dropped one (and ONLY it) must redial even
+        // though connected.len() > 0 (the old connected==0 gate never fired).
+        let pid_a = PeerId::random();
+        let pid_b = PeerId::random();
+        let learned = DashMap::new();
+        learned.insert(canonical(ADDR_A), pid_a);
+        learned.insert(canonical(ADDR_B), pid_b);
+        let connected: HashSet<PeerId> = [pid_b].into_iter().collect();
+        let needing = bootstrap_needing_redial(
+            &[ADDR_A.to_string(), ADDR_B.to_string()],
+            &learned,
+            &connected,
+        );
+        assert_eq!(needing.len(), 1);
+        assert_eq!(needing[0].to_string(), canonical(ADDR_A));
+    }
+
+    #[test]
+    fn invalid_multiaddr_is_skipped() {
+        let learned = DashMap::new();
+        let connected = HashSet::new();
+        let needing = bootstrap_needing_redial(
+            &["not-a-multiaddr".to_string(), ADDR_A.to_string()],
+            &learned,
+            &connected,
+        );
+        assert_eq!(needing.len(), 1);
     }
 }
 
