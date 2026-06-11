@@ -136,3 +136,15 @@ gains first-class anchors): `elohim-protocol-specification` (protocol-specificat
 (`avodah`/`elohim`/`infrastructure`/`mishpat`/`steward-node`). Island docs still to route+retire:
 elohim-storage {EDGE/P2P-ARCHITECTURE, REACH}, doorway-service {ARCHITECTURE, FEDERATION, SCALING, RECOVERY-*,
 EDGE-DESIGN}, holochain {LINK_ARCHITECTURE}.
+
+### No-gospel homes resolved — 2026-06-11 (layered-drift disposition)
+
+Operator decision via the layered-drift hierarchy ("which layer?"):
+- **Design domains → ANCHORED**: `avodah-domain-gospel`, `elohim-domain-gospel`, `mishpat-domain-gospel`
+  created at `elohim/sdk/domains/<x>/CLAUDE.md` — each has its own EPR app-manifest, each cites
+  `elohim-protocol-specification` (the substrate it assumes, not redesigns); `avodah` also cites
+  `shefa-domain-gospel` (horizontal — work creates shefa value).
+- **Implementation crate → HELD**: `steward/node` is not its own domain — it implements the compute-hub-storage
+  orchestration epic (`elohim-hub-boundaries-design`). When anchored it cites that epic (as `steward-device`
+  cites `iroh-libp2p-complementarity`), not a domain. Held pending operator go.
+- **Marginal → HELD**: `infrastructure` has a manifest but ownership is undecided; revisit.

@@ -71,6 +71,35 @@ The gap is the other three edge types. Extend the same reverse-index fan-out so 
 direction (dependent → source) is **traversed in reverse** at propagation time (source-change → flag-dependents).
 One authored edge, two read directions. The reverse index is the shared primitive; §6 lists the per-edge work.
 
+## 2b. The layered-drift hierarchy (the depth axis)
+
+The edges of §1 carry a **depth direction**, which gives the graph a layer ordering:
+
+```
+substrate       elohim-protocol-specification, sdk schemas/wire types     ← the "W3C / HTML spec"
+   ↑ assumes
+domain          lamad · qahal · imagodei · shefa · avodah · elohim · mishpat   (app-manifest design domains)
+   ↑ assumes
+implementation  app pillars (render the domain) · crates (steward-node → an orchestration epic)
+```
+
+A `cites:`/`derived_from` edge from layer N to layer N−1 is a declaration: *"I assume the layer below; I do
+not redesign it."* A domain designer composes ON the substrate the way a web developer builds on HTML
+without authoring the W3C spec. Drift flows **up the layers**: when the substrate changes (HTML6 ships),
+every domain that cited `elohim-protocol-specification` goes STALE — "re-verify the assumptions your work
+rested on" — and that staleness cascades to the implementations citing those domains. The graph tells a
+domain designer the ground moved *without their having to watch the substrate themselves*.
+
+Edges are **vertical** (to the layer below — `avodah → elohim-protocol-specification`) or **horizontal** (to
+a sibling at the same layer it composes — `avodah → shefa-domain-gospel`, since avodah work creates shefa
+value). Both are real dependencies; both drift-track. The depth ordering is what lets a per-locus roll-up
+(§4) weight a substrate-level change as higher-blast-radius than a leaf change.
+
+The disposition test for a no-gospel candidate is therefore **"which layer?"**: a true **design domain** (own
+app-manifest — avodah/elohim/mishpat) earns a gospel that cites the substrate below; an **implementation
+crate** (steward-node, under the compute-hub-storage orchestration epic) cites the epic *above* it, not a
+domain of its own; a **marginal** candidate (infrastructure) is held until ownership is decided.
+
 ## 3. Parent-agnostic composition (the cascade)
 
 A child locus must work **standalone** (a submodule checked out alone is a complete repo) — it must NOT
