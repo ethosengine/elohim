@@ -45,34 +45,45 @@ const EL_TOKENS = `
   --el-shadow-soft: 0 2px 8px rgba(107, 97, 87, 0.08);
 `;
 
+/*
+ * Names match the primitive's published @cssprop surface exactly (the prior
+ * switcher/profile/banner/shadow token names were ghosts — the 2026-06-11
+ * eyes sweep showed the bubble rendering system-grey in both themes).
+ * Banners are per-kind: info carries amber warmth (golden-hour), warning
+ * deepens it, error speaks terracotta — never alarm-red.
+ */
 const NAV_TOKENS_LIGHT = `
   --elohim-nav-bg:              var(--el-cream);
   --elohim-nav-fg:              var(--el-stone);
   --elohim-nav-border:          1px solid color-mix(in oklch, var(--el-stone) 15%, transparent);
-  --elohim-nav-shadow:          var(--el-shadow-soft);
-  --elohim-nav-switcher-bg:     color-mix(in oklch, var(--el-stone) 6%, var(--el-cream));
-  --elohim-nav-switcher-fg:     var(--el-green-deep);
-  --elohim-nav-profile-bg:      var(--el-green-deep);
-  --elohim-nav-profile-fg:      var(--el-cream);
-  --elohim-nav-banner-bg:       color-mix(in oklch, var(--el-amber) 15%, var(--el-cream));
-  --elohim-nav-banner-fg:       var(--el-stone);
+  --elohim-nav-bubble-bg:       var(--el-green-deep);
+  --elohim-nav-bubble-fg:       var(--el-cream);
+  --elohim-nav-banner-info-bg:  color-mix(in oklch, var(--el-amber) 15%, var(--el-cream));
+  --elohim-nav-banner-info-fg:  var(--el-stone);
+  --elohim-nav-banner-warning-bg: color-mix(in oklch, var(--el-amber) 35%, var(--el-cream));
+  --elohim-nav-banner-warning-fg: color-mix(in oklch, var(--el-stone) 70%, var(--el-night));
+  --elohim-nav-banner-error-bg: color-mix(in oklch, var(--el-clay) 18%, var(--el-cream));
+  --elohim-nav-banner-error-fg: color-mix(in oklch, var(--el-clay) 75%, var(--el-night));
   --elohim-nav-tray-bg:         var(--el-cream);
   --elohim-nav-tray-border:     1px solid color-mix(in oklch, var(--el-stone) 15%, transparent);
+  --elohim-nav-tray-shadow:     var(--el-shadow-soft);
 `;
 
 const NAV_TOKENS_DARK = `
   --elohim-nav-bg:              var(--el-night);
   --elohim-nav-fg:              var(--el-starlight);
   --elohim-nav-border:          1px solid color-mix(in oklch, var(--el-starlight) 12%, transparent);
-  --elohim-nav-shadow:          0 2px 8px rgba(0, 0, 0, 0.3);
-  --elohim-nav-switcher-bg:     color-mix(in oklch, var(--el-starlight) 8%, var(--el-night));
-  --elohim-nav-switcher-fg:     var(--el-green-light);
-  --elohim-nav-profile-bg:      var(--el-green-deep);
-  --elohim-nav-profile-fg:      var(--el-cream);
-  --elohim-nav-banner-bg:       color-mix(in oklch, var(--el-amber) 20%, var(--el-night));
-  --elohim-nav-banner-fg:       var(--el-starlight);
+  --elohim-nav-bubble-bg:       var(--el-green-deep);
+  --elohim-nav-bubble-fg:       var(--el-cream);
+  --elohim-nav-banner-info-bg:  color-mix(in oklch, var(--el-amber) 20%, var(--el-night));
+  --elohim-nav-banner-info-fg:  var(--el-starlight);
+  --elohim-nav-banner-warning-bg: color-mix(in oklch, var(--el-amber) 32%, var(--el-night));
+  --elohim-nav-banner-warning-fg: color-mix(in oklch, var(--el-amber) 60%, var(--el-starlight));
+  --elohim-nav-banner-error-bg: color-mix(in oklch, var(--el-clay) 28%, var(--el-night));
+  --elohim-nav-banner-error-fg: color-mix(in oklch, var(--el-clay) 35%, var(--el-starlight));
   --elohim-nav-tray-bg:         var(--el-night-alt);
   --elohim-nav-tray-border:     1px solid color-mix(in oklch, var(--el-starlight) 12%, transparent);
+  --elohim-nav-tray-shadow:     0 4px 16px rgba(15, 26, 18, 0.4);
 `;
 
 // ---------------------------------------------------------------------------
