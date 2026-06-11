@@ -50,7 +50,7 @@ But Holochain's DHT wasn't designed for:
 
 elohim-node handles the **Data Layer** - the actual bytes, the sync, the replication.
 
-See [P2P-DATAPLANE.md](../P2P-DATAPLANE.md) for the full architectural separation.
+See genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md (design history) for the full architectural separation; live P2P data-plane truth: elohim/elohim-storage/CLAUDE.md.
 
 ## Core Components
 
@@ -59,6 +59,7 @@ elohim-node/
 ├── src/
 │   ├── main.rs              # Daemon entry point (clap CLI + tokio runtime)
 │   ├── config.rs            # Node configuration (TOML + env + CLI overrides)
+│   ├── elohim_service.rs    # elohim-agent wiring (axum POST /elohim/invoke, GET /elohim/health)
 │   │
 │   ├── sync/                # Automerge sync engine
 │   │   ├── mod.rs           # SyncEngine core
@@ -67,16 +68,19 @@ elohim-node/
 │   │   ├── merge.rs         # CRDT conflict resolution
 │   │   └── protocol.rs      # Sync wire protocol
 │   │
-│   ├── p2p/                 # libp2p networking (0.53)
-│   │   ├── mod.rs           # Swarm builder + ElohimBehaviour
-│   │   ├── transport.rs     # QUIC/TCP transport
-│   │   ├── protocols.rs     # /elohim/sync, /elohim/shard protocols
+│   ├── p2p/                 # libp2p networking (0.54)
+│   │   ├── mod.rs           # Module exports (swarm builder lives in transport.rs)
+│   │   ├── transport.rs     # QUIC/TCP transport + ElohimBehaviour + swarm builder
+│   │   ├── protocols.rs     # /elohim/doc-sync, /elohim/shard, /elohim/cluster protocols
 │   │   └── nat.rs           # NAT traversal
 │   │
 │   ├── pod/                 # Autonomous operations manager
 │   │   ├── mod.rs           # Pod core (decision loop)
 │   │   ├── cli.rs           # Pod subcommands (status, trigger, history)
 │   │   ├── analyzer.rs      # Metrics analysis
+│   │   ├── admission.rs     # Compute admission control types
+│   │   ├── capacity.rs      # Capacity announcements (gossipsub compute discovery)
+│   │   ├── compute_rea.rs   # REA compute accounting (economic event per invocation)
 │   │   ├── consensus.rs     # Multi-node pod consensus
 │   │   ├── decider.rs       # Rule-based decision engine
 │   │   ├── executor.rs      # Action execution
@@ -109,7 +113,7 @@ elohim-node/
 │   │   ├── download.rs      # Binary download
 │   │   └── apply.rs         # Update application
 │   │
-│   ├── cluster/             # Family cluster orchestration
+│   ├── cluster/             # Family cluster orchestration (TODO stubs — mDNS/Kademlia live in p2p/transport.rs)
 │   │   ├── mod.rs
 │   │   ├── discovery.rs     # mDNS local discovery
 │   │   ├── membership.rs    # Cluster join/leave
@@ -120,7 +124,7 @@ elohim-node/
 │   │   ├── blobs.rs         # Blob store
 │   │   └── reach.rs         # Reach-based access control
 │   │
-│   └── api/                 # Control APIs
+│   └── api/                 # Control APIs (TODO stubs — live HTTP surface is dashboard/ + elohim_service.rs)
 │       ├── mod.rs
 │       ├── http.rs          # REST API for management
 │       └── grpc.rs          # gRPC for device clients
@@ -199,7 +203,7 @@ Content replicates based on its reach level:
 | `neighborhood` | Trusted clusters | Optional |
 | `commons` | Any willing node | No |
 
-See [REACH.md](../REACH.md) for enforcement details.
+The reach vocabulary is under cross-codebase reconciliation — see genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md for the recorded drift (this crate's own enum in src/storage/reach.rs is a dormant 6-variant definition site; the table above predates reconciliation).
 
 ## Configuration
 
@@ -213,7 +217,7 @@ cluster_name = "johnson-family"
 
 [sync]
 # Automerge settings
-max_document_size = "10MB"
+max_document_size = 10485760  # bytes (10 MB)
 sync_interval_ms = 1000
 
 [cluster]
@@ -374,12 +378,13 @@ nix build .#dockerImage
 
 **Implemented**:
 - Sync engine (Automerge CRDT integration, stream positions, merge resolution, coordinator)
-- P2P transport (libp2p 0.53 with QUIC/TCP, mDNS, Kademlia, relay, request-response)
+- P2P transport (libp2p 0.54 with QUIC/TCP, mDNS, Kademlia, relay, request-response)
 - Pod autonomous operations (decision loop, rule engine, consensus, CLI, recovery/cache/storage/config actions)
 - Network operator layer (registration, sync state)
 - Web dashboard (axum-based with metrics, discovery, routes)
 - Over-the-air update system (manifest parsing, download, apply)
 - Configuration system (TOML + environment + CLI overrides)
+- elohim-agent service wiring (src/elohim_service.rs: POST /elohim/invoke, GET /elohim/health) + compute coordination types (pod/admission.rs, pod/capacity.rs, pod/compute_rea.rs)
 
 **Next Steps**:
 1. Integration testing across sync + P2P + pod layers
@@ -388,4 +393,4 @@ nix build .#dockerImage
 4. Production deployment on family hardware
 5. Reed-Solomon sharding for blob storage
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for implementation details.
+Implementation truth lives in [CLAUDE.md](./CLAUDE.md) (crate gospel).
