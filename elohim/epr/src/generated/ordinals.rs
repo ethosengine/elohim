@@ -6,7 +6,7 @@
 //! Lives in epr (not elohim-storage) because epr is upstream of storage and
 //! cannot import storage's generated enums without a circular dependency.
 
-/// (reach value, openness score) — 1 = most restrictive, 8 = most open.
+/// (value, ordinal score) — 1 = lowest, 8 = highest.
 pub const REACH_OPENNESS: &[(&str, u8)] = &[
     ("private", 1),
     ("self", 2),

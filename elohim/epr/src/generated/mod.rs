@@ -7,6 +7,6 @@
 //!
 //! DO NOT EDIT the generated submodules by hand.
 
-mod reach_ordinal;
+mod ordinals;
 
-pub use reach_ordinal::*;
+pub use ordinals::REACH_OPENNESS;

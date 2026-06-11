@@ -34,9 +34,9 @@ const OUTPUT_ATTESTATION_KINDS = resolve(
 // epr is a foundational crate upstream of elohim-storage, so it cannot import
 // storage's generated_enums.rs. Ordinal slices (e.g. REACH_OPENNESS) for
 // `_ordinal` enums are emitted into epr's own generated module instead.
-const OUTPUT_EPR_ORDINAL = resolve(
+const OUTPUT_EPR_ORDINALS = resolve(
   REPO_ROOT,
-  'elohim/epr/src/generated/reach_ordinal.rs',
+  'elohim/epr/src/generated/ordinals.rs',
 );
 
 const VERIFY = process.argv.includes('--verify');
@@ -116,7 +116,7 @@ function formatOrdinalSlice(constant, allValues) {
   const name = constant.replace(/_LEVELS$/, '') + '_OPENNESS';
   const rows = allValues.map((v, i) => `    ("${v}", ${i + 1}),`).join('\n');
   return [
-    `/// (reach value, openness score) — 1 = most restrictive, ${allValues.length} = most open.`,
+    `/// (value, ordinal score) — 1 = lowest, ${allValues.length} = highest.`,
     `pub const ${name}: &[(&str, u8)] = &[`,
     rows,
     `];`,
@@ -303,7 +303,7 @@ async function main() {
 
     // Verify epr ordinal slice file (REACH_OPENNESS, etc.)
     if (generatedEprOrdinals !== null) {
-      const tmpEprOrdinals = join(tmpDir, 'reach_ordinal.rs');
+      const tmpEprOrdinals = join(tmpDir, 'ordinals.rs');
       await writeFile(tmpEprOrdinals, generatedEprOrdinals);
       try {
         execFileSync('rustfmt', [tmpEprOrdinals], { stdio: 'pipe' });
@@ -313,9 +313,9 @@ async function main() {
       const expectedEprOrdinals = await readFile(tmpEprOrdinals, 'utf8');
       let existingEprOrdinals;
       try {
-        existingEprOrdinals = await readFile(OUTPUT_EPR_ORDINAL, 'utf8');
+        existingEprOrdinals = await readFile(OUTPUT_EPR_ORDINALS, 'utf8');
       } catch {
-        console.error(`FAIL: Generated file does not exist (epr-ordinal): ${OUTPUT_EPR_ORDINAL}`);
+        console.error(`FAIL: Generated file does not exist (epr-ordinal): ${OUTPUT_EPR_ORDINALS}`);
         stale = true;
       }
       if (existingEprOrdinals !== undefined && existingEprOrdinals !== expectedEprOrdinals) {
@@ -353,14 +353,14 @@ async function main() {
 
   // Write epr ordinal slice file (REACH_OPENNESS, etc. — epr is upstream of storage)
   if (generatedEprOrdinals !== null) {
-    await mkdir(dirname(OUTPUT_EPR_ORDINAL), { recursive: true });
-    await writeFile(OUTPUT_EPR_ORDINAL, generatedEprOrdinals);
+    await mkdir(dirname(OUTPUT_EPR_ORDINALS), { recursive: true });
+    await writeFile(OUTPUT_EPR_ORDINALS, generatedEprOrdinals);
     try {
-      execFileSync('rustfmt', [OUTPUT_EPR_ORDINAL], { stdio: 'pipe' });
+      execFileSync('rustfmt', [OUTPUT_EPR_ORDINALS], { stdio: 'pipe' });
     } catch {
       // rustfmt not available
     }
-    console.log(`Generated (epr-ordinal): ${OUTPUT_EPR_ORDINAL}`);
+    console.log(`Generated (epr-ordinal): ${OUTPUT_EPR_ORDINALS}`);
   }
 }
 

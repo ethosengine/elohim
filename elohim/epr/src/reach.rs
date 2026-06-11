@@ -63,6 +63,13 @@ mod tests {
     /// fails the moment it drifts from the schema's declared ordinal order.
     #[test]
     fn openness_matches_generated_ordinal() {
+        // One entry per Reach variant. A mismatch means reach.rs and reach.schema.json
+        // are out of sync — regenerate: pnpm run schema:codegen:rs
+        assert_eq!(
+            REACH_OPENNESS.len(),
+            8,
+            "REACH_OPENNESS length != Reach variant count"
+        );
         for (name, score) in REACH_OPENNESS {
             let r: Reach =
                 serde_json::from_value(serde_json::Value::String((*name).into())).unwrap();
