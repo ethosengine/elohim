@@ -17,3 +17,7 @@ platform), keep the AuthProvider abstraction at the edge. Bigger blast radius
 than a2o (production login flows, refresh timers, SSR) — own plan, not a task
 rider. Connection-matrix rails apply (arc spec §client-connection-matrix):
 trustMode stays discovered-from-/auth/me; no strategy logic enters the client.
+RESOLVED 2026-06-11 (auth-wire plan T2-T4, commits df41f874d / 9dd0a286e+15eda45f8 / f5a8d86a7,
+all two-stage reviewed): elohim-app auth.service + doorway-app auth-state migrated onto
+DoorwaySessionClient (SSR-guarded + single-key stores); every hand-written auth wire shape
+retired onto generated contracts (proof grep empty); logout made network-unhostage.

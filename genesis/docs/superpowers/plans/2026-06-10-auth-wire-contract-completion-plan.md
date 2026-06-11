@@ -1,7 +1,7 @@
 ---
 title: Auth Wire-Contract Completion — schema-contract the doorway auth shapes, migrate the Angular consumers
 id: auth-wire-contract-completion-plan
-status: Draft
+status: landed
 class: protocol-canonical
 domain: D8
 sprint: unranked — born 2026-06-10; sequenced AFTER sdk-core-entrypoints-plan (identity package churn). Operational wire-contract only — no storage, no DHT.
@@ -85,16 +85,16 @@ platform tokenStore adapter in the imagodei pillar.
 
 **Files:** `doorway/doorway-app/src/app/services/auth-state.service.ts` (+ spec).
 
-- [ ] Same adapter pattern (doorway-app is browser-only — no SSR guard needed; verify);
+- [x] Same adapter pattern (doorway-app is browser-only — no SSR guard needed; verify);
       trustMode handling stays exactly as-is (discovered from `/auth/me` at portal render —
       rail check: grep proves no config-pinned trustMode appears)
-- [ ] doorway-app lint + test green (`pnpm exec eslint src --ext .ts,.html`). Commit.
+- [x] doorway-app lint + test green (`pnpm exec eslint src --ext .ts,.html`). Commit.
 
 ## Task 4: Retire the duplication evidence
 
-- [ ] Grep proof: no hand-written `AuthResponse`/`MeResponse`/`AccountResponse` interface
+- [x] Grep proof: no hand-written `AuthResponse`/`MeResponse`/`AccountResponse` interface
       declarations remain anywhere outside generated dirs + the identity re-export
-- [ ] Update the two backlog entries (this plan's cites) to `resolved-by:` lines; re-run
+- [x] Update the two backlog entries (this plan's cites) to `resolved-by:` lines; re-run
       `decompose.py` on this plan; `placement-audit.py --ledger` reflects the drain. Commit.
 
 
@@ -110,7 +110,12 @@ platform tokenStore adapter in the imagodei pillar.
 - **T2 LANDED + reviewed ✅/APPROVED:** df41f874d — full app suite 214 files / 4612 tests; SSR
   spy-proof real; storage contract preserved (expiry canonicalized w/ migrate-on-read); seconds/ms
   timer math traced both directions; consolidation bypassed the OAuth provider's drifted snake_case
-  refresh parse. T3 (doorway-app) dispatched; T4 pending. T2 dev-loop eyes check done 2026-06-11: /identity
+  refresh parse. **T3 LANDED + reviewed ✅/APPROVED:** 9dd0a286e (+ 15eda45f8 logout-hang fix from review) — 30 tests,
+  production build green, trustMode grep clean, single-key store preserved.
+- **T4 LANDED + reviewed ✅/APPROVED (plan COMPLETE):** f5a8d86a7 — proof grep EMPTY across all four TS
+  surfaces; doorway-account remapped from phantom fields to wire truth (always-blank Doorway-info row
+  removed; conductorId graduation semantics verified in Rust). Follow-up filed:
+  backlog/handle-account-suspension-mirror.md. T2 dev-loop eyes check done 2026-06-11: /identity
   (threshold login) renders clean with the migrated service against live-data profile — zero
   pageErrors/httpErrors; single console error is the backlogged :8888 health probe. Note:
   /login and /dashboard are NOT routes (auth surface = /identity).

@@ -17,3 +17,6 @@ schema-contract harness (schema_contract.rs + codegen-ts) would make that drift
 structurally impossible. Note: auth shapes are operational session state
 (Category C; no storage schema) — this is wire-contract discipline only.
 Sources of truth audit + 10-rules conventions: elohim/sdk/schemas/v1/views/CONVENTIONS.md.
+RESOLVED 2026-06-11 (auth-wire plan T1, commits 09becf281+3b3a89d4d, re-reviewed ✅): five auth
+view schemas + doorway-side contract harness (14 tests); codegen distributes to six locations;
+@elohim/identity types are generated re-exports. Drift is now structurally impossible.
