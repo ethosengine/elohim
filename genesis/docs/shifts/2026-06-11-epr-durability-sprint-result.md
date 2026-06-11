@@ -24,13 +24,18 @@ Target 0 not reached; the lone failing gate is operator-ceiling
 
 ## Ceiling menu (operator decisions; full diagnoses in the backlog docs)
 
-1. **Conductor PVC schema** — `no such table: DhtOp` (kitsune2 cannot
-   write ops) → custody-convergence + the DepMissingFromDht class.
-   `dna-conductor-dht-gossip-gap.md`. Genesis pair must move together.
-2. **infrastructure role** fails 5/5 connects → PeerStatus/resilience
-   dark. Role-name vs happ manifest. `storage-hcclient-boot-giveup.md`.
-3. `record_health_attestation` caller decision —
-   `dna-health-attestation-ci-authz.md`.
+1. ~~Conductor PVC schema~~ **RETRACTED by operator on-host evidence**
+   (~20:00Z): conductor DBs healthy, gossip publishing 1035/1035, zero
+   DhtOp errors. DO NOT touch PVCs. See the retraction in
+   `dna-conductor-dht-gossip-gap.md` (superseded).
+2. **THE real root (operator-diagnosed): doorway-operator identity
+   mismatch** — the attestation guard checks the registration record's
+   frozen operator_agent vs the doorway's CURRENT cell key (re-keyed by
+   reinstalls); register/update both reject, total lockout. Fix landed
+   this shift (re-registration + latest-wins). 
+   `dna-health-attestation-ci-authz.md` (now central).
+3. **infrastructure role** connect failures + read-pool saturation on
+   ethosengine conductors (Util 125-162%) — tuning, not blocking.
 4. elohim-epr Jenkins job not provisioned (orchestrator warns every run).
 5. Dataplane SDK: 3 design questions → /brainstorm.
    `arch-dataplane-sdk-proposal.md`.

@@ -7,9 +7,9 @@ title: "Entries authored on matthew's conductor never gossip to other conductors
 slug: "dna-conductor-dht-gossip-gap"
 written: "2026-06-11"
 author: "agentic-developer (EPR durability shift, #1123 decisive read)"
-status: "backlog"
+status: "superseded"
 priority: "high"
-ci_status: red
+ci_status: retracted
 jobs: [elohim-genesis]
 tags: [dna, holochain, kitsune2, gossip, custody-convergence, epr-durability-arc, ceiling]
 cites:
@@ -69,3 +69,27 @@ controlled reset (ALLOW_DNA_REINSTALL family: both genesis-pair pods
 together or DHT partition). The diagnosis is now concrete enough for a
 targeted operator session: check conductor holochain version vs PVC DB
 schema; decide migrate-vs-reset; alpha keys need lineage care.
+
+## RETRACTED 2026-06-11 ~20:00Z — operator on-host counter-evidence
+
+The operator read the FULL conductor logs on-host and falsified this
+concern's mechanism AND its framing:
+- jessica's conductor logs contain ZERO "no such table"; her DHT DB is
+  83MB and WAL-checkpointing live. The investigator-quoted
+  "kitsune2_gossip … no such table: DhtOp" line could not be reproduced —
+  the only "no such table" anywhere is `content_attestations` on matthew,
+  in the APP layer (elohim_storage::http), a diesel projection table
+  never created because no attestation ever lands.
+- DepMissingFromDht: zero occurrences in any conductor log.
+- Conductors publish healthily (1035/1035, 75/75 ops). Gossip is FINE.
+- HC 0.6 names conductor DBs <DnaHash>-<AgentPubKey> with no extension —
+  the .sqlite3-absence "evidence" was a red herring.
+
+DO NOT pursue PVC migration/reset — it would destroy healthy data and fix
+nothing. The REAL root cause is the doorway-operator identity mismatch in
+the infrastructure zome attestation guard: see
+dna-health-attestation-ci-authz.md (upgraded to the central concern).
+Lesson for the museum: a subagent-"quoted" log line is not evidence until
+source-pinned (file+timestamp+query) — this one propagated into a
+destructive ceiling recommendation that the operator's on-host read
+caught.
