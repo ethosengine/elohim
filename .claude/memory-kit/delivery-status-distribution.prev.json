@@ -7,9 +7,9 @@
     "active.alpha": 0,
     "wip": 14,
     "refined": 15,
-    "backlog": 38,
+    "backlog": 40,
     "envisioned": 4,
-    "unknown": 24,
+    "unknown": 25,
     "undelivered": 5,
     "regression": 0
   },
@@ -334,6 +334,16 @@
       "feature_file_exists": false
     },
     {
+      "slug": "ci-orchestrator-graph-only-pipeline-dispatch-leak",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/ci-orchestrator-graph-only-pipeline-dispatch-leak.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "ci-rbac-jenkins-deployer",
       "path": "/projects/elohim/genesis/data/timeline/backlog/ci-rbac-jenkins-deployer.md",
       "author_status": "",
@@ -493,6 +503,16 @@
     {
       "slug": "deprecation-relationship-inference-source-retire",
       "path": "/projects/elohim/genesis/data/timeline/backlog/deprecation-relationship-inference-source-retire.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "deprecation-serde-yaml-archived-crate-retire",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/deprecation-serde-yaml-archived-crate-retire.md",
       "author_status": "",
       "delivery_status": "backlog",
       "delivery_status_updated": "",
@@ -749,6 +769,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "limitarian-governor-v1-followons",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/limitarian-governor-v1-followons.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:documented"
     },
     {
       "slug": "manifest-strategy-drift-test",
