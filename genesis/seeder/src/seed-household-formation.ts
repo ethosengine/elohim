@@ -326,13 +326,32 @@ async function findMemberSessions(
 
   for (const conductorUrl of conductorUrls) {
     let session: ConductorSession | null = null;
-    try {
-      session = await connectToConductor(conductorUrl, appIdPrefix);
-    } catch (err) {
-      console.error(
-        `  [X] connect (${conductorUrl}): ${err instanceof Error ? err.message : err}`,
-      );
-      continue;
+    // DHT-settle retry: right after Seed Conductor Identities creates fresh
+    // Human entries, the conductor's signing-credential commit can fail with
+    // "Source chain error … DepMissingFromDht" — the deps are seconds-old and
+    // not yet integrated. The conductor itself says "may be retried" (genesis
+    // #1123 killed formation on exactly this). Retry with a settle delay;
+    // only this transient class re-attempts, real errors fail fast.
+    const CONNECT_ATTEMPTS = 4;
+    const SETTLE_MS = 15_000;
+    for (let attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt++) {
+      try {
+        session = await connectToConductor(conductorUrl, appIdPrefix);
+        break;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const retriable =
+          msg.includes('DepMissingFromDht') || msg.includes('may be retried');
+        if (retriable && attempt < CONNECT_ATTEMPTS) {
+          console.warn(
+            `  [~] connect (${conductorUrl}): DHT deps not yet integrated (attempt ${attempt}/${CONNECT_ATTEMPTS}) — retrying in ${SETTLE_MS / 1000}s`,
+          );
+          await new Promise(r => setTimeout(r, SETTLE_MS));
+          continue;
+        }
+        console.error(`  [X] connect (${conductorUrl}): ${msg}`);
+        break;
+      }
     }
     if (!session) {
       continue;
