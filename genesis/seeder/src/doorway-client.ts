@@ -90,6 +90,35 @@ export interface DoorwayClientConfig {
   dryRun?: boolean;
 }
 
+/** Credentials for authenticating the seeder against a bearer-gated doorway. */
+export interface SeederCredentials {
+  identifier: string;
+  password: string;
+}
+
+/**
+ * Read seeder doorway credentials from the environment.
+ *
+ * Returns null when EITHER var is unset — the dev/local-stack path. The
+ * doorway's `require_seed_authority` gate passes dev_mode without a bearer
+ * (Task 1 of the jenkins-seed-bearer-gate plan), so `pnpm hc:start:seed`
+ * against the local stack stays unbroken when these are absent.
+ *
+ * On a non-dev (alpha/prod) doorway the gate fails closed: an unauthenticated
+ * `PUT /admin/seed/blob` returns 401. Set both vars (Jenkins secrets) to
+ * authenticate.
+ */
+export function readSeederCredentials(
+  env: NodeJS.ProcessEnv = process.env
+): SeederCredentials | null {
+  const identifier = env.SEED_DOORWAY_IDENTIFIER;
+  const password = env.SEED_DOORWAY_PASSWORD;
+  if (!identifier || !password) {
+    return null;
+  }
+  return { identifier, password };
+}
+
 export interface HealthStatus {
   healthy: boolean;
   version?: string;
@@ -243,6 +272,13 @@ export interface ImportStatusResponse {
 export class DoorwayClient {
   private config: DoorwayClientConfig & { baseUrl: string; timeout: number; retries: number; dryRun: boolean };
 
+  /**
+   * Bearer JWT minted by `login()`. When present it is sent on every request
+   * and takes precedence over `apiKey` — this is how gated admin calls
+   * (`PUT /admin/seed/blob`, `POST /admin/cache/*`) carry Stage-A identity.
+   */
+  private jwt: string | null = null;
+
   constructor(config: DoorwayClientConfig) {
     // Warn if storageUrl has a non-root path (common misconfiguration)
     if (config.storageUrl) {
@@ -263,6 +299,107 @@ export class DoorwayClient {
       retries: config.retries || 3,
       dryRun: config.dryRun || false,
     };
+  }
+
+  /**
+   * The bearer JWT held after a successful `login()`, or null when the seeder
+   * is running unauthenticated (dev/local-stack path). Exposed so callers that
+   * make raw `fetch` calls outside this client (e.g. the projection cache
+   * warm-up in seed.ts) can reuse the same bearer.
+   */
+  get bearerToken(): string | null {
+    return this.jwt;
+  }
+
+  /**
+   * Adopt a bearer JWT obtained elsewhere (e.g. an earlier `login()` on a
+   * sibling client). Lets a single seed-start authentication serve multiple
+   * client instances without re-logging in.
+   */
+  setBearerToken(token: string | null): void {
+    this.jwt = token;
+  }
+
+  /**
+   * Authenticate against the bearer-gated doorway (POST /auth/login) and hold
+   * the resulting JWT for subsequent gated admin calls.
+   *
+   * Stage A of the jenkins-seed-bearer-gate plan: a registered admin account
+   * (e.g. `jenkins-ci@alpha.elohim.host`) carries a login event + actor, which
+   * is the identity+audit the gate requires (deliberately a JWT, not a shared
+   * X-API-Key — see the plan's "Why this is the honest Stage A").
+   *
+   * Token refresh is intentionally out of scope: seed runs are short. If a run
+   * ever outlives token expiry, that is a future concern (re-login per run).
+   *
+   * @throws Error with an actionable message on 401 (bad creds) naming the env
+   *   vars; network failures propagate.
+   */
+  async login(creds: SeederCredentials): Promise<void> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would authenticate as ${creds.identifier}`);
+      return;
+    }
+
+    let response: Response;
+    try {
+      response = await this.fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: creds.identifier, password: creds.password }),
+        timeout: 15000,
+      });
+    } catch (error) {
+      throw new Error(
+        `Seeder authentication request to ${this.config.baseUrl}/auth/login failed: ` +
+          `${error instanceof Error ? error.message : 'network error'}. ` +
+          `Check the doorway is reachable and SEED_DOORWAY_IDENTIFIER points at the right host.`
+      );
+    }
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(
+        `Seeder authentication failed (HTTP ${response.status}) as ` +
+          `SEED_DOORWAY_IDENTIFIER=${creds.identifier}. ` +
+          `Check SEED_DOORWAY_IDENTIFIER / SEED_DOORWAY_PASSWORD (bad or expired credentials).` +
+          (detail ? ` Doorway said: ${detail.slice(0, 200)}` : '')
+      );
+    }
+
+    const body = (await response.json()) as { token?: string };
+    if (!body?.token) {
+      throw new Error(
+        'Seeder authentication succeeded but the doorway returned no token — ' +
+          'unexpected /auth/login response shape.'
+      );
+    }
+    this.jwt = body.token;
+  }
+
+  /**
+   * Translate a 401/403 from a gated admin route into an actionable error
+   * naming the credential env vars, instead of a raw HTTP/fetch dump.
+   *
+   * Returns null when the response is not an auth failure (caller keeps its
+   * existing error path).
+   */
+  private describeAuthFailure(status: number, errorText: string): string | null {
+    if (status === 401) {
+      return this.jwt
+        ? `Doorway rejected the seeder's bearer (401) — the JWT is invalid or expired. ` +
+            `Re-authenticate (the seed run may have outlived the token).`
+        : `Doorway requires authentication (401) but the seeder has no bearer. ` +
+            `Set SEED_DOORWAY_IDENTIFIER and SEED_DOORWAY_PASSWORD (Jenkins seed credentials) ` +
+            `so the seeder authenticates before gated admin calls. ` +
+            `(${errorText.slice(0, 200)})`;
+    }
+    if (status === 403) {
+      return `Doorway accepted the seeder's identity but it is under-privileged (403) — ` +
+        `SEED_DOORWAY_IDENTIFIER must resolve to an Admin-level account. ` +
+        `(${errorText.slice(0, 200)})`;
+    }
+    return null;
   }
 
   /**
@@ -480,12 +617,13 @@ export class DoorwayClient {
 
       if (!response.ok) {
         const errorText = await response.text();
+        const authMessage = this.describeAuthFailure(response.status, errorText);
         return {
           success: false,
           cid,
           hash,
           cached: false,
-          error: `HTTP ${response.status}: ${errorText}`,
+          error: authMessage ?? `HTTP ${response.status}: ${errorText}`,
         };
       }
 
@@ -1028,7 +1166,12 @@ export class DoorwayClient {
       ...options.headers,
     };
 
-    if (this.config.apiKey) {
+    // A login() JWT takes precedence — it carries Stage-A identity+audit and is
+    // what the doorway's require_seed_authority gate accepts. Fall back to the
+    // configured apiKey (dev / legacy shared secret) when not authenticated.
+    if (this.jwt) {
+      headers['Authorization'] = `Bearer ${this.jwt}`;
+    } else if (this.config.apiKey) {
       headers['Authorization'] = `Bearer ${this.config.apiKey}`;
     }
 

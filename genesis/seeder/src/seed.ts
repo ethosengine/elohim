@@ -34,7 +34,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AdminWebsocket, AppWebsocket, type CellId } from '@holochain/client';
-import DoorwayClient from './doorway-client.js';
+import DoorwayClient, { readSeederCredentials } from './doorway-client.js';
 import StorageClient from './storage-client.js'; // Used for computing blob hash (thumbnails, HTML5 apps)
 import BlobManager from './blob-manager.js';
 import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
@@ -473,6 +473,13 @@ const DOORWAY_API_KEY = process.env.DOORWAY_API_KEY;
 // Storage URL for direct blob sync (must point to elohim-storage, e.g., http://host:8090)
 // Do NOT derive from DOORWAY_URL — doorway proxies /db/* requests itself.
 const STORAGE_URL = process.env.STORAGE_URL || null;
+
+// Bearer JWT minted at seed start when SEED_DOORWAY_IDENTIFIER/PASSWORD are set
+// (jenkins-seed-bearer-gate plan, Stage A). Shared module-wide so both the
+// DoorwayClient (PUT /admin/seed/blob) and the raw cache-warm fetch
+// (POST /admin/cache/warm) authenticate. Null on the dev/local-stack path —
+// the doorway's dev_mode gate accepts unauthenticated seeding.
+let seederBearerToken: string | null = null;
 
 /**
  * Clean up error messages by truncating long byte arrays
@@ -1005,6 +1012,9 @@ async function seedViaDoorway(): Promise<SeedResult> {
     timeout: 120000, // 2 min for large blob uploads
     retries: 3,
   });
+  // Carry the seed-start bearer (if authenticated) so PUT /admin/seed/blob is
+  // accepted by the doorway's require_seed_authority gate on non-dev targets.
+  doorwayClient.setBearerToken(seederBearerToken);
 
   // Check doorway status (comprehensive preflight)
   console.log('\n🏥 Checking doorway status...');
@@ -1970,6 +1980,31 @@ async function seed() {
   if (IDS.length > 0) console.log(`🎯 Filtering to IDs: ${IDS.join(', ')}`);
   if (LIMIT > 0) console.log(`📊 Limit: ${LIMIT}`);
 
+  // ========================================
+  // AUTHENTICATION (jenkins-seed-bearer-gate plan, Stage A)
+  // ========================================
+  // The doorway gates PUT /admin/seed/blob and POST /admin/cache/warm behind an
+  // Admin-level bearer (non-dev). If creds are present, authenticate once and
+  // hold the JWT module-wide for every gated call. If NOT present, proceed with
+  // no bearer — the doorway's dev_mode gate accepts unauthenticated seeding, so
+  // `pnpm hc:start:seed` against the local stack stays unbroken.
+  const seederCreds = readSeederCredentials();
+  if (seederCreds) {
+    console.log(`\n🔐 Authenticating seeder as ${seederCreds.identifier}...`);
+    const authClient = new DoorwayClient({ baseUrl: DOORWAY_URL, apiKey: DOORWAY_API_KEY });
+    try {
+      await authClient.login(seederCreds);
+    } catch (error) {
+      console.error(`\n❌ ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
+    seederBearerToken = authClient.bearerToken;
+    console.log('   ✅ Seeder authenticated — gated admin calls will carry the bearer');
+  } else {
+    console.log('\n🔓 No SEED_DOORWAY_IDENTIFIER/PASSWORD set — proceeding unauthenticated');
+    console.log('   (dev-mode doorway accepts this; non-dev gated routes will 401)');
+  }
+
   // Load genesis manifest for sparse DHT pattern
   const manifest = loadGenesisManifest();
   if (manifest) {
@@ -2128,10 +2163,24 @@ async function seed() {
   // without requiring a restart. The endpoint returns 202 and warms in background.
   try {
     console.log('\n🔄 Triggering projection cache warm-up...');
-    const warmResp = await fetch(`${DOORWAY_URL}/admin/cache/warm`, { method: 'POST' });
+    // POST /admin/cache/warm is bearer-gated (require_seed_authority) on non-dev
+    // doorways — carry the same seed-start JWT used for blob uploads.
+    const warmHeaders: Record<string, string> = seederBearerToken
+      ? { Authorization: `Bearer ${seederBearerToken}` }
+      : {};
+    const warmResp = await fetch(`${DOORWAY_URL}/admin/cache/warm`, {
+      method: 'POST',
+      headers: warmHeaders,
+    });
     if (warmResp.ok) {
       const warmData = await warmResp.json();
       console.log(`   ✅ Cache warm-up triggered (${warmData.peers} peer(s))`);
+    } else if (warmResp.status === 401 || warmResp.status === 403) {
+      // Actionable auth failure — name the env vars, not a raw status dump.
+      const hint = seederBearerToken
+        ? `the seeder's account is under-privileged or its bearer expired (need Admin; check SEED_DOORWAY_IDENTIFIER)`
+        : `set SEED_DOORWAY_IDENTIFIER and SEED_DOORWAY_PASSWORD so the seeder authenticates`;
+      console.warn(`   ⚠️ Cache warm-up rejected (${warmResp.status}) — ${hint}`);
     } else {
       console.warn(`   ⚠️ Cache warm-up returned ${warmResp.status} — doorway may need restart`);
     }
