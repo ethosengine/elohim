@@ -108,15 +108,17 @@ const DEFAULT_PERMITTED_TYPES: EmotionalReactionType[] = [
  *
  * @cssprop --elohim-reaction-bar-gap - Gap between reaction buttons
  * @cssprop --elohim-reaction-btn-bg - Reaction button background
- * @cssprop --elohim-reaction-btn-border - Reaction button border
+ * @cssprop --elohim-reaction-btn-border - Reaction button border (FULL shorthand, e.g. `1px solid …` — not a color)
  * @cssprop --elohim-reaction-btn-fg - Reaction button foreground color
  * @cssprop --elohim-reaction-btn-active-bg - Active (selected) button background
- * @cssprop --elohim-reaction-btn-active-border - Active button border color
+ * @cssprop --elohim-reaction-btn-active-fg - Active (selected) button foreground color
+ * @cssprop --elohim-reaction-btn-active-border - Active button border (FULL shorthand, e.g. `1px solid …` — not a color)
  * @cssprop --elohim-reaction-btn-radius - Reaction button border radius
  * @cssprop --elohim-reaction-count-fg - Count text color
  * @cssprop --elohim-reaction-mediation-bg - Mediation dialog background
  * @cssprop --elohim-reaction-mediation-fg - Mediation dialog foreground text color
  * @cssprop --elohim-reaction-warning-color - Mediation indicator / warning color
+ * @cssprop --elohim-reaction-scrim - Mediation overlay scrim color
  *
  * @csspart bar - The reaction bar container
  * @csspart button - Each reaction button
@@ -165,8 +167,10 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
       gap: 0.25rem;
       padding-block: 0.25rem;
       padding-inline: 0.5rem;
-      border: 1px solid
-        var(--elohim-reaction-btn-border, color-mix(in oklch, currentColor 25%, transparent));
+      border: var(
+        --elohim-reaction-btn-border,
+        1px solid color-mix(in oklch, currentColor 25%, transparent)
+      );
       border-radius: var(--elohim-reaction-btn-radius, 1rem);
       background: var(--elohim-reaction-btn-bg, Canvas);
       color: var(--elohim-reaction-btn-fg, CanvasText);
@@ -178,7 +182,7 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
     .reaction-btn[aria-pressed='true'] {
       background: var(--elohim-reaction-btn-active-bg, Highlight);
       color: var(--elohim-reaction-btn-active-fg, HighlightText);
-      border-color: var(--elohim-reaction-btn-active-border, Highlight);
+      border: var(--elohim-reaction-btn-active-border, 1px solid Highlight);
     }
 
     .reaction-btn[data-mediated='true'] {
@@ -207,14 +211,16 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
     }
 
     .mediation-indicator {
-      color: var(--elohim-reaction-warning-color, Canvas);
+      /* CanvasText fallback, NOT Canvas: Canvas-on-Canvas renders the
+         mediation indicator invisible in blank-slate mode */
+      color: var(--elohim-reaction-warning-color, CanvasText);
       font-weight: bold;
     }
 
     .mediation-overlay {
       position: fixed;
       inset: 0;
-      background: rgb(0 0 0 / 50%);
+      background: var(--elohim-reaction-scrim, rgb(0 0 0 / 50%));
       display: flex;
       align-items: center;
       justify-content: center;
@@ -252,20 +258,24 @@ export class ElohimReactionBar extends CapabilityAwareElement(LitElement) {
     }
 
     .mediation-alt-btn {
-      border: 1px solid
-        var(--elohim-reaction-btn-border, color-mix(in oklch, currentColor 25%, transparent));
+      border: var(
+        --elohim-reaction-btn-border,
+        1px solid color-mix(in oklch, currentColor 25%, transparent)
+      );
       background: Canvas;
     }
 
     .mediation-proceed-btn {
-      border: 1px solid var(--elohim-reaction-warning-color, Canvas);
+      border: 1px solid var(--elohim-reaction-warning-color, CanvasText);
       background: transparent;
-      color: var(--elohim-reaction-warning-color, Canvas);
+      color: var(--elohim-reaction-warning-color, CanvasText);
     }
 
     .mediation-cancel-btn {
-      border: 1px solid
-        var(--elohim-reaction-btn-border, color-mix(in oklch, currentColor 25%, transparent));
+      border: var(
+        --elohim-reaction-btn-border,
+        1px solid color-mix(in oklch, currentColor 25%, transparent)
+      );
       background: transparent;
     }
 
