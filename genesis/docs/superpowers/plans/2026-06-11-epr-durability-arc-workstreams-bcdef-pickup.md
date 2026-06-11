@@ -35,6 +35,28 @@ attestation-lockout DNA fix (edge #1063 → genesis #1127). Check:
    `resilience.*` (peer-statuses still dark until the infrastructure-role
    connect is fixed — separate item below).
 
+## WAVE-6 VERDICT (landed 22:27Z, after this prompt was first written)
+
+Genesis #1127 completed (4th consecutive); **measure stayed 1**. The
+attestation rejections CONTINUE at 22:26Z with the SAME OLD wasm hash
+(`uhCokSPspAA…`) even though edge #1063 deployed and matthew's pod
+restarted (new UID 32d4509c). **The happ reinstall is NOT firing.** The
+FIRST ACTION's trace therefore narrows to: (a) how edge resolves
+HAPP_TAG — did #1063 (an empty-commit retrigger) consume the happ bundle
+from DNA #1325 or a stale tag?; (b) the happ-installer container's own
+runtime log (different container label than elohim-node — find it via
+label values) — did it run, and did its stale-check + ALLOW_DNA_REINSTALL
+logic decide skip?; (c) if the installer logic only reinstalls on
+role-structure change even with the flag, that's the bug (gospel says the
+flag forces it — verify). The DNA fix itself is correct and built; only
+its delivery is stuck.
+
+POSITIVE side-finding (21:58Z, matthew): `update_via_conductor: stale
+dht_anchor_hash — healing via create_content re-publish` fired across
+dozens of content ids — the conductor path is actively healing the
+bulk-seed anchor gap (ci-seeder-stamp-conductor-anchor-circularity.md);
+expect reach re-notarization and anchor coverage to improve run-over-run.
+
 ## State of the world (verified 2026-06-11, do not re-derive)
 
 - **Mesh PROVEN**: 14/14 pods `connected:13`; `mesh.adjacency` both
