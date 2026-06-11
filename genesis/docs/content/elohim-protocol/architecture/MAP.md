@@ -130,7 +130,7 @@ five-step reading order for working on that pillar.
 [`economic_coordination/epic.md`](../economic_coordination/epic.md) +
 [`living_memory/epic.md`](../living_memory/epic.md); (2) architecture seeds **D1, D3, D5, D6**
 (core-graph-substrate, records-lifecycle, iroh-libp2p, hub-boundaries); (3) pillar guide
-[`elohim/claude.md`](../../../../../app/elohim-app/src/app/elohim/claude.md) (the cross-pillar owner);
+[`elohim/CLAUDE.md`](../../../../../app/elohim-app/src/app/elohim/CLAUDE.md) (the cross-pillar owner);
 (4) code `elohim/elohim-storage/`, `elohim/epr/`, `elohim/elohim-hub/`; (5) scenarios
 `genesis/a2o/features/elohim-core/`, `content/`, `federation/`.
 

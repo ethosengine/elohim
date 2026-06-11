@@ -1,8 +1,27 @@
+---
+id: elohim-pillar-gospel
+cites:
+  - elohim-domain-gospel | the cross-cutting coordination subject this pillar renders — signal kinds, constitutional ratios, shared primitives (renders, never redefines) | sha256:68751b91f9749048 | path: elohim/sdk/domains/elohim/CLAUDE.md
+---
+
 # Elohim Pillar - Protocol Core
 
 Infrastructure layer: data loading, agents, trust, source chain.
 
 **Architecture:** `ELOHIM_PROTOCOL_ARCHITECTURE.md`
+
+## Subject home & citation discipline (this pillar is a CONSUMER)
+
+This Angular pillar renders the protocol core; the cross-cutting subject (cross-pillar `signalKinds`,
+`constitutionalRatios`, shared coordination vocabulary) is owned at the cited subject home
+`elohim-domain-gospel` (`elohim/sdk/domains/elohim/`). The cite is content-addressed: a change at the subject
+home drifts this gospel STALE for re-verification.
+
+**Where code citations to the subject belong:**
+- When code encodes a cross-pillar coordination assumption (a signal kind, a constitutional ratio, a shared
+  reach/mastery primitive), leave a `// subject: elohim-domain-gospel` breadcrumb at the assumption site.
+- The shared models here (`protocol-core.model.ts`, `agent.model.ts`) mirror substrate/wire types — when a
+  wire shape moves upstream, cite the substrate rather than forking a hand-copy.
 
 ## Models
 

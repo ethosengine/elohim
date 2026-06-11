@@ -1,3 +1,9 @@
+---
+id: avodah-pillar-gospel
+cites:
+  - avodah-domain-gospel | the work design subject this pillar renders — work-story/work-project vocabulary + the REA work-event coupling (renders, never redefines) | sha256:6ba5a52e1647a05b | path: elohim/sdk/domains/avodah/CLAUDE.md
+---
+
 # Avodah Pillar — Work as Protocol Participation
 
 Avodah (Hebrew: work / service / worship — the same word) is a **reference
@@ -15,6 +21,19 @@ REA economic event. Nothing here is a new entry type.
 > Memory anchor: `project_avodah_pillar` — "Avodah is protocol-as-process, not a pillar."
 
 ---
+
+## Subject home & citation discipline (this pillar is a CONSUMER)
+
+This pillar renders the avodah subject; the vocabulary (`work-story`/`work-project`, the terminal-column →
+REA `work`-event coupling) is owned at the cited subject home `avodah-domain-gospel`
+(`elohim/sdk/domains/avodah/`), which in turn assumes the protocol substrate + shefa. The cite is
+content-addressed: a change at the subject home (or the substrate below it) drifts this gospel STALE.
+
+**Where code citations to the subject belong:**
+- `../generated/metadata-types` (`WorkProjectMeta`/`WorkStoryMeta`) is DERIVED from the subject home — never
+  hand-edit; regenerate. The "schema is the source of truth" note IS the code-side citation.
+- When code encodes the terminal-column → REA `work` event coupling, leave a `// subject: avodah-domain-gospel`
+  breadcrumb (the coupling is subject-owned, not pillar-invented).
 
 ## Why a reference impl, not a pillar
 
