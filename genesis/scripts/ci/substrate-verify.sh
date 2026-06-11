@@ -183,6 +183,22 @@ cmd_mesh() {
     warn "mesh.adjacency" "skipped — $source_peer or $target_peer unreachable/unidentified"
   fi
 
+  # Adjacency, reverse direction (Workstream C: bidirectional or it doesn't
+  # count). The TARGET must also list the SOURCE: projection-reconcile
+  # discovery and reverse heals run from the target's side, and a one-way
+  # edge starves them quietly — the 2026-06-10 Phase-0 shape (target asked
+  # 2-3 peers, discovered 0 ids, while the source held 16 anchored rows).
+  local tgt_url src_id
+  if tgt_url="$(peer_url_for "$target_peer")" && src_id="${PEER_IDS[$source_peer]:-}" && [ -n "$src_id" ]; then
+    if http_get "$tgt_url/p2p/peers" | jq -e --arg id "$src_id" '(.peers // []) | map(.peerId // .peer_id) | index($id) != null' >/dev/null; then
+      pass "mesh.adjacency-reverse" "$target_peer lists $source_peer ($src_id) in its connected peer set"
+    else
+      fail "mesh.adjacency-reverse" "$target_peer does NOT list $source_peer ($src_id) — reconcile discovery on $target_peer cannot reach the row/blob holder"
+    fi
+  else
+    warn "mesh.adjacency-reverse" "skipped — $target_peer or $source_peer unreachable/unidentified"
+  fi
+
   # Version parity (warn-only: partial rollouts are a real, deploy-owned state)
   if [ "$reachable" -ge 1 ]; then
     local distinct
