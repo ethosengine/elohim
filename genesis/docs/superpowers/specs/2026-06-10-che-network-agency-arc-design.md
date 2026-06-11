@@ -9,7 +9,7 @@ cites:
   - doorway-access-tier-patterns | the canonical agency-state catalog this arc maps onto — Stage A = its Tier-2 hosted user; its Tier-3 recovery proxy is the sibling story Stage C must NOT be confused with | sha256:f862d55525b442c3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
   - che-live-peer-dev-loop-design | the eyes this arc adds hands to — L3 of the browser-feedback series; its read-mostly rail is what Stages A-C graduate beyond | sha256:f976477c2f2baba0 | path: genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md
-  - genesis/docs/architecture/elohim-sdk.md
+  - elohim-sdk-architecture | elohim-sdk | sha256:7d1a9b09f3c6592d | path: genesis/docs/architecture/elohim-sdk.md
   - genesis/docs/architecture/rea-compute-commitment-primitive.md
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md

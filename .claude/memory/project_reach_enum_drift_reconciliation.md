@@ -6,7 +6,7 @@ metadata:
   type: project
 cites:
   - elohim/elohim-storage/src/services/reach_earning.rs
-  - genesis/docs/content/elohim-protocol/resilience/README.md
+  - resilience-protocol-spec | README | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
   - elohim/sdk/schemas/v1/enums/reach.schema.json
 ---
 

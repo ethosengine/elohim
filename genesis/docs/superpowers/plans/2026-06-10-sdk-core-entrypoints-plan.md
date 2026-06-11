@@ -6,7 +6,7 @@ class: process-meta
 process_subdomain: schema-sdk
 sprint: unranked — born 2026-06-10; gates arc Phase 4 (rea-runtime CommitmentService). Packaging-only — operational concern, no storage schema, no DHT entities.
 cites:
-  - genesis/docs/architecture/elohim-sdk.md
+  - elohim-sdk-architecture | elohim-sdk | sha256:7d1a9b09f3c6592d | path: genesis/docs/architecture/elohim-sdk.md
   - genesis/docs/superpowers/plans/2026-05-18-sdk-boundary-clarification.md
   - che-network-agency-arc-design | parent arc — Task 1.2 empirically produced the two module-resolution failure modes this packaging pattern retires; Phase 4 (rea-runtime) is gated on this plan | sha256:ede3841e83bc2b65 | path: genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md
   - genesis/data/timeline/backlog/elohim-identity-type-module-esm-interop.md
