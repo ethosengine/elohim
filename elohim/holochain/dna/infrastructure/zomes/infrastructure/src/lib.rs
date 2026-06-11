@@ -225,12 +225,27 @@ pub fn register_doorway(input: RegisterDoorwayInput) -> ExternResult<DoorwayOutp
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    // Check if doorway already exists with this ID
-    if get_doorway_by_id(input.id.clone())?.is_some() {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Doorway with ID '{}' already exists",
-            input.id
-        ))));
+    // Re-registration is ALLOWED (scoped bootstrap debt, 2026-06-11): a
+    // doorway whose conductor was reinstalled signs with a NEW agent key,
+    // and the old duplicate-rejection here + the operator guard on
+    // update_doorway made the lockout total — the live doorway could never
+    // reclaim its own id, so record_health_attestation failed forever
+    // ("Only the doorway operator can record attestations", every 5 min on
+    // alpha) and no attestation ever landed. Each registration creates a
+    // NEW entry + link: the full churn trail stays readable on the DHT
+    // (get_doorways_by_operator + the link history), and
+    // get_doorway_by_id resolves latest-wins. The id-squatting risk this
+    // accepts is bounded to the bootstrap phase; the consistent end-state
+    // is commitment-gated reclaim (operate-doorway REA / delegates-compute
+    // family) — tracked in
+    // genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md.
+    if let Some(prev) = get_doorway_by_id(input.id.clone())? {
+        if prev.doorway.operator_agent != agent_info.agent_initial_pubkey.to_string() {
+            warn!(
+                "register_doorway: id '{}' re-registered under a NEW operator agent (was {}, now {}) — operator churn recorded on the DHT trail",
+                input.id, prev.doorway.operator_agent, agent_info.agent_initial_pubkey
+            );
+        }
     }
 
     let doorway = DoorwayRegistration {
@@ -345,7 +360,9 @@ pub fn get_doorway_by_id(id: String) -> ExternResult<Option<DoorwayOutput>> {
     let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToDoorway)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    if let Some(link) = links.first() {
+    // Latest-wins: re-registration (re-keyed doorways reclaiming their id)
+    // appends a link per registration; the newest link is the live record.
+    if let Some(link) = links.iter().max_by_key(|l| l.timestamp) {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
                 if let Some(doorway) = record
