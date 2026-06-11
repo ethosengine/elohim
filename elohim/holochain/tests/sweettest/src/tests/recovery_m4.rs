@@ -426,11 +426,19 @@ async fn m4_rotation_blocked_by_effective_revocation() -> Result<()> {
 /// (e.g., RevokedKeyToRevocation omitted during a refactor) or was written to a
 /// different target.
 ///
-/// Design reference: `LINK_ARCHITECTURE.md` §3 "dual-anchor primacy" — every
-/// KeyRevocation must be reachable from both the human listing anchor and the
-/// revoked-key hot-path anchor.
+/// Design reference (corrected 2026-06-11 — the previously cited
+/// `LINK_ARCHITECTURE.md` §3 "dual-anchor primacy" never existed in any version
+/// of that doc): the dual-anchor write pattern required every KeyRevocation to
+/// be reachable from both the human listing anchor and the revoked-key hot-path
+/// anchor. NOTE: `KeyRevocation` and its `HumanToKeyRevocation` /
+/// `RevokedKeyToRevocation` links were REMOVED from imagodei integrity in
+/// Recovery M4 Task 15 — superseded by `governance-action:key-revocation`
+/// Content entries on the elohim DNA, read via TypeToContent + metadata flags
+/// (see content_store/src/lib.rs "Recovery M4 — cross-DNA gate-reader query
+/// helpers"). This stub's assertion shape predates T15 and needs re-drawing
+/// against that Content-entry read surface before the body is filled in.
 ///
-/// Assertion shape:
+/// Assertion shape (pre-T15, historical):
 ///   - query HumanToKeyRevocation links → get target ActionHash H1
 ///   - query RevokedKeyToRevocation links → get target ActionHash H2
 ///   - assert H1 == H2 (same entry, both anchors point to it)
