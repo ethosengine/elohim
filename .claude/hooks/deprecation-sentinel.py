@@ -158,8 +158,9 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
     The three guards:
       A) Line sourced from the ledger file (self-capture via recursive grep).
       B) Line sourced from the history/museum prose tree.
-      C) Line that is git commit-message text (log oneline or subject line),
-         NOT a diff hunk (diff hunks start with + or - so carry real signal).
+      C) Line that is git commit-message text (log oneline entry, or any
+         subject/body line from a pure git history read), NOT a diff hunk
+         (diff hunks start with + or - so carry real signal).
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
@@ -170,12 +171,19 @@ def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool
     if ECHO_HISTORY_PATH_RE.search(line) or cmd_is_history_tree:
         return True
 
-    # Guard C — commit-message text shapes; preserve diff hunks (lines that
-    # start with + or - are hunk content, not commit prose)
+    # Guard C — commit-message text (both git log oneline entries and all
+    # lines of commit message bodies from git log/show history reads).
+    # Preserve diff hunks: lines starting with + or - are hunk content that
+    # can legitimately add a real #[deprecated] attribute and must still capture.
     if not line.startswith(("+", "-")):
+        # git log --oneline shape: "8f0cb4122 commit subject…" — always echo.
         if ECHO_GIT_ONELINE_RE.match(line):
             return True
-        if cmd_is_git_history and ECHO_COMMIT_SUBJECT_RE.match(line):
+        # Any non-hunk line from a pure git history read (git log/git show
+        # without -p/--patch) is commit message prose — subject OR body.
+        # ECHO_COMMIT_SUBJECT_RE was too narrow (subject-only); the command-
+        # level flag is the authoritative gate for the whole message body.
+        if cmd_is_git_history:
             return True
 
     return False
