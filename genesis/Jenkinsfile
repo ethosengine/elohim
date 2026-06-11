@@ -1115,7 +1115,7 @@ spec:
 
     options {
         skipDefaultCheckout(true)
-        timeout(time: 60, unit: 'MINUTES')  // topology seeds + substrate-validation suite + E2E (~25-35 min); 60 absorbs pod-flap archival waits
+        timeout(time: 90, unit: 'MINUTES')  // topology seeds + substrate-validation suite + E2E (~25-35 min on settled pods); 90 absorbs a deploy-fronted wave — when edge deploys immediately before genesis (orchestrator Level 1→2), the alpha rollout + readiness waits ate ~half the old 60-min budget and #1121 ABORTED mid-Seed-Database
         buildDiscarder(logRotator(numToKeepStr: '20'))
         overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
     }

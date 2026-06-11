@@ -466,7 +466,15 @@ cmd_projection() {
       if body="$(http_get "$PEER_URL/p2p/status")"; then
         local repl pull projr
         repl="$(jq -r '.replication.caughtUp // .replication.caught_up // empty' <<<"$body")"
-        pull="$(jq -r 'if .pull == null then "null" else (.pull.caughtUp // .pull.caught_up // false | tostring) end' <<<"$body")"
+        # pull tri-state: acquisition rollup() is spec-R-A "never false-complete" —
+        # caught_up = total>0 && fetched==total, so total==0 (NO acquisition
+        # workload) reports caughtUp=false BY DESIGN (genesis #1119 failed all 3
+        # pods on exactly this misread). BUT total==0 cannot distinguish
+        # resolved-empty from an acquisition loop that never registered pins —
+        # so "idle" is WARN-class (not proven), never a clean pass; and idle is
+        # only claimed when the wire actually carries a total field (a schema
+        # rename must fail closed via the caughtUp path, not read as idle).
+        pull="$(jq -r 'if .pull == null then "null" elif ((.pull | has("total")) and .pull.total == 0) then "idle" else (.pull.caughtUp // .pull.caught_up // false | tostring) end' <<<"$body")"
         projr="$(jq -r 'if .projectionReconcile == null and .projection_reconcile == null then "null" else ((.projectionReconcile // .projection_reconcile).caughtUp // (.projectionReconcile // .projection_reconcile).caught_up // false | tostring) end' <<<"$body")"
         detail="replication=$repl pull=$pull projection_reconcile=$projr"
         if [ "$repl" = "true" ] && [ "$pull" != "false" ] && [ "$projr" != "false" ]; then ok=true; break; fi
@@ -478,6 +486,7 @@ cmd_projection() {
     if $ok; then
       case "$detail" in
         *null*) warn "projection.$PEER_NAME.streams" "$detail — null streams are 'not computable', NEVER caught-up (spec §4.3); not failing, but not proven" ;;
+        *idle*) warn "projection.$PEER_NAME.streams" "$detail — pull total==0: resolved-empty OR an acquisition loop that never registered pins; not failing, but not proven (cross-check seeded pin expectations)" ;;
         *)      pass "projection.$PEER_NAME.streams" "$detail" ;;
       esac
     else
