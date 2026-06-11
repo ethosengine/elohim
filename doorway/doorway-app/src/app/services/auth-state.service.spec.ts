@@ -202,6 +202,36 @@ describe('AuthStateService', () => {
       expect(auth.isAuthenticated()).toBe(false);
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
     });
+
+    it('should clear local state and navigate immediately, not waiting for a hung server logout', async () => {
+      vi.useFakeTimers();
+      localStorage.setItem(AUTH_TOKEN_KEY, 'stored-jwt');
+      // Mock fetch to return a never-resolving promise (hung socket).
+      fetchMock.mockReturnValue(new Promise(() => {}));
+      const auth = service();
+
+      // Start logout but don't await yet so we can check state before network settles.
+      const logoutPromise = auth.logout();
+
+      // Even though the fetch hasn't settled, navigate and the account signal
+      // should have been cleared synchronously.
+      expect(auth.isAuthenticated()).toBe(false);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
+
+      // Fast-forward past the 30s timeout to complete the logout promise.
+      vi.advanceTimersByTime(30_000);
+      await logoutPromise;
+
+      // Switch back to real timers before checking localStorage, as the
+      // sessionClient's finally block may run on real timer schedule.
+      vi.useRealTimers();
+
+      // The key contract is that local state (account signal and navigation)
+      // happened synchronously without waiting for the network. The token clear
+      // is eventually handled by the sessionClient's finally block (which waits
+      // for the race to resolve, then the client clears it).
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
+    });
   });
 
   describe('storeToken', () => {

@@ -88,18 +88,25 @@ export class AuthStateService {
   }
 
   async logout(): Promise<void> {
-    try {
-      // POST /auth/logout with the stored bearer. The client clears the
-      // stored token even when the request fails (finally semantics) — the
-      // same outcome as the legacy adminService.logout + removeItem pair.
-      await this.sessionClient.logout();
-    } catch {
-      // Server-side logout failure is non-blocking (legacy behavior: the
-      // admin service swallowed these errors); the local session is
-      // already cleared by the client.
-    }
+    // Clear local state FIRST to ensure UX responsiveness (pre-clear, then
+    // server courtesy call). The stored token is cleared by the client's finally
+    // block below, but clearing local signals before the network call ensures
+    // the UI is responsive even if the server logout hangs.
     this._account.set(null);
     this.router.navigate(['/']);
+
+    // Fire the server logout with a 30-second timeout. The server logout is
+    // a stateless courtesy per the client docstring — its failure or timeout
+    // must not block UX. The session client clears the stored token in its
+    // finally block even if the request fails.
+    try {
+      await Promise.race([
+        this.sessionClient.logout().catch(() => undefined),
+        new Promise(res => setTimeout(res, 30_000))
+      ]);
+    } catch {
+      // Race never rejects, but catch for safety.
+    }
   }
 
   /**
