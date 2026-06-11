@@ -19,7 +19,7 @@
 //! `signal_weight_registry` for the weight policy.
 
 use crate::services::bounds_validator::{self, BoundsViolation, EventForValidation};
-use crate::services::commitment_fetcher::CommitmentFetcher;
+use crate::services::commitment_fetcher::{CommitmentFetcher, FetchError};
 use crate::services::rate_history::RateHistory;
 
 /// Outcomes for the republish-epr validator.
@@ -30,8 +30,32 @@ pub enum ValidationError {
     Schema(String),
 
     /// Substrate bounds check failed (delegate from `bounds_validator::validate`).
+    /// A GENUINE policy violation (revoked / out-of-window / out-of-scope /
+    /// reach-ceiling / rate-limit / not-found). The HTTP boundary maps this to
+    /// 400/404 — the caller is at fault.
     #[error("bounds validation failed: {0:?}")]
     Bounds(BoundsViolation),
+
+    /// INFRA failure reaching the commitment store (db pool checkout / query /
+    /// conductor unreachable). NOT a caller fault — the HTTP boundary maps this
+    /// to 503 service_unavailable so a transient pool/DB outage is not
+    /// mis-reported as a bounds rejection.
+    ///
+    /// # Why this arm exists (the seam)
+    ///
+    /// `bounds_validator::validate` deliberately COLLAPSES
+    /// `FetchError::ConductorUnreachable` into `ViolationKind::CommitmentNotFound`
+    /// (fail-closed: a bounds-gate is never cleared on an unreachable store —
+    /// see bounds_validator.rs §1 and diagnostics_bounds.rs, which report the
+    /// violation in-band as a 200 view body). That collapse is correct for the
+    /// diagnostics route but loses the infra/violation distinction the put_epr
+    /// HTTP status needs. Rather than widen the ts-rs-anchored `ViolationKind`
+    /// enum (which would ripple through the schema + codegen + 6 callers of
+    /// `validate`), we recover the distinction at THIS layer — the single
+    /// republish boundary that needs it — with one infra-sensitive probe of the
+    /// fetcher before delegating. Smallest correct seam.
+    #[error("commitment store unavailable (infra): {0}")]
+    Unavailable(String),
 }
 
 /// Validate a republish-epr EconomicEvent payload at the elohim-storage HTTP
@@ -72,7 +96,20 @@ pub async fn validate_republish_epr<F: CommitmentFetcher, R: RateHistory>(
             .to_string(),
     };
 
-    // 3. Substrate bounds check (delegates to Sprint 2's primitive).
+    // 3. Infra-class probe (the seam): one fetch of the bounding commitment.
+    //    `bounds_validator::validate` will fetch again, but it collapses an
+    //    unreachable store into CommitmentNotFound (fail-closed). We probe here
+    //    FIRST so a genuine infra failure surfaces as `Unavailable` (→ 503)
+    //    rather than being mis-reported as a bounds rejection (→ 400/404).
+    //    `Ok(None)` (genuinely absent) and `Ok(Some(_))` (present) both fall
+    //    through to the real bounds check below — only the infra error arm
+    //    short-circuits. The probe is a cheap local diesel read (spawn_blocking)
+    //    on the projection table; the fail-closed semantics are unchanged.
+    if let Err(FetchError::ConductorUnreachable(msg)) = fetcher.fetch(&event.bounded_by).await {
+        return Err(ValidationError::Unavailable(msg));
+    }
+
+    // 4. Substrate bounds check (delegates to Sprint 2's primitive).
     bounds_validator::validate(&event, fetcher, rate_history)
         .await
         .map(|_checks| ())

@@ -633,36 +633,40 @@ async fn put_epr(
 
             // Build the substrate fetcher + rate-history wrappers from the
             // available dependencies.
-            // TODO(slice-2a T6-wire): swap to ProjectionCommitmentFetcher once
-            // pool is accessible here (requires threading DbPool through this
-            // code path — tracked for the e2e task T8). The diagnostics_bounds
-            // route is already wired to ProjectionCommitmentFetcher (T6 done).
-            let hc_lamad: Option<Arc<crate::hc_client::HcClient>> = None;
-            match hc_lamad {
-                Some(hc_client) => {
-                    let fetcher = crate::services::commitment_fetcher::ConductorCommitmentFetcher {
-                        hc_client,
-                    };
-                    let rate =
-                        crate::services::rate_history::DieselRateHistory { pool: pool.clone() };
-                    let result = crate::services::republish_epr_validator::validate_republish_epr(
-                        &event_json,
-                        &fetcher,
-                        &rate,
-                        &target_epr_id,
-                    )
-                    .await;
-                    if let Err(e) = result {
-                        return Ok(response::bad_request(&format!(
-                            "republish-epr validation failed: {e}"
-                        )));
-                    }
+            //
+            // P1 (storage as reconciliation controller): bounds-checks read the
+            // read-optimised `mishpat_commitments` projection — NOT a live
+            // conductor. The `ProjectionCommitmentFetcher` is the production
+            // fetcher the diagnostics_bounds route already uses; `pool` is a
+            // parameter here, so we wire it directly.
+            let fetcher =
+                crate::services::commitment_fetcher::ProjectionCommitmentFetcher::new(pool.clone());
+            let rate = crate::services::rate_history::DieselRateHistory { pool: pool.clone() };
+            let result = crate::services::republish_epr_validator::validate_republish_epr(
+                &event_json,
+                &fetcher,
+                &rate,
+                &target_epr_id,
+            )
+            .await;
+            // Error-class mapping: a Schema/Bounds failure is the CALLER's fault
+            // (malformed event or a genuine policy violation) → 400. An infra
+            // failure reaching the commitment store (db pool/query) is NOT the
+            // caller's fault → 503, matching the pre-change behaviour of the
+            // formerly-hardcoded `None` arm. The `Unavailable` arm is the seam
+            // that recovers this distinction (see republish_epr_validator.rs).
+            use crate::services::republish_epr_validator::ValidationError;
+            match result {
+                Ok(()) => {}
+                Err(ValidationError::Unavailable(msg)) => {
+                    return Ok(response::service_unavailable(&format!(
+                        "republish-epr bounds check unavailable: {msg}"
+                    )));
                 }
-                None => {
-                    // Substrate-correct: refuse the deploy until the conductor bridge is up.
-                    return Ok(response::service_unavailable(
-                        "republish-epr validator unavailable — HcClient bridge not yet wired (Sprint 1)",
-                    ));
+                Err(e @ (ValidationError::Schema(_) | ValidationError::Bounds(_))) => {
+                    return Ok(response::bad_request(&format!(
+                        "republish-epr validation failed: {e}"
+                    )));
                 }
             }
         }

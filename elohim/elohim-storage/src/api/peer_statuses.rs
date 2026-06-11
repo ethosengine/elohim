@@ -2,8 +2,8 @@
 //!
 //! Routes:
 //! - `GET /api/v1/peer-statuses` — List current PeerStatus projection rows
-//!   Optional query parameter: `?householdId=<id>` (falls back to list_all
-//!   until Task C3 adds `stewarded_nodes.household_id` to the schema).
+//!   Optional query parameter: `?householdId=<id>` (filters via the
+//!   `stewarded_nodes.household_id` junction).
 
 use bytes::Bytes;
 use http_body_util::Full;
