@@ -5,26 +5,6 @@
   "engines": {
     "node": ">=20.20"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "esbuild",
-      "less",
-      "lmdb",
-      "msgpackr-extract",
-      "sharp",
-      "unrs-resolver"
-    ],
-    "overrides": {
-      "libsodium-wrappers": "^0.8.2",
-      "libsodium": "^0.8.2",
-      "playwright": "1.59.1",
-      "playwright-core": "1.59.1"
-    },
-    "patchedDependencies": {
-      "@angular/build@19.2.22": "patches/@angular__build@19.2.22.patch"
-    }
-  },
   "devDependencies": {
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",

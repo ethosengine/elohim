@@ -62,7 +62,7 @@ Then('the participant set includes the canonical household triad', function (thi
     string,
     unknown
   >[];
-  const triad = ['human-matthew-manager', 'human-jessica-spouse', 'human-james-student'];
+  const triad = ['human-matthew-manager', 'human-jessica-spouse', 'human-james-son'];
   for (const member of triad) {
     assert.ok(
       rows.some(

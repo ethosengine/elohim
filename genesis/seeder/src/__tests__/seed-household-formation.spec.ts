@@ -71,7 +71,7 @@ describe('buildCeremonyCustodyInput', () => {
 describe('HOUSEHOLD_MEMBERS', () => {
   it('is the canonical triad with the founder first', () => {
     expect(HOUSEHOLD_MEMBERS.map(m => m.humanId)).toEqual([
-      'human-matthew-manager', 'human-jessica-spouse', 'human-james-student',
+      'human-matthew-manager', 'human-jessica-spouse', 'human-james-son',
     ]);
     expect(HOUSEHOLD_MEMBERS[2].minor).toBe(true);
   });

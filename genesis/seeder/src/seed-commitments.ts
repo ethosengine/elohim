@@ -240,21 +240,21 @@ export function defaultCustodyPairs(): CustodyPair[] {
     // ceremony landing (stage-1 plan Task 10). Loud provenance via metadata.
     {
       providerHumanId: 'human-matthew-manager', providerArchetype: 'desktop',
-      receiverHumanId: 'human-james-student', receiverArchetype: 'mobile',
+      receiverHumanId: 'human-james-son', receiverArchetype: 'mobile',
       ...fixture,
     },
     {
-      providerHumanId: 'human-james-student', providerArchetype: 'mobile',
+      providerHumanId: 'human-james-son', providerArchetype: 'mobile',
       receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
       ...fixture,
     },
     {
       providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
-      receiverHumanId: 'human-james-student', receiverArchetype: 'mobile',
+      receiverHumanId: 'human-james-son', receiverArchetype: 'mobile',
       ...fixture,
     },
     {
-      providerHumanId: 'human-james-student', providerArchetype: 'mobile',
+      providerHumanId: 'human-james-son', providerArchetype: 'mobile',
       receiverHumanId: 'human-jessica-spouse', receiverArchetype: 'desktop',
       ...fixture,
     },

@@ -149,8 +149,14 @@ cmd_mesh() {
       connected="$(jq -r '.connectedPeers // 0' <<<"$status_json")"
       nat="$(jq -r '.natStatus // "?"' <<<"$status_json")"
       PEER_IDS[$PEER_NAME]="$pid"
-      peers_json="$(jq -c --arg n "$PEER_NAME" --argjson s "$status_json" \
-        '. + [{name:$n, peerId:$s.peerId, connectedPeers:$s.connectedPeers, natStatus:$s.natStatus, relayMode:$s.relayMode}]' <<<"$peers_json")"
+      # Archive the FULL connected-peer-id list, not just the count: the
+      # 2026-06-11 #1119 partition (matthew↔jessica absent from each other's
+      # sets while both held 10+ connections) was undiagnosable from counts
+      # alone — the artifact must name WHO each pod is connected to.
+      local peer_list
+      peer_list="$(http_get "$PEER_URL/p2p/peers" | jq -c '[(.peers // [])[] | (.peerId // .peer_id)]' 2>/dev/null || echo '[]')"
+      peers_json="$(jq -c --arg n "$PEER_NAME" --argjson s "$status_json" --argjson pl "${peer_list:-[]}" \
+        '. + [{name:$n, peerId:$s.peerId, connectedPeers:$s.connectedPeers, natStatus:$s.natStatus, relayMode:$s.relayMode, connectedPeerIds:$pl}]' <<<"$peers_json")"
       if [ "$connected" -ge "$min_connected" ]; then
         pass "mesh.$PEER_NAME.connected" "connectedPeers=$connected nat=$nat"
       else
