@@ -72,6 +72,9 @@ rmpv = "1.3"
 # Use lair_signing for the signer, but not wasmer (we're native, not wasm)
 holochain_client = { version = "0.9.0-dev.5", default-features = false, features = ["lair_signing"] }
 holochain_types = { version = "0.7.0-dev.5", default-features = false }
+# Direct use is limited to Bundle::new in happ_manager's coordinator hot-swap;
+# version must stay in the range holochain_types resolves (one shared crate).
+mr_bundle = { version = "0.7.0-dev.2", default-features = false }
 
 # Provide custom getrandom implementation for holochain's wasm-oriented dependencies
 # The custom backend delegates to std on native platforms

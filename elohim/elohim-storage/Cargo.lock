@@ -2366,6 +2366,7 @@ dependencies = [
  "libp2p",
  "lru 0.12.5",
  "lz4_flex 0.11.5",
+ "mr_bundle",
  "multihash-codetable 0.1.4",
  "n0-future 0.1.3",
  "pkarr",
