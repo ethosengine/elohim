@@ -2111,7 +2111,7 @@ async fn async_main(
     // In dev / blob-only mode any of 1-3 may be absent; the no-op path is correct.
     // ---------------------------------------------------------------------------
     if !args.imagodei_app_id.is_empty() {
-        if let Some(admin_url) = saved_admin_url {
+        if let Some(admin_url) = saved_admin_url.clone() {
             let app_url_clone = args.app_url.clone();
             let admin_url_clone = admin_url;
             let imagodei_app_id_clone = args.imagodei_app_id.clone();
@@ -2132,63 +2132,137 @@ async fn async_main(
             #[cfg(feature = "p2p")]
             let swarm_tx_opt = p2p_node.as_ref().map(|n| n.handle().command_sender());
 
+            // genesis #1122 fix: the imagodei conductor needs 6+ minutes to
+            // enable its cells after a rolling restart. The old code connected
+            // ONCE and, on failure ("app 'imagodei' not found" / CellDisabled),
+            // permanently disabled the reconcile controller for the pod's whole
+            // lifetime — so MembershipProjected → humans-junction stamps never
+            // landed and projection-reconcile heals reported conductor_missing
+            // on every non-genesis pod until the next pod delete.
+            //
+            // Now: retry the signal-stream connect FOREVER with capped
+            // exponential backoff (`hc_client_registry::reconnect_backoff`,
+            // the same policy the registry late-connect uses). When it lands —
+            // early OR late — the controller is built and run_loop started with
+            // EXACTLY the same wiring the boot-success path used (the whole
+            // build-controller + run_loop is self-contained in this task, so
+            // late success is byte-for-byte as good as early success). If the
+            // conductor later disconnects mid-loop, we fall back into the same
+            // reconnect loop rather than giving up.
+            let mut reconcile_shutdown = shutdown_tx.subscribe();
             tokio::spawn(async move {
-                match HolochainAppSignalStream::connect(
-                    &admin_url_clone,
-                    &app_url_clone,
-                    &imagodei_app_id_clone,
-                    &imagodei_app_id_clone, // role = app_id by convention for single-DNA apps
-                    reconcile_pool.clone(),
-                )
-                .await
-                {
-                    Ok(stream) => {
-                        info!(
-                            app_id = %imagodei_app_id_clone,
-                            "Reconcile controller connected to imagodei conductor — starting loop"
-                        );
-
-                        // Build controller. new_with_storage when db_pool available
-                        // (enables sweep + compromise_at derivation); new() otherwise.
-                        let mut controller = match reconcile_pool {
-                            Some(pool) => {
-                                let c = ReconcileController::new_with_storage(
-                                    stream,
-                                    pool,
-                                    Arc::clone(&pubkey_cache),
-                                );
-                                #[cfg(feature = "p2p")]
-                                let c = match swarm_tx_opt {
-                                    Some(tx) => c.with_swarm_tx(tx),
-                                    None => c,
-                                };
-                                c
+                use elohim_storage::hc_client_registry::{
+                    reconnect_backoff, should_warn_still_down,
+                };
+                loop {
+                    let mut attempt: u32 = 0;
+                    let stream = loop {
+                        attempt = attempt.saturating_add(1);
+                        match HolochainAppSignalStream::connect(
+                            &admin_url_clone,
+                            &app_url_clone,
+                            &imagodei_app_id_clone,
+                            &imagodei_app_id_clone, // role = app_id by convention for single-DNA apps
+                            reconcile_pool.clone(),
+                        )
+                        .await
+                        {
+                            Ok(stream) => {
+                                if attempt == 1 {
+                                    info!(
+                                        app_id = %imagodei_app_id_clone,
+                                        "Reconcile controller connected to imagodei conductor — starting loop"
+                                    );
+                                } else {
+                                    info!(
+                                        app_id = %imagodei_app_id_clone,
+                                        attempt,
+                                        "Reconcile controller connected to imagodei conductor (late) — \
+                                         starting loop with same wiring as boot-success path"
+                                    );
+                                }
+                                break stream;
                             }
-                            None => {
-                                // No db_pool — sweep ops will be no-ops (logged by controller).
-                                let c = ReconcileController::new(stream);
-                                #[cfg(feature = "p2p")]
-                                let c = match swarm_tx_opt {
-                                    Some(tx) => c.with_swarm_tx(tx),
-                                    None => c,
-                                };
-                                c
+                            Err(e) => {
+                                let delay = reconnect_backoff(attempt);
+                                if should_warn_still_down(attempt) {
+                                    warn!(
+                                        error = %e,
+                                        app_id = %imagodei_app_id_clone,
+                                        attempt,
+                                        delay_secs = delay.as_secs(),
+                                        "Reconcile controller bridge still down — retrying forever \
+                                         (conductor cells may still be CellDisabled after a rolling \
+                                         restart; storage keeps serving blobs/HTTP meanwhile)"
+                                    );
+                                } else {
+                                    info!(
+                                        error = %e,
+                                        app_id = %imagodei_app_id_clone,
+                                        attempt,
+                                        delay_secs = delay.as_secs(),
+                                        "Reconcile controller bridge reconnect: retrying"
+                                    );
+                                }
+                                tokio::select! {
+                                    _ = tokio::time::sleep(delay) => {}
+                                    _ = reconcile_shutdown.recv() => {
+                                        info!(
+                                            app_id = %imagodei_app_id_clone,
+                                            "Reconcile controller reconnect loop exiting (shutdown)"
+                                        );
+                                        return;
+                                    }
+                                }
                             }
-                        };
-
-                        if let Err(e) = controller.run_loop().await {
-                            warn!(error = %e, "Reconcile controller run_loop exited with error");
-                        } else {
-                            info!("Reconcile controller run_loop exited cleanly (conductor disconnected)");
                         }
-                    }
-                    Err(e) => {
-                        warn!(
-                            error = %e,
-                            app_id = %imagodei_app_id_clone,
-                            "Reconcile controller disabled: imagodei conductor connection failed \
-                             (storage still serves blobs/HTTP without reconciliation)"
+                    };
+
+                    // Build controller. new_with_storage when db_pool available
+                    // (enables sweep + compromise_at derivation); new() otherwise.
+                    let mut controller = match reconcile_pool.clone() {
+                        Some(pool) => {
+                            let c = ReconcileController::new_with_storage(
+                                stream,
+                                pool,
+                                Arc::clone(&pubkey_cache),
+                            );
+                            #[cfg(feature = "p2p")]
+                            let c = match swarm_tx_opt.clone() {
+                                Some(tx) => c.with_swarm_tx(tx),
+                                None => c,
+                            };
+                            c
+                        }
+                        None => {
+                            // No db_pool — sweep ops will be no-ops (logged by controller).
+                            let c = ReconcileController::new(stream);
+                            #[cfg(feature = "p2p")]
+                            let c = match swarm_tx_opt.clone() {
+                                Some(tx) => c.with_swarm_tx(tx),
+                                None => c,
+                            };
+                            c
+                        }
+                    };
+
+                    if let Err(e) = controller.run_loop().await {
+                        warn!(error = %e, "Reconcile controller run_loop exited with error — re-entering reconnect loop");
+                    } else {
+                        info!(
+                            "Reconcile controller run_loop exited cleanly (conductor disconnected) — re-entering reconnect loop"
                         );
+                    }
+
+                    // The conductor dropped (clean or error). Rather than
+                    // giving up for the pod's lifetime, fall back into the
+                    // reconnect loop — the same forever-survival guarantee.
+                    tokio::select! {
+                        _ = tokio::time::sleep(reconnect_backoff(1)) => {}
+                        _ = reconcile_shutdown.recv() => {
+                            info!("Reconcile controller exiting after disconnect (shutdown)");
+                            return;
+                        }
                     }
                 }
             });
@@ -2225,14 +2299,30 @@ async fn async_main(
             .and_then(|v| v.parse().ok())
             .unwrap_or(300);
         let p2p_handle = p2p_node.as_ref().map(|n| n.handle());
-        let lamad_hc = hc_registry_for_http.as_ref().and_then(|r| r.lamad.clone());
-        match (reconcile_secs, p2p_handle, lamad_hc, db_pool.clone()) {
-            (0, _, _, _) => {
+        // genesis #1122 fix (lamad heal leg): DON'T gate task spawn on a
+        // boot-time lamad HcClient. If the registry's bounded boot ramp
+        // None-stamped lamad (conductor cells still CellDisabled), the
+        // projection-reconcile heal sweep — the leg that asks the LOCAL
+        // conductor and was reporting conductor_missing on every non-genesis
+        // pod — would never spawn. Instead we acquire the lamad bridge INSIDE
+        // the task via `connect_role_forever`, so the heal sweep starts the
+        // moment lamad lands, late or early.
+        let lamad_hc_boot = hc_registry_for_http.as_ref().and_then(|r| r.lamad.clone());
+        let late_inputs = saved_admin_url.clone().map(|admin_url| {
+            elohim_storage::hc_client_registry::HcRegistryInputs {
+                admin_url,
+                app_url: args.app_url.clone(),
+                app_id: args.app_id.clone(),
+            }
+        });
+        match (reconcile_secs, p2p_handle, db_pool.clone()) {
+            (0, _, _) => {
                 info!("projection-reconcile: disabled (PROJECTION_RECONCILE_SECS=0)");
             }
-            (secs, Some(handle), Some(hc), Some(pool)) => {
+            (secs, Some(handle), Some(pool)) => {
                 let state = projection_reconcile_state.clone();
                 let mut reconcile_shutdown = shutdown_tx.subscribe();
+                let late_inputs_for_task = late_inputs.clone();
                 tokio::spawn(async move {
                     use tokio::time::{interval, Duration, MissedTickBehavior};
                     // Boot settle: let peers connect + conductor finish init
@@ -2244,6 +2334,46 @@ async fn async_main(
                             return;
                         }
                     }
+
+                    // Acquire the lamad bridge. Fast path: boot-connect already
+                    // landed it. Late path: boot-connect None-stamped it, so we
+                    // retry forever (capped backoff) — the heal sweep is exactly
+                    // as good once it lands late as if it had landed at boot.
+                    let hc = match lamad_hc_boot {
+                        Some(hc) => hc,
+                        None => match late_inputs_for_task {
+                            Some(inputs) => {
+                                info!(
+                                    "projection-reconcile: lamad bridge not up at boot — \
+                                     awaiting late connect (heal sweep starts once it lands)"
+                                );
+                                match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
+                                    &inputs,
+                                    "lamad",
+                                    reconcile_shutdown.resubscribe(),
+                                )
+                                .await
+                                {
+                                    Some(hc) => {
+                                        info!("projection-reconcile: lamad bridge connected (late) — heal sweep enabled");
+                                        hc
+                                    }
+                                    None => {
+                                        // Only None on shutdown.
+                                        tracing::debug!("projection-reconcile: shutdown while awaiting lamad late connect");
+                                        return;
+                                    }
+                                }
+                            }
+                            None => {
+                                info!(
+                                    "projection-reconcile: disabled (no admin-url for lamad late connect)"
+                                );
+                                return;
+                            }
+                        },
+                    };
+
                     let mut ticker = interval(Duration::from_secs(secs));
                     ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
                     loop {
@@ -2263,13 +2393,11 @@ async fn async_main(
                 });
                 info!(
                     interval_secs = secs,
-                    "projection-reconcile stream started (boot sweep +30s, then periodic, shutdown-aware)"
+                    "projection-reconcile stream started (boot sweep +30s, then periodic, shutdown-aware; lamad bridge acquired in-task with forever-retry)"
                 );
             }
             _ => {
-                info!(
-                    "projection-reconcile: disabled (requires libp2p P2P handle + lamad HcClient + db pool)"
-                );
+                info!("projection-reconcile: disabled (requires libp2p P2P handle + db pool)");
             }
         }
     }
