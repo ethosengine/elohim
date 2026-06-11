@@ -1020,7 +1020,7 @@ There is no tier where you can do whatever you want. The ceiling exists for ever
 
 **6. Reach: Graduated Broadcast Limits**
 
-The protocol's reach system (see [REACH.md](../../REACH.md)) provides another structural barrier:
+The protocol's reach system (vocabulary lineage + drift record: `genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md`; the DNA-notarized enum is `elohim/sdk/schemas/v1/enums/reach.schema.json`, matched by `elohim/epr/src/reach.rs`) provides another structural barrier:
 
 ```
 private → invited → local → neighborhood → municipal → bioregional → regional → commons

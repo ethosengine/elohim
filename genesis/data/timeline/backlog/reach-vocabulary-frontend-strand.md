@@ -14,6 +14,7 @@ derived_from:
   - app/elohim-app/src/app/elohim/ARCHITECTURE.md   # retired to git 2026-06-11 (elohim-pillar island recompose) — carried the geographic 8 verbatim
   - elohim/elohim-storage/REACH.md                  # retired to git 2026-06-11 (storage island recompose) — design-doc ORIGIN of the geographic 8 (§Core Mapping carries the ladder verbatim)
   - doorway/doorway-service/REACH.md                # retired to git 2026-06-11 (doorway island recompose) — sibling origin-strand; same geographic 8 as its enforcement ladder + access matrix
+  - elohim/holochain/docs/REACH.md                  # retired to git 2026-06-11 (holochain docs island recompose) — the SYSTEM-WIDE overview strand; same geographic 8 (pre-reorg holochain/REACH.md — the "../REACH.md" target the doorway + imagodei dead pointers intended)
 cites:
   - resilience-protocol-spec | the canonical reconciliation home — gap-matrix row :628 + roadmap item 13 :704 name only three of the (now five+) reach vocabularies | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
   - genesis/data/timeline/backlog/http-reach-enforcement-gap.md
@@ -23,6 +24,9 @@ cites:
   - app/elohim-library/projects/elohim-service/src/cache/types.ts
   - app/elohim-library/projects/elohim-service/src/models/holochain.model.ts
   - elohim/sdk/schemas/v1/enums/reach.schema.json
+  - steward/node/src/storage/reach.rs
+  - elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_enums.rs
+  - elohim/holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs
 ---
 
 # Reach drift: the TypeScript geographic vocabulary is an unrecorded 4th strand
@@ -58,6 +62,26 @@ HTTP route gates by reach this way. The live enforcement gap is already tracked 
 variant" table noted in the blast-radius paragraph below (`doorway/CLAUDE.md:139-144`) was corrected to
 the geographic 8, with accurate simplified-enforcement language, in the 2026-06-11 doorway island recompose.
 
+**System-wide overview strand (noted 2026-06-11, holochain docs island recompose):**
+`elohim/holochain/docs/REACH.md` (retired to git 2026-06-11) was the SYSTEM-WIDE overview of the
+same geographic 8 — its level table, flow diagram, and relationship matrix carry the ladder
+verbatim. Pre-reorg it lived at `holochain/REACH.md` (born 2026-01-07 in commit 403ddd460, the
+SAME commit that created doorway's REACH.md at `holochain/doorway/REACH.md`; moved into
+`elohim/holochain/docs/` by eb5b53133, 2026-03-10). It is therefore the "`../REACH.md`
+system-wide pointer" doorway's retired REACH.md pointed at, and the `../../REACH.md` that
+`elohim/holochain/dna/imagodei/STEWARDSHIP_PHILOSOPHY.md:1023` cited while quoting the geographic
+ladder with ordinals 0–7 verbatim — that ref was VALID when authored 2026-01-13 at
+`holochain/dna/imagodei/`, broke at the 2026-03 reorg (`elohim/holochain/REACH.md` never existed
+at any commit), and was repaired 2026-06-11 to point at this strand entry. The same recompose
+retires `elohim/holochain/docs/COMMUNITY-COMPUTE.md`, which sketches a 6-value SUBSET
+(`Private/Invited/Local/Neighborhood/Municipal/Commons`, lines 648–656) attributed to
+`elohim-storage/src/reach.rs` — a path that never existed in any commit (`git log --all` over
+`elohim-storage/src/reach.rs`, `holochain/elohim-storage/src/reach.rs`,
+`elohim/elohim-storage/src/reach.rs`: zero); the sketch's enum lives with the same 6 variants at
+`steward/node/src/storage/reach.rs` instead — another live definition site, steward-side,
+dormant (its `can_serve` is `#[allow(dead_code)]`). docs/REACH.md's §Implementation Status table
+over-claims liveness on most rows; claim-by-claim verdicts at the end of this entry.
+
 And a **5th, mutually inconsistent** 6-value family `private/invited/local/community/federated/commons`:
 
 5. `app/elohim-library/projects/elohim-service/src/models/holochain.model.ts:319-326` — `VALID_REACH_LEVELS`, comment claims "matching Rust validation" (false: matches neither Rust enum)
@@ -68,3 +92,70 @@ Cross-bundle blast radius: 72 files reference `ReachLevel` across app/elohim-app
 **Why this matters for roadmap item 13**: a reconciliation scoped only to Rust/schema/epic will under-scope. The TS geographic ordinals feed `reachEncompasses()` comparisons and reach-aware cache eviction; renaming the vocabulary changes ordinal semantics across ~70 consuming files in three separately-built bundles, two of which (lamad via `@elohim/storage-client`, elohim-library locally) cannot be fixed by editing elohim-app alone.
 
 **Action**: when roadmap item 13 is picked up, extend the gap-matrix row at `resilience/README.md:628` to name the TS strands, and treat `elohim/sdk/storage-client-ts/src/protocol-core.model.ts` (hand-written, NOT ts-rs-generated despite living in the SDK) as the single TS edit point — the other three sites should re-export rather than redefine.
+
+---
+
+## docs/REACH.md §Implementation Status — claim-by-claim verdicts (verified 2026-06-11)
+
+Liveness verdicts correcting the retired system-wide overview's status table (precedent: the
+doorway-enforcement paragraph above — reach-LIVENESS verdicts live here when they correct a
+retired doc's claims; unconsumed storage scaffolding stays in
+`genesis/data/timeline/backlog/storage-island-harvest-residue.md`; do not record twice).
+
+- **"DNA (content_store) | Entry validation | ✅ Implemented" — mechanism TRUE, vocabulary
+  FALSE.** Content entries DO validate reach at create: the integrity validate callback
+  (`elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs:4278` →
+  `content.validate()`) runs the check at `content_store_integrity/src/healing.rs:73` against
+  `ALL_REACH_LEVELS` — which is the schema 8
+  (`private/self/intimate/trusted/familiar/community/public/commons`,
+  `content_store_integrity/src/generated_enums.rs:315,327`; CORE and ALL are identical).
+  Coordinator-side checks agree: `content_store/src/providers.rs:56` and
+  `content_store/src/republish_epr.rs:67-78` (inline list, same 8). Net: SIX of docs/REACH.md's
+  documented eight values (`invited`, `local`, `neighborhood`, `municipal`, `bioregional`,
+  `regional`) would be REJECTED by the very validation the table cites as implementing them. The
+  Content struct's own comment says `// Visibility: private, community, public, commons`
+  (`lib.rs:502`) — a fourth-different sketch in the same crate.
+- **"Doorway | HTTP/WS gating | ✅ Implemented" — FALSE as stated.** Already recorded in this
+  entry's doorway paragraph: no doorway HTTP route gates by reach; `can_serve_at_reach` is
+  zero-consumer outside `src/cache/`; the only `X-Reach` response header is hardcoded
+  `"commons"` (`doorway/doorway-service/src/routes/apps.rs:355`). Tracked:
+  `genesis/data/timeline/backlog/http-reach-enforcement-gap.md`.
+- **"elohim-storage | Reach field tracking | ✅ Implemented" — fields exist, but the live
+  enforcement MODEL is different in kind.** Live storage-side reach is author-side earning +
+  receiver-side pre-authorization (`elohim/elohim-storage/src/p2p/reach_authorization.rs` —
+  Stage 1 structural; consumes `elohim_epr::Reach`, i.e. the schema 8 of
+  `elohim/epr/src/reach.rs`), NOT the receive/delivery-side filtering docs/REACH.md describes
+  ("Gates blob replication to peers"). The module doc-comment explicitly rejects receive-side
+  filtering ("It is NOT a per-message filter").
+- **"Delivery gating / Replication gating | 🔄 Partial (sovereignty only)" — the sovereignty
+  scaffolding is recorded as UNCONSUMED** (`storage-island-harvest-residue.md`; routed from
+  `elohim/elohim-storage/CLAUDE.md` §P2P Data Plane & Reach).
+- **"Encryption at rest / LRU by reach priority / RS shard distribution | ❌ Not started" —
+  accurate.** Designed-never-built; same residue entry.
+- **"Agent apps | DHT validation | ✅ Inherent" — true in mechanism** (DNA validation runs on
+  every conductor) **but it enforces the schema 8**, not the geographic 8 the doc documents.
+- **"Geographic verification | 📋 Planned" — no implementation found** anywhere (no
+  location-based reach code in dna/ or elohim-storage).
+- **CustodianCommitment ("Custodian Override") — entry type LIVE, override semantics NOT.** A
+  `CustodianCommitment` entry type exists in the elohim DNA
+  (`content_store_integrity/src/lib.rs:3334`; documented as the substrate primitive for the
+  Sheila community-custody case at `genesis/docs/content/elohim-protocol/resilience/README.md:365`),
+  with coordinator create/fetch + wire conversion (`content_store/src/lib.rs:129,136,611-629`
+  via `shefa_types`). But its shape is custody/replication/recovery (content_filters_json —
+  which may carry reach levels — shard topology, emergency_triggers_json,
+  recovery_instructions_json), NOT docs/REACH.md's sketch
+  (`custodian/beneficiary/category/approved_reach_levels`). No code path grants a custodian
+  ACCESS beyond their reach level — there is no reach-gated access anywhere for an override to
+  pierce (see doorway verdict). Declared data, not enforced behavior. (Adjacent: the modern
+  commitment primitive is `Mishpat::Commitment`, `mishpat_integrity/src/lib.rs:275` — a separate
+  lineage; the content_store CustodianCommitment predates it.)
+- **Emergency escalation — declared fields, no activation path.** Five emergency-trigger types
+  exist as JSON-string fields on CustodianCommitment (resilience README:365 enumerates them); no
+  coordinator or storage code found that ACTS on a trigger to expand reach (and imagodei's
+  `steward_emergency` / `emergency_access_enabled` machinery,
+  `imagodei_integrity/src/lib.rs:215,396`, is KEY-RECOVERY quorum, not content-reach
+  escalation). Vision beyond the entry-type declaration.
+- **Reach promotion — NOT implemented.** No promote/promotion code in `dna/elohim/zomes/` or
+  `elohim/elohim-storage/src/` (only WAL-promotion hits in `db/mod.rs`).
+  `content_store/src/attestation.rs:273` and `content_store/src/migration.rs:241` COPY/preserve
+  the original reach; no audit-trail-preserving promotion mechanism exists.

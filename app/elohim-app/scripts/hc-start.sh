@@ -303,6 +303,16 @@ EOF
     chmod +x "$HC_WRAPPER"
 
     rm -f "$SANDBOX_LOG"
+    # WHY the weird socat line (rationale harvested from the retired
+    # elohim/holochain/docs/claude.md, 2026-06-11):
+    #   - lair keystore demands an interactive TTY; a plain backgrounded
+    #     `hc sandbox generate --in-process-lair` dies with
+    #     "No such device or address (os error 6)".
+    #   - socat's EXEC:...,pty,setsid,ctty gives the wrapper a real PTY +
+    #     session; `(echo "test"; ...)` feeds the keystore passphrase, and
+    #     `sleep infinity` holds stdin open so lair never sees EOF.
+    #   - PTY output carries null bytes — any parsing of $SANDBOX_LOG must
+    #     use `grep -a` (see the admin_port wait loop below).
     nohup sh -c '(echo "test"; sleep infinity) | socat - EXEC:'"$HC_WRAPPER"',pty,setsid,ctty' > "$SANDBOX_LOG" 2>&1 &
 
     echo -n "   ⏳ Waiting for conductor"

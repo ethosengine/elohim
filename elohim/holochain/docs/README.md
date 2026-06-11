@@ -1,126 +1,46 @@
-# Elohim Protocol: Holochain Infrastructure
+# elohim/holochain/ — Holochain Infrastructure
 
-## Why Holochain?
+This directory is the Holochain layer of the Elohim Protocol: the DNAs that form
+the distributed truth layer, plus the toolkits, tests, and packaging that keep
+them buildable and upgradeable. The architecture prose that used to live in this
+`docs/` folder (ARCHITECTURE, P2P-DATAPLANE, SYNC-ENGINE, COMMUNITY-COMPUTE,
+REACH, and siblings) was harvested and retired to git history on 2026-06-11 —
+this README is a thin pointer index, not a design document.
 
-The Elohim Protocol requires infrastructure that humans can own. Not rent. Own.
+**Why Holochain?** The protocol needs infrastructure that households can own
+rather than rent: data lives with its owners, identity is cryptographic,
+validation is distributed math rather than corporate policy, and every entry
+type in `dna/` is a notary anchor no single party controls. That agency framing
+is canonical in the protocol specification
+(`genesis/docs/content/elohim-protocol/protocol-specification.md`) — this
+directory implements it; read the canon for the why.
 
-Cloud services create dependency. Dependency creates extraction. Extraction erodes agency. Holochain breaks this pattern by enabling truly peer-to-peer applications where:
+## What this directory contains
 
-- **Data lives with its owners** - Your family's data on your family's hardware
-- **Identity is cryptographic** - No platform can lock you out of your own identity
-- **Validation is distributed** - Rules enforced by math, not corporate policy
-- **Networks heal themselves** - No single point of failure
+| Path | What it is |
+|------|------------|
+| `dna/` | Multi-DNA hApp — elohim, imagodei, mishpat, infrastructure, node-registry, hrea (lamad-v1 is a v1 archive for healing migration). Per-DNA Jenkinsfiles + build manifests. |
+| `rna/` | DNA migration toolkit — Rust + TypeScript validators, templates |
+| `tests/` | `sweettest/` integration suite + `manifest-hygiene/` manifest checks |
+| `edgenode/` | Deployment packaging — Dockerfile, conductor config, compose |
+| `elohim-wasm/` | WASM utility crate |
+| `local-dev/` | Deployed bundles for the local dev stack |
 
-## The Vision: Progressive Agency
+## Where the truth lives
 
-People shouldn't need to understand cryptography to own their digital lives. The Elohim Protocol meets people where they are:
+| Concern | Canonical home |
+|---------|----------------|
+| Integrity-layer rails — entry types, link budget, upgrade rails | `elohim/holochain/dna/CLAUDE.md` (the holochain-integrity-layer gospel; read it before any zome change) |
+| DNA upgrade governance — forward-compat rules, network-seed ladder, lineage | `genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md` |
+| Protocol canon | `genesis/docs/content/elohim-protocol/protocol-specification.md` |
+| Trust/data split — what the DHT notarizes vs. what storage carries | `genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md` + `genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md` |
+| Founding vision — family nodes, community compute, agency stages | `genesis/docs/content/elohim-protocol/history/2026-06-11-community-compute-founding-vision-arc.md` |
+| P2P dataplane + sync-engine design history | `genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md` |
 
-```
-Stage 1: Visitor     → Browse public content via any doorway
-Stage 2: Hosted      → Account on elohim.host (custodial, but exportable)
-Stage 3: App Steward → Desktop app with local keys (self-custodied)
-Stage 4: Node Steward → Family Node serving your household and community
-```
+## Live how-to (skills, in `.claude/skills/`)
 
-Each stage preserves identity, content, and reputation. No lock-in at any level.
-
-## The Hardware Vision
-
-Stage 4 is the destination: a Family Node in your home. Think of it as:
-
-- **Your family's private cloud** - Photos, documents, learning progress
-- **A backup node for relatives** - Grandma's data replicated to your hardware
-- **A community service** - Serve public content to neighbors
-- **Regional resilience** - Geographic redundancy through relationships
-
-Multiple Family Nodes form clusters. Clusters form regional networks. Regional networks form a global mesh. CDN-like distribution emerges from relationships, not corporations.
-
-## What This Directory Contains
-
-This is the P2P infrastructure layer. Everything here exists to make the vision above real:
-
-| Component | Purpose |
-|-----------|---------|
-| `dna/` | Holochain DNAs - the validation rules and data structures |
-| `doorway/` | Web2 gateway - bridges browsers to the P2P network |
-| `elohim-storage/` | Blob storage - media files, Reed-Solomon shards |
-| `holochain-cache-core/` | Performance primitives - caching, write buffering |
-| `edgenode/` | Deployment packaging for Kubernetes |
-| `sdk/` | TypeScript client for browser/Node.js |
-
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for technical details.
-
-## Key Principles
-
-**1. Doorway is Cloudflare, not AWS**
-
-Doorway is a thin web2 bridge. It caches and protects, but doesn't own. Users can switch doorways freely. Data lives in the DHT.
-
-**2. Performance happens at the agent level**
-
-The Family Node runs `holochain-cache-core` and `elohim-storage`. These provide web2-like performance on P2P infrastructure. Doorway is optional for P2P-native clients.
-
-**3. Relationships drive replication**
-
-Your data replicates to people you trust: family, church, neighborhood. Not to anonymous cloud regions. Backup is a social contract, not a billing tier.
-
-**4. The DNA is law**
-
-Validation rules in the DNA are cryptographically enforced. No doorway, no admin, no corporation can override them. This is what makes agency real.
-
-## The Gap We're Bridging
-
-The Holochain DHT promises automatic distributed storage, but in practice:
-- Chokes at ~3000 entries
-- Gossip latency of 200-2000ms
-- No query capability
-
-We're building the **Community Compute Model** - a hybrid that preserves agency while actually working at scale. See:
-
-- [ARCHITECTURE-GAP.md](./ARCHITECTURE-GAP.md) - Why pure agent-centric doesn't scale
-- [COMMUNITY-COMPUTE.md](./COMMUNITY-COMPUTE.md) - The family node and community replication model
-
-**Key insight:** The DHT stores *coordination* (who exists, who trusts whom, where content lives), not *content*. Content lives in `elohim-storage`, replicated by community investment.
-
-## Getting Started
-
-For development setup, see [DEVELOPMENT.md](./DEVELOPMENT.md).
-
-For deployment options, see [DEPLOYMENT-RUNTIMES.md](./DEPLOYMENT-RUNTIMES.md).
-
-## Documentation Guide
-
-### Architecture Vision
-
-| Document | Purpose |
-|----------|---------|
-| [P2P-DATAPLANE.md](./P2P-DATAPLANE.md) | **Start here** - Master P2P architecture, layer separation, technology choices |
-| [COMMUNITY-COMPUTE.md](./COMMUNITY-COMPUTE.md) | Vision: family nodes, community replication, agency model |
-| [ARCHITECTURE-GAP.md](./ARCHITECTURE-GAP.md) | Why pure agent-centric DHT doesn't scale |
-| [SYNC-ENGINE.md](./SYNC-ENGINE.md) | Automerge CRDT sync design, stream positions |
-
-### Technical Reference
-
-| Document | Purpose |
-|----------|---------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Component overview, data flow, deployment topologies |
-| [elohim-node/ARCHITECTURE.md](../elohim-node/ARCHITECTURE.md) | Infrastructure runtime: sync, cluster, P2P |
-| [doorway/FEDERATION.md](./doorway/FEDERATION.md) | Doorway federation, DIDs, P2P bootstrap role |
-| [doorway/ARCHITECTURE.md](./doorway/ARCHITECTURE.md) | Doorway internals, routes, caching |
-| [elohim-storage/P2P-ARCHITECTURE.md](./elohim-storage/P2P-ARCHITECTURE.md) | Storage P2P implementation, shard protocol |
-
-### Implementation Guides
-
-| Document | Purpose |
-|----------|---------|
-| [DEVELOPMENT.md](./DEVELOPMENT.md) | Local development setup |
-| [DEPLOYMENT-RUNTIMES.md](./DEPLOYMENT-RUNTIMES.md) | Deployment modes and options |
-| [dna/NETWORK_UPGRADES.md](./dna/NETWORK_UPGRADES.md) | DNA migration strategy |
-
-### Reading Order (Recommended)
-
-1. **P2P-DATAPLANE.md** - Understand the 4-layer architecture
-2. **COMMUNITY-COMPUTE.md** - Understand the vision and values
-3. **SYNC-ENGINE.md** - Understand how sync works
-4. **ARCHITECTURE.md** - Understand the components
-5. **doorway/FEDERATION.md** - Understand doorway's role
+- `hc-dev-orchestrator` — start/manage the local conductor + storage + doorway trio
+- `holochain-import` — DHT seeding, hc-rna fixtures, snapshots
+- `automerge-sync` — CRDT sync engine, stream positions, conflict resolution
+- `libp2p-discovery` / `libp2p-transport` / `libp2p-protocols` — P2P networking reference
+- `holochain-storage-api` — storage HTTP surface + Rust→TS type pipeline

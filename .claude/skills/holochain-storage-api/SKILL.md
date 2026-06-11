@@ -325,7 +325,7 @@ Server validates against `SUPPORTED_SCHEMA_VERSIONS`. Unknown fields are silentl
 | `elohim/elohim-storage/src/http.rs` | HTTP route handlers |
 | `elohim/elohim-storage/CLAUDE.md` | Detailed boundary architecture guide |
 | `elohim/sdk/storage-client-ts/src/client.ts` | TypeScript SDK client |
-| `holochain/sdk/storage-client-ts/src/generated/` | Auto-generated TypeScript types |
+| `elohim/sdk/storage-client-ts/src/generated/` | Auto-generated TypeScript types |
 | `elohim/sdk/storage-client-ts/CLAUDE.md` | Generated types usage guide |
 | `elohim/holochain/docs/ARCHITECTURE.md` | Overall architecture |
 | `elohim/holochain/docs/P2P-DATAPLANE.md` | P2P data plane design |
