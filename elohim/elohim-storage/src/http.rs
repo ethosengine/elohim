@@ -9254,6 +9254,8 @@ impl HttpServer {
 /// so a reach correction never sticks. `blob_hash` is likewise carried through
 /// the re-authored Content entry. Metadata-only patches (title/description/
 /// tags) stay on the legacy diesel path.
+/// Note: `p2p_published_at` is deliberately excluded — it is a provenance stamp,
+/// not a DHT entry field, so its diesel write is not subject to reconciliation-controller reversion.
 fn patch_needs_conductor(view: &UpdateContentInputView) -> bool {
     view.blob_hash.is_some() || view.reach.is_some()
 }
@@ -11500,6 +11502,16 @@ mod tests {
         assert!(
             !patch_needs_conductor(&view),
             "non-notarized PATCH can use diesel"
+        );
+
+        // A title-only patch (no blob, no reach) does not need the conductor.
+        let titled = UpdateContentInputView {
+            title: Some("new title".into()),
+            ..patch_view(None, None)
+        };
+        assert!(
+            !patch_needs_conductor(&titled),
+            "title-only PATCH can use diesel"
         );
     }
 

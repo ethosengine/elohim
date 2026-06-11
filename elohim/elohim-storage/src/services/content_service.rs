@@ -334,6 +334,14 @@ impl ContentService {
             conductor_writes::call_create_content(hc, &bootstrap).await?
         } else {
             // Standard update: only patched fields cross the wire.
+            // LIMITATION (reach floor, G1): `reach` is NOT threaded through this standard
+            // update path — the zome's update_content (content_store) does not accept a
+            // reach patch field. A reach correction on content with a LIVE dht_anchor_hash
+            // therefore routes here but does not change the notarized reach. It IS applied
+            // on the null-anchor and stale-anchor branches above, which re-publish via
+            // create_content (carrying reach). The heal of bulk-seeded (never-anchored)
+            // content works for that reason; updating reach on a live-anchored entry needs
+            // a zome change (future slice). See reach-floor-foundation-plan.md Task 6.
             let patch = lamad_types::UpdateContentInput {
                 id: id.to_string(),
                 blob_cid: new_blob_cid.clone(),
