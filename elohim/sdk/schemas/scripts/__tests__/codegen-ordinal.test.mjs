@@ -16,7 +16,7 @@ test('formatTsOrdinal emits a Record + openness fn matching schema order', () =>
   assert.match(out, /private: 1/);
   assert.match(out, /commons: 8/);
   assert.match(out, /export function reachOpenness\(r: Reach\): number \{ return REACH_OPENNESS\[r\]; \}/);
-  assert.match(out, /export function isReach\(v: string\): v is Reach \{/);
+  assert.match(out, /export function isReach\(v: string\): v is Reach \{ return Object\.hasOwn\(REACH_OPENNESS, v\); \}/);
 });
 
 // Ordinal codegen is gated on the schema's explicit `_ordinal: true` marker, NOT a

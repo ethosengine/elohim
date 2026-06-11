@@ -509,15 +509,15 @@ function formatTsConst(name, values) {
 export function formatTsOrdinal(baseName, title, allValues) {
   const entries = allValues.map((v, i) => `  ${v}: ${i + 1},`).join('\n');
   const ordinalName = `${baseName.replace(/_LEVELS$/, '')}_OPENNESS`; // REACH_OPENNESS
+  const fnName = title.charAt(0).toLowerCase() + title.slice(1) + 'Openness';
   return [
     `export const ${ordinalName}: Record<${title}, number> = {`,
     entries,
     `} as const;`,
     ``,
-    `export function ${title.toLowerCase()}Openness(r: ${title}): number { return ${ordinalName}[r]; }`,
+    `export function ${fnName}(r: ${title}): number { return ${ordinalName}[r]; }`,
     ``,
-    `export function is${title}(v: string): v is ${title} { return v in ${ordinalName}; }`,
-    ``,
+    `export function is${title}(v: string): v is ${title} { return Object.hasOwn(${ordinalName}, v); }`,
   ].join('\n');
 }
 
@@ -660,7 +660,9 @@ async function main() {
   console.log('TypeScript generation and distribution complete.');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
