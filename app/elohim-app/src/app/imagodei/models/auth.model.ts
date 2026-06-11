@@ -259,43 +259,25 @@ export interface LoginRequest {
   password: string;
 }
 
-/** Human profile from registration response */
-export interface HumanProfileResponse {
-  id: string;
-  displayName: string;
-  bio?: string;
-  affinities: string[];
-  profileReach: string;
-  location?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** Response from auth endpoints on success */
-export interface AuthResponse {
-  token: string;
-  humanId: string;
-  agentPubKey: string;
-  /** Token expiration - Unix timestamp (seconds) or ISO string */
-  expiresAt: number | string;
-  identifier: string;
-  /** Holochain installed app ID for this user (multi-conductor routing) */
-  installedAppId?: string;
-  /** Profile info (returned on registration) */
-  profile?: HumanProfileResponse;
-}
+/**
+ * Auth wire shapes — the schema-contract-pinned generated contracts,
+ * re-exported from @elohim/identity (single source; Rust wire authority:
+ * doorway/doorway-service/src/routes/auth_routes.rs, validated by that
+ * crate's schema_contract tests). The drifted hand-written duplicates
+ * (AuthResponse with `expiresAt: number | string`, and CurrentUserResponse —
+ * a renamed /auth/me shape) were retired (auth-wire plan Task 4).
+ *
+ * Note: the wire `expiresAt` is a Unix-seconds number. The app-level
+ * AuthSuccess above deliberately keeps the looser `number | string` because
+ * non-wire flows (Tauri/OAuth handoff) feed ISO strings through
+ * parseExpiryDate.
+ */
+export type { AuthResponse, HumanProfileResponse, MeResponse } from '@elohim/identity';
 
 /** Response from auth endpoints on error */
 export interface AuthErrorResponse {
   error: string;
   code?: AuthErrorCode;
-}
-
-/** Response from GET /auth/me */
-export interface CurrentUserResponse {
-  humanId: string;
-  agentPubKey: string;
-  identifier: string;
 }
 
 // =============================================================================

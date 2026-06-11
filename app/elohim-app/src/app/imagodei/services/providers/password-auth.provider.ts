@@ -28,6 +28,7 @@ import {
   type AuthFailure,
   type AuthResponse,
   type AuthErrorResponse,
+  type MeResponse,
   type RegisterAuthRequest,
   type LoginRequest,
 } from '../../models/auth.model';
@@ -265,8 +266,10 @@ export class PasswordAuthProvider implements AuthProvider {
     const url = `${this.getAuthBaseUrl()}/auth/me`;
 
     try {
+      // The wire shape is the generated MeResponse; callers only need the
+      // identity triple, so the return type stays the narrow projection.
       return await firstValueFrom(
-        this.http.get<{ humanId: string; agentPubKey: string; identifier: string }>(url, {
+        this.http.get<MeResponse>(url, {
           headers: {
             ...this.getHeaders(),
             Authorization: `Bearer ${token}`,

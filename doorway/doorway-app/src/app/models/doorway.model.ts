@@ -481,24 +481,14 @@ export interface PortalHostResponse {
 }
 
 /**
- * Account response from GET /auth/account
+ * Account response from GET /auth/account — the schema-contract-pinned
+ * generated wire shape (flat camelCase; Rust wire authority:
+ * doorway-service/src/routes/auth_routes.rs AccountResponse). Re-exported
+ * here to preserve existing import paths; the drifted hand-written nested
+ * shape (usage/quota objects, isActive/hasLocalConductor/doorwayName — none
+ * of which the wire carries) was retired (auth-wire plan Task 4).
  */
-export interface AccountResponse {
-  id: string;
-  identifier: string;
-  identifierType: string;
-  permissionLevel: UserPermissionLevel;
-  isActive: boolean;
-  isSteward: boolean;
-  hasLocalConductor: boolean;
-  hasExportedKey: boolean;
-  createdAt: string | null;
-  lastLoginAt: string | null;
-  doorwayName: string;
-  doorwayRegion: string | null;
-  usage: UserUsage;
-  quota: UserQuota;
-}
+export type { AccountResponse } from '../generated/account-response';
 
 // ============================================================================
 // User Admin Models

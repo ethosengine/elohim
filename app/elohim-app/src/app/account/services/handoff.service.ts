@@ -20,28 +20,10 @@ import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from '@app/imagodei';
 
-// ---------------------------------------------------------------------------
-// Wire shape returned by /auth/exchange-session
-// ---------------------------------------------------------------------------
-
-interface ExchangeSessionResponse {
-  /** Full JWT replacing the short-lived session token. */
-  token: string;
-  humanId: string;
-  agentPubKey: string;
-  /** Human-readable identifier (email or username). */
-  identifier: string;
-  /** Unix timestamp (seconds) or ISO string. */
-  expiresAt: number | string;
-  doorwayUrl?: string;
-  portalHostUrl?: string;
-}
-
-/** Wire shape returned by GET /auth/session-token (single-use mint). */
-interface SessionTokenMintResponse {
-  sessionToken: string;
-  expiresAt: number;
-}
+// Wire shapes (/auth/exchange-session, /auth/session-token) are the
+// schema-contract-pinned generated contracts re-exported by @elohim/identity
+// (auth-wire plan Task 4 — local hand-written duplicates retired).
+import type { ExchangeSessionResponse, SessionTokenResponse } from '@elohim/identity';
 
 // ---------------------------------------------------------------------------
 // Service
@@ -104,7 +86,7 @@ export class HandoffService {
     if (!bearer) return null;
     try {
       const resp = await firstValueFrom(
-        this.http.get<SessionTokenMintResponse>('/auth/session-token', {
+        this.http.get<SessionTokenResponse>('/auth/session-token', {
           headers: { Authorization: `Bearer ${bearer}` },
         })
       );

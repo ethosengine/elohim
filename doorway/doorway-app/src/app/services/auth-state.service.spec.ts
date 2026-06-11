@@ -23,40 +23,23 @@ import { AuthStateService } from './auth-state.service';
 import { DoorwayAdminService } from './doorway-admin.service';
 import { AUTH_TOKEN_KEY } from './doorway-session-token.store';
 
+// Fixture matches the schema-contract-pinned generated AccountResponse
+// (flat wire shape; auth-wire plan Task 4 retired the nested duplicate).
 const STEWARD_ACCOUNT: AccountResponse = {
-  id: 'user-1',
+  humanId: 'human-1',
   identifier: 'operator@example.com',
-  identifierType: 'email',
   permissionLevel: 'ADMIN',
-  isActive: true,
+  storageBytes: 0,
+  storageLimit: 0,
+  storagePercent: 0,
+  projectionQueries: 0,
+  dailyQueryLimit: 0,
+  queriesPercent: 0,
+  bandwidthBytes: 0,
+  dailyBandwidthLimit: 0,
+  bandwidthPercent: 0,
   isSteward: true,
-  hasLocalConductor: true,
-  hasExportedKey: false,
-  createdAt: null,
-  lastLoginAt: null,
-  doorwayName: 'alpha',
-  doorwayRegion: null,
-  usage: {
-    storageBytes: 0,
-    storageMb: 0,
-    projectionQueries: 0,
-    bandwidthBytes: 0,
-    bandwidthMb: 0,
-    periodStart: null,
-    lastUpdated: null,
-  },
-  quota: {
-    storageLimitBytes: 0,
-    storageLimitMb: 0,
-    storagePercentUsed: 0,
-    dailyQueryLimit: 0,
-    queriesPercentUsed: 0,
-    dailyBandwidthLimitBytes: 0,
-    dailyBandwidthLimitMb: 0,
-    bandwidthPercentUsed: 0,
-    enforceHardLimit: false,
-    isOverQuota: false,
-  },
+  keyExported: false,
 };
 
 /** Minimal fetch Response stand-in (DoorwaySessionClient uses ok/json/text). */

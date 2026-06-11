@@ -7,7 +7,6 @@
  * doorway/doorway-service/src/routes/auth_routes.rs).
  *
  * Non-auth types below are derived from:
- *   - doorway/src/routes/auth_routes.rs (AccountResponse)
  *   - doorway/src/routes/health.rs (HealthResponse)
  */
 
@@ -15,6 +14,7 @@ import { DoorwaySessionClient, InMemorySessionTokenStore } from '@elohim/identit
 import { request } from 'undici';
 
 import type {
+  AccountResponse,
   AuthResponse,
   ExchangeSessionResponse,
   LoginRequest,
@@ -29,6 +29,7 @@ import type {
 // definitions; a2o consumers keep importing them from this module.
 export { DoorwaySessionError } from '@elohim/identity/core';
 export type {
+  AccountResponse,
   AuthResponse,
   ExchangeSessionResponse,
   HumanProfileResponse,
@@ -129,36 +130,9 @@ export interface PathWithDetailsView extends PathIndexEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Account types (mirrors auth_routes.rs AccountResponse — flat camelCase;
-// optional fields are serde skip_serializing_if = Option::is_none)
-// ---------------------------------------------------------------------------
-
-export interface AccountResponse {
-  humanId: string;
-  identifier: string;
-  permissionLevel: string;
-  // Storage
-  storageBytes: number;
-  storageLimit: number;
-  storagePercent: number;
-  // Queries
-  projectionQueries: number;
-  dailyQueryLimit: number;
-  queriesPercent: number;
-  // Bandwidth
-  bandwidthBytes: number;
-  dailyBandwidthLimit: number;
-  bandwidthPercent: number;
-  // Hosting / stewardship
-  conductorId?: string;
-  isSteward: boolean;
-  stewardshipAt?: string;
-  keyExported: boolean;
-  // Timestamps
-  createdAt?: string;
-  lastLoginAt?: string;
-}
-
+// Account types: AccountResponse is the schema-contract-pinned generated wire
+// shape, imported and re-exported from @elohim/identity/core above (the
+// hand-written mirror was retired — auth-wire plan Task 4).
 // ---------------------------------------------------------------------------
 // Status types (mirrors doorway /status endpoint)
 // ---------------------------------------------------------------------------

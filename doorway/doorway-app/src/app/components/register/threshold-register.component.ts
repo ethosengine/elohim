@@ -20,6 +20,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
+// Wire shape (/auth/register) is the schema-contract-pinned generated
+// contract (auth-wire plan Task 4 — the drifted local duplicate, e.g.
+// `expiresAt: string`, was retired).
+import type { AuthResponse } from '../../generated/auth-response';
 import { AuthStateService } from '../../services/auth-state.service';
 
 /** OAuth params from query string */
@@ -37,15 +41,6 @@ interface RegisterForm {
   email: string;
   password: string;
   confirmPassword: string;
-}
-
-/** Auth response from /auth/register */
-interface AuthResponse {
-  token: string;
-  humanId: string;
-  agentPubKey: string;
-  expiresAt: string;
-  identifier: string;
 }
 
 /** State machine for registration flow */

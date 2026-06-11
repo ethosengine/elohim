@@ -18,6 +18,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
+// Wire shapes (/auth/login, /auth/session-token) are the schema-contract-
+// pinned generated contracts (auth-wire plan Task 4 — the drifted local
+// duplicates, e.g. `expiresAt: string`, were retired).
+import type { AuthResponse } from '../../generated/auth-response';
+import type { SessionTokenResponse } from '../../generated/session-token-response';
 import { AuthStateService } from '../../services/auth-state.service';
 
 /** OAuth params from query string */
@@ -34,27 +39,6 @@ interface OAuthParams {
 interface LoginForm {
   identifier: string;
   password: string;
-}
-
-/** Auth response from /auth/login */
-interface AuthResponse {
-  token: string;
-  humanId: string;
-  agentPubKey: string;
-  expiresAt: string;
-  identifier: string;
-  /** True when this human is a confirmed steward at the substrate level. */
-  isSteward?: boolean;
-  /** First reachable portal host URL when the human is a steward — the
-   *  peer-native OAuth portal that owns their identity. Doorway is the
-   *  relying party here, not the identity provider. */
-  portalHostUrl?: string;
-}
-
-/** Response from GET /auth/session-token (single-use transfer-code mint). */
-interface SessionTokenResponse {
-  sessionToken: string;
-  expiresAt: number;
 }
 
 /** State machine for login flow */

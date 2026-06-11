@@ -70,9 +70,10 @@ const AGENCY_STEPS: PipelineStep[] = [
             </div>
             <div class="info-item">
               <span class="info-label">Status</span>
-              <span class="status-badge" [class.active]="account()?.isActive">
-                {{ account()?.isActive ? 'Active' : 'Inactive' }}
-              </span>
+              <!-- The /auth/account wire carries no isActive (that flag is an
+                   admin-surface concern); a successful bearer-authenticated
+                   account probe implies the account is active. -->
+              <span class="status-badge active">Active</span>
             </div>
             <div class="info-item">
               <span class="info-label">Member Since</span>
@@ -82,24 +83,15 @@ const AGENCY_STEPS: PipelineStep[] = [
               <span class="info-label">Last Login</span>
               <span class="info-value">{{ account()?.lastLoginAt | date:'medium' }}</span>
             </div>
-            <div class="info-item">
-              <span class="info-label">Doorway</span>
-              <span class="info-value">
-                {{ account()?.doorwayName }}
-                @if (account()?.doorwayRegion) {
-                  <span class="region-tag">{{ account()?.doorwayRegion }}</span>
-                }
-              </span>
-            </div>
           </div>
         </section>
 
         <!-- Steward context banner -->
-        @if (account()?.isSteward && !account()?.hasLocalConductor) {
+        @if (stewardAccessingThroughDoorway()) {
           <div class="context-banner">
             <span class="banner-icon">&#9432;</span>
             <div class="banner-text">
-              <strong>Accessing through {{ account()?.doorwayName }}</strong>
+              <strong>Accessing through this doorway</strong>
               <p>Your local conductor is not connected. You can download your key bundle or re-provision below.</p>
             </div>
           </div>
@@ -125,8 +117,8 @@ const AGENCY_STEPS: PipelineStep[] = [
                 </div>
               </div>
               <span class="gauge-detail">
-                {{ account()?.usage?.storageMb | number:'1.1-1' }} MB /
-                {{ account()?.quota?.storageLimitMb | number:'1.0-0' }} MB
+                {{ formatBytesHelper(account()?.storageBytes ?? 0) }} /
+                {{ formatBytesHelper(account()?.storageLimit ?? 0) }}
               </span>
             </div>
 
@@ -146,8 +138,8 @@ const AGENCY_STEPS: PipelineStep[] = [
                 </div>
               </div>
               <span class="gauge-detail">
-                {{ account()?.usage?.projectionQueries | number }} /
-                {{ account()?.quota?.dailyQueryLimit | number }} queries
+                {{ account()?.projectionQueries | number }} /
+                {{ account()?.dailyQueryLimit | number }} queries
               </span>
             </div>
 
@@ -167,8 +159,8 @@ const AGENCY_STEPS: PipelineStep[] = [
                 </div>
               </div>
               <span class="gauge-detail">
-                {{ account()?.usage?.bandwidthMb | number:'1.1-1' }} MB /
-                {{ account()?.quota?.dailyBandwidthLimitMb | number:'1.0-0' }} MB
+                {{ formatBytesHelper(account()?.bandwidthBytes ?? 0) }} /
+                {{ formatBytesHelper(account()?.dailyBandwidthLimit ?? 0) }}
               </span>
             </div>
           </div>
@@ -212,12 +204,12 @@ const AGENCY_STEPS: PipelineStep[] = [
                   <span class="req-check">{{ true ? '&#10003;' : '&#10007;' }}</span>
                   Active hosted account
                 </li>
-                <li [class.met]="account()?.hasExportedKey">
-                  <span class="req-check">{{ account()?.hasExportedKey ? '&#10003;' : '&#10007;' }}</span>
+                <li [class.met]="account()?.keyExported">
+                  <span class="req-check">{{ account()?.keyExported ? '&#10003;' : '&#10007;' }}</span>
                   Export cryptographic keys
                 </li>
-                <li [class.met]="account()?.hasLocalConductor">
-                  <span class="req-check">{{ account()?.hasLocalConductor ? '&#10003;' : '&#10007;' }}</span>
+                <li [class.met]="runsOwnConductor()">
+                  <span class="req-check">{{ runsOwnConductor() ? '&#10003;' : '&#10007;' }}</span>
                   Install and run Elohim locally
                 </li>
               </ul>
@@ -256,9 +248,25 @@ export class DoorwayAccountComponent implements OnInit {
   readonly Math = Math;
   readonly formatBytesHelper = formatBytes;
 
-  readonly storagePercent = computed(() => this.account()?.quota?.storagePercentUsed ?? 0);
-  readonly queriesPercent = computed(() => this.account()?.quota?.queriesPercentUsed ?? 0);
-  readonly bandwidthPercent = computed(() => this.account()?.quota?.bandwidthPercentUsed ?? 0);
+  readonly storagePercent = computed(() => this.account()?.storagePercent ?? 0);
+  readonly queriesPercent = computed(() => this.account()?.queriesPercent ?? 0);
+  readonly bandwidthPercent = computed(() => this.account()?.bandwidthPercent ?? 0);
+
+  /**
+   * The wire carries no hasLocalConductor flag. The closest wire-true signal
+   * is conductorId: it names the doorway conductor hosting this account's
+   * cell, and is absent when the human runs their own conductor.
+   */
+  readonly runsOwnConductor = computed(() => {
+    const acct = this.account();
+    return !!acct && !acct.conductorId;
+  });
+
+  /** Steward whose cell is still doorway-hosted (no local conductor). */
+  readonly stewardAccessingThroughDoorway = computed(() => {
+    const acct = this.account();
+    return !!acct?.isSteward && !!acct.conductorId;
+  });
 
   readonly storageColor = computed(() => quotaGaugeColor(this.storagePercent()));
   readonly queriesColor = computed(() => quotaGaugeColor(this.queriesPercent()));
@@ -311,8 +319,8 @@ export class DoorwayAccountComponent implements OnInit {
     if (!acct) return false;
     switch (step) {
       case 'hosted': return true;
-      case 'key_export': return acct.hasExportedKey;
-      case 'install_app': return acct.hasLocalConductor;
+      case 'key_export': return acct.keyExported;
+      case 'install_app': return this.runsOwnConductor();
       case 'steward': return acct.isSteward;
       default: return false;
     }
@@ -321,9 +329,9 @@ export class DoorwayAccountComponent implements OnInit {
   isCurrentStep(step: AgencyStep): boolean {
     const acct = this.account();
     if (!acct) return step === 'hosted';
-    if (step === 'steward' && !acct.isSteward && acct.hasLocalConductor) return true;
-    if (step === 'install_app' && !acct.hasLocalConductor && acct.hasExportedKey) return true;
-    if (step === 'key_export' && !acct.hasExportedKey) return true;
+    if (step === 'steward' && !acct.isSteward && this.runsOwnConductor()) return true;
+    if (step === 'install_app' && !this.runsOwnConductor() && acct.keyExported) return true;
+    if (step === 'key_export' && !acct.keyExported) return true;
     return false;
   }
 }
