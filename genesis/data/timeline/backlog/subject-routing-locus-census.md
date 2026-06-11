@@ -116,3 +116,23 @@ Each: sdk/domains home id-anchored + cites its design canon (drift-tracked); the
 **Remaining subject homes:** the no-gospel domains (`avodah`/`elohim`/`infrastructure`/`mishpat` — create-or-decline,
 sibling task) and the implementation-layer truth homes (`elohim-storage`/`elohim-cache-core`/`holochain`/
 `doorway-service`/`steward` + `sdk` root) — larger, truth-disputed island trees (handle per the corrected-truth column).
+
+### Implementation-layer homes anchored — 2026-06-11
+
+| Home | id | truth | cites canon |
+|---|---|---|---|
+| `elohim/sdk` | `elohim-sdk-gospel` | derived | `elohim-sdk-architecture` |
+| `elohim/elohim-storage` | `elohim-storage-gospel` | self | `tiered-quilt-stewardship-design` |
+| `elohim/elohim-cache-core` | `elohim-cache-core-gospel` | derived | `tiered-quilt-stewardship-design` |
+| `doorway/doorway-service` | `doorway-service-gospel` | derived | `resilience-protocol-spec` |
+| `elohim/holochain/dna` | `holochain-integrity-layer-gospel` | derived | `elohim-protocol-specification` |
+| `steward/device` | `steward-device-gospel` | derived | `iroh-libp2p-complementarity` |
+
+Also **id'd 3 foundational canon docs** so the home→canon cites are drift-tracked envelopes (and the corpus
+gains first-class anchors): `elohim-protocol-specification` (protocol-specification.md), `resilience-protocol-spec`
+(resilience/README.md), `elohim-sdk-architecture` (architecture/elohim-sdk.md).
+
+**`steward/node` has NO gospel** (only ARCHITECTURE.md) → folded into the no-gospel create-or-decline set
+(`avodah`/`elohim`/`infrastructure`/`mishpat`/`steward-node`). Island docs still to route+retire:
+elohim-storage {EDGE/P2P-ARCHITECTURE, REACH}, doorway-service {ARCHITECTURE, FEDERATION, SCALING, RECOVERY-*,
+EDGE-DESIGN}, holochain {LINK_ARCHITECTURE}.

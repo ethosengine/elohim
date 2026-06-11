@@ -1,3 +1,9 @@
+---
+id: doorway-service-gospel
+cites:
+  - resilience-protocol-spec | the resilience protocol + account-recovery canon (Parts V/VI) this gateway implements as the web2 projection — patron-CDN, social-recovery, creator-succession | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
+---
+
 # Doorway Service (Rust)
 
 doorway-service is the Rust implementation of the web2 projection of the elohim substrate — it makes the patron-CDN, the storage-stewardship surface, and the social-recovery flows reachable from the traditional internet. This file is the Rust-implementation orientation for the crate; architecture, trust model, routing model, and the no-per-domain-proxy-files discipline live in `../CLAUDE.md`. The deeper "why" — patron-CDN, account-takeover-recovery, creator-succession — lives in `../../genesis/docs/content/elohim-protocol/resilience/README.md` (Parts V and VI).

@@ -1,3 +1,7 @@
+---
+id: elohim-protocol-specification
+---
+
 # The Elohim Protocol: Content Addressing for Human Flourishing
 ## A Specification for Value-Bearing, Governance-Aware, Knowledge-Coupled Content Distribution
 

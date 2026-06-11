@@ -1,3 +1,7 @@
+---
+id: resilience-protocol-spec
+---
+
 # **Resilience — Mutual Aid as Substrate, Not Workaround**
 
 *The trillion-dollar problem of consumer technology, restated as a substrate question; the in-kind reciprocity primitive that dissolves it; and the recovery surface where the answer becomes testable.*

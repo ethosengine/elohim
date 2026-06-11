@@ -1,3 +1,9 @@
+---
+id: steward-device-gospel
+cites:
+  - iroh-libp2p-complementarity | the canon defining the steward device as a first-class Track 2 participant and the graduated-stewardship progression this desktop client realizes | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
+---
+
 # Elohim Steward - Desktop P2P Client
 
 Tauri 2.x desktop application that runs the full Elohim P2P stack locally: cryptographic identity (Holochain conductor), content storage (elohim-storage sidecar), and the Angular learning platform. The steward makes a user a direct participant in the network's web of mutual accountability - holding their own keys, validating peers, and contributing to the shared infrastructure that the community depends on.

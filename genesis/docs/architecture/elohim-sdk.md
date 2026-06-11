@@ -1,3 +1,7 @@
+---
+id: elohim-sdk-architecture
+---
+
 # The Elohim SDK
 
 > **Canon status:** Foundational. Read [stewardship-over-sovereignty](epr:stewardship-over-sovereignty), [rea-compute-commitment-primitive](epr:rea-compute-commitment-primitive), and [cradle-to-grave-capability-gradient](epr:cradle-to-grave-capability-gradient) first. This doc names the operational consumption surface that those canon principles produce in TypeScript.

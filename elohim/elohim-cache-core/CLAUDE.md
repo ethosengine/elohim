@@ -1,3 +1,9 @@
+---
+id: elohim-cache-core-gospel
+cites:
+  - tiered-quilt-stewardship-design | the tiered-quilt three-layer content model (Truth/Cache/Client) whose Cache layer this crate implements | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
+---
+
 # Elohim Cache Core — Protocol Caching Substrate
 
 The protocol's caching layer. Provides reach-aware LRU caching, tiered content resolution, write buffering for conductor protection, and disk-backed extraction caching for rendered content (HTML5 apps, etc.).

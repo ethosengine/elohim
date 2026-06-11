@@ -1,3 +1,9 @@
+---
+id: elohim-storage-gospel
+cites:
+  - tiered-quilt-stewardship-design | the protocol tiered storage substrate design (cold/warm/hot planes, RS sharding, reach enforcement) this crate implements as the operational data plane | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
+---
+
 # Elohim Storage - API Boundary Architecture
 
 This crate is the **single source of truth** for the HTTP API that serves TypeScript clients.

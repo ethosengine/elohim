@@ -1,3 +1,9 @@
+---
+id: holochain-integrity-layer-gospel
+cites:
+  - elohim-protocol-specification | the authoritative protocol specification this DNA implements as the distributed truth layer for notarized primitives (Economic, Identity, Content, Infrastructure) | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md
+---
+
 # Holochain DNA — Protocol Integrity Layer
 
 This directory contains the integrity and coordinator zomes that form the

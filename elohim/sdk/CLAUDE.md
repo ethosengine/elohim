@@ -1,3 +1,9 @@
+---
+id: elohim-sdk-gospel
+cites:
+  - elohim-sdk-architecture | the consumption-layer + five-library SDK boundary architecture this surface implements (not a source of truth — symbols reconstructible from substrate) | sha256:7d1a9b09f3c6592d | path: genesis/docs/architecture/elohim-sdk.md
+---
+
 # Elohim Protocol SDK
 
 The TypeScript surface of the Elohim Protocol — types and client libraries that applications use to interact with the protocol's distributed infrastructure.
