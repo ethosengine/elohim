@@ -108,7 +108,7 @@ events + governance/reach), and each design domain is a **cohesive lens that rei
 | Lens | Reinterprets the core as… | Archetype |
 |---|---|---|
 | lamad | learning · mastery · attribution over the nodes | LMS |
-| shefa | authoring + value flow — "how do I author the node," the R and how value moves | CMS × Mint/Analytics |
+| shefa | authoring + value flow + exchange — "how do I author the node," the R, stewarded inventories, the "stuff" axis | CMS × Mint/Analytics × Amazon/real-estate |
 | avodah | **process** — *the process as canon*; coordination, flows, risk pools | Cybersyn control room |
 | qahal | the social graph — community space of stewards | the network |
 | mishpat | consensus, election hygiene, **limits on the rest** | the constitution |

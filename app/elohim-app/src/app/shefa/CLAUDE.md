@@ -25,11 +25,15 @@ storage (fast), but writes should go through the conductor (truthful).
 
 ## Hazard: the tool's meta vs the EPRs it senses
 
-Shefa is more than a UX layer — it is a **sensemaking tool OVER EPRs**, three fused surfaces on one
+Shefa is more than a UX layer — it is a **sensemaking tool OVER EPRs**, four fused surfaces on one
 substrate: a **CMS** (the authoring lens — "how do I author the node": new doc / sheet / car / boat /
-epr-app …), a **filesystem/namespace** for EPRs (organize, browse, name), and a **value-flow analytics**
-view (the **R** in REA — resources, and how value flows through them). Think Google Drive × Mint/Monarch ×
-Analytics, *for the protocol* — but a CMS whose content lives one layer DOWN: the EPRs are notarized on the
+epr-app …), a **filesystem/namespace** for EPRs (organize, browse, name), an **exchange/marketplace**
+surface (the Amazon/Walmart/real-estate "stuff" axis — and exchanges are themselves AUTHORED EPRs: a
+storefront EPR / requests-&-offers-admin EPR *defines* the exchange in the Drive view; the exchange
+*presents* what's offered; each steward carries their own requests + wishlists), and **Flows** — the
+Mint/Monarch lens over **my stewarded inventories** (the **R** in REA — resources, and how value moves
+through them). Think Google Drive × Mint/Monarch × Analytics × Amazon, *for the protocol* — but a CMS
+whose content lives one layer DOWN: the EPRs are notarized on the
 substrate; shefa authors *into* and projects *from* them, never owning them the way a normal CMS owns its
 database. That inversion IS the hazard: **shefa confuses the meta its tool is concerned with (dashboards,
 aggregations, the authoring chrome, the "filesystem" framing) with the underlying EPRs it makes sense
