@@ -36,7 +36,19 @@ Authorship discipline rules come from the avodah ceremony pilot (see its chronic
 2. **Liveness-check** the island's central design claims against code/manifest (is the designed system
    live? → CANONIZE; superseded? → harvest+retire).
 3. **Duplication check** for relocate candidates; **prior-art** via `spec-coherence-index.py --query`
-   (compose with existing seeds, never fork).
+   (compose with existing seeds, never fork) — and sweep **same-day sibling-session artifacts**
+   (storage lesson: a sibling's hours-old backlog entry absorbed a whole disposition as one
+   origin-note append).
+4. **Code sweeps span ALL bundles and crates**, not just the locus tree (qahal lesson: two of three
+   agents independently asserted "never typed" for vocabulary living behind a cross-bundle `@app/*`
+   alias in a different bundle).
+5. **Liveness verdicts at mechanism granularity** — distinguish idea-won / mechanism-shipped /
+   stub-with-comment (storage lesson: `__doorway_routes` introspection is an explicit stub while the
+   idea landed via steward self-registration). Check for **philosophy inversion**, not just stale
+   detail (storage REACH.md's delivery-side filtering was *inverted* by live author-side earning).
+   Verify liveness labels and version claims against the **build graph**, never prose — a crate can
+   compile into every artifact while a STATUS line calls it dormant (rna/hc-rna), and a version-split
+   "fact" in gospel survived five sessions before the lockfile falsified it (libp2p 0.54.1, both crates).
 
 ## Phase 1 — authorship fan-out (staged drafts, one agent per disposition group)
 
@@ -47,6 +59,16 @@ uncertainty = explicit "OPEN QUESTION:" · **drafts to a staging dir, return SHO
 in returns blow context and weaken the gate). Backlog drafts follow `timeline/CONVENTIONS.md` frontmatter;
 history drafts are museum-shaped (`tier: history`); the canonical seed separates AS-IMPLEMENTED (cited
 per-mechanic) from §Vision-remainder (gap ledger → backlog companion).
+
+Further rails earned by the six-pillar fan-out: **consumers-exist check** before any code-canonical
+blessing — a live enum with zero consumers gets recorded, not blessed (elohim-pillar lesson: one agent
+proposed "code-canonical" for a type another agent proved consumer-less). **Co-owner boundary lines
+quoted verbatim in agent prompts work** (the mishpat gospel one-liner kept all qahal drafts
+boundary-clean). The **seed bar is high**: across six pillars only two seeds were earned
+(doorway two-axis-scaling, dna-upgrade-governance — both verified-live-with-no-other-home); four
+pillars placed none because every still-true claim was already homed — a seed that forks canon is
+worse than no seed. Single-file islands still need the full disposition fan-out (qahal: 582 lines →
+history + 2 backlog + gospel-reconcile).
 
 ## Phase 2 — serial placement (operator-side; cite tooling is shared state)
 
@@ -65,14 +87,26 @@ per-mechanic) from §Vision-remainder (gap ledger → backlog companion).
    reported a code-comment defect in present tense after the session had already repaired it. At
    placement, sweep every draft for references to (a) island files on the retirement list and (b)
    defects the Phase 0-1 drift repairs already fixed.
-6. Seal doc-roots (`cite-gen --seal`, serial); verify each. Harvested cross-bundle contracts → one-line
-   gospel rails, not new docs.
+6. Seal doc-roots (`cite-gen --seal`, serial); verify each. **Order matters**: apply gospel
+   drift-repairs BEFORE sealing docs that cite the gospel (envelopes fingerprint the post-repair
+   body), and run `cite-describe` relationship hints while context is hot (sealing alone emits
+   title-default descs). Harvested cross-bundle contracts → one-line gospel rails, not new docs.
+7. **Every placed history record gets a row in `history/INDEX.md`** (one-line lesson, house style) —
+   three fan-out sessions missed this independently before it became a step.
+8. Provenance comments in `derived_from:` use **anticipated-retirement phrasing** ("retired to git
+   <date>") — confirmed to read correctly across a deferred gate; if the gate later rejects, it's a
+   one-line soften.
 
 ## Phase 3 — the gate, then retirement
 
 1. Present ONE disposition map (file → recomposed-into) + the retirement list. Operator gates once.
+   When sessions run dispatched (gate deferred/consolidated), split edits into **drift-repairs**
+   (true regardless of retirement — apply pre-gate) vs **deletion-presupposing** (prepare exact
+   old/new pairs, defer); deferred pairs must **existence-check their replacement targets**, not just
+   their old-text anchors (doorway prepared repairs pointing at a spec that was itself deleted).
 2. `git rm` the island → **live-ref sweep** (lineage prose mentions are fine; fix `cites:` entries and
-   "tracked in <island-file>" lines that now point at nothing).
+   "tracked in <island-file>" lines that now point at nothing). Islands that cross-point at each
+   other retire in ONE commit (no dead-pointer window).
 3. Update the locus registries: the pillar's `.claude/subject-routing.yaml` `docs_island` line + the
    census entry.
 
@@ -82,6 +116,11 @@ Verify all placed docs (`cite-gen --verify`), `locus-drift.py` back at stasis fo
 commit, and **fold any new lesson back into this recipe** (it is the living artifact).
 
 ## Fan-out prompts (paste-ready, one per session — firing order)
+
+> **STATUS 2026-06-11: ALL SIX FIRED AND PLACED** (orchestrated dispatch, Phases 0-2 + verify per
+> pillar; holochain split into dna/ + docs/ passes). Placement commits and the consolidated
+> retirement gate live at `.claude/data/island-recompose-gate/GATE.md` — retirement awaits that
+> single operator gate. The blocks below are retained as the reusable template shape.
 
 Each block below opens its own session verbatim. The RAILS are identical for all and live in this
 file's Phases 1-4 (the session reads this recipe first); each block carries only what is pillar-specific:
