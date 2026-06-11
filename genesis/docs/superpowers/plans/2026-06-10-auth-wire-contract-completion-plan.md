@@ -78,7 +78,7 @@ platform tokenStore adapter in the imagodei pillar.
       `isRefreshing` guard maps onto `refresh()`
 - [x] Existing auth.service spec green + new tests for the adapter (SSR path included);
       `pnpm test` (app) for the imagodei subset; lint clean
-- [ ] Verify in the dev loop: `pnpm look http://localhost:4200/<auth-surface>` renders login OK
+- [x] Verify in the dev loop: `pnpm look http://localhost:4200/<auth-surface>` renders login OK
       (eyes check — capture.json clean of new console errors). Commit.
 
 ## Task 3: doorway-app `auth-state.service.ts` onto the client
@@ -110,7 +110,10 @@ platform tokenStore adapter in the imagodei pillar.
 - **T2 LANDED + reviewed ✅/APPROVED:** df41f874d — full app suite 214 files / 4612 tests; SSR
   spy-proof real; storage contract preserved (expiry canonicalized w/ migrate-on-read); seconds/ms
   timer math traced both directions; consolidation bypassed the OAuth provider's drifted snake_case
-  refresh parse. T3 (doorway-app) dispatched; T4 pending.
+  refresh parse. T3 (doorway-app) dispatched; T4 pending. T2 dev-loop eyes check done 2026-06-11: /identity
+  (threshold login) renders clean with the migrated service against live-data profile — zero
+  pageErrors/httpErrors; single console error is the backlogged :8888 health probe. Note:
+  /login and /dashboard are NOT routes (auth surface = /identity).
 
 ## Out of scope
 
