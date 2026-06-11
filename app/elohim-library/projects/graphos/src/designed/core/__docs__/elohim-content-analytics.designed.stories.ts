@@ -32,18 +32,20 @@ const ANALYTICS_TOKENS_LIGHT = `
   --elohim-analytics-padding:      1.25rem;
   --elohim-analytics-bg:           color-mix(in oklch, var(--el-stone) 5%, var(--el-cream));
   --elohim-analytics-fg:           var(--el-stone);
-  --elohim-analytics-title-size:   1rem;
+  --elohim-analytics-title-font:   var(--el-font-display);
+  --elohim-analytics-title-size:   1.125rem;
   --elohim-analytics-value-size:   1.75rem;
   --elohim-analytics-value-weight: 700;
   --elohim-analytics-label-size:   0.75rem;
   --elohim-analytics-label-color:  var(--el-stone);
   --elohim-analytics-grid-gap:     1rem;
-  --elohim-analytics-note-size:    0.7rem;
-  --elohim-analytics-note-color:   color-mix(in oklch, var(--el-stone) 70%, transparent);
+  --elohim-analytics-note-size:    0.75rem;
+  --elohim-analytics-note-color:   var(--el-stone);
 `;
 
 const ANALYTICS_TOKENS_DARK = `
   --elohim-analytics-padding:      1.25rem;
+  --elohim-analytics-title-font:   var(--el-font-display);
   --elohim-analytics-bg:           color-mix(in oklch, var(--el-starlight) 6%, var(--el-night));
   --elohim-analytics-fg:           var(--el-starlight);
   --elohim-analytics-title-size:   1rem;
@@ -53,7 +55,7 @@ const ANALYTICS_TOKENS_DARK = `
   --elohim-analytics-label-color:  color-mix(in oklch, var(--el-starlight) 70%, transparent);
   --elohim-analytics-grid-gap:     1rem;
   --elohim-analytics-note-size:    0.7rem;
-  --elohim-analytics-note-color:   color-mix(in oklch, var(--el-starlight) 50%, transparent);
+  --elohim-analytics-note-color:   color-mix(in oklch, var(--el-starlight) 85%, transparent);
 `;
 
 // ---------------------------------------------------------------------------
@@ -100,7 +102,11 @@ export const Light: Story = {
       </div>
     `,
   ],
-  render: () => html`<elohim-content-analytics .metrics=${RICH_METRICS}></elohim-content-analytics>`,
+  render: () =>
+    html`<elohim-content-analytics
+      style="display: block; border-block-start: 2px solid var(--el-amber);"
+      .metrics=${RICH_METRICS}
+    ></elohim-content-analytics>`,
 };
 
 export const Dark: Story = {
@@ -119,5 +125,9 @@ export const Dark: Story = {
       </div>
     `,
   ],
-  render: () => html`<elohim-content-analytics .metrics=${RICH_METRICS}></elohim-content-analytics>`,
+  render: () =>
+    html`<elohim-content-analytics
+      style="display: block; border-block-start: 2px solid var(--el-amber);"
+      .metrics=${RICH_METRICS}
+    ></elohim-content-analytics>`,
 };
