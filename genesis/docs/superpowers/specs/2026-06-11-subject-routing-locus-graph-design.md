@@ -100,6 +100,36 @@ app-manifest — avodah/elohim/mishpat) earns a gospel that cites the substrate 
 crate** (steward-node, under the compute-hub-storage orchestration epic) cites the epic *above* it, not a
 domain of its own; a **marginal** candidate (infrastructure) is held until ownership is decided.
 
+### 2b.1 The domain layer is a LENS layer (operator articulation, 2026-06-11)
+
+The domains are not partitions of the primitive set — there is **ONE shared core** (EPR content atoms + REA
+events + governance/reach), and each design domain is a **cohesive lens that reinterprets that core**:
+
+| Lens | Reinterprets the core as… | Archetype |
+|---|---|---|
+| lamad | learning · mastery · attribution over the nodes | LMS |
+| shefa | authoring + value flow — "how do I author the node," the R and how value moves | CMS × Mint/Analytics |
+| avodah | **process** — *the process as canon*; coordination, flows, risk pools | Cybersyn control room |
+| qahal | the social graph — community space of stewards | the network |
+| mishpat | consensus, election hygiene, **limits on the rest** | the constitution |
+| imagodei | identity ground every lens references | — |
+| elohim | the cross-cutting coordination vocabulary itself | substrate-adjacent |
+
+A single `EconomicEvent` *is* value flow to shefa, process telemetry to avodah, attributable contribution to
+lamad. Two consequences the avodah pilot proved load-bearing:
+
+- **Lens overlap is the model working, not duplication.** Mutual risk-pooling exists in avodah (process view:
+  `CoveragePolicy`, `MemberRiskProfile`) AND shefa (value view: mutual-credit, premium gates) — same core
+  primitive, two cohesive readings. A census/triage that treats this as "misfiled" is applying a
+  partition model to a lens model.
+- **The meta-vs-substrate hazard is universal, per-lens.** Every lens risks confusing its reinterpretation
+  with the core it senses (shefa: the CMS owning vs projecting the EPRs; avodah: the control room owning vs
+  reading the events). Each lens gospel carries its own form of the hazard rail.
+
+Ceremony refinement from the avodah pilot: lens agents produce confident **category/notarization claims**;
+require a substrate citation (manifest/schema/zome wiring) for any such claim — the pilot's only fictions
+were uncited architectural assertions ("Category C", invented memory slugs), caught by verification.
+
 ## 3. Parent-agnostic composition (the cascade)
 
 A child locus must work **standalone** (a submodule checked out alone is a complete repo) — it must NOT

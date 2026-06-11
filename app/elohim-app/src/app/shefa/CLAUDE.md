@@ -23,6 +23,22 @@ If it's notarized on the DHT and projected to storage with a
 `dht_anchor_hash`, it's cryptographically provable. Shefa reads from
 storage (fast), but writes should go through the conductor (truthful).
 
+## Hazard: the tool's meta vs the EPRs it senses
+
+Shefa is more than a UX layer — it is a **sensemaking tool OVER EPRs**, three fused surfaces on one
+substrate: a **CMS** (the authoring lens — "how do I author the node": new doc / sheet / car / boat /
+epr-app …), a **filesystem/namespace** for EPRs (organize, browse, name), and a **value-flow analytics**
+view (the **R** in REA — resources, and how value flows through them). Think Google Drive × Mint/Monarch ×
+Analytics, *for the protocol* — but a CMS whose content lives one layer DOWN: the EPRs are notarized on the
+substrate; shefa authors *into* and projects *from* them, never owning them the way a normal CMS owns its
+database. That inversion IS the hazard: **shefa confuses the meta its tool is concerned with (dashboards,
+aggregations, the authoring chrome, the "filesystem" framing) with the underlying EPRs it makes sense
+FROM.** The CMS instinct to own content is exactly the trap. When a shefa view feels like it *owns* a
+number or a node, that is the smell — it should be reading the substrate, not authoring it. (The
+sensemaking-tool form of "storage is projection, not truth"; every lens carries its own form of this hazard —
+see the lens model in `2026-06-11-subject-routing-locus-graph-design.md` §2b.1. Shefa's own-session cleanup
+must hold this line.)
+
 ## Subject home & citation discipline (this pillar is a CONSUMER)
 
 This Angular pillar does not OWN the shefa subject — it consumes it. The protocol primitives
