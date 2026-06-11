@@ -495,6 +495,7 @@ function loadContentFiles(): ConceptJson[] {
  * HARD-FAILS on non-canonical input — no silent coalesce. Legacy keys
  * (invited, local, neighborhood, municipal) are NOT canonical and throw here.
  */
+// NOTE: genesis/data/lamad/paths/love-map-adam-eve.json currently has reach="invited" (non-canonical) — seed hard-fails until reconciled in slice 3 / Task 9. See reach-floor-foundation-plan.md.
 function assertReach(v: string, ctx: string): Reach {
   if (!isReach(v)) {
     throw new Error(
@@ -546,13 +547,15 @@ function loadReachOverrides(): Map<string, string> {
         // assignment comes from JSON.parse (untyped) — coerce to string so the
         // isReach guard can narrow to Reach for the typed ordinal lookup.
         const candidateReach = String(assignment.reach);
-        // Compare by the generated ordinal; non-canonical values rank lowest
-        // (0) so they never win the raise-only contest. Canonical enforcement
-        // happens at resolution time in earnedReach (HARD-FAIL, not here).
+        // Only STORE canonical values: account-package data is external input
+        // that degrades gracefully — a non-canonical advisory is dropped here at
+        // load time rather than stored and thrown on at resolution. Canonical
+        // enforcement for AUTHORED values still HARD-FAILS in earnedReach (and
+        // earnedReach keeps its own assertReach on any advisory passed directly).
         const existingOrder = existing && isReach(existing) ? REACH_OPENNESS[existing] : -1;
         const newOrder = isReach(candidateReach) ? REACH_OPENNESS[candidateReach] : 0;
 
-        if (newOrder > existingOrder) {
+        if (isReach(candidateReach) && newOrder > existingOrder) {
           overrides.set(assignment.contentId, candidateReach);
         }
       }
@@ -1167,6 +1170,22 @@ async function main() {
       return input;
     });
     console.log(`   Transformed ${formatCount(contentInputs.length)} items`);
+
+    // Inverted-burden surprise guard: the `private` default silently migrates
+    // ungraded content to private. Warn the operator when a large fraction of
+    // resolved reach landed on `private` AND account-packages is off (so they
+    // can add reach fields or pass --use-account-packages if unexpected).
+    // Robust by construction — a pure count over the transformed inputs.
+    if (!USE_ACCOUNT_PACKAGES && contentInputs.length > 0) {
+      const privateCount = contentInputs.filter(c => c.reach === 'private').length;
+      if (privateCount / contentInputs.length >= 0.5) {
+        console.warn(
+          `\nWARNING: ${privateCount}/${contentInputs.length} content items resolved to 'private' ` +
+          `(inverted-burden default; no authored reach). ` +
+          `Add reach fields or use --use-account-packages if unexpected.`
+        );
+      }
+    }
 
     console.log(`\nSeeding content to database...`);
     const BATCH_SIZE = 100;

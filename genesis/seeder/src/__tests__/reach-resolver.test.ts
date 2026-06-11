@@ -16,6 +16,9 @@ describe('earnedReach (inverted burden)', () => {
   it('HARD-FAILS on a non-canonical reach value (no silent coalesce)', () => {
     expect(() => earnedReach({ authored: 'invited', advisory: undefined })).toThrow(/non-canonical reach/i);
   });
+  it('HARD-FAILS on a non-canonical advisory value (defense-in-depth)', () => {
+    expect(() => earnedReach({ authored: undefined, advisory: 'invited' })).toThrow(/non-canonical reach.*archetype advisory/i);
+  });
   it('uses the generated ordinal, not a local copy', () => {
     expect(REACH_OPENNESS.private).toBe(1);
     expect(REACH_OPENNESS.commons).toBe(8);
