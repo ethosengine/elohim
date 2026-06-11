@@ -10,9 +10,9 @@ use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper::{Method, Request, Response, StatusCode};
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
-use crate::auth::{extract_token_from_header, ApiKeyValidator, JwtValidator, PermissionLevel};
+use crate::auth::{extract_http_permission, PermissionLevel};
 use crate::server::AppState;
 
 pub async fn handle_elohim_agent_request(
@@ -43,62 +43,6 @@ pub async fn handle_elohim_agent_request(
 
     let agent_url = resolve_agent_url(&state).await;
     forward_to_agent(req, &agent_url, sidecar_path).await
-}
-
-/// Extract permission level from HTTP request headers.
-///
-/// Checks (in order): Authorization header (JWT), X-API-Key header, dev-mode fallback.
-/// This is the HTTP equivalent of websocket.rs `extract_permission`, but returns
-/// `PermissionLevel::Public` instead of `Err` when no auth is found (caller decides
-/// whether Public is sufficient).
-fn extract_http_permission(state: &AppState, req: &Request<Incoming>) -> PermissionLevel {
-    // Try JWT from Authorization header
-    let auth_header = req
-        .headers()
-        .get(hyper::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
-
-    if let Some(token) = extract_token_from_header(auth_header) {
-        if let Some(level) = validate_jwt_token(state, token) {
-            return level;
-        }
-    }
-
-    // Try API key from X-API-Key header
-    let api_key = req.headers().get("x-api-key").and_then(|v| v.to_str().ok());
-    let api_validator = ApiKeyValidator::new(
-        state.args.api_key_authenticated.clone(),
-        state.args.api_key_admin.clone(),
-    );
-    if let Some(permission) = api_validator.validate(api_key) {
-        if api_key.is_some() {
-            return permission;
-        }
-    }
-
-    // Dev mode: allow authenticated-level access for local development
-    if state.args.dev_mode {
-        info!("Dev mode: granting authenticated access for elohim agent");
-        return PermissionLevel::Authenticated;
-    }
-
-    PermissionLevel::Public
-}
-
-fn validate_jwt_token(state: &AppState, token: &str) -> Option<PermissionLevel> {
-    let jwt = if state.args.dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        state.args.jwt_secret.as_ref().and_then(|secret| {
-            JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()
-        })?
-    };
-    let result = jwt.verify_token(token);
-    if result.valid {
-        result.claims.map(|c| c.permission_level)
-    } else {
-        None
-    }
 }
 
 /// Resolve which agent URL to use — try elohim-node first, fall back to sidecar.
@@ -241,6 +185,7 @@ async fn forward_to_agent(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::ApiKeyValidator;
     use crate::config::Args;
     use clap::Parser;
 

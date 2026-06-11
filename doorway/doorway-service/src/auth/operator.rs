@@ -304,7 +304,7 @@ mod tests {
         let snap = snapshot(vec!["*"], 30);
         let age = snapshot_age(&snap);
         // Allow 5s slack for test scheduling.
-        assert!(age >= 30 && age < 35, "expected ~30s, got {}", age);
+        assert!((30..35).contains(&age), "expected ~30s, got {age}");
     }
 
     #[test]

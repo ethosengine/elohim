@@ -2350,17 +2350,31 @@ async fn handle_request(
             to_boxed(routes::admin_cache::cache_stats(Arc::clone(&state)).await)
         }
         (Method::POST, "/admin/cache/disable") => {
-            to_boxed(routes::admin_cache::cache_disable(Arc::clone(&state)).await)
+            match routes::seed::require_seed_authority(&state, &req) {
+                Ok(()) => to_boxed(routes::admin_cache::cache_disable(Arc::clone(&state)).await),
+                Err(resp) => to_boxed(resp),
+            }
         }
         (Method::POST, "/admin/cache/enable") => {
-            to_boxed(routes::admin_cache::cache_enable(Arc::clone(&state)).await)
+            match routes::seed::require_seed_authority(&state, &req) {
+                Ok(()) => to_boxed(routes::admin_cache::cache_enable(Arc::clone(&state)).await),
+                Err(resp) => to_boxed(resp),
+            }
         }
         (Method::POST, p) if p.starts_with("/admin/cache/clear/") => {
-            let slug = p.strip_prefix("/admin/cache/clear/").unwrap_or("");
-            to_boxed(routes::admin_cache::cache_clear_slug(Arc::clone(&state), slug).await)
+            match routes::seed::require_seed_authority(&state, &req) {
+                Ok(()) => {
+                    let slug = p.strip_prefix("/admin/cache/clear/").unwrap_or("");
+                    to_boxed(routes::admin_cache::cache_clear_slug(Arc::clone(&state), slug).await)
+                }
+                Err(resp) => to_boxed(resp),
+            }
         }
         (Method::POST, "/admin/cache/warm") => {
-            to_boxed(routes::admin_cache::cache_warm(Arc::clone(&state)).await)
+            match routes::seed::require_seed_authority(&state, &req) {
+                Ok(()) => to_boxed(routes::admin_cache::cache_warm(Arc::clone(&state)).await),
+                Err(resp) => to_boxed(resp),
+            }
         }
 
         // ====================================================================
