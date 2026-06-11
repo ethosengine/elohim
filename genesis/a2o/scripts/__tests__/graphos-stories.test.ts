@@ -14,7 +14,17 @@ import {
   type StoryEntry,
 } from '../lib/graphos-stories.js';
 
-function entry(id: string, title: string, name: string, type: 'story' | 'docs' = 'story'): StoryEntry {
+const COMPUTE_TILE = 'elohim-compute-tile';
+const COMPUTE_TILE_PREFIX = 'designed-core-elohim-compute-tile';
+const COMPUTE_TILE_DARK = 'designed-core-elohim-compute-tile--dark';
+const COMPUTE_TILE_TITLE = 'Designed/Core/elohim-compute-tile';
+
+function entry(
+  id: string,
+  title: string,
+  name: string,
+  type: 'story' | 'docs' = 'story'
+): StoryEntry {
   return { id, title, name, type };
 }
 
@@ -29,14 +39,10 @@ function index(): StorybookIndex {
       ),
       'designed-core-elohim-compute-tile--standard': entry(
         'designed-core-elohim-compute-tile--standard',
-        'Designed/Core/elohim-compute-tile',
+        COMPUTE_TILE_TITLE,
         'Standard'
       ),
-      'designed-core-elohim-compute-tile--dark': entry(
-        'designed-core-elohim-compute-tile--dark',
-        'Designed/Core/elohim-compute-tile',
-        'Dark'
-      ),
+      [COMPUTE_TILE_DARK]: entry(COMPUTE_TILE_DARK, COMPUTE_TILE_TITLE, 'Dark'),
       'designed-foundations-compute-capacity-tokens--docs': entry(
         'designed-foundations-compute-capacity-tokens--docs',
         'Designed/Foundations/Compute Capacity Tokens',
@@ -56,7 +62,7 @@ void describe('componentPrefix', () => {
   void it('returns the id prefix before --', () => {
     assert.equal(
       componentPrefix('designed-core-elohim-compute-tile--standard'),
-      'designed-core-elohim-compute-tile'
+      COMPUTE_TILE_PREFIX
     );
   });
   void it('returns the whole id when there is no --', () => {
@@ -66,21 +72,19 @@ void describe('componentPrefix', () => {
 
 void describe('matchesComponent (segment-aligned)', () => {
   void it('matches when prefix ends with -<component>', () => {
-    assert.ok(
-      matchesComponent('designed-core-elohim-compute-tile--dark', 'elohim-compute-tile')
-    );
+    assert.ok(matchesComponent(COMPUTE_TILE_DARK, COMPUTE_TILE));
   });
   void it('matches exact prefix', () => {
-    assert.ok(matchesComponent('elohim-compute-tile--dark', 'elohim-compute-tile'));
+    assert.ok(matchesComponent('elohim-compute-tile--dark', COMPUTE_TILE));
   });
   void it('does NOT match a bare substring tail (tile)', () => {
-    assert.equal(matchesComponent('designed-core-elohim-compute-tile--dark', 'tile'), false);
+    assert.equal(matchesComponent(COMPUTE_TILE_DARK, 'tile'), false);
   });
 });
 
 void describe('familyOf', () => {
   void it('lowercases the first title segment', () => {
-    assert.equal(familyOf(entry('x--y', 'Designed/Core/elohim-compute-tile', 'Y')), 'designed');
+    assert.equal(familyOf(entry('x--y', COMPUTE_TILE_TITLE, 'Y')), 'designed');
   });
 });
 
@@ -106,19 +110,19 @@ void describe('groupByComponent', () => {
       [...groups.keys()],
       [
         'default-core-elohim-compute-tile',
-        'designed-core-elohim-compute-tile',
+        COMPUTE_TILE_PREFIX,
         'designed-foundations-compute-capacity-tokens',
         'designed-core-elohim-presence-badge',
       ]
     );
-    assert.equal(groups.get('designed-core-elohim-compute-tile')?.length, 2);
+    assert.equal(groups.get(COMPUTE_TILE_PREFIX)?.length, 2);
   });
 });
 
 void describe('suggestComponents', () => {
   void it('suggests component prefixes containing the name, deduped', () => {
     const got = suggestComponents(index(), 'compute');
-    assert.ok(got.includes('designed-core-elohim-compute-tile'));
+    assert.ok(got.includes(COMPUTE_TILE_PREFIX));
     assert.ok(got.includes('default-core-elohim-compute-tile'));
     assert.equal(new Set(got).size, got.length);
   });
@@ -129,12 +133,12 @@ void describe('suggestComponents', () => {
 
 void describe('storiesForSheet', () => {
   void it('selects story-type entries for the component across families', () => {
-    const got = storiesForSheet(index(), 'elohim-compute-tile');
+    const got = storiesForSheet(index(), COMPUTE_TILE);
     assert.equal(got.length, 3);
     assert.ok(got.every(e => e.type === 'story'));
   });
   void it('narrows by family', () => {
-    const got = storiesForSheet(index(), 'elohim-compute-tile', 'designed');
+    const got = storiesForSheet(index(), COMPUTE_TILE, 'designed');
     assert.equal(got.length, 2);
   });
   void it('excludes docs entries', () => {
@@ -145,18 +149,16 @@ void describe('storiesForSheet', () => {
 
 void describe('sheetHtml', () => {
   void it('renders one labeled iframe per story, grouped by family, with grid cols', () => {
-    const entries = storiesForSheet(index(), 'elohim-compute-tile');
+    const entries = storiesForSheet(index(), COMPUTE_TILE);
     const html = sheetHtml({
-      component: 'elohim-compute-tile',
+      component: COMPUTE_TILE,
       base: 'https://storybook.elohim.host',
       entries,
       cell: { width: 420, height: 320 },
       cols: 3,
     });
     assert.ok(
-      html.includes(
-        'iframe.html?id=designed-core-elohim-compute-tile--standard&amp;viewMode=story'
-      )
+      html.includes('iframe.html?id=designed-core-elohim-compute-tile--standard&amp;viewMode=story')
     );
     assert.equal((html.match(/<iframe /g) ?? []).length, 3);
     assert.ok(html.includes('<h2>default</h2>'));
@@ -168,7 +170,7 @@ void describe('sheetHtml', () => {
     const html = sheetHtml({
       component: 'x',
       base: 'https://s',
-      entries: [entry('x--a', 'Default/x', '<b>&'), ],
+      entries: [entry('x--a', 'Default/x', '<b>&')],
       cell: { width: 100, height: 100 },
       cols: 1,
     });

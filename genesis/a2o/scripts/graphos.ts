@@ -62,9 +62,58 @@ export interface GraphosCommand {
 }
 
 function parseWxH(val: string | undefined, flag: string): { width: number; height: number } {
-  const m = /^(\d+)x(\d+)$/.exec(val ?? '');
-  if (!m) throw new Error(`${flag} expects WxH (e.g. 420x320), got: ${val}`);
-  return { width: Number(m[1]), height: Number(m[2]) };
+  const [wStr, hStr, ...extra] = (val ?? '').split('x');
+  const w = Number(wStr);
+  const h = Number(hStr);
+  if (extra.length > 0 || !Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1)
+    throw new Error(`${flag} expects WxH (e.g. 420x320), got: ${val}`);
+  return { width: w, height: h };
+}
+
+/** Strip one or more trailing slashes from a URL base string. */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return end === s.length ? s : s.slice(0, end);
+}
+
+/**
+ * Apply one flag+val pair to `cmd`. Returns true if `val` was consumed
+ * (i.e. caller should advance the index past the value argument).
+ */
+function applyFlag(cmd: GraphosCommand, flag: string, val: string | undefined): boolean {
+  switch (flag) {
+    case '--base':
+      if (!val) throw new Error(`--base expects a URL`);
+      cmd.base = stripTrailingSlashes(val);
+      return true;
+    case '--out':
+      if (!val) throw new Error(`--out expects a slug`);
+      cmd.out = val;
+      return true;
+    case '--docs':
+      cmd.docs = true;
+      return false;
+    case '--family':
+      if (val !== 'designed' && val !== 'default')
+        throw new Error(`--family expects designed|default, got: ${val}`);
+      cmd.family = val;
+      return true;
+    case '--cell':
+      cmd.cell = parseWxH(val, '--cell');
+      return true;
+    case '--cols': {
+      const n = Number(val);
+      if (!Number.isInteger(n) || n < 1) throw new Error(`--cols expects a positive integer`);
+      cmd.cols = n;
+      return true;
+    }
+    case '--viewport':
+      cmd.viewport = parseWxH(val, '--viewport');
+      return true;
+    default:
+      throw new Error(`Unknown flag: ${flag}\n${USAGE}`);
+  }
 }
 
 export function parseGraphosArgs(argv: string[]): GraphosCommand {
@@ -81,46 +130,7 @@ export function parseGraphosArgs(argv: string[]): GraphosCommand {
   if (args[0] && !args[0].startsWith('--')) cmd.arg = args.shift();
   if ((verb === 'story' || verb === 'sheet') && !cmd.arg) throw new Error(USAGE);
   for (let i = 0; i < args.length; i++) {
-    const flag = args[i];
-    const val = args[i + 1];
-    switch (flag) {
-      case '--base':
-        if (!val) throw new Error(`--base expects a URL`);
-        cmd.base = val.replace(/\/+$/, '');
-        i++;
-        break;
-      case '--out':
-        if (!val) throw new Error(`--out expects a slug`);
-        cmd.out = val;
-        i++;
-        break;
-      case '--docs':
-        cmd.docs = true;
-        break;
-      case '--family':
-        if (val !== 'designed' && val !== 'default')
-          throw new Error(`--family expects designed|default, got: ${val}`);
-        cmd.family = val;
-        i++;
-        break;
-      case '--cell':
-        cmd.cell = parseWxH(val, '--cell');
-        i++;
-        break;
-      case '--cols': {
-        const n = Number(val);
-        if (!Number.isInteger(n) || n < 1) throw new Error(`--cols expects a positive integer`);
-        cmd.cols = n;
-        i++;
-        break;
-      }
-      case '--viewport':
-        cmd.viewport = parseWxH(val, '--viewport');
-        i++;
-        break;
-      default:
-        throw new Error(`Unknown flag: ${flag}\n${USAGE}`);
-    }
+    if (applyFlag(cmd, args[i], args[i + 1])) i++;
   }
   return cmd;
 }
@@ -138,7 +148,7 @@ async function fetchIndex(base: string): Promise<StorybookIndex> {
 }
 
 function unreachableMsg(base: string, detail: string): string {
-  const local = /localhost|127\.0\.0\.1/.test(base);
+  const local = base.includes('localhost') || base.includes('127.0.0.1');
   const hint = local
     ? `No storybook at ${base} — start it with:\n  cd app/elohim-library && pnpm storybook`
     : `Storybook at ${base} is unreachable (site or network down).`;
@@ -154,7 +164,8 @@ function cmdList(index: StorybookIndex, filter?: string): void {
     console.log(`${prefix}  (${entries.length})`);
     console.log(`    ${names.join(' · ')}`);
   }
-  console.log(`\n${total} entries in ${groups.size} components${filter ? ` matching "${filter}"` : ''}`);
+  const matching = filter ? ` matching "${filter}"` : '';
+  console.log(`\n${total} entries in ${groups.size} components${matching}`);
 }
 
 async function cmdStory(index: StorybookIndex, cmd: GraphosCommand): Promise<boolean> {
@@ -164,7 +175,9 @@ async function cmdStory(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
     const near = suggestComponents(index, componentPrefix(id));
     throw new Error(
       `Unknown story id: ${id}` +
-        (near.length ? `\nNear matches:\n  ${near.join('\n  ')}` : `\nTry: pnpm graphos list <filter>`)
+        (near.length
+          ? `\nNear matches:\n  ${near.join('\n  ')}`
+          : `\nTry: pnpm graphos list <filter>`)
     );
   }
   const mode = cmd.docs || entry.type === 'docs' ? 'docs' : 'story';

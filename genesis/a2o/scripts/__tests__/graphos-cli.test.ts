@@ -20,9 +20,15 @@ void describe('parseGraphosArgs', () => {
   });
   void it('parses story flags', () => {
     const cmd = parseGraphosArgs([
-      'story', 'designed-core-elohim-compute-tile--standard',
-      '--docs', '--base', 'http://localhost:6006/', '--out', 'my-slug',
-      '--viewport', '800x600',
+      'story',
+      'designed-core-elohim-compute-tile--standard',
+      '--docs',
+      '--base',
+      'http://localhost:6006/',
+      '--out',
+      'my-slug',
+      '--viewport',
+      '800x600',
     ]);
     assert.equal(cmd.verb, 'story');
     assert.equal(cmd.docs, true);
@@ -37,10 +43,7 @@ void describe('parseGraphosArgs', () => {
     assert.equal(cmd.family, undefined);
   });
   void it('parses --family and validates it', () => {
-    assert.equal(
-      parseGraphosArgs(['sheet', 'x', '--family', 'designed']).family,
-      'designed'
-    );
+    assert.equal(parseGraphosArgs(['sheet', 'x', '--family', 'designed']).family, 'designed');
     assert.throws(() => parseGraphosArgs(['sheet', 'x', '--family', 'bogus']));
   });
   void it('parses --cell and --cols', () => {
@@ -66,6 +69,7 @@ void describe('containedSlug', () => {
   });
   void it('rejects traversal and absolute slugs', () => {
     assert.throws(() => containedSlug('../../etc'));
+    // eslint-disable-next-line sonarjs/publicly-writable-directories -- asserting /tmp traversal is BLOCKED, not used
     assert.throws(() => containedSlug('/tmp/exfil'));
   });
 });
@@ -74,7 +78,9 @@ void describe('groupRows', () => {
   const e = (id: string, title: string): StoryEntry => ({ id, title, name: 'X', type: 'story' });
   void it('yields ceil(rows) per family', () => {
     const entries = [
-      e('default-a--1', 'Default/A'), e('default-a--2', 'Default/A'), e('default-a--3', 'Default/A'),
+      e('default-a--1', 'Default/A'),
+      e('default-a--2', 'Default/A'),
+      e('default-a--3', 'Default/A'),
       e('default-a--4', 'Default/A'),
       e('designed-a--1', 'Designed/A'),
     ];

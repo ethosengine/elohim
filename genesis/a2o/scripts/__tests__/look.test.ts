@@ -10,6 +10,8 @@ import { pathToFileURL } from 'node:url';
 
 import { parseArgs, runLook, type LookResult } from '../look.js';
 
+const DUMMY_URL = 'https://x.test';
+
 describe('parseArgs', () => {
   it('parses a bare url', () => {
     const o = parseArgs(['https://example.test/path']);
@@ -47,14 +49,11 @@ describe('parseArgs', () => {
   });
 
   it('throws on a bad --viewport', () => {
-    assert.throws(
-      () => parseArgs(['https://x.test', '--viewport', 'huge']),
-      /--viewport expects WxH/
-    );
+    assert.throws(() => parseArgs([DUMMY_URL, '--viewport', 'huge']), /--viewport expects WxH/);
   });
 
   it('throws on an unknown flag', () => {
-    assert.throws(() => parseArgs(['https://x.test', '--nope', 'v']), /Unknown flag: --nope/);
+    assert.throws(() => parseArgs([DUMMY_URL, '--nope', 'v']), /Unknown flag: --nope/);
   });
 
   it('parses --timeout as timeoutMs', () => {
@@ -64,14 +63,14 @@ describe('parseArgs', () => {
 
   it('throws on --timeout below 1000', () => {
     assert.throws(
-      () => parseArgs(['https://x.test', '--timeout', '500']),
+      () => parseArgs([DUMMY_URL, '--timeout', '500']),
       /--timeout expects milliseconds >= 1000/
     );
   });
 
   it('throws on --timeout non-numeric', () => {
     assert.throws(
-      () => parseArgs(['https://x.test', '--timeout', 'forever']),
+      () => parseArgs([DUMMY_URL, '--timeout', 'forever']),
       /--timeout expects milliseconds >= 1000/
     );
   });

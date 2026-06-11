@@ -84,7 +84,8 @@ export function parseArgs(argv: string[]): LookOptions {
       }
       case '--timeout': {
         const n = Number(val);
-        if (!Number.isInteger(n) || n < 1000) throw new Error(`--timeout expects milliseconds >= 1000, got: ${val}`);
+        if (!Number.isInteger(n) || n < 1000)
+          throw new Error(`--timeout expects milliseconds >= 1000, got: ${val}`);
         opts.timeoutMs = n;
         i++;
         break;
@@ -159,7 +160,10 @@ export async function runLook(opts: LookOptions): Promise<LookResult> {
 
     let ok = true;
     try {
-      await device.page.goto(opts.url, { waitUntil: 'networkidle', timeout: opts.timeoutMs ?? 30_000 });
+      await device.page.goto(opts.url, {
+        waitUntil: 'networkidle',
+        timeout: opts.timeoutMs ?? 30_000,
+      });
     } catch {
       ok = false; // nav/idle timeout — still capture what rendered
     }

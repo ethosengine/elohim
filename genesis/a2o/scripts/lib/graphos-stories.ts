@@ -78,9 +78,7 @@ export function storiesForSheet(
 ): StoryEntry[] {
   return Object.values(index.entries).filter(
     e =>
-      e.type === 'story' &&
-      matchesComponent(e.id, component) &&
-      (!family || familyOf(e) === family)
+      e.type === 'story' && matchesComponent(e.id, component) && (!family || familyOf(e) === family)
   );
 }
 
