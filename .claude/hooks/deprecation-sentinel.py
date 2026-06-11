@@ -98,6 +98,88 @@ GUARD_TOKENS = ("deprecat", "vulnerab", "cve-", "ghsa-", "rustsec", "advisor")
 
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
+# ── Anti-echo guards (three deterministic false-positive classes) ─────────────
+#
+# Guard A — ledger self-capture:
+#   A grep that recurses into the repo may hit the ledger file itself and
+#   re-fingerprint already-triaged entries.  A grep-with-filename result line
+#   looks like "/path/to/deprecations.jsonl:42:{...json...}" so we match any
+#   line that contains "deprecations.jsonl" as a source path prefix.
+ECHO_LEDGER_PATH = re.compile(r"deprecations\.jsonl", re.IGNORECASE)
+
+# Guard B — history/museum prose:
+#   Lines sourced from genesis/docs/content/elohim-protocol/history/** narrate
+#   past deprecations.  They appear in grep-with-filename output as a leading
+#   file path, or the command itself directly reads such a file.
+#   Match: grep output prefix "…/history/<file>:<digits>:" OR bare path token
+#   anywhere in the line (cat/head/sed output from those files has no path
+#   prefix, but the command gate below covers that case).
+ECHO_HISTORY_PATH_RE = re.compile(
+    r"genesis/docs/content/elohim-protocol/history/", re.IGNORECASE
+)
+
+# Guard C — commit-message prose:
+#   git log --oneline produces lines like "8f0cb4122 chore(deprecation): …"
+#   git show --stat/--format produces commit subject lines verbatim.
+#   Heuristic: a line that starts with a short hex run followed by a space is a
+#   git log oneline entry.  Additionally, bare commit-subject lines beginning
+#   with conventional-commit prefixes (chore(deprecat…)/fix(deprecat…) etc.)
+#   are commit message text, not live runtime output.
+#   We do NOT gate on the command being a git command alone — a `git show` DIFF
+#   hunk (lines starting with + or -) can legitimately add a `#[deprecated]`
+#   attribute and should still be captured.  The shape guards below are
+#   line-level and do not suppress diff hunks.
+ECHO_GIT_ONELINE_RE = re.compile(r"^[0-9a-f]{7,12} ")
+ECHO_COMMIT_SUBJECT_RE = re.compile(
+    r"^(?:chore|fix|feat|refactor|docs|test|perf|ci|build|revert)"
+    r"\((?:deprecat|security|sentinel)[^)]*\)\s*:",
+    re.IGNORECASE,
+)
+
+# Command-level gates for echo classes B and C: if the command itself is a pure
+# git history read (git log / git show without a -p / --patch flag) or reads
+# directly from the history prose tree, ALL lines from that output are echo
+# candidates — the command gate is a cheap early exit before per-line work.
+_CMD_GIT_HISTORY_RE = re.compile(
+    r"\bgit\s+(?:log|show)\b(?!.*(?:\s-p\b|\s--patch\b|\s--diff\b))",
+    re.IGNORECASE,
+)
+_CMD_HISTORY_TREE_RE = re.compile(
+    r"genesis/docs/content/elohim-protocol/history/", re.IGNORECASE
+)
+
+
+def _is_echo_line(line: str, cmd_is_git_history: bool, cmd_is_history_tree: bool) -> bool:
+    """Return True if *line* is a known echo false-positive and must be skipped.
+
+    Called after classify() returns non-None to prevent false echo entries
+    from being fingerprinted and appended to the ledger.
+
+    The three guards:
+      A) Line sourced from the ledger file (self-capture via recursive grep).
+      B) Line sourced from the history/museum prose tree.
+      C) Line that is git commit-message text (log oneline or subject line),
+         NOT a diff hunk (diff hunks start with + or - so carry real signal).
+    """
+    # Guard A — ledger self-capture
+    if ECHO_LEDGER_PATH.search(line):
+        return True
+
+    # Guard B — history prose (grep output carries file path in the line;
+    # if the command itself reads from the tree, every line is echo output)
+    if ECHO_HISTORY_PATH_RE.search(line) or cmd_is_history_tree:
+        return True
+
+    # Guard C — commit-message text shapes; preserve diff hunks (lines that
+    # start with + or - are hunk content, not commit prose)
+    if not line.startswith(("+", "-")):
+        if ECHO_GIT_ONELINE_RE.match(line):
+            return True
+        if cmd_is_git_history and ECHO_COMMIT_SUBJECT_RE.match(line):
+            return True
+
+    return False
+
 
 def collect_strings(node, out, budget):
     """Walk the tool_response JSON collecting string values, bounded."""
@@ -178,6 +260,10 @@ def main() -> None:
                 except (json.JSONDecodeError, KeyError):
                     continue
 
+    # Pre-compute command-level echo flags (cheap, done once per call).
+    cmd_is_git_history = bool(_CMD_GIT_HISTORY_RE.search(command))
+    cmd_is_history_tree = bool(_CMD_HISTORY_TREE_RE.search(command))
+
     new_entries = []
     reencountered = []  # known, live
     matched_this_call = set()
@@ -188,6 +274,10 @@ def main() -> None:
                 continue
             cls = classify(line)
             if cls is None:
+                continue
+            # Anti-echo guards: skip deterministic false-positive line shapes
+            # before fingerprinting so they never enter the ledger.
+            if _is_echo_line(line, cmd_is_git_history, cmd_is_history_tree):
                 continue
             fp = fingerprint(line, cls)
             if fp in matched_this_call:
