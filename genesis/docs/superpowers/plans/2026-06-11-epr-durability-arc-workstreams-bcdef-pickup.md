@@ -57,6 +57,60 @@ dozens of content ids — the conductor path is actively healing the
 bulk-seed anchor gap (ci-seeder-stamp-conductor-anchor-circularity.md);
 expect reach re-notarization and anchor coverage to improve run-over-run.
 
+## TRACE RESOLVED (next session, ~23:30Z 06-11) — root cause + fix landed
+
+The FIRST ACTION trace completed; all three hypotheses (a/b/c) were
+checked and the truth was a fourth thing:
+
+- (a) FALSIFIED: the bundle delivery is healthy. DNA #1325 checked out
+  `2f02879df` exactly, rebuilt the infrastructure zome fresh (no cache),
+  pushed `elohim-happ:dev-latest` at NEW digest `6f0d3142…` (prior
+  `4d36bb7c…`); every alpha pod's happ-fetcher pulled the new digest at
+  21:45–21:49Z (Loki-quoted).
+- (b) FALSIFIED: the installer ran. matthew's `happ_manager` (the .cjs is
+  legacy; consolidated pods run `elohim-storage/src/happ_manager.rs`)
+  logged `App already installed` at 21:49:14Z, ran the offline drift
+  check against the NEW bundle, and correctly concluded **no DNA drift**.
+- (c) REFINED into the real bug: **a Holochain DNA hash covers only
+  integrity zomes + modifiers — coordinator zomes are not part of it.**
+  `2f02879df` changed ONLY the coordinator zome
+  (`zomes/infrastructure/src/lib.rs`; integrity untouched), so the new
+  bundle's DNA hashes are byte-identical to the installed app and
+  `has_dna_drift` is structurally blind to the change. The conductor
+  keeps serving the OLD coordinator wasm (`uhCok…` in the rejections is a
+  WASM hash) from its PVC. ALLOW_DNA_REINSTALL behaves exactly as
+  documented — the attestation fix simply never moves the DNA hash.
+
+**Fix landed (elohim-storage):** `happ_manager.rs` now compares per-zome
+coordinator WASM hashes (bundle `DnaFile` vs conductor
+`get_dna_definition`) and heals drift via the conductor's
+`update_coordinators` HOT-SWAP — no uninstall, no new agent key, no DHT
+churn (also dodges the re-key chicken-and-egg a forced reinstall would
+hit against the still-old `register_doorway` guard). Gate:
+`ALLOW_COORDINATOR_UPDATE`, defaulting to `ALLOW_DNA_REINSTALL`'s value
+(alpha applies immediately; prod stays detect-and-log). Unit tests pin
+the invariant (`coordinator_drift_is_visible_when_dna_hash_is_not`).
+Delivery = next edge wave rebuilds the storage image; on pod restart the
+hot-swap applies the bundle's coordinators → attestation rejections
+should stop → custody-convergence flips → measure → 0.
+
+**Same-session bounded fix (workstream C item 3, re-diagnosed):** the
+infrastructure-role connect failure is NOT a role-name mismatch — Loki
+shows `CellDisabled` through all 5 boot-ramp attempts (infrastructure
+connects FIRST, in the coldest ~30s window; imagodei, attempted next,
+landed on attempt 4 ten seconds later). The real defect: `main.rs` gated
+the PeerStatus heartbeat AND five signal subscribers (Infrastructure→
+peer_statuses, REA, ElohimContent, Mishpat, CommitmentByState drain) on
+the boot-time client — miss the ramp and they stay dead for the pod's
+lifetime (the give-up WARN promised a reconnect loop that only existed
+for lamad). Fixed with the genesis-#1122 pattern: the whole consumer
+block now acquires the bridge in-task via `connect_role_forever`. This
+is what lights `resilience.peer-statuses` / `onlinePeerCount` — the
+first real substrate signal in the EPR resilience tooltip. The tooltip's
+OTHER zeros (stewarding/commitment-backed/diversity/regions) remain
+gated on the humans-junction + provide-row gaps (workstream D / Epic B —
+unchanged).
+
 ## State of the world (verified 2026-06-11, do not re-derive)
 
 - **Mesh PROVEN**: 14/14 pods `connected:13`; `mesh.adjacency` both
