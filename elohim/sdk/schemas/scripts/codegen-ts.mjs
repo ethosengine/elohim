@@ -465,10 +465,14 @@ async function generateEnumConstants() {
     // Type alias from the ALL_* constant
     blocks.push(`export type ${title} = (typeof ALL_${baseName})[number];`);
 
-    // Ordinal Record + helpers for ordered enums (the *_LEVELS convention, e.g.
-    // REACH_LEVELS -> REACH_OPENNESS). index i -> openness i+1, matching the schema
-    // enum order and the Rust Reach::openness(). Consumers stop hand-rolling order.
-    if (/_LEVELS$/.test(baseName)) {
+    // Ordinal Record + helpers for true monotonic ordinals (opt-in via the
+    // schema's explicit `_ordinal: true` marker, e.g. reach -> REACH_OPENNESS).
+    // index i -> openness i+1, matching the schema enum order and the Rust
+    // Reach::openness(). Consumers stop hand-rolling order. The marker (not a
+    // name heuristic) is required because some *_LEVELS enums have legacy alias
+    // values (e.g. mastery-level: recognize/recall/synthesize) whose positional
+    // ordinals would be semantically wrong.
+    if (schema._ordinal === true) {
       blocks.push(formatTsOrdinal(baseName, title, allValues));
     }
 
