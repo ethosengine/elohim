@@ -988,30 +988,34 @@ def substrateVerifyStage(String sub) {
  * for the custody/propagation/delivery stages downstream.
  */
 /**
- * Mint a doorway bearer JWT for the jenkins-ci CI account (jenkins-seed-bearer-gate
+ * Mint a doorway bearer JWT for the jenkins-ci seed actor (jenkins-seed-bearer-gate
  * plan, Task 3). The substrate upload stage PUTs to /admin/seed/blob, which the
- * non-dev doorway bearer-gates (Task 1). doorway-seed-login.sh logs in with the
- * `doorway-seed-jenkins-ci` username/password credential and prints ONLY the JWT —
- * secrets reach the script via withEnv, never argv (Jenkinsfile heredoc/secret
- * discipline). Returns '' when the credential is not visible (dev/unconfigured) so
- * the upload runs unauthenticated; a non-dev doorway then 401s loudly downstream.
+ * non-dev doorway bearer-gates (Task 1).
+ *
+ * Self-provisioning, NO new Jenkins credential: doorway-seed-ensure.sh reuses the
+ * EXISTING `doorway-admin-bootstrap-key` (= doorway API_KEY_ADMIN, the same credential
+ * the seed-admin stages already bind) to register-on-first-run + log in the seed actor,
+ * deriving its password from the admin key (no second stored secret). ADMIN_KEY reaches
+ * the script via withEnv — never argv (Jenkinsfile heredoc/secret discipline). Returns ''
+ * when the credential is not visible (dev/unconfigured) so the upload runs unauthenticated;
+ * a non-dev doorway then 401s loudly downstream.
  */
 def resolveSeedDoorwayToken() {
     def token = ''
     def loginUrl = "http://${env.INTERNAL_DOORWAY_URL}"
     try {
-        withCredentials([usernamePassword(credentialsId: 'doorway-seed-jenkins-ci', usernameVariable: 'SEED_DOORWAY_IDENTIFIER', passwordVariable: 'SEED_DOORWAY_PASSWORD')]) {
+        withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
             withEnv(["DOORWAY_URL=${loginUrl}"]) {
-                def status = sh(script: "bash '${env.WORKSPACE}/genesis/scripts/ci/doorway-seed-login.sh' > /tmp/login.out", returnStatus: true)
+                def status = sh(script: "bash '${env.WORKSPACE}/genesis/scripts/ci/doorway-seed-ensure.sh' > /tmp/seed-token.out", returnStatus: true)
                 if (status == 0) {
-                    token = readFile('/tmp/login.out').trim()
+                    token = readFile('/tmp/seed-token.out').trim()
                 } else {
-                    echo "doorway-seed-login failed (credential present but login rejected or doorway unreachable — see stderr above) — upload runs unauthenticated (dev-mode accepts; non-dev alpha 401s downstream)"
+                    echo "doorway-seed-ensure failed (admin key present but register/login rejected or doorway unreachable — see stderr) — upload runs unauthenticated (dev-mode accepts; non-dev alpha 401s)"
                 }
             }
         }
     } catch (e) {
-        echo "doorway-seed-jenkins-ci credential not provisioned in Jenkins — substrate upload runs unauthenticated (dev-mode doorway accepts; non-dev alpha will 401)"
+        echo "doorway-admin-bootstrap-key credential not visible — substrate upload runs unauthenticated (dev-mode doorway accepts; non-dev alpha will 401)"
     }
     return token
 }

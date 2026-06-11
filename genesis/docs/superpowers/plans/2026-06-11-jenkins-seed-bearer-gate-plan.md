@@ -138,60 +138,53 @@ Category A — exists, `auth/operator.rs`). At Stage A it is a registered accoun
   **only when the token is non-empty** (conditional curl-header array). Dev/local runs leave it empty
   → no header → dev-mode doorway accepts (`require_seed_authority` dev-mode pass, Task 1).
 
-- **`doorway-seed-login.sh`** (new): logs the `jenkins-ci` account in (`POST /auth/login`) and prints
-  ONLY the JWT. Empty/missing creds → empty stdout, exit 0 (unauthenticated dev path); rejected creds
-  → exit 1 (hard CI fail). Decision: **pre-minted-token, not in-script login** — keeps the careful
-  `substrate-verify.sh` untouched except for the conditional header, and isolates the secret-bearing
-  login into a tiny dedicated helper (mirrors `restart-doorway-epr.sh` standalone-script precedent).
+- **`doorway-seed-ensure.sh`** (new; supersedes the short-lived `doorway-seed-login.sh`):
+  **self-provisions** the seed actor in-pipeline, then mints its JWT. It reads `ADMIN_KEY` (the existing
+  `doorway-admin-bootstrap-key` = doorway `API_KEY_ADMIN`), **derives the account password from it**
+  (`sha256sum`, dependency-free — no openssl, matching substrate-verify.sh's toolset), idempotently
+  **registers** the actor (`POST /auth/register` with `adminBootstrapKey` = ADMIN_KEY → Admin in one
+  call; **200/201 created AND 409 USER_EXISTS both succeed**, mirroring `seed-humans.ts`'s 409-via-login
+  precedent), then **logs in** and prints ONLY the JWT. Empty/unset `ADMIN_KEY` → empty stdout, exit 0
+  (unauthenticated dev path); register/login rejected or doorway unreachable → exit 1 (hard CI fail,
+  with a diagnostic that distinguishes the two). PW/ADMIN_KEY are never echoed. Decision:
+  **pre-minted-token, not in-script login** in `substrate-verify.sh` — keeps that careful script
+  untouched except for the conditional header, and isolates the secret-bearing provision+login into a
+  tiny dedicated helper.
 
 - **`genesis/Jenkinsfile`** `uploadBlobContentStage()` mints the token in `resolveSeedDoorwayToken()`
-  via `withCredentials([usernamePassword(credentialsId: 'doorway-seed-jenkins-ci', …)])` → runs the
-  login helper with creds in env (`withEnv`, never argv) → passes `SEED_DOORWAY_TOKEN` to
+  via `withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')])`
+  (the **same credential the seed-admin stages at ~1583/1621 already bind** — no new credential) → runs
+  the ensure helper with `ADMIN_KEY` in env (`withEnv`, never argv) → passes `SEED_DOORWAY_TOKEN` to
   `substrate-verify.sh` via `withEnv`. Heredoc-free (both `sh` calls invoke external scripts); both
   helpers are top-level `def`s (own CPS methods — no pressure on the 64KB pipeline-block limit).
 
-**OPERATOR ACTIVATION (NOT repo changes — do these on the live cluster/Jenkins; CLAIMED until the
-next operator-merged genesis build runs green):**
+**OPERATOR ACTIVATION — now IN-PIPELINE and self-healing. Zero new operator steps.**
 
-1. **Create the Jenkins credential** `doorway-seed-jenkins-ci` (kind: *Username with password*) in the
-   Jenkins credential store. Username = `jenkins-ci@alpha.elohim.host`; password = the password chosen
-   in step 2. (When this credential is absent, `resolveSeedDoorwayToken()` logs a notice and the upload
-   runs unauthenticated — on non-dev alpha that 401s loudly, the intended fail-closed signal.)
+Provisioning the `jenkins-ci` seed actor is no longer a manual one-shot curl, and there is **no new
+Jenkins credential to create**. On every genesis run `doorway-seed-ensure.sh` registers the actor (if
+absent) from the existing `doorway-admin-bootstrap-key`, promotes it to Admin via `adminBootstrapKey`,
+and logs in with a password **derived** from that same key — so the account self-heals if the doorway
+DB is ever wiped. The register-on-conflict path (409 USER_EXISTS) makes re-runs idempotent.
 
-2. **Provision the `jenkins-ci` Admin account on alpha.** One-shot doorway-hosted registration — no
-   Holochain connection needed (`humanId`/`agentPubKey` are optional; the doorway creates the identity).
-   The `adminBootstrapKey` field grants Admin (camelCase wire field — the Task-3 fix; the snake_case
-   form was silently dropped). Run from an operator host that can reach alpha doorway, with
-   `API_KEY_ADMIN` = the value alpha doorway validates (the `doorway-admin-bootstrap-key` / `api-key-admin`
-   Secret):
+The **only** remaining precondition (already satisfied — the seed-admin stages at ~1583/1621 depend on
+it): the `doorway-admin-bootstrap-key` Jenkins credential exists and equals the **alpha doorway's
+`API_KEY_ADMIN`** (the `api-key-admin` Secret). `config.rs:287` already requires `jwt_secret` in non-dev
+(boot fails otherwise), so login/JWT-validation works by construction on a healthy alpha doorway.
 
-   ```bash
-   curl -fsS -X POST https://doorway-alpha.elohim.host/auth/register \
-     -H 'Content-Type: application/json' \
-     -d "$(jq -n --arg pw "$JENKINS_CI_PASSWORD" --arg k "$API_KEY_ADMIN" '{
-       identifier: "jenkins-ci@alpha.elohim.host",
-       identifierType: "email",
-       password: $pw,
-       displayName: "Jenkins CI (seed actor)",
-       bio: "Non-human CI seed actor — Stage A identity+audit for genesis substrate seeding.",
-       profileReach: "private",
-       adminBootstrapKey: $k
-     }')"
-   ```
+**Password-derivation rationale:** the actor password is `sha256(ADMIN_KEY + ":jenkins-ci-seed-actor")`,
+truncated to 48 chars. No password is stored anywhere — only an `ADMIN_KEY` holder can derive it, and
+`ADMIN_KEY` is already a total-admin secret, so the seed actor adds **zero marginal exposure**.
 
-   Verify Admin promotion: `POST /auth/login` with the same identifier/password returns a token whose
-   permission resolves to Admin (or simply confirm the next genesis build's authenticated upload 200s).
-   `$JENKINS_CI_PASSWORD` is the same secret stored in the Jenkins credential (step 1).
-
-3. **Confirm alpha doorway has `jwt_secret` + `API_KEY_ADMIN` set.** `config.rs:287` already *requires*
-   `jwt_secret` in non-dev (else boot fails), so login/JWT-validation works by construction on a healthy
-   alpha doorway; `API_KEY_ADMIN` must equal the value step 2 passes as `adminBootstrapKey`. Verify via
-   the existing alpha doorway env/Secret wiring — do not assume.
+**Admin-key-rotation caveat:** doorway `register` does NOT reset a password on a 409 conflict, so after
+rotating `ADMIN_KEY` the derived password changes but the stored hash does not → login would 401. The
+one-time fix: **delete the `jenkins-ci@alpha.elohim.host` account once** after rotating; the next genesis
+build re-provisions it under the new derivation. (This is the entire rotation runbook.)
 
 **Live-verification gate:** CLAIMED until the next operator-merged genesis build's *Upload Blob-Backed
-Content* stage uploads with a bearer and returns 200 (currently the substrate-verify-upload.json
-artifact will show `upload.content`/`upload.probe` pass). If the credential is wired but the account is
-not yet Admin, expect a 403 with the actionable substrate-verify message.
+Content* stage uploads with a bearer and returns 200 (the substrate-verify-upload.json artifact shows
+`upload.content`/`upload.probe` pass). If `doorway-admin-bootstrap-key` does not match the alpha
+doorway's `API_KEY_ADMIN`, expect a register `ADMIN_KEY_REJECTED`/403 with the actionable
+`doorway-seed-ensure` diagnostic.
 
 ## Task 4: Close the loop — concern status + netpol-revert note
 
