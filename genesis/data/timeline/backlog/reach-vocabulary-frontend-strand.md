@@ -12,6 +12,7 @@ priority: "medium"
 tags: [reach, vocabulary-drift, frontend, sdk, reconciliation, lamad, elohim-library, storage-client-ts]
 derived_from:
   - app/elohim-app/src/app/elohim/ARCHITECTURE.md   # retired to git 2026-06-11 (elohim-pillar island recompose) — carried the geographic 8 verbatim
+  - elohim/elohim-storage/REACH.md                  # retired to git 2026-06-11 (storage island recompose) — design-doc ORIGIN of the geographic 8 (§Core Mapping carries the ladder verbatim)
 cites:
   - resilience-protocol-spec | the canonical reconciliation home — gap-matrix row :628 + roadmap item 13 :704 name only three of the (now five+) reach vocabularies | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
   - genesis/data/timeline/backlog/http-reach-enforcement-gap.md
@@ -33,6 +34,13 @@ The TypeScript side carries a **4th vocabulary, unrecorded there**: the 8-value 
 2. `elohim/sdk/storage-client-ts/src/protocol-core.model.ts:50-124` — the SDK twin exporting `ReachLevel`, `REACH_LEVEL_VALUES`, `reachEncompasses()`; this is what the lamad bundle imports (`app/lamad/src/app/models/content-node.model.ts:31`, `app/lamad/src/app/quiz-engine/services/discovery-attestation.service.ts:20`, etc.)
 3. `app/lamad/src/app/models/trust-badge.model.ts:20-28` (inlined copy)
 4. `app/elohim-library/projects/elohim-service/src/cache/types.ts:19-40` (numeric const 0-7, same vocabulary — feeds the reach-aware cache)
+
+**Design-doc origin (noted 2026-06-11, storage island recompose):** the geographic 8 is not a
+frontend invention — it originates in `elohim/elohim-storage/REACH.md` (2026-04-15, the storage
+data-plane reach design; retired to git 2026-06-11). Its §"The Core Mapping: Reach → Trust →
+Action" table carries the ladder verbatim, driving designed-but-never-built encryption/eviction/
+replication tiers (residue: `genesis/data/timeline/backlog/storage-island-harvest-residue.md`).
+The four TS sites are descendants of that design, not drift that arose frontend-side.
 
 And a **5th, mutually inconsistent** 6-value family `private/invited/local/community/federated/commons`:
 

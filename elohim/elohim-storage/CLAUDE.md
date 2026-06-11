@@ -2,6 +2,7 @@
 id: elohim-storage-gospel
 cites:
   - tiered-quilt-stewardship-design | the protocol tiered storage substrate design (cold/warm/hot planes, RS sharding, reach enforcement) this crate implements as the operational data plane | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
+  - storage-dual-plane-design-arc | the April 2026 design-arc lineage (dual-plane bet, paths not taken, reach-vocabulary ghost) distilled when the P2P-ARCHITECTURE/EDGE-ARCHITECTURE/REACH island retired | sha256:2315c84345a2ef3c | path: genesis/docs/content/elohim-protocol/history/2026-06-11-storage-dual-plane-design-arc.md
 ---
 
 # Elohim Storage - API Boundary Architecture
@@ -138,6 +139,12 @@ The Track 2 substrate plane for observations is `IROH_OBSERVATION_ALPN` / libp2p
 ## Design Vocabulary
 
 Storage and distribution language — `quilt` (RS-encoded distribution of a content unit), `pantry` (peer-tended container), `stock`/`draw` (deposit/retrieve verbs), `shard`, `RS(N,K)` — is defined in `genesis/graphos/vocabulary.md`. Wire-level identifiers (`/blob/{hash}`, `BlobStore`, `sha256-{hex}`) keep their existing names. New design discussion, signal/event names, and any fresh identifiers should use the new vocabulary. Legacy `/store/{hash}` paths were retired 2026-04-30 — the canonical HTTP path is `/blob/{hash}`.
+
+## P2P Data Plane & Reach (concern routing)
+
+- **Data-plane architecture truth** is the tiered-quilt design (cited above): three truth layers, pantry-temperature classes, custody commitments. The April 2026 design-arc lineage (dual-plane bet, paths not taken) is the `storage-dual-plane-design-arc` history record (cited above) — read the canon, not retired drafts.
+- **Reach vocabulary**: DNA-notarized 8 values in `elohim/sdk/schemas/v1/enums/reach.schema.json` (matched by `elohim/epr/src/reach.rs`); the standing-policy family is `src/services/epr_kind.rs`. Multi-vocabulary drift is a known OPEN item — `genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md` + the resilience README reconciliation (roadmap item 13); do not canonize any single vocabulary as resolved.
+- **Reach enforcement** is author-side earning + receiver-side pre-authorization (`src/p2p/reach_authorization.rs`), not delivery-side filtering. The HTTP-path enforcement gap is tracked in `genesis/data/timeline/backlog/http-reach-enforcement-gap.md`; unconsumed sovereignty/cluster scaffolding is recorded in `genesis/data/timeline/backlog/storage-island-harvest-residue.md`.
 
 ## File Reference
 
