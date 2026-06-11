@@ -117,8 +117,7 @@ Every content type declares claims with positive + negative observations:
 | Service | Purpose |
 |---------|---------|
 | `CollectiveService` | Community CRUD, membership management |
-| `MechanismSelectionService` | Voting mechanism selection based on proposal type |
-| `SignalAccumulationService` | Graduated feedback → formal proposal escalation |
+| `GovernanceApiService` (`@elohim/service`) | Server-side governance projections — mechanism selection (M-POLICY-2, `MechanismSelectionView`) and signal accumulation (M-POLICY-1, `AccumulationStatusView`) |
 | `BracketSynthesisService` | Polis bracket synthesis for sensemaking |
 
 ## Cross-Pillar Coupling
