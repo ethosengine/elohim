@@ -143,3 +143,25 @@ shift_objective: |
   next instrumented genesis run, fix the pinned leg (adjacency, decode skew, or
   responder), and keep propagation.custody-convergence green for three
   consecutive builds.
+
+## UPDATE 2026-06-11 (live Loki, post edge-#1059 deploy): MESH + DISCOVERY HEALED — new front is the conductor bridge
+
+The persistent-peering fix is proven on all 14 pods: `Bootstrap link
+established` on first dial, redial arm resolved the startup stagger
+(attempts 1-7, zero failures), `Bootstrap links recovered, connected:13`
+on EVERY pod by 15:02:54Z. matthew↔jessica adjacency: HEALED. And
+discovery works end-to-end for the first time: every pod's sweep reports
+`ids_discovered:34` (matthew's full commitment inventory, responders now
+NAMED in per-peer lines).
+
+The new (and likely final) break in the chain: `conductor_missing:34,
+healed:0` on every non-matthew pod — the heal leg asks the LOCAL conductor
+for the discovered entries and gets nothing. Prime suspect is not DHT
+gossip but the bridge: at boot, storage retries the conductor connection
+5x while cells are still CellDisabled, then PERMANENTLY disables the
+reconcile bridge ("Reconcile controller disabled" fleet-wide at 15:00Z) —
+the same one-shot-init disease the peering fix cured in libp2p. Fix in
+flight: persistent HcClient reconnect (capped backoff, late-success ==
+boot-success wiring). Secondary candidate if conductor_missing persists
+with a healthy bridge: true DHT gossip lag (kitsune2 "Bootstrap
+overloaded, dropping put" was observed under load).
