@@ -47,7 +47,8 @@ export interface RequestingClient {
  * @cssprop --elohim-consent-rp-bg - RP brand strip background (default: 6% currentColor mix)
  * @cssprop --elohim-consent-rp-fg - RP brand strip foreground (default: inherit)
  * @cssprop --elohim-consent-claim-row-bg - Claim row background (default: transparent)
- * @cssprop --elohim-consent-claim-row-border - Claim row border (default: 14% currentColor mix)
+ * @cssprop --elohim-consent-claim-row-border - Claim row border (FULL shorthand, e.g. `1px solid …` — not a color; default: 1px solid 14% currentColor mix)
+ * @cssprop --elohim-consent-toggle-accent - Claim checkbox accent color (default: AccentColor)
  * @cssprop --elohim-consent-approve-bg - Approve button background (default: transparent)
  * @cssprop --elohim-consent-approve-fg - Approve button foreground (default: inherit)
  * @cssprop --elohim-consent-decline-bg - Decline button background (default: transparent)
@@ -92,10 +93,7 @@ export class ElohimImagodeiConsentCard extends CapabilityAwareElement(LitElement
       gap: 0.75rem;
       padding-block: 0.75rem;
       padding-inline: 0.75rem;
-      background: var(
-        --elohim-consent-rp-bg,
-        color-mix(in srgb, currentColor 6%, transparent)
-      );
+      background: var(--elohim-consent-rp-bg, color-mix(in srgb, currentColor 6%, transparent));
       color: var(--elohim-consent-rp-fg, inherit);
       border-radius: var(--elohim-consent-radius, 6px);
     }
@@ -137,11 +135,10 @@ export class ElohimImagodeiConsentCard extends CapabilityAwareElement(LitElement
       padding-block: 0.75rem;
       padding-inline: 0.75rem;
       background: var(--elohim-consent-claim-row-bg, transparent);
-      border: 1px solid
-        var(
-          --elohim-consent-claim-row-border,
-          color-mix(in srgb, currentColor 14%, transparent)
-        );
+      border: var(
+        --elohim-consent-claim-row-border,
+        1px solid color-mix(in srgb, currentColor 14%, transparent)
+      );
       border-radius: var(--elohim-consent-radius, 6px);
       cursor: pointer;
     }
@@ -150,6 +147,7 @@ export class ElohimImagodeiConsentCard extends CapabilityAwareElement(LitElement
       margin-block-start: 0.25rem;
       cursor: pointer;
       flex-shrink: 0;
+      accent-color: var(--elohim-consent-toggle-accent, AccentColor);
     }
 
     [part='claim-row'] input[type='checkbox']:disabled {
@@ -274,7 +272,7 @@ export class ElohimImagodeiConsentCard extends CapabilityAwareElement(LitElement
   protected override updated(): void {
     if (!this._initialized && this.requestedClaims.length > 0) {
       // All claims start granted; the user may then opt out of optional ones.
-      this._granted = new Set(this.requestedClaims.map((c) => c.id));
+      this._granted = new Set(this.requestedClaims.map(c => c.id));
       this._initialized = true;
     }
   }
@@ -282,8 +280,7 @@ export class ElohimImagodeiConsentCard extends CapabilityAwareElement(LitElement
   override render() {
     return html`
       <div class="card">
-        ${this._renderRpStrip()}
-        ${this.requestedClaims.map((c) => this._renderClaimRow(c))}
+        ${this._renderRpStrip()} ${this.requestedClaims.map(c => this._renderClaimRow(c))}
         <slot name="policy-link"></slot>
         <div class="actions" part="actions">
           <button type="button" part="decline" @click=${this._decline}>Decline</button>
@@ -298,11 +295,19 @@ export class ElohimImagodeiConsentCard extends CapabilityAwareElement(LitElement
     return html`
       <div part="rp">
         <div part="rp-mark" aria-hidden="true">
-          ${brandMark ? html`<img src=${brandMark} alt="" />` : ''}
+          ${brandMark
+            ? html`
+                <img src=${brandMark} alt="" />
+              `
+            : ''}
         </div>
         <div class="rp-details">
           <div part="client-name">${displayName}</div>
-          <div class="rp-subtext">is asking for access to:</div>
+          <div class="rp-subtext">
+            ${this.trustMode === 'peer-conductor'
+              ? 'is asking your own conductor to share:'
+              : 'is asking for access to:'}
+          </div>
         </div>
       </div>
     `;
@@ -317,17 +322,22 @@ export class ElohimImagodeiConsentCard extends CapabilityAwareElement(LitElement
           type="checkbox"
           ?checked=${isGranted}
           ?disabled=${isRequired}
-          @change=${(e: Event) => this._toggleClaim(claim.id, (e.target as HTMLInputElement).checked)}
+          @change=${(e: Event) =>
+            this._toggleClaim(claim.id, (e.target as HTMLInputElement).checked)}
         />
         <div class="claim-details">
           <div class="claim-label">
             ${claim.label}
             ${isRequired
-              ? html`<span class="required-badge">(required)</span>`
+              ? html`
+                  <span class="required-badge">(required)</span>
+                `
               : ''}
           </div>
           ${claim.description
-            ? html`<div class="claim-description">${claim.description}</div>`
+            ? html`
+                <div class="claim-description">${claim.description}</div>
+              `
             : ''}
           <slot name="claim-detail"></slot>
         </div>

@@ -94,6 +94,7 @@ const TRUST_TOKENS_LIGHT = `
 const CONSENT_TOKENS_LIGHT = `
   --elohim-consent-rp-bg:              #FCF0D8;
   --elohim-consent-rp-fg:              var(--el-night);
+  --elohim-consent-toggle-accent:     var(--el-green-deep);
   --elohim-consent-claim-row-bg:       var(--el-cream);
   --elohim-consent-claim-row-border:   1px solid rgba(107, 97, 87, 0.18);
   --elohim-consent-approve-bg:         var(--el-green-deep);
@@ -138,6 +139,7 @@ const TRUST_TOKENS_DARK = `
 const CONSENT_TOKENS_DARK = `
   --elohim-consent-rp-bg:              rgba(212, 160, 62, 0.1);
   --elohim-consent-rp-fg:              var(--el-starlight);
+  --elohim-consent-toggle-accent:     var(--el-green-deep);
   --elohim-consent-claim-row-bg:       rgba(232, 228, 217, 0.04);
   --elohim-consent-claim-row-border:   1px solid rgba(232, 228, 217, 0.12);
   --elohim-consent-approve-bg:         var(--el-green-deep);
@@ -317,11 +319,6 @@ export const Default: Story = {
         .authority=${doorwayHostResolution}
         step="consent"
       >
-        <elohim-imagodei-trust-indicator
-          slot="header"
-          trust-mode="doorway-host"
-          authority-label="alpha.elohim.host"
-        ></elohim-imagodei-trust-indicator>
 
         <elohim-imagodei-consent-card
           slot="primary"
@@ -375,11 +372,6 @@ export const Dark: Story = {
         .authority=${doorwayHostResolution}
         step="consent"
       >
-        <elohim-imagodei-trust-indicator
-          slot="header"
-          trust-mode="doorway-host"
-          authority-label="alpha.elohim.host"
-        ></elohim-imagodei-trust-indicator>
 
         <elohim-imagodei-consent-card
           slot="primary"
@@ -431,11 +423,6 @@ export const AllOptional: Story = {
         .authority=${doorwayHostResolution}
         step="consent"
       >
-        <elohim-imagodei-trust-indicator
-          slot="header"
-          trust-mode="doorway-host"
-          authority-label="alpha.elohim.host"
-        ></elohim-imagodei-trust-indicator>
 
         <elohim-imagodei-consent-card
           slot="primary"
@@ -492,11 +479,6 @@ export const PeerConductorContext: Story = {
         .authority=${peerResolution}
         step="consent"
       >
-        <elohim-imagodei-trust-indicator
-          slot="header"
-          trust-mode="peer-conductor"
-          authority-label="your conductor — alpha.elohim.host is helping with ingress"
-        ></elohim-imagodei-trust-indicator>
 
         <elohim-imagodei-consent-card
           slot="primary"
@@ -558,11 +540,6 @@ export const Hebrew: Story = {
         .authority=${doorwayHostResolution}
         step="consent"
       >
-        <elohim-imagodei-trust-indicator
-          slot="header"
-          trust-mode="doorway-host"
-          authority-label="alpha.elohim.host"
-        ></elohim-imagodei-trust-indicator>
 
         <elohim-imagodei-consent-card
           slot="primary"

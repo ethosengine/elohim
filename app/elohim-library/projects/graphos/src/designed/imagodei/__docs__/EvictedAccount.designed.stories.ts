@@ -264,11 +264,6 @@ export const Default: Story = {
       <elohim-imagodei-portal-shell
         .authority=${evictedResolution}
       >
-        <elohim-imagodei-trust-indicator
-          slot="header"
-          trust-mode="doorway-host"
-          authority-label="alpha.elohim.host"
-        ></elohim-imagodei-trust-indicator>
 
         <p slot="primary" style="display: none;"></p>
 
@@ -385,11 +380,6 @@ export const Dark: Story = {
       <elohim-imagodei-portal-shell
         .authority=${evictedResolution}
       >
-        <elohim-imagodei-trust-indicator
-          slot="header"
-          trust-mode="doorway-host"
-          authority-label="alpha.elohim.host"
-        ></elohim-imagodei-trust-indicator>
 
         <p slot="primary" style="display: none;"></p>
 
@@ -485,11 +475,6 @@ export const RecoveryInProgress: Story = {
       <elohim-imagodei-portal-shell
         .authority=${evictedResolution}
       >
-        <elohim-imagodei-trust-indicator
-          slot="header"
-          trust-mode="doorway-host"
-          authority-label="alpha.elohim.host"
-        ></elohim-imagodei-trust-indicator>
 
         <p slot="primary" style="display: none;"></p>
 

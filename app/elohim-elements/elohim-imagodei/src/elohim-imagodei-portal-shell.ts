@@ -117,7 +117,11 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
       opacity: 0.7;
     }
 
-    [part='error-region']:empty {
+    [part='primary-region'][data-suppressed='true'] {
+      display: none;
+    }
+
+    [part='error-region'][data-empty='true'] {
       display: none;
     }
 
@@ -154,6 +158,7 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
   @state() private _trustMode: TrustMode = 'doorway-host';
   @state() private _authorityLabel = '';
   @state() private _attestors: AttestorRef[] = [];
+  @state() private _hasErrorContent = false;
 
   /** Track whether we have already emitted authority-needed for this mount. */
   private _authorityNeededFired = false;
@@ -221,6 +226,18 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
     this._propagateContextToSlots();
   };
 
+  /**
+   * Error content suppresses the primary panel ("renders error-region INSTEAD
+   * of the primary step"). Slot-assignment state, not CSS :empty — a region
+   * that wraps a <slot> is never :empty, so the CSS-only collapse was dead.
+   */
+  private readonly _onErrorSlotChange = (e: Event): void => {
+    const slot = e.target as HTMLSlotElement;
+    this._hasErrorContent = slot
+      .assignedNodes({ flatten: true })
+      .some(n => n.nodeType === Node.ELEMENT_NODE || (n.textContent ?? '').trim().length > 0);
+  };
+
   override render() {
     return html`
       <div part="frame" class="frame">
@@ -237,12 +254,12 @@ export class ElohimImagodeiPortalShell extends CapabilityAwareElement(LitElement
           </slot>
         </header>
 
-        <main part="primary-region">
+        <main part="primary-region" data-suppressed=${this._hasErrorContent ? 'true' : 'false'}>
           <slot name="primary" @slotchange=${this._onSlotChange}></slot>
         </main>
 
-        <div part="error-region">
-          <slot name="error-region"></slot>
+        <div part="error-region" data-empty=${this._hasErrorContent ? 'false' : 'true'}>
+          <slot name="error-region" @slotchange=${this._onErrorSlotChange}></slot>
         </div>
 
         <footer part="footer">
