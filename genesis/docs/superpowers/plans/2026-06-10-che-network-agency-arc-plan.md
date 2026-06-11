@@ -9,7 +9,7 @@ cites:
   - che-network-agency-arc-design | the spec this plan implements — Stages A/B/C, dual-plane discipline, dev-surface coherence, SDK complement | sha256:2902184a7c95c0d0 | path: genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md
   - sprint1-zd-substrate-correct-deploy | owns the deploy-instance of delegates-compute + bounds_validator — Phase 4 consumes its rails behind the 4.1 readiness gate, never rebuilds them | sha256:fbb8a4a2885b0499 | path: genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md
   - epr-acquisition-slice2a-rea-rails-plan | owns the foundational REA emit + commitment-graduation rails (active, D9) — the CommitmentCommitted 2a gap and graduation semantics live in its lane | sha256:62a490200c40f5d4 | path: genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md
-  - genesis/docs/architecture/elohim-sdk.md
+  - elohim-sdk-architecture | elohim-sdk | sha256:7d1a9b09f3c6592d | path: genesis/docs/architecture/elohim-sdk.md
   - genesis/docs/superpowers/plans/2026-05-18-sdk-boundary-clarification.md
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md
