@@ -75,17 +75,161 @@ per-mechanic) from §Vision-remainder (gap ledger → backlog companion).
 Verify all placed docs (`cite-gen --verify`), `locus-drift.py` back at stasis for the locus, selective-stage
 commit, and **fold any new lesson back into this recipe** (it is the living artifact).
 
-## Firing order (remaining islands, census-ranked)
+## Fan-out prompts (paste-ready, one per session — firing order)
 
-1. **qahal** — `QAHAL_API_SPECIFICATION_v1.0.md` (census row 4)
-2. **elohim-pillar + shell root** — `ELOHIM_PROTOCOL_ARCHITECTURE.md`, `ARCHITECTURE.md`, shell-root
-   copies out of `app/elohim-app/` (rows 5+9 — highest-leverage cleanup)
-3. **elohim-storage** — `P2P-ARCHITECTURE`, `EDGE-ARCHITECTURE`, `REACH` (row 10)
-4. **doorway-service** — `ARCHITECTURE`, `FEDERATION`, `SCALING`, `RECOVERY-*`, `EDGE-DESIGN` (row 12;
-   derived-truth: residue cites the resilience canon)
-5. **holochain** — 11 docs incl. `LINK_ARCHITECTURE` (row 11; derived-truth: cites protocol-specification)
-6. **steward/node** — `ARCHITECTURE.md`, `P2P-COMPUTE-FOOTPRINT` (row 15; pairs with its create-or-decline
-   gospel decision)
+Each block below opens its own session verbatim. The RAILS are identical for all and live in this
+file's Phases 1-4 (the session reads this recipe first); each block carries only what is pillar-specific:
+locus, island inventory (verified 2026-06-11), and the liveness/caution lines earned from the census's
+corrected-truth column. The `ultracode` keyword authorizes the Phase-1 agent fan-out. One pillar per
+session. Frontend-type loci (elements/graphos) are NOT this recipe — they route to `/looking-at-frontend`.
 
-One pillar per session; frontend-type loci (elements/graphos) are NOT this recipe — they route to
-`/looking-at-frontend`. shefa's session is design-forward (its own seed entry), not island cleanup.
+### 1 — qahal
+
+```
+Run the QAHAL island recompose per the proven recipe:
+genesis/data/timeline/backlog/pillar-island-recompose-recipe.md — read it first; it IS the
+method (4 phases, authorship rules, gate). This prompt only scopes the session. ultracode.
+
+LOCUS: qahal — subject home `qahal-domain-gospel` (elohim/sdk/domains/qahal/CLAUDE.md, cites
+qahal-architecture-vision), consumer `qahal-pillar-gospel` (app/elohim-app/src/app/qahal/CLAUDE.md).
+Truth: self + sdk vocabulary home. Census row 4.
+
+ISLAND: app/elohim-app/src/app/qahal/QAHAL_API_SPECIFICATION_v1.0.md (no shell-root copy —
+verified 2026-06-11). Phase 0 sweeps inbound refs (MAP.md and pillar gospels reference it).
+
+LIVENESS CAUTIONS: governance vocabulary is CO-OWNED — qahal manifest
+(collective/proposal/challenge/appeal/statement) vs the mishpat DNA (`mishpat-domain-gospel`
+is the judgment substrate qahal escalates into; do NOT recompose mishpat's share into qahal
+canon). Verify spec claims against elohim/sdk/domains/qahal/manifest.json + the mishpat zomes
+before any CANONIZE verdict. Psephos renders formal ballots (levels 3+); casual governance is
+Angular — keep that ladder straight in the seed.
+
+RAILS: this recipe §Phases 1-4, non-negotiable. One operator gate before retirement.
+```
+
+### 2 — elohim pillar + shell sub-manifest
+
+```
+Run the ELOHIM-PILLAR island recompose per the proven recipe:
+genesis/data/timeline/backlog/pillar-island-recompose-recipe.md — read it first. ultracode.
+
+LOCUS: elohim (protocol-core pillar) — subject home `elohim-domain-gospel`
+(elohim/sdk/domains/elohim/CLAUDE.md, cross-cutting signalKinds/constitutionalRatios),
+consumer `elohim-pillar-gospel` (app/elohim-app/src/app/elohim/CLAUDE.md). Truth: SELF for the
+TS models (`models/` is canonical — census verifier correction), but protocol-wide *architecture
+prose* is likely superseded by `elohim-protocol-specification` + the anchored sdk canon. Census rows 5+9.
+
+ISLAND: app/elohim-app/src/app/elohim/{ELOHIM_PROTOCOL_ARCHITECTURE.md, ARCHITECTURE.md}
+(no shell-root copies — verified 2026-06-11).
+
+LIVENESS CAUTIONS: ELOHIM_PROTOCOL_ARCHITECTURE.md is the most-referenced island doc in the
+repo — qahal/imagodei pillar gospels carry "**Architecture:**" pointer lines at minimum, and
+MAP/docs reference it; the inbound-ref sweep is the critical step. Expect heavy SUPERSEDED
+verdicts (protocol truth now lives in elohim-protocol-specification + sdk schemas); the residue
+test is "still true AND homed nowhere else." Also in scope: census row 9's shell decision —
+declare app/elohim-app/.claude/subject-routing.yaml (multi-pillar delivery locus, consumer of
+sdk/domains + elohim-storage; sub-manifests stay DECLARATIVE until deep-merge lands).
+
+RAILS: this recipe §Phases 1-4. One operator gate before retirement.
+```
+
+### 3 — elohim-storage
+
+```
+Run the ELOHIM-STORAGE island recompose per the proven recipe:
+genesis/data/timeline/backlog/pillar-island-recompose-recipe.md — read it first. ultracode.
+
+LOCUS: elohim-storage — gospel `elohim-storage-gospel` (elohim/elohim-storage/CLAUDE.md,
+truth: SELF for the HTTP/blob/P2P surface; cites tiered-quilt-stewardship-design). Census row 10.
+
+ISLAND: elohim/elohim-storage/{P2P-ARCHITECTURE.md, EDGE-ARCHITECTURE.md, REACH.md}.
+
+LIVENESS CAUTIONS: EDGE-ARCHITECTURE.md describes DOORWAY edge performance — part of it may
+belong to the doorway locus, not storage (decide per-section, don't move wholesale). REACH.md
+must be reconciled against the LIVE reach machinery — substrate enforcement in
+elohim/epr/src/reach.rs + the 8-value reach.schema.json + the known three-vocabulary drift
+([[project_reach_enum_drift_reconciliation]]) — do not canonize a stale reach vocabulary.
+P2P-ARCHITECTURE (dual-plane: Holochain control / storage data) composes with
+tiered-quilt-stewardship-design and the three-layer truth model — cite, never restate.
+
+RAILS: this recipe §Phases 1-4. One operator gate before retirement.
+```
+
+### 4 — doorway-service
+
+```
+Run the DOORWAY-SERVICE island recompose per the proven recipe:
+genesis/data/timeline/backlog/pillar-island-recompose-recipe.md — read it first. ultracode.
+
+LOCUS: doorway-service — gospel `doorway-service-gospel` (doorway/doorway-service/CLAUDE.md).
+Truth: DERIVED — these docs are refinements OF the resilience canon (`resilience-protocol-spec`,
+Parts V/VI); residue cites genesis, never claims truth:self. Census row 12.
+
+ISLAND: doorway/doorway-service/{ARCHITECTURE.md, FEDERATION.md, SCALING.md, REACH.md,
+RECOVERY-PROTOCOL.md, RECOVERY-SPRINT-PLAN.md, EDGE-DESIGN.md} (7 docs).
+
+LIVENESS CAUTIONS: doorway/CLAUDE.md (the parent gospel) lists all 7 under "Reference
+Documentation" — that section must be rewritten as part of retirement (inbound-ref repair).
+RECOVERY-SPRINT-PLAN is plan-shaped → decompose to history + verified-open backlog, not seed.
+The no-per-domain-proxy + no-blob-fan-out rules are ALREADY gospel in doorway/CLAUDE.md —
+dedupe toward the gospel, never restate in residue. SCALING's two-axis model + graduation
+flywheel may be the strongest CANONIZE candidate — verify against the live deployment first.
+
+RAILS: this recipe §Phases 1-4. One operator gate before retirement.
+```
+
+### 5 — holochain (biggest island — consider two passes)
+
+```
+Run the HOLOCHAIN island recompose per the proven recipe:
+genesis/data/timeline/backlog/pillar-island-recompose-recipe.md — read it first. ultracode.
+
+LOCUS: holochain substrate — gospel `holochain-integrity-layer-gospel`
+(elohim/holochain/dna/CLAUDE.md). Truth: DERIVED — implements `elohim-protocol-specification`;
+residue cites the protocol canon, never claims truth:self. Census row 11.
+
+ISLAND (11 docs, two clusters):
+- dna/: LINK_ARCHITECTURE.md, NETWORK_UPGRADES.md, SCHEMA_VERSIONS.md
+- docs/: ARCHITECTURE.md, ARCHITECTURE-GAP.md, P2P-DATAPLANE.md, COMMUNITY-COMPUTE.md,
+  SYNC-ENGINE.md, DEPLOYMENT-RUNTIMES.md, DEVELOPMENT.md, REACH.md
+If one session can't hold it, split: dna/ cluster first (load-bearing: link architecture,
+upgrade/schema governance), docs/ cluster second.
+
+LIVENESS CAUTIONS: census verifier flagged a broken /elohim-node/ reference and stale paths in
+this tree — verify every pointer. docs/claude.md is lowercase (invisible to the cite graph) —
+normalize as part of the pass. LINK_ARCHITECTURE is integrity-layer governance: verify against
+the actual zome link types before CANONIZE. zome-sweettest-sync applies if any zome source is
+touched (it should NOT be — docs only). DNA workspaces stay plain cargo (no CARGO_TARGET_DIR).
+
+RAILS: this recipe §Phases 1-4. One operator gate before retirement.
+```
+
+### 6 — steward/node (pairs with its gospel decision)
+
+```
+Run the STEWARD-NODE island recompose per the proven recipe:
+genesis/data/timeline/backlog/pillar-island-recompose-recipe.md — read it first. ultracode.
+
+LOCUS: steward/node — NO gospel exists yet (held create-or-decline, census). Step 1 of this
+session IS the decision: create `steward-node-gospel` (steward/node/CLAUDE.md) as an
+implementation-crate gospel citing the orchestration epic ABOVE it
+(elohim-hub-boundaries-design) — the layered-drift rule: an implementation crate cites the
+epic, it is not its own domain. Census row 15.
+
+ISLAND: steward/node/ARCHITECTURE.md (+ check simulation/ — P2P-COMPUTE-FOOTPRINT lives there;
+it was judged simulation/analysis, likely research-home or stay, not retire).
+
+LIVENESS CAUTIONS: verify ARCHITECTURE.md against the live crate (libp2p 0.53 — macros+ed25519
+features, with_codec(), StreamExt::next()) and against elohim-hub-boundaries-design before any
+CANONIZE; the hub-composition content belongs to the epic, the crate-mechanics to the gospel.
+
+RAILS: this recipe §Phases 1-4. One operator gate before retirement.
+```
+
+### (shefa — different recipe)
+
+shefa's session is design-forward, seeded at
+`genesis/data/timeline/backlog/shefa-sensemaking-surface-session-seed.md` (four-surface lens,
+exchange-definition EPRs through the p2p-design-gate). Its small islands
+(README-EXCHANGE.md, README-INSURANCE-MUTUAL.md, banking-bridge/README.md) ride that session
+as a Phase-0 side-task using this recipe's rules — not a separate island session.
