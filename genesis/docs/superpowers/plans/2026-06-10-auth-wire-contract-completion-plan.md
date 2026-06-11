@@ -69,14 +69,14 @@ invent a parallel mechanism); `elohim/sdk/schemas/scripts/codegen-ts.mjs` `INTER
 **Files:** `app/elohim-app/src/app/imagodei/services/auth.service.ts` (+ its spec), a new
 platform tokenStore adapter in the imagodei pillar.
 
-- [ ] Angular adapter: `SessionTokenStore` backed by `localStorage` with SSR platform guard
+- [x] Angular adapter: `SessionTokenStore` backed by `localStorage` with SSR platform guard
       (`isPlatformBrowser` — the server path uses the in-memory default); `fetchImpl` from the
       platform; the `AuthProvider` registry and refresh-timer semantics stay at the service edge —
       the client replaces only the hand-rolled HTTP walking + token bookkeeping
-- [ ] Preserve observable behavior: same `AuthState` signal shape, same localStorage keys
+- [x] Preserve observable behavior: same `AuthState` signal shape, same localStorage keys
       (`AUTH_TOKEN_KEY` etc. — migrate-on-read if the stored shape changes), same refresh timing;
       `isRefreshing` guard maps onto `refresh()`
-- [ ] Existing auth.service spec green + new tests for the adapter (SSR path included);
+- [x] Existing auth.service spec green + new tests for the adapter (SSR path included);
       `pnpm test` (app) for the imagodei subset; lint clean
 - [ ] Verify in the dev loop: `pnpm look http://localhost:4200/<auth-surface>` renders login OK
       (eyes check — capture.json clean of new console errors). Commit.
@@ -107,7 +107,10 @@ platform tokenStore adapter in the imagodei pillar.
   direction for /core; suites 70 + 108 green, a2o tsc clean). Independent two-lens review was
   dispatched but **terminated by the account spend limit after 31 tool calls — re-review queued as
   the first action when work resumes.** Boxes below are CLAIMS with implementer evidence only.
-- T2-T4 not started. T2 next (elohim-app auth.service migration).
+- **T2 LANDED + reviewed ✅/APPROVED:** df41f874d — full app suite 214 files / 4612 tests; SSR
+  spy-proof real; storage contract preserved (expiry canonicalized w/ migrate-on-read); seconds/ms
+  timer math traced both directions; consolidation bypassed the OAuth provider's drifted snake_case
+  refresh parse. T3 (doorway-app) dispatched; T4 pending.
 
 ## Out of scope
 
