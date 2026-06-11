@@ -1,21 +1,46 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
+import { DoorwaySessionClient } from '@elohim/identity';
+
 import { DoorwayAdminService } from './doorway-admin.service';
+import { DoorwaySessionTokenStore } from './doorway-session-token.store';
 import { AccountResponse } from '../models/doorway.model';
 import { environment } from '../../environments/environment';
 
-const AUTH_TOKEN_KEY = 'doorway_auth_token';
-
+/**
+ * Auth display state for the operator dashboard.
+ *
+ * Edge vs walking split (auth-wire plan 2026-06-10, Task 3):
+ * - EDGE (stays here): the account signal + display computeds
+ *   (isSteward/modeLabel/initials), the URL session_token detection and
+ *   history cleanup, the GET /auth/account probe (an account-surface view,
+ *   not part of the session client's wire surface), and router navigation.
+ * - WALKING (delegated): GET /auth/exchange-session and POST /auth/logout go
+ *   through @elohim/identity's DoorwaySessionClient — the consolidated,
+ *   schema-contract-pinned auth wire surface. All token persistence goes
+ *   through DoorwaySessionTokenStore (the SAME legacy `doorway_auth_token`
+ *   raw-JWT localStorage key the auth interceptor reads).
+ */
 @Injectable({ providedIn: 'root' })
 export class AuthStateService {
   private readonly adminService = inject(DoorwayAdminService);
-  private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
 
+  /** Session persistence — same legacy localStorage key as always. */
+  private readonly tokenStore = inject(DoorwaySessionTokenStore);
+
   private readonly baseUrl = environment.doorwayUrl ?? '';
+
+  /**
+   * Doorway session wire walking. Bearer comes from the token store; these
+   * fetch calls do not pass through the Angular auth interceptor.
+   */
+  private readonly sessionClient = new DoorwaySessionClient({
+    baseUrl: this.baseUrl,
+    tokenStore: this.tokenStore,
+  });
 
   private readonly _account = signal<AccountResponse | null>(null);
   private readonly _isLoading = signal(true);
@@ -45,8 +70,7 @@ export class AuthStateService {
       // pages such as /threshold/login even though catchError swallowed the
       // RxJS error — the browser network layer logs the response before RxJS
       // processes it. Skip the probe and resolve as unauthenticated immediately.
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
-      if (!token) {
+      if (!this.sessionClient.token) {
         this._account.set(null);
         return;
       }
@@ -64,8 +88,16 @@ export class AuthStateService {
   }
 
   async logout(): Promise<void> {
-    await firstValueFrom(this.adminService.logout());
-    localStorage.removeItem(AUTH_TOKEN_KEY);
+    try {
+      // POST /auth/logout with the stored bearer. The client clears the
+      // stored token even when the request fails (finally semantics) — the
+      // same outcome as the legacy adminService.logout + removeItem pair.
+      await this.sessionClient.logout();
+    } catch {
+      // Server-side logout failure is non-blocking (legacy behavior: the
+      // admin service swallowed these errors); the local session is
+      // already cleared by the client.
+    }
     this._account.set(null);
     this.router.navigate(['/']);
   }
@@ -74,7 +106,7 @@ export class AuthStateService {
    * Store a JWT token (used after login or session exchange).
    */
   storeToken(token: string): void {
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
+    this.tokenStore.setToken(token);
   }
 
   /**
@@ -95,14 +127,9 @@ export class AuthStateService {
     window.history.replaceState({}, '', cleanUrl);
 
     try {
-      const response = await firstValueFrom(
-        this.http.get<{ token: string }>(
-          `${this.baseUrl}/auth/exchange-session?session_token=${encodeURIComponent(sessionToken)}`
-        )
-      );
-      if (response?.token) {
-        this.storeToken(response.token);
-      }
+      // Walks GET /auth/exchange-session and persists the resulting session
+      // via the token store (same legacy localStorage key).
+      await this.sessionClient.exchangeSessionToken(sessionToken);
     } catch {
       // Exchange failed (expired, consumed, or invalid token).
       // User will see the unauthenticated state and can log in manually.
