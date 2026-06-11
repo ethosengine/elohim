@@ -3,10 +3,10 @@
 Apply AFTER the operator gate approves `git rm` of the 7 docs in `doorway/doorway-service/`
 (ARCHITECTURE.md, FEDERATION.md, SCALING.md, REACH.md, RECOVERY-PROTOCOL.md, RECOVERY-SPRINT-PLAN.md, EDGE-DESIGN.md).
 
-Placeholders to substitute at apply time:
-- `<SCALING-SEED-PATH>` = `genesis/docs/content/elohim-protocol/architecture/2026-06-11-<scaling-seed>.md` (final name TBD)
-- `<HISTORY-CONSOLIDATION-FEDERATION-PATH>` = history record (gateway consolidation + federation arc)
-- `<HISTORY-RECOVERY-ARC-PATH>` = history record (recovery protocol arc)
+Placeholders (now resolved — substitute at apply time):
+- `<SCALING-SEED-PATH>` = `genesis/docs/content/elohim-protocol/architecture/2026-06-11-doorway-two-axis-scaling.md`
+- `<HISTORY-CONSOLIDATION-FEDERATION-PATH>` = `genesis/docs/content/elohim-protocol/history/2026-06-11-doorway-consolidation-federation-arc.md`
+- `<HISTORY-RECOVERY-ARC-PATH>` = `genesis/docs/content/elohim-protocol/history/2026-06-11-doorway-recovery-protocol-arc.md`
 
 Every old-text block below was verified verbatim against the file on 2026-06-11. All quoted line
 numbers are as of commit-time of this prep; match on text, not line number.
@@ -35,7 +35,7 @@ Detailed design docs live in `doorway-service/`:
 - `genesis/graphos/vocabulary.md` — Storage and distribution vocabulary register
 ```
 
-**NEW:**
+**NEW (reworked 2026-06-11 — hub-edge spec was deleted in 53190a234; replaced with existing targets):**
 
 ```markdown
 ## Reference Documentation
@@ -44,10 +44,10 @@ Component design lives in this file (architecture, trust model, routing, two sca
 reach enforcement) and in `doorway-service/CLAUDE.md` (Rust implementation orientation). The former
 `doorway-service/` design-doc island (ARCHITECTURE, FEDERATION, SCALING, REACH, RECOVERY-PROTOCOL,
 RECOVERY-SPRINT-PLAN, EDGE-DESIGN) was retired to git 2026-06-11. Deeper design:
-- `<SCALING-SEED-PATH>` — the scaling model seed (two-axis model, graduation flywheel, conductor pool, K8s modeling)
-- `<HISTORY-CONSOLIDATION-FEDERATION-PATH>` — gateway consolidation + federation arc (history)
-- `<HISTORY-RECOVERY-ARC-PATH>` — recovery protocol arc (history)
-- `genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md` — doorway/hub edge boundary (canonical)
+- `genesis/docs/content/elohim-protocol/architecture/2026-06-11-doorway-two-axis-scaling.md` — scaling model seed (two-axis model, graduation flywheel, conductor pool, K8s modeling)
+- `genesis/docs/content/elohim-protocol/history/2026-06-11-doorway-consolidation-federation-arc.md` — gateway consolidation + federation arc (history)
+- `genesis/docs/content/elohim-protocol/history/2026-06-11-doorway-recovery-protocol-arc.md` — recovery protocol arc (history)
+- `genesis/docs/content/elohim-protocol/resilience/` — resilience canon (doorway docs are derived from these epics)
 - `genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md` — recovery protocol, current design
 - `genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md` — access tiers (anon / hosted / steward-via-web)
 - `genesis/graphos/vocabulary.md` — Storage and distribution vocabulary register
@@ -71,17 +71,17 @@ Sibling design docs:
 - `RECOVERY-SPRINT-PLAN.md` — Recovery protocol implementation phases
 ```
 
-**NEW (repo-root paths used deliberately; the surviving "Upward anchors" list keeps its `../../` style):**
+**NEW (repo-root paths used deliberately; the surviving "Upward anchors" list keeps its `../../` style) (reworked 2026-06-11 — hub-edge spec deleted):**
 
 ```markdown
 ## Design Documentation
 
 The sibling design-doc island was retired to git 2026-06-11. Component design lives in `../CLAUDE.md`
 and this file; deeper design:
-- `<SCALING-SEED-PATH>` — scaling model (two-axis, graduation flywheel, K8s modeling)
-- `<HISTORY-CONSOLIDATION-FEDERATION-PATH>` — gateway consolidation + federation arc (history)
-- `<HISTORY-RECOVERY-ARC-PATH>` — recovery protocol arc (history)
-- `genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md` — doorway/hub edge boundary
+- `genesis/docs/content/elohim-protocol/architecture/2026-06-11-doorway-two-axis-scaling.md` — scaling model (two-axis, graduation flywheel, K8s modeling)
+- `genesis/docs/content/elohim-protocol/history/2026-06-11-doorway-consolidation-federation-arc.md` — gateway consolidation + federation arc (history)
+- `genesis/docs/content/elohim-protocol/history/2026-06-11-doorway-recovery-protocol-arc.md` — recovery protocol arc (history)
+- `genesis/docs/content/elohim-protocol/resilience/` — resilience canon (doorway service scenarios are derived from these epics)
 - `genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md` — recovery protocol, current design
 - `genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md` — access tiers
 ```

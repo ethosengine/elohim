@@ -73,9 +73,16 @@ NOT retiring: `elohim/holochain/docs/README.md` (reconciled in place), `steward/
 
 ## Known flaws to fix BEFORE applying deferred repairs
 
-- **doorway/deferred-ref-repairs.md §1.1/§1.2**: repoint "Reference Documentation" at the hub-edge
+- **doorway/deferred-ref-repairs.md §1.1/§1.2**: ~~repoint "Reference Documentation" at the hub-edge
   spec (`2026-05-08-doorway-hub-edge-design.md`) — that spec was DELETED in `53190a234`. Rework
-  those two blocks (suggested target: doorway gospel + the two history arcs + the two-axis seed).
+  those two blocks (suggested target: doorway gospel + the two history arcs + the two-axis seed).~~
+  **RESOLVED** (commit `docs(gate): rework doorway ref-repair blocks 1.1/1.2`): replaced dead
+  hub-edge spec pointer with the two-axis-scaling seed, two history arcs, resilience canon dir,
+  recovery-phase-2-revised spec, and access-tier-patterns — all verified to exist.
+- **NEW ROT found in §1.1/§1.2 sweep**: `doorway/deferred-ref-repairs.md §3.3` NEW block also
+  points to the deleted hub-edge spec (`2026-05-08-doorway-hub-edge-design.md`). §3.3 targets
+  `elohim/elohim-hub/README.md` — the repair should route to `doorway/CLAUDE.md` for doorway-side
+  framing instead. Fix before executing the gate (out of scope for this commit — operator action).
 - If any pillar's retirement is REJECTED: that pillar's history-record prose/derived_from uses
   anticipated-retirement phrasing ("retired to git 2026-06-11") — one-line softens needed
   (qahal session staged the exact edit; others note it in their state files).
