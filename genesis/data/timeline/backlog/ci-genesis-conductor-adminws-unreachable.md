@@ -9,7 +9,7 @@ written: "2026-06-08"
 author: "agentic-developer (overnight shift)"
 status: "wip"
 priority: "high"
-ci_status: blocked
+ci_status: pending-verification
 jobs: [elohim-genesis]
 tags: [ci, genesis, seeding, conductor, admin-ws, substrate, escalation, operator-owned]
 cites:
@@ -83,6 +83,15 @@ authorization end-state (and the condition for re-closing 8444/8445) is tracked 
 lever: it removes 3 stage-UNSTABLEs, the 33-step content-alpha resilience cascade, AND
 unblocks the conductor-seeded signal chain (`PeerStatusRecorded` → `/api/v1/peer-statuses`
 → `/api/v1/network/posture`) that the substrate-validation stages assert on.
+
+**UPDATE 2026-06-11: operator confirmed the netpol IS applied.** Build #1118
+(2026-06-10T20:47Z, all probes still refused) predates the apply, and no genesis
+build has run since (latest = #1118, nothing queued) — so the apply is real but
+unexercised. `ci_status` flipped blocked → pending-verification: the next genesis
+trigger is the self-verification (expect `[probe] ✅` ×3, the three seed stages
+actually seeding for the first time from CI, and — once the substrate-validation
+suite commits land — `CONDUCTOR_SEEDING_READY=true` un-gating Verify Resilience
+Signals and the Workstream-D junction fill).
 
 ## Diagnosis provenance
 Overnight agentic-developer shift 2026-06-08 (ci-investigator on builds #1104–#1106 +
