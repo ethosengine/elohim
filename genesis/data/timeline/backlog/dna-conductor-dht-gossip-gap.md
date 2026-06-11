@@ -49,3 +49,23 @@ shift_objective: |
   seed mismatch?), fix at the conductor layer, and prove it by
   propagation.custody-convergence going green with healed>0 or
   conductor_missing=0-with-local_total>0 on replicas.
+
+## MECHANISM CANDIDATE (live, fresh Gen-3 pods ~18:50Z 06-11): broken conductor DHT DB
+
+jessica's freshly-restarted conductor: `kitsune2_gossip: Failed to update
+DHT "no such table: DhtOp"` — the gossip layer cannot WRITE ops because
+the conductor database is missing the DhtOp table. A conductor whose
+gossip store is schema-broken cannot propagate or integrate ops,
+explaining both the entries-never-reach-siblings pattern AND formation's
+DepMissingFromDht class. Prime suspect: the conductor data dir is a
+persistent PVC — a holochain version change with a stale DB schema
+(never-migrated/incompatible) leaves kitsune2 writing into a table that
+doesn't exist. Sibling wrinkle, same window: matthew's lamad bridge
+cycling at attempt 82 on `DepMissingFromDht(InitZomesComplete)` — cell
+init itself failing the dep lookup.
+
+Disposition: operator-gated — fixing means conductor DB migration or a
+controlled reset (ALLOW_DNA_REINSTALL family: both genesis-pair pods
+together or DHT partition). The diagnosis is now concrete enough for a
+targeted operator session: check conductor holochain version vs PVC DB
+schema; decide migrate-vs-reset; alpha keys need lineage care.
