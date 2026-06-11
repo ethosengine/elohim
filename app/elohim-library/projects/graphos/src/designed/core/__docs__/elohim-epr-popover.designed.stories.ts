@@ -54,11 +54,11 @@ const POPOVER_TOKENS_DARK = `
   --elohim-epr-popover-fg:     var(--el-starlight);
   --elohim-epr-popover-border: 1px solid color-mix(in oklch, var(--el-starlight) 15%, transparent);
   --elohim-epr-popover-radius: var(--el-radius-md);
-  --elohim-epr-popover-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --elohim-epr-popover-shadow: 0 4px 24px rgba(15, 26, 18, 0.45);
   --elohim-epr-type-bg:        color-mix(in oklch, var(--el-green-light) 20%, var(--el-night-alt));
   --elohim-epr-type-fg:        var(--el-green-light);
-  --elohim-epr-tag-bg:         color-mix(in oklch, var(--el-starlight) 8%, var(--el-night-alt));
-  --elohim-epr-tag-fg:         var(--el-starlight);
+  --elohim-epr-tag-bg:         color-mix(in oklch, var(--el-amber) 22%, var(--el-night-alt));
+  --elohim-epr-tag-fg:         color-mix(in oklch, var(--el-amber) 55%, var(--el-starlight));
   --elohim-epr-reach-bg:       color-mix(in oklch, var(--el-starlight) 8%, var(--el-night-alt));
   --elohim-epr-reach-fg:       var(--el-starlight);
   --elohim-epr-layer-bg:       color-mix(in oklch, var(--el-starlight) 8%, var(--el-night-alt));
