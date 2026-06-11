@@ -32,6 +32,12 @@ shift, pending CI): persistent reconnect with capped backoff; late connect
 completes the same wiring as boot connect. Same pattern as the libp2p
 persistent-peering fix.
 
+Residual (deliberate, not implicated in the #1122 evidence): the registry's
+boot-time connect_role stays bounded for the infrastructure role (heartbeat,
+peer-status subscribers read its Option synchronously at boot) — converting
+it needs interior-mutable registry state; follow-up when that path shows up
+in evidence.
+
 shift_objective: |
   Verify on the next deploy that a rolling restart converges: bridge
   connects late, reconcile controller starts, conductor_missing drains to
