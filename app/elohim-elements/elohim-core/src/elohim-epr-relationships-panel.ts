@@ -76,7 +76,8 @@ function buildGroups(relationships: EprRelationship[]): RelationshipGroup[] {
  * @cssprop --elohim-epr-panel-card-border - Relationship card border
  * @cssprop --elohim-epr-panel-card-fg - Relationship card foreground text color
  * @cssprop --elohim-epr-panel-card-radius - Relationship card border radius
- * @cssprop --elohim-epr-panel-gap - Gap between relationship cards
+ * @cssprop --elohim-epr-panel-gap - Vertical rhythm between panel sections/groups
+ * @cssprop --elohim-epr-panel-card-gap - Gap between relationship cards inside the grid
  *
  * @csspart panel - The outer section element
  * @csspart group - Each relationship group container
@@ -126,7 +127,7 @@ export class ElohimEprRelationshipsPanel extends CapabilityAwareElement(LitEleme
     .group-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 0.625rem;
+      gap: var(--elohim-epr-panel-card-gap, 0.625rem);
     }
 
     .card {
