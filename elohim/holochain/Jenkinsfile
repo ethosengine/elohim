@@ -1269,6 +1269,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
+                                # Angular build happens HERE in the pnpm workspace:
+                                # doorway-app needs @elohim/identity (workspace:* +
+                                # tsconfig paths into app/elohim-library), unreachable
+                                # from the docker context (#1057). The image is a
+                                # thin nginx copy of dist/.
+                                pnpm install --frozen-lockfile --filter doorway-app...
+                                pnpm --filter doorway-app build
+
                                 cd doorway/doorway-app
 
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\

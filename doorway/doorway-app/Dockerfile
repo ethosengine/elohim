@@ -1,37 +1,24 @@
 # Doorway Operator Dashboard
-# Multi-stage build: Node for Angular, nginx for serving
+# THIN image: the Angular build happens OUTSIDE this Dockerfile, in the pnpm
+# workspace. doorway-app depends on @elohim/identity via workspace:* plus
+# tsconfig paths into ../../app/elohim-library — both unreachable from this
+# build context, so an in-image standalone `pnpm install` cannot resolve them
+# (edge #1057: ERR_PNPM_WORKSPACE_PKG_NOT_FOUND). CI builds in the
+# 'Build Doorway App' stage of elohim/holochain/Jenkinsfile.
 #
-# Build: docker build -t doorway-app .
+# Build: pnpm install --frozen-lockfile --filter doorway-app... \
+#        && pnpm --filter doorway-app build \
+#        && docker build -t doorway-app .
 # Run:   docker run -p 8080:80 doorway-app
 
-# Stage 1: Build Angular app
-FROM node:20-alpine AS builder
-
-# Enable pnpm via corepack
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
-
-WORKDIR /app
-
-# Copy package file for layer caching
-COPY package.json ./
-
-# Install dependencies
-# Note: doorway-app is a pnpm workspace member but has no workspace: deps,
-# so we install standalone without the workspace lockfile
-RUN pnpm install
-
-# Copy source and build (baseHref=/threshold/ is set in angular.json production config)
-COPY . .
-RUN pnpm run build
-
-# Stage 2: Serve with nginx
 FROM nginx:alpine
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy built Angular app
-COPY --from=builder /app/dist/doorway-app/browser /usr/share/nginx/html
+# Copy built Angular app (baseHref=/threshold/ is set in angular.json
+# production config; path matches angular.json "outputPath" + /browser)
+COPY dist/doorway-app/browser /usr/share/nginx/html
 
 # Expose port 80
 EXPOSE 80
