@@ -651,6 +651,10 @@
               "name": "--elohim-analytics-fg"
             },
             {
+              "description": "Title font family (display face binding point)",
+              "name": "--elohim-analytics-title-font"
+            },
+            {
               "description": "Title font size",
               "name": "--elohim-analytics-title-size"
             },
@@ -715,6 +719,10 @@
             {
               "description": "The explanatory note",
               "name": "note"
+            },
+            {
+              "description": "The error state",
+              "name": "error"
             }
           ],
           "members": [
@@ -2044,8 +2052,12 @@
               "name": "--elohim-epr-panel-card-radius"
             },
             {
-              "description": "Gap between relationship cards",
+              "description": "Vertical rhythm between panel sections/groups",
               "name": "--elohim-epr-panel-gap"
+            },
+            {
+              "description": "Gap between relationship cards inside the grid",
+              "name": "--elohim-epr-panel-card-gap"
             }
           ],
           "cssParts": [
@@ -2605,11 +2617,31 @@
           "name": "ElohimGateFeedbackTrigger",
           "cssProperties": [
             {
-              "description": "Trigger button icon color",
+              "description": "Trigger button background",
+              "name": "--elohim-gate-trigger-bg"
+            },
+            {
+              "description": "Trigger button icon/text color (preferred; falls back to --elohim-gate-trigger-btn-color)",
+              "name": "--elohim-gate-trigger-fg"
+            },
+            {
+              "description": "Trigger button border (FULL shorthand)",
+              "name": "--elohim-gate-trigger-border"
+            },
+            {
+              "description": "Trigger button corner radius",
+              "name": "--elohim-gate-trigger-radius"
+            },
+            {
+              "description": "Trigger button hover color (preferred; falls back to --elohim-gate-trigger-btn-hover-color)",
+              "name": "--elohim-gate-trigger-hover-fg"
+            },
+            {
+              "description": "Trigger button icon color (legacy alias)",
               "name": "--elohim-gate-trigger-btn-color"
             },
             {
-              "description": "Trigger button hover color",
+              "description": "Trigger button hover color (legacy alias)",
               "name": "--elohim-gate-trigger-btn-hover-color"
             },
             {
@@ -2629,12 +2661,44 @@
               "name": "--elohim-gate-menu-shadow"
             },
             {
+              "description": "Menu item text color",
+              "name": "--elohim-gate-menu-fg"
+            },
+            {
               "description": "Menu item hover background",
               "name": "--elohim-gate-menu-item-hover-bg"
             },
             {
               "description": "Modal panel background",
               "name": "--elohim-gate-modal-bg"
+            },
+            {
+              "description": "Modal panel text color",
+              "name": "--elohim-gate-modal-fg"
+            },
+            {
+              "description": "Modal panel border (FULL shorthand)",
+              "name": "--elohim-gate-modal-border"
+            },
+            {
+              "description": "Modal close button color",
+              "name": "--elohim-gate-close-fg"
+            },
+            {
+              "description": "Modal textarea background",
+              "name": "--elohim-gate-textarea-bg"
+            },
+            {
+              "description": "Modal textarea text color",
+              "name": "--elohim-gate-textarea-fg"
+            },
+            {
+              "description": "Modal textarea border (FULL shorthand)",
+              "name": "--elohim-gate-textarea-border"
+            },
+            {
+              "description": "Modal overlay scrim color",
+              "name": "--elohim-gate-scrim"
             },
             {
               "description": "Modal panel border radius",
@@ -3025,6 +3089,42 @@
             {
               "description": "Distribution bar height",
               "name": "--elohim-feedback-distribution-height"
+            },
+            {
+              "description": "Resting position button background",
+              "name": "--elohim-feedback-position-bg"
+            },
+            {
+              "description": "Resting position button text color",
+              "name": "--elohim-feedback-position-fg"
+            },
+            {
+              "description": "Position button border (FULL shorthand, e.g. `1px solid …` — not a color)",
+              "name": "--elohim-feedback-position-border"
+            },
+            {
+              "description": "Position button corner radius",
+              "name": "--elohim-feedback-position-radius"
+            },
+            {
+              "description": "Selected position button background (uniform override; falls back to the per-slot scale color)",
+              "name": "--elohim-feedback-position-active-bg"
+            },
+            {
+              "description": "Selected position button text color (uniform override; falls back to the per-slot fg)",
+              "name": "--elohim-feedback-position-active-fg"
+            },
+            {
+              "description": "Scale color for the 0 position (also -25/-50/-75/-100); drives resting border accent, selected bg, and distribution segments",
+              "name": "--elohim-feedback-scale-0"
+            },
+            {
+              "description": "Readable text color paired with --elohim-feedback-scale-0 when selected (also -25/-50/-75/-100); bind these in pairs",
+              "name": "--elohim-feedback-scale-0-fg"
+            },
+            {
+              "description": "Intensity slider accent color",
+              "name": "--elohim-feedback-accent"
             }
           ],
           "cssParts": [
@@ -3276,6 +3376,26 @@
             },
             {
               "kind": "method",
+              "name": "slotKey",
+              "privacy": "private",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "index",
+                  "type": {
+                    "text": "number"
+                  }
+                }
+              ],
+              "description": "Stable theming slot for a normalized position index (0 → \"0\", 0.25 → \"25\",\n… 1 → \"100\") — keys the per-slot `--elohim-feedback-scale-*` override\nsurface independently of context-specific labels."
+            },
+            {
+              "kind": "method",
               "name": "renderIntensitySection",
               "privacy": "private",
               "return": {
@@ -3326,6 +3446,25 @@
                   }
                 }
               ]
+            },
+            {
+              "kind": "method",
+              "name": "onRadioKeydown",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "e",
+                  "type": {
+                    "text": "KeyboardEvent"
+                  }
+                }
+              ],
+              "description": "APG radio-group pattern: arrows move focus AND selection (roving tabindex)."
             },
             {
               "kind": "method",
@@ -4298,7 +4437,7 @@
               },
               "default": "true",
               "description": "Show the search bar",
-              "attribute": "showSearch"
+              "attribute": "show-search"
             },
             {
               "kind": "field",
@@ -4308,7 +4447,7 @@
               },
               "default": "false",
               "description": "Whether the user is authenticated",
-              "attribute": "isAuthenticated"
+              "attribute": "is-authenticated"
             },
             {
               "kind": "field",
@@ -4318,7 +4457,7 @@
               },
               "default": "'Traveler'",
               "description": "Authenticated user display name",
-              "attribute": "displayName"
+              "attribute": "display-name"
             },
             {
               "kind": "field",
@@ -4338,7 +4477,7 @@
               },
               "default": "'anonymous'",
               "description": "Identity mode ('hosted' | 'steward' | 'anonymous')",
-              "attribute": "identityMode"
+              "attribute": "identity-mode"
             },
             {
               "kind": "field",
@@ -4715,7 +4854,7 @@
               "fieldName": "context"
             },
             {
-              "name": "showSearch",
+              "name": "show-search",
               "type": {
                 "text": "boolean"
               },
@@ -4724,7 +4863,7 @@
               "fieldName": "showSearch"
             },
             {
-              "name": "isAuthenticated",
+              "name": "is-authenticated",
               "type": {
                 "text": "boolean"
               },
@@ -4733,7 +4872,7 @@
               "fieldName": "isAuthenticated"
             },
             {
-              "name": "displayName",
+              "name": "display-name",
               "type": {
                 "text": "string"
               },
@@ -4751,7 +4890,7 @@
               "fieldName": "identifier"
             },
             {
-              "name": "identityMode",
+              "name": "identity-mode",
               "type": {
                 "text": "string"
               },
@@ -4965,7 +5104,7 @@
               "name": "--elohim-reaction-btn-bg"
             },
             {
-              "description": "Reaction button border",
+              "description": "Reaction button border (FULL shorthand, e.g. `1px solid …` — not a color)",
               "name": "--elohim-reaction-btn-border"
             },
             {
@@ -4977,7 +5116,11 @@
               "name": "--elohim-reaction-btn-active-bg"
             },
             {
-              "description": "Active button border color",
+              "description": "Active (selected) button foreground color",
+              "name": "--elohim-reaction-btn-active-fg"
+            },
+            {
+              "description": "Active button border (FULL shorthand, e.g. `1px solid …` — not a color)",
               "name": "--elohim-reaction-btn-active-border"
             },
             {
@@ -4999,6 +5142,10 @@
             {
               "description": "Mediation indicator / warning color",
               "name": "--elohim-reaction-warning-color"
+            },
+            {
+              "description": "Mediation overlay scrim color",
+              "name": "--elohim-reaction-scrim"
             }
           ],
           "cssParts": [
@@ -5465,9 +5612,24 @@
             {
               "description": "Override border-radius",
               "name": "--elohim-skeleton-radius"
+            },
+            {
+              "description": "Shared small-radius token consumed as the default corner radius (4px fallback)",
+              "name": "--elohim-radius-sm"
             }
           ],
           "members": [
+            {
+              "kind": "field",
+              "name": "DEFAULT_RADIUS",
+              "type": {
+                "text": "string"
+              },
+              "privacy": "private",
+              "static": true,
+              "readonly": true,
+              "default": "'var(--elohim-radius-sm, 4px)'"
+            },
             {
               "kind": "field",
               "name": "width",
@@ -5494,7 +5656,6 @@
               "type": {
                 "text": "string"
               },
-              "default": "'var(--elohim-radius-sm, 4px)'",
               "description": "Optional border-radius (default: var(--elohim-radius-sm, 4px))",
               "attribute": "radius"
             }
@@ -5523,7 +5684,6 @@
               "type": {
                 "text": "string"
               },
-              "default": "'var(--elohim-radius-sm, 4px)'",
               "description": "Optional border-radius (default: var(--elohim-radius-sm, 4px))",
               "fieldName": "radius"
             }
