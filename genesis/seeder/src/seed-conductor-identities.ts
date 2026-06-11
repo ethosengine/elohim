@@ -16,9 +16,21 @@
  *                                soft-land before the pipeline's global timeout fires
  *
  * Output:
- *   [+] Created — Human profile was just created on the conductor
- *   [=] Exists  — Human profile already present (idempotent)
- *   [X] Failed  — Could not connect or create (see error)
+ *   [+] Created  — Human profile was just created on the conductor
+ *   [=] Exists   — THIS human's profile already present (idempotent)
+ *   [C] Conflict — the human's own conductor already embodies a DIFFERENT
+ *                  human id (one agent = one Human; needs operator attention)
+ *   [-] Skipped  — no conductor deployed for this human (soft, not a failure)
+ *   [X] Failed   — could not connect or create (see error)
+ *
+ * Conductor affinity: a human seeds ONLY onto their own pod, resolved by the
+ * `elohim-<name>-<env>` service naming convention — the same rule
+ * genesis/Jenkinsfile uses to build CONDUCTOR_URLS. First-reachable-wins is
+ * how genesis #1119 got the founder FATAL: every human probed matthew's
+ * conductor first, saw SOME human existed (the old exists-check never compared
+ * ids), and reported a no-op "exists" while matthew himself (doorway phase)
+ * was filtered out entirely. When CONDUCTOR_URLS carries no name-affine URLs
+ * (local dev), the legacy walk applies, but with the id-aware exists check.
  *
  *   seed-results-conductor-identities.json — structured per-human results,
  *     written next to the script. The Jenkinsfile reads this to emit a
@@ -79,7 +91,7 @@ interface HumanOutput {
   display_name: string;
 }
 
-type SeedResult = 'created' | 'exists' | 'failed';
+type SeedResult = 'created' | 'exists' | 'conflict' | 'skipped' | 'failed';
 
 interface ConductorResult {
   displayName: string;
@@ -271,14 +283,58 @@ async function createHuman(
 }
 
 // =============================================================================
+// Conductor affinity + identity helpers (pure — exported for unit tests)
+// =============================================================================
+
+/** `human-matthew-manager` → `matthew` (genesis/Jenkinsfile's exact rule). */
+export function humanShortName(humanId: string): string {
+  return humanId.replace(/^human-/, '').split('-')[0];
+}
+
+/** A URL set is name-affine when any URL follows `elohim-<name>-<env>`. */
+const NAME_AFFINE_RE = /elohim-[a-z0-9]+-/;
+
+export function urlsAreNameAffine(conductorUrls: string[]): boolean {
+  return conductorUrls.some(u => NAME_AFFINE_RE.test(u));
+}
+
+/**
+ * Resolve the conductor URL that belongs to this human via the
+ * `elohim-<name>-<env>` service convention. Null when the human has no
+ * deployed conductor in the list.
+ */
+export function conductorUrlForHuman(
+  humanId: string,
+  conductorUrls: string[]
+): string | null {
+  const name = humanShortName(humanId);
+  return conductorUrls.find(u => u.includes(`elohim-${name}-`)) ?? null;
+}
+
+/**
+ * Normalize get_my_human's return across zome/client shapes:
+ * `{ id }` (HumanOutput) or `{ human: { id } }` (wrapped).
+ */
+export function extractHumanId(result: unknown): string | undefined {
+  if (!result || typeof result !== 'object') return undefined;
+  const r = result as Record<string, unknown>;
+  if (typeof r['id'] === 'string') return r['id'];
+  const nested = r['human'];
+  if (nested && typeof nested === 'object') {
+    const nid = (nested as Record<string, unknown>)['id'];
+    if (typeof nid === 'string') return nid;
+  }
+  return undefined;
+}
+
+// =============================================================================
 // Per-human seeding logic
 // =============================================================================
 
 /**
- * Attempt to seed one human across the available conductor URLs.
- *
- * Iterates conductor URLs until one responds with a matching app. If none
- * match, the human is skipped (no conductor found for them).
+ * Seed one human onto THEIR conductor (name-affine), or — when CONDUCTOR_URLS
+ * has no name-affine URLs (local dev) — walk the list with the id-aware
+ * exists check.
  */
 async function seedHumanOnConductor(
   human: HumansJsonHuman,
@@ -290,9 +346,24 @@ async function seedHumanOnConductor(
     humanId: human.id,
   };
 
+  // Name-affine targeting: this human's own pod, or nothing. The legacy
+  // walk survives only for non-affine URL sets (local dev).
+  const affine = urlsAreNameAffine(conductorUrls);
+  const ownUrl = conductorUrlForHuman(human.id, conductorUrls);
+  const candidates = affine ? (ownUrl ? [ownUrl] : []) : conductorUrls;
+
+  if (candidates.length === 0) {
+    return {
+      ...base,
+      conductorUrl: '(none)',
+      result: 'skipped',
+      error: `no conductor deployed for this human (no elohim-${humanShortName(human.id)}-* in CONDUCTOR_URLS)`,
+    };
+  }
+
   let lastError: string | undefined;
 
-  for (const conductorUrl of conductorUrls) {
+  for (const conductorUrl of candidates) {
     let session: ConductorSession | null = null;
 
     try {
@@ -311,12 +382,30 @@ async function seedHumanOnConductor(
     const { appWs, cellId } = session;
 
     try {
-      // Check if Human already exists
+      // Identity-aware exists check: "a human exists here" only counts when
+      // it is THIS human. One agent = one Human — a different id on the
+      // human's own conductor is a conflict, not an idempotent no-op.
       const existing = await getMyHuman(appWs, cellId);
+      const existingId = extractHumanId(existing);
 
-      if (existing) {
+      if (existingId === human.id) {
         await appWs.client.close();
         return { ...base, conductorUrl, result: 'exists' };
+      }
+
+      if (existingId !== undefined) {
+        await appWs.client.close();
+        if (affine) {
+          return {
+            ...base,
+            conductorUrl,
+            result: 'conflict',
+            error: `conductor already embodies '${existingId}' — expected '${human.id}'`,
+          };
+        }
+        // Legacy walk: someone else's conductor — keep looking.
+        lastError = `conductor at ${conductorUrl} embodies '${existingId}'`;
+        continue;
       }
 
       // Create Human profile
@@ -382,9 +471,11 @@ async function main(): Promise<void> {
   }
   const humansJson: HumansJson = JSON.parse(readFileSync(jsonPath, 'utf-8'));
 
-  // Filter to node and device humans only
+  // Node, device, AND doorway humans: doorway humans (matthew) host a full
+  // conductor too — excluding them is how the household founder was never
+  // seeded and formation FATALed (genesis #1119).
   const targets = humansJson.humans.filter(
-    h => h.agencyPhase === 'node' || h.agencyPhase === 'device'
+    h => h.agencyPhase === 'node' || h.agencyPhase === 'device' || h.agencyPhase === 'doorway'
   );
 
   console.log('=== Seed Conductor Identities ===\n');
@@ -392,7 +483,7 @@ async function main(): Promise<void> {
   console.log(
     `Conductors:    ${conductorUrls.length > 0 ? conductorUrls.join(', ') : '(none — set CONDUCTOR_URLS)'}`
   );
-  console.log(`Humans:        ${targets.length} node/device of ${humansJson.humans.length} total`);
+  console.log(`Humans:        ${targets.length} node/device/doorway of ${humansJson.humans.length} total`);
   console.log('');
 
   if (conductorUrls.length === 0) {
@@ -401,8 +492,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Sort: node first, then device
-  const phaseOrder: Record<string, number> = { node: 0, device: 1 };
+  // Sort: doorway (founder hosts) first, then node, then device
+  const phaseOrder: Record<string, number> = { doorway: 0, node: 1, device: 2 };
   const sorted = [...targets].sort(
     (a, b) => (phaseOrder[a.agencyPhase ?? 'device'] ?? 99) - (phaseOrder[b.agencyPhase ?? 'device'] ?? 99)
   );
@@ -413,7 +504,12 @@ async function main(): Promise<void> {
     const result = await seedHumanOnConductor(human, conductorUrls, appIdPrefix);
     results.push(result);
 
-    const icon = result.result === 'created' ? '+' : result.result === 'exists' ? '=' : 'X';
+    const icon =
+      result.result === 'created' ? '+'
+      : result.result === 'exists' ? '='
+      : result.result === 'conflict' ? 'C'
+      : result.result === 'skipped' ? '-'
+      : 'X';
     const phase = (human.agencyPhase ?? '').padEnd(6);
     const name = result.displayName.padEnd(16);
     const suffix = result.error ? ` (${result.error})` : '';
@@ -422,11 +518,15 @@ async function main(): Promise<void> {
 
   const created = results.filter(r => r.result === 'created').length;
   const exists = results.filter(r => r.result === 'exists').length;
-  const failed = results.filter(r => r.result === 'failed').length;
+  const conflict = results.filter(r => r.result === 'conflict').length;
+  const skipped = results.filter(r => r.result === 'skipped').length;
+  const failed = results.filter(r => r.result === 'failed').length + conflict;
   const succeeded = created + exists;
 
   console.log('');
-  console.log(`=== Results: ${created} created, ${exists} existing, ${failed} failed ===`);
+  console.log(
+    `=== Results: ${created} created, ${exists} existing, ${conflict} conflict, ${skipped} skipped, ${failed - conflict} failed ===`
+  );
 
   // Structured artifact for Jenkinsfile + orchestrator-level reconciliation.
   // Schema kept stable so Path C (stageAnnotations in actual-build-graph.json)
@@ -435,10 +535,10 @@ async function main(): Promise<void> {
     schemaVersion: '1',
     seededAt: new Date().toISOString(),
     script: 'seed-conductor-identities',
-    counts: { created, exists, failed, succeeded, total: results.length },
+    counts: { created, exists, conflict, skipped, failed, succeeded, total: results.length },
     partial: succeeded > 0 && failed > 0,
     allSucceeded: failed === 0,
-    allFailed: succeeded === 0 && results.length > 0,
+    allFailed: succeeded === 0 && failed > 0,
     results: results.map(r => ({
       humanId: r.humanId,
       displayName: r.displayName,
@@ -455,7 +555,7 @@ async function main(): Promise<void> {
 
   if (failed > 0) {
     console.error('\nFailed humans:');
-    for (const r of results.filter(r => r.result === 'failed')) {
+    for (const r of results.filter(r => r.result === 'failed' || r.result === 'conflict')) {
       console.error(`  ${r.displayName} (${r.humanId}): ${r.error}`);
     }
     // Partial-readiness aware: exit 2 if at least one succeeded, exit 1
@@ -468,4 +568,8 @@ async function main(): Promise<void> {
   process.exit(0);
 }
 
-main();
+// Only run when executed directly (same guard as seed-household-formation.ts) —
+// the pure helpers above are imported by unit tests.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

@@ -71,7 +71,7 @@ export interface HouseholdMember {
 export const HOUSEHOLD_MEMBERS: HouseholdMember[] = [
   { humanId: 'human-matthew-manager', archetype: 'desktop', role: 'steward', minor: false },
   { humanId: 'human-jessica-spouse', archetype: 'desktop', role: 'steward', minor: false },
-  { humanId: 'human-james-student', archetype: 'mobile', role: 'contributor', minor: true },
+  { humanId: 'human-james-son', archetype: 'mobile', role: 'contributor', minor: true },
 ];
 
 // =============================================================================

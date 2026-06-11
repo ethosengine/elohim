@@ -131,8 +131,8 @@ describe('resolvePeerId (Stage 2)', () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error('timeout');
     });
-    const a = await resolvePeerId('human-james-student', 'mobile', { fetchImpl });
-    const b = await resolvePeerId('human-james-student', 'mobile', { fetchImpl });
+    const a = await resolvePeerId('human-james-son', 'mobile', { fetchImpl });
+    const b = await resolvePeerId('human-james-son', 'mobile', { fetchImpl });
     expect(a).toBe(b);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
@@ -183,7 +183,7 @@ describe('defaultCustodyPairs triad fixture', () => {
     // 2 M1 pairs (matthew<->jessica) + 4 fixture pairs (james with each parent, both directions)
     expect(pairs).toHaveLength(6);
     const jamesPairs = pairs.filter(
-      p => p.providerHumanId === 'human-james-student' || p.receiverHumanId === 'human-james-student'
+      p => p.providerHumanId === 'human-james-son' || p.receiverHumanId === 'human-james-son'
     );
     expect(jamesPairs).toHaveLength(4);
     for (const p of jamesPairs) expect(p.fixture).toBe('formation-output');
@@ -194,7 +194,7 @@ describe('defaultCustodyPairs triad fixture', () => {
   it('stamps fixture provenance into the commitment body metadata', () => {
     const body = buildCustodyCommitmentBody({
       providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
-      receiverHumanId: 'human-james-student', receiverArchetype: 'mobile',
+      receiverHumanId: 'human-james-son', receiverArchetype: 'mobile',
       blobHash: 'sha256-deadbeef', blobSizeBytes: 1, fixture: 'formation-output',
     });
     expect(body.metadata.fixture).toBe('formation-output');
