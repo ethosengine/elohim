@@ -114,7 +114,8 @@ iframes is permitted in Chromium (mixed-content rules block the reverse).
 ## Testing
 
 Pure functions (id parsing, component matching + suggestions, grouping,
-`sheet.html` generation) unit-tested in `scripts/__tests__/graphos.test.ts`
+`sheet.html` generation) unit-tested in `scripts/__tests__/graphos-stories.test.ts`
++ `scripts/__tests__/graphos-cli.test.ts` (parser, slug containment, groupRows)
 under a2o's existing `test:unit` (node:test via tsx). Browser paths follow
 the `look.ts` convention: exercised by use, not CI. Post-implementation
 smoke: `pnpm graphos sheet elohim-compute-tile` rendered and Read.
