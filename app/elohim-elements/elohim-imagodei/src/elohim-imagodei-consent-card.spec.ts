@@ -78,11 +78,11 @@ describe('<elohim-imagodei-consent-card>', () => {
       ></elohim-imagodei-consent-card>
     `);
     let detail: { grantedClaims: string[] } | null = null;
-    el.addEventListener('approve', (e) => {
+    el.addEventListener('approve', e => {
       detail = (e as CustomEvent<{ grantedClaims: string[] }>).detail;
     });
     await el.updateComplete;
-    (el.shadowRoot!.querySelector<HTMLElement>('[part="approve"]'))!.click();
+    el.shadowRoot!.querySelector<HTMLElement>('[part="approve"]')!.click();
     expect(detail!.grantedClaims).to.deep.equal(['imagodei.displayName', 'qahal.standing']);
   });
 
@@ -95,10 +95,10 @@ describe('<elohim-imagodei-consent-card>', () => {
       ></elohim-imagodei-consent-card>
     `);
     let detail: { reason: string } | null = null;
-    el.addEventListener('decline', (e) => {
+    el.addEventListener('decline', e => {
       detail = (e as CustomEvent<{ reason: string }>).detail;
     });
-    (el.shadowRoot!.querySelector<HTMLElement>('[part="decline"]'))!.click();
+    el.shadowRoot!.querySelector<HTMLElement>('[part="decline"]')!.click();
     expect(detail!.reason).to.equal('user-rejected');
   });
 
@@ -118,10 +118,10 @@ describe('<elohim-imagodei-consent-card>', () => {
     optionalToggle.dispatchEvent(new Event('change'));
     await el.updateComplete;
     let detail: { grantedClaims: string[] } | null = null;
-    el.addEventListener('approve', (e) => {
+    el.addEventListener('approve', e => {
       detail = (e as CustomEvent<{ grantedClaims: string[] }>).detail;
     });
-    (el.shadowRoot!.querySelector<HTMLElement>('[part="approve"]'))!.click();
+    el.shadowRoot!.querySelector<HTMLElement>('[part="approve"]')!.click();
     expect(detail!.grantedClaims).to.deep.equal(['imagodei.displayName']);
   });
 
@@ -138,13 +138,13 @@ describe('<elohim-imagodei-consent-card>', () => {
     (el as unknown as { _granted: Set<string> })._granted = new Set(['qahal.standing']);
     let declineDetail: { reason: string } | null = null;
     let approveDetail: { grantedClaims: string[] } | null = null;
-    el.addEventListener('decline', (e) => {
+    el.addEventListener('decline', e => {
       declineDetail = (e as CustomEvent<{ reason: string }>).detail;
     });
-    el.addEventListener('approve', (e) => {
+    el.addEventListener('approve', e => {
       approveDetail = (e as CustomEvent<{ grantedClaims: string[] }>).detail;
     });
-    (el.shadowRoot!.querySelector<HTMLElement>('[part="approve"]'))!.click();
+    el.shadowRoot!.querySelector<HTMLElement>('[part="approve"]')!.click();
     expect(approveDetail).to.be.null;
     expect(declineDetail!.reason).to.equal('partial-decline-blocked');
   });
@@ -152,7 +152,11 @@ describe('<elohim-imagodei-consent-card>', () => {
   it('renders rp part with client displayName and RP-mark', async () => {
     const el = await fixture<ElohimImagodeiConsentCard>(html`
       <elohim-imagodei-consent-card
-        .requestingClient=${{ id: 'myapp', displayName: 'My App', brandMark: 'https://example.com/logo.png' }}
+        .requestingClient=${{
+          id: 'myapp',
+          displayName: 'My App',
+          brandMark: 'https://example.com/logo.png',
+        }}
         .requestedClaims=${CLAIMS}
         .requiredClaims=${[]}
       ></elohim-imagodei-consent-card>
@@ -189,7 +193,7 @@ describe('<elohim-imagodei-consent-card>', () => {
     `);
     const slot = el.shadowRoot!.querySelector('slot[name="policy-link"]') as HTMLSlotElement;
     expect(slot).to.exist;
-    expect(slot.assignedElements().some((n) => (n as HTMLElement).tagName === 'A')).to.equal(true);
+    expect(slot.assignedElements().some(n => (n as HTMLElement).tagName === 'A')).to.equal(true);
   });
 
   it('approve and decline buttons exist', async () => {
@@ -213,7 +217,7 @@ describe('<elohim-imagodei-consent-card>', () => {
       ></elohim-imagodei-consent-card>
     `);
     const rows = el.shadowRoot!.querySelectorAll('[part="claim-row"]');
-    const ids = Array.from(rows).map((r) => r.getAttribute('data-claim-id'));
+    const ids = Array.from(rows).map(r => r.getAttribute('data-claim-id'));
     expect(ids).to.deep.equal(['imagodei.displayName', 'qahal.standing']);
   });
 
@@ -238,10 +242,10 @@ describe('<elohim-imagodei-consent-card>', () => {
     toggle.dispatchEvent(new Event('change'));
     await el.updateComplete;
     let detail: { grantedClaims: string[] } | null = null;
-    el.addEventListener('approve', (e) => {
+    el.addEventListener('approve', e => {
       detail = (e as CustomEvent<{ grantedClaims: string[] }>).detail;
     });
-    (el.shadowRoot!.querySelector<HTMLElement>('[part="approve"]'))!.click();
+    el.shadowRoot!.querySelector<HTMLElement>('[part="approve"]')!.click();
     expect(detail!.grantedClaims).to.include('qahal.standing');
   });
 });
@@ -298,17 +302,15 @@ describe('<elohim-imagodei-consent-card> — ua-prefs precondition gate', () => 
   afterEach(() => clearMediaQueries());
 
   it('CSS omits transitions and animations (still by default)', () => {
-    const cssText = (
-      ElohimImagodeiConsentCardClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiConsentCardClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     expect(cssText).to.not.contain('transition:');
     expect(cssText).to.not.contain('animation:');
   });
 
   it('CSS has a forced-colors override block', () => {
-    const cssText = (
-      ElohimImagodeiConsentCardClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiConsentCardClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     expect(cssText).to.contain('forced-colors');
   });
 
@@ -349,9 +351,8 @@ describe('<elohim-imagodei-consent-card> — i18n precondition gate', () => {
   });
 
   it('uses no physical CSS properties (only logical or non-positional)', () => {
-    const cssText = (
-      ElohimImagodeiConsentCardClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiConsentCardClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });

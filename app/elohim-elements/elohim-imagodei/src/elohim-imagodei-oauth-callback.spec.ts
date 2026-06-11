@@ -24,7 +24,10 @@ describe('<elohim-imagodei-oauth-callback>', () => {
       <elohim-imagodei-oauth-callback
         code="abc"
         state="xyz"
-        .exchangeCode=${async () => new Promise(() => {/* never resolves */})}
+        .exchangeCode=${async () =>
+          new Promise(() => {
+            /* never resolves */
+          })}
       ></elohim-imagodei-oauth-callback>
     `);
     await el.updateComplete;
@@ -40,8 +43,10 @@ describe('<elohim-imagodei-oauth-callback>', () => {
       ></elohim-imagodei-oauth-callback>
     `);
     let detail: any = null;
-    el.addEventListener('success', (e) => { detail = (e as CustomEvent).detail; });
-    await new Promise((r) => setTimeout(r, 20));
+    el.addEventListener('success', e => {
+      detail = (e as CustomEvent).detail;
+    });
+    await new Promise(r => setTimeout(r, 20));
     expect(detail.session.humanId).to.equal('matthew');
   });
 
@@ -50,12 +55,16 @@ describe('<elohim-imagodei-oauth-callback>', () => {
       <elohim-imagodei-oauth-callback
         code="abc"
         state="xyz"
-        .exchangeCode=${async () => { throw new Error('invalid_grant'); }}
+        .exchangeCode=${async () => {
+          throw new Error('invalid_grant');
+        }}
       ></elohim-imagodei-oauth-callback>
     `);
     let detail: any = null;
-    el.addEventListener('error', (e) => { detail = (e as CustomEvent).detail; });
-    await new Promise((r) => setTimeout(r, 20));
+    el.addEventListener('error', e => {
+      detail = (e as CustomEvent).detail;
+    });
+    await new Promise(r => setTimeout(r, 20));
     expect(detail.reason).to.include('invalid_grant');
   });
 
@@ -64,10 +73,13 @@ describe('<elohim-imagodei-oauth-callback>', () => {
     const el = await fixture<ElohimImagodeiOauthCallback>(html`
       <elohim-imagodei-oauth-callback
         state="xyz"
-        .exchangeCode=${async (): Promise<ExchangeOutcome> => { called = true; return { session: {} }; }}
+        .exchangeCode=${async (): Promise<ExchangeOutcome> => {
+          called = true;
+          return { session: {} };
+        }}
       ></elohim-imagodei-oauth-callback>
     `);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 20));
     expect(called).to.equal(false);
   });
 
@@ -76,10 +88,13 @@ describe('<elohim-imagodei-oauth-callback>', () => {
     const el = await fixture<ElohimImagodeiOauthCallback>(html`
       <elohim-imagodei-oauth-callback
         code="abc"
-        .exchangeCode=${async (): Promise<ExchangeOutcome> => { called = true; return { session: {} }; }}
+        .exchangeCode=${async (): Promise<ExchangeOutcome> => {
+          called = true;
+          return { session: {} };
+        }}
       ></elohim-imagodei-oauth-callback>
     `);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 20));
     expect(called).to.equal(false);
   });
 
@@ -89,15 +104,18 @@ describe('<elohim-imagodei-oauth-callback>', () => {
       <elohim-imagodei-oauth-callback
         code="abc"
         state="xyz"
-        .exchangeCode=${async (): Promise<ExchangeOutcome> => { callCount += 1; return { session: {} }; }}
+        .exchangeCode=${async (): Promise<ExchangeOutcome> => {
+          callCount += 1;
+          return { session: {} };
+        }}
       ></elohim-imagodei-oauth-callback>
     `);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 20));
     // Re-set the props to the same values; should NOT trigger another exchange
     el.code = 'abc';
     el.state = 'xyz';
     await el.updateComplete;
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 20));
     expect(callCount).to.equal(1);
   });
 
@@ -106,17 +124,23 @@ describe('<elohim-imagodei-oauth-callback>', () => {
       <elohim-imagodei-oauth-callback
         code="abc"
         state="xyz"
-        .exchangeCode=${async () => { throw new Error('invalid_grant'); }}
+        .exchangeCode=${async () => {
+          throw new Error('invalid_grant');
+        }}
       >
         <div slot="error-detail" id="err-detail">extra detail</div>
         <a slot="recovery-cta" id="recovery" href="/identity/recovery">recover</a>
       </elohim-imagodei-oauth-callback>
     `);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 20));
     const errSlot = el.shadowRoot!.querySelector('slot[name="error-detail"]') as HTMLSlotElement;
     const recSlot = el.shadowRoot!.querySelector('slot[name="recovery-cta"]') as HTMLSlotElement;
-    expect(errSlot?.assignedElements().some((n) => (n as HTMLElement).id === 'err-detail')).to.equal(true);
-    expect(recSlot?.assignedElements().some((n) => (n as HTMLElement).id === 'recovery')).to.equal(true);
+    expect(errSlot?.assignedElements().some(n => (n as HTMLElement).id === 'err-detail')).to.equal(
+      true
+    );
+    expect(recSlot?.assignedElements().some(n => (n as HTMLElement).id === 'recovery')).to.equal(
+      true
+    );
   });
 
   it('renders idle state when neither code nor state provided', async () => {
@@ -137,7 +161,7 @@ describe('<elohim-imagodei-oauth-callback>', () => {
         .exchangeCode=${async (): Promise<ExchangeOutcome> => ({ session: {} })}
       ></elohim-imagodei-oauth-callback>
     `);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 20));
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector('[part="done"]')).to.exist;
   });
@@ -148,7 +172,10 @@ describe('<elohim-imagodei-oauth-callback>', () => {
         code="abc"
         state="xyz"
         provider-label="GitHub"
-        .exchangeCode=${async () => new Promise(() => {/* never resolves */})}
+        .exchangeCode=${async () =>
+          new Promise(() => {
+            /* never resolves */
+          })}
       ></elohim-imagodei-oauth-callback>
     `);
     await el.updateComplete;
@@ -161,10 +188,12 @@ describe('<elohim-imagodei-oauth-callback>', () => {
       <elohim-imagodei-oauth-callback
         code="abc"
         state="xyz"
-        .exchangeCode=${async () => { throw new Error('token_expired'); }}
+        .exchangeCode=${async () => {
+          throw new Error('token_expired');
+        }}
       ></elohim-imagodei-oauth-callback>
     `);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 20));
     await el.updateComplete;
     const errorEl = el.shadowRoot!.querySelector('[part="error"]');
     expect(errorEl).to.exist;
@@ -176,7 +205,10 @@ describe('<elohim-imagodei-oauth-callback>', () => {
       <elohim-imagodei-oauth-callback
         code="abc"
         state="xyz"
-        .exchangeCode=${async () => new Promise(() => {/* never resolves */})}
+        .exchangeCode=${async () =>
+          new Promise(() => {
+            /* never resolves */
+          })}
       ></elohim-imagodei-oauth-callback>
     `);
     await el.updateComplete;
@@ -205,7 +237,10 @@ describe('<elohim-imagodei-oauth-callback> — a11y precondition gate', () => {
       <elohim-imagodei-oauth-callback
         code="abc"
         state="xyz"
-        .exchangeCode=${async () => new Promise(() => {/* never resolves */})}
+        .exchangeCode=${async () =>
+          new Promise(() => {
+            /* never resolves */
+          })}
       ></elohim-imagodei-oauth-callback>
     `);
     await el.updateComplete;
@@ -218,10 +253,12 @@ describe('<elohim-imagodei-oauth-callback> — a11y precondition gate', () => {
       <elohim-imagodei-oauth-callback
         code="abc"
         state="xyz"
-        .exchangeCode=${async () => { throw new Error('invalid_grant'); }}
+        .exchangeCode=${async () => {
+          throw new Error('invalid_grant');
+        }}
       ></elohim-imagodei-oauth-callback>
     `);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 20));
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -234,7 +271,7 @@ describe('<elohim-imagodei-oauth-callback> — a11y precondition gate', () => {
         .exchangeCode=${async (): Promise<ExchangeOutcome> => ({ session: {} })}
       ></elohim-imagodei-oauth-callback>
     `);
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 20));
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);
   });
@@ -248,16 +285,14 @@ describe('<elohim-imagodei-oauth-callback> — ua-prefs precondition gate', () =
   afterEach(() => clearMediaQueries());
 
   it('CSS wraps skeleton animation in prefers-reduced-motion media query', () => {
-    const cssText = (
-      ElohimImagodeiOauthCallbackClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiOauthCallbackClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     expect(cssText).to.contain('prefers-reduced-motion');
   });
 
   it('CSS has a forced-colors override block', () => {
-    const cssText = (
-      ElohimImagodeiOauthCallbackClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiOauthCallbackClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     expect(cssText).to.contain('forced-colors');
   });
 
@@ -294,9 +329,8 @@ describe('<elohim-imagodei-oauth-callback> — i18n precondition gate', () => {
   });
 
   it('uses no physical CSS properties (only logical or non-positional)', () => {
-    const cssText = (
-      ElohimImagodeiOauthCallbackClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiOauthCallbackClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });

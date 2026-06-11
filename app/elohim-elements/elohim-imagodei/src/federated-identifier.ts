@@ -117,13 +117,13 @@ export type ResolveOutcome =
  */
 export function resolveGatewayToDoorwayUrl(
   gatewayDomain: string,
-  knownDoorways: ReadonlyArray<DoorwayDescriptor> = [],
+  knownDoorways: ReadonlyArray<DoorwayDescriptor> = []
 ): ResolveOutcome {
   // 1. Match against known doorways (by URL content or doorway-prefix convention)
   const parts = gatewayDomain.split('.');
   const firstSubdomain = parts[0] ?? '';
   const known = knownDoorways.find(
-    (d) => d.url.includes(gatewayDomain) || d.url.includes(`doorway-${firstSubdomain}`),
+    d => d.url.includes(gatewayDomain) || d.url.includes(`doorway-${firstSubdomain}`)
   );
   if (known) {
     return { ok: true, doorway: { url: known.url, id: known.id } };

@@ -60,7 +60,10 @@ export class ElohimImagodeiTrustIndicator extends CapabilityAwareElement(LitElem
       gap: 0.5rem;
       padding-block: var(--elohim-trust-padding-block, 0.25rem);
       padding-inline: var(--elohim-trust-padding-inline, 0.625rem);
-      border: var(--elohim-trust-border, 1px solid color-mix(in srgb, currentColor 25%, transparent));
+      border: var(
+        --elohim-trust-border,
+        1px solid color-mix(in srgb, currentColor 25%, transparent)
+      );
       border-radius: var(--elohim-trust-radius, 999px);
       background: var(--elohim-trust-bg, transparent);
       color: var(--elohim-trust-fg, inherit);
@@ -136,13 +139,20 @@ export class ElohimImagodeiTrustIndicator extends CapabilityAwareElement(LitElem
         type="button"
         part="mode"
         data-mode=${this.trustMode}
-        aria-label="${modeLabel} ${this.authorityLabel}${showFlywheelHint ? ' (flywheel — you can graduate to your own conductor)' : ''}"
+        aria-label="${modeLabel} ${this.authorityLabel}${showFlywheelHint
+          ? ' (flywheel — you can graduate to your own conductor)'
+          : ''}"
         @click=${this._onTap}
       >
         <span part="glyph" aria-hidden="true">${modeIcon}</span>
-        <span part="label"><strong>${modeLabel}</strong> ${this.authorityLabel}</span>
+        <span part="label">
+          <strong>${modeLabel}</strong>
+          ${this.authorityLabel}
+        </span>
         ${showFlywheelHint
-          ? html`<span part="flywheel-hint">(flywheel)</span>`
+          ? html`
+              <span part="flywheel-hint">(flywheel)</span>
+            `
           : ''}
       </button>
     `;

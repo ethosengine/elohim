@@ -69,14 +69,14 @@ describe('<elohim-imagodei-login-card>', () => {
       ></elohim-imagodei-login-card>
     `);
     let detail: any = null;
-    el.addEventListener('password-submit', (e) => {
+    el.addEventListener('password-submit', e => {
       detail = (e as CustomEvent).detail;
     });
     const pw = el.shadowRoot!.querySelector('input[type="password"]') as HTMLInputElement;
     pw.value = 'secret';
     pw.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     expect(detail.identifier).to.equal('matthew@alpha');
     expect(detail.password).to.equal('secret');
   });
@@ -89,14 +89,14 @@ describe('<elohim-imagodei-login-card>', () => {
       ></elohim-imagodei-login-card>
     `);
     let detail: any = null;
-    el.addEventListener('password-submit', (e) => {
+    el.addEventListener('password-submit', e => {
       detail = (e as CustomEvent).detail;
     });
     const pw = el.shadowRoot!.querySelector('input[type="password"]') as HTMLInputElement;
     pw.value = 'pass1';
     pw.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     expect(detail.remember).to.equal(true);
   });
 
@@ -125,10 +125,12 @@ describe('<elohim-imagodei-login-card>', () => {
       <elohim-imagodei-login-card .oauthProviders=${PROVIDERS}></elohim-imagodei-login-card>
     `);
     let detail: any = null;
-    el.addEventListener('oauth-start', (e) => {
+    el.addEventListener('oauth-start', e => {
       detail = (e as CustomEvent).detail;
     });
-    (el.shadowRoot!.querySelector<HTMLElement>('[part="oauth-button"][data-provider="github"]'))!.click();
+    el.shadowRoot!.querySelector<HTMLElement>(
+      '[part="oauth-button"][data-provider="github"]'
+    )!.click();
     expect(detail.providerId).to.equal('github');
   });
 
@@ -137,11 +139,15 @@ describe('<elohim-imagodei-login-card>', () => {
       <elohim-imagodei-login-card .oauthProviders=${PROVIDERS}></elohim-imagodei-login-card>
     `);
     const events: string[] = [];
-    el.addEventListener('oauth-start', (e) => {
+    el.addEventListener('oauth-start', e => {
       events.push((e as CustomEvent).detail.providerId);
     });
-    (el.shadowRoot!.querySelector<HTMLElement>('[part="oauth-button"][data-provider="google"]'))!.click();
-    (el.shadowRoot!.querySelector<HTMLElement>('[part="oauth-button"][data-provider="github"]'))!.click();
+    el.shadowRoot!.querySelector<HTMLElement>(
+      '[part="oauth-button"][data-provider="google"]'
+    )!.click();
+    el.shadowRoot!.querySelector<HTMLElement>(
+      '[part="oauth-button"][data-provider="github"]'
+    )!.click();
     expect(events).to.deep.equal(['google', 'github']);
   });
 
@@ -153,15 +159,23 @@ describe('<elohim-imagodei-login-card>', () => {
     `);
     const slot = el.shadowRoot!.querySelector('slot[name="unlock-prompt"]') as HTMLSlotElement;
     expect(slot).to.exist;
-    expect(slot.assignedElements().some((n) => (n as HTMLElement).id === 'tauri-unlock')).to.equal(true);
+    expect(slot.assignedElements().some(n => (n as HTMLElement).id === 'tauri-unlock')).to.equal(
+      true
+    );
   });
 
   it('adapts copy based on trustMode — doorway-host vs peer-conductor', async () => {
     const elHost = await fixture<ElohimImagodeiLoginCard>(html`
-      <elohim-imagodei-login-card .allowPassword=${true} .trustMode=${'doorway-host'}></elohim-imagodei-login-card>
+      <elohim-imagodei-login-card
+        .allowPassword=${true}
+        .trustMode=${'doorway-host'}
+      ></elohim-imagodei-login-card>
     `);
     const elPeer = await fixture<ElohimImagodeiLoginCard>(html`
-      <elohim-imagodei-login-card .allowPassword=${true} .trustMode=${'peer-conductor'}></elohim-imagodei-login-card>
+      <elohim-imagodei-login-card
+        .allowPassword=${true}
+        .trustMode=${'peer-conductor'}
+      ></elohim-imagodei-login-card>
     `);
     const hostLabel = elHost.shadowRoot!.querySelector('label[for="pw"]')?.textContent ?? '';
     const peerLabel = elPeer.shadowRoot!.querySelector('label[for="pw"]')?.textContent ?? '';
@@ -172,7 +186,10 @@ describe('<elohim-imagodei-login-card>', () => {
 
   it('doorway-host label references sign in', async () => {
     const el = await fixture<ElohimImagodeiLoginCard>(html`
-      <elohim-imagodei-login-card .allowPassword=${true} .trustMode=${'doorway-host'}></elohim-imagodei-login-card>
+      <elohim-imagodei-login-card
+        .allowPassword=${true}
+        .trustMode=${'doorway-host'}
+      ></elohim-imagodei-login-card>
     `);
     const label = el.shadowRoot!.querySelector('label[for="pw"]')?.textContent ?? '';
     expect(label.toLowerCase()).to.match(/sign in|password/);
@@ -313,17 +330,15 @@ describe('<elohim-imagodei-login-card> — ua-prefs precondition gate', () => {
   afterEach(() => clearMediaQueries());
 
   it('CSS omits transitions and animations (still by default)', () => {
-    const cssText = (
-      ElohimImagodeiLoginCardClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiLoginCardClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     expect(cssText).to.not.contain('transition:');
     expect(cssText).to.not.contain('animation:');
   });
 
   it('CSS has a forced-colors override block', () => {
-    const cssText = (
-      ElohimImagodeiLoginCardClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiLoginCardClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     expect(cssText).to.contain('forced-colors');
   });
 
@@ -356,9 +371,8 @@ describe('<elohim-imagodei-login-card> — i18n precondition gate', () => {
   });
 
   it('uses no physical CSS properties (only logical or non-positional)', () => {
-    const cssText = (
-      ElohimImagodeiLoginCardClass as unknown as { styles: { cssText: string } }
-    ).styles.cssText;
+    const cssText = (ElohimImagodeiLoginCardClass as unknown as { styles: { cssText: string } })
+      .styles.cssText;
     const findings = requiresLogicalProperties(cssText);
     expect(findings, JSON.stringify(findings, null, 2)).to.have.lengthOf(0);
   });

@@ -33,14 +33,14 @@ describe('<elohim-imagodei-federated-resolver>', () => {
       ></elohim-imagodei-federated-resolver>
     `);
     let detail: unknown = null;
-    el.addEventListener('resolved', (e) => {
+    el.addEventListener('resolved', e => {
       detail = (e as CustomEvent).detail;
     });
     const input = el.shadowRoot!.querySelector('input') as HTMLInputElement;
     input.value = 'matthew@alpha.elohim.host';
     input.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     expect(detail).to.deep.equal({
       identifier: 'matthew@alpha.elohim.host',
       doorwayUrl: 'https://alpha.elohim.host',
@@ -57,14 +57,14 @@ describe('<elohim-imagodei-federated-resolver>', () => {
       ></elohim-imagodei-federated-resolver>
     `);
     let detail: unknown = null;
-    el.addEventListener('resolve-error', (e) => {
+    el.addEventListener('resolve-error', e => {
       detail = (e as CustomEvent).detail;
     });
     const input = el.shadowRoot!.querySelector('input') as HTMLInputElement;
     input.value = 'someone@nowhere';
     input.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     expect(detail).to.deep.equal({ identifier: 'someone@nowhere', reason: 'unknown-host' });
   });
 
@@ -82,7 +82,7 @@ describe('<elohim-imagodei-federated-resolver>', () => {
     input.value = 'matthew@alpha.elohim.host';
     input.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     expect(localStorage.getItem('test-id-key')).to.equal('matthew@alpha.elohim.host');
   });
 
@@ -111,7 +111,7 @@ describe('<elohim-imagodei-federated-resolver>', () => {
     input.value = 'bad@host';
     input.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     expect(localStorage.getItem('test-id-key')).to.be.null;
   });
 
@@ -120,7 +120,7 @@ describe('<elohim-imagodei-federated-resolver>', () => {
     const el = await fixture<ElohimImagodeiFederatedResolver>(html`
       <elohim-imagodei-federated-resolver
         .resolveIdentifier=${() =>
-          new Promise<FederatedResolveOutcome>((r) => {
+          new Promise<FederatedResolveOutcome>(r => {
             resolveFn = r;
           })}
       ></elohim-imagodei-federated-resolver>
@@ -133,7 +133,7 @@ describe('<elohim-imagodei-federated-resolver>', () => {
     const submit = el.shadowRoot!.querySelector('button[type="submit"]') as HTMLButtonElement;
     expect(submit.disabled).to.equal(true);
     resolveFn!({ ok: true, doorwayUrl: 'https://x' });
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     expect(submit.disabled).to.equal(false);
   });
 
@@ -166,7 +166,7 @@ describe('<elohim-imagodei-federated-resolver>', () => {
     input.value = 'bad@host';
     input.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     await el.updateComplete;
     expect(input.getAttribute('aria-invalid')).to.equal('true');
   });
@@ -184,7 +184,7 @@ describe('<elohim-imagodei-federated-resolver>', () => {
     input.value = 'unknown@host';
     input.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     await el.updateComplete;
     const alert = el.shadowRoot!.querySelector('[role="alert"]');
     expect(alert).to.exist;
@@ -204,7 +204,7 @@ describe('<elohim-imagodei-federated-resolver>', () => {
     input.value = 'matthew@alpha.elohim.host';
     input.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     expect(localStorage.getItem('elohim_auth_identifier')).to.equal('matthew@alpha.elohim.host');
   });
 
@@ -250,7 +250,7 @@ describe('<elohim-imagodei-federated-resolver> — a11y precondition gate', () =
     input.value = 'matthew@unreachable.host';
     input.dispatchEvent(new Event('input'));
     el.shadowRoot!.querySelector('form')!.requestSubmit();
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 10));
     await el.updateComplete;
     const results = await axe.run(el);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).to.have.lengthOf(0);

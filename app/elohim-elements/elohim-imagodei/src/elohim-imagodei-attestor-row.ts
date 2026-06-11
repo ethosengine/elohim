@@ -75,10 +75,7 @@ export class ElohimImagodeiAttestorRow extends CapabilityAwareElement(LitElement
       inline-size: var(--elohim-attestor-avatar-size, 28px);
       block-size: var(--elohim-attestor-avatar-size, 28px);
       border-radius: 50%;
-      background: var(
-        --elohim-attestor-bg,
-        color-mix(in srgb, currentColor 14%, transparent)
-      );
+      background: var(--elohim-attestor-bg, color-mix(in srgb, currentColor 14%, transparent));
       border: 2px solid var(--elohim-attestor-ring, Canvas);
       display: inline-flex;
       align-items: center;
@@ -166,7 +163,9 @@ export class ElohimImagodeiAttestorRow extends CapabilityAwareElement(LitElement
           `
         )}
         ${overflow > 0
-          ? html`<li><span part="overflow">+${overflow}</span></li>`
+          ? html`
+              <li><span part="overflow">+${overflow}</span></li>
+            `
           : ''}
       </ul>
     `;

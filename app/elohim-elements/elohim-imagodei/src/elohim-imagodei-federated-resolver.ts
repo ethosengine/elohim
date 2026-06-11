@@ -205,17 +205,11 @@ export class ElohimImagodeiFederatedResolver extends CapabilityAwareElement(LitE
           <slot name="help-text"></slot>
         </div>
         ${this._error
-          ? html`<div
-              part="error"
-              id="federated-error"
-              role="alert"
-            >${this._error}</div>`
+          ? html`
+              <div part="error" id="federated-error" role="alert">${this._error}</div>
+            `
           : ''}
-        <button
-          type="submit"
-          part="submit"
-          ?disabled=${this._busy || !this._value.trim()}
-        >
+        <button type="submit" part="submit" ?disabled=${this._busy || !this._value.trim()}>
           ${this._busy ? 'Resolving…' : 'Continue'}
         </button>
       </form>

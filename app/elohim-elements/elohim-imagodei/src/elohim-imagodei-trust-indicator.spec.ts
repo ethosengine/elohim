@@ -25,9 +25,9 @@ describe('<elohim-imagodei-trust-indicator>', () => {
     `);
     const text = el.shadowRoot!.textContent ?? '';
     expect(text).to.include('alpha.elohim.host');
-    expect(
-      el.shadowRoot!.querySelector('[part="mode"]')?.getAttribute('data-mode')
-    ).to.equal('doorway-host');
+    expect(el.shadowRoot!.querySelector('[part="mode"]')?.getAttribute('data-mode')).to.equal(
+      'doorway-host'
+    );
   });
 
   it('renders peer-conductor chrome with a different mode marker', async () => {
@@ -37,9 +37,9 @@ describe('<elohim-imagodei-trust-indicator>', () => {
         authority-label="your conductor on this device"
       ></elohim-imagodei-trust-indicator>
     `);
-    expect(
-      el.shadowRoot!.querySelector('[part="mode"]')?.getAttribute('data-mode')
-    ).to.equal('peer-conductor');
+    expect(el.shadowRoot!.querySelector('[part="mode"]')?.getAttribute('data-mode')).to.equal(
+      'peer-conductor'
+    );
   });
 
   it('includes the authority label text in the peer-conductor render', async () => {
@@ -128,9 +128,7 @@ describe('<elohim-imagodei-trust-indicator>', () => {
 
   it('defaults to doorway-host mode when no trust-mode attribute is set', async () => {
     const el = await fixture<ElohimImagodeiTrustIndicator>(html`
-      <elohim-imagodei-trust-indicator
-        authority-label="fallback"
-      ></elohim-imagodei-trust-indicator>
+      <elohim-imagodei-trust-indicator authority-label="fallback"></elohim-imagodei-trust-indicator>
     `);
     expect(el.trustMode).to.equal('doorway-host');
   });
