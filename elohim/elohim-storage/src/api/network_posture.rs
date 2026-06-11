@@ -75,9 +75,10 @@ async fn handle_get_posture(pool: &DbPool) -> Response<Full<Bytes>> {
         }
     }
 
-    // households_reciprocating: distinct households among nodes with an active
-    // peer status. If stewarded_nodes lacks household_id (pre-C3), this stays
-    // zero — honest absence is better than a fake count.
+    // households_reciprocating: distinct non-null household_id among
+    // stewarded_nodes that join an active (online/degraded, non-stale) peer
+    // status. Nodes whose household_id is NULL (env HOUSEHOLD_ID unset) are
+    // excluded — honest absence is better than a fake count.
     let households_reciprocating =
         match nodes::distinct_active_households(&mut conn, STALE_THRESHOLD_SECS, now_secs) {
             Ok(n) => n as i32,

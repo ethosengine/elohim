@@ -382,3 +382,121 @@ pub fn list_nodes_for_human(
         .load::<NodeStewardship>(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to list nodes for human: {}", e)))
 }
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::peer_statuses::{upsert as upsert_peer, PeerStatusRow};
+    use crate::test_util::test_pool;
+
+    /// Insert a stewarded node with a given (optional) household_id.
+    fn insert_node(conn: &mut SqliteConnection, id: &str, household: Option<&str>) {
+        create_stewarded_node(
+            conn,
+            CreateStewardedNodeInput {
+                id: id.to_string(),
+                display_name: format!("node-{id}"),
+                claim_status: "claimed".to_string(),
+                cpu_cores: 4,
+                memory_gb: 8,
+                storage_tb: 1.0,
+                bandwidth_mbps: 100,
+                steward_tier: "household".to_string(),
+                custodian_opt_in: 0,
+                region: None,
+                context_epr_id: None,
+                dht_anchor_hash: Some(format!("uhCkk-anchor-{id}")),
+                h_app_id: "lamad".to_string(),
+            },
+        )
+        .expect("create node");
+        if let Some(h) = household {
+            diesel::update(stewarded_nodes::table.filter(stewarded_nodes::id.eq(id)))
+                .set(stewarded_nodes::household_id.eq(h))
+                .execute(conn)
+                .expect("set household_id");
+        }
+    }
+
+    /// Insert a peer status row joined to a node id (peer_id == node id).
+    fn insert_peer(conn: &mut SqliteConnection, peer_id: &str, status: &str, updated_at: i64) {
+        upsert_peer(
+            conn,
+            &PeerStatusRow {
+                peer_id: peer_id.to_string(),
+                status: status.to_string(),
+                general_pool_member: 0,
+                accepting_stewardship_reserves: 0,
+                archetype_class: None,
+                timestamp: updated_at,
+                dht_anchor_hash: format!("uhCkk-ps-{peer_id}"),
+                updated_at,
+            },
+        )
+        .expect("upsert peer status");
+    }
+
+    /// distinct_active_households counts DISTINCT non-null household_id over
+    /// nodes that join an active (online/degraded, non-stale) peer status.
+    #[test]
+    fn distinct_active_households_counts_distinct_nonnull_over_active_nodes() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let now = 1_000_000_i64;
+        let stale_threshold = 120_i64;
+        let fresh = now - 10; // within window
+        let stale = now - 500; // older than stale_threshold
+
+        // Two nodes in household "eden", both active → counts as ONE distinct.
+        insert_node(&mut conn, "n-eden-1", Some("eden"));
+        insert_node(&mut conn, "n-eden-2", Some("eden"));
+        insert_peer(&mut conn, "n-eden-1", "online", fresh);
+        insert_peer(&mut conn, "n-eden-2", "degraded", fresh);
+
+        // One node in household "ararat", active → second distinct household.
+        insert_node(&mut conn, "n-ararat-1", Some("ararat"));
+        insert_peer(&mut conn, "n-ararat-1", "online", fresh);
+
+        // Node in household "sinai" but STALE peer status → excluded.
+        insert_node(&mut conn, "n-sinai-1", Some("sinai"));
+        insert_peer(&mut conn, "n-sinai-1", "online", stale);
+
+        // Node in household "horeb" but OFFLINE status → excluded.
+        insert_node(&mut conn, "n-horeb-1", Some("horeb"));
+        insert_peer(&mut conn, "n-horeb-1", "offline", fresh);
+
+        // Node with NULL household_id, active → excluded (non-null filter).
+        insert_node(&mut conn, "n-null-1", None);
+        insert_peer(&mut conn, "n-null-1", "online", fresh);
+
+        let count = distinct_active_households(&mut conn, stale_threshold, now)
+            .expect("distinct_active_households");
+
+        assert_eq!(
+            count, 2,
+            "only 'eden' (deduped across 2 nodes) and 'ararat' are active+non-null; \
+             stale/offline/null-household nodes excluded"
+        );
+    }
+
+    /// With no active nodes carrying a household_id, the count is zero (honest
+    /// absence, not a fake number).
+    #[test]
+    fn distinct_active_households_zero_when_none_qualify() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let now = 2_000_000_i64;
+        // Node with household but no peer status row at all → no join → excluded.
+        insert_node(&mut conn, "n-orphan", Some("eden"));
+
+        let count =
+            distinct_active_households(&mut conn, 120, now).expect("distinct_active_households");
+        assert_eq!(count, 0, "a node with no joined peer status is not counted");
+    }
+}

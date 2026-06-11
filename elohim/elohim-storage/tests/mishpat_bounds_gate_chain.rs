@@ -36,7 +36,7 @@ use elohim_storage::db::mishpat_commitments;
 use elohim_storage::mishpat_projection::CommitmentPayload;
 use elohim_storage::services::bounds_validator::{validate, BoundsViolation, EventForValidation};
 use elohim_storage::services::commitment_fetcher::ProjectionCommitmentFetcher;
-use elohim_storage::services::rate_history::MockRateHistory;
+use elohim_storage::services::rate_history::{DieselRateHistory, MockRateHistory};
 use elohim_storage::signals::{handle_mishpat_signal, MishpatSignal};
 use elohim_storage::test_util::test_pool;
 use elohim_views::bounds::ViolationKind;
@@ -460,4 +460,153 @@ async fn mishpat_bounds_gate_chain_end_to_end() {
             result
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// N2: put_epr republish-epr gate is wired to the production ProjectionCommitmentFetcher
+//
+// Regression guard for the N2 fix. `put_epr` (src/api/epr.rs) previously held a
+// hardcoded `let hc_lamad: Option<Arc<HcClient>> = None;` whose `None` arm
+// unconditionally returned 503 service_unavailable — the republish-epr bounds
+// gate never executed. The fix swaps to `ProjectionCommitmentFetcher::new(pool)`
+// + `DieselRateHistory { pool }` and calls `validate_republish_epr` directly
+// (the pool is already a parameter; P1: storage as reconciliation controller).
+//
+// These tests exercise the EXACT function-and-fetcher pairing the handler now
+// uses — `validate_republish_epr` over a real ProjectionCommitmentFetcher
+// reading a projected notarized row — proving the gate actually runs (pass on
+// a clean commitment, refuse on a revoked one), not bypassed/503.
+// ---------------------------------------------------------------------------
+
+use elohim_storage::services::republish_epr_validator::{validate_republish_epr, ValidationError};
+
+/// A well-formed `republish-epr` EconomicEvent payload bounded by the projected
+/// commitment. Mirrors the JSON the put_epr handler hands to
+/// `validate_republish_epr` (the `input.event` serialized to a serde Value).
+fn republish_event_json(bounded_by_cid: &str) -> serde_json::Value {
+    serde_json::json!({
+        "action": "republish-epr",
+        "performer": "agent:deploy-svc-matthew",
+        "bounded_by": bounded_by_cid,
+        "target": "epr-head-new",
+        "payload": {
+            "blob_cid": "bafkrei-blob-cid",
+            "epr_kind": "Content",
+            "reach": "commons",
+            "bundle_path": "lamad-spa"
+        },
+        // Within [valid_from, valid_until] (2026-06 → 2026-09) and inside the
+        // 90-day rotation TTL measured from valid_from.
+        "signed_at": "2026-07-01T12:00:00Z"
+    })
+}
+
+/// The put_epr gate CLEARS for a notarized, in-window, in-scope commitment when
+/// driven through the production fetcher pairing the N2 fix installed.
+#[tokio::test]
+async fn n2_put_epr_republish_gate_clears_via_projection_fetcher() {
+    let pool = test_pool();
+    let cid = project_commitment(&pool);
+
+    // Exact production wiring from the N2 fix in put_epr.
+    let fetcher = ProjectionCommitmentFetcher::new(pool.clone());
+    let rate = DieselRateHistory { pool: pool.clone() };
+
+    let event = republish_event_json(&cid);
+    let result = validate_republish_epr(&event, &fetcher, &rate, "epr:lamad-spa").await;
+
+    assert!(
+        result.is_ok(),
+        "N2: republish-epr gate MUST clear for a notarized in-window commitment \
+         through the production ProjectionCommitmentFetcher + DieselRateHistory \
+         (previously the hardcoded None returned 503 and never ran); got: {:?}",
+        result
+    );
+}
+
+/// The put_epr gate REFUSES when the bounding commitment is revoked — proving
+/// the gate genuinely executes (not the prior unconditional 503 bypass).
+#[tokio::test]
+async fn n2_put_epr_republish_gate_refuses_revoked_commitment() {
+    let pool = test_pool();
+    let cid = project_commitment(&pool);
+
+    {
+        let mut conn = pool.get().expect("pool conn for revoke");
+        mishpat_commitments::set_revoked_at(&mut conn, &cid, "2026-06-15T00:00:00Z")
+            .expect("set_revoked_at");
+    }
+
+    let fetcher = ProjectionCommitmentFetcher::new(pool.clone());
+    let rate = DieselRateHistory { pool: pool.clone() };
+
+    let event = republish_event_json(&cid);
+    let result = validate_republish_epr(&event, &fetcher, &rate, "epr:lamad-spa").await;
+
+    assert!(
+        matches!(result, Err(ValidationError::Bounds(_))),
+        "N2: republish-epr gate MUST refuse a revoked commitment (Bounds \
+         violation) — proving the gate executes rather than 503-bypassing; got: {:?}",
+        result
+    );
+}
+
+// ---------------------------------------------------------------------------
+// N2-infra: an INFRA failure reaching the commitment store is a 503-class
+// `ValidationError::Unavailable`, NOT a 400-class `Bounds` rejection.
+//
+// Regression guard for the error-class fix: `put_epr` previously mapped EVERY
+// validation `Err` to `bad_request(400)`, so a transient db pool/query outage
+// (the `FetchError::ConductorUnreachable` class, which `bounds_validator`
+// fail-closed-collapses into `CommitmentNotFound`) was mis-reported as a caller
+// fault. The fix re-introduces the infra distinction at the republish layer
+// (`ValidationError::Unavailable`) and maps it to 503 — restoring the
+// pre-change behaviour of the formerly-hardcoded `None` arm for the infra case.
+// ---------------------------------------------------------------------------
+
+/// Build a deliberately-poisoned pool whose every `get()` fails: it points at
+/// an unopenable SQLite URL (`mode=rw` against a non-existent directory, so the
+/// file is never created) and is built with `build_unchecked` + a short
+/// `connection_timeout` so construction succeeds but checkout fails fast. This
+/// drives `ProjectionCommitmentFetcher::fetch` down the
+/// `FetchError::ConductorUnreachable` (infra) arm.
+fn poisoned_pool() -> elohim_storage::db::DbPool {
+    use diesel::r2d2::{ConnectionManager, Pool};
+    use elohim_storage::db::SqliteConnection;
+    use std::time::Duration;
+
+    let unopenable = "file:/nonexistent_dir_n2_infra/blocked.db?mode=rw";
+    let manager = ConnectionManager::<SqliteConnection>::new(unopenable);
+    Pool::builder()
+        .max_size(1)
+        .min_idle(Some(0))
+        .connection_timeout(Duration::from_millis(200))
+        .build_unchecked(manager)
+}
+
+/// A pool/query infra failure path returns the 503-class `Unavailable`, not a
+/// 400-class `Bounds` violation.
+#[tokio::test]
+async fn n2_put_epr_republish_gate_infra_failure_is_unavailable_503_class() {
+    let pool = poisoned_pool();
+
+    // Sanity: this pool genuinely cannot hand out a connection.
+    assert!(
+        pool.get().is_err(),
+        "poisoned pool must fail to check out a connection (test precondition)"
+    );
+
+    let fetcher = ProjectionCommitmentFetcher::new(pool.clone());
+    let rate = DieselRateHistory { pool };
+
+    // A schema-valid event so we reach the bounds/fetch path (not a Schema error).
+    let event = republish_event_json("uhCEk-some-commitment-cid");
+    let result = validate_republish_epr(&event, &fetcher, &rate, "epr:lamad-spa").await;
+
+    assert!(
+        matches!(result, Err(ValidationError::Unavailable(_))),
+        "N2-infra: a pool/query infra failure MUST surface as the 503-class \
+         ValidationError::Unavailable (NOT a 400-class Bounds rejection); got: {:?}",
+        result
+    );
 }

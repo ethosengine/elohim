@@ -197,17 +197,37 @@ pub fn record_from_row(
 #[async_trait]
 impl CommitmentFetcher for ProjectionCommitmentFetcher {
     async fn fetch(&self, cid: &str) -> Result<Option<CommitmentRecord>, FetchError> {
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| FetchError::ConductorUnreachable(format!("db pool: {e}")))?;
-        let row = crate::db::mishpat_commitments::get_by_cid(&mut conn, cid)
-            .map_err(|e| FetchError::ConductorUnreachable(format!("query: {e}")))?;
-        let Some(row) = row else {
-            // Not found → Ok(None); bounds_validator maps this to CommitmentNotFound.
-            return Ok(None);
-        };
-        record_from_row(row).map(Some)
+        // The pool checkout + sync diesel query are blocking; offload to a
+        // spawn_blocking thread so this `async fn` does not stall the runtime
+        // (mirrors `DieselRateHistory::count_in_window`, rate_history.rs:60-77).
+        // A pool/query infra failure surfaces as `FetchError::ConductorUnreachable`
+        // — an INFRA class the put_epr boundary maps to 503, distinct from a
+        // genuine bounds violation (404/400). A missing row stays `Ok(None)`.
+        let pool = self.pool.clone();
+        let cid_owned = cid.to_string();
+
+        let join =
+            tokio::task::spawn_blocking(move || -> Result<Option<CommitmentRecord>, FetchError> {
+                let mut conn = pool
+                    .get()
+                    .map_err(|e| FetchError::ConductorUnreachable(format!("db pool: {e}")))?;
+                let row = crate::db::mishpat_commitments::get_by_cid(&mut conn, &cid_owned)
+                    .map_err(|e| FetchError::ConductorUnreachable(format!("query: {e}")))?;
+                let Some(row) = row else {
+                    // Not found → Ok(None); bounds_validator maps this to CommitmentNotFound.
+                    return Ok(None);
+                };
+                record_from_row(row).map(Some)
+            })
+            .await;
+
+        match join {
+            Ok(result) => result,
+            // The blocking task panicked or the runtime is shutting down — infra.
+            Err(e) => Err(FetchError::ConductorUnreachable(format!(
+                "spawn_blocking join failed: {e}"
+            ))),
+        }
     }
 }
 

@@ -922,9 +922,14 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             .optional()
             .unwrap_or(None);
 
+        // Tracks whether the participation row was successfully written. The
+        // household_id stamp below is gated on this so a failed insert/update
+        // never leaves a human with a household_id but no participation row.
+        let participation_ok: bool;
+
         if let Some(existing_id) = existing_id {
             // Re-delivery: update the mutable fields.
-            let _ = diesel::update(
+            let updated = diesel::update(
                 collective_participations::table
                     .filter(collective_participations::id.eq(&existing_id)),
             )
@@ -945,6 +950,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                     "on_membership_projected: update of existing row failed (non-fatal)"
                 );
             });
+            participation_ok = updated.is_ok();
             debug!(
                 member_cid = %signal.member_cid,
                 dht_anchor_hash = %signal.action_hash,
@@ -990,6 +996,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                             "on_membership_projected: DHT-column stamp failed (non-fatal)"
                         );
                     });
+                    participation_ok = true;
                     debug!(
                         member_cid = %signal.member_cid,
                         collective_id = %collective_id,
@@ -998,11 +1005,114 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                     );
                 }
                 Err(e) => {
+                    participation_ok = false;
                     warn!(
                         member_cid = %signal.member_cid,
                         collective_id = %collective_id,
                         error = %e,
                         "on_membership_projected: create_participation failed"
+                    );
+                }
+            }
+        }
+
+        // Backfill the member's household_id from this collective membership.
+        //
+        // Both resilience snapshot() joins read humans.household_id, and nothing
+        // else in production populates it. A membership signal is the canonical
+        // source: the member now belongs to this collective. We stamp idempotently
+        // — only NULL household_id rows are touched, so a human already placed in a
+        // household (or a re-delivery) is never overwritten. A failure here WARNs
+        // and never aborts the membership projection (the participation row is the
+        // primary product of this handler).
+        //
+        // Four guards make this stamp production-correct (not a no-op or over-broad):
+        //
+        //  (a) KEYING — `member_cid` is the imagodei `encode_agent_cid` form
+        //      `agent:{pubkey}` (qahal_coordinator.rs). Production `humans` rows
+        //      are keyed by slug `id` (`human-alice-...`) with `agent_pub_key`
+        //      carrying the RAW base64 pubkey (`uhCAk...`, NO `agent:` prefix —
+        //      see seeder bootstrap.ts `uint8ArrayToBase64(cellId[1])`). The
+        //      resilience snapshot() joins on `humans.agent_pub_key = peer_id`,
+        //      so the stamp MUST light the same rows that join reads. We match
+        //      BOTH vocabularies: `id == member_cid` (in case a row was keyed by
+        //      the CID directly) OR `agent_pub_key == <member_cid sans agent:>`
+        //      (the production shape that aligns with the resilience join).
+        //
+        //  (b) COLLECTIVE KIND — only HOUSEHOLD collectives populate
+        //      humans.household_id. A qahal/community membership arriving first
+        //      must not permanently stamp the wrong household_id (the NULL-only
+        //      guard would then block correction). We look up the projected
+        //      collectives row and stamp only when governance_layer == FAMILY
+        //      (the household marker set by on_collective_projected ~line 751).
+        //
+        //  (c) DEPARTED — a departure (`departed_at` set) must never stamp.
+        //
+        //  (d) ORDERING — gated on `participation_ok`; a failed participation
+        //      insert/update must not yield household_id-without-participation.
+        let member_agent_key = signal
+            .member_cid
+            .strip_prefix("agent:")
+            .unwrap_or(&signal.member_cid);
+
+        // (b): resolve the collective's governance_layer; stamp only households.
+        let collective_is_household: bool = collectives::table
+            .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+            .filter(collectives::collective_cid.eq(&signal.collective_cid))
+            .select(collectives::governance_layer)
+            .first::<String>(&mut conn)
+            .ok()
+            .map(|layer| layer == crate::db::models::governance_layers::FAMILY)
+            .unwrap_or(false);
+
+        let skip_reason = if signal.departed_at.is_some() {
+            Some("member departed (departed_at set)")
+        } else if !participation_ok {
+            Some("participation row was not written")
+        } else if !collective_is_household {
+            Some("collective is not a household (governance_layer != family)")
+        } else {
+            None
+        };
+
+        if let Some(reason) = skip_reason {
+            debug!(
+                member_cid = %signal.member_cid,
+                collective_cid = %signal.collective_cid,
+                reason,
+                "on_membership_projected: household_id stamp skipped"
+            );
+        } else {
+            use crate::db::diesel_schema::humans;
+
+            match diesel::update(
+                humans::table
+                    .filter(
+                        humans::id
+                            .eq(&signal.member_cid)
+                            .or(humans::agent_pub_key.eq(member_agent_key)),
+                    )
+                    .filter(humans::household_id.is_null()),
+            )
+            .set(humans::household_id.eq(Some(&signal.collective_cid)))
+            .execute(&mut conn)
+            {
+                Ok(n) if n > 0 => {
+                    debug!(
+                        member_cid = %signal.member_cid,
+                        collective_cid = %signal.collective_cid,
+                        "on_membership_projected: stamped humans.household_id"
+                    );
+                }
+                Ok(_) => {
+                    // No-op: human row absent or household_id already set. Honest.
+                }
+                Err(e) => {
+                    warn!(
+                        member_cid = %signal.member_cid,
+                        collective_cid = %signal.collective_cid,
+                        error = %e,
+                        "on_membership_projected: household_id stamp failed (non-fatal)"
                     );
                 }
             }
@@ -2165,6 +2275,310 @@ mod tests {
         assert!(
             departed_at.contains("2026"),
             "departed_at should contain the timestamp year: {departed_at}"
+        );
+    }
+
+    /// N1: MembershipProjected backfills humans.household_id from the collective
+    /// CID when (a) the human's household_id is NULL, (b) the collective is a
+    /// HOUSEHOLD, (c) the membership is not a departure, and (d) the participation
+    /// row was written.
+    ///
+    /// Production shapes (NOT the prior toy `id == member_cid` shape that masked
+    /// the keying bug): humans rows are keyed by slug `id` (`human-alice-n1`)
+    /// with `agent_pub_key` carrying the RAW pubkey (`uhCAk...`, no `agent:`
+    /// prefix — matching the resilience snapshot() join `agent_pub_key = peer_id`).
+    /// The membership signal's `member_cid` is the imagodei `encode_agent_cid`
+    /// form `agent:{pubkey}`. The stamp must bridge these vocabularies so it
+    /// lights exactly the rows the resilience join reads.
+    ///
+    /// The stamp must be idempotent: a NULL row is filled; a row already carrying
+    /// a (different) household_id is NEVER overwritten.
+    #[tokio::test]
+    async fn n1_membership_projection_stamps_null_household_id() {
+        use crate::db::diesel_schema::humans;
+        use crate::db::models::NewHuman;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        // Seed two PRODUCTION-shaped human rows up front:
+        //  - alice: slug id `human-alice-n1`, agent_pub_key = RAW pubkey
+        //           `uhCAkAliceN1` (no `agent:` prefix), household_id = NULL.
+        //           Must be stamped from the membership via the agent_pub_key arm.
+        //  - bob:   slug id `human-bob-n1`, agent_pub_key `uhCAkBobN1`,
+        //           household_id = "eden" → must NOT be overwritten.
+        {
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(humans::table)
+                .values(&NewHuman {
+                    id: "human-alice-n1".to_string(),
+                    agent_pub_key: Some("uhCAkAliceN1".to_string()),
+                    display_name: "Alice N1".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "lamad".to_string(),
+                    household_id: None,
+                })
+                .execute(&mut conn)
+                .expect("insert alice");
+            diesel::insert_into(humans::table)
+                .values(&NewHuman {
+                    id: "human-bob-n1".to_string(),
+                    agent_pub_key: Some("uhCAkBobN1".to_string()),
+                    display_name: "Bob N1".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "lamad".to_string(),
+                    household_id: Some("eden".to_string()),
+                })
+                .execute(&mut conn)
+                .expect("insert bob");
+        }
+
+        // Household collective: charter carries `{"kind":"household"}` so
+        // on_collective_projected sets governance_layer = family — the gate the
+        // household stamp now requires.
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCollectiveN1".to_string(),
+            collective_cid: "collective:uhCkkCollectiveN1".to_string(),
+            display_name: "N1 Household".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderN1".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"household"}"#.to_string()),
+        };
+
+        // member_cid is the `agent:{pubkey}` encode_agent_cid form.
+        let alice_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembershipN1Alice".to_string(),
+            collective_cid: "collective:uhCkkCollectiveN1".to_string(),
+            member_cid: "agent:uhCAkAliceN1".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: None,
+        };
+        let bob_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembershipN1Bob".to_string(),
+            collective_cid: "collective:uhCkkCollectiveN1".to_string(),
+            member_cid: "agent:uhCAkBobN1".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: None,
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(alice_signal.clone()),
+            DnaSignal::MembershipProjected(bob_signal),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+        controller.run_one_pass().await.expect("collective pass");
+        controller.run_one_pass().await.expect("alice pass");
+        controller.run_one_pass().await.expect("bob pass");
+
+        let mut conn = pool.get().expect("conn");
+
+        // Alice: NULL → stamped to the collective CID via the agent_pub_key arm.
+        let alice_household: Option<String> = humans::table
+            .filter(humans::id.eq("human-alice-n1"))
+            .select(humans::household_id)
+            .first(&mut conn)
+            .expect("alice query");
+        assert_eq!(
+            alice_household.as_deref(),
+            Some("collective:uhCkkCollectiveN1"),
+            "alice's NULL household_id must be stamped via the agent_pub_key arm \
+             (member_cid agent:uhCAkAliceN1 → agent_pub_key uhCAkAliceN1)"
+        );
+
+        // Bob: pre-set "eden" → untouched (no overwrite).
+        let bob_household: Option<String> = humans::table
+            .filter(humans::id.eq("human-bob-n1"))
+            .select(humans::household_id)
+            .first(&mut conn)
+            .expect("bob query");
+        assert_eq!(
+            bob_household.as_deref(),
+            Some("eden"),
+            "bob's existing household_id must NOT be overwritten by membership projection"
+        );
+
+        // Idempotency: re-delivering alice's membership must not change anything.
+        let stream2 = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::MembershipProjected(
+            alice_signal,
+        )]);
+        let mut controller2 =
+            ReconcileController::new_with_storage(stream2, Arc::clone(&pool), Arc::clone(&cache));
+        controller2.run_one_pass().await.expect("alice re-delivery");
+
+        let alice_household_again: Option<String> = humans::table
+            .filter(humans::id.eq("human-alice-n1"))
+            .select(humans::household_id)
+            .first(&mut conn)
+            .expect("alice re-query");
+        assert_eq!(
+            alice_household_again.as_deref(),
+            Some("collective:uhCkkCollectiveN1"),
+            "re-delivery must be idempotent (household_id stays the same)"
+        );
+    }
+
+    /// N1-b: a COMMUNITY (non-household) collective membership must NOT stamp
+    /// humans.household_id. Only households populate that column; a community
+    /// membership arriving (first or otherwise) must leave it NULL so a later
+    /// household membership can still fill it (the NULL-only guard would
+    /// otherwise be poisoned by a wrong stamp).
+    #[tokio::test]
+    async fn n1b_community_membership_does_not_stamp_household_id() {
+        use crate::db::diesel_schema::humans;
+        use crate::db::models::NewHuman;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        {
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(humans::table)
+                .values(&NewHuman {
+                    id: "human-carol-n1b".to_string(),
+                    agent_pub_key: Some("uhCAkCarolN1b".to_string()),
+                    display_name: "Carol N1b".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "lamad".to_string(),
+                    household_id: None,
+                })
+                .execute(&mut conn)
+                .expect("insert carol");
+        }
+
+        // Community collective: NO household charter → governance_layer = community.
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkCommunityN1b".to_string(),
+            collective_cid: "collective:uhCkkCommunityN1b".to_string(),
+            display_name: "Garden Club".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderN1b".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"interest"}"#.to_string()),
+        };
+        let carol_signal = MembershipProjectedSignal {
+            action_hash: "uhCkkMembershipN1bCarol".to_string(),
+            collective_cid: "collective:uhCkkCommunityN1b".to_string(),
+            member_cid: "agent:uhCAkCarolN1b".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: None,
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(carol_signal),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("collective pass");
+        controller.run_one_pass().await.expect("carol pass");
+
+        let mut conn = pool.get().expect("conn");
+        let carol_household: Option<String> = humans::table
+            .filter(humans::id.eq("human-carol-n1b"))
+            .select(humans::household_id)
+            .first(&mut conn)
+            .expect("carol query");
+        assert_eq!(
+            carol_household, None,
+            "a COMMUNITY membership must NOT stamp humans.household_id \
+             (only households populate that column)"
+        );
+    }
+
+    /// N1-c: a DEPARTED membership (`departed_at` set) must NOT stamp
+    /// humans.household_id even for a household collective. A departure is the
+    /// opposite of a placement; stamping it would assert membership the signal
+    /// is withdrawing.
+    #[tokio::test]
+    async fn n1c_departed_membership_does_not_stamp_household_id() {
+        use crate::db::diesel_schema::humans;
+        use crate::db::models::NewHuman;
+        use crate::test_util::test_pool;
+        use diesel::prelude::*;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        {
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(humans::table)
+                .values(&NewHuman {
+                    id: "human-dave-n1c".to_string(),
+                    agent_pub_key: Some("uhCAkDaveN1c".to_string()),
+                    display_name: "Dave N1c".to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "lamad".to_string(),
+                    household_id: None,
+                })
+                .execute(&mut conn)
+                .expect("insert dave");
+        }
+
+        // Household collective (would otherwise stamp), but the membership is a
+        // departure.
+        let coll_signal = CollectiveProjectedSignal {
+            action_hash: "uhCkkHouseholdN1c".to_string(),
+            collective_cid: "collective:uhCkkHouseholdN1c".to_string(),
+            display_name: "Dave Household".to_string(),
+            founder_agent_cid: "agent:uhCAkFounderN1c".to_string(),
+            anchor_agreement_cid: None,
+            charter: Some(r#"{"kind":"household"}"#.to_string()),
+        };
+        let dave_departed = MembershipProjectedSignal {
+            action_hash: "uhCkkMembershipN1cDave".to_string(),
+            collective_cid: "collective:uhCkkHouseholdN1c".to_string(),
+            member_cid: "agent:uhCAkDaveN1c".to_string(),
+            member_kind: "person".to_string(),
+            role_context: "contributor".to_string(),
+            departed_at: Some("2026-06-15T00:00:00Z".to_string()),
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![
+            DnaSignal::CollectiveProjected(coll_signal),
+            DnaSignal::MembershipProjected(dave_departed),
+        ]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        controller.run_one_pass().await.expect("collective pass");
+        controller
+            .run_one_pass()
+            .await
+            .expect("dave departure pass");
+
+        let mut conn = pool.get().expect("conn");
+        let dave_household: Option<String> = humans::table
+            .filter(humans::id.eq("human-dave-n1c"))
+            .select(humans::household_id)
+            .first(&mut conn)
+            .expect("dave query");
+        assert_eq!(
+            dave_household, None,
+            "a DEPARTED membership must NOT stamp humans.household_id"
         );
     }
 }
