@@ -99,14 +99,43 @@ the jessica→matthew edge in CI.
 - **Ceremony peer ids**: `buildCeremonyCustodyInput` now resolves Stage-2 REAL
   peer ids (was the last custody-blob writer on Stage-1 fakes).
 
+## UPDATE 2026-06-11, genesis #1119: candidate 1 CONFIRMED — adjacency partition
+
+The new mesh asserts ran live and pinned it:
+
+```
+❌ mesh.adjacency — matthew does NOT list jessica (12D3KooWBS8a…) — cross-pod fetch will starve
+❌ mesh.adjacency-reverse — jessica does NOT list matthew (12D3KooWQAaK…) — reconcile discovery on jessica cannot reach the row/blob holder
+✅ mesh.{matthew,adam,jessica}.connected — connectedPeers=10/11/10
+✅ mesh.version-parity — all pods on 195bc4f
+```
+
+Both directions of the matthew↔jessica edge are absent while every pod
+holds 10-11 live connections — **the row-holder is partitioned from the
+askers at the libp2p adjacency level**, not at decode (candidate 2 dead,
+version parity proven) nor responder scope (candidate 3 dead). And
+`propagation.custody-convergence` fired exactly as designed: commitment
+present on matthew, `missing on: adam jessica` after 315s/21 attempts.
+
+Open question the artifact could not answer: WHO are the 10-11 peers each
+pod IS connected to? `substrate-verify-mesh.json` archived only counts —
+fixed this session: the mesh stage now archives `connectedPeerIds` per pod,
+so the next run yields the full adjacency matrix (suspects: doorways,
+steward devices, browser/relay clients crowding a connection budget, or a
+dial-policy gap where alpha pods never dial each other absent gossip
+inventory need).
+
 ## Verification path
 
-Next genesis run with these commits (plus the operator netpol apply for the
-conductor-seed legs): correlate per-peer "serving local inventory" vs "peer
-inventory received" Loki lines to pin which of the three candidates is real, and
-watch `propagation.custody-convergence` + `kicksFiredTotal` rising on receivers.
-Done = three consecutive genesis builds with convergence passing (arc plan's
-stability gate).
+Next genesis run after the edge deploy (instrumented storage + custody
+fallback kicker): (1) read `connectedPeerIds` in substrate-verify-mesh.json
+for the true topology; (2) correlate per-peer "serving local inventory" vs
+"peer inventory received" Loki lines to see whether ANY pod successfully
+asks matthew; (3) watch `propagation.custody-convergence` + fallback kicks.
+NOTE the fallback kicker races CONNECTED peers — while matthew↔jessica
+adjacency is absent, the kicker cannot reach the holder either; the
+adjacency fix is the convergence fix. Done = three consecutive genesis
+builds with convergence passing (arc plan's stability gate).
 
 shift_objective: |
   Make REA commitment projections converge on every alpha pod without CI nudging:

@@ -7,9 +7,9 @@ title: "Genesis conductor admin-WS unreachable from CI — household-formation s
 slug: "ci-genesis-conductor-adminws-unreachable"
 written: "2026-06-08"
 author: "agentic-developer (overnight shift)"
-status: "wip"
+status: "done"
 priority: "high"
-ci_status: pending-verification
+ci_status: verified
 jobs: [elohim-genesis]
 tags: [ci, genesis, seeding, conductor, admin-ws, substrate, escalation, operator-owned]
 cites:
@@ -92,6 +92,15 @@ trigger is the self-verification (expect `[probe] ✅` ×3, the three seed stage
 actually seeding for the first time from CI, and — once the substrate-validation
 suite commits land — `CONDUCTOR_SEEDING_READY=true` un-gating Verify Resilience
 Signals and the Workstream-D junction fill).
+
+**VERIFIED 2026-06-11, genesis #1119 (first run after the apply): RESOLVED.**
+All three conductors probed `[probe] ✅ …:4444 reachable` in all three seed
+stages; the stages genuinely seeded for the first time from CI (identities:
+5 existing/idempotent; peer bindings: **9 bindings written, 6 humans, 0
+failed**; household formation reached its ceremony logic). The concern's
+scope ends here — the next rung of the seeding chain surfaced its own
+distinct bug (founder binding FATAL, tracked in
+`ci-genesis-household-founder-binding.md`).
 
 ## Diagnosis provenance
 Overnight agentic-developer shift 2026-06-08 (ci-investigator on builds #1104–#1106 +
