@@ -50,9 +50,11 @@ What doorway DOES do for blobs:
 - Cache the response in the tiered blob cache so subsequent requests are served locally.
 - Never know or care which physical peer holds which blob.
 
-### Known TODO — blob-tier cache write-on-fetch
+### Blob-tier cache write-on-fetch (implemented)
 
-The tiered blob cache (`TieredBlobCache`) is allocated and its cleanup loop runs, but its blob tier is never written on the storage-proxy path. `routes::forward_to_storage` returns the upstream response directly to the client without populating the cache. As a result every `/blob/<hash>` request round-trips to elohim-storage. Fixing this is independent of any P2P substrate work and is what makes doorway actually behave like a projection cache. Symptom in `/admin/cache/stats`: `appFileCache.cachedFiles: 0` and `Tiered cache cleanup completed expired_blobs=0` indefinitely.
+The blob tier is written on the storage-proxy path: `/blob/<hash>` requests dispatch to `routes::forward_blob_to_storage` (the `Disposition::StorageProxy` arm gates on `p.starts_with("/blob/")` in `server/http.rs`), which is cache-first (serve from the local pantry on hit) and stocks the pantry on a clean 200. Subsequent requests for the same hash are served locally — doorway behaves as a projection cache, not a pass-through.
+
+Bounds (never cache): `Range` requests, 206 Partial Content, non-200 responses, and blobs over `BLOB_PANTRY_MAX_BYTES` (50 MB default). Cache-write failures are logged at `warn!` and never fail the user response. Tests live in `storage_proxy.rs` (`blob_200_stocks_pantry`, `blob_206_does_not_stock_pantry`, `range_request_skips_pantry`, `oversized_blob_served_but_not_cached`, `second_request_served_from_pantry`, `blob_404_does_not_stock_pantry`). This is cache only — single-target, no fan-out, no peer iteration (see No Blob Fan-Out rule above).
 
 ## Architecture
 

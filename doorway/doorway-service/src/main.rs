@@ -1082,11 +1082,14 @@ fn apply_epr_fallback_outcome(
 ) {
     match outcome {
         FallbackOutcome::PrimaryNonEmpty { url, projections } => {
-            let count = projections.len();
-            router.replace_all(projections);
+            // Log the POST-validation truth: a fetched batch may install fewer
+            // rows than it carried (poisoned rows skipped per-row). Reporting
+            // `installed` (not the input length) is the Fix-2 observability seam.
+            let outcome = router.replace_all(projections);
             info!(
                 phase,
-                count,
+                installed = outcome.installed,
+                rejected = outcome.rejected,
                 doorway_id = %doorway_id,
                 serving_url = %url,
                 "EPR router: loaded projections from primary storage"
@@ -1098,11 +1101,11 @@ fn apply_epr_fallback_outcome(
             serving_url,
             projections,
         } => {
-            let count = projections.len();
-            router.replace_all(projections);
+            let outcome = router.replace_all(projections);
             warn!(
                 phase,
-                count,
+                installed = outcome.installed,
+                rejected = outcome.rejected,
                 doorway_id = %doorway_id,
                 primary_url = %primary_url,
                 primary_state = if primary_empty { "empty" } else { "unreachable" },

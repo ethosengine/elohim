@@ -783,6 +783,41 @@ mod tests {
         );
     }
 
+    /// N6 bound: errors must NEVER be cached. A 404 (or any non-200) from
+    /// storage is forwarded to the caller but must not stock the pantry — only
+    /// successful (200) blob GETs are cacheable. The 206 test covers partial
+    /// content; this closes the error-status bound the cache-write contract
+    /// promises ("never cache errors or non-blob routes").
+    #[tokio::test]
+    async fn blob_404_does_not_stock_pantry() {
+        let _guard = BLOB_TEST_LOCK.lock().await;
+        let payload = b"not found".to_vec();
+        let (addr, _handle) = spawn_mock_storage(404, payload.clone(), "application/json").await;
+        let storage_url = format!("http://{addr}");
+
+        let cache = make_cache();
+        let hash = "sha256-aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccddff000404";
+        let path = format!("/blob/{hash}");
+
+        let req = make_get_request(&format!("http://doorway{path}"));
+        let resp = forward_blob_to_storage(
+            req,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            ForwardCtx::default(),
+        )
+        .await;
+
+        // The upstream error is forwarded unchanged to the caller.
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        // But the pantry must remain empty — errors are never cached.
+        assert!(
+            cache.blob_size(hash).is_none(),
+            "a 404 from storage must not stock the pantry (errors are never cached)"
+        );
+    }
+
     // ========================================================================
     // X-Agent-Cid header injection (T28a)
     // ========================================================================

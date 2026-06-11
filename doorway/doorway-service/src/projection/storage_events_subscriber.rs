@@ -226,11 +226,15 @@ async fn sync_router_from_storage(
 ) {
     match fetch_projections_from_storage(storage_base_url, doorway_id, http).await {
         Ok(projections) => {
-            let count = projections.len();
-            epr_router.replace_all(projections);
+            // Log the POST-validation truth (installed, not the fetched length):
+            // a batch of N rows that installs 0 is the Welcome-at-`/` incident
+            // class, and the fetched count hides it.
+            let outcome = epr_router.replace_all(projections);
             info!(
                 cause,
-                count, "storage_events_subscriber: EprRouter re-synced from storage"
+                installed = outcome.installed,
+                rejected = outcome.rejected,
+                "storage_events_subscriber: EprRouter re-synced from storage"
             );
         }
         Err(e) => {

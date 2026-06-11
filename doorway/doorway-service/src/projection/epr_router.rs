@@ -75,13 +75,24 @@ pub enum FallbackOutcome {
 /// unreachable.
 ///
 /// Selection (Fix A):
-/// 1. Try `base_urls[0]` (the primary). If it returns a non-empty set, use it.
-/// 2. Otherwise (error OR empty), try each remaining URL in order until one
-///    returns a NON-EMPTY set. Use the first such result.
-/// 3. If primary and all peers return empty (successfully), that is a genuine
-///    empty state (`AllEmpty`).
+/// 1. Try `base_urls[0]` (the primary). If it returns a set with at least one
+///    INSTALLABLE row, use it.
+/// 2. Otherwise (error OR empty OR wholly-poisoned), try each remaining URL in
+///    order until one returns a set with an installable row. Use the first such
+///    result.
+/// 3. If primary and all peers return empty/poisoned (successfully), that is a
+///    genuine empty state (`AllEmpty`).
 /// 4. If every URL errored, that is total unreachability (`AllUnreachable`) —
 ///    the caller preserves the last-good table.
+///
+/// Fix 2 — truthful classification: "non-empty" is measured AFTER validation,
+/// not on the raw row count. A primary that returns N rows of which 0 are
+/// installable (every url_path reserved/invalid) is the Welcome-at-`/` incident
+/// class: `replace_all` would install 0 rows under an INFO "success" log. So a
+/// wholly-poisoned batch is classified exactly like an empty fetch — it falls
+/// through to pool peers, and `primary_empty` records it as the empty (not
+/// errored) primary. `batch_has_installable_row` reuses the same free predicate
+/// `replace_all` uses, so the validity definition lives in exactly one place.
 ///
 /// The outcome variant carries enough to log at the right level and to decide
 /// whether to call `replace_all`.
@@ -99,7 +110,10 @@ pub async fn fetch_projections_with_fallback(
     for (idx, base_url) in base_urls.iter().enumerate() {
         urls_tried.push(base_url.clone());
         match fetch_projections_from_storage(base_url, doorway_id, http).await {
-            Ok(projections) if !projections.is_empty() => {
+            // "Usable" = fetched AND at least one row would survive validation.
+            // A wholly-poisoned batch (rows present, none installable) is treated
+            // exactly like an empty fetch (the `Ok(_)` arm below).
+            Ok(projections) if batch_has_installable_row(&projections) => {
                 if idx == 0 {
                     return FallbackOutcome::PrimaryNonEmpty {
                         url: base_url.clone(),
@@ -115,7 +129,9 @@ pub async fn fetch_projections_with_fallback(
                     projections,
                 };
             }
-            Ok(_empty) => {
+            // Fetched successfully but no installable row (empty OR wholly
+            // poisoned) — a genuine empty/degraded primary, not a usable set.
+            Ok(_no_installable_row) => {
                 any_success = true;
                 if idx == 0 {
                     primary_url = Some(base_url.clone());
@@ -171,25 +187,112 @@ pub struct EprRouter {
     generation: AtomicU64,
 }
 
+/// The post-validation truth of a `replace_all`: how many rows were actually
+/// installed into the table, and how many were skipped as poisoned.
+///
+/// Callers MUST log `installed` (not the pre-validation row count) — a fetch
+/// that returned N rows but installed 0 is the Welcome-at-`/` incident class,
+/// and pre-validation counts hide it (the INFO log claimed success with a
+/// non-zero count while the router was empty). `rejected` rides alongside so
+/// operators see degradation without grepping WARN lines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReplaceOutcome {
+    /// Rows that passed validation and are now reachable in the table.
+    pub installed: usize,
+    /// Rows skipped as poisoned (reserved/structurally-invalid url_path).
+    pub rejected: usize,
+}
+
+/// Why a projection row was rejected at table-load. `None` = the row is a
+/// syntactically valid, non-reserved mount and may be inserted.
+///
+/// Per-row degradation (N4): one poisoned row must never empty the whole
+/// router. This mirrors the resolver-side per-row degradation precedent
+/// (commit f38be2635) — skip-and-WARN the bad row, install the valid remainder.
+fn projection_reject_reason(view: &EprProjectionView) -> Option<&'static str> {
+    let path = &view.url_path;
+    // Structural validity: a mount must be an absolute path with no internal
+    // whitespace or control characters (a junk url_path would otherwise become
+    // an unreachable HashMap key and silently bloat the table).
+    if path.is_empty() {
+        return Some("url_path is empty");
+    }
+    if !path.starts_with('/') {
+        return Some("url_path is not absolute (must start with '/')");
+    }
+    if path.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Some("url_path contains whitespace or control characters");
+    }
+    // §12.1: reserved service prefixes can never be projection mounts.
+    if crate::server::http::is_reserved_url_path(path) {
+        return Some("url_path collides with a reserved service prefix (§12.1)");
+    }
+    None
+}
+
+/// True iff at least one row in the batch would survive `replace_all`'s
+/// per-row validation (i.e. `projection_reject_reason(...) == None`).
+///
+/// This is the classification seam (Fix 2): the pool fallback consults
+/// post-validation reality, so a wholly-poisoned primary batch (N rows, 0
+/// installable) is NOT treated as `PrimaryNonEmpty`/`PeerServed` — it falls
+/// through to pool peers or `AllEmpty`, never installing 0 rows under an INFO
+/// "success" log. Reuses the same free predicate `replace_all` uses, so there
+/// is exactly ONE validation definition.
+fn batch_has_installable_row(projections: &[EprProjectionView]) -> bool {
+    projections
+        .iter()
+        .any(|v| projection_reject_reason(v).is_none())
+}
+
 impl EprRouter {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Replace the entire routing table atomically.
-    pub fn replace_all(&self, projections: Vec<EprProjectionView>) {
-        // §12.1: reserved service prefixes can never be projection mounts.
-        let (legal, reserved): (Vec<_>, Vec<_>) = projections
-            .into_iter()
-            .partition(|v| !crate::server::http::is_reserved_url_path(&v.url_path));
-        for v in &reserved {
-            tracing::warn!(epr_id = %v.epr_id, url_path = %v.url_path,
-                "skipping projection: url_path collides with a reserved service prefix (§12.1)");
+    /// Replace the entire routing table atomically. Returns the post-validation
+    /// truth ([`ReplaceOutcome`]) — `installed` is the count actually reachable,
+    /// `rejected` the count skipped as poisoned. Callers MUST log `installed`,
+    /// never the input length (a batch of N that installs 0 is the
+    /// Welcome-at-`/` incident class, and the input length hides it).
+    ///
+    /// Per-row degraded insert (N4): each row is validated independently in a
+    /// single pass. A syntactically invalid or reserved-path row is skipped with
+    /// a WARN naming the row id and reason; the valid remainder is still
+    /// installed. One poisoned row never empties the whole router (the live
+    /// incident this guards: Welcome at `/`, 404 on `/lamad`).
+    pub fn replace_all(&self, projections: Vec<EprProjectionView>) -> ReplaceOutcome {
+        // Single pass: classify each row once, carrying its rejection reason so
+        // the WARN prints the reason exactly once and the predicate is never
+        // re-evaluated (the `.unwrap_or(...)` double-eval fallback is gone).
+        let mut legal: Vec<EprProjectionView> = Vec::with_capacity(projections.len());
+        let mut rejected = 0usize;
+        for v in projections {
+            match projection_reject_reason(&v) {
+                Some(reason) => {
+                    rejected += 1;
+                    tracing::warn!(epr_id = %v.epr_id, url_path = %v.url_path, reason = %reason,
+                        "skipping projection row (per-row degraded insert)");
+                }
+                None => legal.push(v),
+            }
         }
+        let mut installed = 0usize;
         {
             let mut table = self.table.write().expect("router lock poisoned");
             table.clear();
             for p in legal {
+                // Duplicate url_path keys are last-write-wins in a HashMap, which
+                // is silent data loss. Mirror the claim-index conflict WARN below
+                // so a colliding mount is visible (the duplicate row still wins,
+                // last-write — semantics documented in the test suite).
+                if let Some(existing) = table.get(&p.url_path) {
+                    tracing::warn!(url_path = %p.url_path,
+                        dropped_epr_id = %existing.epr_id, kept_epr_id = %p.epr_id,
+                        "duplicate projection url_path at router build — last-write-wins (earlier mount dropped)");
+                } else {
+                    installed += 1;
+                }
                 table.insert(p.url_path.clone(), p);
             }
         }
@@ -227,6 +330,11 @@ impl EprRouter {
         // Bump the generation last — readers (sitemap) compare against this to
         // decide whether their materialized projection is stale (spec §7.5).
         self.generation.fetch_add(1, Ordering::SeqCst);
+
+        ReplaceOutcome {
+            installed,
+            rejected,
+        }
     }
 
     /// Dispatch a request path → the projection whose `url_path` is the
@@ -479,6 +587,135 @@ mod tests {
         );
     }
 
+    #[test]
+    fn replace_all_degrades_per_row_keeping_valid_remainder() {
+        // N4: a mixed batch — one valid row, one reserved-path row, one
+        // structurally invalid row (non-absolute url_path) — must install the
+        // valid row and skip-and-WARN the rest. The router must NOT end empty:
+        // the live incident this guards is one poisoned row collapsing the
+        // whole router (Welcome at /, 404 on /lamad).
+        let router = EprRouter::new();
+        let outcome = router.replace_all(vec![
+            make_projection("lamad", "/lamad"),       // valid → must land
+            make_projection("bad-epr-mount", "/epr"), // reserved → skipped
+            make_projection("not-absolute", "lamad"), // structurally invalid → skipped
+            make_projection("empty-path", ""),        // structurally invalid → skipped
+        ]);
+
+        // The returned outcome must carry the post-validation truth: 1 installed,
+        // 3 rejected — the count callers log, not the input length of 4.
+        assert_eq!(
+            outcome,
+            ReplaceOutcome {
+                installed: 1,
+                rejected: 3
+            },
+            "replace_all must report installed=1 rejected=3, not the fetched count of 4"
+        );
+
+        // Exactly the one valid row landed; the router is non-empty.
+        assert_eq!(
+            router.len(),
+            1,
+            "only the valid /lamad row may be installed; the batch must not be dropped wholesale"
+        );
+        assert!(
+            !router.is_empty(),
+            "a poisoned row must not empty the router"
+        );
+        assert_eq!(
+            router.dispatch("/lamad").unwrap().epr_id,
+            "lamad",
+            "the valid /lamad mount must remain reachable"
+        );
+        // The reserved + structurally-invalid rows must not be reachable.
+        assert!(router.dispatch("/epr").is_none());
+        assert!(
+            router.dispatch("/lamadx").is_none(),
+            "the non-absolute 'lamad' junk key must not be installed as a reachable mount"
+        );
+    }
+
+    #[test]
+    fn replace_all_reports_installed_and_rejected_counts() {
+        // Fix 1: a mixed batch returns the post-validation truth — installed
+        // counts the rows actually reachable, rejected the rows skipped.
+        let router = EprRouter::new();
+        let outcome = router.replace_all(vec![
+            make_projection("a", "/a"),               // valid
+            make_projection("b", "/b"),               // valid
+            make_projection("bad-epr-mount", "/epr"), // reserved → rejected
+            make_projection("junk", "no-slash"),      // invalid → rejected
+        ]);
+        assert_eq!(
+            outcome,
+            ReplaceOutcome {
+                installed: 2,
+                rejected: 2
+            }
+        );
+        assert_eq!(router.len(), 2);
+    }
+
+    #[test]
+    fn replace_all_wholly_poisoned_installs_nothing() {
+        // Fix 1: a batch where EVERY row is poisoned must install 0 — the router
+        // ends empty, and the outcome says so (installed=0). The caller logs
+        // installed=0, never the fetched count, so the Welcome-at-`/` incident
+        // (0 rows installed under a non-zero "success" count) cannot recur.
+        let router = EprRouter::new();
+        // Pre-load a good row so we can prove the poisoned replace truly clears.
+        let pre = router.replace_all(vec![make_projection("good", "/good")]);
+        assert_eq!(pre.installed, 1);
+
+        let outcome = router.replace_all(vec![
+            make_projection("bad-epr-mount", "/epr"), // reserved
+            make_projection("not-absolute", "lamad"), // structurally invalid
+            make_projection("empty-path", ""),        // structurally invalid
+        ]);
+        assert_eq!(
+            outcome,
+            ReplaceOutcome {
+                installed: 0,
+                rejected: 3
+            },
+            "a wholly-poisoned batch installs 0 rows"
+        );
+        assert!(
+            router.is_empty(),
+            "replace_all clears the table even when nothing installs (atomic replace)"
+        );
+    }
+
+    #[test]
+    fn replace_all_duplicate_url_path_is_last_write_wins() {
+        // Fix 1: duplicate url_path keys are deterministic last-write-wins (the
+        // earlier mount is dropped, the later one kept). The WARN is observable;
+        // `installed` counts only the FIRST insert at each key (the table holds
+        // exactly one row per url_path). Documented semantics: last writer wins.
+        let router = EprRouter::new();
+        let first = make_projection("first-owner", "/dup");
+        let second = make_projection("second-owner", "/dup");
+        let outcome = router.replace_all(vec![first, second]);
+
+        // One key in the table; installed counts the single distinct key.
+        assert_eq!(router.len(), 1);
+        assert_eq!(
+            outcome,
+            ReplaceOutcome {
+                installed: 1,
+                rejected: 0
+            },
+            "duplicate keys collapse to one installed slot (last-write-wins)"
+        );
+        // Last writer wins: the second projection is the one that dispatches.
+        assert_eq!(
+            router.dispatch("/dup").unwrap().epr_id,
+            "second-owner",
+            "the later projection at a duplicate url_path must win (last-write-wins)"
+        );
+    }
+
     // ── Slice-3 claims + alias indexes (spec §8.5, §4) ───────────────────────
     #[derive(serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -634,6 +871,23 @@ mod tests {
                 .await;
         }
 
+        /// Mount a project-epr query returning a WHOLLY-POISONED batch: rows are
+        /// present (non-zero length) but every url_path is reserved/invalid, so
+        /// `replace_all` would install 0 of them. Models the Welcome-at-`/`
+        /// incident: a primary that "answers" with junk only.
+        async fn mock_project_epr_poisoned(server: &MockServer) {
+            let body = vec![
+                make_projection("bad-epr-mount", "/epr"), // reserved prefix
+                make_projection("not-absolute", "lamad"), // missing leading '/'
+            ];
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/db/rea_commitments"))
+                .and(matchers::query_param("action", "project-epr"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&body))
+                .mount(server)
+                .await;
+        }
+
         #[tokio::test]
         async fn primary_non_empty_short_circuits_the_pool() {
             let primary = MockServer::start().await;
@@ -781,6 +1035,90 @@ mod tests {
             let urls: Vec<String> = vec![];
             let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
             assert!(matches!(outcome, FallbackOutcome::AllUnreachable { .. }));
+        }
+
+        #[tokio::test]
+        async fn wholly_poisoned_primary_is_not_classified_primary_non_empty() {
+            // Fix 2 — the exact Welcome-at-`/` class: a primary that returns rows
+            // but ZERO installable rows must NOT be classified PrimaryNonEmpty
+            // (which would install 0 under an INFO "success" log). With a peer
+            // that has real rows, it must fall through to PeerServed naming the
+            // poisoned primary as `empty`.
+            let primary = MockServer::start().await;
+            mock_project_epr_poisoned(&primary).await; // rows present, none installable
+            let peer = MockServer::start().await;
+            mock_project_epr(&peer, &["landing", "lamad"]).await;
+
+            let http = reqwest::Client::new();
+            let urls = vec![primary.uri(), peer.uri()];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+
+            match outcome {
+                FallbackOutcome::PeerServed {
+                    primary_url,
+                    primary_empty,
+                    serving_url,
+                    projections,
+                } => {
+                    assert_eq!(primary_url, primary.uri());
+                    assert!(
+                        primary_empty,
+                        "a wholly-poisoned primary is classified as empty, not errored"
+                    );
+                    assert_eq!(serving_url, peer.uri());
+                    assert_eq!(projections.len(), 2);
+                }
+                other => panic!(
+                    "wholly-poisoned primary must NOT win classification; expected PeerServed, got {other:?}"
+                ),
+            }
+        }
+
+        #[tokio::test]
+        async fn wholly_poisoned_pool_is_all_empty_not_peer_served() {
+            // Fix 2: when EVERY pool member answers with only poisoned rows, the
+            // pool is a genuine empty state (AllEmpty) — never a usable set. The
+            // caller's AllEmpty arm replaces with an honest empty router rather
+            // than installing 0 rows under a degraded-but-served WARN.
+            let primary = MockServer::start().await;
+            mock_project_epr_poisoned(&primary).await;
+            let peer = MockServer::start().await;
+            mock_project_epr_poisoned(&peer).await;
+
+            let http = reqwest::Client::new();
+            let urls = vec![primary.uri(), peer.uri()];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+
+            match outcome {
+                FallbackOutcome::AllEmpty { urls_tried } => {
+                    assert_eq!(urls_tried.len(), 2);
+                }
+                other => panic!(
+                    "a wholly-poisoned pool is a genuine empty state; expected AllEmpty, got {other:?}"
+                ),
+            }
+        }
+
+        #[tokio::test]
+        async fn single_poisoned_primary_is_all_empty_not_primary_non_empty() {
+            // Fix 2, pool-of-one: a lone primary that answers with only poisoned
+            // rows is AllEmpty (not PrimaryNonEmpty) — the caller installs an
+            // honest empty router instead of claiming success with 0 rows.
+            let primary = MockServer::start().await;
+            mock_project_epr_poisoned(&primary).await;
+
+            let http = reqwest::Client::new();
+            let urls = vec![primary.uri()];
+            let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
+
+            match outcome {
+                FallbackOutcome::AllEmpty { urls_tried } => {
+                    assert_eq!(urls_tried, vec![primary.uri()]);
+                }
+                other => panic!(
+                    "a lone poisoned primary is a genuine empty state; expected AllEmpty, got {other:?}"
+                ),
+            }
         }
     }
 }
