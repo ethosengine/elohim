@@ -9,6 +9,12 @@ overrides:
   libsodium: ^0.8.2
   playwright: 1.59.1
   playwright-core: 1.59.1
+  '@vue/compiler-sfc': 3.5.34
+  '@vue/compiler-core': 3.5.34
+  '@vue/compiler-dom': 3.5.34
+  '@vue/compiler-ssr': 3.5.34
+  '@vue/reactivity': 3.5.34
+  '@vue/shared': 3.5.34
 
 patchedDependencies:
   '@angular/build@19.2.22':
