@@ -999,15 +999,19 @@ def substrateVerifyStage(String sub) {
 def resolveSeedDoorwayToken() {
     def token = ''
     def loginUrl = "http://${env.INTERNAL_DOORWAY_URL}"
-    withCredentials([usernamePassword(credentialsId: 'doorway-seed-jenkins-ci', usernameVariable: 'SEED_DOORWAY_IDENTIFIER', passwordVariable: 'SEED_DOORWAY_PASSWORD')]) {
-        withEnv(["DOORWAY_URL=${loginUrl}"]) {
-            def status = sh(script: "bash '${env.WORKSPACE}/genesis/scripts/ci/doorway-seed-login.sh' > /tmp/login.out", returnStatus: true)
-            if (status == 0) {
-                token = readFile('/tmp/login.out').trim()
-            } else {
-                echo "doorway-seed-login failed (creds present but login rejected or doorway unreachable — see stderr above)"
+    try {
+        withCredentials([usernamePassword(credentialsId: 'doorway-seed-jenkins-ci', usernameVariable: 'SEED_DOORWAY_IDENTIFIER', passwordVariable: 'SEED_DOORWAY_PASSWORD')]) {
+            withEnv(["DOORWAY_URL=${loginUrl}"]) {
+                def status = sh(script: "bash '${env.WORKSPACE}/genesis/scripts/ci/doorway-seed-login.sh' > /tmp/login.out", returnStatus: true)
+                if (status == 0) {
+                    token = readFile('/tmp/login.out').trim()
+                } else {
+                    echo "doorway-seed-login failed (credential present but login rejected or doorway unreachable — see stderr above) — upload runs unauthenticated (dev-mode accepts; non-dev alpha 401s downstream)"
+                }
             }
         }
+    } catch (e) {
+        echo "doorway-seed-jenkins-ci credential not provisioned in Jenkins — substrate upload runs unauthenticated (dev-mode doorway accepts; non-dev alpha will 401)"
     }
     return token
 }
