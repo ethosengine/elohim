@@ -57,6 +57,91 @@ mod tests {
     use super::*;
     use crate::generated::REACH_OPENNESS;
 
+    /// N8 guardrail: pins the canonical Reach vocabulary pair — this enum's
+    /// serde serialization ↔ `reach.schema.json`'s `enum` array — before any
+    /// reconciliation of the drifted reach vocabularies. The schema declares
+    /// `_ordinal: true` (see `codegen-ordinal.test.mjs`): codegen derives
+    /// positional ordinals (index + 1 = openness), so ORDER is significant —
+    /// this asserts ordered equality, not just set equality.
+    #[test]
+    fn serde_matches_schema_enum_values_and_order() {
+        // Declaration-order list of every variant. The exhaustive match below
+        // is the compile-time pin: adding a `Reach` variant breaks it, forcing
+        // this list (and the schema) to be updated together.
+        const ALL: [Reach; 8] = [
+            Reach::Private,
+            Reach::SelfScope,
+            Reach::Intimate,
+            Reach::Trusted,
+            Reach::Familiar,
+            Reach::Community,
+            Reach::Public,
+            Reach::Commons,
+        ];
+        for r in ALL {
+            match r {
+                Reach::Private
+                | Reach::SelfScope
+                | Reach::Intimate
+                | Reach::Trusted
+                | Reach::Familiar
+                | Reach::Community
+                | Reach::Public
+                | Reach::Commons => {}
+            }
+        }
+
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../sdk/schemas/v1/enums/reach.schema.json"
+        ))
+        .expect("reach.schema.json parses as JSON");
+
+        // `_ordinal: true` is what makes order load-bearing (positional
+        // ordinal codegen). If this marker is ever dropped, revisit the
+        // ordered-equality assertion below.
+        assert_eq!(
+            schema["_ordinal"],
+            serde_json::Value::Bool(true),
+            "reach.schema.json lost its _ordinal: true marker — ordering semantics changed"
+        );
+
+        let schema_values: Vec<&str> = schema["enum"]
+            .as_array()
+            .expect("reach.schema.json has an enum array")
+            .iter()
+            .map(|v| v.as_str().expect("enum values are strings"))
+            .collect();
+
+        let serialized: Vec<String> = ALL
+            .iter()
+            .map(|r| {
+                serde_json::to_value(r)
+                    .unwrap()
+                    .as_str()
+                    .expect("Reach serializes as a JSON string")
+                    .to_owned()
+            })
+            .collect();
+
+        // Sets AND order in one assertion: ordered equality over the full
+        // exhaustive variant list. With _ordinal: true the position IS the
+        // openness score, so a reorder is as breaking as a rename.
+        assert_eq!(
+            serialized, schema_values,
+            "Reach serde serialization drifted from reach.schema.json enum (values and/or order)"
+        );
+
+        // Positional ordinal ↔ openness: index + 1 == openness(), the exact
+        // invariant codegen relies on when emitting REACH_OPENNESS.
+        for (i, r) in ALL.iter().enumerate() {
+            assert_eq!(
+                r.openness() as usize,
+                i + 1,
+                "openness() of {r:?} disagrees with its schema ordinal position"
+            );
+        }
+    }
+
     /// Pins the hand-written `openness()` match to the schema-generated
     /// `REACH_OPENNESS` slice (codegen emits it from reach.schema.json's
     /// `_ordinal` marker). The enum match stays exhaustive/const; this test

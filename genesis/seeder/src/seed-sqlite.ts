@@ -931,6 +931,8 @@ async function stampProvenance(
   let stamped = 0;
   let failed = 0;
 
+  let reachSkipped = 0;
+
   for (const item of items) {
     try {
       const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(item.id)}`, {
@@ -943,12 +945,41 @@ async function stampProvenance(
       });
       if (response.ok) {
         stamped++;
-      } else {
-        failed++;
+        continue;
       }
+      // Substrate-correct storage routes reach-carrying PATCHes through the
+      // conductor (re-notarize in the DHT) — which FAILS for bulk-seeded rows
+      // that were never DHT-authored (genesis #1121: 3354/3429 stamp-failed,
+      // all 'private'-resolved). Provenance must still land or the read gate
+      // 404s the row forever: retry with p2pPublishedAt ONLY (metadata-only
+      // PATCH stays on the diesel path). The authored reach then reconciles
+      // when the row is properly anchored (bulk-seed anchor step — the real
+      // fix home, tracked in the timeline backlog).
+      if (item.reach) {
+        const fallback = await fetch(
+          `${STORAGE_URL}/db/content/${encodeURIComponent(item.id)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p2pPublishedAt: publishedAt }),
+          },
+        );
+        if (fallback.ok) {
+          stamped++;
+          reachSkipped++;
+          continue;
+        }
+      }
+      failed++;
     } catch {
       failed++;
     }
+  }
+
+  if (reachSkipped > 0) {
+    console.warn(
+      `   stampProvenance: ${reachSkipped} row(s) stamped provenance-only — reach re-notarization needs the conductor and these rows are not DHT-anchored (bulk-seed anchor gap)`,
+    );
   }
 
   return { stamped, failed };
