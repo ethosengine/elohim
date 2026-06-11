@@ -486,6 +486,22 @@ describe('AuthService', () => {
   // ==========================================================================
 
   describe('refreshToken', () => {
+    // Refresh walking is delegated to @elohim/identity's DoorwaySessionClient
+    // (POST /auth/refresh with the stored bearer); the provider stays as a
+    // capability gate only. Restore spies so per-test fetch mocks don't leak.
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    const loginFirst = async (provider: AuthProvider) => {
+      service.registerProvider(provider);
+      await service.login('password', {
+        type: 'password',
+        identifier: 'test@example.com',
+        password: 'password123',
+      });
+    };
+
     it('should return error when not authenticated', async () => {
       const result = await service.refreshToken();
 
@@ -497,15 +513,7 @@ describe('AuthService', () => {
     });
 
     it('should return error when provider does not support refresh', async () => {
-      const provider = createMockProvider('password', {
-        refreshToken: undefined,
-      });
-      service.registerProvider(provider);
-      await service.login('password', {
-        type: 'password',
-        identifier: 'test@example.com',
-        password: 'password123',
-      });
+      await loginFirst(createMockProvider('password', { refreshToken: undefined }));
 
       const result = await service.refreshToken();
 
@@ -516,32 +524,64 @@ describe('AuthService', () => {
       }
     });
 
-    it('should refresh token successfully', async () => {
+    it('should refresh the token through the doorway session client', async () => {
       const provider = createMockProvider('password');
-      service.registerProvider(provider);
-      await service.login('password', {
-        type: 'password',
-        identifier: 'test@example.com',
-        password: 'password123',
-      });
+      await loginFirst(provider);
+
+      const wireExpiry = Math.floor(Date.now() / 1000) + 3600;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            token: 'refreshed-token-789',
+            humanId: 'human-123',
+            agentPubKey: 'agent-pub-key-123',
+            identifier: 'test@example.com',
+            expiresAt: wireExpiry,
+          }),
+      } as Response);
 
       const result = await service.refreshToken();
 
       expect(result.success).toBe(true);
-      expect(provider.refreshToken).toHaveBeenCalledWith('test-token-123');
       expect(service.token()).toBe('refreshed-token-789');
+      // Walking is the client's job — the provider is only a capability gate
+      expect(provider.refreshToken).not.toHaveBeenCalled();
+
+      // Wire contract: POST /auth/refresh with the stored bearer token
+      const [url, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+      expect(String(url)).toBe('http://localhost:8888/auth/refresh');
+      expect(init.method).toBe('POST');
+      expect((init.headers as Record<string, string>)['Authorization']).toBe(
+        'Bearer test-token-123'
+      );
+    });
+
+    it('should map doorway error envelopes onto the auth result contract', async () => {
+      await loginFirst(createMockProvider('password'));
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({ error: 'Token expired or invalid', code: 'INVALID_CREDENTIALS' })
+          ),
+      } as Response);
+
+      const result = await service.refreshToken();
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Token expired or invalid');
+        expect(result.code).toBe('INVALID_CREDENTIALS');
+      }
     });
 
     it('should handle refresh failure', async () => {
-      const provider = createMockProvider('password', {
-        refreshToken: vi.fn().mockReturnValue(Promise.reject(new Error('Refresh token expired'))),
-      });
-      service.registerProvider(provider);
-      await service.login('password', {
-        type: 'password',
-        identifier: 'test@example.com',
-        password: 'password123',
-      });
+      await loginFirst(createMockProvider('password'));
+
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Refresh token expired'));
 
       const result = await service.refreshToken();
 

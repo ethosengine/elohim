@@ -7,9 +7,21 @@
  * Design:
  * - Uses signals for reactive state management
  * - Supports multiple auth providers through the AuthProvider interface
- * - Persists auth state in localStorage for session recovery
+ * - Persists auth state via BrowserSessionTokenStore (same localStorage keys
+ *   as always; in-memory on the SSR server path)
+ * - Delegates doorway session walking (token refresh, expiry-checked session
+ *   restore) to @elohim/identity's DoorwaySessionClient — the consolidated,
+ *   schema-contract-pinned auth wire surface
  * - Integrates with IdentityService for Holochain identity coordination
  * - Doorway-aware: Exposes selected doorway info for UI components
+ *
+ * Edge vs walking split (auth-wire plan 2026-06-10, Task 2):
+ * - EDGE (stays here): the AuthProvider registry + provider selection,
+ *   refresh TIMER scheduling + isRefreshing guard, the AuthState signal,
+ *   and auth base-URL derivation (the client receives a plain origin —
+ *   no connection-strategy logic enters the client)
+ * - WALKING (delegated): the /auth/refresh HTTP call and all token
+ *   bookkeeping go through DoorwaySessionClient + the token store
  *
  * Doorway Integration:
  * - Users select a doorway (fediverse-style gateway) at registration
@@ -26,7 +38,9 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 
 // @coverage: 93.5% (2026-02-24)
 
-import { SIGNING_CREDENTIALS_KEY } from '../../elohim/models/holochain-connection.model';
+import { DoorwaySessionClient, DoorwaySessionError } from '@elohim/identity';
+
+import { environment } from '../../../environments/environment';
 import {
   type AuthState,
   type AuthProvider,
@@ -34,24 +48,29 @@ import {
   type AuthCredentials,
   type RegisterCredentials,
   type AuthResult,
+  type AuthFailure,
+  type AuthErrorCode,
   INITIAL_AUTH_STATE,
-  AUTH_TOKEN_KEY,
-  AUTH_PROVIDER_KEY,
-  AUTH_EXPIRY_KEY,
-  AUTH_IDENTIFIER_KEY,
-  AUTH_HUMAN_ID_KEY,
-  AUTH_AGENT_PUB_KEY_KEY,
-  AUTH_INSTALLED_APP_ID_KEY,
   parseExpiryDate,
-  isTokenExpiringSoon,
 } from '../models/auth.model';
-import { DOORWAY_CACHE_KEY } from '../models/doorway.model';
 
+import { BrowserSessionTokenStore } from './browser-session-token.store';
 import { DoorwayRegistryService } from './doorway-registry.service';
 
 // =============================================================================
 // Service
 // =============================================================================
+
+/** Valid wire error codes — used to pass doorway envelope codes through. */
+const AUTH_ERROR_CODES: ReadonlySet<string> = new Set([
+  'INVALID_CREDENTIALS',
+  'USER_EXISTS',
+  'IDENTITY_EXISTS',
+  'NOT_ENABLED',
+  'VALIDATION_ERROR',
+  'NETWORK_ERROR',
+  'TOKEN_EXPIRED',
+]);
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -60,6 +79,9 @@ export class AuthService {
   // ==========================================================================
 
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
+
+  /** SSR-guarded session persistence (same localStorage keys as always). */
+  private readonly sessionStore = inject(BrowserSessionTokenStore);
 
   // ==========================================================================
   // State
@@ -76,6 +98,12 @@ export class AuthService {
 
   /** Guard against re-entrant token refresh */
   private isRefreshing = false;
+
+  /** Doorway session client (wire walking); rebuilt when the baseUrl changes. */
+  private sessionClient: DoorwaySessionClient | null = null;
+
+  /** baseUrl the cached session client was built for. */
+  private sessionClientBaseUrl: string | null = null;
 
   // ==========================================================================
   // Public Signals (read-only)
@@ -280,8 +308,8 @@ export class AuthService {
     // Clear timer
     this.clearRefreshTimer();
 
-    // Clear persisted state
-    this.clearPersistedAuth();
+    // Clear persisted state (same key set clearPersistedAuth always removed)
+    this.sessionStore.clear();
 
     // Reset state
     this.updateState(INITIAL_AUTH_STATE);
@@ -289,6 +317,10 @@ export class AuthService {
 
   /**
    * Refresh the current token.
+   *
+   * The provider capability gate stays at the service edge (provider
+   * selection); the HTTP walking itself is delegated to the composed
+   * DoorwaySessionClient (`POST /auth/refresh`, bearer from the token store).
    *
    * @returns New authentication result
    */
@@ -313,17 +345,32 @@ export class AuthService {
       };
     }
 
+    const baseUrl = this.deriveAuthBaseUrl();
+    if (!baseUrl) {
+      return {
+        success: false,
+        error: 'Holochain configuration not available',
+        code: 'NETWORK_ERROR',
+      };
+    }
+
     try {
-      const result = await provider.refreshToken(currentToken);
+      const response = await this.getSessionClient(baseUrl).refresh();
 
-      if (result.success) {
-        this.handleAuthSuccess(result, providerType);
-      }
+      const result = {
+        success: true as const,
+        token: response.token,
+        humanId: response.humanId,
+        agentPubKey: response.agentPubKey,
+        expiresAt: response.expiresAt,
+        identifier: response.identifier,
+        installedAppId: response.installedAppId,
+      };
 
+      this.handleAuthSuccess(result, providerType);
       return result;
     } catch (err) {
-      const error = err instanceof Error ? err.message : 'Token refresh failed';
-      return { success: false, error, code: 'NETWORK_ERROR' };
+      return this.refreshFailure(err);
     }
   }
 
@@ -332,39 +379,35 @@ export class AuthService {
   // ==========================================================================
 
   /**
-   * Restore session from localStorage.
+   * Restore session from the persisted token store.
+   *
+   * Delegates the expiry-checked read to DoorwaySessionClient.restoreSession()
+   * (purely local — clears the stored session when expired); the provider
+   * type and the AuthState hydration stay at the service edge.
    *
    * @returns True if session was restored
    */
   restoreSession(): boolean {
     try {
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
-      const provider = localStorage.getItem(AUTH_PROVIDER_KEY) as AuthProviderType | null;
-      const expiresAtStr = localStorage.getItem(AUTH_EXPIRY_KEY);
-      const identifier = localStorage.getItem(AUTH_IDENTIFIER_KEY);
-      const humanId = localStorage.getItem(AUTH_HUMAN_ID_KEY);
-      const agentPubKey = localStorage.getItem(AUTH_AGENT_PUB_KEY_KEY);
+      const provider = this.sessionStore.getProviderType();
+      const client = this.getSessionClient(this.deriveAuthBaseUrl() ?? '');
+      const stored = client.restoreSession();
 
-      if (!token || !provider) {
+      if (!stored || !provider) {
         return false;
       }
 
-      const expiresAt = parseExpiryDate(expiresAtStr);
-
-      // Check if token is expired
-      if (isTokenExpiringSoon(expiresAt, 0)) {
-        this.clearPersistedAuth();
-        return false;
-      }
+      const expiresAt = new Date(stored.expiresAt * 1000);
 
       this.updateState({
         isAuthenticated: true,
-        token,
+        token: stored.token,
         provider,
         expiresAt,
-        identifier,
-        humanId,
-        agentPubKey,
+        // '' is the token store's absent-value sentinel — map back to null
+        identifier: stored.identifier || null,
+        humanId: stored.humanId || null,
+        agentPubKey: stored.agentPubKey || null,
         isLoading: false,
         error: null,
       });
@@ -385,7 +428,7 @@ export class AuthService {
    * @returns True if session data exists
    */
   hasStoredSession(): boolean {
-    return !!localStorage.getItem(AUTH_TOKEN_KEY);
+    return this.sessionStore.get() !== null;
   }
 
   // ==========================================================================
@@ -414,62 +457,116 @@ export class AuthService {
       error: null,
     });
 
-    // Persist to localStorage
-    this.persistAuth(
-      result.token,
-      provider,
-      result.expiresAt,
-      result.identifier,
-      result.humanId,
-      result.agentPubKey
-    );
-
-    // Store installed app ID for multi-conductor routing
-    if (result.installedAppId) {
-      localStorage.setItem(AUTH_INSTALLED_APP_ID_KEY, result.installedAppId);
-    }
+    // Persist via the session token store (same localStorage keys as before;
+    // also seeds the bearer source DoorwaySessionClient refreshes from)
+    this.sessionStore.set({
+      token: result.token,
+      humanId: result.humanId,
+      agentPubKey: result.agentPubKey,
+      identifier: result.identifier,
+      expiresAt: expiresAt ? Math.floor(expiresAt.getTime() / 1000) : 0,
+      installedAppId: result.installedAppId,
+    });
+    this.sessionStore.setProviderType(provider);
 
     // Schedule token refresh
     this.scheduleRefresh(expiresAt);
   }
 
   /**
-   * Persist auth state to localStorage.
+   * Map a thrown refresh error onto the AuthResult failure contract,
+   * preserving pre-migration semantics: doorway envelope code/message when
+   * present, provider-equivalent status mapping otherwise, NETWORK_ERROR
+   * for network-level failures.
    */
-  private persistAuth(
-    token: string,
-    provider: AuthProviderType,
-    expiresAt: string | number,
-    identifier: string,
-    humanId?: string,
-    agentPubKey?: string
-  ): void {
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-    localStorage.setItem(AUTH_PROVIDER_KEY, provider);
-    // Store as string - parseExpiryDate handles both formats on restore
-    localStorage.setItem(AUTH_EXPIRY_KEY, String(expiresAt));
-    localStorage.setItem(AUTH_IDENTIFIER_KEY, identifier);
-    if (humanId) {
-      localStorage.setItem(AUTH_HUMAN_ID_KEY, humanId);
+  private refreshFailure(err: unknown): AuthFailure {
+    if (err instanceof DoorwaySessionError) {
+      return {
+        success: false,
+        error: err.message,
+        code: this.mapRefreshErrorCode(err),
+      };
     }
-    if (agentPubKey) {
-      localStorage.setItem(AUTH_AGENT_PUB_KEY_KEY, agentPubKey);
+
+    const error = err instanceof Error ? err.message : 'Token refresh failed';
+    return { success: false, error, code: 'NETWORK_ERROR' };
+  }
+
+  /** Status→code mapping mirroring the password provider's getHttpErrorCode. */
+  private mapRefreshErrorCode(err: DoorwaySessionError): AuthErrorCode {
+    if (err.code && AUTH_ERROR_CODES.has(err.code)) {
+      return err.code as AuthErrorCode;
+    }
+    switch (err.status) {
+      case 401:
+        return 'INVALID_CREDENTIALS';
+      case 409:
+        return 'USER_EXISTS';
+      case 501:
+        return 'NOT_ENABLED';
+      default:
+        return 'NETWORK_ERROR';
     }
   }
 
   /**
-   * Clear persisted auth state.
+   * Doorway base URL for session walking. The service owns this derivation —
+   * the client receives a plain origin (no strategy logic in the client).
+   * Mirrors PasswordAuthProvider.getAuthBaseUrl() priority:
+   * selected doorway > Che hc-dev endpoint > environment authUrl > adminUrl.
+   *
+   * @returns Base URL, or null when no configuration is available
    */
-  private clearPersistedAuth(): void {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_PROVIDER_KEY);
-    localStorage.removeItem(AUTH_EXPIRY_KEY);
-    localStorage.removeItem(AUTH_IDENTIFIER_KEY);
-    localStorage.removeItem(AUTH_HUMAN_ID_KEY);
-    localStorage.removeItem(AUTH_AGENT_PUB_KEY_KEY);
-    localStorage.removeItem(AUTH_INSTALLED_APP_ID_KEY);
-    localStorage.removeItem(SIGNING_CREDENTIALS_KEY);
-    localStorage.removeItem(DOORWAY_CACHE_KEY);
+  private deriveAuthBaseUrl(): string | null {
+    // Selected doorway first (fediverse-style gateway)
+    const doorwayUrl = this.doorwayRegistry.selectedUrl();
+    if (doorwayUrl) {
+      return doorwayUrl;
+    }
+
+    // Eclipse Che: the admin-proxy is exposed via the hc-dev endpoint
+    const hostname = globalThis.location?.hostname ?? '';
+    if (hostname.includes('.devspaces.') || hostname.includes('.code.ethosengine.com')) {
+      return `https://${hostname.replace(/-angular-dev\./, '-hc-dev.')}`;
+    }
+
+    // Explicit authUrl (local dev or production)
+    if (environment.holochain?.authUrl) {
+      return environment.holochain.authUrl;
+    }
+
+    // Fall back to deriving from adminUrl (WS → HTTP)
+    const adminUrl = environment.holochain?.adminUrl;
+    if (!adminUrl) {
+      return null;
+    }
+
+    let httpUrl = adminUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
+    try {
+      const parsed = new URL(httpUrl);
+      httpUrl = `${parsed.protocol}//${parsed.host}`;
+    } catch {
+      // If URL parsing fails, just use the converted URL
+    }
+    return httpUrl;
+  }
+
+  /**
+   * Lazily build (and cache per baseUrl) the composed DoorwaySessionClient.
+   * The token store is the shared persistence seam: the service writes
+   * sessions there on auth success, the client reads the bearer from it.
+   */
+  private getSessionClient(baseUrl: string): DoorwaySessionClient {
+    if (!this.sessionClient || this.sessionClientBaseUrl !== baseUrl) {
+      this.sessionClient = new DoorwaySessionClient({
+        baseUrl,
+        // Late-bound platform fetch (browser and SSR Node both provide it)
+        fetchImpl: async (input, init) => globalThis.fetch(input, init),
+        tokenStore: this.sessionStore,
+      });
+      this.sessionClientBaseUrl = baseUrl;
+    }
+    return this.sessionClient;
   }
 
   /**
