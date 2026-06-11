@@ -198,6 +198,14 @@ doorway's `API_KEY_ADMIN`, expect a register `ADMIN_KEY_REJECTED`/403 with the a
       for licensing a netpol rollback.
 - [x] Commit.
 
+## Execution record (2026-06-11)
+
+T1 doorway gate 396779747 · T2 seeder auth 1372fbe57 · T3 CI wiring b99d6a186+b3e6f91a1 · catch-restore
+87a628216 — all two-stage reviewed. **FINAL SHAPE (edcac9800, reviewed ✅, live 6-scenario mock):**
+in-pipeline self-provisioning from the existing `doorway-admin-bootstrap-key` — zero new operator credential,
+zero manual provisioning, self-healing; seed runs under jenkins-ci's JWT (audit names the actor, not raw
+admin key). Operator activation now NIL beyond the credential the seed-admin stages already depend on.
+
 ## Out of scope
 
 Brokered conductor-WS seeding surface (hole #1 — closes the netpol + the ipBlock VXLAN drift);

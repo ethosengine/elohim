@@ -118,8 +118,10 @@ landed perimeter hole #2's Stage A, all tasks two-stage reviewed:
   bug fixed (jenkins-ci must be Admin) — b99d6a186 + b3e6f91a1.
 
 Live-verification CLAIMED until the next operator-merged genesis build's Upload stage returns 200 with a
-bearer. Operator activation steps (Jenkins credential `doorway-seed-jenkins-ci`, alpha account provisioning,
-jwt_secret confirm) in the plan's Task-3 ops block.
+bearer. **Zero-touch activation (edcac9800):** the pipeline self-provisions `jenkins-ci` idempotently from
+the existing `doorway-admin-bootstrap-key` credential (no new credential, no manual curl) — register-or-confirm
++ login → JWT bearer; self-heals on a MongoDB wipe. Only precondition (already satisfied): that credential
+exists and equals alpha's API_KEY_ADMIN. Caveat: rotate ADMIN_KEY ⇒ delete the jenkins-ci account once.
 
 **STILL OPEN:** hole #1 (jenkins → conductor-WS 8444/8445, netpol-gated by network position — the
 brokered-conductor-surface task; closing it reverts the netpol + retires the ipBlock VXLAN manifest-drift
