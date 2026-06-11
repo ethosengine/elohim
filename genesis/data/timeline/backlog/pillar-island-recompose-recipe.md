@@ -59,7 +59,13 @@ per-mechanic) from §Vision-remainder (gap ledger → backlog companion).
 4. **Strip staged-draft frontmatter completely when wrapping into entity bodies** (`tail -n +2` only
    removes one line — flatten the whole block to a provenance sentence; the lamad rep shipped orphan
    metadata mid-body and had to fix it).
-5. Seal doc-roots (`cite-gen --seal`, serial); verify each. Harvested cross-bundle contracts → one-line
+5. **Re-tense drafts against the disposition map and the session's own repairs** (doorway lesson):
+   fan-out agents write before dispositions/repairs are final — one draft cited a retiring sibling as
+   "staying in-tree" (a `cites:` that would go DEAD at the gate; belongs in `derived_from:`), another
+   reported a code-comment defect in present tense after the session had already repaired it. At
+   placement, sweep every draft for references to (a) island files on the retirement list and (b)
+   defects the Phase 0-1 drift repairs already fixed.
+6. Seal doc-roots (`cite-gen --seal`, serial); verify each. Harvested cross-bundle contracts → one-line
    gospel rails, not new docs.
 
 ## Phase 3 — the gate, then retirement

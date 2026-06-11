@@ -36,6 +36,9 @@ The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM.
 | `src/render/` | Manifest-driven SSR dispatch (V8 + capability + concurrency semaphore) |
 | `src/ssr.rs` | SSR entry orchestration and `x-ssr-*` observability headers |
 | `src/main.rs` | Startup: creates AppState, self-registers steward storage |
+| `src/conductor/registry.rs` + `src/conductor/router.rs` | Conductor pool: agent_pub_key → conductor mapping with per-request routing (identity-hosting axis) |
+| `src/routes/admin_conductors.rs` | Hosted-user provisioning (`POST /admin/hosted-users`) + graduation accounting (MongoDB flag-state; source-chain migration not yet built) |
+| `src/services/federation.rs` | DHT self-registration as `DoorwayRegistration` + federation peer discovery |
 | `src/cache/resolution.rs` | DoorwayResolver: tiered Projection → Conductor → External resolution, exactly the three-layer truth model ([[project_three_layer_truth_model]]); also the write-on-fetch site for the projection cache |
 | `src/projection/subscriber.rs` | Signal subscriber: connects to conductor app interface, receives DHT signals |
 | `src/services/discovery.rs` | DiscoveryService: conductor DNA introspection (route stubs, future) |

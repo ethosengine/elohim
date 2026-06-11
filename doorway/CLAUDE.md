@@ -132,16 +132,16 @@ Doorways are **projections of the DHT**, not authorities. Unlike traditional fed
 
 Peers register with multiple doorways for redundancy, account recovery, and geographic distribution. Doorways share projection caches via MongoDB.
 
+Live federation mechanisms (doorway-service):
+- **DHT self-registration**: at startup the doorway registers itself as a `DoorwayRegistration` entry via the infrastructure zome (`doorway-service/src/services/federation.rs` → `register_doorway` coordinator fn) — doorway discovery is DHT-native, not a central registry.
+- **Cross-doorway JWT validation**: tokens carry `doorway_id`/`doorway_url` claims (`doorway-service/src/auth/jwt.rs`); a receiving doorway verifies against the issuer's `GET /.well-known/doorway-keys` (JWKS, `doorway-service/src/routes/federation.rs`). The doorway also serves its DID document at `/.well-known/did.json` (`doorway-service/src/routes/identity.rs`).
+- **Peer discovery**: `FEDERATION_PEERS` config + the startup peer-discovery task (`doorway-service/src/main.rs`).
+
 ## Reach Enforcement
 
-Doorway gates HTTP requests based on content reach levels:
+Doorway gates projection-cache serving by content reach. The live gate is `can_serve_at_reach` (`doorway-service/src/cache/access_control.rs`), which knows the 8-value ladder (`private`/`invited`/`local`/`neighborhood`/`municipal`/`bioregional`/`regional`/`commons`) but enforces simplified rules: `private` → beneficiary match only; `invited` through `regional` → any authenticated requester (invite-list and relationship checks are NOT yet implemented); `commons` → everyone; unknown value → deny. Do not document a stricter table than the code enforces, and do not canonize any reach vocabulary here — the vocabulary is in known multi-way drift (`genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md`).
 
-| Reach | Anonymous | Authenticated |
-|-------|-----------|---------------|
-| commons | allowed | allowed |
-| regional-private | denied | allowed |
-| local | denied | requires relationship |
-| private | denied | requires beneficiary match |
+Known enforcement gap (HIGH, open): the storage HTTP path behind the proxy applies an even coarser gate — fine-grained reach authorization runs only on the P2P resolve path, so HTTP reads can return 200 to any authenticated caller regardless of reach. Tracked in `genesis/data/timeline/backlog/http-reach-enforcement-gap.md`; acceptance scenarios already exist (`genesis/a2o/features/lamad/intimate-reach-household.feature`).
 
 ## Design Vocabulary
 

@@ -1,7 +1,7 @@
 //! DID document and identity endpoints
 //!
 //! Serves the doorway's W3C DID Document for federation discovery.
-//! See holochain/doorway/DID-FEDERATION.md for architecture details.
+//! See doorway/CLAUDE.md "Federation" for the live federation mechanisms.
 //!
 //! Also provides a transparent proxy to elohim-storage `/api/v1/identity/*`.
 

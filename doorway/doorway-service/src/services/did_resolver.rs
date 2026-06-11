@@ -3,7 +3,7 @@
 //! Resolves W3C DIDs to their DID Documents and extracts service endpoints.
 //! Supports did:web and did:key methods for doorway federation.
 //!
-//! See holochain/doorway/DID-FEDERATION.md for architecture details.
+//! See doorway/CLAUDE.md "Federation" for the live federation mechanisms.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
