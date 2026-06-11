@@ -63,6 +63,21 @@ describe('<elohim-skeleton>', () => {
     expect(el.style.getPropertyValue('--elohim-skeleton-radius')).to.equal('8px');
   });
 
+  it('does NOT clobber an inherited --elohim-skeleton-radius binding at the default radius', async () => {
+    // Regression: an unconditional host setProperty made the advertised
+    // @cssprop override surface dead — the CustomTheme proof bound radius 0
+    // yet corners rendered 4px (2026-06-11 eyes sweep).
+    const wrap = await fixture<HTMLDivElement>(html`
+      <div style="--elohim-skeleton-radius: 0px;">
+        <elohim-skeleton></elohim-skeleton>
+      </div>
+    `);
+    const el = wrap.querySelector('elohim-skeleton') as ElohimSkeleton;
+    await elementUpdated(el);
+    expect(el.style.getPropertyValue('--elohim-skeleton-radius')).to.equal('');
+    expect(getComputedStyle(el).borderRadius).to.equal('0px');
+  });
+
   it('has shadowRoot', async () => {
     const el = await fixture<ElohimSkeleton>(html`
       <elohim-skeleton></elohim-skeleton>
