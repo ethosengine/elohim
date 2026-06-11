@@ -25,7 +25,11 @@ export function componentPrefix(id: string): string {
   return i === -1 ? id : id.slice(0, i);
 }
 
-/** Segment-aligned: prefix === component or (multi-segment) prefix ends with `-<component>`. */
+/**
+ * Segment-aligned: prefix === component or (multi-segment) prefix ends with `-<component>`.
+ * Multi-segment names may match as any segment-aligned suffix (e.g. `core-elohim-compute-tile`
+ * also matches `designed-core-elohim-compute-tile`); single-segment names require exact prefix equality.
+ */
 export function matchesComponent(id: string, component: string): boolean {
   const prefix = componentPrefix(id);
   if (prefix === component) return true;
@@ -63,13 +67,8 @@ export function groupByComponent(entries: StoryEntry[]): Map<string, StoryEntry[
 
 export function suggestComponents(index: StorybookIndex, name: string, limit = 5): string[] {
   const n = name.toLowerCase();
-  const seen = new Set<string>();
-  for (const e of Object.values(index.entries)) {
-    const prefix = componentPrefix(e.id);
-    if (prefix.toLowerCase().includes(n)) seen.add(prefix);
-    if (seen.size >= limit) break;
-  }
-  return [...seen];
+  const all = Object.values(index.entries).map(e => componentPrefix(e.id));
+  return [...new Set(all.filter(p => p.toLowerCase().includes(n)))].slice(0, limit);
 }
 
 export function storiesForSheet(
@@ -97,6 +96,7 @@ export interface SheetOptions {
  * Self-contained iframe-grid page; rendered via file:// in one full-page
  * screenshot. A file:// parent loading http(s) iframes is permitted in
  * Chromium (mixed-content rules block the reverse case).
+ * Precondition: caller validates `entries` is non-empty (the CLI errors before calling).
  */
 export function sheetHtml(opts: SheetOptions): string {
   const { component, base, entries, cell, cols } = opts;
@@ -113,7 +113,7 @@ export function sheetHtml(opts: SheetOptions): string {
         .map(
           e => `<figure class="cell">
   <figcaption>${escapeHtml(e.name)}</figcaption>
-  <iframe src="${escapeHtml(base)}/iframe.html?id=${encodeURIComponent(e.id)}&viewMode=story" width="${cell.width}" height="${cell.height}" loading="eager"></iframe>
+  <iframe src="${escapeHtml(base)}/iframe.html?id=${encodeURIComponent(e.id)}&amp;viewMode=story" width="${cell.width}" height="${cell.height}" loading="eager"></iframe>
 </figure>`
         )
         .join('\n');

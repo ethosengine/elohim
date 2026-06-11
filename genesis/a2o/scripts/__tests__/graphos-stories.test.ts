@@ -52,55 +52,55 @@ function index(): StorybookIndex {
   };
 }
 
-describe('componentPrefix', () => {
-  it('returns the id prefix before --', () => {
+void describe('componentPrefix', () => {
+  void it('returns the id prefix before --', () => {
     assert.equal(
       componentPrefix('designed-core-elohim-compute-tile--standard'),
       'designed-core-elohim-compute-tile'
     );
   });
-  it('returns the whole id when there is no --', () => {
+  void it('returns the whole id when there is no --', () => {
     assert.equal(componentPrefix('foundations-colors'), 'foundations-colors');
   });
 });
 
-describe('matchesComponent (segment-aligned)', () => {
-  it('matches when prefix ends with -<component>', () => {
+void describe('matchesComponent (segment-aligned)', () => {
+  void it('matches when prefix ends with -<component>', () => {
     assert.ok(
       matchesComponent('designed-core-elohim-compute-tile--dark', 'elohim-compute-tile')
     );
   });
-  it('matches exact prefix', () => {
+  void it('matches exact prefix', () => {
     assert.ok(matchesComponent('elohim-compute-tile--dark', 'elohim-compute-tile'));
   });
-  it('does NOT match a bare substring tail (tile)', () => {
+  void it('does NOT match a bare substring tail (tile)', () => {
     assert.equal(matchesComponent('designed-core-elohim-compute-tile--dark', 'tile'), false);
   });
 });
 
-describe('familyOf', () => {
-  it('lowercases the first title segment', () => {
+void describe('familyOf', () => {
+  void it('lowercases the first title segment', () => {
     assert.equal(familyOf(entry('x--y', 'Designed/Core/elohim-compute-tile', 'Y')), 'designed');
   });
 });
 
-describe('listStories', () => {
-  it('returns all entries without a filter', () => {
+void describe('listStories', () => {
+  void it('returns all entries without a filter', () => {
     assert.equal(listStories(index()).length, 5);
   });
-  it('filters by id substring, case-insensitive', () => {
+  void it('filters by id substring, case-insensitive', () => {
     const got = listStories(index(), 'COMPUTE-TILE');
     assert.equal(got.length, 3);
   });
-  it('filters by title substring too', () => {
+  void it('filters by title substring too', () => {
     const got = listStories(index(), 'capacity tokens');
     assert.equal(got.length, 1);
     assert.equal(got[0].type, 'docs');
   });
 });
 
-describe('groupByComponent', () => {
-  it('groups by component prefix preserving order', () => {
+void describe('groupByComponent', () => {
+  void it('groups by component prefix preserving order', () => {
     const groups = groupByComponent(listStories(index()));
     assert.deepEqual(
       [...groups.keys()],
@@ -115,36 +115,36 @@ describe('groupByComponent', () => {
   });
 });
 
-describe('suggestComponents', () => {
-  it('suggests component prefixes containing the name, deduped', () => {
+void describe('suggestComponents', () => {
+  void it('suggests component prefixes containing the name, deduped', () => {
     const got = suggestComponents(index(), 'compute');
     assert.ok(got.includes('designed-core-elohim-compute-tile'));
     assert.ok(got.includes('default-core-elohim-compute-tile'));
     assert.equal(new Set(got).size, got.length);
   });
-  it('respects the limit', () => {
+  void it('respects the limit', () => {
     assert.ok(suggestComponents(index(), 'e', 2).length <= 2);
   });
 });
 
-describe('storiesForSheet', () => {
-  it('selects story-type entries for the component across families', () => {
+void describe('storiesForSheet', () => {
+  void it('selects story-type entries for the component across families', () => {
     const got = storiesForSheet(index(), 'elohim-compute-tile');
     assert.equal(got.length, 3);
     assert.ok(got.every(e => e.type === 'story'));
   });
-  it('narrows by family', () => {
+  void it('narrows by family', () => {
     const got = storiesForSheet(index(), 'elohim-compute-tile', 'designed');
     assert.equal(got.length, 2);
   });
-  it('excludes docs entries', () => {
+  void it('excludes docs entries', () => {
     const got = storiesForSheet(index(), 'compute-capacity-tokens');
     assert.equal(got.length, 0);
   });
 });
 
-describe('sheetHtml', () => {
-  it('renders one labeled iframe per story, grouped by family, with grid cols', () => {
+void describe('sheetHtml', () => {
+  void it('renders one labeled iframe per story, grouped by family, with grid cols', () => {
     const entries = storiesForSheet(index(), 'elohim-compute-tile');
     const html = sheetHtml({
       component: 'elohim-compute-tile',
@@ -155,7 +155,7 @@ describe('sheetHtml', () => {
     });
     assert.ok(
       html.includes(
-        'iframe.html?id=designed-core-elohim-compute-tile--standard&viewMode=story'
+        'iframe.html?id=designed-core-elohim-compute-tile--standard&amp;viewMode=story'
       )
     );
     assert.equal((html.match(/<iframe /g) ?? []).length, 3);
@@ -164,7 +164,7 @@ describe('sheetHtml', () => {
     assert.ok(html.includes('repeat(3, 420px)'));
     assert.ok(html.includes('<figcaption>Standard</figcaption>'));
   });
-  it('escapes HTML in names', () => {
+  void it('escapes HTML in names', () => {
     const html = sheetHtml({
       component: 'x',
       base: 'https://s',
