@@ -1,3 +1,67 @@
-git add genesis/docs/shifts/2026-06-11-epr-durability-sprint-result.md $(git diff --name-only -- genesis/data/timeline/backlog/ genesis/docs/ | tr '\n' ' ') 2>/dev/null; git add -u genesis/data/timeline/backlog/ 2>/dev/null; git commit --no-verify -m "shift(epr-durability): sprint result — measure 3→1→1, done-to-the-ceiling; seal sweep
+# Sprint Result — EPR Durability Cluster Validation (overnight 2026-06-11)
 
-Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>" | tail -1
+**Objective:** drive the genesis substrate gates (mesh.adjacency ×2,
+propagation.custody-convergence) to 0 with formation past founder binding.
+**Outcome: measure 3 → 1 → 1** (two consecutive complete genesis runs,
+fresh-triggered — the first complete runs after a week of aborts).
+Target 0 not reached; the lone failing gate is operator-ceiling
+(conductor PVC). **Done-to-the-ceiling.**
+
+## Proven on the live cluster tonight
+
+- Persistent bootstrap peering: 14/14 pods `connected:13`, zero redial
+  failures — the weeks-old matthew↔jessica partition is gone (CI asserts
+  mesh.adjacency BOTH directions green, #1123 + #1124).
+- Byte plane: jessica served the build-unique probe blob 0s/1-attempt;
+  filesystem replicas persisted (5→7).
+- Discovery: every pod names its responders; matthew's 28-34 commitments
+  discovered fleet-wide (was 0 since Phase 0).
+- Reconcile controller: FIRST successful connect in alpha history
+  (app-id mismatch fixed — it had literally never run).
+- Identity seeding: founder created on his own conductor, 0 conflicts.
+- Seed Database: seconds, not hours (stamp circuit breaker killed the
+  hour-sink that aborted #1121/#1122).
+
+## Ceiling menu (operator decisions; full diagnoses in the backlog docs)
+
+1. **Conductor PVC schema** — `no such table: DhtOp` (kitsune2 cannot
+   write ops) → custody-convergence + the DepMissingFromDht class.
+   `dna-conductor-dht-gossip-gap.md`. Genesis pair must move together.
+2. **infrastructure role** fails 5/5 connects → PeerStatus/resilience
+   dark. Role-name vs happ manifest. `storage-hcclient-boot-giveup.md`.
+3. `record_health_attestation` caller decision —
+   `dna-health-attestation-ci-authz.md`.
+4. elohim-epr Jenkins job not provisioned (orchestrator warns every run).
+5. Dataplane SDK: 3 design questions → /brainstorm.
+   `arch-dataplane-sdk-proposal.md`.
+
+## Anti-patterns observed (museum candidates)
+
+- **One-shot-init disease** — 3 instances cured in one night: bootstrap
+  dials (retry only at connected==0), HcClient 5-then-die, and the
+  reconcile-controller app-id mismatch masked beneath the retry noise.
+- **Baseline-advance-despite-failure** under-build hole (3 occurrences;
+  `[build:app,edge]` workaround;
+  `ci-orchestrator-baseline-advance-despite-failure.md`).
+- **Audit rows graded docs over code** — 4 stale audit rows caught at
+  implementation; the code review then caught the implementation's own
+  blind spot (N1 production no-op with a green test). Two verify layers,
+  both earned their keep.
+- K8s pod-exec websocket transient (canonicalized + ledger-triaged).
+
+## Visual validation
+
+Not measured — visual gate OFF for this shift (substrate work; no
+in-scope `@elohim-visually-validated` surface).
+
+## Follow-up objective candidates
+
+B peer-recovery drill (after the PVC decision) · D quilt-shaped
+aggregates (p2p-design-gate + reach-enum reconciliation first; junction
+now fillable with the controller alive) · E emitter-side pull state
+field · dataplane refactor backlog items 1-9
+(`arch-dataplane-refactor-backlog.md`).
+
+Journal (full iteration log):
+`.claude/shifts/2026-06-11T12-15-epr-durability-cluster-validation.journal.md`
+(gitignored; backup at /tmp/sprint-journal-backup.md)
