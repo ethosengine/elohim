@@ -40,6 +40,7 @@ export interface ContentAnalyticsLoader {
  * @cssprop --elohim-analytics-padding - Container padding
  * @cssprop --elohim-analytics-bg - Container background
  * @cssprop --elohim-analytics-fg - Container foreground text color
+ * @cssprop --elohim-analytics-title-font - Title font family (display face binding point)
  * @cssprop --elohim-analytics-title-size - Title font size
  * @cssprop --elohim-analytics-value-size - Metric value font size
  * @cssprop --elohim-analytics-value-weight - Metric value font weight
@@ -57,6 +58,7 @@ export interface ContentAnalyticsLoader {
  * @csspart metric-value - The metric value span
  * @csspart metric-label - The metric label span
  * @csspart note - The explanatory note
+ * @csspart error - The error state
  *
  * @capabilityMaxLens detail
  * @capabilityThemes light, dark
@@ -85,6 +87,7 @@ export class ElohimContentAnalytics extends CapabilityAwareElement(LitElement) {
     }
 
     .title {
+      font-family: var(--elohim-analytics-title-font, inherit);
       font-size: var(--elohim-analytics-title-size, 1rem);
       font-weight: 600;
       margin: 0 0 0.75rem;

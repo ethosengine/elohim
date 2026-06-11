@@ -1,8 +1,5 @@
 import { expect } from '@open-wc/testing';
-import {
-  parseFederatedIdentifier,
-  resolveGatewayToDoorwayUrl,
-} from './federated-identifier.js';
+import { parseFederatedIdentifier, resolveGatewayToDoorwayUrl } from './federated-identifier.js';
 
 // ─── parseFederatedIdentifier ────────────────────────────────────────────────
 
@@ -100,9 +97,7 @@ describe('resolveGatewayToDoorwayUrl', () => {
   });
 
   it('returns a known doorway URL when the domain matches by URL content', () => {
-    const knownDoorways = [
-      { url: 'https://doorway-custom.example.com', id: 'custom' },
-    ];
+    const knownDoorways = [{ url: 'https://doorway-custom.example.com', id: 'custom' }];
     const result = resolveGatewayToDoorwayUrl('custom.example.com', knownDoorways);
     expect(result.ok).to.be.true;
     if (result.ok) {

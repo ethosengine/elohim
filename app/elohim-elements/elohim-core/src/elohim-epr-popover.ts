@@ -165,7 +165,6 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
 
     .format {
       font-size: 0.75em;
-      color: CanvasText;
     }
 
     .title {
@@ -177,7 +176,6 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
     .description {
       margin: 0 0 0.5rem;
       font-size: 0.8em;
-      color: CanvasText;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
@@ -207,10 +205,6 @@ export class ElohimEprPopover extends CapabilityAwareElement(LitElement) {
       gap: 0.375rem;
       margin-block-end: 0.25rem;
       font-size: 0.8em;
-    }
-
-    .section-label {
-      color: CanvasText;
     }
 
     .section-value {

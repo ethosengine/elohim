@@ -119,6 +119,15 @@ const DEFAULT_SCALES: FeedbackContextScales = {
  * @cssprop --elohim-feedback-submit-fg - Submit button foreground
  * @cssprop --elohim-feedback-submit-radius - Submit button border radius
  * @cssprop --elohim-feedback-distribution-height - Distribution bar height
+ * @cssprop --elohim-feedback-position-bg - Resting position button background
+ * @cssprop --elohim-feedback-position-fg - Resting position button text color
+ * @cssprop --elohim-feedback-position-border - Position button border (FULL shorthand, e.g. `1px solid …` — not a color)
+ * @cssprop --elohim-feedback-position-radius - Position button corner radius
+ * @cssprop --elohim-feedback-position-active-bg - Selected position button background (uniform override; falls back to the per-slot scale color)
+ * @cssprop --elohim-feedback-position-active-fg - Selected position button text color (uniform override; falls back to the per-slot fg)
+ * @cssprop --elohim-feedback-scale-0 - Scale color for the 0 position (also -25/-50/-75/-100); drives resting border accent, selected bg, and distribution segments
+ * @cssprop --elohim-feedback-scale-0-fg - Readable text color paired with --elohim-feedback-scale-0 when selected (also -25/-50/-75/-100); bind these in pairs
+ * @cssprop --elohim-feedback-accent - Intensity slider accent color
  *
  * @csspart container - The feedback container
  * @csspart label - The scale label heading
@@ -175,9 +184,7 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
     .position-btn {
       padding-block: 0.5rem;
       padding-inline: 0.75rem;
-      border: 2px solid;
-      border-radius: 0.375rem;
-      background: transparent;
+      border-radius: var(--elohim-feedback-position-radius, 0.375rem);
       cursor: pointer;
       font: inherit;
       font-size: 0.875rem;
@@ -206,7 +213,7 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
 
     .intensity-slider {
       inline-size: 100%;
-      accent-color: Highlight;
+      accent-color: var(--elohim-feedback-accent, Highlight);
     }
 
     .reasoning-section {
@@ -398,16 +405,35 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
     return l > 0.1833 ? '#000000' : '#ffffff';
   }
 
+  /**
+   * Stable theming slot for a normalized position index (0 → "0", 0.25 → "25",
+   * … 1 → "100") — keys the per-slot `--elohim-feedback-scale-*` override
+   * surface independently of context-specific labels.
+   */
+  private static slotKey(index: number): string {
+    return String(Math.round(index * 100));
+  }
+
   override render() {
     const scale = this.currentScale;
+    const tabbableIndex = this.selectedPosition ?? scale.positions[0]?.index;
 
     return html`
       <div class="container" part="container">
         <h4 class="feedback-label" part="label">${scale.label}</h4>
 
-        <div class="positions" part="positions" role="radiogroup" aria-label="${scale.label}">
+        <div
+          class="positions"
+          part="positions"
+          role="radiogroup"
+          aria-label="${scale.label}"
+          @keydown=${this.onRadioKeydown}
+        >
           ${scale.positions.map(position => {
             const selected = this.selectedPosition === position.index;
+            const slot = ElohimGraduatedFeedback.slotKey(position.index);
+            const scaleColor = `var(--elohim-feedback-scale-${slot}, ${position.color})`;
+            const selectedFg = `var(--elohim-feedback-position-active-fg, var(--elohim-feedback-scale-${slot}-fg, ${ElohimGraduatedFeedback.readableOn(position.color)}))`;
             return html`
               <button
                 class="position-btn"
@@ -416,13 +442,17 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
                 role="radio"
                 aria-checked=${selected ? 'true' : 'false'}
                 aria-label="${position.label}"
+                tabindex=${position.index === tabbableIndex ? '0' : '-1'}
+                data-position-index="${position.index}"
                 data-testid="position-${position.label.toLowerCase().replace(/\s+/g, '-')}"
                 style="
-                  border-color: ${position.color};
-                  background-color: ${selected ? position.color : 'transparent'};
+                  border: var(--elohim-feedback-position-border, 2px solid ${scaleColor});
+                  background-color: ${selected
+                  ? `var(--elohim-feedback-position-active-bg, ${scaleColor})`
+                  : 'var(--elohim-feedback-position-bg, transparent)'};
                   color: ${selected
-                  ? ElohimGraduatedFeedback.readableOn(position.color)
-                  : 'CanvasText'};
+                  ? selectedFg
+                  : 'var(--elohim-feedback-position-fg, CanvasText)'};
                 "
                 @click=${() => this.selectPosition(position)}
               >
@@ -553,10 +583,11 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
             const count = dist[position.label] ?? 0;
             const pct = total > 0 ? (count / total) * 100 : 0;
             if (pct === 0) return nothing;
+            const slot = ElohimGraduatedFeedback.slotKey(position.index);
             return html`
               <div
                 class="distribution-segment"
-                style="width: ${pct}%; background-color: ${position.color};"
+                style="width: ${pct}%; background-color: var(--elohim-feedback-scale-${slot}, ${position.color});"
                 title="${position.label}: ${Math.round(pct)}%"
               ></div>
             `;
@@ -571,6 +602,27 @@ export class ElohimGraduatedFeedback extends CapabilityAwareElement(LitElement) 
     if (position.requiresReasoning || this.requiresReasoning || position.index <= 0.25) {
       this.showReasoningField = true;
     }
+  }
+
+  /** APG radio-group pattern: arrows move focus AND selection (roving tabindex). */
+  private onRadioKeydown(e: KeyboardEvent): void {
+    const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+    const backward = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+    if (!forward && !backward) return;
+    const positions = this.currentScale.positions;
+    const first = positions[0];
+    if (!first) return;
+    e.preventDefault();
+    const currentIndex = this.selectedPosition ?? first.index;
+    const at = positions.findIndex(p => p.index === currentIndex);
+    const next = positions[(at + (forward ? 1 : -1) + positions.length) % positions.length];
+    if (!next) return;
+    this.selectPosition(next);
+    void this.updateComplete.then(() => {
+      this.shadowRoot
+        ?.querySelector<HTMLButtonElement>(`[data-position-index='${next.index}']`)
+        ?.focus();
+    });
   }
 
   private toggleReasoning(): void {

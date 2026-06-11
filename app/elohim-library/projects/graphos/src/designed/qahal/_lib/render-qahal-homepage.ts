@@ -29,8 +29,40 @@
  */
 
 import { html, nothing, type TemplateResult } from 'lit';
+import type { Rubric } from 'elohim-qahal';
 import type { CapabilityTier } from '../../../default/qahal/fixtures/primitives/mock-imagodei-profiles';
+import type { MockRubric } from '../../../default/qahal/fixtures/primitives/mock-rubrics';
 import type { Scene, RenderOpts, ActivePanel } from './types';
+
+/**
+ * MockRubric.bloomMapping is a Record<tier, label>; the rules-panel primitive
+ * consumes an ordered BloomMapping[] of { tier, standingLabel }. Passing the
+ * mock straight through threw `bloomMapping.map is not a function` and killed
+ * the RULES section in every scene (2026-06-11 eyes sweep, P0).
+ */
+const BLOOM_TIER_ORDER = [
+  'remember',
+  'understand',
+  'apply',
+  'analyze',
+  'evaluate',
+  'create',
+] as const;
+
+function toRulesPanelRubric(mock: MockRubric): Rubric {
+  return {
+    name: mock.name,
+    standingHonors: mock.standingHonors,
+    bloomMapping: BLOOM_TIER_ORDER.map(tier => ({
+      tier,
+      standingLabel: mock.bloomMapping[tier],
+    })),
+    cadenceLabel: mock.cadenceLabel,
+    frictionGradientNote: mock.frictionGradientNote,
+    configuredBy: mock.configuredBy,
+    lastRevised: mock.lastRevised,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Element registration — load via barrel imports so Storybook + tests get all
@@ -110,7 +142,7 @@ function renderSidebar(scene: Scene, opts: RenderOpts): TemplateResult {
       <elohim-qahal-protocol-panel-list slot="panels"></elohim-qahal-protocol-panel-list>
       <elohim-qahal-curated-epr-list
         slot="curated"
-        .eprs=${scene.curatedEprs}
+        .eprs=${scene.curatedEprs.map(epr => ({ id: epr.id, label: epr.title }))}
       ></elohim-qahal-curated-epr-list>
       ${renderExternalLinkSection(scene, opts)}
       ${renderPowerUserSection(scene, opts)}
@@ -217,7 +249,9 @@ function renderActivePanel(
       `;
     }
     case 'rules':
-      return html`<elohim-qahal-rules-panel .rubric=${scene.rubric}></elohim-qahal-rules-panel>`;
+      return html`<elohim-qahal-rules-panel
+        .rubric=${toRulesPanelRubric(scene.rubric)}
+      ></elohim-qahal-rules-panel>`;
     case 'co-steward':
       return html`
         <elohim-qahal-co-steward-panel
@@ -255,7 +289,10 @@ function renderContextColumn(scene: Scene, _opts: RenderOpts): TemplateResult {
         primary-observation=${scene.coStewardObservation}
         .pendingAcknowledgments=${pending}
       ></elohim-qahal-co-steward-panel>
-      <elohim-qahal-rules-panel slot="rules" .rubric=${scene.rubric}></elohim-qahal-rules-panel>
+      <elohim-qahal-rules-panel
+        slot="rules"
+        .rubric=${toRulesPanelRubric(scene.rubric)}
+      ></elohim-qahal-rules-panel>
       <elohim-qahal-graph-discovery-panel
         slot="discovery"
       ></elohim-qahal-graph-discovery-panel>

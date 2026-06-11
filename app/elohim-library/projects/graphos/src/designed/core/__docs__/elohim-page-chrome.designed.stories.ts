@@ -61,18 +61,37 @@ const EL_TOKENS = `
   --el-shadow-medium: 0 4px 16px rgba(107, 97, 87, 0.12);
 `;
 
-/** Light mode — warm Linen omnibar, Vineyard border */
+/** Light mode — warm Linen omnibar, Hearthstone ink, Vineyard border */
 const CHROME_TOKENS_LIGHT = `
   --elohim-chrome-omnibar-z: 10;
   --elohim-omnibar-bg:       var(--el-cream);
+  --elohim-omnibar-fg:       var(--el-stone);
   --elohim-omnibar-border:   color-mix(in oklch, var(--el-stone) 20%, transparent);
 `;
 
-/** Dark mode — Indigo Night omnibar, subtle starlight border */
+/** Dark mode — Indigo Night omnibar, Starlight ink, subtle starlight border */
 const CHROME_TOKENS_DARK = `
   --elohim-chrome-omnibar-z: 10;
   --elohim-omnibar-bg:       var(--el-night-alt);
+  --elohim-omnibar-fg:       var(--el-starlight);
   --elohim-omnibar-border:   color-mix(in oklch, var(--el-starlight) 15%, transparent);
+`;
+
+/**
+ * The omnibar brand mark in the protocol's display voice — Fraunces, Harvest
+ * Gold. Part-level styling has to travel as a <style> element (custom-property
+ * inheritance can't reach ::part), shared by both theme decorators. This is
+ * what makes the "Harvest Gold brand mark" the story docs describe actually
+ * render, and it carries the golden-hour warmth in every chrome composition.
+ */
+const BRAND_MARK_CSS = html`
+  <style>
+    elohim-default-omnibar::part(brand) {
+      font-family: var(--el-font-display);
+      font-weight: 600;
+      color: var(--el-amber);
+    }
+  </style>
 `;
 
 // ---------------------------------------------------------------------------
@@ -102,10 +121,11 @@ function lightDecorator(story: () => unknown) {
         ${EL_TOKENS}
         ${CHROME_TOKENS_LIGHT}
         font-family: var(--el-font-ui);
+        background: var(--el-cream);
         min-block-size: 300px;
       "
     >
-      ${story()}
+      ${BRAND_MARK_CSS}${story()}
     </div>
   `;
 }
@@ -117,10 +137,12 @@ function darkDecorator(story: () => unknown) {
         ${EL_TOKENS}
         ${CHROME_TOKENS_DARK}
         font-family: var(--el-font-ui);
+        background: var(--el-night);
+        color-scheme: dark;
         min-block-size: 300px;
       "
     >
-      ${story()}
+      ${BRAND_MARK_CSS}${story()}
     </div>
   `;
 }

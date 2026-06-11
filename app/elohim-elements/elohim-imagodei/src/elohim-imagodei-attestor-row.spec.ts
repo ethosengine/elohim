@@ -75,7 +75,7 @@ describe('<elohim-imagodei-attestor-row>', () => {
     el.addEventListener('attestor-tap', e => {
       detail = (e as CustomEvent).detail;
     });
-    (el.shadowRoot!.querySelectorAll<HTMLElement>('[part="avatar"]')[1]).click();
+    el.shadowRoot!.querySelectorAll<HTMLElement>('[part="avatar"]')[1].click();
     expect(detail?.eprRef).to.equal('epr:human-james');
   });
 

@@ -48,6 +48,7 @@ const PANEL_TOKENS_LIGHT = `
   --elohim-epr-panel-card-fg:       var(--el-green-deep);
   --elohim-epr-panel-card-radius:   var(--el-radius-sm);
   --elohim-epr-panel-gap:           var(--el-space-sm);
+  --elohim-epr-panel-card-gap:      var(--el-space-sm);
 `;
 
 const PANEL_TOKENS_DARK = `
@@ -57,6 +58,7 @@ const PANEL_TOKENS_DARK = `
   --elohim-epr-panel-card-fg:       var(--el-green-light);
   --elohim-epr-panel-card-radius:   var(--el-radius-sm);
   --elohim-epr-panel-gap:           var(--el-space-sm);
+  --elohim-epr-panel-card-gap:      var(--el-space-sm);
 `;
 
 // ---------------------------------------------------------------------------

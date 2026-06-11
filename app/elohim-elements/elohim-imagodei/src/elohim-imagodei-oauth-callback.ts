@@ -98,16 +98,17 @@ export class ElohimImagodeiOauthCallback extends CapabilityAwareElement(LitEleme
     }
 
     @keyframes elohim-callback-pulse {
-      0%, 100% { opacity: 0.6; }
-      50% { opacity: 1; }
+      0%,
+      100% {
+        opacity: 0.6;
+      }
+      50% {
+        opacity: 1;
+      }
     }
 
     [part='error'] {
-      color: color-mix(
-        in srgb,
-        currentColor var(--elohim-callback-error-color-mix, 70%),
-        red
-      );
+      color: color-mix(in srgb, currentColor var(--elohim-callback-error-color-mix, 70%), red);
     }
 
     @media (forced-colors: active) {
@@ -196,7 +197,12 @@ export class ElohimImagodeiOauthCallback extends CapabilityAwareElement(LitEleme
     if (this._status === 'idle') {
       return html`
         <div part="idle">
-          Waiting for OAuth response${this.providerLabel ? html` from ${this.providerLabel}` : ''}…
+          Waiting for OAuth
+          response${this.providerLabel
+            ? html`
+                from ${this.providerLabel}
+              `
+            : ''}…
         </div>
       `;
     }
@@ -209,7 +215,12 @@ export class ElohimImagodeiOauthCallback extends CapabilityAwareElement(LitEleme
           <div></div>
         </div>
         <p part="exchanging-message">
-          Finishing sign-in${this.providerLabel ? html` with ${this.providerLabel}` : ''}…
+          Finishing
+          sign-in${this.providerLabel
+            ? html`
+                with ${this.providerLabel}
+              `
+            : ''}…
         </p>
       `;
     }
@@ -217,7 +228,13 @@ export class ElohimImagodeiOauthCallback extends CapabilityAwareElement(LitEleme
     if (this._status === 'error') {
       return html`
         <div part="error" role="alert">
-          Sign-in failed${this.providerLabel ? html` (${this.providerLabel})` : ''}: ${this._errorReason}
+          Sign-in
+          failed${this.providerLabel
+            ? html`
+                (${this.providerLabel})
+              `
+            : ''}:
+          ${this._errorReason}
         </div>
         <slot name="error-detail"></slot>
         <slot name="recovery-cta"></slot>
@@ -225,7 +242,9 @@ export class ElohimImagodeiOauthCallback extends CapabilityAwareElement(LitEleme
     }
 
     // done
-    return html`<p part="done">Signed in. Redirecting…</p>`;
+    return html`
+      <p part="done">Signed in. Redirecting…</p>
+    `;
   }
 }
 

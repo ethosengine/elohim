@@ -106,3 +106,4 @@ genesis/research/repos/
 !.claude/memory-kit/CLAUDE.md
 !.claude/memory-kit/TRAJECTORY.md
 .claude/memory-kit/*.json
+.claude/data/push-lease.json

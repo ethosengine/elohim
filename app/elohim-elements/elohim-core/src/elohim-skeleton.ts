@@ -15,6 +15,7 @@ import { property } from 'lit/decorators.js';
  * @cssprop --elohim-skeleton-bg       - Override base color
  * @cssprop --elohim-skeleton-shimmer  - Override shimmer highlight color
  * @cssprop --elohim-skeleton-radius   - Override border-radius
+ * @cssprop --elohim-radius-sm         - Shared small-radius token consumed as the default corner radius (4px fallback)
  *
  * @capabilityMaxLens detail
  * @capabilityThemes light, dark
@@ -27,9 +28,11 @@ import { property } from 'lit/decorators.js';
  * @capabilityStates empty:n/a, loading:designed, error:n/a, stale:n/a, contested:n/a, offline:n/a, unauthorized:n/a
  */
 export class ElohimSkeleton extends LitElement {
+  private static readonly DEFAULT_RADIUS = 'var(--elohim-radius-sm, 4px)';
+
   @property() width = '100%';
   @property() height = '1rem';
-  @property() radius = 'var(--elohim-radius-sm, 4px)';
+  @property() radius = ElohimSkeleton.DEFAULT_RADIUS;
 
   static override readonly styles = css`
     :host {
@@ -87,7 +90,16 @@ export class ElohimSkeleton extends LitElement {
   protected override updated(): void {
     this.style.width = this.width;
     this.style.height = this.height;
-    this.style.setProperty('--elohim-skeleton-radius', this.radius);
+    // Mirror radius onto the host ONLY when explicitly set (attribute or
+    // property): an unconditional setProperty writes the default into the
+    // host's inline style, which beats every inherited
+    // --elohim-skeleton-radius binding and silently kills the advertised
+    // @cssprop override surface.
+    if (this.radius !== ElohimSkeleton.DEFAULT_RADIUS) {
+      this.style.setProperty('--elohim-skeleton-radius', this.radius);
+    } else {
+      this.style.removeProperty('--elohim-skeleton-radius');
+    }
   }
 
   override render() {

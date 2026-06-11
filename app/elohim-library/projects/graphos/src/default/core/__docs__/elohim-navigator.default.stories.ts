@@ -294,12 +294,11 @@ export const CustomTheme: Story = {
           --elohim-nav-bg: #0f172a;
           --elohim-nav-fg: #e2e8f0;
           --elohim-nav-border: 1px solid #334155;
-          --elohim-nav-switcher-bg: #1e293b;
-          --elohim-nav-switcher-fg: #f1f5f9;
-          --elohim-nav-profile-bg: #1e293b;
-          --elohim-nav-profile-fg: #f1f5f9;
-          --elohim-nav-banner-bg: #1e3a8a;
-          --elohim-nav-banner-fg: #dbeafe;
+          --elohim-nav-bubble-bg: #1e293b;
+          --elohim-nav-bubble-fg: #f1f5f9;
+          --elohim-nav-banner-info-bg: #1e3a8a;
+          --elohim-nav-banner-info-fg: #dbeafe;
+          --elohim-nav-tray-shadow: 0 4px 12px rgba(2, 6, 23, 0.6);
           font-family: ui-sans-serif, sans-serif;
         "
       >

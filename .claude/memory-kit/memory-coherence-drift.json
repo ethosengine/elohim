@@ -42,9 +42,9 @@
       "last_signal_at": "2026-06-10T00:39:05Z"
     },
     "project_ci_storage_topology": {
-      "hits": 2,
+      "hits": 3,
       "last_changed": "elohim/holochain/Jenkinsfile",
-      "last_signal_at": "2026-06-07T15:50:16Z"
+      "last_signal_at": "2026-06-11T12:04:47Z"
     },
     "feedback_diesel_migration_timestamp_collision": {
       "hits": 3,
@@ -57,14 +57,39 @@
       "last_signal_at": "2026-06-09T00:10:35Z"
     },
     "feedback_codegen_prettier_oscillation": {
-      "hits": 7,
+      "hits": 15,
       "last_changed": "elohim/sdk/schemas/scripts/codegen-ts.mjs",
-      "last_signal_at": "2026-06-09T20:38:19Z"
+      "last_signal_at": "2026-06-11T00:17:23Z"
     },
     "project_alpha_topology_bootstrap_pair": {
       "hits": 1,
       "last_changed": "genesis/orchestrator/data/deployments.json",
       "last_signal_at": "2026-06-10T11:50:57Z"
+    },
+    "feedback_no_brittle_commands_in_poststart": {
+      "hits": 1,
+      "last_changed": "devfile.yaml",
+      "last_signal_at": "2026-06-10T21:20:44Z"
+    },
+    "project_reach_enum_drift_reconciliation": {
+      "hits": 1,
+      "last_changed": "elohim/sdk/schemas/v1/enums/reach.schema.json",
+      "last_signal_at": "2026-06-11T00:07:43Z"
+    },
+    "project_container_cargo_environment_quirks": {
+      "hits": 4,
+      "last_changed": ".husky/pre-push",
+      "last_signal_at": "2026-06-11T00:52:17Z"
+    },
+    "feedback_workflow_long_cargo_orphan_lock": {
+      "hits": 4,
+      "last_changed": ".husky/pre-push",
+      "last_signal_at": "2026-06-11T00:52:17Z"
+    },
+    "feedback_lint_autofix_string_scan_poison": {
+      "hits": 17,
+      "last_changed": "app/elohim-elements/elohim-core/src/elohim-skeleton.spec.ts",
+      "last_signal_at": "2026-06-11T04:39:59Z"
     }
   }
 }

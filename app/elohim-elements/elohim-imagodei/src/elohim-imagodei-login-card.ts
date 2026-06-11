@@ -256,65 +256,65 @@ export class ElohimImagodeiLoginCard extends CapabilityAwareElement(LitElement) 
 
         ${this.oauthProviders.length > 0
           ? html`
-            <div class="oauth-row" part="oauth-row">
-              ${this.oauthProviders.map(
-                (p) => html`
-                  <button
-                    type="button"
-                    part="oauth-button"
-                    data-provider=${p.id}
-                    @click=${() => this._onOAuth(p.id)}
-                  >Continue with ${p.displayName}</button>
-                `
-              )}
-            </div>
-            ${this.allowPassword ? html`<div class="divider">or</div>` : ''}
-          `
+              <div class="oauth-row" part="oauth-row">
+                ${this.oauthProviders.map(
+                  p => html`
+                    <button
+                      type="button"
+                      part="oauth-button"
+                      data-provider=${p.id}
+                      @click=${() => this._onOAuth(p.id)}
+                    >
+                      Continue with ${p.displayName}
+                    </button>
+                  `
+                )}
+              </div>
+              ${this.allowPassword
+                ? html`
+                    <div class="divider">or</div>
+                  `
+                : ''}
+            `
           : ''}
-
         ${this.allowPassword
           ? html`
-            <form part="form" @submit=${this._onSubmit}>
-              <label for="pw">${passwordLabel}</label>
-              <input
-                id="pw"
-                type="password"
-                autocomplete="current-password"
-                .value=${this._password}
-                @input=${(e: Event) => {
-                  this._password = (e.target as HTMLInputElement).value;
-                }}
-                ?disabled=${this._busy}
-                aria-invalid=${this._error ? 'true' : 'false'}
-                aria-describedby=${this._error ? 'login-error' : ''}
-              />
-              <label class="remember">
+              <form part="form" @submit=${this._onSubmit}>
+                <label for="pw">${passwordLabel}</label>
                 <input
-                  type="checkbox"
-                  ?checked=${this.remember}
-                  @change=${(e: Event) => {
-                    this.remember = (e.target as HTMLInputElement).checked;
+                  id="pw"
+                  type="password"
+                  autocomplete="current-password"
+                  .value=${this._password}
+                  @input=${(e: Event) => {
+                    this._password = (e.target as HTMLInputElement).value;
                   }}
+                  ?disabled=${this._busy}
+                  aria-invalid=${this._error ? 'true' : 'false'}
+                  aria-describedby=${this._error ? 'login-error' : ''}
                 />
-                Remember me on this device
-              </label>
-              ${this._error
-                ? html`
-                  <div
-                    part="error"
-                    id="login-error"
-                    role="alert"
-                    aria-live="polite"
-                  >${this._error}</div>
-                `
-                : ''}
-              <button
-                type="submit"
-                part="submit"
-                ?disabled=${this._busy || !this._password}
-              >${submitLabel}</button>
-            </form>
-          `
+                <label class="remember">
+                  <input
+                    type="checkbox"
+                    ?checked=${this.remember}
+                    @change=${(e: Event) => {
+                      this.remember = (e.target as HTMLInputElement).checked;
+                    }}
+                  />
+                  Remember me on this device
+                </label>
+                ${this._error
+                  ? html`
+                      <div part="error" id="login-error" role="alert" aria-live="polite">
+                        ${this._error}
+                      </div>
+                    `
+                  : ''}
+                <button type="submit" part="submit" ?disabled=${this._busy || !this._password}>
+                  ${submitLabel}
+                </button>
+              </form>
+            `
           : ''}
       </div>
     `;

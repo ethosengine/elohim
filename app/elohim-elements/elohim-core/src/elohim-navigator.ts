@@ -395,11 +395,19 @@ export class ElohimNavigator extends CapabilityAwareElement(LitElement) {
   `;
 
   @property({ reflect: true }) context: ElohimContextApp = 'lamad';
-  @property({ type: Boolean }) showSearch = true;
-  @property({ type: Boolean }) isAuthenticated = false;
-  @property() displayName = 'Traveler';
+  /**
+   * Default-true boolean: a plain Boolean attribute could never turn it OFF
+   * from markup, so the converter accepts `show-search="false"` explicitly.
+   */
+  @property({
+    attribute: 'show-search',
+    converter: { fromAttribute: (v: string | null) => v !== 'false' && v !== null },
+  })
+  showSearch = true;
+  @property({ type: Boolean, attribute: 'is-authenticated' }) isAuthenticated = false;
+  @property({ attribute: 'display-name' }) displayName = 'Traveler';
   @property() identifier = '';
-  @property() identityMode = 'anonymous';
+  @property({ attribute: 'identity-mode' }) identityMode = 'anonymous';
   @property({ attribute: false }) session: ElohimNavigatorSession | null = null;
   /** Host-supplied context apps (§12.3: no app routing baked into primitives). Empty → switcher hidden. */
   @property({ attribute: false }) contextApps: ElohimContextAppConfig[] = [];

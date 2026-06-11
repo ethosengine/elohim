@@ -105,7 +105,7 @@ export const WithAggregateDistribution: Story = {
         .totalResponses=${42}
         .distribution=${{
           'Not Useful': 2,
-          'Somewhat Useful': 8,
+          'Slightly Useful': 8,
           'Useful': 18,
           'Very Useful': 10,
           'Transformative': 4,
@@ -196,6 +196,8 @@ export const CustomTheme: Story = {
           --elohim-feedback-position-fg: #fde68a;
           --elohim-feedback-position-border: 1px solid #d97706;
           --elohim-feedback-position-active-bg: #92400e;
+          --elohim-feedback-position-active-fg: #fffbeb;
+          --elohim-feedback-accent: #f59e0b;
           --elohim-feedback-submit-bg: #b45309;
           --elohim-feedback-submit-fg: #fffbeb;
           background: #0c0a06;
