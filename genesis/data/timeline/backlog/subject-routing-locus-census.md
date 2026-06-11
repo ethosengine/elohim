@@ -137,6 +137,13 @@ gains first-class anchors): `elohim-protocol-specification` (protocol-specificat
 elohim-storage {EDGE/P2P-ARCHITECTURE, REACH}, doorway-service {ARCHITECTURE, FEDERATION, SCALING, RECOVERY-*,
 EDGE-DESIGN}, holochain {LINK_ARCHITECTURE}.
 
+### Lamad island RECOMPOSED — 2026-06-11 (the proving rep)
+
+`app/lamad/docs/` (12 files, ~6,100 lines) retired to git after full recomposition: 1 architecture seed
+(`bloom-mastery-progression-design`), 2 history records (mvp-implementation-arc, deleted-concepts-2024),
+6 backlog entries, the Imago Dei whitepaper relocated to `genesis/docs/content/elohim-protocol/imagodei.md`.
+Recipe + firing order for the remaining pillar islands: `pillar-island-recompose-recipe.md` (this dir).
+
 ### No-gospel homes resolved — 2026-06-11 (layered-drift disposition)
 
 Operator decision via the layered-drift hierarchy ("which layer?"):

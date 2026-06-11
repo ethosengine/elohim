@@ -1,3 +1,19 @@
+---
+title: Imago Dei — A Framework for Human-Centered Digital Identity
+id: imago-dei-identity-framework
+tier: vision
+status: vision
+class: protocol-canonical
+pillar: imagodei
+created: ~2025 (pre-implementation whitepaper)
+provenance: relocated 2026-06-11 from app/lamad/docs/ ("Imago Dei_ A Framework for Human-Centered Digital Identity.md"); body preserved verbatim
+cites:
+  - imagodei-surfaces | Imagodei | sha256:e0abac6f6a6a0906 | path: genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md
+  - imagodei-domain-gospel | CLAUDE | sha256:ff2c1e545374281f | path: elohim/sdk/domains/imagodei/CLAUDE.md
+---
+
+> **Relocation note (2026-06-11).** This is the imagodei pillar's founding vision whitepaper, written ~2025 before implementation. It is vision-tier: it assumes no substrate and predates the current canon. The module decomposition sketched in §2 (imagodei-core / -experience / -gifts / -needs / -synthesis / -resources) is the *ancestor* of, not a substitute for, the current architecture: the three-surfaces decomposition lives in `genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md`, and the implemented domain vocabulary (metadata schemas, coupling contracts) lives in `elohim/sdk/domains/imagodei/` (see its CLAUDE.md). Read those for what imagodei *is* today; read this for *why* it exists. The body below is unmodified.
+
 # Imago Dei: A Framework for Human-Centered Digital Identity
 
 ## Abstract

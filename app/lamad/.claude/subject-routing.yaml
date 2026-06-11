@@ -28,6 +28,6 @@ locus:
   pillar: lamad
   role: reference-client-consumer                 # consumes the lamad subject; does NOT own it
   subject_truth_home: elohim/sdk/domains/lamad     # cited as `lamad-domain-gospel` from app/lamad/CLAUDE.md
-  docs_island: app/lamad/docs                      # legacy island to stamp+decompose, then retire (NOT a born-here home)
+  # docs_island RETIRED 2026-06-11 — recomposed into bloom-mastery seed + 2 history records + 6 backlog entries + imagodei.md (recipe: genesis/data/timeline/backlog/pillar-island-recompose-recipe.md)
   # Intended remap once deep-merge lands (NOT active today — see SHALLOW-MERGE caveat above):
   intended_pillar_pin: lamad                       # docs born here are lamad-pillar — no D# guessing
