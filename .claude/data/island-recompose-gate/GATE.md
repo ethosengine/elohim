@@ -79,25 +79,25 @@ NOT retiring: `elohim/holochain/docs/README.md` (reconciled in place), `steward/
   **RESOLVED** (commit `docs(gate): rework doorway ref-repair blocks 1.1/1.2`): replaced dead
   hub-edge spec pointer with the two-axis-scaling seed, two history arcs, resilience canon dir,
   recovery-phase-2-revised spec, and access-tier-patterns — all verified to exist.
-- **NEW ROT found in §1.1/§1.2 sweep**: `doorway/deferred-ref-repairs.md §3.3` NEW block also
-  points to the deleted hub-edge spec (`2026-05-08-doorway-hub-edge-design.md`). §3.3 targets
-  `elohim/elohim-hub/README.md` — the repair should route to `doorway/CLAUDE.md` for doorway-side
-  framing instead. Fix before executing the gate (out of scope for this commit — operator action).
+- ~~**NEW ROT found in §1.1/§1.2 sweep**: `doorway/deferred-ref-repairs.md §3.3` NEW block also
+  points to the deleted hub-edge spec.~~ **RESOLVED** (same commit as the ledger flips): §3.3 NEW
+  now routes to `doorway/CLAUDE.md` + the consolidation-federation arc for lineage. All 23 doorway
+  pairs now have existence-verified replacement targets — the bundle is gate-ready.
 - If any pillar's retirement is REJECTED: that pillar's history-record prose/derived_from uses
   anticipated-retirement phrasing ("retired to git 2026-06-11") — one-line softens needed
   (qahal session staged the exact edit; others note it in their state files).
 
 ## Operator items beyond the gate (surfaced by the fan-out, not gate-blocking)
 
-1. **Root CLAUDE.md libp2p gotcha is stale**: "libp2p 0.53 API (steward/node)" — build graph
-   shows BOTH steward/node and elohim-storage resolve libp2p **0.54.1**. Managed-surface repair
-   (+ same staleness in the `libp2p-transport` skill). Five sessions inherited this as fact
-   before session 6 falsified it.
-2. **Deprecation-sentinel hardening** (39 of 62 ledger entries are self-capture false positives;
-   triage agents flagged 3 converging guards): (a) skip pure-read cmds (sed -n/cat/grep of
-   source paths); (b) exclude `genesis/docs/content/elohim-protocol/history/**` prose +
-   `chore(deprecation)` commit subjects; (c) exclude the ledger file itself from fingerprintable
-   output.
+1. ~~**Root CLAUDE.md libp2p gotcha is stale**~~ **DONE** (`f5a20e742`): lockfiles confirm both
+   crates resolve 0.54.1 — the split was never true at lockfile level; root CLAUDE.md gotcha +
+   `libp2p-transport` skill corrected (`with_codec()` was also a dead pre-0.54 idiom; the
+   macros+ed25519 and `StreamExt::next()` rails survive).
+2. ~~**Deprecation-sentinel hardening**~~ **DONE** (`0232dc9f1` + `2e4239097`): three
+   deterministic anti-echo guards landed in `.claude/hooks/deprecation-sentinel.py` (ledger
+   self-capture, history-tree prose, git commit-message subject+body — diff hunks still capture),
+   16/16 test matrix. The contested pure-read suppression was deliberately NOT implemented
+   (true positives come from greps of in-source `#[deprecated]` markers).
 3. **Reach reconciliation pressure is now fully mapped**: `reach-vocabulary-frontend-strand.md`
    carries storage + doorway + holochain-docs origin strands + the steward sixth site; the
    three-vocabulary reconciliation (roadmap item 13) now has its complete evidence file.

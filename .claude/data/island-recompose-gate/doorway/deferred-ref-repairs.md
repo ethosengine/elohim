@@ -286,7 +286,9 @@ NEW:
 
 ### 3.3 `elohim/elohim-hub/README.md` (line 54)
 
-EDGE-DESIGN.md was itself a pointer-doc to the hub-edge spec; repoint at the canonical spec it cited.
+EDGE-DESIGN.md was itself a pointer-doc to the hub-edge spec — but that spec was DELETED in
+`53190a234` (same rot class as the original §1.1/§1.2 blocks; reworked 2026-06-11). Route to the
+parent doorway gospel, which owns the doorway-side framing (gateway role, no-per-domain-proxy rails).
 
 OLD (exact):
 
@@ -297,7 +299,7 @@ The doorway is one role a hub can take, not a mandatory layer. See `doorway/door
 NEW:
 
 ```markdown
-The doorway is one role a hub can take, not a mandatory layer. See `genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md` for the doorway-side framing (the `EDGE-DESIGN.md` pointer-doc was retired to git 2026-06-11).
+The doorway is one role a hub can take, not a mandatory layer. See `doorway/CLAUDE.md` for the doorway-side framing (the `EDGE-DESIGN.md` pointer-doc was retired to git 2026-06-11; design lineage in `genesis/docs/content/elohim-protocol/history/2026-06-11-doorway-consolidation-federation-arc.md`).
 ```
 
 ---
