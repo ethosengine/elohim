@@ -247,6 +247,14 @@ spec:
             # Rendered per-env by deployHumanManifest: true for alpha/staging
             # (ephemeral, re-seeded), false for prod (DNA upgrades need
             # migration/lineage, not a blind reinstall).
+            #
+            # NOTE: the DNA hash covers ONLY integrity zomes + modifiers, so a
+            # coordinator-zome-only change never trips this reinstall. That
+            # class is healed separately via the conductor's
+            # update_coordinators HOT-SWAP (no re-key, no DHT churn), gated by
+            # ALLOW_COORDINATOR_UPDATE — which defaults to this flag's value
+            # and may be set explicitly to enable coordinator updates on prod
+            # without enabling re-key reinstalls.
             - name: ALLOW_DNA_REINSTALL
               value: "ALLOW_DNA_REINSTALL_PLACEHOLDER"
             - name: ENABLE_IMPORT_API

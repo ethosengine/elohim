@@ -15,7 +15,11 @@
 use std::path::Path;
 
 use holochain_client::{AdminWebsocket, AllowedOrigins, CellInfo, InstallAppPayload};
-use holochain_types::app::{AppBundle, AppBundleSource, AppStatus};
+use holochain_types::app::{
+    AppBundle, AppBundleSource, AppStatus, CoordinatorSource, UpdateCoordinatorsPayload,
+};
+use holochain_types::dna::{CoordinatorBundle, CoordinatorManifest, DnaFile, ZomeManifest};
+use holochain_types::prelude::{DnaDef, ZomeDependency};
 use tracing::{error, info, warn};
 
 /// Default installed app ID.
@@ -110,13 +114,41 @@ pub async fn ensure_happ_installed(
                 .map_err(|e| anyhow::anyhow!("uninstall_app failed: {e}"))?;
             info!(app_id = app_id, "Old hApp removed");
             install_fresh(admin_ws, happ_path, app_id).await?;
-        } else if matches!(app_info.status, AppStatus::Disabled(_)) {
-            info!(app_id = app_id, "Enabling disabled app");
-            admin_ws
-                .enable_app(app_id.to_string())
-                .await
-                .map_err(|e| anyhow::anyhow!("enable_app failed: {e}"))?;
-            info!(app_id = app_id, "App enabled");
+        } else {
+            // No integrity-level drift and not structurally stale. A
+            // coordinator-ONLY change is still invisible here: the DNA hash
+            // covers integrity zomes + modifiers only, so has_dna_drift reads
+            // "no drift" while the conductor keeps serving OLD coordinator
+            // wasm from its PVC (exactly how the 2f02879d attestation fix sat
+            // built-but-undelivered). Coordinator drift is healed by the
+            // conductor's update_coordinators hot-swap — agent key, cells, and
+            // DHT state all preserved, so it is safe wherever a deploy is.
+            let allow_coordinator_update = std::env::var("ALLOW_COORDINATOR_UPDATE")
+                .map(|v| v.eq_ignore_ascii_case("true"))
+                .unwrap_or(allow_reinstall);
+            match sync_coordinators(admin_ws, app_info, happ_path, allow_coordinator_update).await {
+                Ok(0) => info!(app_id = app_id, "No coordinator-zome drift"),
+                Ok(n) => info!(
+                    app_id = app_id,
+                    drifted_roles = n,
+                    applied = allow_coordinator_update,
+                    "Coordinator-zome drift handled"
+                ),
+                Err(e) => error!(
+                    app_id = app_id,
+                    error = %e,
+                    "coordinator drift check FAILED — coordinator-only changes will NOT deploy until resolved"
+                ),
+            }
+
+            if matches!(app_info.status, AppStatus::Disabled(_)) {
+                info!(app_id = app_id, "Enabling disabled app");
+                admin_ws
+                    .enable_app(app_id.to_string())
+                    .await
+                    .map_err(|e| anyhow::anyhow!("enable_app failed: {e}"))?;
+                info!(app_id = app_id, "App enabled");
+            }
         }
     } else {
         info!(app_id = app_id, "App not found — installing fresh");
@@ -288,6 +320,179 @@ async fn install_fresh(
     Ok(())
 }
 
+/// Map zome name → coordinator wasm hash (as a string) for a DnaDef.
+///
+/// This is the drift unit for coordinator-zome changes: the DNA hash covers
+/// ONLY integrity zomes + modifiers, so a coordinator-only change (new
+/// coordinator wasm, same integrity) produces a bundle whose DNA hashes are
+/// byte-identical to the installed app — invisible to [`has_dna_drift`]. The
+/// coordinator wasm hashes are where that change IS visible.
+fn coordinator_wasm_hashes(dna_def: &DnaDef) -> std::collections::BTreeMap<String, String> {
+    dna_def
+        .coordinator_zomes
+        .iter()
+        .filter_map(|(name, zome_def)| {
+            zome_def
+                .wasm_hash(name)
+                .ok()
+                .map(|h| (name.to_string(), h.to_string()))
+        })
+        .collect()
+}
+
+/// Resolve the bundle's per-role [`DnaFile`]s directly from the `.happ` file —
+/// same offline resolution path as [`bundle_dna_hashes`], but keeping the full
+/// DnaFile (coordinator zome defs + wasm code) instead of just the DNA hash.
+async fn bundle_role_dna_files(
+    happ_path: &Path,
+) -> anyhow::Result<std::collections::BTreeMap<String, DnaFile>> {
+    let bytes = std::fs::read(happ_path)
+        .map_err(|e| anyhow::anyhow!("read happ {}: {e}", happ_path.display()))?;
+    let bundle = AppBundle::unpack(std::io::Cursor::new(bytes))
+        .map_err(|e| anyhow::anyhow!("unpack happ bundle: {e}"))?;
+    let resolution = bundle
+        .resolve_cells(Default::default(), Default::default())
+        .await
+        .map_err(|e| anyhow::anyhow!("resolve_cells: {e}"))?;
+
+    let by_hash: std::collections::HashMap<_, _> = resolution
+        .dnas_to_register
+        .into_iter()
+        .map(|(dna_file, _proof)| (dna_file.dna_hash().clone(), dna_file))
+        .collect();
+
+    let mut out = std::collections::BTreeMap::new();
+    for (role_name, assignment) in &resolution.role_assignments {
+        if let Some(primary) = assignment.as_primary() {
+            if let Some(dna_file) = by_hash.get(primary.dna_hash()) {
+                out.insert(role_name.to_string(), dna_file.clone());
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Build a [`CoordinatorBundle`] from a DnaFile's coordinator zomes — the
+/// payload shape `update_coordinators` consumes. Resources are the coordinator
+/// wasm bytes already carried in the DnaFile's code map.
+async fn coordinator_bundle_from_dna_file(dna_file: &DnaFile) -> anyhow::Result<CoordinatorBundle> {
+    let mut zomes = Vec::new();
+    let mut resources = Vec::new();
+    for (name, zome_def) in &dna_file.dna_def().coordinator_zomes {
+        let wasm_hash = zome_def
+            .wasm_hash(name)
+            .map_err(|e| anyhow::anyhow!("coordinator zome '{name}' has no wasm hash: {e}"))?;
+        let wasm = dna_file
+            .code()
+            .get(&wasm_hash)
+            .ok_or_else(|| anyhow::anyhow!("wasm for coordinator zome '{name}' not in bundle"))?;
+        let dependencies = zome_def
+            .as_any_zome_def()
+            .dependencies()
+            .iter()
+            .map(|dep| ZomeDependency { name: dep.clone() })
+            .collect::<Vec<_>>();
+        let manifest_zome = ZomeManifest {
+            name: name.clone(),
+            hash: Some(wasm_hash.into()),
+            path: format!("{name}.wasm"),
+            dependencies: Some(dependencies),
+        };
+        resources.push((manifest_zome.resource_id(), wasm.code.to_vec().into()));
+        zomes.push(manifest_zome);
+    }
+    let manifest = CoordinatorManifest { zomes };
+    let bundle = mr_bundle::Bundle::new(manifest, resources)
+        .map_err(|e| anyhow::anyhow!("build coordinator bundle: {e}"))?;
+    Ok(bundle.into())
+}
+
+/// Detect and (when `apply`) heal coordinator-zome drift between the installed
+/// cells and the bundle on disk via the conductor's `update_coordinators`
+/// hot-swap — which preserves the agent key, the cell, and all DHT state
+/// (unlike a reinstall, which mints a new key).
+///
+/// Returns the number of roles whose coordinators drifted. Per-role failures
+/// are logged and skipped so one bad role can never block startup or the
+/// remaining roles.
+async fn sync_coordinators(
+    admin_ws: &AdminWebsocket,
+    app_info: &holochain_client::AppInfo,
+    happ_path: &Path,
+    apply: bool,
+) -> anyhow::Result<usize> {
+    let role_dnas = bundle_role_dna_files(happ_path).await?;
+    let mut drifted = 0usize;
+
+    for (role, cells) in &app_info.cell_info {
+        let Some(dna_file) = role_dnas.get(role) else {
+            continue;
+        };
+        let Some(cell_id) = cells.iter().find_map(|c| match c {
+            CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
+            _ => None,
+        }) else {
+            continue;
+        };
+
+        let installed_def = match admin_ws.get_dna_definition(cell_id.clone()).await {
+            Ok(def) => def,
+            Err(e) => {
+                error!(role = role.as_str(), error = %e, "get_dna_definition failed — skipping coordinator drift check for role");
+                continue;
+            }
+        };
+
+        let installed = coordinator_wasm_hashes(&installed_def);
+        let bundled = coordinator_wasm_hashes(dna_file.dna_def());
+        if installed == bundled {
+            continue;
+        }
+        drifted += 1;
+        warn!(
+            role = role.as_str(),
+            installed = ?installed,
+            bundle = ?bundled,
+            "Coordinator-zome drift (DNA hash unchanged — integrity-only hashing cannot see this)"
+        );
+
+        if !apply {
+            warn!(
+                role = role.as_str(),
+                "NOT hot-swapping — set ALLOW_COORDINATOR_UPDATE=true (or ALLOW_DNA_REINSTALL=true) to apply; \
+                 the conductor keeps serving the OLDER coordinator wasm until then"
+            );
+            continue;
+        }
+
+        let coordinator_bundle = match coordinator_bundle_from_dna_file(dna_file).await {
+            Ok(b) => b,
+            Err(e) => {
+                error!(role = role.as_str(), error = %e, "failed to build coordinator bundle — skipping role");
+                continue;
+            }
+        };
+        match admin_ws
+            .update_coordinators(UpdateCoordinatorsPayload {
+                cell_id,
+                source: CoordinatorSource::Bundle(Box::new(coordinator_bundle)),
+            })
+            .await
+        {
+            Ok(()) => {
+                info!(
+                    role = role.as_str(),
+                    "Coordinator zomes hot-swapped to bundle version"
+                );
+            }
+            Err(e) => {
+                error!(role = role.as_str(), error = %e, "update_coordinators failed — role keeps old coordinators");
+            }
+        }
+    }
+    Ok(drifted)
+}
+
 /// Ensure an app WebSocket interface exists on [`APP_INTERFACE_PORT`].
 ///
 /// Idempotent — if the interface already exists the conductor returns an error
@@ -310,4 +515,116 @@ async fn ensure_app_interface(admin_ws: &AdminWebsocket) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use holochain_types::prelude::*;
+
+    /// Build a DnaFile with one integrity zome and one coordinator zome from
+    /// raw (never-executed) wasm bytes — hashing is all these tests exercise.
+    async fn test_dna_file(integrity_wasm: &[u8], coordinator_wasm: &[u8]) -> DnaFile {
+        let integrity = DnaWasm::from(integrity_wasm.to_vec());
+        let coordinator = DnaWasm::from(coordinator_wasm.to_vec());
+        let integrity_hash = DnaWasmHashed::from_content(integrity.clone())
+            .await
+            .into_hash();
+        let coordinator_hash = DnaWasmHashed::from_content(coordinator.clone())
+            .await
+            .into_hash();
+
+        let integrity_name: ZomeName = "test_integrity".into();
+        let coordinator_name: ZomeName = "test_coordinator".into();
+
+        let dna_def = DnaDef {
+            name: "test-dna".to_string(),
+            modifiers: DnaModifiers {
+                network_seed: "test-seed".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            integrity_zomes: vec![(
+                integrity_name.clone(),
+                ZomeDef::Wasm(WasmZome {
+                    wasm_hash: integrity_hash,
+                    dependencies: vec![],
+                })
+                .into(),
+            )],
+            coordinator_zomes: vec![(
+                coordinator_name,
+                ZomeDef::Wasm(WasmZome {
+                    wasm_hash: coordinator_hash,
+                    dependencies: vec![integrity_name],
+                })
+                .into(),
+            )],
+        };
+
+        DnaFile::new(dna_def, vec![integrity, coordinator]).await
+    }
+
+    #[tokio::test]
+    async fn coordinator_drift_is_visible_when_dna_hash_is_not() {
+        // Same integrity wasm (→ identical DNA hash), different coordinator
+        // wasm — the exact shape of the 2f02879d attestation fix that the
+        // DNA-hash drift check was blind to.
+        let installed = test_dna_file(b"integrity-v1", b"coordinator-v1").await;
+        let bundle = test_dna_file(b"integrity-v1", b"coordinator-v2").await;
+
+        assert_eq!(
+            installed.dna_hash(),
+            bundle.dna_hash(),
+            "precondition: coordinator-only change must NOT move the DNA hash"
+        );
+        assert_ne!(
+            coordinator_wasm_hashes(installed.dna_def()),
+            coordinator_wasm_hashes(bundle.dna_def()),
+            "coordinator wasm hashes must expose the drift the DNA hash hides"
+        );
+    }
+
+    #[tokio::test]
+    async fn coordinator_wasm_hashes_equal_for_identical_bundles() {
+        let a = test_dna_file(b"integrity-v1", b"coordinator-v1").await;
+        let b = test_dna_file(b"integrity-v1", b"coordinator-v1").await;
+        assert_eq!(
+            coordinator_wasm_hashes(a.dna_def()),
+            coordinator_wasm_hashes(b.dna_def())
+        );
+    }
+
+    #[tokio::test]
+    async fn coordinator_bundle_round_trips_with_matching_hashes() {
+        let dna_file = test_dna_file(b"integrity-v1", b"coordinator-v7").await;
+        let expected = coordinator_wasm_hashes(dna_file.dna_def());
+
+        let bundle = coordinator_bundle_from_dna_file(&dna_file)
+            .await
+            .expect("coordinator bundle builds from DnaFile");
+
+        // into_zomes re-hashes the carried wasm bytes — the round-tripped
+        // hashes must equal the DnaFile's, proving the hot-swap payload
+        // delivers exactly the bundle's coordinators.
+        let (zomes, wasms) = bundle.into_zomes().await.expect("bundle resolves to zomes");
+        assert_eq!(wasms.len(), 1);
+        let round_tripped: std::collections::BTreeMap<String, String> = zomes
+            .iter()
+            .filter_map(|(name, zome_def)| {
+                zome_def
+                    .wasm_hash(name)
+                    .ok()
+                    .map(|h| (name.to_string(), h.to_string()))
+            })
+            .collect();
+        assert_eq!(round_tripped, expected);
+
+        // Dependencies must survive — update_coordinators rejects coordinators
+        // whose integrity dependency is missing.
+        let (_, zome_def) = &zomes[0];
+        assert_eq!(
+            zome_def.as_any_zome_def().dependencies(),
+            &[ZomeName::from("test_integrity")]
+        );
+    }
 }
