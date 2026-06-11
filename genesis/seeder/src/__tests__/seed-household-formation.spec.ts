@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   buildHouseholdCharter, buildCeremonyCustodyInput, HOUSEHOLD_MEMBERS,
   resolveExistingCollectiveCid,
 } from '../seed-household-formation.js';
+import { deterministicPeerId } from '../peer-id.js';
 
 describe('buildHouseholdCharter', () => {
   it('declares household kind, rubric, and the family-dowell slug alias', () => {
@@ -26,6 +28,43 @@ describe('buildCeremonyCustodyInput', () => {
     expect(input.in_scope_of).toEqual(['collective:uhCkkFAKE']);
     expect(JSON.parse(input.metadata_json!).seedGeneration).toBe('ceremony');
     expect(JSON.parse(input.metadata_json!).providerHumanId).toBe('human-jessica-spouse');
+  });
+
+  it('uses resolved REAL peer ids when provided and content-addresses the id from them', () => {
+    // Same contract as buildCustodyCommitmentBody(pair, peerIds): the live
+    // seed path resolves Stage-2 ids first; the builder must carry them
+    // verbatim or the storage custody sweep (provider == self peer id) and
+    // the receiver placement-gap leg can never match this row.
+    const peerIds = {
+      provider: '12D3KooWLiveJessicaPodRealPeerIdAAAAAAAAAAAAAA',
+      receiver: '12D3KooWLiveMatthewPodRealPeerIdBBBBBBBBBBBBBB',
+    };
+    const input = buildCeremonyCustodyInput({
+      providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
+      receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
+      blobHash: 'sha256-deadbeef', blobSizeBytes: 64,
+      collectiveCid: 'collective:uhCkkFAKE',
+    }, peerIds);
+    expect(input.provider).toBe(peerIds.provider);
+    expect(input.receiver).toBe(peerIds.receiver);
+    const expectedDigest = createHash('sha256')
+      .update(`${peerIds.provider}|${peerIds.receiver}|sha256-deadbeef`)
+      .digest('hex')
+      .slice(0, 16);
+    expect(input.id).toBe(`custody-blob-${expectedDigest}`);
+    // Provenance metadata keeps naming the humans, not the peer ids.
+    expect(JSON.parse(input.metadata_json!).providerHumanId).toBe('human-jessica-spouse');
+  });
+
+  it('falls back to Stage-1 deterministic ids only when peerIds is omitted (shape-tests only)', () => {
+    const input = buildCeremonyCustodyInput({
+      providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
+      receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
+      blobHash: 'sha256-deadbeef', blobSizeBytes: 64,
+      collectiveCid: 'collective:uhCkkFAKE',
+    });
+    expect(input.provider).toBe(deterministicPeerId('human-jessica-spouse', 'desktop'));
+    expect(input.receiver).toBe(deterministicPeerId('human-matthew-manager', 'desktop'));
   });
 });
 

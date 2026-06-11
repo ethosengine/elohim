@@ -2062,6 +2062,21 @@ impl P2PNode {
             inventory_freshness_seconds: self.config.inventory_freshness_seconds,
         };
 
+        // Connected-peer snapshot for the inventory-blind fallback: when the
+        // gossip inventory has no candidates for a missing provider-owned
+        // blob, the pass races these instead (capped in reconcile_pass).
+        let connected_peers: Vec<String> = self
+            .peer_metrics
+            .iter()
+            .filter_map(|e| {
+                if e.value().is_connected {
+                    Some(e.key().clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         match reconcile_pass(
             &mut conn,
             &self_cid,
@@ -2069,6 +2084,7 @@ impl P2PNode {
             &kicker,
             cfg,
             chrono::Utc::now(),
+            &connected_peers,
         ) {
             Ok(outcome) => {
                 self.reconciliation_metrics
@@ -2079,12 +2095,17 @@ impl P2PNode {
                     .fetch_add(outcome.placement_gaps_emitted as u64, Ordering::Relaxed);
                 // kicks_fired_total is incremented inside RaceFetchKicker::kick
                 // so the count reflects work scheduled (one increment per kick).
-                debug!(
+                // INFO, not debug: per-pass evidence must reach Loki — the
+                // 2026-06-10 Phase-0 read found zero pass lines in 953k lines
+                // and could not tell a dead sweep from a quiet one.
+                tracing::info!(
                     target: "elohim_storage::reconcile",
                     snapshot_size = snapshot.len(),
                     commitments_examined = outcome.commitments_examined,
                     kicks_fired = outcome.kicks_fired,
+                    fallback_kicks = outcome.fallback_kicks,
                     placement_gaps = outcome.placement_gaps_emitted,
+                    connected_peers = connected_peers.len(),
                     "T23: custody reconcile pass completed"
                 );
             }

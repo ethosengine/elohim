@@ -219,7 +219,12 @@ pub async fn run_sweep(
             match serde_json::from_value(resp.slice.payload.0.clone()) {
                 Ok(p) => p,
                 Err(e) => {
-                    tracing::debug!(
+                    // WARN, not debug: an undecodable inventory is a protocol
+                    // break (version skew), and at debug it is invisible in
+                    // Loki — the 2026-06-10 Phase-0 read could not tell
+                    // "peers advertise nothing" from "responses don't decode".
+                    tracing::warn!(
+                        target: "elohim_storage::projection_reconcile",
                         peer = %peer.peer_id,
                         error = %e,
                         "projection-reconcile: peer inventory payload undecodable; skipping peer"
@@ -227,6 +232,16 @@ pub async fn run_sweep(
                     continue;
                 }
             };
+
+        // Per-peer INFO: makes the discovery leg observable end-to-end
+        // (which peers answered, and with how much).
+        tracing::info!(
+            target: "elohim_storage::projection_reconcile",
+            peer = %peer.peer_id,
+            entries = payload.entries.len(),
+            peer_total = payload.total,
+            "projection-reconcile: peer inventory received"
+        );
 
         ids_discovered += payload.entries.len();
         for entry in &payload.entries {

@@ -49,7 +49,8 @@ import {
   encodeHashToBase64,
   type AppInfo,
 } from '@holochain/client';
-import { deterministicPeerId, type Archetype } from './peer-id.js';
+import { deterministicPeerId, resolvePeerId, type Archetype } from './peer-id.js';
+import type { CustodyPeerIds } from './seed-commitments.js';
 
 // =============================================================================
 // Canonical household triad
@@ -106,13 +107,20 @@ export interface CeremonyCustodyParams {
  * `seedGeneration: 'ceremony'` provenance so views can distinguish ceremony
  * output from the retiring interim fixtures (spec §7).
  *
+ * `peerIds` carries the resolved REAL peer ids (Stage 2 — peer-id.ts); when
+ * omitted the body falls back to Stage-1 deterministic ids — isolated
+ * shape-tests only. The live ceremony path always resolves first: the storage
+ * custody sweep kicks a blob fetch iff commitment.provider == the node's REAL
+ * peer id (and observes placement gaps iff receiver matches), which a Stage-1
+ * fake id can never equal. Same contract as buildCustodyCommitmentBody.
+ *
  * NOTE: `resource_conforms_to` is intentionally absent — it is not a field on
  * the DNA wire struct (`shefa_types::CreateReaCommitmentInput`); the zome sets
  * it to `None` itself.
  */
-export function buildCeremonyCustodyInput(p: CeremonyCustodyParams) {
-  const provider = deterministicPeerId(p.providerHumanId, p.providerArchetype);
-  const receiver = deterministicPeerId(p.receiverHumanId, p.receiverArchetype);
+export function buildCeremonyCustodyInput(p: CeremonyCustodyParams, peerIds?: CustodyPeerIds) {
+  const provider = peerIds?.provider ?? deterministicPeerId(p.providerHumanId, p.providerArchetype);
+  const receiver = peerIds?.receiver ?? deterministicPeerId(p.receiverHumanId, p.receiverArchetype);
   const idDigest = createHash('sha256')
     .update(`${provider}|${receiver}|${p.blobHash}`)
     .digest('hex')
@@ -643,6 +651,12 @@ async function main(): Promise<void> {
         if (receiver.humanId === provider.humanId) {
           continue;
         }
+        // Stage-2 resolution (cached per host; falls back to Stage-1 with a
+        // loud warning) — fake ids here silently disarm the custody sweep.
+        const peerIds: CustodyPeerIds = {
+          provider: await resolvePeerId(provider.humanId, provider.archetype),
+          receiver: await resolvePeerId(receiver.humanId, receiver.archetype),
+        };
         const input = buildCeremonyCustodyInput({
           providerHumanId: provider.humanId,
           providerArchetype: provider.archetype,
@@ -651,7 +665,7 @@ async function main(): Promise<void> {
           blobHash,
           blobSizeBytes,
           collectiveCid,
-        });
+        }, peerIds);
         try {
           await providerSession.session.appWs.callZome({
             cell_id: lamadCell,

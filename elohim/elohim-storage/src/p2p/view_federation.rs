@@ -360,6 +360,16 @@ fn build_inventory_payload(
                 total,
                 entries,
             };
+            // INFO: the serve side of the discovery exchange. Paired with the
+            // asker's "peer inventory received" line this makes an empty
+            // exchange attributable (served 0 vs response lost vs undecodable).
+            tracing::info!(
+                target: "elohim_storage::view_federation",
+                table = %table,
+                entries = payload.entries.len(),
+                total,
+                "ProjectionInventory: serving local inventory"
+            );
             (
                 serde_json::to_value(payload).unwrap_or(serde_json::Value::Null),
                 FreshnessState::Live,

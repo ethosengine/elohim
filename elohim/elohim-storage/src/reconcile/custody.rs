@@ -10,7 +10,12 @@
 //! For each `custody-blob` commitment in `rea_commitments`:
 //! - If this peer is the provider AND blob_hash is missing locally:
 //!   query `peer_blob_inventory` for hosts; if any candidates exist,
-//!   kick a fetch via `blob_fetch::race_fetch` (T17).
+//!   kick a fetch via `blob_fetch::race_fetch` (T17). When the inventory
+//!   is EMPTY, fall back to racing the currently-connected peers (capped
+//!   at [`FALLBACK_CANDIDATE_CAP`]) — gossip inventory publish dies on
+//!   every pod restart (`InsufficientPeers`), so an empty inventory is
+//!   NOT evidence the mesh lacks the blob. Mirrors `get_blob_or_heal`'s
+//!   connected-fallback, which is what makes the CI cross-pod fetch pass.
 //! - If this peer is the receiver AND last_seen for the provider is older
 //!   than `placement_grace_seconds`: emit a `placement-gap` REA event
 //!   (with cooldown).
@@ -78,10 +83,17 @@ impl LocalBlobStore for BlobStoreSnapshot {
     }
 }
 
+/// Cap on connected peers raced by an inventory-blind fallback kick.
+/// Mirrors the `get_blob_or_heal` connected-fallback cap in `http.rs`.
+pub const FALLBACK_CANDIDATE_CAP: usize = 8;
+
 /// Outcome of a single reconcile pass; useful for tests + metrics.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ReconcileOutcome {
     pub kicks_fired: u32,
+    /// Subset of `kicks_fired` that raced connected peers because the
+    /// gossip inventory had no candidates (inventory-blind fallback).
+    pub fallback_kicks: u32,
     pub placement_gaps_emitted: u32,
     pub commitments_examined: u32,
 }
@@ -106,6 +118,7 @@ pub fn reconcile_pass(
     fetch_kicker: &dyn FetchKicker,
     cfg: ReconcileConfig,
     now: DateTime<Utc>,
+    connected_peers: &[String],
 ) -> Result<ReconcileOutcome, StorageError> {
     let placement_grace_seconds = cfg.placement_grace_seconds;
     let placement_gap_cooldown_seconds = cfg.placement_gap_cooldown_seconds;
@@ -143,6 +156,20 @@ pub fn reconcile_pass(
                         candidates.into_iter().map(|c| c.peer_id).collect();
                     fetch_kicker.kick(blob_hash, candidate_peers);
                     outcome.kicks_fired += 1;
+                } else if !connected_peers.is_empty() {
+                    // Inventory-blind fallback: gossip inventory publish dies
+                    // on every pod restart (InsufficientPeers), so an empty
+                    // candidate set is NOT evidence the mesh lacks the blob.
+                    // Race the connected peers, capped — the same fallback
+                    // that makes heal-on-read pass the CI cross-pod fetch.
+                    let fallback: Vec<String> = connected_peers
+                        .iter()
+                        .take(FALLBACK_CANDIDATE_CAP)
+                        .cloned()
+                        .collect();
+                    fetch_kicker.kick(blob_hash, fallback);
+                    outcome.kicks_fired += 1;
+                    outcome.fallback_kicks += 1;
                 }
             }
         } else if commitment.receiver == self_cid {
@@ -331,6 +358,7 @@ mod tests {
             &kicker,
             default_cfg(),
             chrono::Utc::now(),
+            &[],
         )
         .unwrap();
 
@@ -368,6 +396,7 @@ mod tests {
             &kicker,
             default_cfg(),
             now,
+            &[],
         )
         .unwrap();
 
@@ -395,10 +424,117 @@ mod tests {
             &kicker,
             default_cfg(),
             chrono::Utc::now(),
+            &[],
         )
         .unwrap();
 
         assert_eq!(outcome.kicks_fired, 0);
+    }
+
+    /// Inventory empty + connected peers present → the provider races the
+    /// connected set (inventory-blind fallback). Gossip publish dies on every
+    /// pod restart, so sweep convergence must not depend on inventory health.
+    #[test]
+    fn own_commitment_no_inventory_falls_back_to_connected_peers() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let blob_hash = "a".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let connected = vec!["peer_A".to_string(), "peer_B".to_string()];
+        let outcome = reconcile_pass(
+            &mut conn,
+            "self_cid",
+            &StaticStore(vec![]),
+            &kicker,
+            default_cfg(),
+            chrono::Utc::now(),
+            &connected,
+        )
+        .unwrap();
+
+        assert_eq!(outcome.kicks_fired, 1);
+        assert_eq!(outcome.fallback_kicks, 1);
+        let kicks = kicker.kicks.lock().unwrap();
+        assert_eq!(kicks.len(), 1);
+        assert_eq!(kicks[0].0, blob_hash);
+        assert_eq!(kicks[0].1, connected);
+    }
+
+    /// The fallback set is capped at FALLBACK_CANDIDATE_CAP connected peers
+    /// (mirrors get_blob_or_heal's cap-8 race).
+    #[test]
+    fn fallback_caps_connected_candidates() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let blob_hash = "a".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let connected: Vec<String> = (0..12).map(|i| format!("peer_{i}")).collect();
+        let outcome = reconcile_pass(
+            &mut conn,
+            "self_cid",
+            &StaticStore(vec![]),
+            &kicker,
+            default_cfg(),
+            chrono::Utc::now(),
+            &connected,
+        )
+        .unwrap();
+
+        assert_eq!(outcome.fallback_kicks, 1);
+        let kicks = kicker.kicks.lock().unwrap();
+        assert_eq!(kicks[0].1.len(), FALLBACK_CANDIDATE_CAP);
+        assert_eq!(kicks[0].1, connected[..FALLBACK_CANDIDATE_CAP].to_vec());
+    }
+
+    /// Fresh inventory candidates win over the fallback: the targeted kick
+    /// uses the advertised host set, and fallback_kicks stays 0.
+    #[test]
+    fn inventory_candidates_preferred_over_connected_fallback() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let blob_hash = "a".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+
+        let now = chrono::Utc::now();
+        let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        apply_snapshot(
+            &mut conn,
+            "peer_X",
+            std::slice::from_ref(&blob_hash),
+            1,
+            &when,
+        )
+        .unwrap();
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let outcome = reconcile_pass(
+            &mut conn,
+            "self_cid",
+            &StaticStore(vec![]),
+            &kicker,
+            default_cfg(),
+            now,
+            &["peer_FALLBACK".to_string()],
+        )
+        .unwrap();
+
+        assert_eq!(outcome.kicks_fired, 1);
+        assert_eq!(outcome.fallback_kicks, 0);
+        let kicks = kicker.kicks.lock().unwrap();
+        assert_eq!(kicks[0].1, vec!["peer_X".to_string()]);
     }
 
     #[test]
@@ -419,6 +555,7 @@ mod tests {
             &kicker,
             default_cfg(),
             chrono::Utc::now(),
+            &[],
         )
         .unwrap();
 
@@ -466,6 +603,7 @@ mod tests {
             &kicker,
             default_cfg(),
             now,
+            &[],
         )
         .unwrap();
 
@@ -492,6 +630,7 @@ mod tests {
             &kicker,
             default_cfg(),
             now,
+            &[],
         )
         .unwrap();
 
@@ -503,6 +642,7 @@ mod tests {
             &kicker,
             default_cfg(),
             now + chrono::Duration::seconds(60),
+            &[],
         )
         .unwrap();
 

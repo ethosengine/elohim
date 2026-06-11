@@ -336,9 +336,37 @@ cmd_propagation() {
     fi
   fi
 
+  # Manifest convergence: the custody-blob commitment for the content blob
+  # must be visible in EVERY reachable pod's projection — not just the pod
+  # that received the POST. This is the DHT-leg assertion (anchor → conductor
+  # gossip → projection_reconcile): the 2026-06-10 Phase-0 read found rows on
+  # the source only, with peer discovery returning 0 ids fleet-wide. Reuses
+  # the remaining propagation window (reconcile cadence is 300s).
+  local manifest_missing=""
+  while :; do
+    manifest_missing=""
+    for entry in $(peers); do
+      split_peer "$entry"
+      if http_get "$PEER_URL/api/v1/commitments?action=custody-blob&limit=200" | \
+         jq -e --arg h "$content_hash" '[.[]? | select(.action=="custody-blob" and ((.resourceClassifiedAs // []) | index($h)))] | length >= 1' >/dev/null; then
+        :
+      else
+        manifest_missing="$manifest_missing $PEER_NAME"
+      fi
+    done
+    [ -z "$manifest_missing" ] && break
+    [ "$waited" -ge "$timeout_secs" ] && break
+    sleep "$poll_secs"; waited=$((waited + poll_secs))
+  done
+  if [ -z "$manifest_missing" ]; then
+    pass "propagation.custody-convergence" "custody-blob commitment for $content_hash visible on every pod (manifest converged by ${waited}s)"
+  else
+    fail "propagation.custody-convergence" "custody-blob commitment for $content_hash missing on:$manifest_missing after ${waited}s — DHT leg (anchor → conductor gossip → projection_reconcile) not converging; correlate per-peer 'ProjectionInventory: serving local inventory' vs 'peer inventory received' Loki lines"
+  fi
+
   finish propagation "$(jq -cn --arg c "$content_hash" --arg p "$probe_hash" \
-    --arg w "$waited" --arg a "$attempts" \
-    '{contentBlobHash:$c, probeBlobHash:$p, waitedSecs:($w|tonumber), attempts:($a|tonumber)}')"
+    --arg w "$waited" --arg a "$attempts" --arg mm "${manifest_missing# }" \
+    '{contentBlobHash:$c, probeBlobHash:$p, waitedSecs:($w|tonumber), attempts:($a|tonumber), custodyManifestMissingOn:($mm|split(" ")|map(select(length>0)))}')"
 }
 
 # ===========================================================================
