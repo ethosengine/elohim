@@ -331,6 +331,11 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "^genesis/data/\|^elohim/sdk/schemas/.*enum\|generated/schema-enums"; then
     PROJECTS="$PROJECTS constants-sync"
   fi
+  # reach-drift: canonical-value compiler check (G7). Fail the build if any
+  # seed content/path authors a reach value outside the 8-level reach enum.
+  if echo "$CHANGED" | grep -qE "^genesis/data/lamad/(content|paths)/|^elohim/sdk/schemas/v1/enums/reach.schema.json"; then
+    PROJECTS="$PROJECTS reach-drift"
+  fi
   if echo "$CHANGED" | grep -q "^elohim/sdk/schemas/"; then
     PROJECTS="$PROJECTS schema-codegen"
   fi
@@ -527,7 +532,7 @@ run_gate() {
   fi
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "cargo-coverage" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ] || [ "$PROJECT_NAME" = "elements-codegen" ] || [ "$PROJECT_NAME" = "pipeline-list-fresh" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "reach-drift" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "cargo-coverage" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ] || [ "$PROJECT_NAME" = "elements-codegen" ] || [ "$PROJECT_NAME" = "pipeline-list-fresh" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -566,6 +571,11 @@ run_gate() {
         # would make the seed-vs-enum equality check below a tautology.
         pnpm run schema:codegen:ts -- --verify 2>&1 && \
         (cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts) 2>&1
+        rc=$?
+        ;;
+      reach-drift)
+        echo "[$PROJECT_NAME] Verifying reach values are canonical..."
+        node genesis/seeder/scripts/check-reach-drift.mjs 2>&1
         rc=$?
         ;;
       domain-types)
@@ -923,6 +933,7 @@ for PROJECT in $PROJECTS; do
       schema-dna)       PROJECT_DIR="." ;;
       schema-codegen)   PROJECT_DIR="." ;;
       constants-sync)   PROJECT_DIR="." ;;
+      reach-drift)      PROJECT_DIR="." ;;
       genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
       orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
       domain-types)     PROJECT_DIR="." ;;
