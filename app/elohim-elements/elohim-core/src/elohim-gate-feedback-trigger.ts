@@ -62,14 +62,27 @@ const MODAL_PLACEHOLDERS: Record<GateFeedbackType, string> = {
  * @fires feedback-submit - { detail: { type, contentId, text } }
  * @fires feedback-closed - when modal is closed
  *
- * @cssprop --elohim-gate-trigger-btn-color - Trigger button icon color
- * @cssprop --elohim-gate-trigger-btn-hover-color - Trigger button hover color
+ * @cssprop --elohim-gate-trigger-bg - Trigger button background
+ * @cssprop --elohim-gate-trigger-fg - Trigger button icon/text color (preferred; falls back to --elohim-gate-trigger-btn-color)
+ * @cssprop --elohim-gate-trigger-border - Trigger button border (FULL shorthand)
+ * @cssprop --elohim-gate-trigger-radius - Trigger button corner radius
+ * @cssprop --elohim-gate-trigger-hover-fg - Trigger button hover color (preferred; falls back to --elohim-gate-trigger-btn-hover-color)
+ * @cssprop --elohim-gate-trigger-btn-color - Trigger button icon color (legacy alias)
+ * @cssprop --elohim-gate-trigger-btn-hover-color - Trigger button hover color (legacy alias)
  * @cssprop --elohim-gate-menu-bg - Dropdown menu background
  * @cssprop --elohim-gate-menu-border - Dropdown menu border
  * @cssprop --elohim-gate-menu-radius - Dropdown menu border radius
  * @cssprop --elohim-gate-menu-shadow - Dropdown menu box shadow
+ * @cssprop --elohim-gate-menu-fg - Menu item text color
  * @cssprop --elohim-gate-menu-item-hover-bg - Menu item hover background
  * @cssprop --elohim-gate-modal-bg - Modal panel background
+ * @cssprop --elohim-gate-modal-fg - Modal panel text color
+ * @cssprop --elohim-gate-modal-border - Modal panel border (FULL shorthand)
+ * @cssprop --elohim-gate-close-fg - Modal close button color
+ * @cssprop --elohim-gate-textarea-bg - Modal textarea background
+ * @cssprop --elohim-gate-textarea-fg - Modal textarea text color
+ * @cssprop --elohim-gate-textarea-border - Modal textarea border (FULL shorthand)
+ * @cssprop --elohim-gate-scrim - Modal overlay scrim color
  * @cssprop --elohim-gate-modal-radius - Modal panel border radius
  * @cssprop --elohim-gate-modal-shadow - Modal panel box shadow
  * @cssprop --elohim-gate-submit-bg - Submit button background
@@ -108,14 +121,15 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
     }
 
     .trigger-btn {
-      background: none;
-      border: none;
+      background: var(--elohim-gate-trigger-bg, none);
+      border: var(--elohim-gate-trigger-border, none);
+      border-radius: var(--elohim-gate-trigger-radius, 0.25rem);
       font-size: 1.25rem;
       cursor: pointer;
       padding-block: 0.25rem;
       padding-inline: 0.5rem;
       line-height: 1;
-      color: var(--elohim-gate-trigger-btn-color, GrayText);
+      color: var(--elohim-gate-trigger-fg, var(--elohim-gate-trigger-btn-color, GrayText));
       min-block-size: 44px;
       min-inline-size: 44px;
       display: inline-flex;
@@ -125,7 +139,10 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
 
     .trigger-btn:hover,
     .trigger-btn:focus-visible {
-      color: var(--elohim-gate-trigger-btn-hover-color, CanvasText);
+      color: var(
+        --elohim-gate-trigger-hover-fg,
+        var(--elohim-gate-trigger-btn-hover-color, CanvasText)
+      );
       outline: 2px solid Highlight;
       outline-offset: 1px;
       border-radius: 0.25rem;
@@ -157,7 +174,7 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
       cursor: pointer;
       font: inherit;
       font-size: 0.875rem;
-      color: CanvasText;
+      color: var(--elohim-gate-menu-fg, CanvasText);
       min-block-size: 44px;
     }
 
@@ -173,7 +190,7 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgb(0 0 0 / 50%);
+      background: var(--elohim-gate-scrim, rgb(0 0 0 / 50%));
       display: flex;
       align-items: center;
       justify-content: center;
@@ -188,7 +205,8 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
       max-block-size: 90vh;
       overflow-y: auto;
       box-shadow: var(--elohim-gate-modal-shadow, 0 8px 32px rgb(0 0 0 / 20%));
-      color: CanvasText;
+      border: var(--elohim-gate-modal-border, none);
+      color: var(--elohim-gate-modal-fg, CanvasText);
     }
 
     .modal-header {
@@ -208,7 +226,7 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
       border: none;
       font-size: 1.5rem;
       cursor: pointer;
-      color: GrayText;
+      color: var(--elohim-gate-close-fg, GrayText);
       line-height: 1;
       padding-block: 0.25rem;
       padding-inline: 0.25rem;
@@ -221,7 +239,7 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
 
     .close-btn:hover,
     .close-btn:focus-visible {
-      color: CanvasText;
+      color: var(--elohim-gate-modal-fg, CanvasText);
       outline: 2px solid Highlight;
       outline-offset: 1px;
       border-radius: 0.25rem;
@@ -231,13 +249,16 @@ export class ElohimGateFeedbackTrigger extends CapabilityAwareElement(LitElement
       inline-size: 100%;
       padding-block: 0.5rem;
       padding-inline: 0.75rem;
-      border: 1px solid color-mix(in oklch, currentcolor 25%, transparent);
+      border: var(
+        --elohim-gate-textarea-border,
+        1px solid color-mix(in oklch, currentcolor 25%, transparent)
+      );
       border-radius: 0.25rem;
       font: inherit;
       font-size: 0.875rem;
       resize: vertical;
-      background: Canvas;
-      color: CanvasText;
+      background: var(--elohim-gate-textarea-bg, Canvas);
+      color: var(--elohim-gate-textarea-fg, CanvasText);
       box-sizing: border-box;
       min-block-size: 120px;
       margin-block-end: 1rem;
