@@ -56,6 +56,30 @@ Remaining root-cause candidates (not yet discriminable from the evidence):
 3. The holder's responder serves empty for another reason (h_app_id scope was
    ruled out: POST and inventory both resolve to `"lamad"`).
 
+## UPDATE 2026-06-11 00:30 (post-grant Loki re-read): candidates narrowed
+
+Fleet sweep table (live, every pod on the same 300s cadence):
+
+| pod | local_total | peers_asked | ids_discovered |
+|---|---|---|---|
+| matthew | **28** | 10 | 0 |
+| adam | 0 | 11 | 0 |
+| jessica | 0 | 2-3 | 0 |
+
+And `d88bba0a1` (the commit carrying the CURRENT ProjectionInventory
+responder — latest touch of view_federation.rs on origin/dev) **is deployed
+fleet-wide** (edge #1056 built after it). So candidate 2 (version skew) is
+DEAD, and candidate 3 stays dead. If any pod successfully asked matthew, it
+would discover 28 ids; every pod discovers 0. The break is therefore:
+**matthew is absent from every other pod's successful-responder set** —
+either he's not in their connected-peer lists (adjacency/visibility), or
+requests to him fail (timeout/Err), which silently drops him from
+`peers_asked` (the counter only increments on a received response).
+matthew asking 10 peers while jessica reaches 2-3 shows the topology is
+already asymmetric. The landed per-peer INFO lines will name each pod's
+responders on the first post-deploy sweep; `mesh.adjacency-reverse` asserts
+the jessica→matthew edge in CI.
+
 ## Landed this session (status: wip)
 
 - **Observability that makes the next run decisive**: per-peer

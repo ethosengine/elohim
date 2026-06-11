@@ -37,6 +37,18 @@ sustained from one pod.
 - 26 GB/day of Loki ingest is real disk/retention pressure on the observability
   stack for zero diagnostic value if it's a spam loop.
 
+## UPDATE 2026-06-11 00:30: burst-shaped, not steady-state
+
+A 1-minute unfiltered window on adam (00:30-00:31Z) returned **32 lines**
+(~46k/day pace — normal): sync rounds with 11 peers, content-inventory
+serve/receive lines, holochain websocket-close WARNs, PTxnGuard-held WARNs.
+So the 94M/24h was a **burst**, not a steady firehose. The burst chunks
+remain poison: stats/metric queries touching adam's 06-09→06-10 windows
+502 instantly while same-shape queries on matthew succeed. Burst-window
+bisect deferred until Loki digests; prime suspect class is a
+websocket/gossip reconnect storm window (matthew showed close-bursts at
+20:50/20:52Z on 06-10).
+
 ## First actions (when Loki is responsive)
 
 1. `{namespace="elohim-alpha", pod="elohim-adam-alpha-0"}` with NO filter over a
