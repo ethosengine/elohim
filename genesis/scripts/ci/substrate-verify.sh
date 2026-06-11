@@ -228,8 +228,17 @@ upload_one() { # upload_one <file> <label> -> sets UP_HASH / UP_SIZE
   local file="$1" label="$2" status
   UP_SIZE="$(wc -c <"$file")"
   UP_HASH="sha256-$(sha256sum "$file" | awk '{print $1}')"
+  # Bearer-gate (jenkins-seed-bearer-gate plan, Task 1): non-dev doorway requires
+  # an Admin bearer on PUT /admin/seed/blob. The Jenkinsfile mints SEED_DOORWAY_TOKEN
+  # (doorway-seed-login.sh) and exports it; dev/local runs leave it empty → no header →
+  # dev-mode doorway accepts. Built as an array so the unauthenticated path adds nothing.
+  local auth_header=()
+  if [ -n "${SEED_DOORWAY_TOKEN:-}" ]; then
+    auth_header=(-H "Authorization: Bearer ${SEED_DOORWAY_TOKEN}")
+  fi
   status="$(curl -s -o "$STATE_DIR/upload-$label.out" -w '%{http_code}' -m 30 \
     -X PUT "http://${INTERNAL_DOORWAY_URL}/admin/seed/blob" \
+    "${auth_header[@]}" \
     -H "X-Blob-Hash: $UP_HASH" \
     -H 'Content-Type: application/octet-stream' \
     --data-binary @"$file")"

@@ -130,6 +130,24 @@ def peerStorageUrlsCsv() {
  * agencyPhase is node, doorway, or device. Each URL points at the conductor's
  * app WebSocket port; the seeder derives admin port (= app port - 1) per the
  * existing socat convention in K8s.
+ *
+ * NETPOL DEPENDENCY: reaching these conductor admin/app WS sockets from a
+ * jenkins agent requires the elohim-alpha NetworkPolicy default-deny-cross-env
+ * to admit the jenkins ns on pod ports 8444 (admin, Svc 4444) / 8445 (app, Svc
+ * 4445). Applied 2026-06-10 (genesis/orchestrator/manifests/network-policies.yaml).
+ * Cross-node agents are admitted by the sibling ipBlock rule (the 7 Calico
+ * VXLAN tunnel /32s); the namespaceSelector match only fires same-node, because
+ * the VXLAN source IP is rewritten across nodes. That ipBlock rule lives ONLY
+ * in the live cluster, NOT in the manifest -- do NOT `kubectl apply -f` the
+ * manifest blindly or it strips the cross-node fix.
+ *
+ * TODO (scoped bootstrap debt): this admits CI compute to Holochain's admin WS
+ * (root-on-conductor) by network position alone -- no identity, standing, or
+ * revocation. Retire by routing seeding through a commitment-gated doorway
+ * deputy under Mishpat::Commitment `delegates-compute` -- the same primitive
+ * that lets a matthew-authorized conductor back Eclipse Che dev against the
+ * real P2P network. Tracked:
+ * genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md
  */
 def getConductorAppUrls() {
     def topoPath = "genesis/orchestrator/environments/topology.json"
@@ -661,7 +679,7 @@ def probeConductorReadiness(String urlsString, String stageLabel) {
             echo "[probe] ✅ ${host}:${adminPort} reachable"
         } else {
             unreadyDetails.add([url: appUrl, host: host, adminPort: adminPort, reason: 'tcp-timeout-or-refused'])
-            echo "[probe] ❌ ${host}:${adminPort} unreachable (admin WS not accepting TCP) — if ALL peers fail, the jenkins→elohim-alpha NetworkPolicy must admit pod ports 8444/8445 (genesis/orchestrator/manifests/network-policies.yaml is operator-applied; see backlog ci-genesis-conductor-adminws-unreachable)"
+            echo "[probe] ❌ ${host}:${adminPort} unreachable (admin WS not accepting TCP) — if ALL peers fail, check the jenkins→elohim-alpha NetworkPolicy admits pod ports 8444/8445 AND (for cross-node agents) the ipBlock VXLAN-tunnel rule (genesis/orchestrator/manifests/network-policies.yaml; applied 2026-06-10; see backlog ci-genesis-conductor-adminws-unreachable)"
         }
     }
 
@@ -969,9 +987,36 @@ def substrateVerifyStage(String sub) {
  * build-unique propagation probe blob via doorway, then export the hashes
  * for the custody/propagation/delivery stages downstream.
  */
+/**
+ * Mint a doorway bearer JWT for the jenkins-ci CI account (jenkins-seed-bearer-gate
+ * plan, Task 3). The substrate upload stage PUTs to /admin/seed/blob, which the
+ * non-dev doorway bearer-gates (Task 1). doorway-seed-login.sh logs in with the
+ * `doorway-seed-jenkins-ci` username/password credential and prints ONLY the JWT —
+ * secrets reach the script via withEnv, never argv (Jenkinsfile heredoc/secret
+ * discipline). Returns '' when the credential is not visible (dev/unconfigured) so
+ * the upload runs unauthenticated; a non-dev doorway then 401s loudly downstream.
+ */
+def resolveSeedDoorwayToken() {
+    def token = ''
+    def loginUrl = "http://${env.INTERNAL_DOORWAY_URL}"
+    try {
+        withCredentials([usernamePassword(credentialsId: 'doorway-seed-jenkins-ci', usernameVariable: 'SEED_DOORWAY_IDENTIFIER', passwordVariable: 'SEED_DOORWAY_PASSWORD')]) {
+            withEnv(["DOORWAY_URL=${loginUrl}"]) {
+                token = sh(script: "bash '${env.WORKSPACE}/genesis/scripts/ci/doorway-seed-login.sh'", returnStdout: true).trim()
+            }
+        }
+    } catch (e) {
+        echo "doorway-seed-jenkins-ci credential not visible — substrate upload runs unauthenticated (dev-mode doorway accepts; non-dev alpha will 401)"
+    }
+    return token
+}
+
 def uploadBlobContentStage() {
+    def seedToken = resolveSeedDoorwayToken()
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/substrate-verify.sh' upload"
+        withEnv(["SEED_DOORWAY_TOKEN=${seedToken}"]) {
+            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/substrate-verify.sh' upload"
+        }
         env.CONTENT_BLOB_HASH = sh(script: 'cat /tmp/substrate-verify/content_blob_hash', returnStdout: true).trim()
         env.CONTENT_BLOB_SIZE_BYTES = sh(script: 'cat /tmp/substrate-verify/content_blob_size', returnStdout: true).trim()
         env.PROBE_BLOB_HASH = sh(script: 'cat /tmp/substrate-verify/probe_blob_hash', returnStdout: true).trim()
@@ -1696,9 +1741,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             env.SEED_RESULTS_CONDUCTOR_IDENTITIES_FILE ?: 'seed-results-conductor-identities.json',
                         )
                         // Gates Verify Resilience Signals: peer-status projections
-                        // only fill once conductor seeding actually runs. 'false'
-                        // while the jenkins→conductor netpol apply is pending
-                        // (backlog ci-genesis-conductor-adminws-unreachable).
+                        // only fill once conductor seeding actually runs. The
+                        // jenkins→conductor netpol (pod ports 8444/8445) was
+                        // applied 2026-06-10, so 'false' now means the conductor
+                        // seeder genuinely skipped/failed -- not a blocked socket.
+                        // (backlog ci-genesis-conductor-adminws-unreachable;
+                        // retirement TODO: see getConductorAppUrls() +
+                        // backlog security-ci-substrate-authorization-grant-coherence).
                         env.CONDUCTOR_SEEDING_READY = res.skipped ? 'false' : 'true'
                         if (res.skipped) return
                         def c = res.seedReport?.counts ?: [:]
@@ -2034,10 +2083,11 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             // conductor-originated PeerStatusRecorded signals — before
             // conductor seeding runs they are empty BY DESIGN, so this stage
             // gates on CONDUCTOR_SEEDING_READY (set by Seed Conductor
-            // Identities) instead of false-failing while the jenkins→
-            // conductor netpol apply is pending (backlog
-            // ci-genesis-conductor-adminws-unreachable). This is the canary
-            // that lights up once the operator applies network-policies.yaml.
+            // Identities) instead of false-failing. The jenkins→conductor
+            // netpol (pod ports 8444/8445) was applied 2026-06-10, so this
+            // canary should now light up; if it stays dark, re-check the
+            // elohim-alpha default-deny-cross-env netpol AND its ipBlock VXLAN-
+            // tunnel rule (backlog ci-genesis-conductor-adminws-unreachable).
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.SEED_DATA }
