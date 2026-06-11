@@ -243,7 +243,11 @@ async function registerAuthCredentials(
       identifier: email.toLowerCase(),
       identifierType: 'email',
       password,
-      admin_bootstrap_key: adminBootstrapKey || undefined,
+      // Wire field is camelCase: RegisterRequest is #[serde(rename_all="camelCase")]
+      // (auth_routes.rs) with no field override. The former snake_case
+      // `admin_bootstrap_key` was silently dropped → the minted account never
+      // got Admin promotion. (backlog: 2026-06-03-seed-test-admin-bootstrap-key-wire-name)
+      adminBootstrapKey: adminBootstrapKey || undefined,
     }),
   });
 
