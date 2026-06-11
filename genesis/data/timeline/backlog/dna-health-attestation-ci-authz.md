@@ -50,3 +50,23 @@ re-registration (latest-wins lookup, churn trail preserved) as scoped
 bootstrap debt, with the commitment-gated reclaim (operate-doorway REA /
 delegates-compute family) as the end-state — routed to
 security-ci-substrate-authorization-grant-coherence.md.
+
+## FIX LANDED (this shift) + verification path
+
+Zome-side: `register_doorway` now ALLOWS re-registration (each
+registration = new entry + link; operator churn WARN'd and readable on
+the DHT trail) and `get_doorway_by_id` resolves latest-wins. The lockout
+breaks: a re-keyed doorway reclaims its id on its next boot
+self-registration, the guard then matches its live key, attestations
+land, content_attestations materializes, /api/v1/attestations stops
+500ing. WASM check clean; the two clippy warnings in the integrity zome
+are pre-existing (untouched). zome-sweettest-sync note: a two-conductor
+sweettest should pin (a) re-registration latest-wins lookup, (b) a
+re-keyed agent attesting successfully after reclaim, (c) the churn trail
+remaining readable via get_doorways_by_operator.
+
+DEPLOYMENT: DNA-content change → new hash → reaches alpha via the
+non-prod ALLOW_DNA_REINSTALL path on the next DNA deploy; the reinstall
+mints new agent keys, and the new re-registration semantics are exactly
+what lets the doorways heal on that same boot. Genesis pair caveat still
+applies (both pods take the reinstall together).
