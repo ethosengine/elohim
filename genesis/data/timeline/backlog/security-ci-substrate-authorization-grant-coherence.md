@@ -106,3 +106,23 @@ agent, one stage behind:
   commitment — rides the arc plan Phase 4 rail-readiness checkpoint (Z.D Sprint 1 / slice2a lanes),
   do not build rails here.
 
+## Stage A LANDED 2026-06-11 (hole #2 closed — identity + audit)
+
+The jenkins-seed-bearer-gate plan (genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md)
+landed perimeter hole #2's Stage A, all tasks two-stage reviewed:
+- **doorway** bearer-gates `PUT /admin/seed/blob` + mutating `/admin/cache/{disable,enable,clear,warm}`
+  (`require_seed_authority`, dev-mode-safe, named for the Stage-C `seed-content` operator capability) — 396779747.
+- **seeder** authenticates (SEED_DOORWAY_* → JWT → bearer; dev-mode no-bearer invariant test-proven) — 1372fbe57.
+- **CI** sends the bearer on the genesis pipeline's one gated call (`substrate-verify.sh upload`) via a
+  standalone login helper + Jenkinsfile withCredentials; the load-bearing `adminBootstrapKey` snake_case
+  bug fixed (jenkins-ci must be Admin) — b99d6a186 + b3e6f91a1.
+
+Live-verification CLAIMED until the next operator-merged genesis build's Upload stage returns 200 with a
+bearer. Operator activation steps (Jenkins credential `doorway-seed-jenkins-ci`, alpha account provisioning,
+jwt_secret confirm) in the plan's Task-3 ops block.
+
+**STILL OPEN:** hole #1 (jenkins → conductor-WS 8444/8445, netpol-gated by network position — the
+brokered-conductor-surface task; closing it reverts the netpol + retires the ipBlock VXLAN manifest-drift
+hazard) and bounded standing (Stage C delegates-compute, rails-gated). The 8444/8445 netpol revert is
+gated on hole #1, NOT licensed by this Stage-A landing.
+
