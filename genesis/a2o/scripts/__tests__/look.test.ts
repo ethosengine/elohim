@@ -53,6 +53,25 @@ describe('parseArgs', () => {
   it('throws on an unknown flag', () => {
     assert.throws(() => parseArgs(['https://x.test', '--nope', 'v']), /Unknown flag: --nope/);
   });
+
+  it('parses --timeout as timeoutMs', () => {
+    const o = parseArgs(['https://example.test', '--timeout', '90000']);
+    assert.equal(o.timeoutMs, 90000);
+  });
+
+  it('throws on --timeout below 1000', () => {
+    assert.throws(
+      () => parseArgs(['https://x.test', '--timeout', '500']),
+      /--timeout expects milliseconds >= 1000/
+    );
+  });
+
+  it('throws on --timeout non-numeric', () => {
+    assert.throws(
+      () => parseArgs(['https://x.test', '--timeout', 'forever']),
+      /--timeout expects milliseconds >= 1000/
+    );
+  });
 });
 
 describe('runLook (file:// hermetic render)', () => {

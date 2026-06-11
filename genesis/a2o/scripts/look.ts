@@ -22,6 +22,7 @@ export interface LookOptions {
   waitTestid?: string;
   out?: string;
   viewport?: { width: number; height: number };
+  timeoutMs?: number;
 }
 
 export interface LookResult {
@@ -46,7 +47,7 @@ const REPORTS_DIR = 'reports/look';
 
 const USAGE =
   'Usage: look <url> [--as <FixtureHuman>] [--doorway <id|url>] ' +
-  '[--wait-testid <id>] [--out <slug>] [--viewport <WxH>]';
+  '[--wait-testid <id>] [--out <slug>] [--viewport <WxH>] [--timeout <ms>]';
 
 export function parseArgs(argv: string[]): LookOptions {
   const args = [...argv];
@@ -78,6 +79,13 @@ export function parseArgs(argv: string[]): LookOptions {
         const m = /^(\d+)x(\d+)$/.exec(val ?? '');
         if (!m) throw new Error(`--viewport expects WxH (e.g. 1280x800), got: ${val}`);
         opts.viewport = { width: Number(m[1]), height: Number(m[2]) };
+        i++;
+        break;
+      }
+      case '--timeout': {
+        const n = Number(val);
+        if (!Number.isInteger(n) || n < 1000) throw new Error(`--timeout expects milliseconds >= 1000, got: ${val}`);
+        opts.timeoutMs = n;
         i++;
         break;
       }
@@ -151,7 +159,7 @@ export async function runLook(opts: LookOptions): Promise<LookResult> {
 
     let ok = true;
     try {
-      await device.page.goto(opts.url, { waitUntil: 'networkidle', timeout: 30_000 });
+      await device.page.goto(opts.url, { waitUntil: 'networkidle', timeout: opts.timeoutMs ?? 30_000 });
     } catch {
       ok = false; // nav/idle timeout — still capture what rendered
     }

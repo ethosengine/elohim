@@ -194,10 +194,13 @@ async function cmdSheet(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
   );
   // cols * cellW + (cols-1) * 8px grid gap + 2*8px body padding + 2px border per cell column; full-page shot covers height.
   const width = cmd.cols * cmd.cell.width + (cmd.cols - 1) * 8 + 16 + 2 * cmd.cols;
+  // 30s base + ~1.5s per iframe; a 42-cell sheet needs ~90s to settle. Cap at 120s.
+  const timeoutMs = Math.min(120_000, 30_000 + 1_500 * entries.length);
   const result = await runLook({
     url: pathToFileURL(sheetPath).href,
     out: slug,
     viewport: { width, height: 800 },
+    timeoutMs,
   });
   console.log(result.shotPath);
   console.log(result.capturePath);
