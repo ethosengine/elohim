@@ -85,3 +85,24 @@ before HTTP route shape.
 - [ ] Seeder migrated off raw AdminWebsocket
 - [ ] `/admin/seed/*` gated by the same check
 - [ ] 8444/8445 removed from the jenkins netpol rule + operator re-apply
+
+## Composition note (2026-06-11, network-agency arc session)
+
+The che-network-agency arc (genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md)
+landed the LADDER this concern graduates along — Jenkins is the same shape of actor as the Che
+agent, one stage behind:
+
+- **Stage A for CI (available now):** a `jenkins-ci` service account authenticates through
+  `DoorwaySessionClient` (framework-free `@elohim/identity/core`, proven Node-consumable by a2o;
+  auth wire shapes now schema-contract-pinned). Bearer-gating `/admin/seed/*` + the seeder sending
+  the session token closes perimeter hole #2 with identity + audit (not yet bounded standing).
+- **Brokered conductor surface (closes hole #1):** Holochain admin WS has no auth surface — netpol
+  is its ONLY gate, so identity cannot ride it directly. Doorway already holds the conductor pool
+  admin connections (typed_admin.rs): a doorway-brokered, authenticated conductor-seeding surface
+  lets jenkins-ns stop touching 8444/8445 entirely, the netpol reverts to 8090/8080, and the
+  cluster-only ipBlock VXLAN rule (manifest-vs-live drift hazard) retires with it. Same shape as
+  Che: drive the native network through doorway's governed surfaces, never raw admin sockets.
+- **Stage C (the destination this file already names):** the grant becomes the delegates-compute
+  commitment — rides the arc plan Phase 4 rail-readiness checkpoint (Z.D Sprint 1 / slice2a lanes),
+  do not build rails here.
+
