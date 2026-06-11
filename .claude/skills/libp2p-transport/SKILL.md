@@ -1,6 +1,6 @@
 ---
 name: libp2p-transport
-description: Reference for libp2p swarm setup, transport configuration, behaviour composition, and version differences between elohim-node (0.53) and elohim-storage (0.54). Use when someone asks "configure the swarm", "add a new behaviour", "set up transport", "libp2p version differences", or debugs P2P connection issues.
+description: Reference for libp2p swarm setup, transport configuration, and behaviour composition in steward/node and elohim-storage (both resolve libp2p 0.54.1). Use when someone asks "configure the swarm", "add a new behaviour", "set up transport", or debugs P2P connection issues.
 metadata:
   author: elohim-protocol
   version: 1.0.0
@@ -10,24 +10,26 @@ metadata:
 
 > **Parallel stack:** A second transport stack lives alongside libp2p — `elohim-storage/src/p2p_iroh/` (iroh QUIC, ALPN-based, with iroh-blobs + iroh-gossip). Services are transport-neutral; libp2p and iroh adapters delegate to them. Selection is via `TransportBackend` config; runtime is mode-exclusive (libp2p OR iroh, never both). See `rust-architect.md` §"Truth in motion" for the design. This skill describes the libp2p side specifically; for iroh ALPN handler patterns see `project_iroh_alpn_handlers_one_stream_design.md` and the linked iroh memory entries, which carry the temporal phase/gate state.
 
-The Elohim Protocol uses libp2p for P2P networking in two crates with different versions.
+The Elohim Protocol uses libp2p for P2P networking in two crates — both on the same version.
 
 ## Two Implementations
 
 | Crate | libp2p Version | Purpose |
 |-------|---------------|---------|
-| `elohim-node` | 0.53 | Always-on infrastructure runtime (family nodes) |
-| `elohim-storage` | 0.54 | Content storage sidecar (dormant, needs activation) |
+| `elohim-node` | **0.54.1** (Cargo.lock verified 2026-06-11) | Always-on infrastructure runtime (family nodes) |
+| `elohim-storage` | **0.54.1** (Cargo.lock verified 2026-06-11) | Content storage sidecar |
 
-### Version Differences
+> **Historical note:** An older "node 0.53 vs storage 0.54" split was documented here. The lockfiles falsify it — both crates have been on 0.54 since before the steward/ restructure. The `with_codec()` constructor was a pre-0.54 idiom; actual code uses `Behaviour::new()`.
 
-| Feature | 0.53 (elohim-node) | 0.54 (elohim-storage) |
-|---------|--------------------|-----------------------|
-| Request-Response | `Behaviour::with_codec()` | `Behaviour::new()` or `with_codec()` |
-| Swarm event loop | `StreamExt::next()` | `StreamExt::next()` |
-| NetworkBehaviour derive | `#[derive(NetworkBehaviour)]` | `#[derive(NetworkBehaviour)]` |
-| Auto-generated events | `ElohimBehaviourEvent` | Same pattern |
-| Required features | `macros` + `ed25519` | `macros` + `ed25519` |
+### Shared API Idioms (0.54.1)
+
+| Feature | Idiom |
+|---------|-------|
+| Request-Response construction | `Behaviour::new([(Proto, ProtocolSupport::Full)], cfg)` |
+| Swarm event loop | `StreamExt::next()` (not the deprecated `select_next_event()`) |
+| NetworkBehaviour derive | `#[derive(NetworkBehaviour)]` |
+| Auto-generated events | `ElohimBehaviourEvent` enum |
+| Required features | `macros` + `ed25519` |
 
 ---
 
@@ -49,7 +51,7 @@ pub struct ElohimBehaviour {
 
 **Requires** `macros` and `ed25519` features in `Cargo.toml`:
 ```toml
-libp2p = { version = "0.53", features = [
+libp2p = { version = "0.54", features = [
     "tokio", "tcp", "quic", "noise", "yamux",
     "mdns", "kad", "identify", "relay", "dcutr",
     "request-response",
@@ -144,7 +146,7 @@ loop {
 
 ## Request-Response Setup
 
-### libp2p 0.53 (elohim-node)
+### libp2p 0.54 (both crates)
 
 ```rust
 use libp2p::{request_response, StreamProtocol};
@@ -153,12 +155,12 @@ let sync_protocol = StreamProtocol::new("/elohim/sync/1.0.0");
 let rr_config = request_response::Config::default()
     .with_request_timeout(Duration::from_secs(30));
 
-// 0.53: Use with_codec()
-let rr = request_response::Behaviour::with_codec(
-    SyncCodec,
+// 0.54: Use new() with (protocol, support) pairs
+let rr = request_response::Behaviour::new(
     [(sync_protocol, request_response::ProtocolSupport::Full)],
     rr_config,
 );
+// Note: with_codec() was a pre-0.54 idiom — no longer used here.
 ```
 
 ### Sending Requests
@@ -251,12 +253,11 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 | `steward/node/src/p2p/mod.rs` | Module exports |
 | `steward/node/src/p2p/protocols.rs` | SyncCodec, protocol constants |
 | `steward/node/src/p2p/nat.rs` | NAT traversal (stub/TODO) |
-| `steward/node/Cargo.toml` | libp2p 0.53 with features |
+| `steward/node/Cargo.toml` | libp2p 0.54 features declaration (resolves 0.54.1) |
 | `elohim/elohim-storage/src/p2p/behaviour.rs` | Storage P2P behaviour (0.54) |
 | `elohim/holochain/docs/P2P-DATAPLANE.md` | Architecture design document |
 
 ## External References
 
-- libp2p 0.53 docs: `https://docs.rs/libp2p/0.53.2/libp2p/`
-- libp2p 0.54 docs: `https://docs.rs/libp2p/0.54.1/libp2p/`
+- libp2p 0.54.1 docs: `https://docs.rs/libp2p/0.54.1/libp2p/`
 - libp2p concepts: `https://libp2p.io/concepts/transports/overview/`

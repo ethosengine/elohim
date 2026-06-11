@@ -206,8 +206,8 @@ Build before elohim-app builds; the `prebuild` script checks. Run: `cd sophia &&
 ### pnpm Workspace
 All TypeScript/Node.js projects use pnpm workspaces (sophia excluded — submodule). Target packages with `pnpm --filter <name> <cmd>`. The `libsodium-wrappers` package is overridden to `^0.8.2` in root `package.json` to fix a broken ESM relative import in 0.7.x that fails with pnpm's strict module resolution.
 
-### libp2p 0.53 API (steward/node)
-Requires `macros` + `ed25519` features. Use `with_codec()` not `new()` for request-response. Swarm uses `StreamExt::next()` not `select_next_event()`.
+### libp2p API (steward/node + elohim-storage)
+Both crates declare `version = "0.54"` and resolve `0.54.1` (Cargo.lock verified 2026-06-11 — the earlier "node 0.53 vs storage 0.54" split is STALE). Requires `macros` + `ed25519` features. `request_response` behaviours are constructed via `Behaviour::new([(Proto, ProtocolSupport::Full)], cfg)` — `with_codec()` was a pre-0.54 idiom, no longer used. Swarm event loop uses `StreamExt::next()` (not the deprecated `select_next_event()`).
 
 ## CI/CD
 
