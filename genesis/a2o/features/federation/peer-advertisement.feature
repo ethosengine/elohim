@@ -159,3 +159,22 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
     Then "matthew-home" sees 1 stale peer and 2 active peers
     And routing decisions exclude the stale laptop peer
     And no degradation occurs because always-on peers remain
+
+  # --- Heartbeat Survival Across Slow Conductor Boots ---------------------------
+
+  @wip @regression
+  Scenario: Peer vitals light up even when the conductor enables cells slowly
+    Given human "Matthew" has a storage peer whose conductor takes longer than the bounded boot ramp to enable cells
+    When the peer's infrastructure bridge misses every boot-ramp connect attempt with CellDisabled
+    Then the peer keeps retrying the infrastructure bridge in the background
+    And once the bridge lands the PeerStatus heartbeat begins broadcasting
+    And the resilience view shows the peer's online status instead of staying dark
+    # Evidence anchor (2026-06-11, matthew-alpha): connect_role("infrastructure")
+    # failed 5/5 with CellDisabled — it connects FIRST after a pod restart, in
+    # the coldest window (imagodei, attempted ~30s later, landed on attempt 4).
+    # Boot-gating disabled the heartbeat AND five signal subscribers for the
+    # pod's lifetime: peer_statuses dark, REA/attestation/mishpat projections dark.
+    # Operational parameters: boot ramp = 5 attempts, 2→4→8→16→30s backoff
+    # (~60s budget); observed cell-enable window on alpha ≈ 50-75s post-restart.
+    # Informs: any conductor-bridge consumer must acquire its bridge with
+    # forever-retry IN-TASK (connect_role_forever), never boot-gate.
