@@ -30,12 +30,15 @@ describe('parseArgs', () => {
       'my-slug',
       '--viewport',
       '800x600',
+      '--timeout',
+      '45000',
     ]);
     assert.equal(o.as, 'Matthew');
     assert.equal(o.doorway, 'https://doorway.test');
     assert.equal(o.waitTestid, 'app-root');
     assert.equal(o.out, 'my-slug');
     assert.deepEqual(o.viewport, { width: 800, height: 600 });
+    assert.equal(o.timeoutMs, 45000);
   });
 
   it('throws when url is missing', () => {

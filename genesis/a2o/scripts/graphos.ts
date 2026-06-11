@@ -25,6 +25,7 @@ import {
   sheetHtml,
   storiesForSheet,
   suggestComponents,
+  type StoryEntry,
   type StorybookIndex,
 } from './lib/graphos-stories.js';
 import { runLook } from './look.js';
@@ -175,13 +176,10 @@ async function cmdStory(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
 }
 
 /** Rows per family section at the configured column count. */
-function* groupRows(
-  entries: { title: string }[],
-  cmd: { cols: number }
-): Generator<number> {
+export function* groupRows(entries: StoryEntry[], cmd: { cols: number }): Generator<number> {
   const counts = new Map<string, number>();
   for (const e of entries) {
-    const fam = (e.title.split('/')[0] ?? '').toLowerCase();
+    const fam = familyOf(e);
     counts.set(fam, (counts.get(fam) ?? 0) + 1);
   }
   for (const n of counts.values()) yield Math.ceil(n / cmd.cols);
@@ -217,7 +215,16 @@ async function cmdSheet(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
   // blank cells. Make the viewport tall enough to hold the WHOLE sheet.
   const families = new Set(entries.map(e => familyOf(e))).size;
   const rows = [...groupRows(entries, cmd)].reduce((a, b) => a + b, 0);
+  // 16px body padding + per-family blended h1+h2 header ≈46px + per-row:
+  // figcaption ~18px + iframe (cell.height + 2px border) + 8px row-gap + ~5px rounding ≈ cell.height + 33.
   const sheetHeight = 16 + families * 46 + rows * (cmd.cell.height + 33);
+  if (sheetHeight + 100 > 15_000) {
+    console.warn(
+      `[graphos] sheet height ${sheetHeight}px exceeds the 15000px viewport cap ` +
+        `(${entries.length} stories at ${cmd.cols} cols) — iframes below the fold may capture blank. ` +
+        `Narrow with --family or raise --cols.`
+    );
+  }
   const height = Math.min(15_000, sheetHeight + 100);
   const result = await runLook({
     url: pathToFileURL(sheetPath).href,
@@ -228,10 +235,12 @@ async function cmdSheet(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
   console.log(result.shotPath);
   console.log(result.capturePath);
   console.log(sheetPath);
-  // networkidle may never fire for a sheet of Storybook iframes (production storybook
-  // keeps WebSocket / HMR connections open). If the only failure signal is the timeout
-  // (no pageErrors, no failed requests, no HTTP errors) the sheet captured correctly —
-  // treat it as success.
+  // PRECONDITION: the viewport must cover the full sheet (above). With a short
+  // viewport Chromium defers offscreen iframes — which ALSO yields zero errors,
+  // but then networkidle fires EARLY (ok=true), so this clause would not be
+  // reached. The two fixes are co-dependent: full-height viewport makes every
+  // iframe load; this clause only absorbs the storybook connection that keeps
+  // networkidle from ever firing on an otherwise-complete page.
   const realFailure =
     result.pageErrors.length > 0 ||
     result.failedRequests.length > 0 ||

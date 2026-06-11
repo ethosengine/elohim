@@ -1,7 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { containedSlug, parseGraphosArgs } from '../graphos.js';
+import { containedSlug, groupRows, parseGraphosArgs } from '../graphos.js';
+import { type StoryEntry } from '../lib/graphos-stories.js';
 
 void describe('parseGraphosArgs', () => {
   void it('parses list with optional filter', () => {
@@ -66,5 +67,21 @@ void describe('containedSlug', () => {
   void it('rejects traversal and absolute slugs', () => {
     assert.throws(() => containedSlug('../../etc'));
     assert.throws(() => containedSlug('/tmp/exfil'));
+  });
+});
+
+void describe('groupRows', () => {
+  const e = (id: string, title: string): StoryEntry => ({ id, title, name: 'X', type: 'story' });
+  void it('yields ceil(rows) per family', () => {
+    const entries = [
+      e('default-a--1', 'Default/A'), e('default-a--2', 'Default/A'), e('default-a--3', 'Default/A'),
+      e('default-a--4', 'Default/A'),
+      e('designed-a--1', 'Designed/A'),
+    ];
+    assert.deepEqual([...groupRows(entries, { cols: 3 })], [2, 1]);
+  });
+  void it('handles a single family with even division', () => {
+    const entries = [e('x--1', 'Default/X'), e('x--2', 'Default/X'), e('x--3', 'Default/X')];
+    assert.deepEqual([...groupRows(entries, { cols: 3 })], [1]);
   });
 });
