@@ -120,6 +120,22 @@ const lamadItems: ContextMenuItem[] = [
 // Decorator factories
 // ---------------------------------------------------------------------------
 
+/**
+ * The invocation anchor the menu was opened FROM — selected, therefore amber
+ * (spec §6: "Active/selected nodes use --el-amber"). Carries the golden-hour
+ * warmth in every composition that uses the bare theme decorators.
+ */
+const ANCHOR_CHIP_STYLE = `
+  position: absolute;
+  inset-block-start: 1.25rem;
+  inset-inline-start: var(--el-space-lg);
+  font-size: 0.8125rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--el-amber) 28%, transparent);
+  border: 1px solid var(--el-amber);
+`;
+
 function lightDecorator(story: () => unknown) {
   return html`
     <div
@@ -128,11 +144,13 @@ function lightDecorator(story: () => unknown) {
         ${MENU_TOKENS_LIGHT}
         font-family: var(--el-font-ui);
         background: var(--el-cream);
+        color: var(--el-stone);
         padding: 4rem var(--el-space-lg) var(--el-space-lg);
         position: relative;
         min-block-size: 240px;
       "
     >
+      <span style="${ANCHOR_CHIP_STYLE}">household-budgeting</span>
       ${story()}
     </div>
   `;
@@ -146,11 +164,14 @@ function darkDecorator(story: () => unknown) {
         ${MENU_TOKENS_DARK}
         font-family: var(--el-font-ui);
         background: var(--el-night);
+        color: var(--el-starlight);
+        color-scheme: dark;
         padding: 4rem var(--el-space-lg) var(--el-space-lg);
         position: relative;
         min-block-size: 240px;
       "
     >
+      <span style="${ANCHOR_CHIP_STYLE}">household-budgeting</span>
       ${story()}
     </div>
   `;
@@ -403,6 +424,35 @@ export const Dark: Story = {
           'Constellation dark theme — Indigo Night background, Starlight text, ' +
           'deep night shadow. The menu is a small lit panel in the dark; its warmth ' +
           'comes from the Starlight text color, not from a glow effect.',
+      },
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Gentle (fold-down) — the named motion story the file header promises
+// ---------------------------------------------------------------------------
+
+export const GentleFoldDown: Story = {
+  name: 'Gentle (fold-down)',
+  decorators: [lightDecorator],
+  render: () => html`
+    <elohim-context-menu
+      .open=${true}
+      .items=${mvpItems}
+      style="position: static;"
+    ></elohim-context-menu>
+  `,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The fold-down motion, named: the menu unfolds from its anchor in 120ms ' +
+          'ease-out — drawing, not loading (spec §9). The animation is gated behind ' +
+          '`prefers-reduced-motion: no-preference` and `(update: fast)`: stillness is ' +
+          'the default, and reduced-motion users get an instant, calm appearance. ' +
+          'Replay the fold by remounting the story (canvas toolbar → remount); a ' +
+          'static frame cannot carry the motion, only the resting state.',
       },
     },
   },
