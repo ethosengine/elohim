@@ -10,6 +10,19 @@
 # Apply per cluster:
 #   kubectl apply -f genesis/orchestrator/manifests/network-policies.yaml
 #
+# !! DRIFT WARNING (2026-06-10): the LIVE default-deny-cross-env policies in
+#    elohim-alpha / -staging / -prod each carry an ADDITIONAL ipBlock ingress
+#    rule admitting the 7 Calico VXLAN node-tunnel /32s. That is the cross-node
+#    fix: when a jenkins agent (or any cross-node source) reaches an elohim pod
+#    on another node, Calico rewrites the source to a VXLAN tunnel address that
+#    no namespaceSelector can match, so the traffic is dropped without it. Those
+#    /32s are NODE-SPECIFIC and are intentionally NOT committed here (they go
+#    stale as nodes change). A blind `kubectl apply -f` of this file STRIPS that
+#    rule and re-breaks cross-node ingress. To change these policies: patch the
+#    live object and PRESERVE the ipBlock rule (e.g. `kubectl patch netpol ...
+#    --type=json` to add a port), or re-add the current node tunnel IPs after
+#    applying. See operator memory cluster_cross_node_host_pod_broken.
+#
 # Prerequisites:
 #   - CNI plugin must support NetworkPolicy (Calico, Cilium, etc.)
 #   - Namespaces must have labels: elohim/environment: alpha|staging|prod
