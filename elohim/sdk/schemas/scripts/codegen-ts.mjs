@@ -465,6 +465,13 @@ async function generateEnumConstants() {
     // Type alias from the ALL_* constant
     blocks.push(`export type ${title} = (typeof ALL_${baseName})[number];`);
 
+    // Ordinal Record + helpers for ordered enums (the *_LEVELS convention, e.g.
+    // REACH_LEVELS -> REACH_OPENNESS). index i -> openness i+1, matching the schema
+    // enum order and the Rust Reach::openness(). Consumers stop hand-rolling order.
+    if (/_LEVELS$/.test(baseName)) {
+      blocks.push(formatTsOrdinal(baseName, title, allValues));
+    }
+
     blocks.push('');
   }
 
@@ -486,6 +493,28 @@ function formatTsConst(name, values) {
   // Fall back to multi-line for long arrays
   const items = values.map((v) => `  '${v}',`).join('\n');
   return `export const ${name} = [\n${items}\n] as const;`;
+}
+
+/**
+ * Emit an ordinal Record + helpers for an ordered enum (e.g. Reach).
+ * index i -> openness i+1 (1=most restrictive, matching the schema enum order and
+ * the Rust Reach::openness()). Gives consumers a single generated reach ordinal so
+ * they stop hand-rolling reach ordering. Also emits an `is<Title>` runtime guard
+ * keyed off the same Record.
+ */
+export function formatTsOrdinal(baseName, title, allValues) {
+  const entries = allValues.map((v, i) => `  ${v}: ${i + 1},`).join('\n');
+  const ordinalName = `${baseName.replace(/_LEVELS$/, '')}_OPENNESS`; // REACH_OPENNESS
+  return [
+    `export const ${ordinalName}: Record<${title}, number> = {`,
+    entries,
+    `} as const;`,
+    ``,
+    `export function ${title.toLowerCase()}Openness(r: ${title}): number { return ${ordinalName}[r]; }`,
+    ``,
+    `export function is${title}(v: string): v is ${title} { return v in ${ordinalName}; }`,
+    ``,
+  ].join('\n');
 }
 
 /**

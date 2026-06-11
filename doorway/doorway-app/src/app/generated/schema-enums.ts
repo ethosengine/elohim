@@ -298,6 +298,24 @@ export const ALL_MASTERY_LEVELS = [
 ] as const;
 export const MASTERY_LEVELS = ALL_MASTERY_LEVELS;
 export type MasteryLevel = (typeof ALL_MASTERY_LEVELS)[number];
+export const MASTERY_OPENNESS: Record<MasteryLevel, number> = {
+  not_started: 1,
+  seen: 2,
+  remember: 3,
+  understand: 4,
+  apply: 5,
+  analyze: 6,
+  evaluate: 7,
+  create: 8,
+  recognize: 9,
+  recall: 10,
+  synthesize: 11,
+} as const;
+
+export function masterylevelOpenness(r: MasteryLevel): number { return MASTERY_OPENNESS[r]; }
+
+export function isMasteryLevel(v: string): v is MasteryLevel { return v in MASTERY_OPENNESS; }
+
 
 export const CORE_OBSERVATION_POLARITIES = ['positive', 'negative'] as const;
 export const ALL_OBSERVATION_POLARITIES = ['positive', 'negative'] as const;
@@ -338,6 +356,21 @@ export const ALL_REACH_LEVELS = [
 ] as const;
 export const REACH_LEVELS = ALL_REACH_LEVELS;
 export type Reach = (typeof ALL_REACH_LEVELS)[number];
+export const REACH_OPENNESS: Record<Reach, number> = {
+  private: 1,
+  self: 2,
+  intimate: 3,
+  trusted: 4,
+  familiar: 5,
+  community: 6,
+  public: 7,
+  commons: 8,
+} as const;
+
+export function reachOpenness(r: Reach): number { return REACH_OPENNESS[r]; }
+
+export function isReach(v: string): v is Reach { return v in REACH_OPENNESS; }
+
 
 export const CORE_SESSION_LIFECYCLE_STATES = [
   'Anonymous',
