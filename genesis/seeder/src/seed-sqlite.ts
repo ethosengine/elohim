@@ -21,7 +21,7 @@ import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 import { CONTENT_FORMATS } from './validation-constants.js';
-import { ALL_STEP_TYPES } from './generated/schema-enums.js';
+import { ALL_STEP_TYPES, REACH_OPENNESS, isReach } from './generated/schema-enums.js';
 import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
 import type { CreateContentInput } from './generated/create-content-input.js';
 import type { ConceptMetadata, PathMetadata } from './generated/metadata-types.js';
@@ -187,7 +187,8 @@ interface PathJson {
   thumbnailUrl?: string;
   thumbnailAlt?: string;
   version?: string;
-  visibility?: string;
+  reach?: string;           // Authored reach grade (preferred over visibility)
+  visibility?: string;      // Legacy fallback when reach is absent
   tags?: string[];
   chapters?: ChapterJson[];
   conceptIds?: string[];
@@ -490,22 +491,32 @@ function loadContentFiles(): ConceptJson[] {
 // ============================================================================
 
 /**
- * Canonical 8-level reach order, most-restrictive to most-open.
- * Mirrors elohim/sdk/schemas/v1/enums/reach.schema.json (DNA-notarized).
- * Legacy keys (invited, local, neighborhood, municipal) are absent; any
- * surviving references to them elsewhere in this file will coalesce to
- * REACH_ORDER[key] ?? 0 — non-canonical drift to be reconciled separately.
+ * Assert a string is a canonical reach value (from the generated ordinal).
+ * HARD-FAILS on non-canonical input — no silent coalesce. Legacy keys
+ * (invited, local, neighborhood, municipal) are NOT canonical and throw here.
  */
-const REACH_ORDER: Record<string, number> = {
-  private: 0,
-  self: 1,
-  intimate: 2,
-  trusted: 3,
-  familiar: 4,
-  community: 5,
-  public: 6,
-  commons: 7,
-};
+function assertReach(v: string, ctx: string): Reach {
+  if (!isReach(v)) {
+    throw new Error(
+      `non-canonical reach "${v}" in ${ctx} — must be one of ${Object.keys(REACH_OPENNESS).join(', ')}`
+    );
+  }
+  return v;
+}
+
+/**
+ * Resolve effective reach under an inverted burden: default `private`, rise
+ * only via an authored value or an archetype advisory (account-package
+ * relationship assignment). The most-open candidate across
+ * {private, advisory, authored} wins, compared by the generated REACH_OPENNESS
+ * ordinal. Any non-canonical candidate HARD-FAILS via assertReach.
+ */
+export function earnedReach(input: { authored?: string; advisory?: string }): Reach {
+  const candidates: Reach[] = ['private'];
+  if (input.advisory) candidates.push(assertReach(input.advisory, 'archetype advisory'));
+  if (input.authored) candidates.push(assertReach(input.authored, 'authored reach'));
+  return candidates.reduce((a, b) => (REACH_OPENNESS[a] >= REACH_OPENNESS[b] ? a : b));
+}
 
 /**
  * Load account packages and build a map of content ID → maximum reach level.
@@ -532,11 +543,17 @@ function loadReachOverrides(): Map<string, string> {
 
       for (const assignment of pkg.content) {
         const existing = overrides.get(assignment.contentId);
-        const existingOrder = existing ? (REACH_ORDER[existing] ?? 0) : -1;
-        const newOrder = REACH_ORDER[assignment.reach] ?? 0;
+        // assignment comes from JSON.parse (untyped) — coerce to string so the
+        // isReach guard can narrow to Reach for the typed ordinal lookup.
+        const candidateReach = String(assignment.reach);
+        // Compare by the generated ordinal; non-canonical values rank lowest
+        // (0) so they never win the raise-only contest. Canonical enforcement
+        // happens at resolution time in earnedReach (HARD-FAIL, not here).
+        const existingOrder = existing && isReach(existing) ? REACH_OPENNESS[existing] : -1;
+        const newOrder = isReach(candidateReach) ? REACH_OPENNESS[candidateReach] : 0;
 
         if (newOrder > existingOrder) {
-          overrides.set(assignment.contentId, assignment.reach);
+          overrides.set(assignment.contentId, candidateReach);
         }
       }
     } catch {
@@ -551,19 +568,16 @@ function loadReachOverrides(): Map<string, string> {
 let reachOverrides: Map<string, string> | null = null;
 
 /**
- * Resolve the effective reach for a content item.
+ * Resolve the effective reach for a content item under the inverted burden.
  *
- * Authored reach (from the content JSON) is the floor — the earned grade at
- * authoring time. Account-package relationship assignments may only RAISE
- * reach; they can never drag a publicly-authored document down to a more
- * restrictive level. The most-open candidate across {authoredReach, override}
- * is selected, using REACH_ORDER rank as the comparator.
- *
- * When USE_ACCOUNT_PACKAGES is false the default is 'public' (dev mode).
- * When enabled the default falls back to 'commons' for ungraded content.
+ * Default is `private` — content earns openness, it is not granted it. An
+ * authored value (from the content JSON) and/or an account-package archetype
+ * advisory may RAISE reach; the most-open candidate wins (delegated to
+ * earnedReach, which HARD-FAILS on any non-canonical value). Advisories never
+ * drag an authored grade down — earnedReach picks the more-open of the two.
  */
 function getReachForContent(contentId: string, authoredReach?: string): Reach {
-  const defaultReach: Reach = USE_ACCOUNT_PACKAGES ? 'commons' : 'public';
+  let advisory: string | undefined;
 
   if (USE_ACCOUNT_PACKAGES) {
     if (!reachOverrides) {
@@ -580,27 +594,10 @@ function getReachForContent(contentId: string, authoredReach?: string): Reach {
         console.log(`     ${reach}: ${count}`);
       }
     }
+    advisory = reachOverrides.get(contentId);
   }
 
-  // Collect candidates: authored reach + override (if account packages enabled)
-  const candidates: string[] = [];
-  if (authoredReach && REACH_ORDER[authoredReach] !== undefined) {
-    candidates.push(authoredReach);
-  }
-  if (USE_ACCOUNT_PACKAGES && reachOverrides) {
-    const override = reachOverrides.get(contentId);
-    if (override && REACH_ORDER[override] !== undefined) {
-      candidates.push(override);
-    }
-  }
-
-  if (candidates.length === 0) return defaultReach;
-
-  // Pick the most-open (highest rank) candidate — authored floor cannot be lowered
-  const best = candidates.reduce((a, b) =>
-    (REACH_ORDER[a] ?? 0) >= (REACH_ORDER[b] ?? 0) ? a : b
-  );
-  return best as Reach;
+  return earnedReach({ authored: authoredReach, advisory });
 }
 
 function transformContent(json: ConceptJson): CreateContentInput {
@@ -804,7 +801,7 @@ function transformPathToContent(json: PathJson): CreateContentInput {
     contentBody,
     contentSizeBytes: Buffer.byteLength(contentBody, 'utf-8'),
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-    reach: (json.visibility as Reach | undefined) ?? 'public',
+    reach: earnedReach({ authored: json.reach ?? json.visibility, advisory: undefined }),
     tags: json.tags || [],
   };
 }
@@ -1333,7 +1330,13 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// Standalone execution only — guard so importing this module (e.g. for
+// earnedReach in unit tests) does NOT run the seeder. Mirrors the isMain
+// pattern in seed-commitments.ts.
+const isMain = import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  main().catch(err => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}
