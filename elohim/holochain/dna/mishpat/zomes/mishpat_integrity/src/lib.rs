@@ -670,6 +670,99 @@ fn validate_challenge_outcome(outcome: &ChallengeOutcome) -> ExternResult<Valida
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Locate `"<field>"` used as a JSON *key* (quoted name, optional ASCII
+/// whitespace, then `:`) and, if its value is a quoted string, return the raw
+/// value slice (between the opening quote and the first *unescaped* closing
+/// quote).
+///
+/// This is a structural scanner, not a parser — serde_json is dev-only here
+/// (WASM size budget; see `validate_commitment_entry` preamble). It is far
+/// stronger than a bare `meta.contains("field")`: the literal must appear as a
+/// quoted key with a `:` after it, so smuggling the bare word into a comment or
+/// free-text value no longer matches, and `"<field>_obligations"`-style sibling
+/// keys (the schema's reciprocity block) are not confused for `<field>`.
+///
+/// Residual approximation (documented honestly): the scanner does not track
+/// JSON string-context, so a key-shaped substring sitting *inside another
+/// string value* — e.g. the value `"\"provider\":x"` — would be matched as if
+/// it were a real key. Producing such a payload requires deliberately encoding
+/// an escaped quoted-key inside a value; it cannot occur from ordinary
+/// well-formed data, and the coordinator's full serde validation rejects it on
+/// the create path. The integrity arm is defense-in-depth against a direct
+/// source-chain write, and this residual is strictly narrower than the previous
+/// `contains` behaviour.
+fn json_string_field<'a>(meta: &'a str, field: &str) -> Option<&'a str> {
+    let bytes = meta.as_bytes();
+    let mut search_from = 0usize;
+    while let Some(key_value_start) = find_json_key(meta, field, search_from) {
+        // After the key + ':' we expect optional whitespace then a quoted string.
+        let mut i = key_value_start;
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i < bytes.len() && bytes[i] == b'"' {
+            let value_start = i + 1;
+            let mut j = value_start;
+            while j < bytes.len() {
+                match bytes[j] {
+                    b'\\' => j += 2, // skip escaped char (conservative)
+                    b'"' => return Some(&meta[value_start..j]),
+                    _ => j += 1,
+                }
+            }
+            return None; // unterminated string value
+        }
+        // Key present but value is not a string (number/array/object/etc.).
+        // Continue searching in case the same field name appears again.
+        search_from = key_value_start;
+    }
+    None
+}
+
+/// Does `meta` contain `"<field>"` used as a JSON *key* (quoted name, optional
+/// ASCII whitespace, then `:`)? Use this for non-string values (objects,
+/// numbers, arrays). Same structural guarantees and same documented residual
+/// as [`json_string_field`].
+fn has_json_key(meta: &str, field: &str) -> bool {
+    find_json_key(meta, field, 0).is_some()
+}
+
+/// Shared scan: return the byte index *just past the `:`* of the first
+/// occurrence of `"<field>"` followed by optional ASCII whitespace and a `:`,
+/// at or after `from`. Returns None if no such key occurrence exists.
+fn find_json_key(meta: &str, field: &str, from: usize) -> Option<usize> {
+    let bytes = meta.as_bytes();
+    // The quoted key token, e.g. `"provider"`.
+    let mut quoted = String::with_capacity(field.len() + 2);
+    quoted.push('"');
+    quoted.push_str(field);
+    quoted.push('"');
+    let needle = quoted.as_bytes();
+    if from >= meta.len() {
+        return None;
+    }
+    let mut start = from;
+    while let Some(rel) = meta[start..].find(&quoted) {
+        let key_end = start + rel + needle.len(); // index just past the closing quote
+        let mut i = key_end;
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i < bytes.len() && bytes[i] == b':' {
+            return Some(i + 1);
+        }
+        // Not a key (no `:` after the quoted token). Advance past this match.
+        start = start + rel + 1;
+    }
+    None
+}
+
+/// A JSON string value counts as "present and meaningful" only when it is
+/// non-empty after trimming ASCII whitespace. Rejects `""`, `"   "`, etc.
+fn json_string_field_nonblank(meta: &str, field: &str) -> bool {
+    json_string_field(meta, field).is_some_and(|v| !v.trim().is_empty())
+}
+
 fn validate_commitment_entry(commitment: &Commitment) -> ExternResult<ValidateCallbackResult> {
     if commitment.action.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -697,86 +790,107 @@ fn validate_commitment_entry(commitment: &Commitment) -> ExternResult<ValidateCa
             "Commitment.signed_at must be non-empty".into(),
         ));
     }
-    // Sprint 3: replicates-dwelling defense-in-depth.
-    // Coordinator does full schema validation; integrity catches direct-source-chain bypass.
-    if commitment.action == "replicates-dwelling" {
-        let meta = commitment.payload_json.trim();
-        if meta.is_empty() || !meta.starts_with('{') {
-            return Ok(ValidateCallbackResult::Invalid(
-                "replicates-dwelling requires payload_json as a JSON object".into(),
-            ));
-        }
-        // Recipient must be non-empty (anonymous replication forbidden).
-        if !meta.contains("recipient_dwelling_hub_id") {
-            return Ok(ValidateCallbackResult::Invalid(
-                "replicates-dwelling requires recipient_dwelling_hub_id field".into(),
-            ));
-        }
-        if meta.contains("\"recipient_dwelling_hub_id\":\"\"") || meta.contains("\"recipient_dwelling_hub_id\": \"\"") {
-            return Ok(ValidateCallbackResult::Invalid(
-                "replicates-dwelling recipient_dwelling_hub_id must be non-empty".into(),
-            ));
-        }
-        // Provider role must be one of the two enum values (substring check).
-        let has_steward_mutual = meta.contains("\"provider_role\":\"steward_mutual\"")
-            || meta.contains("\"provider_role\": \"steward_mutual\"");
-        let has_collective_steward = meta.contains("\"provider_role\":\"collective_steward\"")
-            || meta.contains("\"provider_role\": \"collective_steward\"");
-        if !has_steward_mutual && !has_collective_steward {
-            return Ok(ValidateCallbackResult::Invalid(
-                "replicates-dwelling provider_role must be steward_mutual or collective_steward".into(),
-            ));
-        }
-    }
-    // Slice-2b: replicates-commons defense-in-depth (substring-only — serde_json
-    // is dev-only here; coordinator does full schema validation, integrity catches
-    // a direct-source-chain bypass).
-    if commitment.action == "replicates-commons" {
-        let meta = commitment.payload_json.trim();
-        if meta.is_empty() || !meta.starts_with('{') {
-            return Ok(ValidateCallbackResult::Invalid(
-                "replicates-commons requires payload_json as a JSON object".into(),
-            ));
-        }
-        // Must carry a variant discriminator (content|capacity).
-        let has_content = meta.contains("\"variant\":\"content\"")
-            || meta.contains("\"variant\": \"content\"");
-        let has_capacity = meta.contains("\"variant\":\"capacity\"")
-            || meta.contains("\"variant\": \"capacity\"");
-        if !has_content && !has_capacity {
-            return Ok(ValidateCallbackResult::Invalid(
-                "replicates-commons variant must be content or capacity".into(),
-            ));
-        }
-        // reach_ceiling must be commons (commons provide loop only).
-        let commons_ceiling = meta.contains("\"reach_ceiling\":\"commons\"")
-            || meta.contains("\"reach_ceiling\": \"commons\"");
-        if !commons_ceiling {
-            return Ok(ValidateCallbackResult::Invalid(
-                "replicates-commons reach_ceiling must be commons".into(),
-            ));
-        }
-    }
-    // Slice-2b: revokes-commitment defense-in-depth.
-    if commitment.action == "revokes-commitment" {
-        let meta = commitment.payload_json.trim();
-        if meta.is_empty() || !meta.starts_with('{') {
-            return Ok(ValidateCallbackResult::Invalid(
-                "revokes-commitment requires payload_json as a JSON object".into(),
-            ));
-        }
-        if !meta.contains("target_cid") {
-            return Ok(ValidateCallbackResult::Invalid(
-                "revokes-commitment requires target_cid field".into(),
-            ));
-        }
-        if meta.contains("\"target_cid\":\"\"") || meta.contains("\"target_cid\": \"\"") {
-            return Ok(ValidateCallbackResult::Invalid(
-                "revokes-commitment target_cid must be non-empty".into(),
-            ));
-        }
+    // Per-action defense-in-depth. The coordinator does full serde_json schema
+    // validation on the create path; these integrity checks catch a direct
+    // source-chain write that bypasses the coordinator. They run on the trimmed
+    // payload (already confirmed to start with '{' by the preamble above) using
+    // the structural `json_string_field` / `has_json_key` scanners — NOT bare
+    // `contains`, which matched smuggled free-text and `*_obligations` siblings.
+    let meta = commitment.payload_json.trim();
+    if let Some(reason) = commitment_action_requirements(&commitment.action, meta) {
+        return Ok(ValidateCallbackResult::Invalid(reason));
     }
     Ok(ValidateCallbackResult::Valid)
+}
+
+/// Per-action requirements table for [`validate_commitment_entry`]. Returns
+/// `Some(reason)` if `meta` (a trimmed JSON object) fails the action's
+/// defense-in-depth checks, `None` if it passes (or the action carries no
+/// integrity-level requirements). All field lookups are structural (key-shaped
+/// presence and string-value reads), so a bare-word smuggle or a sibling
+/// `<field>_obligations` key cannot satisfy a requirement.
+fn commitment_action_requirements(action: &str, meta: &str) -> Option<String> {
+    match action {
+        // Sprint 3: dwelling-hub mutual replication. Recipient is required and
+        // must name a hub (no anonymous replication); provider_role is a
+        // closed enum of two values (value match via the string-value read).
+        "replicates-dwelling" => {
+            if !has_json_key(meta, "recipient_dwelling_hub_id") {
+                return Some("replicates-dwelling requires recipient_dwelling_hub_id field".into());
+            }
+            if !json_string_field_nonblank(meta, "recipient_dwelling_hub_id") {
+                return Some(
+                    "replicates-dwelling recipient_dwelling_hub_id must be non-empty".into(),
+                );
+            }
+            match json_string_field(meta, "provider_role") {
+                Some("steward_mutual") | Some("collective_steward") => None,
+                _ => Some(
+                    "replicates-dwelling provider_role must be steward_mutual or collective_steward"
+                        .into(),
+                ),
+            }
+        }
+        // Slice-2b: commons replication. `variant` is a content|capacity enum;
+        // `reach_ceiling` must equal "commons" (commons provide loop only).
+        "replicates-commons" => {
+            match json_string_field(meta, "variant") {
+                Some("content") | Some("capacity") => {}
+                _ => return Some("replicates-commons variant must be content or capacity".into()),
+            }
+            if json_string_field(meta, "reach_ceiling") != Some("commons") {
+                return Some("replicates-commons reach_ceiling must be commons".into());
+            }
+            None
+        }
+        // N5: the REA compute-commitment primitive's first concrete instance
+        // (Z.D deploy authority). provider/recipient are required non-empty
+        // strings (no anonymous grant of authority); the bounds object must
+        // carry the four fields the substrate walks on every bounded_by
+        // EconomicEvent. The bound fields are non-string (arrays/numbers) and
+        // live inside the nested `bounds` object, so we assert key presence with
+        // `has_json_key`; the coordinator enforces types/minimums.
+        // Ref: spec §1; schema v1/commitments/delegates-compute.schema.json.
+        "delegates-compute" => {
+            if !has_json_key(meta, "provider") {
+                return Some("delegates-compute requires provider field".into());
+            }
+            if !has_json_key(meta, "recipient") {
+                return Some("delegates-compute requires recipient field".into());
+            }
+            if !has_json_key(meta, "bounds") {
+                return Some("delegates-compute requires bounds field".into());
+            }
+            if !json_string_field_nonblank(meta, "provider") {
+                return Some("delegates-compute provider must be non-empty".into());
+            }
+            if !json_string_field_nonblank(meta, "recipient") {
+                return Some("delegates-compute recipient must be non-empty".into());
+            }
+            for bound in [
+                "epr_scope",
+                "reach_ceiling",
+                "rate_per_hour",
+                "rotation_ttl_days",
+            ] {
+                if !has_json_key(meta, bound) {
+                    return Some(format!("delegates-compute bounds must carry {bound}"));
+                }
+            }
+            None
+        }
+        // Slice-2b: revocation. target_cid is required and non-empty.
+        "revokes-commitment" => {
+            if !has_json_key(meta, "target_cid") {
+                return Some("revokes-commitment requires target_cid field".into());
+            }
+            if !json_string_field_nonblank(meta, "target_cid") {
+                return Some("revokes-commitment target_cid must be non-empty".into());
+            }
+            None
+        }
+        _ => None,
+    }
 }
 
 // =============================================================================
@@ -926,6 +1040,295 @@ mod tests {
         };
         let result = validate_commitment_entry(&event).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // delegates-compute Commitment integrity tests (N5)
+    //
+    // Defense-in-depth: the coordinator does full serde_json validation; these
+    // assert the integrity arm catches a direct-source-chain bypass. The payloads
+    // are built with serde_json (a dev-dependency) and stringified — the runtime
+    // validator itself sees only the string and uses substring checks.
+    // =========================================================================
+
+    fn delegates_compute_payload() -> serde_json::Value {
+        serde_json::json!({
+            "action": "delegates-compute",
+            "scope": "republish-epr",
+            "provider": "agent:matthew-steward",
+            "recipient": "agent:deploy-svc-matthew",
+            "bounds": {
+                "epr_scope": ["epr:lamad-spa"],
+                "reach_ceiling": "commons",
+                "rate_per_hour": 30,
+                "rotation_ttl_days": 90
+            },
+            "valid_from": "2026-05-25T00:00:00Z",
+            "valid_until": "2026-08-23T00:00:00Z"
+        })
+    }
+
+    fn delegates_compute_commitment(payload: &serde_json::Value) -> Commitment {
+        Commitment {
+            action: "delegates-compute".into(),
+            payload_json: payload.to_string(),
+            signed_at: "2026-05-25T00:00:00Z".into(),
+        }
+    }
+
+    #[test]
+    fn delegates_compute_well_formed_accepted() {
+        let c = delegates_compute_commitment(&delegates_compute_payload());
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(
+            matches!(result, ValidateCallbackResult::Valid),
+            "well-formed delegates-compute bounds must pass integrity: {result:?}"
+        );
+    }
+
+    #[test]
+    fn delegates_compute_missing_recipient_rejected() {
+        let mut payload = delegates_compute_payload();
+        payload.as_object_mut().unwrap().remove("recipient");
+        let c = delegates_compute_commitment(&payload);
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn delegates_compute_empty_provider_rejected() {
+        let mut payload = delegates_compute_payload();
+        payload["provider"] = serde_json::json!("");
+        let c = delegates_compute_commitment(&payload);
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn delegates_compute_missing_bounds_rejected() {
+        let mut payload = delegates_compute_payload();
+        payload.as_object_mut().unwrap().remove("bounds");
+        let c = delegates_compute_commitment(&payload);
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn delegates_compute_bounds_missing_rate_per_hour_rejected() {
+        let mut payload = delegates_compute_payload();
+        payload["bounds"]
+            .as_object_mut()
+            .unwrap()
+            .remove("rate_per_hour");
+        let c = delegates_compute_commitment(&payload);
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn delegates_compute_bounds_missing_rotation_ttl_days_rejected() {
+        let mut payload = delegates_compute_payload();
+        payload["bounds"]
+            .as_object_mut()
+            .unwrap()
+            .remove("rotation_ttl_days");
+        let c = delegates_compute_commitment(&payload);
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn delegates_compute_non_object_payload_rejected() {
+        // Direct-source-chain bypass authoring a non-object payload.
+        let c = Commitment {
+            action: "delegates-compute".into(),
+            payload_json: "\"not-an-object\"".into(),
+            signed_at: "2026-05-25T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // Adversary tests — confirm the structural scanner closes the four
+    // `contains`-bypass classes the previous arms were vulnerable to. These are
+    // hand-authored direct-source-chain payloads (the attacker controls the raw
+    // bytes), NOT serde_json-built fixtures.
+    // =========================================================================
+
+    /// Bypass (1): the required field names smuggled as bare words inside an
+    /// unrelated string value. The old `meta.contains("provider")` matched this;
+    /// the structural scanner requires `"provider"` as a quoted key + `:`.
+    #[test]
+    fn delegates_compute_note_smuggling_rejected() {
+        let c = Commitment {
+            action: "delegates-compute".into(),
+            payload_json: r#"{"note":"provider recipient bounds epr_scope reach_ceiling rate_per_hour rotation_ttl_days"}"#
+                .into(),
+            signed_at: "2026-05-25T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(
+            matches!(result, ValidateCallbackResult::Invalid(_)),
+            "bare-word smuggling in a note value must not satisfy required fields"
+        );
+    }
+
+    /// Bypass (2): the schema's optional `reciprocity` block carries
+    /// `provider_obligations` / `recipient_obligations` keys, whose names contain
+    /// the substrings `provider` / `recipient`. A payload with NO top-level
+    /// provider/recipient but a reciprocity block passed the old `contains`
+    /// check; the structural scanner matches `"provider"` exactly, not the
+    /// `*_obligations` sibling.
+    #[test]
+    fn delegates_compute_reciprocity_block_only_rejected() {
+        let c = Commitment {
+            action: "delegates-compute".into(),
+            payload_json: r#"{"reciprocity":{"provider_obligations":["x"],"recipient_obligations":["y"]},"bounds":{"epr_scope":[],"reach_ceiling":"commons","rate_per_hour":1,"rotation_ttl_days":1}}"#
+                .into(),
+            signed_at: "2026-05-25T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(
+            matches!(result, ValidateCallbackResult::Invalid(_)),
+            "a reciprocity block must not satisfy the top-level provider/recipient requirement"
+        );
+    }
+
+    /// Bypass (3a): `"provider" : ""` — space-colon-space then empty value. The
+    /// old arm only literal-matched `":""` and `": ""`; the structural scanner
+    /// tolerates whitespace around the colon and still sees the empty value.
+    #[test]
+    fn delegates_compute_space_colon_space_empty_provider_rejected() {
+        let c = Commitment {
+            action: "delegates-compute".into(),
+            payload_json: r#"{"provider" : "","recipient":"agent:r","bounds":{"epr_scope":[],"reach_ceiling":"commons","rate_per_hour":1,"rotation_ttl_days":1}}"#
+                .into(),
+            signed_at: "2026-05-25T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(
+            matches!(result, ValidateCallbackResult::Invalid(_)),
+            "whitespace around the colon must not let an empty provider through"
+        );
+    }
+
+    /// Bypass (3b): whitespace-only value `"   "`. The old empty-check only
+    /// caught the exactly-empty string; `json_string_field_nonblank` trims.
+    #[test]
+    fn delegates_compute_whitespace_only_provider_rejected() {
+        let c = Commitment {
+            action: "delegates-compute".into(),
+            payload_json: r#"{"provider":"   ","recipient":"agent:r","bounds":{"epr_scope":[],"reach_ceiling":"commons","rate_per_hour":1,"rotation_ttl_days":1}}"#
+                .into(),
+            signed_at: "2026-05-25T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(
+            matches!(result, ValidateCallbackResult::Invalid(_)),
+            "a whitespace-only provider must be rejected"
+        );
+    }
+
+    /// Same whitespace-only rejection on the replicates-dwelling recipient and
+    /// the revokes-commitment target_cid — the shared `nonblank` helper covers
+    /// every arm, not just delegates-compute.
+    #[test]
+    fn replicates_dwelling_whitespace_only_recipient_rejected() {
+        let c = Commitment {
+            action: "replicates-dwelling".into(),
+            payload_json: r#"{"recipient_dwelling_hub_id":"  ","provider_role":"steward_mutual"}"#
+                .into(),
+            signed_at: "2026-05-28T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn revokes_commitment_whitespace_only_target_rejected() {
+        let c = Commitment {
+            action: "revokes-commitment".into(),
+            payload_json: r#"{"target_cid":"   "}"#.into(),
+            signed_at: "2026-05-28T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    /// The scanner must not treat a key-shaped substring sitting inside the
+    /// VALUE of another field as a real key. Here `target_cid` appears only
+    /// inside the value of `decoy` (as escaped text), never as a real key, so
+    /// the revokes-commitment arm must reject for a missing target_cid.
+    ///
+    /// NOTE (honest residual): the scanner is string-context-unaware. It
+    /// rejects THIS payload because the embedded `target_cid` is preceded by an
+    /// escaped quote (`\"`), so `find_json_key` searching for the *unescaped*
+    /// token `"target_cid"` does not match the escaped form. A payload that
+    /// embedded the *unescaped* sequence `"target_cid":"x"` inside another
+    /// string value (only constructable as `"\"target_cid\":\"x\""` at the JSON
+    /// level, i.e. with escapes) is the documented residual: the scanner would
+    /// see the inner token as a key. Producing it requires deliberately
+    /// encoding an escaped key inside a value; the coordinator's full serde
+    /// validation rejects it on the create path.
+    #[test]
+    fn revokes_commitment_key_inside_value_not_a_key() {
+        let c = Commitment {
+            action: "revokes-commitment".into(),
+            // {"decoy":"\"target_cid\":\"x\""} — target_cid only as escaped text.
+            payload_json: r#"{"decoy":"\"target_cid\":\"x\""}"#.into(),
+            signed_at: "2026-05-28T00:00:00Z".into(),
+        };
+        let result = validate_commitment_entry(&c).unwrap();
+        assert!(
+            matches!(result, ValidateCallbackResult::Invalid(_)),
+            "an escaped target_cid token inside a value must not satisfy the key requirement"
+        );
+    }
+
+    /// Direct unit coverage of the shared matchers, independent of any arm.
+    #[test]
+    fn json_string_field_matchers_behave() {
+        // Plain key/value.
+        assert_eq!(
+            json_string_field(r#"{"a":"b"}"#, "a"),
+            Some("b"),
+            "basic key/value read"
+        );
+        // Whitespace around the colon.
+        assert_eq!(
+            json_string_field(r#"{"a" : "b"}"#, "a"),
+            Some("b"),
+            "tolerates ws around colon"
+        );
+        // Sibling key with the target as a prefix must NOT match.
+        assert_eq!(
+            json_string_field(r#"{"a_obligations":"b"}"#, "a"),
+            None,
+            "prefix-sibling key is not the field"
+        );
+        // Bare word in a value is not a key.
+        assert_eq!(
+            json_string_field(r#"{"note":"a b c"}"#, "a"),
+            None,
+            "bare word in value is not a key"
+        );
+        // Non-string value: not returned by json_string_field, but seen by has_json_key.
+        assert_eq!(json_string_field(r#"{"a":[1,2]}"#, "a"), None);
+        assert!(has_json_key(r#"{"a":[1,2]}"#, "a"));
+        assert!(has_json_key(r#"{"a" : 3}"#, "a"));
+        assert!(!has_json_key(r#"{"a_obligations":3}"#, "a"));
+        // Escaped quote inside value terminates conservatively at the escape's
+        // following content — the value read stops at the first UNescaped quote.
+        assert_eq!(
+            json_string_field(r#"{"a":"x\"y"}"#, "a"),
+            Some(r#"x\"y"#),
+            "escaped quote does not terminate the value early"
+        );
+        // Blank-detection helper.
+        assert!(json_string_field_nonblank(r#"{"a":"b"}"#, "a"));
+        assert!(!json_string_field_nonblank(r#"{"a":""}"#, "a"));
+        assert!(!json_string_field_nonblank(r#"{"a":"   "}"#, "a"));
     }
 
     // =========================================================================
