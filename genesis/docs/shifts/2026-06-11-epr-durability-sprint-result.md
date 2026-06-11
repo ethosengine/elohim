@@ -2,10 +2,15 @@
 
 **Objective:** drive the genesis substrate gates (mesh.adjacency ×2,
 propagation.custody-convergence) to 0 with formation past founder binding.
-**Outcome: measure 3 → 1 → 1** (two consecutive complete genesis runs,
-fresh-triggered — the first complete runs after a week of aborts).
-Target 0 not reached; the lone failing gate is operator-ceiling
-(conductor PVC). **Done-to-the-ceiling.**
+**Outcome: measure 3 → 1, floor held across THREE complete genesis runs**
+(the first complete runs after a week of aborts). Target 0 not reached at
+close — the lone failing gate (custody-convergence) is the
+operator-diagnosed doorway-attestation lockout, whose DNA fix was BUILT
+(#1325) and DEPLOYING at close (wave-6: edge #1063 → genesis #1127 carries
+the verdict; watcher output in the session task dir). Edge #1062 had raced
+the fire-and-forget DNA build and shipped the pre-fix happ — the
+dispatch-ordering wart is journaled (ebbe201f7). **Done-to-the-ceiling**,
+with the deploy verdict handed to morning review.
 
 ## Proven on the live cluster tonight
 
