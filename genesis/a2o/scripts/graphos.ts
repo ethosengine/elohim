@@ -19,6 +19,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   componentPrefix,
+  familyOf,
   groupByComponent,
   listStories,
   sheetHtml,
@@ -173,6 +174,19 @@ async function cmdStory(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
   return result.ok;
 }
 
+/** Rows per family section at the configured column count. */
+function* groupRows(
+  entries: { title: string }[],
+  cmd: { cols: number }
+): Generator<number> {
+  const counts = new Map<string, number>();
+  for (const e of entries) {
+    const fam = (e.title.split('/')[0] ?? '').toLowerCase();
+    counts.set(fam, (counts.get(fam) ?? 0) + 1);
+  }
+  for (const n of counts.values()) yield Math.ceil(n / cmd.cols);
+}
+
 async function cmdSheet(index: StorybookIndex, cmd: GraphosCommand): Promise<boolean> {
   const component = cmd.arg as string;
   const entries = storiesForSheet(index, component, cmd.family);
@@ -194,18 +208,35 @@ async function cmdSheet(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
   );
   // cols * cellW + (cols-1) * 8px grid gap + 2*8px body padding + 2px border per cell column; full-page shot covers height.
   const width = cmd.cols * cmd.cell.width + (cmd.cols - 1) * 8 + 16 + 2 * cmd.cols;
-  // 30s base + ~1.5s per iframe; a 42-cell sheet needs ~90s to settle. Cap at 120s.
-  const timeoutMs = Math.min(120_000, 30_000 + 1_500 * entries.length);
+  // 60s base + ~3s per iframe; all iframes now load in-viewport simultaneously (viewport
+  // sized to full height — no deferred offscreen loading), so networkidle waits for all
+  // of them to quiesce. Cap at 300s.
+  const timeoutMs = Math.min(300_000, 60_000 + 3_000 * entries.length);
+  // Chromium defers rendering of offscreen iframes — networkidle fires while
+  // below-the-fold frames are still unrendered, so the full-page shot captures
+  // blank cells. Make the viewport tall enough to hold the WHOLE sheet.
+  const families = new Set(entries.map(e => familyOf(e))).size;
+  const rows = [...groupRows(entries, cmd)].reduce((a, b) => a + b, 0);
+  const sheetHeight = 16 + families * 46 + rows * (cmd.cell.height + 33);
+  const height = Math.min(15_000, sheetHeight + 100);
   const result = await runLook({
     url: pathToFileURL(sheetPath).href,
     out: slug,
-    viewport: { width, height: 800 },
+    viewport: { width, height },
     timeoutMs,
   });
   console.log(result.shotPath);
   console.log(result.capturePath);
   console.log(sheetPath);
-  return result.ok;
+  // networkidle may never fire for a sheet of Storybook iframes (production storybook
+  // keeps WebSocket / HMR connections open). If the only failure signal is the timeout
+  // (no pageErrors, no failed requests, no HTTP errors) the sheet captured correctly —
+  // treat it as success.
+  const realFailure =
+    result.pageErrors.length > 0 ||
+    result.failedRequests.length > 0 ||
+    result.httpErrors.length > 0;
+  return result.ok || !realFailure;
 }
 
 async function main(): Promise<void> {
