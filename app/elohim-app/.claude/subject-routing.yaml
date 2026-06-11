@@ -1,0 +1,43 @@
+# app/elohim-app/.claude/subject-routing.yaml
+# CASCADE SUB-MANIFEST (locus: the elohim-app multi-pillar delivery SHELL — census row 9).
+#
+# Merged ON TOP of the root /.claude/subject-routing.yaml by _lib/subject_routing.load_routing()
+# (walks UP from a doc under app/elohim-app, root-first, nearest-wins). This file's job is to DECLARE
+# the locus and pin its subject identity; it deliberately does NOT override `classes` — see SHALLOW-MERGE.
+#
+# SHALLOW-MERGE CAVEAT (found 2026-06-11, app/lamad sub-manifest): _merge_into does
+# `base.classes[cls] = spec` — a FULL replace, not a deep merge. A partial `classes.<x>:` here would
+# CLOBBER the root's write_location / status_modes / discard for everything resolving under
+# app/elohim-app. Functional per-locus class-remap is DEFERRED until the resolver deep-merges
+# (census §Cascade prerequisites, finding 2). Today this manifest's active effect is REGISTRATION
+# (load_routing records it in `sources`) + the locus identity block below.
+#
+# Spec: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md
+# Census: genesis/data/timeline/backlog/subject-routing-locus-census.md (row 9)
+
+version: 1
+default_class: protocol-canonical        # matches root; explicit for documentation
+
+# Locus identity — read by tooling/agents. The resolver ignores unknown top-level keys, so this block
+# is INERT to merge today (documentary) but is the seat the deep-merge remap will activate from.
+locus:
+  subject: elohim-app-shell
+  role: consumer-delivery                          # multi-pillar delivery locus; truth is NOT self
+  # The shell CONSUMES protocol truth; it owns none of it (census row 9 corrected-truth column):
+  #   - vocabulary/domains:   elohim/sdk/domains/<pillar>/   (lamad-/qahal-/imagodei-/shefa-/elohim-domain-gospel)
+  #   - wire/API boundary:    elohim/elohim-storage/         (elohim-storage-gospel; views.rs camelCase boundary)
+  subject_truth_home:
+    - elohim/sdk/domains
+    - elohim/elohim-storage
+  # MULTI-PILLAR: no single pillar pin. Intended remap once deep-merge lands (NOT active today):
+  # docs born under src/app/<pillar>/ pin to that pillar's locus; shell-root docs are delivery-layer.
+  # Per-pillar TRUE-LOCUS exception (census row 5): src/app/elohim/models/ is canonical for the
+  # frontend cross-pillar TS primitives (truth: self for those models; architecture prose is not).
+  #
+  # docs_island — pending retirement at the consolidated six-pillar operator gate (2026-06-11):
+  # recomposition placed; `git rm` + pointer flips await the gate. After the gate these lines flip
+  # to "RETIRED <date> — recomposed into <targets>" (see the lamad sub-manifest for the pattern).
+  docs_island:
+    - app/elohim-app/src/app/elohim/ELOHIM_PROTOCOL_ARCHITECTURE.md   # recomposed → history/2026-06-11-elohim-pillar-architecture-founding-arc.md + pillar-gospel drift-repairs
+    - app/elohim-app/src/app/elohim/ARCHITECTURE.md                   # recomposed → same history record + backlog/reach-vocabulary-frontend-strand.md
+    - app/elohim-app/src/app/qahal/QAHAL_API_SPECIFICATION_v1.0.md    # recomposed session 1 (commit bf4367e98) → qahal-api-spec-extraction-arc + 2 backlog entries

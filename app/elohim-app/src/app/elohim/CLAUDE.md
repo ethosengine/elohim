@@ -20,70 +20,95 @@ home drifts this gospel STALE for re-verification.
 **Where code citations to the subject belong:**
 - When code encodes a cross-pillar coordination assumption (a signal kind, a constitutional ratio, a shared
   reach/mastery primitive), leave a `// subject: elohim-domain-gospel` breadcrumb at the assumption site.
-- The shared models here (`protocol-core.model.ts`, `agent.model.ts`) mirror substrate/wire types — when a
-  wire shape moves upstream, cite the substrate rather than forking a hand-copy.
+- The shared models here (`protocol-core.model.ts`, `zome-wire-types.ts`) mirror substrate/wire types — when a
+  wire shape moves upstream, cite the substrate rather than forking a hand-copy. (`agent.model.ts` and
+  `source-chain.model.ts` migrated to `@elohim/service` — Slice 2.1/2.1b — and are re-exported through the barrel.)
 
 ## Models
 
 | Model | Purpose |
 |-------|---------|
-| `protocol-core.model.ts` | Shared primitives (ReachLevel, GovernanceLayer, etc.) |
-| `agent.model.ts` | Agent, AgentProgress, MasteryLevel (Bloom's Taxonomy) |
+| `protocol-core.model.ts` | Shared primitives (ReachLevel, AffinityScope, CrossPillarLinkType, …) |
 | `elohim-agent.model.ts` | Constitutional AI guardian types |
-| `trust-badge.model.ts` | TrustIndicator for UI display |
-| `source-chain.model.ts` | Holochain-style entry/link types |
+| `trust-badge.model.ts` | TrustIndicator/TrustIndicatorSet for UI display |
+| `zome-wire-types.ts` | snake_case Holochain zome wire types (boundary-only) |
+| `rea-bridge.model.ts`, `economic-event.model.ts` | REA/ValueFlows economic coordination |
+
+Representative rows — `models/` holds 20 files; `models/index.ts` is the barrel. Agent types
+(`Agent`, `AgentProgress`, `MasteryLevel`) and source-chain types (`SourceChainEntry`, `EntryLink`,
+`LamadLinkType`) migrated to `@elohim/service` (Slice 2.1/2.1b) and are re-exported through the barrel.
+
+**Cross-pillar link vocabulary:** `CrossPillarLinkType` lives in `models/protocol-core.model.ts:610`
+(14 values incl. `custom`) — the founding doc-table vocabulary was fully replaced, and the current set
+has no consumers outside the model file yet; verify before building on it.
 
 ## Services
 
 | Service | Purpose |
 |---------|---------|
-| `DataLoaderService` | JSON fetching (Holochain adapter point) |
-| `AgentService` | Agent profiles, progress, attestation checks |
-| `ElohimAgentService` | Constitutional AI invocation |
+| `DataLoaderService` | Index/path/content reads — projection-first, ContentService fallback, IDB cache |
+| `AgentService` | Current agent (session or authenticated), progress, attestation checks |
+| `ElohimAgentService` | Constitutional AI invocation (pluggable backend) |
 | `TrustBadgeService` | Compute trust indicators from attestations |
-| `LocalSourceChainService` | Agent-centric localStorage (pre-Holochain) |
+| `LocalSourceChainService` | Agent-centric localStorage chain — migrated to `@elohim/service` (Slice 2.1b), re-exported via `services/index.ts` |
+
+Representative rows — `services/` now holds ~60 services (content, storage-api, projection-api,
+governance, human-consent, profile, affinity-tracking, epr-nav, …); `services/index.ts` is the barrel.
 
 ## Key Types
 
 ```typescript
-// Mastery progression (Bloom's Taxonomy)
+// Mastery progression (Bloom's Taxonomy) — canonical home: @elohim/service
+// (app/elohim-library/projects/elohim-service/src/angular/models/agent.model.ts:219)
+// Generated schema-enums.ts:300 carries an 11-value superset (adds recognize/recall/synthesize)
 type MasteryLevel =
   | 'not_started' | 'seen' | 'remember' | 'understand'
   | 'apply' | 'analyze' | 'evaluate' | 'create';
 
-// Content visibility scope
+// Geographic/jurisdictional visibility scope (models/protocol-core.model.ts:50)
 type ReachLevel =
-  | 'private' | 'invited' | 'local'
-  | 'community' | 'federated' | 'commons';
+  | 'private' | 'invited' | 'local' | 'neighborhood'
+  | 'municipal' | 'bioregional' | 'regional' | 'commons';
+// DRIFT: the DNA-notarized schema enum (elohim/sdk/schemas/v1/enums/reach.schema.json) is a
+// DIFFERENT 8 (private/self/intimate/trusted/familiar/community/public/commons) — known
+// reconciliation backlog (genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md);
+// do not "fix" either side to match the other here.
 
-// Trust indicator for UI
+// Trust indicator for UI (models/trust-badge.model.ts:188)
 interface TrustIndicator {
+  id: string;
   polarity: 'positive' | 'negative';
+  priority: number; // 1-100 display prominence
   icon: string;
   label: string;
+  description: string;
+  color: BadgeColor;
   verified: boolean;
+  source: IndicatorSource;
+  timestamp: string;
+  sourceType: ContentAttestationType | BadgeWarning['type'];
 }
 ```
 
 ## DataLoaderService Contract
 
-The ONLY service that knows about data sources. All others depend on this.
+Legacy index/path adapter — delegates to ProjectionApiService with ContentService fallback and an
+IndexedDB cache. No longer the only data-source-aware service (see API Boundary Architecture below).
 
 ```typescript
-getPath(pathId: string): Observable<LearningPath>;
+getPath(pathId: string): Observable<LearningPath>;      // delegates to getContent() + parsePathView
 getContent(resourceId: string): Observable<ContentNode>;
-getPathIndex(): Observable<PathIndexEntry[]>;
-getContentIndex(): Observable<ContentIndexEntry[]>;
+getPathIndex(): Observable<PathIndex>;
+getContentIndex(): Observable<ContentIndex>;            // heavy (~1000 items); use checkReadiness() for liveness
 ```
 
-When migrating to Holochain, only this service changes.
+## Holochain Adoption State
 
-## Holochain Migration
-
-- `id` fields become action hashes
-- Progress moves to agent's private source chain
-- Attestations become DHT entries with crypto verification
-- `LocalSourceChainService` data migrates via `prepareMigration()`
+The storage/DHT architecture has landed (see API Boundary Architecture below): reads flow
+projection → ContentService → IndexedDB cache behind `DataLoaderService`; zome calls go through
+`HolochainClientService` (snake_case wire). Pre-Holochain local chains still exist:
+`LocalSourceChainService` (`@elohim/service`) packages them via `prepareMigration()` →
+`ChainMigrationPackage` for source-chain migration.
 
 ---
 
