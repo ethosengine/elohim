@@ -79,4 +79,31 @@ check("load_routing reads the 2 classes", set(["protocol-canonical", "process-me
 check("load_routing carries gate_signals", any(s.get("id") == "vocab-vs-target-mismatch" for s in routing.gate_signals))
 check("load_routing default_class", routing.default_class == "protocol-canonical")
 
+# ── cascade: a sub-manifest COMPOSES on top of root, does NOT shadow it (regression for the 2026-06-11
+#    first-sub-manifest bug — find_repo_root must reach .git, not stop at the nearer sub-manifest) ──
+import tempfile  # noqa: E402
+
+with tempfile.TemporaryDirectory() as _td:
+    _tdp = Path(_td)
+    (_tdp / ".git").mkdir()
+    (_tdp / ".claude").mkdir()
+    (_tdp / ".claude" / "subject-routing.yaml").write_text(
+        "version: 1\ndefault_class: protocol-canonical\n"
+        "classes:\n  protocol-canonical: {has_pillar: true}\n  process-meta: {has_pillar: false}\n"
+    )
+    _sub = _tdp / "app" / "lamad"
+    (_sub / ".claude").mkdir(parents=True)
+    (_sub / ".claude" / "subject-routing.yaml").write_text(
+        "version: 1\ndefault_class: protocol-canonical\nlocus: {subject: lamad}\n"
+    )
+    (_sub / "docs").mkdir()
+    _doc = _sub / "docs" / "x.md"
+    _doc.write_text("# x")
+    _r = sr.load_routing(str(_doc), repo_root=str(_tdp))
+    check("cascade: sub-manifest composes — root classes survive", {"protocol-canonical", "process-meta"}.issubset(_r.classes.keys()))
+    check("cascade: both manifests merged into sources", len(_r.sources) == 2)
+    # without explicit repo_root: find_repo_root must reach .git, NOT stop at the sub-manifest dir
+    _r2 = sr.load_routing(str(_doc))
+    check("cascade: find_repo_root reaches .git, sub-manifest does not shadow root", "process-meta" in _r2.classes)
+
 print(f"\n  {_passed} assertions passed ✅")

@@ -1160,7 +1160,7 @@ All three verticals are now complete and integrated:
 
 | Vertical | Status | Documentation |
 |----------|--------|---------------|
-| 1. Human Identity | **COMPLETE** | `app/elohim-app/src/app/imagodei/claude.md` |
+| 1. Human Identity | **COMPLETE** | `app/elohim-app/src/app/imagodei/CLAUDE.md` |
 | 2. Lamad Learner | **COMPLETE** | `app/elohim-app/src/app/lamad/BLOOM-MASTERY-DESIGN.md` |
 | 3. Economic Attribution | **COMPLETE** | `app/elohim-app/src/app/elohim/models/` |
 

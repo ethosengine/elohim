@@ -1,8 +1,31 @@
+---
+id: imagodei-pillar-gospel
+cites:
+  - imagodei-domain-gospel | the subject SOURCE OF TRUTH this pillar consumes — identity content types, metadata schemas, attestation and reach coupling (renders, never redefines) | sha256:ff2c1e545374281f | path: elohim/sdk/domains/imagodei/CLAUDE.md
+---
+
 # Imago Dei Pillar - Identity
 
 Human identity layer aligned with "Image of God" framework.
 
 **Architecture:** `elohim/ELOHIM_PROTOCOL_ARCHITECTURE.md`
+
+## Subject home & citation discipline (this pillar is a CONSUMER)
+
+This Angular pillar does not OWN the imagodei subject — it consumes it. The identity content types
+(`human`/`role`/`contributor`), their metadata schemas (display name, agency stage, affinity, presence
+state), and coupling contracts (signals, attestation gates, the reach-earning machinery) are the source of
+truth at the cited subject home `imagodei-domain-gospel` (`elohim/sdk/domains/imagodei/`). The cite is
+content-addressed: a change at the subject home drifts this gospel STALE for re-verification.
+
+**Where code citations to the subject belong:**
+- `generated/` is DERIVED from the subject home — never hand-edit; regenerate with `pnpm run imagodei:codegen`.
+- When code encodes identity coupling (agency-stage progression, identity-mode detection, key-location
+  strategy), leave a `// subject: imagodei-domain-gospel` breadcrumb at the assumption site.
+- When guard logic gates routes by attestation type or reach tier, cite the attestation-type rules the
+  manifest owns.
+- When reach/standing computation reads `affinityTotal` or `presenceState`, cite that the subject home owns
+  `PresenceMetadata` — affinity accrues from curation, never attention.
 
 ## Philosophy
 

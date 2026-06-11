@@ -1,3 +1,9 @@
+---
+id: imagodei-domain-gospel
+cites:
+  - imagodei-surfaces | the architecture defining the three identity surfaces and the load-bearing coupling rules this domain vocabulary implements | sha256:e0abac6f6a6a0906 | path: genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md
+---
+
 # Imagodei Domain
 
 This directory is the **imagodei protocol domain** — the identity pillar's vocabulary, metadata schemas, and coupling contracts. Imagodei grounds the protocol in demonstrated capability and community trust.

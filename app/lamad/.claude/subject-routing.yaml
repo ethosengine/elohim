@@ -1,0 +1,33 @@
+# app/lamad/.claude/subject-routing.yaml
+# THE MONOREPO'S FIRST CASCADE SUB-MANIFEST  (locus: lamad reference-client bundle).
+#
+# Merged ON TOP of the root /.claude/subject-routing.yaml by _lib/subject_routing.load_routing()
+# (walks UP from a doc under app/lamad, root-first, nearest-wins). This file's job is to DECLARE the
+# locus and pin its subject identity; it deliberately does NOT override `classes` — see SHALLOW-MERGE.
+#
+# SHALLOW-MERGE CAVEAT (found 2026-06-11): _merge_into does `base.classes[cls] = spec` — a FULL replace,
+# not a deep merge. A partial `classes.protocol-canonical:` here would CLOBBER the root's write_location /
+# status_modes / discard for everything resolving under app/lamad. So functional per-locus class-remap is
+# DEFERRED until the resolver deep-merges (backlog). Today this manifest's active effect is REGISTRATION
+# (load_routing records it in `sources`, so tooling sees app/lamad IS a declared locus) + the subject pin.
+#
+# COMPOSITION NOTE: lamad is IN-TREE, so the walk-up reaches the repo root automatically. SUBMODULE loci
+# must stay parent-agnostic and compose via a runtime claimed-parents walk-up (the walker detects the
+# embedding context and walks up only when a claimed-parent matches where it is actually embedded) — not
+# by hardcoding a parent path here. See the root submodule-awareness stanza + the bidirectional-drift design.
+#
+# Spec: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md
+
+version: 1
+default_class: protocol-canonical        # matches root; explicit for documentation
+
+# Locus identity — read by tooling/agents. The resolver ignores unknown top-level keys, so this block is
+# INERT to merge today (documentary) but is the seat the deep-merge remap will activate from.
+locus:
+  subject: lamad
+  pillar: lamad
+  role: reference-client-consumer                 # consumes the lamad subject; does NOT own it
+  subject_truth_home: elohim/sdk/domains/lamad     # cited as `lamad-domain-gospel` from app/lamad/CLAUDE.md
+  docs_island: app/lamad/docs                      # legacy island to stamp+decompose, then retire (NOT a born-here home)
+  # Intended remap once deep-merge lands (NOT active today — see SHALLOW-MERGE caveat above):
+  intended_pillar_pin: lamad                       # docs born here are lamad-pillar — no D# guessing

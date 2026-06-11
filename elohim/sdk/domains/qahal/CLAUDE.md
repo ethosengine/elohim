@@ -1,3 +1,9 @@
+---
+id: qahal-domain-gospel
+cites:
+  - qahal-architecture-vision | the gospel-tier architecture vision this domain codifies — governance vocabulary, coupling contracts, and standing mechanics for implementers | sha256:6a519b464b586832 | path: genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md
+---
+
 # Qahal Domain
 
 This directory is the **qahal protocol domain** — the social + governance pillar's vocabulary, metadata schemas, and coupling contracts. Qahal is the social layer: governance today, community networking tomorrow.

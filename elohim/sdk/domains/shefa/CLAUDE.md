@@ -1,3 +1,9 @@
+---
+id: shefa-domain-gospel
+cites:
+  - genesis/docs/Shefa_Economic_Infrastructure_Whitepaper.md
+---
+
 # Shefa Domain
 
 This directory is the **shefa protocol domain** — the economy pillar's vocabulary, metadata schemas, and coupling contracts. Shefa declares how value flows through the protocol: stewardship, economic events, resource accounting, and obligation tracking.

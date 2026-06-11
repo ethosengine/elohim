@@ -145,7 +145,7 @@ doorway); (5) scenarios `genesis/a2o/features/shefa/`.
 **To work on `imagodei`:** read (1) [`resilience/README.md`](../resilience/README.md) (recovery is
 the vision's designated MVP acceptance test); (2) seeds **D2, D4** (attestation-consolidation,
 memory-lifecycle); (3) pillar guide
-[`imagodei/claude.md`](../../../../../app/elohim-app/src/app/imagodei/claude.md) (the 218-line
+[`imagodei/CLAUDE.md`](../../../../../app/elohim-app/src/app/imagodei/CLAUDE.md) (the 218-line
 template the other guides mirror); (4) code `app/elohim-app/src/app/imagodei/`; (5) scenarios
 `genesis/a2o/features/auth/`, `resilience/`.
 
@@ -161,7 +161,7 @@ itself a known gap); (4) code `app/lamad/src/` + the `@elohim/sophia-*` renderer
 **To work on `qahal`:** read (1) [`governance/epic.md`](../governance/epic.md) +
 [`social_medium/epic.md`](../social_medium/epic.md); (2) seeds **D7** (multi-collective-collaboration-epr)
 — mishpat (D3/D7) co-owns the demotion/dissolution + scenario-hygiene side; (3) pillar guide
-[`qahal/claude.md`](../../../../../app/elohim-app/src/app/qahal/claude.md); (4) code
+[`qahal/CLAUDE.md`](../../../../../app/elohim-app/src/app/qahal/CLAUDE.md); (4) code
 `app/elohim-app/src/app/qahal/` + the mishpat DNA at `elohim/holochain/dna/mishpat/`; (5) scenarios
 `genesis/a2o/features/qahal/`.
 

@@ -1,6 +1,7 @@
 ---
 id: lamad-bundle-gospel
 cites:
+  - lamad-domain-gospel | the subject SOURCE OF TRUTH this bundle consumes — vocabulary, metadata/body schemas, three-leg coupling, renderer map, signal kinds (this dir renders them; never redefines) | sha256:0c7e351784c6df66 | path: elohim/sdk/domains/lamad/CLAUDE.md
   - elohim-elements-ui-substrate-gospel | layer rails — element/token/binding ownership this bundle consumes (never defines) | sha256:84cff1a46650cf8f | path: app/elohim-elements/CLAUDE.md
   - elohim-app-frontend-gospel | the shell twin of these rails — chrome composition + cross-bundle navigation rules | sha256:5e339d814c53974b | status: stale — target content moved on; re-verify | path: app/elohim-app/CLAUDE.md
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
@@ -13,6 +14,26 @@ lamad (learning) domain. Generated types, renderers, and components.
 
 The domain vocabulary (manifest, schemas, coupling declarations) lives in
 `elohim/sdk/domains/lamad/`. This directory consumes those definitions.
+
+## Subject home & citation discipline (this bundle is a CONSUMER)
+
+This bundle does not OWN the lamad subject — it consumes it. The subject's source of truth
+(vocabulary, metadata/body schemas, three-leg coupling, renderer map, signal kinds) lives at
+the cited subject home `lamad-domain-gospel` (`elohim/sdk/domains/lamad/`). That cite is
+content-addressed: when the subject home's body changes, the cite drifts STALE and this gospel
+surfaces for re-verification — this bundle's tie into the subject-routing drift graph (a source
+change finds its dependents, both ways).
+
+**Where code citations to the subject belong** — keep the discipline at the assumption site, not in a docs island:
+- `src/generated/` and `src/app/generated/` are DERIVED from the subject home — never hand-edit;
+  regenerate with `pnpm run lamad:codegen`. Their "do not hand-edit / regenerate" provenance
+  header IS the code-side citation.
+- When you write NEW code that encodes a subject-owned assumption (a content type's coupling, a
+  renderer mapping, a reach gate, a signal kind), leave a `// subject: lamad-domain-gospel`
+  breadcrumb at the assumption site so a change in the subject home can find its code dependents.
+  (Convention is nascent — these breadcrumbs seed the code-side drift graph.)
+- This bundle's design docs decompose per `.claude/subject-routing.yaml` (the lamad locus
+  sub-manifest) into the protocol-canonical homes — NOT into a local `docs/` island.
 
 ## Generated Types
 

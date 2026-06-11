@@ -199,14 +199,24 @@ def _merge_into(base: Routing, raw: dict, source: str) -> None:
 
 
 def find_repo_root(start: Path) -> Path:
+    # The repo/submodule boundary (.git) is AUTHORITATIVE — a sub-tree subject-routing.yaml is a CASCADE
+    # MEMBER, not a root signal. (Before: stopping at the first manifest meant the first sub-manifest would
+    # SHADOW the root constitution instead of composing on top of it — latent until the monorepo's first
+    # sub-manifest landed, 2026-06-11.) Only fall back to the nearest manifest dir when NO .git ancestor
+    # exists (a standalone sub-project checkout). Submodules carry their own .git, so they bound HERE —
+    # staying parent-agnostic by construction; cross-boundary composition is the runtime claimed-parents
+    # walk-up, not a hardcoded parent.
     here = start.resolve()
+    manifest_fallback = None
     for _ in range(12):
-        if (here / ".git").exists() or (here / ".claude" / MANIFEST_NAME).exists():
+        if (here / ".git").exists():
             return here
+        if manifest_fallback is None and (here / ".claude" / MANIFEST_NAME).exists():
+            manifest_fallback = here
         if here.parent == here:
             break
         here = here.parent
-    return start.resolve()
+    return manifest_fallback or start.resolve()
 
 
 def load_routing(start_path, repo_root=None) -> Routing:

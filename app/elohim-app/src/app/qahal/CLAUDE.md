@@ -1,3 +1,9 @@
+---
+id: qahal-pillar-gospel
+cites:
+  - qahal-domain-gospel | the subject SOURCE OF TRUTH this pillar consumes — governance content types, metadata schemas, graduated-standing function, commons-elohim coupling (renders, never redefines) | sha256:c1afc1a5a0746893 | path: elohim/sdk/domains/qahal/CLAUDE.md
+---
+
 # Qahal Pillar - Community
 
 Community relationships, consent, governance, and deliberation.
@@ -6,6 +12,23 @@ Community relationships, consent, governance, and deliberation.
 
 **Specification:** `QAHAL_API_SPECIFICATION_v1.0.md`
 **Architecture:** `elohim/ELOHIM_PROTOCOL_ARCHITECTURE.md`
+
+## Subject home & citation discipline (this pillar is a CONSUMER)
+
+This Angular pillar does not OWN the qahal subject — it consumes it. The vocabulary, metadata schemas, and
+three-leg coupling (the governance content types `collective`/`proposal`/`challenge`/`statement`, the
+graduated-standing function, the commons-elohim co-steward coupling) are the source of truth at the cited
+subject home `qahal-domain-gospel` (`elohim/sdk/domains/qahal/`). The cite is content-addressed: a change at
+the subject home drifts this gospel STALE for re-verification.
+
+**Where code citations to the subject belong:**
+- `generated/` is DERIVED from the subject home — never hand-edit; regenerate with `pnpm run qahal:codegen`.
+- When code wires the graduated-standing function, Bloom-tier capability surfaces, or rubric versioning, leave
+  a `// subject: qahal-domain-gospel` breadcrumb at the assumption site.
+- When a service gates visible content by reach or capability by standing, cite the three-layer
+  graduated-capability surface and friction-gradient rules the subject home owns.
+- When code instantiates the commons-elohim co-steward (reflection / mediation / witness), cite its
+  dual-stewardship model rather than re-deriving it here.
 
 ## Models
 

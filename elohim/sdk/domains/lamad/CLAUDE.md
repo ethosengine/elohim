@@ -1,3 +1,7 @@
+---
+id: lamad-domain-gospel
+---
+
 # Lamad Domain
 
 This directory is the **lamad protocol domain** — the learning pillar's vocabulary, metadata schemas, and coupling contracts. The protocol validates its structure; lamad owns the semantic meaning.
