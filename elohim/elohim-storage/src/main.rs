@@ -597,46 +597,100 @@ async fn async_main(
                 .await;
                 let registry = std::sync::Arc::new(registry);
 
-                // Heartbeat path — consume registry.infrastructure.
-                if let Some(hc) = registry.infrastructure.clone() {
-                    let agent = hc.cell_id().agent_pubkey().clone();
-                    let publisher =
-                        elohim_storage::heartbeat::ZomeCallPublisher::new(hc.clone(), agent);
-                    let probe = elohim_storage::heartbeat::DefaultProbe::new(
-                        blob_store.clone(),
-                        hc.clone(),
-                    );
-                    let mut heartbeat =
-                        elohim_storage::heartbeat::HeartbeatTask::new(policy_cfg, publisher, probe);
-                    // Task C8: pipe DEVICE_ARCHETYPE through to PeerStatus
-                    // so consumers (/shefa/devices, /shefa/dashboard) can
-                    // correlate peer vitals with hardware archetype.
-                    if let Some(archetype) = config.device_archetype.clone() {
-                        heartbeat = heartbeat.with_archetype_class(archetype);
-                    }
-                    let hb_shutdown = shutdown_tx.subscribe();
+                // Heartbeat path + infrastructure-role signal subscribers.
+                //
+                // genesis #1122 pattern (same as the lamad heal-sweep below):
+                // do NOT gate this wiring on a boot-time client. The registry's
+                // bounded boot ramp connects `infrastructure` FIRST — the
+                // coldest window after a pod restart, while the conductor's
+                // cells are still CellDisabled — so on a slow boot it is the
+                // role most likely to be None-stamped (matthew/jessica failed
+                // 5/5 on alpha, 2026-06-11; imagodei, attempted next, landed on
+                // attempt 4 ten seconds later). Boot-gating meant the
+                // PeerStatus heartbeat AND all the signal subscribers wired in
+                // this block (Infrastructure→peer_statuses, REA, ElohimContent,
+                // Mishpat, CommitmentByState drain) stayed dead for the pod's
+                // lifetime: resilience peer counts dark, projections dark.
+                // Acquire the bridge INSIDE the task via connect_role_forever
+                // instead — a late connection is exactly as good as a boot one.
+                {
+                    let infra_boot = registry.infrastructure.clone();
+                    let late_inputs = elohim_storage::hc_client_registry::HcRegistryInputs {
+                        admin_url: admin_url.clone(),
+                        app_url: args.app_url.clone(),
+                        app_id: args.app_id.clone(),
+                    };
+                    let shutdown_tx = shutdown_tx.clone();
+                    let blob_store = blob_store.clone();
+                    let db_pool = db_pool.clone();
+                    let peer_policy_path = peer_policy_path.clone();
+                    let device_archetype = config.device_archetype.clone();
+                    let infra_app_id = args.app_id.clone();
                     tokio::spawn(async move {
-                        heartbeat.run(hb_shutdown).await;
-                    });
-                    info!(
-                        policy_path = %peer_policy_path.display(),
-                        "PeerStatus heartbeat task started (infrastructure role)"
-                    );
-
-                    // Peer-Stewarded Availability — subscribe to the conductor's
-                    // signal stream and project `InfrastructureSignal::PeerStatusRecorded`
-                    // into the SQLite `peer_statuses` table via `signals::handle_signal`.
-                    //
-                    // Shares the process-wide Diesel pool (created once at startup)
-                    // so subscriber activity is visible via /db/stats and we don't
-                    // multiply SQLite file handles. Non-fatal: if the pool is
-                    // unavailable we log and the node keeps serving HTTP
-                    // (consistent with the heartbeat startup precedent).
-                    if let Some(subscriber_pool) = db_pool.clone() {
-                        let hc_sub = hc.clone();
+                        let hc = match infra_boot {
+                            Some(hc) => hc,
+                            None => {
+                                info!(
+                                    "infrastructure bridge not up at boot — awaiting late connect \
+                                 (heartbeat + signal subscribers start once it lands)"
+                                );
+                                match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
+                                &late_inputs,
+                                "infrastructure",
+                                shutdown_tx.subscribe(),
+                            )
+                            .await
+                            {
+                                Some(hc) => {
+                                    info!(
+                                        "infrastructure bridge connected (late) — wiring \
+                                         heartbeat + signal subscribers"
+                                    );
+                                    hc
+                                }
+                                None => return, // only None on shutdown
+                            }
+                            }
+                        };
+                        let agent = hc.cell_id().agent_pubkey().clone();
+                        let publisher =
+                            elohim_storage::heartbeat::ZomeCallPublisher::new(hc.clone(), agent);
+                        let probe = elohim_storage::heartbeat::DefaultProbe::new(
+                            blob_store.clone(),
+                            hc.clone(),
+                        );
+                        let mut heartbeat = elohim_storage::heartbeat::HeartbeatTask::new(
+                            policy_cfg, publisher, probe,
+                        );
+                        // Task C8: pipe DEVICE_ARCHETYPE through to PeerStatus
+                        // so consumers (/shefa/devices, /shefa/dashboard) can
+                        // correlate peer vitals with hardware archetype.
+                        if let Some(archetype) = device_archetype.clone() {
+                            heartbeat = heartbeat.with_archetype_class(archetype);
+                        }
+                        let hb_shutdown = shutdown_tx.subscribe();
                         tokio::spawn(async move {
-                            let pool = subscriber_pool;
-                            let handle_id = hc_sub
+                            heartbeat.run(hb_shutdown).await;
+                        });
+                        info!(
+                            policy_path = %peer_policy_path.display(),
+                            "PeerStatus heartbeat task started (infrastructure role)"
+                        );
+
+                        // Peer-Stewarded Availability — subscribe to the conductor's
+                        // signal stream and project `InfrastructureSignal::PeerStatusRecorded`
+                        // into the SQLite `peer_statuses` table via `signals::handle_signal`.
+                        //
+                        // Shares the process-wide Diesel pool (created once at startup)
+                        // so subscriber activity is visible via /db/stats and we don't
+                        // multiply SQLite file handles. Non-fatal: if the pool is
+                        // unavailable we log and the node keeps serving HTTP
+                        // (consistent with the heartbeat startup precedent).
+                        if let Some(subscriber_pool) = db_pool.clone() {
+                            let hc_sub = hc.clone();
+                            tokio::spawn(async move {
+                                let pool = subscriber_pool;
+                                let handle_id = hc_sub
                                 .subscribe_infrastructure_signals(
                                     move |signal: elohim_storage::signals::InfrastructureSignal| {
                                         match pool.get() {
@@ -660,52 +714,52 @@ async fn async_main(
                                     },
                                 )
                                 .await;
-                            info!(
-                                subscription_id = %handle_id,
-                                "InfrastructureSignal subscriber registered (projects PeerStatusRecorded → SQLite)"
-                            );
-                        });
-                    } else {
-                        warn!(
+                                info!(
+                                    subscription_id = %handle_id,
+                                    "InfrastructureSignal subscriber registered (projects PeerStatusRecorded → SQLite)"
+                                );
+                            });
+                        } else {
+                            warn!(
                             "InfrastructureSignal subscriber disabled: shared DB pool unavailable"
                         );
-                    }
+                        }
 
-                    // 2026-05-26-substrate-rea-replication-fix Task 6.5 — subscribe to
-                    // ReaProjectionSignals (REA commitments, agreements, economic events)
-                    // and project them into the local SQL via rea_projection::handle_rea_signal.
-                    //
-                    // Without this subscriber, the conductor-first HTTP write path in
-                    // ReaCommitmentService::create_via_conductor would create the DHT entry
-                    // but the bounded SQL-projection poll would time out at 1s — visible to
-                    // the operator as "REA commitment X written via conductor but projection
-                    // did not land". Same shape that affected /lamad on alpha pre-fix.
-                    // Slice-2b T11 — CommitmentByState link author drain.
-                    //
-                    // The graduation projection (`handle_rea_signal`, sync) flips the
-                    // SQL `state` cache proposed→active on a provide event; the DHT
-                    // TRUTH is a `CommitmentByState` link, authored async via the
-                    // mishpat coordinator. `handle_rea_signal` has no HcClient, so it
-                    // pushes the transition onto an mpsc sink; THIS task (which holds
-                    // `hc`) drains it and authors the link. Wired here, beside the REA
-                    // subscriber, because this is the composition where the HcClient is
-                    // available. Without it the SQL cache flip stands alone (honest,
-                    // but the lifecycle is not yet DHT-observable).
-                    {
-                        let hc_link = hc.clone();
-                        let (link_tx, mut link_rx) = tokio::sync::mpsc::unbounded_channel::<
-                            elohim_storage::rea_projection::PendingStateLink,
-                        >();
-                        elohim_storage::rea_projection::install_state_link_sink(link_tx);
-                        tokio::spawn(async move {
-                            while let Some(pending) = link_rx.recv().await {
-                                let input = elohim_storage::services::conductor_writes::CreateCommitmentStateLinkInput {
+                        // 2026-05-26-substrate-rea-replication-fix Task 6.5 — subscribe to
+                        // ReaProjectionSignals (REA commitments, agreements, economic events)
+                        // and project them into the local SQL via rea_projection::handle_rea_signal.
+                        //
+                        // Without this subscriber, the conductor-first HTTP write path in
+                        // ReaCommitmentService::create_via_conductor would create the DHT entry
+                        // but the bounded SQL-projection poll would time out at 1s — visible to
+                        // the operator as "REA commitment X written via conductor but projection
+                        // did not land". Same shape that affected /lamad on alpha pre-fix.
+                        // Slice-2b T11 — CommitmentByState link author drain.
+                        //
+                        // The graduation projection (`handle_rea_signal`, sync) flips the
+                        // SQL `state` cache proposed→active on a provide event; the DHT
+                        // TRUTH is a `CommitmentByState` link, authored async via the
+                        // mishpat coordinator. `handle_rea_signal` has no HcClient, so it
+                        // pushes the transition onto an mpsc sink; THIS task (which holds
+                        // `hc`) drains it and authors the link. Wired here, beside the REA
+                        // subscriber, because this is the composition where the HcClient is
+                        // available. Without it the SQL cache flip stands alone (honest,
+                        // but the lifecycle is not yet DHT-observable).
+                        {
+                            let hc_link = hc.clone();
+                            let (link_tx, mut link_rx) = tokio::sync::mpsc::unbounded_channel::<
+                                elohim_storage::rea_projection::PendingStateLink,
+                            >();
+                            elohim_storage::rea_projection::install_state_link_sink(link_tx);
+                            tokio::spawn(async move {
+                                while let Some(pending) = link_rx.recv().await {
+                                    let input = elohim_storage::services::conductor_writes::CreateCommitmentStateLinkInput {
                                     commitment_cid: pending.commitment_cid.clone(),
                                     state: pending.state.clone(),
                                     event_hash: pending.event_hash.clone(),
                                     signed_at: pending.signed_at.clone(),
                                 };
-                                if let Err(e) = elohim_storage::services::conductor_writes::call_create_commitment_state_link(
+                                    if let Err(e) = elohim_storage::services::conductor_writes::call_create_commitment_state_link(
                                     &hc_link, input,
                                 )
                                 .await
@@ -718,22 +772,22 @@ async fn async_main(
                                         "CommitmentByState link author failed (SQL state cache flip stands)"
                                     );
                                 }
-                            }
-                        });
-                        info!(
-                            "CommitmentByState link-author drain registered (graduation \
+                                }
+                            });
+                            info!(
+                                "CommitmentByState link-author drain registered (graduation \
                              proposed→active authors a notarized lifecycle link; SQL state \
                              is a write-through cache)"
-                        );
-                    }
+                            );
+                        }
 
-                    if let Some(subscriber_pool) = db_pool.clone() {
-                        let hc_sub = hc.clone();
-                        let ctx_sub = elohim_storage::db::AppContext::default_lamad();
-                        tokio::spawn(async move {
-                            let pool = subscriber_pool;
-                            let ctx = ctx_sub;
-                            let handle_id = hc_sub
+                        if let Some(subscriber_pool) = db_pool.clone() {
+                            let hc_sub = hc.clone();
+                            let ctx_sub = elohim_storage::db::AppContext::default_lamad();
+                            tokio::spawn(async move {
+                                let pool = subscriber_pool;
+                                let ctx = ctx_sub;
+                                let handle_id = hc_sub
                                 .subscribe_rea_projection_signals(
                                     move |signal: elohim_storage::rea_projection::ReaProjectionSignal| {
                                         if let Err(e) =
@@ -749,29 +803,29 @@ async fn async_main(
                                     },
                                 )
                                 .await;
-                            info!(
-                                subscription_id = %handle_id,
-                                "ReaProjectionSignal subscriber registered (projects \
-                                 ReaCommitmentCommitted + AgreementCommitted + \
-                                 ReaEconomicEventCommitted → SQLite with dht_anchor_hash)"
-                            );
-                        });
-                    } else {
-                        warn!(
+                                info!(
+                                    subscription_id = %handle_id,
+                                    "ReaProjectionSignal subscriber registered (projects \
+                                     ReaCommitmentCommitted + AgreementCommitted + \
+                                     ReaEconomicEventCommitted → SQLite with dht_anchor_hash)"
+                                );
+                            });
+                        } else {
+                            warn!(
                             "ReaProjectionSignal subscriber disabled: shared DB pool unavailable \
                              — conductor-first HTTP write path will time out at 1s polling for \
                              SQL projection"
                         );
-                    }
+                        }
 
-                    // Recovery M4 — subscribe to ElohimContentSignals (attestation:* and
-                    // governance-action:* Content entries) and fan them through the central
-                    // elohim_content_dispatcher to both AttestationProjector + RecoveryFlowProjector.
-                    if let Some(subscriber_pool) = db_pool.clone() {
-                        let hc_sub = hc.clone();
-                        tokio::spawn(async move {
-                            let pool = subscriber_pool;
-                            let handle_id = hc_sub
+                        // Recovery M4 — subscribe to ElohimContentSignals (attestation:* and
+                        // governance-action:* Content entries) and fan them through the central
+                        // elohim_content_dispatcher to both AttestationProjector + RecoveryFlowProjector.
+                        if let Some(subscriber_pool) = db_pool.clone() {
+                            let hc_sub = hc.clone();
+                            tokio::spawn(async move {
+                                let pool = subscriber_pool;
+                                let handle_id = hc_sub
                                 .subscribe_elohim_content_signals(
                                     move |signal: elohim_storage::signals::ElohimContentSignal| {
                                         match pool.get() {
@@ -796,44 +850,44 @@ async fn async_main(
                                     },
                                 )
                                 .await;
-                            info!(
-                                subscription_id = %handle_id,
-                                "ElohimContentSignal subscriber registered (dispatches to AttestationProjector + RecoveryFlowProjector)"
-                            );
-                        });
-                    } else {
-                        warn!(
+                                info!(
+                                    subscription_id = %handle_id,
+                                    "ElohimContentSignal subscriber registered (dispatches to AttestationProjector + RecoveryFlowProjector)"
+                                );
+                            });
+                        } else {
+                            warn!(
                             "ElohimContentSignal subscriber disabled: shared DB pool unavailable"
                         );
-                    }
+                        }
 
-                    // Slice-2b code-review fix — subscribe to MishpatSignals
-                    // (CommitmentCommitted + gate-decision/challenge variants) and
-                    // project them via signals::handle_mishpat_signal, which parses
-                    // the commitment payload and upserts into `mishpat_commitments`
-                    // with dht_anchor_hash = action_hash (or sets revoked_at for a
-                    // revokes-commitment).
-                    //
-                    // `on_signal` is app-wide: the mishpat zome lives in the mishpat
-                    // role cell (a different DNA), but its post-commit signal still
-                    // arrives on THIS client's app websocket because the conductor
-                    // delivers every Signal::App from any cell in the installed app.
-                    //
-                    // Without this, live authoring (the provide-loop tick + HTTP
-                    // commitment writes) creates the DHT entry but the projection
-                    // never lands. Consequence: the reconciler's
-                    // `live_commons_provides_for_provider` dedup stays empty →
-                    // re-authors every 60s → unbounded commitment proliferation;
-                    // and rea graduation never fires. (Pre-existing 2a gap: the
-                    // projection was only ever exercised by direct-row test
-                    // fixtures, never a live signal subscriber. Wired here.)
-                    if let Some(subscriber_pool) = db_pool.clone() {
-                        let hc_sub = hc.clone();
-                        let mishpat_app_id = args.app_id.clone();
-                        tokio::spawn(async move {
-                            let pool = subscriber_pool;
-                            let app_id = mishpat_app_id;
-                            let handle_id = hc_sub
+                        // Slice-2b code-review fix — subscribe to MishpatSignals
+                        // (CommitmentCommitted + gate-decision/challenge variants) and
+                        // project them via signals::handle_mishpat_signal, which parses
+                        // the commitment payload and upserts into `mishpat_commitments`
+                        // with dht_anchor_hash = action_hash (or sets revoked_at for a
+                        // revokes-commitment).
+                        //
+                        // `on_signal` is app-wide: the mishpat zome lives in the mishpat
+                        // role cell (a different DNA), but its post-commit signal still
+                        // arrives on THIS client's app websocket because the conductor
+                        // delivers every Signal::App from any cell in the installed app.
+                        //
+                        // Without this, live authoring (the provide-loop tick + HTTP
+                        // commitment writes) creates the DHT entry but the projection
+                        // never lands. Consequence: the reconciler's
+                        // `live_commons_provides_for_provider` dedup stays empty →
+                        // re-authors every 60s → unbounded commitment proliferation;
+                        // and rea graduation never fires. (Pre-existing 2a gap: the
+                        // projection was only ever exercised by direct-row test
+                        // fixtures, never a live signal subscriber. Wired here.)
+                        if let Some(subscriber_pool) = db_pool.clone() {
+                            let hc_sub = hc.clone();
+                            let mishpat_app_id = infra_app_id.clone();
+                            tokio::spawn(async move {
+                                let pool = subscriber_pool;
+                                let app_id = mishpat_app_id;
+                                let handle_id = hc_sub
                                 .subscribe_mishpat_signals(
                                     move |signal: elohim_storage::signals::MishpatSignal| {
                                         match pool.get() {
@@ -857,22 +911,19 @@ async fn async_main(
                                     },
                                 )
                                 .await;
-                            info!(
-                                subscription_id = %handle_id,
-                                "MishpatSignal subscriber registered (projects CommitmentCommitted → mishpat_commitments with dht_anchor_hash)"
-                            );
-                        });
-                    } else {
-                        warn!(
-                            "MishpatSignal subscriber disabled: shared DB pool unavailable \
+                                info!(
+                                    subscription_id = %handle_id,
+                                    "MishpatSignal subscriber registered (projects CommitmentCommitted → mishpat_commitments with dht_anchor_hash)"
+                                );
+                            });
+                        } else {
+                            warn!(
+                                "MishpatSignal subscriber disabled: shared DB pool unavailable \
                              — live-authored commitments will create DHT entries but never \
                              project to mishpat_commitments (provide-loop dedup stays empty)"
-                        );
-                    }
-                } else {
-                    warn!(
-                        "PeerStatus heartbeat disabled: infrastructure HcClient unavailable in registry"
-                    );
+                            );
+                        }
+                    });
                 }
 
                 // ── Slice-2b provide-loop AUTHORING tick ─────────────────────
