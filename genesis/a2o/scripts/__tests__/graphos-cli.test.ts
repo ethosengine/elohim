@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { parseGraphosArgs } from '../graphos.js';
+import { containedSlug, parseGraphosArgs } from '../graphos.js';
 
 void describe('parseGraphosArgs', () => {
   void it('parses list with optional filter', () => {
@@ -50,5 +50,21 @@ void describe('parseGraphosArgs', () => {
   void it('rejects unknown verbs and flags', () => {
     assert.throws(() => parseGraphosArgs(['render', 'x']));
     assert.throws(() => parseGraphosArgs(['list', '--bogus']));
+  });
+  void it('throws when --out has no value', () => {
+    assert.throws(() => parseGraphosArgs(['story', 'x', '--out']));
+  });
+  void it('throws when --cols has no value', () => {
+    assert.throws(() => parseGraphosArgs(['sheet', 'x', '--cols']));
+  });
+});
+
+void describe('containedSlug', () => {
+  void it('accepts plain slugs', () => {
+    assert.equal(containedSlug('sheet-elohim-compute-tile'), 'sheet-elohim-compute-tile');
+  });
+  void it('rejects traversal and absolute slugs', () => {
+    assert.throws(() => containedSlug('../../etc'));
+    assert.throws(() => containedSlug('/tmp/exfil'));
   });
 });

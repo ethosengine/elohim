@@ -14,7 +14,7 @@
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
@@ -30,6 +30,16 @@ import { runLook } from './look.js';
 
 const DEFAULT_BASE = 'https://storybook.elohim.host';
 const REPORTS_DIR = 'reports/look';
+
+/** Reject slugs that would escape reports/look (absolute paths, `..` segments). */
+export function containedSlug(slug: string): string {
+  const target = resolve(REPORTS_DIR, slug);
+  const root = resolve(REPORTS_DIR);
+  if (target !== root && !target.startsWith(root + sep)) {
+    throw new Error(`out slug must stay under ${REPORTS_DIR}: ${slug}`);
+  }
+  return slug;
+}
 
 const USAGE = `Usage:
   graphos list  [filter]                                 [--base <url>]
@@ -78,6 +88,7 @@ export function parseGraphosArgs(argv: string[]): GraphosCommand {
         i++;
         break;
       case '--out':
+        if (!val) throw new Error(`--out expects a slug`);
         cmd.out = val;
         i++;
         break;
@@ -156,7 +167,7 @@ async function cmdStory(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
   }
   const mode = cmd.docs || entry.type === 'docs' ? 'docs' : 'story';
   const url = `${cmd.base}/iframe.html?id=${encodeURIComponent(id)}&viewMode=${mode}`;
-  const result = await runLook({ url, out: cmd.out ?? id, viewport: cmd.viewport });
+  const result = await runLook({ url, out: containedSlug(cmd.out ?? id), viewport: cmd.viewport });
   console.log(result.shotPath);
   console.log(result.capturePath);
   return result.ok;
@@ -173,7 +184,7 @@ async function cmdSheet(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
         (near.length ? `\nNear matches:\n  ${near.join('\n  ')}` : '')
     );
   }
-  const slug = cmd.out ?? `sheet-${component}`;
+  const slug = containedSlug(cmd.out ?? `sheet-${component}`);
   const outDir = resolve(REPORTS_DIR, slug);
   await mkdir(outDir, { recursive: true });
   const sheetPath = join(outDir, 'sheet.html');
@@ -181,7 +192,7 @@ async function cmdSheet(index: StorybookIndex, cmd: GraphosCommand): Promise<boo
     sheetPath,
     sheetHtml({ component, base: cmd.base, entries, cell: cmd.cell, cols: cmd.cols })
   );
-  // Width: cols * cell + grid gaps + body padding; full-page shot covers height.
+  // cols * cellW + (cols-1) * 8px grid gap + 2*8px body padding + 2px border per cell column; full-page shot covers height.
   const width = cmd.cols * cmd.cell.width + (cmd.cols - 1) * 8 + 16 + 2 * cmd.cols;
   const result = await runLook({
     url: pathToFileURL(sheetPath).href,
