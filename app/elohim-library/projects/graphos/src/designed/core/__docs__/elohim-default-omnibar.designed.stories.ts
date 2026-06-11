@@ -59,16 +59,34 @@ const EL_TOKENS = `
   --el-shadow-medium: 0 4px 16px rgba(107, 97, 87, 0.12);
 `;
 
-/** Light mode — Linen omnibar, Vineyard-tinted border */
+/** Light mode — Linen omnibar, Hearthstone ink, Vineyard-tinted border */
 const OMNIBAR_TOKENS_LIGHT = `
   --elohim-omnibar-bg:     var(--el-cream);
+  --elohim-omnibar-fg:     var(--el-stone);
   --elohim-omnibar-border: color-mix(in oklch, var(--el-stone) 20%, transparent);
 `;
 
-/** Dark mode — Indigo Night omnibar, faint Starlight border */
+/** Dark mode — Indigo Night omnibar, Starlight ink, faint Starlight border */
 const OMNIBAR_TOKENS_DARK = `
   --elohim-omnibar-bg:     var(--el-night-alt);
+  --elohim-omnibar-fg:     var(--el-starlight);
   --elohim-omnibar-border: color-mix(in oklch, var(--el-starlight) 15%, transparent);
+`;
+
+/**
+ * Brand mark in the display voice — Fraunces at Harvest Gold via ::part
+ * (custom-property inheritance can't reach parts). Makes the "word elohim in
+ * Fraunces / Harvest Gold" the story docs promise actually render, and is
+ * the golden-hour element of both themes.
+ */
+const BRAND_MARK_CSS = html`
+  <style>
+    elohim-default-omnibar::part(brand) {
+      font-family: var(--el-font-display);
+      font-weight: 600;
+      color: var(--el-amber);
+    }
+  </style>
 `;
 
 // ---------------------------------------------------------------------------
@@ -100,9 +118,10 @@ function lightDecorator(story: () => unknown) {
         ${OMNIBAR_TOKENS_LIGHT}
         font-family: var(--el-font-ui);
         background: var(--el-cream);
+        color: var(--el-stone);
       "
     >
-      ${story()}
+      ${BRAND_MARK_CSS}${story()}
     </div>
   `;
 }
@@ -115,9 +134,11 @@ function darkDecorator(story: () => unknown) {
         ${OMNIBAR_TOKENS_DARK}
         font-family: var(--el-font-ui);
         background: var(--el-night);
+        color: var(--el-starlight);
+        color-scheme: dark;
       "
     >
-      ${story()}
+      ${BRAND_MARK_CSS}${story()}
     </div>
   `;
 }
