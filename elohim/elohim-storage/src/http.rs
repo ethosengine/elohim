@@ -4204,18 +4204,21 @@ impl HttpServer {
                 let view: UpdateContentInputView = serde_json::from_slice(&body_bytes)
                     .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
 
-                // Substrate-correct PATCH path: when the patch touches
-                // blob_hash AND the lamad conductor bridge is wired, route
-                // through ContentService::update_via_conductor so the entry
-                // updates flow into the DHT and propagate to all peers via
-                // gossip. Closes Gap C from the 2026-05-26 sprint-result
-                // (stageSpaBlobs PATCHes were diesel-direct, never reaching
-                // the DHT). For non-blob_hash patches (title/description/
-                // metadata-only) we keep the legacy diesel update for now —
+                // Substrate-correct PATCH path: when the patch touches a
+                // DNA-notarized field (blob_hash or reach) AND the lamad
+                // conductor bridge is wired, route through
+                // ContentService::update_via_conductor so the re-authored entry
+                // flows into the DHT and propagates to all peers via gossip.
+                // Closes Gap C from the 2026-05-26 sprint-result (stageSpaBlobs
+                // PATCHes were diesel-direct, never reaching the DHT) and gap G1
+                // from the reach-floor plan (a reach-only PATCH fell to diesel
+                // and was reverted by the reconciliation controller, so a reach
+                // correction never stuck). For metadata-only patches
+                // (title/description/tags) we keep the legacy diesel update —
                 // those don't break cross-peer divergence.
                 //
                 // See 2026-05-26-substrate-rea-replication-fix.md Task 8d.
-                let needs_conductor = view.blob_hash.is_some();
+                let needs_conductor = patch_needs_conductor(&view);
                 let lamad_hc = self.hc_registry.as_ref().and_then(|r| r.lamad.clone());
 
                 let update_result = match (needs_conductor, lamad_hc) {
@@ -4225,7 +4228,16 @@ impl HttpServer {
                             .update_via_conductor(&hc, content_id, view)
                             .await
                     }
-                    _ => services.content.update(content_id, view),
+                    (true, None) => {
+                        // A notarized change (blob_hash/reach) needs the
+                        // conductor to re-author the entry. A diesel-only write
+                        // here would be silently reverted by the reconciliation
+                        // controller (DHT wins), so fail loud instead.
+                        return Ok(response::service_unavailable(
+                            "Conductor bridge unavailable; cannot re-notarize content change",
+                        ));
+                    }
+                    (false, _) => services.content.update(content_id, view),
                 };
 
                 // Pattern Z.B.1 bridge: refresh the in-memory slug_index so the
@@ -9236,6 +9248,16 @@ impl HttpServer {
     }
 }
 
+/// A PATCH must re-notarize through the conductor when it changes a
+/// DNA-notarized field. `reach` is class-A notarized — a reach change cannot be
+/// a diesel-only write or the reconciliation controller (DHT wins) reverts it,
+/// so a reach correction never sticks. `blob_hash` is likewise carried through
+/// the re-authored Content entry. Metadata-only patches (title/description/
+/// tags) stay on the legacy diesel path.
+fn patch_needs_conductor(view: &UpdateContentInputView) -> bool {
+    view.blob_hash.is_some() || view.reach.is_some()
+}
+
 /// Map a DB `AcquisitionPin` model to its wire view.
 ///
 /// `closure_rule_json` is parsed from a JSON string to `serde_json::Value`
@@ -11439,6 +11461,46 @@ mod tests {
         let hash = BlobStore::compute_hash(b"test data");
         assert!(hash.starts_with("sha256-"));
         assert_eq!(hash.len(), 7 + 64); // "sha256-" + 64 hex chars
+    }
+
+    /// Construct an UpdateContentInputView with every field defaulted to None,
+    /// overriding only `reach` and `blob_hash`. UpdateContentInputView does not
+    /// derive Default (shared ts-rs-anchored view; adding a derive would touch
+    /// every consumer), so build it explicitly.
+    fn patch_view(reach: Option<&str>, blob_hash: Option<&str>) -> UpdateContentInputView {
+        UpdateContentInputView {
+            title: None,
+            description: None,
+            content_body: None,
+            content_format: None,
+            metadata: None,
+            tags: None,
+            reach: reach.map(str::to_string),
+            blob_hash: blob_hash.map(str::to_string),
+            p2p_published_at: None,
+        }
+    }
+
+    #[test]
+    fn reach_only_patch_requires_conductor_route() {
+        // A PATCH that changes reach (no blob) must route to the conductor, not
+        // diesel — reach is class-A DNA-notarized; a diesel-only write is
+        // reverted by the reconciliation controller (DHT wins).
+        let view = patch_view(Some("commons"), None);
+        assert!(
+            patch_needs_conductor(&view),
+            "reach-only PATCH must re-notarize via conductor"
+        );
+    }
+
+    #[test]
+    fn metadata_only_patch_stays_diesel() {
+        // A PATCH with neither blob nor reach does NOT need the conductor.
+        let view = patch_view(None, None);
+        assert!(
+            !patch_needs_conductor(&view),
+            "non-notarized PATCH can use diesel"
+        );
     }
 
     #[test]
