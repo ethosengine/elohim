@@ -54,9 +54,12 @@ pnpm graphos sheet <component> [--family designed|default] [--cell WxH] [--cols 
 
 Ids follow `<family>-<group>-<component>--<cell>` (e.g.
 `designed-core-elohim-compute-tile--standard`). Component matching is
-segment-aligned, not substring: the prefix (before `--`) must equal the
-requested name or end with `-<name>` (so `tile` does NOT match
-`elohim-compute-tile`). When both `default-*` and `designed-*` families match, the
+segment-aligned, not substring — with a single-segment guard (ratified during
+implementation, the test is canonical): a multi-segment name matches when the
+prefix (before `--`) equals it or ends with `-<name>`; a single-segment name
+(no dash — custom-element names always contain one) requires exact prefix
+equality, so `tile` does NOT match `elohim-compute-tile`. When both
+`default-*` and `designed-*` families match, the
 sheet renders BOTH grouped into labeled sections — Library A vs Library B
 side by side is itself a review cue. `--family` narrows. Docs-type entries
 are excluded from sheets (full pages; use `story --docs`).
@@ -73,7 +76,18 @@ iframes is permitted in Chromium (mixed-content rules block the reverse).
 
 - Geometry: fixed cells, default `420x320`, `--cell WxH` overrides; `--cols N`
   (default 3). Page width = cols × cell width; full-page shot captures all rows.
-- Wait: `runLook`'s `waitUntil: 'networkidle'` spans child frames.
+- Viewport covers the FULL sheet height (smoke-discovered: Chromium defers
+  rendering of offscreen iframes — with a short viewport, networkidle fires
+  early and below-the-fold cells capture blank with zero errors). Height is
+  computed from the grid geometry, capped at 15,000px with a warning when a
+  sheet exceeds it (narrow with `--family` or raise `--cols`).
+- Wait: `runLook`'s `waitUntil: 'networkidle'` spans child frames; `runLook`
+  gained an additive `timeoutMs` option (`--timeout` on look's CLI) and sheets
+  pass a size-scaled budget (60s + 3s/iframe, cap 300s). When the budget
+  expires with ZERO captured errors on a full-height viewport, the sheet exits
+  0 — a persistent storybook connection can keep networkidle from ever firing
+  on an otherwise-complete page (precondition documented in code: this is only
+  safe BECAUSE the viewport covers every iframe).
 - Capture: `page.on('response')` sees subframe responses, so a story that
   404s/throws inside its iframe lands in `capture.json` (`httpErrors`,
   console) instead of silently rendering blank.
@@ -109,8 +123,12 @@ smoke: `pnpm graphos sheet elohim-compute-tile` rendered and Read.
 
 - `genesis/a2o/package.json` — one script line: `"graphos": "tsx scripts/graphos.ts"`.
 - `genesis/a2o/CLAUDE.md` — Tools bullet beside the `look` entry.
-- Memory `frontend-review-eyes-first` — name `pnpm graphos` for the
-  Storybook/design-guide surfaces (post-implementation).
+- Root `CLAUDE.md` — "Frontend Eyes (available rails)" subsection: pointers so
+  any agent discovers what is AVAILABLE (look, graphos, storybook,
+  reports:serve) when planning frontend design changes — capability
+  discovery, not prescription.
+- Memory `frontend-review-eyes-first` — names `pnpm graphos` for the
+  Storybook/design-guide surfaces.
 
 ## P2P design gate
 

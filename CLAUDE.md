@@ -133,6 +133,15 @@ Before implementing a feature, find or write the a2o scenario that describes the
 
 When story-first isn't practical (prototyping, spikes), capture implementation intent before committing by appending to `.claude/data/dev-intent.jsonl` — a 3-4 sentence summary of what was built, the learner impact, and which a2o feature file needs updating. Then run `/close-loop` to generate scenario updates from your intent.
 
+### Frontend Eyes (available rails)
+
+Frontend review/refinement is eyes-first: render before reading source. Rails available to any agent (run from `genesis/a2o`):
+
+- **`pnpm look <url> [--as <FixtureHuman>]`** (`genesis/a2o/scripts/look.ts`) — render any URL headless; writes `reports/look/<slug>/{shot.png,capture.json}` (console/pageerror/failed-request/httpError capture). Deployed app: `https://doorway-alpha.elohim.host`.
+- **`pnpm graphos {list|story|sheet}`** (`genesis/a2o/scripts/graphos.ts`) — enumerate/render the graphos component library + design guide from the deployed Storybook (`https://storybook.elohim.host`, latest dev) or a local `pnpm storybook` (`--base http://localhost:6006`). `sheet <component>` = the full cell/theme matrix (Library A `default` vs Library B `designed` sections) in ONE composite image. Design: `genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md`.
+- **`pnpm reports:serve`** (port 4201) — the operator sees the same artifacts the agent reads (symmetric vision).
+- Can't-find ≠ never-implemented: if a described view doesn't render, suspect present reachability (capture.json `httpErrors`, routes, env) before concluding absence.
+
 ### Story Harvest (on branch finish and after debugging)
 
 When using `finishing-a-development-branch`, invoke `story-harvest` between Step 1 (tests pass) and Step 3 (present options). When using `systematic-debugging` and a root cause is identified and fixed, invoke `story-harvest` before closing the debugging session. The skill identifies engineering constraints discovered during development — especially parameter-bearing discoveries (memory limits, concurrency thresholds, cache sizes) that inform operator presets and peer diversity configuration — and scaffolds a2o regression scenarios to preserve them.
