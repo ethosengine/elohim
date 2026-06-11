@@ -2,7 +2,7 @@
 
 _Author: Claude Opus · Date: 2026-06-08 · Status: design (brainstorm-approved shape, adversarially reviewed) · Branch context: composes on the Slice 2a REA compute-bounds rail landed on `dev` (`9e7ba313e`, CI-verified DNA-green via `elohim-holochain/dev #1314`)._
 
-> Companion to `genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md` (the parent acquisition spec — §1.2, §6.1–§6.5, §13, §14) and `HANDOFF.md` (Slice 1 + 2a complete). This spec turns the handoff's "Slice 2b is the clean follow-on" into an implementation-ready design, hardened by an adversarial review against the real code.
+> Companion to `genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md` (the parent acquisition spec — §1.2, §6.1–§6.5, §13, §14) and the root `HANDOFF.md` session handoff (Slice 1 + 2a complete; retired 2026-06-11 — its content is absorbed here). This spec turns the handoff's "Slice 2b is the clean follow-on" into an implementation-ready design, hardened by an adversarial review against the real code.
 
 ---
 
@@ -224,7 +224,7 @@ This is DHT-native (the revocation is notarized, not projection-only) and sets t
 ## 15. References & spawned backlog
 
 - Parent: `genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md` (§1.2, §6.1–§6.5, §13, §14).
-- `HANDOFF.md` (Slice 1 + 2a complete).
+- Root `HANDOFF.md` session handoff (Slice 1 + 2a complete) — retired 2026-06-11, content absorbed into this spec.
 - Substrate floor: `compute-commitment-substrate-floor-design`, `rea-compute-substrate-native-roadmap`.
 - Gospel memory: `project_rea_compute_commitment_primitive`, `project_principle_p1_reconciliation_controller`, `project_inventory_exchange_not_byte_replication`.
 - **Spawned backlog items:**

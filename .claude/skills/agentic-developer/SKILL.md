@@ -25,7 +25,7 @@ closes with done or a clean bail.
    corpus can answer is not bail-worthy — an unattended shift that bails on
    an answerable question wastes the whole night. Before any bail, exhaust
    what's here, in order: (a) the governing spec/plan sections for the
-   Objective; (b) the trajectory — shift journals, HANDOFF.md, sprint
+   Objective; (b) the trajectory — shift journals, sprint
    results, recent git log on the touched paths (what was the prior session
    *doing* and *deciding*?); (c) prior-art recall
    (`spec-coherence-index.py --query`, MemPalace when scoped); (d) the
