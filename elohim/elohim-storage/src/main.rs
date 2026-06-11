@@ -2114,7 +2114,16 @@ async fn async_main(
         if let Some(admin_url) = saved_admin_url.clone() {
             let app_url_clone = args.app_url.clone();
             let admin_url_clone = admin_url;
-            let imagodei_app_id_clone = args.imagodei_app_id.clone();
+            // genesis #1123 root-cause: this used to be passed as the INSTALLED
+            // APP ID. No manifest sets IMAGODEI_APP_ID, so the default literal
+            // "imagodei" was asked of a conductor whose installed app is the
+            // elohim happ (with imagodei as a ROLE inside it) — the controller
+            // failed "app 'imagodei' not found" on every boot since inception
+            // and the forever-retry would have retried the wrong id forever.
+            // The registry's working connect uses (app_id=args.app_id,
+            // role="imagodei"); mirror it: imagodei_app_id is the ROLE name.
+            let installed_app_id_clone = args.app_id.clone();
+            let imagodei_role_clone = args.imagodei_app_id.clone();
             let reconcile_pool = db_pool.clone().map(Arc::new);
 
             // Pubkey cache is shared between the controller and the EPR verify
@@ -2161,8 +2170,8 @@ async fn async_main(
                         match HolochainAppSignalStream::connect(
                             &admin_url_clone,
                             &app_url_clone,
-                            &imagodei_app_id_clone,
-                            &imagodei_app_id_clone, // role = app_id by convention for single-DNA apps
+                            &installed_app_id_clone,
+                            &imagodei_role_clone, // role within the installed happ
                             reconcile_pool.clone(),
                         )
                         .await
@@ -2170,12 +2179,12 @@ async fn async_main(
                             Ok(stream) => {
                                 if attempt == 1 {
                                     info!(
-                                        app_id = %imagodei_app_id_clone,
+                                        app_id = %installed_app_id_clone,
                                         "Reconcile controller connected to imagodei conductor — starting loop"
                                     );
                                 } else {
                                     info!(
-                                        app_id = %imagodei_app_id_clone,
+                                        app_id = %installed_app_id_clone,
                                         attempt,
                                         "Reconcile controller connected to imagodei conductor (late) — \
                                          starting loop with same wiring as boot-success path"
@@ -2188,7 +2197,7 @@ async fn async_main(
                                 if should_warn_still_down(attempt) {
                                     warn!(
                                         error = %e,
-                                        app_id = %imagodei_app_id_clone,
+                                        app_id = %installed_app_id_clone,
                                         attempt,
                                         delay_secs = delay.as_secs(),
                                         "Reconcile controller bridge still down — retrying forever \
@@ -2198,7 +2207,7 @@ async fn async_main(
                                 } else {
                                     info!(
                                         error = %e,
-                                        app_id = %imagodei_app_id_clone,
+                                        app_id = %installed_app_id_clone,
                                         attempt,
                                         delay_secs = delay.as_secs(),
                                         "Reconcile controller bridge reconnect: retrying"
@@ -2208,7 +2217,7 @@ async fn async_main(
                                     _ = tokio::time::sleep(delay) => {}
                                     _ = reconcile_shutdown.recv() => {
                                         info!(
-                                            app_id = %imagodei_app_id_clone,
+                                            app_id = %installed_app_id_clone,
                                             "Reconcile controller reconnect loop exiting (shutdown)"
                                         );
                                         return;

@@ -42,3 +42,21 @@ shift_objective: |
   Verify on the next deploy that a rolling restart converges: bridge
   connects late, reconcile controller starts, conductor_missing drains to
   0 on non-genesis pods, junction stamps land.
+
+## VERIFIED LIVE + DEEPER ROOT CAUSE (genesis #1123 window)
+
+Registry roles confirmed healthy post-fix: imagodei connects at attempt
+4-5 through the CellDisabled window, lamad at attempt 1, on all three
+pods. BUT "Reconcile controller disabled" still appeared — and the reason
+is a SECOND, older defect the retry noise had masked since inception: the
+controller passed IMAGODEI_APP_ID (default literal "imagodei", set by NO
+manifest) as the INSTALLED APP ID, while the conductor's installed app is
+the elohim happ with imagodei as a ROLE. "app 'imagodei' not found" was
+an app-id mismatch, not timing — the controller has never connected on
+alpha, and the forever-retry would have retried the wrong id forever.
+Fixed (this wave): the connect now mirrors the registry's working pair
+(app_id = args.app_id, role = "imagodei"). Junction stamps +
+MembershipProjected projection get their first real chance next deploy.
+Also noted: the registry's `infrastructure` role fails all 5 attempts on
+matthew/jessica (PeerStatus heartbeat disabled) — role-name vs happ
+manifest question, same family, separate verification next run.

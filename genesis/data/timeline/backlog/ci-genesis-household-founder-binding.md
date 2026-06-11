@@ -72,3 +72,16 @@ shift_objective: |
   conflict squatter id for the operator), formation creates/reuses the
   family-dowell collective, and ceremony custody commitments seed with
   Stage-2 real peer ids.
+
+## UPDATE genesis #1123: identity layer PROVEN — formation now blocked one layer deeper
+
+Seed Conductor Identities: `3 created, 0 existing, 0 conflict, 3 skipped,
+0 failed` — matthew/adam/jessica each created on their OWN conductor
+(name-affinity + id-aware exists working as designed; no squatter
+conflict). Peer bindings 9/9. Formation then failed at the NEXT layer:
+`Source chain error … DepMissingFromDht` on the ceremony connects — the
+seconds-old identity entries aren't DHT-integrated when formation commits
+against them; the conductor itself says "may be retried". Seeder
+settle-retry landed (4 attempts × 15s on exactly this error class). If
+retries exhaust, the deeper cause is the conductor gossip gap
+(dna-conductor-dht-gossip-gap.md).

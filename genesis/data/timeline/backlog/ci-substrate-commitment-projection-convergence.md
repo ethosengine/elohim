@@ -165,3 +165,15 @@ flight: persistent HcClient reconnect (capped backoff, late-success ==
 boot-success wiring). Secondary candidate if conductor_missing persists
 with a healthy bridge: true DHT gossip lag (kitsune2 "Bootstrap
 overloaded, dropping put" was observed under load).
+
+## MILESTONE genesis #1123 (first complete run): measure 3 → 1
+
+Mesh 7/7 PASS — `mesh.adjacency` AND `mesh.adjacency-reverse` GREEN
+(matthew↔jessica both directions; connectedPeers=13 ×3; parity 9a389fe).
+Propagation 6/7 — `probe-fetch: jessica served build-unique probe blob
+after 0s / 1 attempt — p2p data plane moved bytes THIS build`;
+`bytes-persisted: filesystem_count 5 → 7`. The Phase-0 404-after-21-
+attempts class is gone. The single holdout, `custody-convergence`
+(commitment ROWS on replicas), is pinned to the conductor-to-conductor
+DHT gossip layer — see dna-conductor-dht-gossip-gap.md. Storage-layer
+work on this concern is COMPLETE.
