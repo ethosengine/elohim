@@ -31,6 +31,7 @@ pub mod coupling;
 pub mod envelope;
 pub mod epr;
 pub mod error;
+pub mod generated;
 pub mod kind;
 pub mod proof;
 pub mod reach;

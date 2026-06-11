@@ -9,7 +9,7 @@
  * Source: elohim/sdk/schemas/v1/enums/*.schema.json (schemas with _dna metadata)
  * Output: elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_enums.rs
  */
-import { readdir, readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { readdir, readFile, writeFile, mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -30,6 +30,13 @@ const OUTPUT_STORAGE = resolve(
 const OUTPUT_ATTESTATION_KINDS = resolve(
   REPO_ROOT,
   'elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_attestation_kinds.rs',
+);
+// epr is a foundational crate upstream of elohim-storage, so it cannot import
+// storage's generated_enums.rs. Ordinal slices (e.g. REACH_OPENNESS) for
+// `_ordinal` enums are emitted into epr's own generated module instead.
+const OUTPUT_EPR_ORDINAL = resolve(
+  REPO_ROOT,
+  'elohim/epr/src/generated/reach_ordinal.rs',
 );
 
 const VERIFY = process.argv.includes('--verify');
@@ -97,6 +104,61 @@ pub const ${name}: &[&str] = &[
 ${items}
 ];
 `;
+}
+
+/**
+ * Format an ordinal slice for an `_ordinal` enum: (value, openness score) pairs
+ * where the score is the 1-based declaration index (1 = most restrictive,
+ * N = most open). Derives the const name from the enum's _dna.constant
+ * (e.g. REACH_LEVELS -> REACH_OPENNESS).
+ */
+function formatOrdinalSlice(constant, allValues) {
+  const name = constant.replace(/_LEVELS$/, '') + '_OPENNESS';
+  const rows = allValues.map((v, i) => `    ("${v}", ${i + 1}),`).join('\n');
+  return [
+    `/// (reach value, openness score) — 1 = most restrictive, ${allValues.length} = most open.`,
+    `pub const ${name}: &[(&str, u8)] = &[`,
+    rows,
+    `];`,
+    ``,
+  ].join('\n');
+}
+
+/**
+ * Generate Rust source for epr-bound ordinal slices from `_ordinal` enum schemas.
+ * Returns null if no `_ordinal` enums exist (nothing to write).
+ */
+async function generateEprOrdinals() {
+  const files = (await readdir(ENUM_DIR))
+    .filter((f) => f.endsWith('.schema.json'))
+    .sort();
+
+  const blocks = [];
+
+  for (const file of files) {
+    const raw = await readFile(join(ENUM_DIR, file), 'utf8');
+    const schema = JSON.parse(raw);
+
+    // Gate on the explicit _ordinal marker (mirrors the TS half); never a name heuristic.
+    if (schema._ordinal !== true) continue;
+    if (!schema._dna) continue;
+
+    const { constant } = schema._dna;
+    blocks.push(formatOrdinalSlice(constant, schema.enum));
+  }
+
+  if (blocks.length === 0) return null;
+
+  const header = `//! AUTO-GENERATED from protocol JSON schemas with the \`_ordinal\` marker.
+//! DO NOT EDIT — regenerate with: pnpm run schema:codegen:rs
+//!
+//! Source: elohim/sdk/schemas/v1/enums/*.schema.json (\`_ordinal: true\`)
+//!
+//! Lives in epr (not elohim-storage) because epr is upstream of storage and
+//! cannot import storage's generated enums without a circular dependency.
+`;
+
+  return header + '\n' + blocks.join('\n');
 }
 
 /**
@@ -182,6 +244,7 @@ ${govActionMatchArms}
 async function main() {
   const generated = await generate();
   const generatedKinds = await generateAttestationKinds();
+  const generatedEprOrdinals = await generateEprOrdinals();
 
   const enumTargets = [
     { label: 'DNA', path: OUTPUT_DNA },
@@ -238,6 +301,29 @@ async function main() {
       stale = true;
     }
 
+    // Verify epr ordinal slice file (REACH_OPENNESS, etc.)
+    if (generatedEprOrdinals !== null) {
+      const tmpEprOrdinals = join(tmpDir, 'reach_ordinal.rs');
+      await writeFile(tmpEprOrdinals, generatedEprOrdinals);
+      try {
+        execFileSync('rustfmt', [tmpEprOrdinals], { stdio: 'pipe' });
+      } catch {
+        // rustfmt not available — compare raw
+      }
+      const expectedEprOrdinals = await readFile(tmpEprOrdinals, 'utf8');
+      let existingEprOrdinals;
+      try {
+        existingEprOrdinals = await readFile(OUTPUT_EPR_ORDINAL, 'utf8');
+      } catch {
+        console.error(`FAIL: Generated file does not exist (epr-ordinal): ${OUTPUT_EPR_ORDINAL}`);
+        stale = true;
+      }
+      if (existingEprOrdinals !== undefined && existingEprOrdinals !== expectedEprOrdinals) {
+        console.error('FAIL: Rust epr-ordinal codegen is stale. Run: pnpm run schema:codegen:rs');
+        stale = true;
+      }
+    }
+
     await rm(tmpDir, { recursive: true });
     if (stale) process.exit(1);
     console.log('Rust codegen is up to date.');
@@ -264,6 +350,18 @@ async function main() {
     // rustfmt not available
   }
   console.log(`Generated (attestation-kinds): ${OUTPUT_ATTESTATION_KINDS}`);
+
+  // Write epr ordinal slice file (REACH_OPENNESS, etc. — epr is upstream of storage)
+  if (generatedEprOrdinals !== null) {
+    await mkdir(dirname(OUTPUT_EPR_ORDINAL), { recursive: true });
+    await writeFile(OUTPUT_EPR_ORDINAL, generatedEprOrdinals);
+    try {
+      execFileSync('rustfmt', [OUTPUT_EPR_ORDINAL], { stdio: 'pipe' });
+    } catch {
+      // rustfmt not available
+    }
+    console.log(`Generated (epr-ordinal): ${OUTPUT_EPR_ORDINAL}`);
+  }
 }
 
 main().catch((err) => {

@@ -51,3 +51,22 @@ impl Reach {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::generated::REACH_OPENNESS;
+
+    /// Pins the hand-written `openness()` match to the schema-generated
+    /// `REACH_OPENNESS` slice (codegen emits it from reach.schema.json's
+    /// `_ordinal` marker). The enum match stays exhaustive/const; this test
+    /// fails the moment it drifts from the schema's declared ordinal order.
+    #[test]
+    fn openness_matches_generated_ordinal() {
+        for (name, score) in REACH_OPENNESS {
+            let r: Reach =
+                serde_json::from_value(serde_json::Value::String((*name).into())).unwrap();
+            assert_eq!(r.openness(), *score, "openness drift for {name}");
+        }
+    }
+}
