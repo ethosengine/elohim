@@ -930,50 +930,76 @@ async function stampProvenance(
   const publishedAt = new Date().toISOString();
   let stamped = 0;
   let failed = 0;
-
   let reachSkipped = 0;
 
-  for (const item of items) {
+  // Substrate-correct storage routes reach-carrying PATCHes through the
+  // conductor (re-notarize in the DHT) — which FAILS for bulk-seeded rows
+  // that were never DHT-authored, and EACH failure costs a conductor
+  // round-trip. Genesis #1121/#1122 both burned ~60min in this loop
+  // (sequential, no timeout, fallback only on non-OK — a thrown/hung fetch
+  // skipped the fallback entirely) and hit the pipeline cap. Hardening:
+  // per-request timeout, fallback on BOTH non-OK and thrown errors, a
+  // circuit breaker that stops paying the conductor cost after it has
+  // clearly failed, and bounded concurrency. The authored reach reconciles
+  // when the bulk-seed anchor step lands (timeline backlog:
+  // ci-seeder-stamp-conductor-anchor-circularity).
+  const PATCH_TIMEOUT_MS = 5000;
+  const REACH_BREAKER_THRESHOLD = 5;
+  const CONCURRENCY = 10;
+  let consecutiveReachFailures = 0;
+  let reachCircuitOpen = false;
+
+  const patchContent = async (id: string, body: Record<string, string>): Promise<boolean> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PATCH_TIMEOUT_MS);
     try {
-      const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(item.id)}`, {
+      const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          p2pPublishedAt: publishedAt,
-          ...(item.reach ? { reach: item.reach } : {}),
-        }),
+        body: JSON.stringify(body),
+        signal: controller.signal,
       });
-      if (response.ok) {
-        stamped++;
-        continue;
-      }
-      // Substrate-correct storage routes reach-carrying PATCHes through the
-      // conductor (re-notarize in the DHT) — which FAILS for bulk-seeded rows
-      // that were never DHT-authored (genesis #1121: 3354/3429 stamp-failed,
-      // all 'private'-resolved). Provenance must still land or the read gate
-      // 404s the row forever: retry with p2pPublishedAt ONLY (metadata-only
-      // PATCH stays on the diesel path). The authored reach then reconciles
-      // when the row is properly anchored (bulk-seed anchor step — the real
-      // fix home, tracked in the timeline backlog).
-      if (item.reach) {
-        const fallback = await fetch(
-          `${STORAGE_URL}/db/content/${encodeURIComponent(item.id)}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p2pPublishedAt: publishedAt }),
-          },
-        );
-        if (fallback.ok) {
-          stamped++;
-          reachSkipped++;
-          continue;
-        }
-      }
-      failed++;
+      return response.ok;
     } catch {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const stampOne = async (item: { id: string; reach?: string | null }): Promise<void> => {
+    const tryReach = Boolean(item.reach) && !reachCircuitOpen;
+    if (tryReach) {
+      const ok = await patchContent(item.id, {
+        p2pPublishedAt: publishedAt,
+        reach: item.reach as string,
+      });
+      if (ok) {
+        consecutiveReachFailures = 0;
+        stamped++;
+        return;
+      }
+      consecutiveReachFailures++;
+      if (consecutiveReachFailures >= REACH_BREAKER_THRESHOLD && !reachCircuitOpen) {
+        reachCircuitOpen = true;
+        console.warn(
+          `   stampProvenance: reach circuit OPEN after ${consecutiveReachFailures} consecutive conductor-path failures — remaining rows stamp provenance-only (no per-row conductor cost)`,
+        );
+      }
+    }
+    // Provenance-only (diesel path) — either the reach attempt failed, the
+    // circuit is open, or the item carries no reach.
+    const ok = await patchContent(item.id, { p2pPublishedAt: publishedAt });
+    if (ok) {
+      stamped++;
+      if (item.reach) reachSkipped++;
+    } else {
       failed++;
     }
+  };
+
+  for (let i = 0; i < items.length; i += CONCURRENCY) {
+    await Promise.all(items.slice(i, i + CONCURRENCY).map(stampOne));
   }
 
   if (reachSkipped > 0) {
