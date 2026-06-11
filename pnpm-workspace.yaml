@@ -24,3 +24,29 @@ packages:
   - elohim/elohim-agent/mcp-servers/elohim-content
   - elohim/elohim-agent/elohim-agent-sdk
   - genesis/landing
+
+# pnpm settings home (pnpm >=10 ignores the package.json "pnpm" field).
+# overrides MUST stay in lockstep with the recorded set in pnpm-lock.yaml.
+overrides:
+  libsodium-wrappers: ^0.8.2
+  libsodium: ^0.8.2
+  playwright: 1.59.1
+  playwright-core: 1.59.1
+  '@vue/compiler-sfc': 3.5.34
+  '@vue/compiler-core': 3.5.34
+  '@vue/compiler-dom': 3.5.34
+  '@vue/compiler-ssr': 3.5.34
+  '@vue/reactivity': 3.5.34
+  '@vue/shared': 3.5.34
+
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - esbuild
+  - less
+  - lmdb
+  - msgpackr-extract
+  - sharp
+  - unrs-resolver
+
+patchedDependencies:
+  '@angular/build@19.2.22': patches/@angular__build@19.2.22.patch
