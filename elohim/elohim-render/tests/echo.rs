@@ -16,7 +16,7 @@ impl DataFetcher for NoopFetcher {
 
 #[tokio::test]
 async fn echo_renderer_returns_url_in_html() {
-    let renderer = EchoRenderer::default();
+    let renderer = EchoRenderer;
     let ctx = RenderContext {
         spec: RenderSpec::Echo,
         url: "/test/path".to_string(),

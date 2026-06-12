@@ -22,6 +22,7 @@ impl Renderer for EchoRenderer {
             status: 200,
             headers: vec![("content-type".into(), "text/html; charset=utf-8".into())],
             fetched_inputs: vec![],
+            ..Default::default()
         })
     }
 }

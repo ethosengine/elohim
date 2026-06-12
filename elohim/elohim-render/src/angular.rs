@@ -24,14 +24,19 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
 
+use crate::traced_fetcher::TracingFetcher;
+use crate::types::{FetchEvent, RenderTrace};
 use crate::{RenderContext, RenderError, RenderOutput, Renderer, Result};
 
 /// A single unit of work sent to the background render thread.
 struct StringWorkItem {
     /// The JS expression/IIFE driver to evaluate via `eval_string`.
     script: String,
-    /// Channel to return the raw string result (or error) back to the caller.
-    reply: tokio::sync::oneshot::Sender<Result<String>>,
+    /// Channel to return the raw string result (or error) and the fetch
+    /// breadcrumbs recorded during this render back to the caller. Events are
+    /// returned alongside the result so the caller can assemble the render trace
+    /// even when the render itself errored.
+    reply: tokio::sync::oneshot::Sender<(Result<String>, Vec<FetchEvent>)>,
 }
 
 /// Angular SSR renderer.
@@ -97,19 +102,31 @@ impl AngularRenderer {
                     .expect("angular render worker: tokio runtime init failed");
 
                 local_rt.block_on(async move {
+                    // Wrap the consumer's fetcher in a TracingFetcher so every
+                    // `fetch()` the render issues is recorded below the framework
+                    // (status/timing/empty classification + soft-deadline stall
+                    // detection). The worker keeps a handle to reset+drain it per
+                    // render; the runtime drives fetches through the same instance.
+                    let traced = Arc::new(TracingFetcher::new(fetcher));
+
                     // JsRuntime is created here — it stays on this thread forever.
                     // with_full_shims() wires console, URL, TextEncoder/TextDecoder,
                     // FsModuleLoader, AND a `fetch` global that dispatches into the
                     // supplied DataFetcher. Without fetch, Angular SSR bootstrap
                     // hangs forever waiting on HttpClient calls (services like
                     // ConfigService, AuthService, ContentService).
-                    let mut runtime = crate::runtime::JsRuntime::with_full_shims(fetcher);
+                    let mut runtime = crate::runtime::JsRuntime::with_full_shims(traced.clone());
 
                     for StringWorkItem { script, reply } in rx {
+                        // Scope the trace to this render: reset the log + offset
+                        // clock, run, then drain the breadcrumbs. The isolate is
+                        // sequential, so this cleanly attributes fetches per render.
+                        traced.reset();
                         let result = runtime.eval_string(&script).await;
+                        let events = traced.take_events();
                         // Ignore send error — caller may have dropped its receiver
                         // (e.g. due to a timeout cancellation).
-                        let _ = reply.send(result);
+                        let _ = reply.send((result, events));
                     }
                 });
             })
@@ -195,7 +212,11 @@ impl Renderer for AngularRenderer {
         .map_err(|_| RenderError::Panic("spawn_blocking join failed".into()))??;
 
         // Await the result from the background thread, subject to wall-time limit.
-        let result = tokio::time::timeout(
+        // A hard-timeout here is the backstop for a true hang (e.g. an infinite
+        // loop in JS); the per-fetch soft-deadline already converts a stalled
+        // fetch into a fast-completing render below this limit.
+        let started = std::time::Instant::now();
+        let (render_result, fetch_events) = tokio::time::timeout(
             std::time::Duration::from_millis(ctx.limits.wall_time_ms),
             reply_rx,
         )
@@ -203,9 +224,15 @@ impl Renderer for AngularRenderer {
         .map_err(|_| RenderError::Timeout {
             limit_ms: ctx.limits.wall_time_ms,
         })?
-        .map_err(|_| RenderError::Panic("angular render worker: reply channel dropped".into()))??;
+        .map_err(|_| RenderError::Panic("angular render worker: reply channel dropped".into()))?;
 
-        let html = result;
+        // The render completed within the wall-time limit. Propagate a render
+        // error if the JS threw; otherwise assemble the trace from the recorded
+        // fetch breadcrumbs. `trace_id` is left empty here — the consumer stamps
+        // its `X-Observation-Id` correlation token onto the trace.
+        let html = render_result?;
+        let wall_ms = started.elapsed().as_millis() as u64;
+        let terminal = RenderTrace::classify(&fetch_events, false);
 
         if html.len() > ctx.limits.max_output_bytes {
             return Err(RenderError::OutputTooLarge {
@@ -219,6 +246,12 @@ impl Renderer for AngularRenderer {
             status: 200,
             headers: vec![("content-type".into(), "text/html; charset=utf-8".into())],
             fetched_inputs: vec![],
+            trace: RenderTrace {
+                trace_id: String::new(),
+                fetches: fetch_events,
+                terminal,
+                wall_ms,
+            },
         })
     }
 }

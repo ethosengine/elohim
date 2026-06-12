@@ -102,11 +102,24 @@ impl DataFetcher for LocalFetcher {
 pub async fn render_url(state: &SsrState, url: String) -> Result<String, RenderError> {
     let ctx = RenderContext {
         spec: RenderSpec::AngularSsr,
-        url,
+        url: url.clone(),
         data_fetcher: Arc::new(LocalFetcher),
         limits: Default::default(),
     };
-    state.renderer.render(ctx).await.map(|out| out.html)
+    let out = state.renderer.render(ctx).await?;
+    // p2p-native render-trace telemetry — the same signal doorway emits, but from
+    // a peer rendering its own content directly (no web2 hop). The terminal
+    // classification (rendered-empty vs stalled) + per-render latency is the
+    // feedback that tunes the diversity of peer compute commitments.
+    tracing::info!(
+        target: "elohim_storage::ssr::trace",
+        url = %url,
+        terminal = out.trace.terminal.as_str(),
+        fetches = out.trace.fetches.len(),
+        wall_ms = out.trace.wall_ms,
+        "SSR render trace"
+    );
+    Ok(out.html)
 }
 
 // =============================================================================

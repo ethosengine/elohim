@@ -2869,6 +2869,7 @@ async fn handle_request(
                                 cached_html,
                                 "HIT",
                                 state.render_capability.as_ref(),
+                                None,
                             )));
                         }
 
@@ -2906,21 +2907,36 @@ async fn handle_request(
                             },
                         };
                         return Ok(to_boxed(match renderer.render(ctx).await {
-                            Ok(out) => {
-                                tracing::debug!(
-                                    target: "doorway::ssr",
+                            Ok(mut out) => {
+                                // Stamp the correlation token onto the trace so the
+                                // header + Loki line join browser ↔ doorway ↔ peer.
+                                if let Some(ref obs) = observation_id {
+                                    out.trace.trace_id = obs.clone();
+                                }
+                                // The render-trace signal: terminal classification +
+                                // per-peer latency. Shipped to Loki (info) and the
+                                // feed-forward seam for compute-commitment tuning.
+                                tracing::info!(
+                                    target: "doorway::ssr::trace",
                                     path = %p,
-                                    "SSR render ok — caching result"
+                                    terminal = out.trace.terminal.as_str(),
+                                    fetches = out.trace.fetches.len(),
+                                    wall_ms = out.trace.wall_ms,
+                                    observation_id = observation_id.as_deref().unwrap_or(""),
+                                    "SSR render trace"
                                 );
+                                let trace = out.trace;
+                                let html = out.html;
                                 state.cache.put_rendered(
                                     &cache_key,
-                                    out.html.clone(),
+                                    html.clone(),
                                     std::time::Duration::from_secs(5 * 60),
                                 );
                                 ssr_html_response_with_observability(
-                                    out.html,
+                                    html,
                                     "MISS",
                                     state.render_capability.as_ref(),
+                                    Some(&trace),
                                 )
                             }
                             Err(e) => {
@@ -3420,6 +3436,7 @@ fn ssr_html_response_with_observability(
     html: String,
     cache_status: &str,
     capability: Option<&crate::render::types::RenderCapabilityProfile>,
+    trace: Option<&elohim_render::RenderTrace>,
 ) -> Response<Full<Bytes>> {
     let mut builder = Response::builder()
         .status(StatusCode::OK)
@@ -3427,6 +3444,20 @@ fn ssr_html_response_with_observability(
         .header("cache-control", "no-store")
         .header("x-render-cache", cache_status)
         .header("x-ssr-rendered", "1");
+    // Render-trace observability (fresh renders only — a cache HIT has no live
+    // trace). `x-ssr-terminal` is the rendered-empty-vs-stalled cut; `x-ssr-wall-ms`
+    // is the per-peer latency signal that feeds compute-commitment tuning.
+    if let Some(trace) = trace {
+        builder = builder
+            .header("x-ssr-terminal", trace.terminal.as_str())
+            .header("x-ssr-fetches", trace.fetches.len().to_string())
+            .header("x-ssr-wall-ms", trace.wall_ms.to_string());
+        if !trace.trace_id.is_empty() {
+            if let Ok(v) = hyper::header::HeaderValue::from_str(&trace.trace_id) {
+                builder = builder.header("x-ssr-trace-id", v);
+            }
+        }
+    }
     if let Some(claim) = capability {
         if let Some(bundle) = claim.bundles.first() {
             builder = builder.header(

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use elohim_render::{
     AngularRenderer, DataFetcher, FetchRequest, FetchResponse, RenderContext, RenderLimits,
-    RenderSpec, Renderer, Result,
+    RenderSpec, RenderTerminal, Renderer, Result,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -19,6 +19,46 @@ impl DataFetcher for EmptyFetcher {
             content_hash: None,
         })
     }
+}
+
+/// Returns a non-empty JSON body — a healthy data arrival.
+struct ContentFetcher;
+
+#[async_trait]
+impl DataFetcher for ContentFetcher {
+    async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
+        Ok(FetchResponse {
+            status: 200,
+            headers: HashMap::new(),
+            body: b"{\"title\":\"Micah 6:8\"}".to_vec(),
+            content_hash: None,
+        })
+    }
+}
+
+/// Returns an empty JSON array — a truthful "no content" (the EprRouter-empties shape).
+struct EmptyArrayFetcher;
+
+#[async_trait]
+impl DataFetcher for EmptyArrayFetcher {
+    async fn fetch(&self, _request: FetchRequest) -> Result<FetchResponse> {
+        Ok(FetchResponse {
+            status: 200,
+            headers: HashMap::new(),
+            body: b"[]".to_vec(),
+            content_hash: None,
+        })
+    }
+}
+
+fn trace_fixture_bundle() -> PathBuf {
+    [
+        env!("CARGO_MANIFEST_DIR"),
+        "fixtures",
+        "trace-fixture-bundle.mjs",
+    ]
+    .iter()
+    .collect()
 }
 
 #[tokio::test]
@@ -44,6 +84,51 @@ async fn angular_renderer_returns_rendered_html() {
         out.html.contains("ngh="),
         "hydration markers missing: {}",
         out.html
+    );
+}
+
+#[tokio::test]
+async fn render_trace_records_a_fetch_and_classifies_rendered() {
+    let renderer =
+        AngularRenderer::new(trace_fixture_bundle(), Arc::new(ContentFetcher)).expect("init");
+    let ctx = RenderContext {
+        spec: RenderSpec::AngularSsr,
+        url: "/test".into(),
+        data_fetcher: Arc::new(ContentFetcher),
+        limits: RenderLimits::default(),
+    };
+    let out = renderer.render(ctx).await.expect("render");
+
+    assert!(
+        !out.trace.fetches.is_empty(),
+        "the data fetch must appear in the render trace, got {:?}",
+        out.trace.fetches
+    );
+    assert_eq!(
+        out.trace.terminal,
+        RenderTerminal::Rendered,
+        "a healthy data arrival classifies as rendered"
+    );
+}
+
+#[tokio::test]
+async fn render_trace_classifies_empty_upstream_as_rendered_empty() {
+    // The whole point: a truthful empty (`[]`) is distinguishable from a stall.
+    let renderer =
+        AngularRenderer::new(trace_fixture_bundle(), Arc::new(EmptyArrayFetcher)).expect("init");
+    let ctx = RenderContext {
+        spec: RenderSpec::AngularSsr,
+        url: "/empty".into(),
+        data_fetcher: Arc::new(EmptyArrayFetcher),
+        limits: RenderLimits::default(),
+    };
+    let out = renderer.render(ctx).await.expect("render");
+
+    assert_eq!(
+        out.trace.terminal,
+        RenderTerminal::RenderedEmpty,
+        "an empty-array upstream is rendered-empty, not stalled; trace: {:?}",
+        out.trace.fetches
     );
 }
 
