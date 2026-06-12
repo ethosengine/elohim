@@ -396,6 +396,17 @@ impl HoloHashB64 {
         use base64::Engine;
         Self(format!("u{}", URL_SAFE_NO_PAD.encode(bytes)))
     }
+
+    /// The canonical base64 string this hash normalizes to.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for HoloHashB64 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
 }
 
 impl<'de> Deserialize<'de> for HoloHashB64 {
@@ -481,6 +492,9 @@ pub enum SignalDecodeMiss {
     /// The tag IS one of ours but the payload failed the typed decode —
     /// a real wire-shape regression. LOUD.
     InfraShapeMismatch { type_tag: String, error: String },
+    /// As `InfraShapeMismatch`, but for a `MishpatSignal` mirror variant — a
+    /// real mishpat wire-shape regression. LOUD.
+    MishpatShapeMismatch { type_tag: String, error: String },
     /// Not even the tag could be read.
     Undecodable { error: String },
 }
@@ -559,9 +573,16 @@ pub fn handle_signal(
 // MishpatSignal — projection of mishpat DNA post-commit signals
 // =============================================================================
 //
-// Mirrors the DNA-side `MishpatSignal` enum (mishpat DNA, gate_decision zome).
-// Fields that are `AgentPubKey` or `ActionHash` on the DNA side serialize as
-// base64 `String`s over the wire — no integrity-crate dependency needed here.
+// Mirrors the DNA-side `MishpatSignal` enum (mishpat DNA, `mishpat` zome).
+// Fields that are `AgentPubKey`/`ActionHash`/`EntryHash` on the DNA side
+// serialize on the conductor wire (MessagePack `ExternIO`) as raw 39-BYTE
+// ARRAYS, NOT base64 strings — so they MUST be mirrored as `HoloHashB64`
+// (not `String`). The old `String` mirror + the `rmp → serde_json::Value`
+// pre-pass dropped every real signal at `debug!` level: the exact dark-surface
+// class fixed for `InfrastructureSignal` in d33b0e1f5 (2026-06-12). The
+// embedded `Commitment` / entry sub-structs are all-`String` on the DNA side
+// (verified field-by-field against `mishpat_integrity`), so they need no
+// HoloHashB64 treatment.
 //
 // Serde tagging (`tag = "type", content = "payload"`) MUST match the DNA
 // side exactly. The entry sub-struct uses snake_case to match the DNA wire
@@ -617,24 +638,32 @@ pub struct ChallengeOutcomeEntry {
 #[serde(tag = "type", content = "payload")]
 pub enum MishpatSignal {
     /// GateDecisionAttestation DHT entry was recorded — project into SQLite.
+    ///
+    /// NOTE (Stage C): the mishpat DNA no longer emits this variant — the
+    /// GateDecisionAttestation entry type moved to the elohim DNA. The mirror
+    /// arm is retained for back-compat dispatch/tests; the live wire only
+    /// carries `CommitmentCommitted` and `ChallengeOutcomeCreated`.
     GateDecisionCreated {
-        action_hash: String,
-        entry_hash: String,
-        author: String,
+        action_hash: HoloHashB64,
+        entry_hash: HoloHashB64,
+        author: HoloHashB64,
         entry: GateDecisionAttestationEntry,
     },
     /// GateDecisionChallenge DHT entry was recorded — project into SQLite.
+    ///
+    /// NOTE (Stage C): no longer emitted by the mishpat DNA (entry type moved
+    /// to elohim DNA); mirror arm retained for back-compat.
     GateDecisionChallengeCreated {
-        action_hash: String,
-        entry_hash: String,
-        author: String,
+        action_hash: HoloHashB64,
+        entry_hash: HoloHashB64,
+        author: HoloHashB64,
         entry: GateDecisionChallengeEntry,
     },
     /// ChallengeOutcome DHT entry was recorded — project into SQLite.
     ChallengeOutcomeCreated {
-        action_hash: String,
-        entry_hash: String,
-        author: String,
+        action_hash: HoloHashB64,
+        entry_hash: HoloHashB64,
+        author: HoloHashB64,
         entry: ChallengeOutcomeEntry,
     },
     /// Commitment DHT entry was recorded — project into mishpat_commitments (Slice-2a T5).
@@ -643,11 +672,77 @@ pub enum MishpatSignal {
     /// `Commitment` entry. `entry_hash` is the content-addressed identity used
     /// as `cid` in the projection row; `action_hash` becomes `dht_anchor_hash`.
     CommitmentCommitted {
-        action_hash: String,
-        entry_hash: String,
-        author: String,
+        action_hash: HoloHashB64,
+        entry_hash: HoloHashB64,
+        author: HoloHashB64,
         commitment: crate::mishpat_projection::CommitmentPayload,
     },
+}
+
+/// Mirror-variant names: a decode failure on one of these tags is a REAL
+/// projection miss (loud); any other tag is a foreign signal sharing the app
+/// interface (quiet).
+///
+/// The live mishpat DNA only emits `CommitmentCommitted` and
+/// `ChallengeOutcomeCreated` (the gate-decision variants moved to the elohim
+/// DNA in Stage C); the two retained mirror tags are listed so a back-compat
+/// replay still classifies as a real miss rather than a foreign signal.
+const MISHPAT_MIRROR_VARIANTS: &[&str] = &[
+    "CommitmentCommitted",
+    "ChallengeOutcomeCreated",
+    "GateDecisionCreated",
+    "GateDecisionChallengeCreated",
+];
+
+/// Cumulative count of REAL mishpat decode misses this process.
+static MISHPAT_DECODE_MISSES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Cumulative REAL mishpat decode misses (mirror-variant tag present but the
+/// typed decode failed). Exposed for status surfaces / tests.
+pub fn mishpat_decode_miss_count() -> u64 {
+    MISHPAT_DECODE_MISSES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Decode a conductor app-signal payload (MessagePack `ExternIO` bytes) into
+/// the typed `MishpatSignal` mirror, classifying failures so the subscriber
+/// can be loud about real misses without spamming on foreign signals.
+///
+/// WHY (the 2026-06-12 dark-`CommitmentCommitted` root cause): the conductor
+/// encodes signals with MessagePack, where `ActionHash`/`EntryHash`/
+/// `AgentPubKey` serialize as raw 39-BYTE ARRAYS. The old subscriber pre-
+/// decoded into `serde_json::Value` (no byte-array representation) and the
+/// mirror declared those fields `String`, so EVERY real `CommitmentCommitted`
+/// signal failed decode and was dropped at `debug!` — the Epic B provide
+/// projection (4626f820b) was dead code in production. Identical class to the
+/// `InfrastructureSignal` fix in d33b0e1f5.
+pub fn decode_mishpat_signal(bytes: &[u8]) -> Result<MishpatSignal, SignalDecodeMiss> {
+    match rmp_serde::from_slice::<MishpatSignal>(bytes) {
+        Ok(signal) => Ok(signal),
+        Err(typed_err) => {
+            // Tag-only peek: serde skips the payload via IgnoredAny (which,
+            // unlike `serde_json::Value`, tolerates msgpack byte arrays).
+            #[derive(Deserialize)]
+            struct TagOnly {
+                #[serde(rename = "type")]
+                type_tag: String,
+            }
+            match rmp_serde::from_slice::<TagOnly>(bytes) {
+                Ok(tag) if MISHPAT_MIRROR_VARIANTS.contains(&tag.type_tag.as_str()) => {
+                    MISHPAT_DECODE_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    Err(SignalDecodeMiss::MishpatShapeMismatch {
+                        type_tag: tag.type_tag,
+                        error: typed_err.to_string(),
+                    })
+                }
+                Ok(tag) => Err(SignalDecodeMiss::ForeignSignal {
+                    type_tag: tag.type_tag,
+                }),
+                Err(tag_err) => Err(SignalDecodeMiss::Undecodable {
+                    error: format!("typed: {typed_err}; tag peek: {tag_err}"),
+                }),
+            }
+        }
+    }
 }
 
 /// Dispatch a `MishpatSignal` into the SQLite projection.
@@ -694,7 +789,7 @@ pub fn handle_mishpat_signal(
                 context_summary_cid: entry.context_summary_cid,
                 decided_at: entry.decided_at,
                 universal_band_cid: entry.universal_band_cid,
-                dht_anchor_hash: action_hash,
+                dht_anchor_hash: action_hash.0,
                 created_at: now.clone(),
                 updated_at: now,
             };
@@ -718,7 +813,7 @@ pub fn handle_mishpat_signal(
                 evidence_refs: entry.evidence_refs,
                 filed_at: entry.filed_at,
                 reach: entry.reach,
-                dht_anchor_hash: action_hash,
+                dht_anchor_hash: action_hash.0,
                 created_at: now.clone(),
                 updated_at: now,
             };
@@ -741,7 +836,7 @@ pub fn handle_mishpat_signal(
                 reasoning_json: entry.reasoning_json,
                 decided_at: entry.decided_at,
                 indemnification_actions_json: entry.indemnification_actions_json,
-                dht_anchor_hash: action_hash,
+                dht_anchor_hash: action_hash.0,
                 created_at: now.clone(),
                 updated_at: now,
             };
@@ -763,8 +858,8 @@ pub fn handle_mishpat_signal(
             match crate::mishpat_projection::parse_commitment_payload(
                 &commitment.action,
                 &commitment.payload_json,
-                &entry_hash,
-                &action_hash,
+                entry_hash.as_str(),
+                action_hash.as_str(),
             ) {
                 Ok(crate::mishpat_projection::CommitmentProjection::Upsert(new_row)) => {
                     // Epic B side-projection: a notarized `replicates-commons`
@@ -1974,9 +2069,9 @@ mod mishpat_signal_tests {
 
     fn make_signal(decision_id: &str, decision: &str, phase: &str) -> MishpatSignal {
         MishpatSignal::GateDecisionCreated {
-            action_hash: "uhCkkDEFABC".to_string(),
-            entry_hash: "uhCEkDEFABC".to_string(),
-            author: "uhCAkABCDEF".to_string(),
+            action_hash: "uhCkkDEFABC".into(),
+            entry_hash: "uhCEkDEFABC".into(),
+            author: "uhCAkABCDEF".into(),
             entry: GateDecisionAttestationEntry {
                 decision_id: decision_id.to_string(),
                 phase: phase.to_string(),
@@ -2063,7 +2158,7 @@ mod mishpat_signal_tests {
             MishpatSignal::GateDecisionCreated {
                 action_hash, entry, ..
             } => {
-                assert_eq!(action_hash, "uhCkkABC");
+                assert_eq!(action_hash.0, "uhCkkABC");
                 assert_eq!(entry.decision, "allow");
                 assert_eq!(entry.phase, "elohim-active");
             }
@@ -2105,9 +2200,9 @@ mod mishpat_signal_tests {
 
     fn make_challenge_signal(challenge_id: &str, grounds: &str) -> MishpatSignal {
         MishpatSignal::GateDecisionChallengeCreated {
-            action_hash: "uhCkkCHALABC".to_string(),
-            entry_hash: "uhCEkCHALABC".to_string(),
-            author: "uhCAkCHALLENGER".to_string(),
+            action_hash: "uhCkkCHALABC".into(),
+            entry_hash: "uhCEkCHALABC".into(),
+            author: "uhCAkCHALLENGER".into(),
             entry: GateDecisionChallengeEntry {
                 challenge_id: challenge_id.to_string(),
                 challenged_decision_cid: "bafyDec001".to_string(),
@@ -2184,7 +2279,7 @@ mod mishpat_signal_tests {
             MishpatSignal::GateDecisionChallengeCreated {
                 action_hash, entry, ..
             } => {
-                assert_eq!(action_hash, "uhCkkCHAL");
+                assert_eq!(action_hash.0, "uhCkkCHAL");
                 assert_eq!(entry.grounds, "constitutional");
                 assert_eq!(entry.reach, "community");
             }
@@ -2225,9 +2320,9 @@ mod mishpat_signal_tests {
 
     fn make_outcome_signal(outcome_id: &str, verdict: &str) -> MishpatSignal {
         MishpatSignal::ChallengeOutcomeCreated {
-            action_hash: "uhCkkOUTABC".to_string(),
-            entry_hash: "uhCEkOUTABC".to_string(),
-            author: "uhCAkREVIEWER".to_string(),
+            action_hash: "uhCkkOUTABC".into(),
+            entry_hash: "uhCEkOUTABC".into(),
+            author: "uhCAkREVIEWER".into(),
             entry: ChallengeOutcomeEntry {
                 outcome_id: outcome_id.to_string(),
                 challenge_cid: "bafyChal001".to_string(),
@@ -2298,7 +2393,7 @@ mod mishpat_signal_tests {
             MishpatSignal::ChallengeOutcomeCreated {
                 action_hash, entry, ..
             } => {
-                assert_eq!(action_hash, "uhCkkOUT");
+                assert_eq!(action_hash.0, "uhCkkOUT");
                 assert_eq!(entry.verdict, "upheld");
                 assert_eq!(entry.challenge_cid, "bafyChal");
             }
@@ -2346,9 +2441,9 @@ mod mishpat_signal_tests {
         .to_string();
 
         MishpatSignal::CommitmentCommitted {
-            action_hash: action_hash.to_string(),
-            entry_hash: entry_hash.to_string(),
-            author: "uhCAkAUTHOR".to_string(),
+            action_hash: action_hash.into(),
+            entry_hash: entry_hash.into(),
+            author: "uhCAkAUTHOR".into(),
             commitment: crate::mishpat_projection::CommitmentPayload {
                 action: action.to_string(),
                 payload_json,
@@ -2388,9 +2483,9 @@ mod mishpat_signal_tests {
                 author,
                 commitment,
             } => {
-                assert_eq!(action_hash, "uhCkkCOMMIT");
-                assert_eq!(entry_hash, "uhCEkCOMMIT");
-                assert_eq!(author, "uhCAkCOMMIT");
+                assert_eq!(action_hash.0, "uhCkkCOMMIT");
+                assert_eq!(entry_hash.0, "uhCEkCOMMIT");
+                assert_eq!(author.0, "uhCAkCOMMIT");
                 assert_eq!(commitment.action, "delegates-compute");
                 // epoch-seconds, not ISO-8601
                 assert_eq!(commitment.signed_at, "1748390400");
@@ -2459,6 +2554,210 @@ mod mishpat_signal_tests {
             row.cid, "uhCEkCOM2",
             "Re-delivered CommitmentCommitted must not duplicate the row"
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // Wire-conformance: the REAL conductor msgpack wire (the 2026-06-12 fix)
+    // -------------------------------------------------------------------------
+    //
+    // The JSON-context tests above feed `HoloHashB64` base64 STRINGS, which
+    // prove serde tag/field shape but say NOTHING about the conductor wire.
+    // The conductor emits app signals as MessagePack (`ExternIO`), where
+    // `ActionHash`/`EntryHash`/`AgentPubKey` serialize as raw 39-BYTE ARRAYS.
+    // The old `String` mirror (+ the `rmp → serde_json::Value` pre-pass before
+    // it) failed on every such signal, silently dropping `CommitmentCommitted`
+    // and leaving the Epic B provide projection dead in production.
+
+    /// THE root-cause regression test: decode `CommitmentCommitted` from the
+    /// REAL conductor wire — `rmp_serde::to_vec_named` over the DNA-side enum
+    /// shape with real `holo_hash` types — and assert the holo-hash fields
+    /// round-trip to canonical base64 while the all-`String` `Commitment`
+    /// payload survives intact.
+    #[test]
+    fn commitment_committed_decodes_from_conductor_msgpack_wire() {
+        use holochain_types::prelude::{ActionHash, AgentPubKey, EntryHash};
+
+        // DNA-side shape: mishpat zome's `MishpatSignal::CommitmentCommitted`
+        // with REAL holo_hash types and a `Commitment` struct field-identical
+        // to `mishpat_integrity::Commitment` (action / payload_json / signed_at —
+        // all plain Strings, verified against the integrity crate).
+        #[derive(Serialize)]
+        struct DnaCommitment {
+            action: String,
+            payload_json: String,
+            signed_at: String,
+        }
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum DnaMishpatSignal {
+            CommitmentCommitted {
+                action_hash: ActionHash,
+                entry_hash: EntryHash,
+                commitment: DnaCommitment,
+                author: AgentPubKey,
+            },
+        }
+
+        let action_hash = ActionHash::from_raw_36(vec![0x11; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![0x22; 36]);
+        let author = AgentPubKey::from_raw_36(vec![0x33; 36]);
+
+        let payload_json = r#"{"action":"replicates-commons","scope":"content","provider":"uhCAkPROVIDER","reach_ceiling":"commons"}"#.to_string();
+        let dna_signal = DnaMishpatSignal::CommitmentCommitted {
+            action_hash: action_hash.clone(),
+            entry_hash: entry_hash.clone(),
+            commitment: DnaCommitment {
+                action: "replicates-commons".into(),
+                payload_json: payload_json.clone(),
+                signed_at: "1748390400".into(),
+            },
+            author: author.clone(),
+        };
+
+        // emit_signal encodes via ExternIO == holochain_serialized_bytes ==
+        // rmp_serde::to_vec_named.
+        let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode DNA signal");
+
+        let before = mishpat_decode_miss_count();
+        let decoded =
+            decode_mishpat_signal(&wire).expect("conductor msgpack wire format must decode");
+        match decoded {
+            MishpatSignal::CommitmentCommitted {
+                action_hash: got_action,
+                entry_hash: got_entry,
+                author: got_author,
+                commitment,
+            } => {
+                // Normalized to holochain's canonical base64 ("u" + base64url-
+                // no-pad over the raw 39 bytes) — matches holo_hash Display.
+                assert_eq!(got_action.0, format!("{action_hash}"));
+                assert_eq!(got_entry.0, format!("{entry_hash}"));
+                assert_eq!(got_author.0, format!("{author}"));
+                // The all-String Commitment payload survives the wire intact.
+                assert_eq!(commitment.action, "replicates-commons");
+                assert_eq!(commitment.payload_json, payload_json);
+                assert_eq!(commitment.signed_at, "1748390400");
+            }
+            _ => panic!("Expected CommitmentCommitted variant"),
+        }
+        assert_eq!(
+            mishpat_decode_miss_count(),
+            before,
+            "a successful decode must not count as a miss"
+        );
+    }
+
+    /// End-to-end: a `CommitmentCommitted` decoded from the REAL conductor wire
+    /// drives `handle_mishpat_signal` and projects a `mishpat_commitments` row —
+    /// proving the wire fix actually reaches the projection the old path
+    /// silently starved.
+    #[test]
+    fn conductor_wire_commitment_projects_row() {
+        use holochain_types::prelude::{ActionHash, AgentPubKey, EntryHash};
+
+        #[derive(Serialize)]
+        struct DnaCommitment {
+            action: String,
+            payload_json: String,
+            signed_at: String,
+        }
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum DnaMishpatSignal {
+            CommitmentCommitted {
+                action_hash: ActionHash,
+                entry_hash: EntryHash,
+                commitment: DnaCommitment,
+                author: AgentPubKey,
+            },
+        }
+
+        let action_hash = ActionHash::from_raw_36(vec![0xA1; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![0xB2; 36]);
+        let author = AgentPubKey::from_raw_36(vec![0xC3; 36]);
+        let expected_cid = format!("{entry_hash}");
+
+        let payload_json = serde_json::json!({
+            "action": "delegates-compute",
+            "scope": "republish-epr",
+            "provider": "agent:matthew-steward",
+            "recipient": "agent:deploy-svc",
+            "bounds": { "reach_ceiling": "commons", "rate_per_hour": 30 },
+            "valid_from": "2026-05-28T00:00:00Z",
+            "valid_until": "2026-08-26T00:00:00Z"
+        })
+        .to_string();
+
+        let dna_signal = DnaMishpatSignal::CommitmentCommitted {
+            action_hash,
+            entry_hash,
+            commitment: DnaCommitment {
+                action: "delegates-compute".into(),
+                payload_json,
+                signed_at: "1748390400".into(),
+            },
+            author,
+        };
+        let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode");
+        let signal = decode_mishpat_signal(&wire).expect("decode from wire");
+
+        let mut conn = setup_commitments_conn();
+        handle_mishpat_signal(&mut conn, "app", signal).unwrap();
+
+        let row = crate::db::mishpat_commitments::get_by_cid(&mut conn, &expected_cid)
+            .unwrap()
+            .expect("Row must be present after conductor-wire CommitmentCommitted");
+        assert_eq!(row.cid, expected_cid);
+        assert_eq!(row.action, "delegates-compute");
+        assert_eq!(
+            row.dht_anchor_hash.as_deref(),
+            Some(format!("{}", ActionHash::from_raw_36(vec![0xA1; 36])).as_str()),
+            "dht_anchor_hash must equal the canonical action_hash"
+        );
+    }
+
+    /// A foreign signal (infrastructure, content, …) shares the app interface —
+    /// it must classify quiet, not as a mishpat miss.
+    #[test]
+    fn foreign_signal_classifies_quiet_for_mishpat() {
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum OtherSignal {
+            PeerStatusRecorded { peer_id: String },
+        }
+        let wire = rmp_serde::to_vec_named(&OtherSignal::PeerStatusRecorded {
+            peer_id: "x".into(),
+        })
+        .expect("encode");
+        match decode_mishpat_signal(&wire) {
+            Err(SignalDecodeMiss::ForeignSignal { type_tag }) => {
+                assert_eq!(type_tag, "PeerStatusRecorded");
+            }
+            other => panic!("expected ForeignSignal, got {other:?}"),
+        }
+    }
+
+    /// A mishpat mirror-variant tag whose payload no longer decodes is a REAL
+    /// miss — it must be loud (counted).
+    #[test]
+    fn shape_mismatch_on_mishpat_mirror_variant_is_counted() {
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "payload")]
+        enum BrokenShape {
+            CommitmentCommitted { unexpected_only_field: bool },
+        }
+        let wire = rmp_serde::to_vec_named(&BrokenShape::CommitmentCommitted {
+            unexpected_only_field: true,
+        })
+        .expect("encode");
+        let before = mishpat_decode_miss_count();
+        match decode_mishpat_signal(&wire) {
+            Err(SignalDecodeMiss::MishpatShapeMismatch { type_tag, .. }) => {
+                assert_eq!(type_tag, "CommitmentCommitted");
+            }
+            other => panic!("expected MishpatShapeMismatch, got {other:?}"),
+        }
+        assert_eq!(mishpat_decode_miss_count(), before + 1);
     }
 }
 

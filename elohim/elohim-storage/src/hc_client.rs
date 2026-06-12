@@ -428,6 +428,18 @@ impl HcClient {
                         Err(crate::signals::SignalDecodeMiss::Undecodable { error }) => {
                             debug!(error = %error, "App signal payload undecodable — ignoring");
                         }
+                        // MishpatShapeMismatch cannot arise from the infra
+                        // decoder (different mirror-variant set), but the shared
+                        // enum requires the arm.
+                        Err(crate::signals::SignalDecodeMiss::MishpatShapeMismatch {
+                            type_tag,
+                            ..
+                        }) => {
+                            debug!(
+                                type_tag = %type_tag,
+                                "Unexpected mishpat-shape classification from infra decoder — ignoring"
+                            );
+                        }
                     }
                 }
             })
@@ -551,23 +563,47 @@ impl HcClient {
             .on_signal(move |signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
-                    match rmp_serde::from_slice::<serde_json::Value>(&bytes) {
-                        Ok(value) => {
-                            match serde_json::from_value::<crate::signals::MishpatSignal>(
-                                value.clone(),
-                            ) {
-                                Ok(mishpat) => handler(mishpat),
-                                Err(e) => {
-                                    debug!(
-                                        error = %e,
-                                        value = %value,
-                                        "Received app signal not matching MishpatSignal — ignoring"
-                                    );
-                                }
-                            }
+                    // Typed msgpack decode — the old `rmp → serde_json::Value`
+                    // pre-pass failed on EVERY HoloHash-bearing MishpatSignal
+                    // (serde_json::Value cannot represent msgpack byte arrays)
+                    // and dropped it at debug level: the 2026-06-12
+                    // dark-`CommitmentCommitted` root cause that left the Epic B
+                    // provide projection (4626f820b) dead in production. Real
+                    // misses are now LOUD; foreign signals on the shared app
+                    // interface stay quiet.
+                    match crate::signals::decode_mishpat_signal(&bytes) {
+                        Ok(mishpat) => handler(mishpat),
+                        Err(crate::signals::SignalDecodeMiss::MishpatShapeMismatch {
+                            type_tag,
+                            error,
+                        }) => {
+                            warn!(
+                                type_tag = %type_tag,
+                                error = %error,
+                                misses_total = crate::signals::mishpat_decode_miss_count(),
+                                "MishpatSignal DECODE MISS — signal dropped, projection will go dark for this variant"
+                            );
                         }
-                        Err(e) => {
-                            debug!(error = %e, "Failed to msgpack-decode app signal");
+                        Err(crate::signals::SignalDecodeMiss::ForeignSignal { type_tag }) => {
+                            debug!(
+                                type_tag = %type_tag,
+                                "App signal from another family — ignoring"
+                            );
+                        }
+                        Err(crate::signals::SignalDecodeMiss::Undecodable { error }) => {
+                            debug!(error = %error, "App signal payload undecodable — ignoring");
+                        }
+                        // InfraShapeMismatch cannot arise from the mishpat
+                        // decoder (different mirror-variant set), but the shared
+                        // enum requires the arm.
+                        Err(crate::signals::SignalDecodeMiss::InfraShapeMismatch {
+                            type_tag,
+                            ..
+                        }) => {
+                            debug!(
+                                type_tag = %type_tag,
+                                "Unexpected infra-shape classification from mishpat decoder — ignoring"
+                            );
                         }
                     }
                 }
