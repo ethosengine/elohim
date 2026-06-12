@@ -129,6 +129,34 @@ Layer-2: cluster page triptych renders used/total/committed for the
 logged-in steward (`@wip` — identity-bound; committed-accounting readers
 are the felt-resilience runway item 2).
 
+### D9 — Chaos: the dataplane under deliberate peer churn
+(Added same-session by operator request — "bring peers on and offline,
+prove the resiliency of the dataplane.")
+Three actuation layers:
+- **Protocol chaos (deterministic, CI-now):**
+  `elohim-storage/tests/chaos_dataplane.rs` spawns REAL libp2p nodes
+  (loopback TCP, production BlobProtocol/BlobCodec) with a `Shutdown`
+  kill-switch command that drops the swarm — peer death as the network sees
+  it. Four properties pinned: a dead provider FAILS FAST (error within the
+  protocol timeout, never a hang); the same content-addressed bytes are
+  immediately fetchable from a surviving provider (the primitive under
+  race_fetch/heal-on-read); a provider returning after death (fresh
+  identity + addr, same holdings — the pod-restart shape) serves after a
+  fresh dial; a kill DURING transfer yields a bounded outcome and failover
+  still completes, with sha256 verification on every successful path.
+- **CRDT chaos (existing):** `tests/sync_integration.rs` offline/merge
+  divergence-and-reconverge.
+- **Live-cluster drills (`@wip`):**
+  `genesis/a2o/features/resilience/chaos-peer-churn.feature` owns the
+  DYNAMIC shapes the static `peer-loss-failover.feature` doesn't: flapping
+  (kill/restart ×3 with inventory idempotence), cascading loss traversing
+  the D1 ladder downward live (protected→partial→at-risk with reads
+  outliving the label), mid-read kill completing from a survivor with the
+  serve-blob REA event visible, and simultaneous two-peer loss
+  reconverging without an operator. Actuation rail: drill bash in
+  `genesis/scripts/ci/` (CPS-cap), destructive pod-ops operator-ratified
+  per the EPR durability arc plan.
+
 ### D7 — High availability (cross-reference)
 Carried by: `federation/peer-loss-failover.feature` (reads keep serving,
 returning peer re-syncs), `resilience/app-blob-heal-on-read.feature`
