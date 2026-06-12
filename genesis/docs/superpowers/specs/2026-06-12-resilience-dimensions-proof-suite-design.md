@@ -107,6 +107,28 @@ content shows `◐` AND `status-partial`; a 3-household+2-peer content shows `�
 AND `status-protected`. (Angular unit specs already cover class mapping;
 the E2E rows prove the live join.)
 
+### D8 — Storage aggregation triptych: free / used / committed
+(Added same-session by operator request — "an agent lens on the primitives.")
+Truth lives in two seams:
+- **`cluster_view::compose_totals`** — the device triptych:
+  `used`/`total` = SUM over device summaries (devices reporting `None` are
+  skipped, not zeroed); `external_committed` = SUM of
+  `rea_commitments.resource_quantity_value` over `action='custody-blob'`
+  rows whose provider is one of MY bound peer ids, clamped at 0; empty
+  bindings short-circuit to 0. Free is derived downstream as total − used.
+- **`peer_capacity_service::compute_peer_capacity`** — pledged-vs-held:
+  per-tier pledge sums, `free_bytes_remaining = total_raw − unique_shard`
+  (may go negative — honest over-hold), and the saturate-never-wrap pct
+  guard (already well-tested: 7 in-module tests incl. the 2026-06-04
+  wrap-finding regression).
+Layer-1 edges (new, in `cluster_view.rs` in-module tests): device sums skip
+None; committed=0 without bindings; only custody-blob counts (provide
+excluded); only my peers count; multi-peer sums; negative SUM clamps to 0
+(never-wrap doctrine).
+Layer-2: cluster page triptych renders used/total/committed for the
+logged-in steward (`@wip` — identity-bound; committed-accounting readers
+are the felt-resilience runway item 2).
+
 ### D7 — High availability (cross-reference)
 Carried by: `federation/peer-loss-failover.feature` (reads keep serving,
 returning peer re-syncs), `resilience/app-blob-heal-on-read.feature`

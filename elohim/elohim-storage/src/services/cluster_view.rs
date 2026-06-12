@@ -352,6 +352,144 @@ mod tests {
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
+    // =========================================================================
+    // D8 — storage aggregation triptych (free/used/committed)
+    // (spec: 2026-06-12-resilience-dimensions-proof-suite-design.md, D8)
+    // compose_totals: used/total = SUM over device summaries (None skipped);
+    // external_committed = SUM(rea_commitments.resource_quantity_value) over
+    // action='custody-blob' rows whose provider is one of MY bound peer ids,
+    // clamped at 0; no bindings → 0 without touching the DB.
+    // =========================================================================
+
+    fn device(used: Option<u64>, total: Option<u64>) -> DeviceSummary {
+        DeviceSummary {
+            peer_id: "peer-test".into(),
+            archetype: DeviceArchetype::Node,
+            display_name: None,
+            online: true,
+            freshness: Freshness {
+                state: FreshnessState::Live,
+                stale_since_ms: None,
+            },
+            storage_used_bytes: used,
+            storage_total_bytes: total,
+            memory_used_bytes: None,
+            memory_total_bytes: None,
+            hosting_count: None,
+            projecting_count: None,
+            beacon_age_ms: None,
+            compute: None,
+        }
+    }
+
+    fn binding(peer_id: &str) -> PeerIdentityBindingRow {
+        PeerIdentityBindingRow {
+            peer_id: peer_id.into(),
+            agent_cid: "agent-cid-test".into(),
+            dht_anchor_hash: "anchor-test".into(),
+            valid_from: "2026-01-01T00:00:00Z".into(),
+            valid_until: None,
+            observed_at: "2026-01-01T00:00:00Z".into(),
+            source: "dht".into(),
+            device_archetype: "node".into(),
+            superseded_by: None,
+        }
+    }
+
+    fn seed_commitment_row(
+        conn: &mut diesel::SqliteConnection,
+        id: &str,
+        provider: &str,
+        action: &str,
+        quantity: f32,
+    ) {
+        diesel::insert_into(crate::db::diesel_schema::rea_commitments::table)
+            .values(&crate::db::models::NewReaCommitment {
+                id,
+                h_app_id: "lamad",
+                action,
+                provider,
+                receiver: "commons",
+                resource_conforms_to: None,
+                resource_classified_as: None,
+                resource_quantity_value: Some(quantity),
+                resource_quantity_unit: Some("bytes"),
+                effort_quantity_value: None,
+                effort_quantity_unit: None,
+                has_beginning: None,
+                has_end: None,
+                due: None,
+                clause_of: None,
+                in_scope_of: None,
+                medium_of_exchange_id: None,
+                state: "active",
+                finished: 0,
+                note: None,
+                metadata_json: None,
+                dht_anchor_hash: None,
+            })
+            .execute(conn)
+            .unwrap();
+    }
+
+    #[test]
+    fn d8_totals_sum_devices_and_skip_unknown() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let devices = vec![
+            device(Some(100), Some(1_000)),
+            device(None, None), // a device that reported no storage — skipped, not zeroed
+            device(Some(50), Some(500)),
+        ];
+        let totals = compose_totals(&mut conn, &devices, &[]);
+        assert_eq!(totals.storage_used_bytes, 150);
+        assert_eq!(totals.storage_total_bytes, 1_500);
+    }
+
+    #[test]
+    fn d8_committed_is_zero_without_peer_bindings() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        seed_commitment_row(&mut conn, "d8-c0", "peer-unbound", "custody-blob", 4_096.0);
+        let totals = compose_totals(&mut conn, &[], &[]);
+        assert_eq!(totals.external_committed_bytes, 0);
+    }
+
+    #[test]
+    fn d8_committed_counts_only_custody_blob_for_my_peers() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        // Mine, counted.
+        seed_commitment_row(&mut conn, "d8-c1", "peer-mine", "custody-blob", 1_000.0);
+        // Mine but a different action — the triptych is custody, not provide.
+        seed_commitment_row(&mut conn, "d8-c2", "peer-mine", "provide", 500.0);
+        // Custody-blob but someone else's peer.
+        seed_commitment_row(&mut conn, "d8-c3", "peer-theirs", "custody-blob", 700.0);
+        let totals = compose_totals(&mut conn, &[], &[binding("peer-mine")]);
+        assert_eq!(totals.external_committed_bytes, 1_000);
+    }
+
+    #[test]
+    fn d8_committed_sums_across_all_my_bound_peers() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        seed_commitment_row(&mut conn, "d8-c4", "peer-a", "custody-blob", 1_000.0);
+        seed_commitment_row(&mut conn, "d8-c5", "peer-b", "custody-blob", 250.0);
+        let totals = compose_totals(&mut conn, &[], &[binding("peer-a"), binding("peer-b")]);
+        assert_eq!(totals.external_committed_bytes, 1_250);
+    }
+
+    #[test]
+    fn d8_committed_negative_sum_clamps_to_zero() {
+        // A malformed/corrective negative quantity must clamp, never wrap into
+        // a huge u64 (same never-wrap doctrine as peer_capacity's pct guard).
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        seed_commitment_row(&mut conn, "d8-c6", "peer-neg", "custody-blob", -512.0);
+        let totals = compose_totals(&mut conn, &[], &[binding("peer-neg")]);
+        assert_eq!(totals.external_committed_bytes, 0);
+    }
+
     // Env-var serialization mutex held across .await is intentional — the
     // whole test must own the env-var slot from set through assertion.
     // See feedback_env_var_test_flakiness memory note.

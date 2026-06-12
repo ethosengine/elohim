@@ -98,6 +98,31 @@ Feature: Resilience dimensions — the matrix that proves the felt-durability su
     Then the regional distribution reports the steward under "unknown"
     And the snapshot panel shows "no region data" rather than an empty section
 
+  # --- D8: storage aggregation triptych (free / used / committed) -------------
+  # Truth: cluster_view::compose_totals (device sums + custody-blob committed,
+  # clamped) and peer_capacity_service (pledged-vs-held, saturate-never-wrap).
+  # Boundary edges pinned in Rust (cluster_view in-module D8 tests +
+  # peer_capacity_service's existing 7). These rows prove the felt surface.
+
+  @wip @browser-only
+  Scenario: The cluster page shows an honest free/used/committed triptych
+    Given human "Matthew" is logged in on doorway "alpha" with device
+    And Matthew's devices report storage totals
+    When Matthew opens "/shefa/cluster"
+    Then the totals show used and total bytes summed across reporting devices
+    And devices that report no storage are absent from the sums, not zeroed
+    And the committed figure reflects only custody-blob commitments by Matthew's bound peers
+
+  @wip
+  Scenario: A peer's capacity view never wraps an over-pledge into compliance
+    Given a peer with no known disk capacity holds a storage pledge
+    When I request the peer's capacity view
+    Then the pledge percentage reads saturated, not wrapped
+    And the ratio compliance reports a violation rather than silence
+    # Regression anchor: storage-tier review 2026-06-04 finding #1 — a plain
+    # u8 cast truncated mod 256 and an unbounded over-pledge could read
+    # donut-compliant.
+
   # --- D6: the progressive icon, both vocabularies pinned together ------------
 
   @wip @browser-only
