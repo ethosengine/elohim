@@ -144,6 +144,48 @@ dead guard:
 NOTE: genesis runs read UNSTABLE throughout this arc — that's the standing
 suite shape, not a regression signal; the measure script is the judge.
 
+## WAVE-9 VERDICT (genesis #1130, ~04:50Z 06-12) — chain delivered; two narrowed traces remain
+
+Edge #1066 delivered the role-fix happ; the hot-swap applied THREE drifted
+roles at once on every pod (infrastructure/imagodei/mishpat, 04:12:59Z,
+no re-key — multi-role drift handled correctly on its second live firing).
+`Role not found: elohim` is EXTINCT. matthew's conductor logs ZERO
+attestation errors — the attestation chain runs end-to-end there for the
+first time. Measure stayed **1**. The two remaining traces, both narrow:
+
+1. **custody-convergence (the measure):** now PURELY the DHT/projection
+   leg — "custody-blob commitment missing on: adam jessica after 300s
+   (anchor → conductor gossip → projection_reconcile)". The attestation
+   chain is no longer implicated. Next session's first move: correlate
+   per-peer `ProjectionInventory: serving local inventory` vs peer
+   inventory on adam/jessica during a genesis window; check whether
+   matthew's custody commitment gets a dht_anchor_hash and whether
+   adam/jessica's projection_reconcile sweep ever sees it via their LOCAL
+   conductor (the mishpat bridge sites fixed in wave-8/9 are on this leg's
+   live path — the first post-fix sweep may simply need wall-clock).
+   Side-link: adam still rejects `Subject doorway 'alpha-elohim-host' not
+   found` — that doorway's registration isn't visible on adam's DHT view;
+   check whether the doorway re-registered after #1066's restart and
+   whether the entry gossips to shem-node conductors.
+2. **resilience.peer-statuses (still dark, root NARROWED):** the
+   late-connect fix WORKS (matthew 04:13:36Z: bridge connected late,
+   heartbeat task started, subscriber registered) and the heartbeat ticks
+   60s with no warnings — publishes SUCCEED — yet peer_statuses stays
+   empty. The remaining suspect is the SIGNAL seam: the zome call lands
+   but `PeerStatusRecorded` is either not emitted by the (hot-swapped)
+   infrastructure coordinator or not DECODED by
+   `subscribe_infrastructure_signals` (decode misses drop silently — add
+   a loud counter/log there first, same observability lesson as the
+   drift-check silence). Bounded trace: emit-side grep of the zome's
+   record_peer_status for emit_signal, decode-side the subscriber's
+   signal-shape match vs the zome's current signal enum.
+
+Also landed this session: the resilience dimensions proof suite (spec
+2026-06-12-resilience-dimensions-proof-suite-design.md) — D1–D9, 32
+deterministic tests green (incl. 4 protocol-chaos tests with REAL libp2p
+node kills), two new a2o features; the peer-count multiplication bug
+(list_by_household stub) found by its TDD pass and fixed.
+
 ## State of the world (verified 2026-06-11, do not re-derive)
 
 - **Mesh PROVEN**: 14/14 pods `connected:13`; `mesh.adjacency` both
