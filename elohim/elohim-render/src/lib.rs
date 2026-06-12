@@ -11,6 +11,7 @@ pub mod error;
 pub mod renderer;
 pub mod runtime;
 pub(crate) mod shim;
+pub mod stats;
 pub mod traced_fetcher;
 pub mod types;
 
@@ -18,6 +19,7 @@ pub use angular::AngularRenderer;
 pub use data_fetcher::{DataFetcher, FetchRequest, FetchResponse};
 pub use error::{RenderError, Result};
 pub use renderer::{EchoRenderer, Renderer};
+pub use stats::{RenderTraceSnapshot, RenderTraceStats};
 pub use traced_fetcher::{FetchLog, TracingFetcher};
 pub use types::{
     ContentRef, FetchEvent, FetchOutcome, RenderContext, RenderLimits, RenderOutput, RenderSpec,

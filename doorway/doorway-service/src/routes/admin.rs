@@ -976,6 +976,17 @@ pub async fn handle_admin_capability(state: Arc<AppState>) -> Response<Full<Byte
     }
 }
 
+/// Handle `GET /admin/render-stats`
+///
+/// Returns this peer's in-process render-trace aggregate — terminal-class counts,
+/// `avgWallMs`/`maxWallMs`, and the headline `degenerateRate` (stalled+timed-out
+/// over total). The feed-forward seam consumed by the compute-commitment scorer /
+/// capability tuner to weight this peer's render reliability. No auth (same
+/// rationale as `/admin/capability`: in-cluster peers poll it).
+pub async fn handle_admin_render_stats(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    json_response(StatusCode::OK, state.render_trace_stats.snapshot())
+}
+
 fn json_response<T: Serialize>(status: StatusCode, body: T) -> Response<Full<Bytes>> {
     match serde_json::to_string_pretty(&body) {
         Ok(json) => Response::builder()

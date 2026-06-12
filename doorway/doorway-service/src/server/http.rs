@@ -232,6 +232,12 @@ pub struct AppState {
     /// `None` means no SSR claim was published, so no limiter needed.
     pub render_semaphore: Option<Arc<tokio::sync::Semaphore>>,
 
+    /// In-process aggregate of render-trace outcomes (terminal classification +
+    /// latency). The feed-forward seam: served by `GET /admin/render-stats` for
+    /// the compute-commitment scorer / capability tuner to read this peer's
+    /// `degenerateRate` and `avgWallMs`. Always present (zeroed until first render).
+    pub render_trace_stats: Arc<elohim_render::RenderTraceStats>,
+
     /// Self-hostable pkarr relay service (cutover gate #10).
     /// When `Some`, serves `GET /pkarr/{key}` and `PUT /pkarr/{key}`.
     /// Enabled via `DOORWAY_PKARR_RESOLVER_ENABLED=true`.
@@ -408,6 +414,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
@@ -504,6 +511,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
@@ -615,6 +623,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
@@ -729,6 +738,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
@@ -2188,6 +2198,11 @@ async fn handle_request(
             to_boxed(routes::handle_admin_capability(Arc::clone(&state)).await)
         }
 
+        // Render-trace feed-forward aggregate (terminal classes + latency)
+        (Method::GET, "/admin/render-stats") => {
+            to_boxed(routes::handle_admin_render_stats(Arc::clone(&state)).await)
+        }
+
         // Conductor pool visibility (available on ALL instances)
         (Method::GET, "/admin/conductors") => {
             to_boxed(routes::handle_list_conductors(Arc::clone(&state)).await)
@@ -2928,6 +2943,9 @@ async fn handle_request(
                                     observation_id = observation_id.as_deref().unwrap_or(""),
                                     "SSR render trace"
                                 );
+                                // Feed-forward: fold this render into the in-process
+                                // aggregate the capability tuner / commitment scorer reads.
+                                state.render_trace_stats.record(&out.trace);
                                 let trace = out.trace;
                                 let html = out.html;
                                 state.cache.put_rendered(
