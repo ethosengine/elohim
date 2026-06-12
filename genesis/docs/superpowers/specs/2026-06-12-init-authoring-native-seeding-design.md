@@ -125,24 +125,32 @@ observable.
   source chains are per-agent). Concurrent builds serialize on the one source chain —
   acceptable at seeding cadence.
 
-### b. Author-steward identity for init'd genesis content — **OPEN (operator)**
+### b. Author-steward identity for init'd genesis content — **DECIDED (operator, 2026-06-12)**
 
-Who *owns* genesis content (and therefore appears in the snapshot's `stewardingCollectives`
-join through `humans.household_id`) is a key-custody decision only the operator can make.
-Three candidates, named not chosen:
+Authorship-stewardship is **per-corpus, routed to real personas and their collectives** —
+not one synthetic genesis identity:
 
-1. **A genesis collective** — a named collective agent whose `household_id` junction is the
-   stewarding row; cleanest for the snapshot join, needs a real collective + junction row.
-2. **The ci-steward agent** — the seeding agent is itself the author-steward; simplest custody,
-   but couples "who built it" to "who stewards it."
-3. **The operator household** — genesis content stewarded by matthew's household; reuses an
-   existing junction, but overloads a personal household with protocol content.
+| Corpus / collective | Author-steward | Fixture anchor (existing `genesis/data/collectives/collectives.json` ids where they map) |
+|---|---|---|
+| **Genesis content (the protocol corpus)** | **adam** | adam's collectives: `couple-adam-eve`, `family-eden` / `household-eden` |
+| Dowell family collective (matthew, jessica, james) | matthew (author) | `family-dowell` / `household-dowell` |
+| EthosEngine collective | matthew (author) | `org-ethosengine` |
+| Adam–Eve family collective | (exists as its own collective) | `couple-adam-eve` |
+| Extended-family collective — gertrude + matthew, jessica, james + the Seattle-area couple | (membership per operator statement) | closest existing fixture: `neighborhood-extended` / `household-extended` ("Extended Network") — **mapping to confirm**; note the Seattle members give this collective a real cross-region member set (the D5 regional-distribution dimension's first honest test bed) |
+| Church collective — matthew, jessica, james + one more member (operator: "someone else, can't remember") | matthew (author) | `community-local-church` (Valley Community Church); fixtures suggest the fourth member is `pete-pastor` — **to confirm** |
+| **FCT corpus** (`paths/foundations-christian-technology`) | matthew (author); routes WITH the church collective | content→collective routing example: a corpus whose steward is NOT the genesis default |
 
-Whichever is chosen, the choice *names the junction* (workstream-D constraint: a real
-`humans.household_id` row, not a papered one). Until that row exists, genesis content lights
-attestations and commitments but contributes **0** to the household-count join — honestly,
-not falsely. **Owner: operator. Decision gates stage B's snapshot reading nonzero
-collectives.**
+Implications locked by this decision:
+- The digest/authoring flow needs a **per-corpus steward routing input** (default: adam for
+  genesis content; explicit overrides like FCT→church). One small mapping, not a new entity —
+  it resolves to which agent authors the content + which collective's junction rows light.
+- adam is a **live alpha conductor** (shem node) — the genesis author-steward is a real peer
+  whose authored content is immediately custody-eligible by the M/J/J household mesh
+  (cross-household custody between eden and dowell collectives is the first real D1 ladder).
+- The junction rows themselves (`humans.household_id`, collective membership, regions for the
+  Seattle members) remain **Epic B ingestion work** — this decision names exactly which rows
+  to create, which was the gating unknown. Two residual confirms for the operator: the
+  extended-family fixture mapping, and the church's fourth member.
 
 ### c. Resiliency replication (custody) — who holds the author's blobs
 
