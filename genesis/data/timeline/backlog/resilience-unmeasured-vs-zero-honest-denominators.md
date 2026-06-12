@@ -61,3 +61,24 @@ analog: manifest-on-first-stock). This is a p2p-design-gate question
 honest while this is designed. Related junction gaps (humans.household_id,
 provide rows, regions) remain workstream D as mapped in the
 2026-06-11 pickup plan.
+
+**Operator design direction (2026-06-12, pre-design-gate seed):** don't
+backfill manifests — build CLI tooling that REPLAYS the real CRUD
+lifecycle users would perform on an EPR over time (compose through the
+reach gate → publish through put_epr's republish/bounds validators →
+stock → supersede), so seeded content is indistinguishable from
+user-authored content because it took the same path. The substrate
+already votes for this shape: the 2026-06-11 anchor-gap self-healing
+(`update_via_conductor` → create_content re-publish) is the retroactive
+version of the same front-door principle. Companion frame: "what if
+every EPR were a git artifact" — the substrate is structurally ~70% of
+one already (CID = object hash; sealed supersedes/superseded_by = signed
+parent-commit edges; `epr:x@2` = refs resolving through history; the
+envelope = commit metadata; source chains = per-agent branches; the
+three-legged coupling is the leg git LACKS, the merge primitive is what
+EPR lacks — that case lives on the CRDT plane). The CLI's verb set
+should therefore BE the git porcelain over the real routes (`epr
+commit|push|log|tag|stock`), and the seed sprint becomes
+`epr push --as trusted-issuer` in a loop — the provenance manifest is
+the commit graph real usage would have produced. Bonus: every seed run
+becomes an at-scale integration test of the whole CRUD gate surface.
